@@ -56,10 +56,26 @@ const remoteMigrationNameOverrides = {
     "20260710041500_20260710021043_harden_media_asset_review_boundary",
   "20260710022231_add_media_assets_applicant_submission_index.sql":
     "20260710041502_20260710022231_add_media_assets_applicant_submission_index",
+  "20260712201203_allow_admin_waiting_review_issue_checkpoint.sql":
+    "20260714064305_20260712201203_allow_admin_waiting_review_issue_checkpoint",
+  "20260712225209_save_returned_submission_update_first.sql":
+    "20260714064308_20260712225209_save_returned_submission_update_first",
+  "20260713095403_atomic_export_document_completion.sql":
+    "20260714065154_20260713095403_atomic_export_document_completion",
+  "20260714020334_atomic_export_guard_null_safe.sql":
+    "20260714065303_20260714020334_atomic_export_guard_null_safe",
+  "20260714110000_repair_incomplete_export_document_completion.sql":
+    "20260714065657_20260714110000_repair_incomplete_export_document_completion",
+  "20260714190000_fix_complete_export_package_zip_suffix_guard.sql":
+    "20260714182809_20260714190000_fix_complete_export_package_zip_suffix_guard",
+  "20260714200000_harden_null_safe_admin_rpc_guards.sql":
+    "20260714191730_20260714200000_harden_null_safe_admin_rpc_guards",
 };
 
 const scopedDiffPaths = [
   "package.json",
+  "playwright.supabase-production-export-a1-s1.config.ts",
+  "playwright.supabase-production-export-a2-s1-abort.config.ts",
   "scripts/prepare-supabase-production-packet.mjs",
   "scripts/provision-supabase-pilot-cohort.mjs",
   "scripts/supabase-migration-contract.mjs",
@@ -76,6 +92,8 @@ const scopedDiffPaths = [
   "supabase/migrations/20260713095403_atomic_export_document_completion.sql",
   "supabase/migrations/20260714020334_atomic_export_guard_null_safe.sql",
   "supabase/migrations/20260714110000_repair_incomplete_export_document_completion.sql",
+  "supabase/migrations/20260714190000_fix_complete_export_package_zip_suffix_guard.sql",
+  "supabase/migrations/20260714200000_harden_null_safe_admin_rpc_guards.sql",
   "src/modules/submissions/exportPackageDocumentCommit.ts",
   "src/modules/submissions/exportPackagePersistence.ts",
   "src/modules/submissions/exportWorkflow.ts",
@@ -83,6 +101,7 @@ const scopedDiffPaths = [
   "src/modules/documents/documentRepository.ts",
   "src/components/AdminExportScreen.tsx",
   "src/App.tsx",
+  "src/modules/submissions/submissionActions.ts",
   "supabase/remediation/20260712201203_allow_admin_waiting_review_issue_checkpoint.rollback.sql",
   "supabase/remediation/20260712225209_save_returned_submission_update_first.rollback.sql",
   "docs/release/auth-data-production-readiness.md",
@@ -113,7 +132,15 @@ const scopedDiffPaths = [
   "docs/qa/supabase-production-workflow-smoke-20260701.md",
   "docs/qa/supabase-security-advisor-hardening-2026-06-15.md",
   "tests/e2e-supabase/browser-key-audit.spec.ts",
+  "tests/e2e-supabase-ui/production-export-a1-s1-helpers.ts",
+  "tests/e2e-supabase-ui/production-export-a1-s1-resumable.spec.ts",
+  "tests/e2e-supabase-ui/production-lifecycle-helpers.ts",
+  "tests/e2e-supabase-ui/production-lifecycle-resumable.spec.ts",
+  "tests/unit/appProductionWorkspaceRuntime.spec.tsx",
+  "tests/unit/productionCohortNetworkContract.spec.ts",
   "tests/unit/supabaseSecurityContract.spec.ts",
+  "tests/unit/v19SubmissionRules.spec.ts",
+  "tests/unit/v19SupabasePersistence.spec.ts",
   "production-readiness-audit.md",
 ];
 
@@ -675,11 +702,11 @@ function verifyProductionMigrationEvidence(packet) {
   for (const [label, snippet] of [
     [
       "Production migration evidence records public base table count",
-      "Public base tables: `16`",
+      "Public base tables: `22`",
     ],
     [
       "Production migration evidence records all public tables have RLS",
-      "Public tables with RLS enabled: `16`",
+      "Public tables with RLS enabled: `22`",
     ],
     [
       "Production migration evidence records zero public tables without RLS",
@@ -1464,6 +1491,19 @@ function verifyControlledPilotEnvelope(packet) {
     4500,
     "Controlled pilot has 4500 required media objects",
   );
+  requireActivationPresent(
+    pilot.pilotWindowStartedAt,
+    "Controlled pilot window start is recorded",
+  );
+  const pilotWindowTimestamp = Date.parse(pilot.pilotWindowStartedAt ?? "");
+  if (Number.isFinite(pilotWindowTimestamp) && pilotWindowTimestamp <= Date.now()) {
+    pass("Controlled pilot window start is a valid non-future timestamp");
+  } else {
+    activationBlock(
+      "Controlled pilot window start is a valid non-future timestamp",
+      "missing, invalid, or future timestamp",
+    );
+  }
   requireActivationExistingProjectFile(
     pilot.workloadEvidenceArtifact,
     "Controlled pilot volume evidence artifact exists",
@@ -1485,18 +1525,23 @@ function verifyControlledPilotEnvelope(packet) {
   );
   requireEvidenceSnippet(
     pilot.workloadEvidenceArtifact,
-    "Production total submissions cap: `<= 500`",
-    "Controlled pilot volume evidence records production submission cap",
+    `Pilot window starts at: \`${pilot.pilotWindowStartedAt}\``,
+    "Controlled pilot volume evidence records exact pilot window start",
   );
   requireEvidenceSnippet(
     pilot.workloadEvidenceArtifact,
-    "Production per-agent submissions cap: `<= 50`",
-    "Controlled pilot volume evidence records production per-agent cap",
+    "Production pilot-window submissions cap: `<= 500`",
+    "Controlled pilot volume evidence records pilot-window submission cap",
   );
   requireEvidenceSnippet(
     pilot.workloadEvidenceArtifact,
-    "Production active-agent cap: `<= 10`",
-    "Controlled pilot volume evidence records production active-agent cap",
+    "Production pilot-window per-agent submissions cap: `<= 50`",
+    "Controlled pilot volume evidence records pilot-window per-agent cap",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Production pilot-window active-agent cap: `<= 10`",
+    "Controlled pilot volume evidence records pilot-window active-agent cap",
   );
   requireEvidenceSnippet(
     pilot.workloadEvidenceArtifact,
@@ -1532,21 +1577,21 @@ function verifyControlledPilotEnvelope(packet) {
     );
     requireEvidenceIntegerAtMost(
       evidence,
-      "Production total submissions",
+      "Production pilot-window submissions",
       pilot.maxTotalSubmissions,
-      "Production total submissions stay within controlled pilot cap",
+      "Production pilot-window submissions stay within controlled pilot cap",
     );
     requireEvidenceIntegerAtMost(
       evidence,
-      "Production active agents with submissions",
+      "Production pilot-window active agents with submissions",
       pilot.maxRegisteredAgents,
-      "Production active agents stay within controlled pilot cap",
+      "Production pilot-window active agents stay within controlled pilot cap",
     );
     requireEvidenceIntegerAtMost(
       evidence,
-      "Production max submissions for one agent",
+      "Production pilot-window max submissions for one agent",
       pilot.maxSubmissionsPerAgent,
-      "Production per-agent submission count stays within controlled pilot cap",
+      "Production pilot-window per-agent count stays within controlled pilot cap",
     );
   }
 

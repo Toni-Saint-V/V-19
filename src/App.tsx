@@ -25,6 +25,11 @@ import {
   reconcileExportPackageCompletion,
 } from "./modules/submissions/exportWorkflow";
 import {
+  buildExportPackageIdentity,
+  exportPackageIdentityMatches,
+} from "./modules/submissions/exportRules";
+import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submissions/exportPackageDocumentCommit";
+import {
   loadCockpitSubmissionsForProfile,
   saveCockpitSubmissionsForProfile,
 } from "./modules/submissions/supabasePersistence";
@@ -961,7 +966,11 @@ export default function App({
         );
         await bridge.onAdminAiSuggestionDismiss?.({ submissionId, suggestionId });
       },
-      onExportPackages: async ({ documentExport, submissionIds }) => {
+      onExportPackages: async ({
+        documentExport,
+        packageIdentity,
+        submissionIds,
+      }) => {
         if (
           workspace !== "admin" ||
           activeApprovedSession?.role !== "admin" ||
@@ -973,8 +982,28 @@ export default function App({
           );
         }
 
+        const currentSubmissions = submissionsRef.current;
+        const requestedSubmissionIds = new Set(submissionIds);
+        const selectedCurrent = currentSubmissions.filter((submission) =>
+          requestedSubmissionIds.has(submission.id),
+        );
+        const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
+        const artifactStillMatchesCurrentSelection =
+          requestedSubmissionIds.size === submissionIds.length &&
+          selectedCurrent.length === submissionIds.length &&
+          exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
+          exportPackageDocumentCommitMatchesIdentity(
+            documentExport,
+            packageIdentity,
+          );
+        if (!artifactStillMatchesCurrentSelection) {
+          throw new Error(
+            "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+          );
+        }
+
         const generatedSubmissions = applyExportStateToSelection(
-          submissionsRef.current,
+          currentSubmissions,
           submissionIds,
           "file_generated",
         );
@@ -987,11 +1016,28 @@ export default function App({
           throw new Error("Export download state was blocked by domain guards.");
         }
 
-        await persistSubmissions(downloadedSubmissions);
-
         const selectedDownloaded = downloadedSubmissions.filter((submission) =>
-          submissionIds.includes(submission.id),
+          requestedSubmissionIds.has(submission.id),
         );
+        const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
+        const downloadedSelectionMatchesArtifact =
+          selectedDownloaded.length === submissionIds.length &&
+          exportPackageIdentityMatches(packageIdentity, downloadedIdentity) &&
+          selectedDownloaded.every(
+            (submission) =>
+              submission.exportPackage &&
+              exportPackageIdentityMatches(
+                packageIdentity,
+                submission.exportPackage,
+              ),
+          );
+        if (!downloadedSelectionMatchesArtifact) {
+          throw new Error(
+            "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+          );
+        }
+
+        await persistSubmissions(downloadedSubmissions);
         const failWithRetryableExportState = async (
           failure: unknown,
         ): Promise<never> => {
@@ -1051,6 +1097,7 @@ export default function App({
             try {
               await bridge.onExportPackages?.({
                 documentExport,
+                packageIdentity,
                 submissionIds,
               });
             } catch {
@@ -1091,7 +1138,11 @@ export default function App({
           // A failed follow-up read must not undo a committed export package.
         }
         try {
-          await bridge.onExportPackages?.({ documentExport, submissionIds });
+          await bridge.onExportPackages?.({
+            documentExport,
+            packageIdentity,
+            submissionIds,
+          });
         } catch {
           // External bridge/tracking is deliberately non-transactional after persistence.
         }

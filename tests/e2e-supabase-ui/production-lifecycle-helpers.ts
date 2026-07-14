@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
+import { normalizeLegacySubmissionStatus } from "../../src/modules/submissions/domainContract";
+
 import {
   PRODUCTION_PROJECT_REF,
   buildProductionCohortPlan,
@@ -86,7 +88,17 @@ export type ProductionDraftPayloadMutationContract = {
   };
   draft: ProductionDraftPayloadIdentityContract;
   history: ProductionDraftHistoryExpectation;
+  mode: "export" | "lifecycle";
   ownerId: string;
+  questionnaire:
+    | { mode: "exact" }
+    | {
+        applicantId: string;
+        expectedValueDigest: string;
+        fieldId: string;
+        mode: "replace";
+        sectionId: string;
+      };
   submissionId: string;
 };
 
@@ -102,20 +114,26 @@ export type ProductionLifecycleMutationContract =
 export type ProductionDraftPayloadIdentityContract = {
   applicants: readonly ProductionDraftApplicantIdentity[];
   corrections: readonly ProductionDraftCorrectionIdentity[];
+  effectiveHistoryCount: number;
   mediaAssets: readonly ProductionDraftMediaIdentity[];
   questionnaireAnswers: readonly ProductionDraftQuestionnaireIdentity[];
-  snapshotHistoryCount: number;
+  snapshot: ProductionDraftSnapshotIdentity;
+  snapshotHistory: readonly ProductionDraftSnapshotHistoryIdentity[];
   snapshotIssueCount: number;
+  snapshotUntypedHistoryDigests: readonly string[];
   statusHistory: readonly ProductionDraftStatusHistoryIdentity[];
+  submission: ProductionDraftSubmissionIdentity;
 };
 
 export type ProductionDraftApplicantIdentity = {
+  contentDigest: string;
   id: string;
   submissionId: string;
 };
 
 export type ProductionDraftMediaIdentity = {
   applicantId: string;
+  contentDigest: string;
   id: string;
   storageBucket: string;
   storagePathDigest: string;
@@ -123,13 +141,34 @@ export type ProductionDraftMediaIdentity = {
   type: string;
 };
 
+export type ProductionDraftSubmissionIdentity = {
+  staticContentDigest: string;
+};
+
+export type ProductionDraftSnapshotIdentity = {
+  exportContentDigest: string;
+  lifecycleContentDigest: string;
+};
+
+export type ProductionDraftSnapshotHistoryIdentity = {
+  commentDigest: string;
+  contentDigest: string;
+  fromStatus: string | null;
+  id: string;
+  noteDigest: string | null;
+  source: "admin" | "agent" | "bb" | "system";
+  toStatus: string;
+};
+
 export type ProductionDraftQuestionnaireIdentity = {
   applicantId: string;
   fieldId: string;
   labelDigest: string;
+  logicalValueDigest: string;
   sectionId: string;
   submissionId: string;
   valueDigest: string;
+  valueStructureDigest: string;
 };
 
 export type ProductionDraftCorrectionIdentity = {
@@ -294,6 +333,214 @@ function exactIdentitySet(
   );
 }
 
+function exactIdentityMultiset(
+  actual: readonly string[],
+  expected: readonly string[],
+) {
+  if (actual.length !== expected.length) return false;
+  const counts = new Map<string, number>();
+  for (const value of expected) counts.set(value, (counts.get(value) ?? 0) + 1);
+  for (const value of actual) {
+    const count = counts.get(value) ?? 0;
+    if (count === 0) return false;
+    if (count === 1) counts.delete(value);
+    else counts.set(value, count - 1);
+  }
+  return counts.size === 0;
+}
+
+const submissionPayloadKeys = [
+  "accepted_at",
+  "agent_id",
+  "appointment_status",
+  "city",
+  "country",
+  "exported_at",
+  "family_intelligence",
+  "id",
+  "priority",
+  "readiness_percent",
+  "review_started_at",
+  "status",
+  "submitted_at",
+  "title",
+  "travel_date",
+  "trip_date_from",
+  "trip_date_to",
+  "type",
+  "updated_at",
+] as const;
+
+const submissionStaticPayloadKeys = [
+  "agent_id",
+  "city",
+  "country",
+  "id",
+  "readiness_percent",
+  "title",
+  "travel_date",
+  "trip_date_from",
+  "trip_date_to",
+  "type",
+] as const;
+
+const applicantPayloadKeys = [
+  "address",
+  "birth_date",
+  "citizenship",
+  "city",
+  "country",
+  "email",
+  "full_name",
+  "hotel_address",
+  "hotel_name",
+  "id",
+  "media_percent",
+  "passport_expires_at",
+  "passport_issued_at",
+  "passport_number",
+  "patronymic",
+  "phone",
+  "questionnaire_percent",
+  "role",
+  "role_confirmed",
+  "submission_id",
+  "suggested_role",
+  "trip_dates",
+] as const;
+
+const mediaPayloadKeys = [
+  "applicant_id",
+  "generated_file_name",
+  "id",
+  "mime_type",
+  "original_file_name",
+  "review_status",
+  "reviewed_at",
+  "reviewed_by",
+  "size_bytes",
+  "storage_bucket",
+  "storage_path",
+  "submission_id",
+  "type",
+  "upload_status",
+  "uploaded_at",
+] as const;
+
+function exactRecordKeys(value: JsonRecord, expected: readonly string[]) {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return (
+    actual.length === sortedExpected.length &&
+    actual.every((key, index) => key === sortedExpected[index])
+  );
+}
+
+function contentDigestForKeys(value: JsonRecord, keys: readonly string[]) {
+  const projection = Object.fromEntries(keys.map((key) => [key, value[key]]));
+  return productionDraftValueDigest(projection);
+}
+
+function normalizedTimestamp(value: unknown) {
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+/** Full applicant payload digest; DB-maintained timestamps are intentionally absent. */
+export function productionDraftApplicantContentDigest(value: unknown) {
+  const record = jsonRecord(value);
+  return record && exactRecordKeys(record, applicantPayloadKeys)
+    ? productionDraftValueDigest(record)
+    : null;
+}
+
+/** Full media payload digest with equivalent timestamptz spellings canonicalized. */
+export function productionDraftMediaContentDigest(value: unknown) {
+  const record = jsonRecord(value);
+  if (!record || !exactRecordKeys(record, mediaPayloadKeys)) return null;
+  const uploadedAt = normalizedTimestamp(record.uploaded_at);
+  const reviewedAt = normalizedTimestamp(record.reviewed_at);
+  if (uploadedAt === undefined || reviewedAt === undefined) return null;
+  return productionDraftValueDigest({
+    ...record,
+    reviewed_at: reviewedAt,
+    uploaded_at: uploadedAt,
+  });
+}
+
+/** Canonical digest of root fields that a draft action is never allowed to change. */
+export function productionDraftSubmissionStaticContentDigest(value: unknown) {
+  const record = jsonRecord(value);
+  return record ? contentDigestForKeys(record, submissionStaticPayloadKeys) : null;
+}
+
+function canonicalSnapshot(value: unknown) {
+  const intelligence = jsonRecord(value);
+  if (
+    !intelligence ||
+    !exactRecordKeys(intelligence, ["status", "v19CockpitSnapshot"]) ||
+    intelligence.status !== "unreviewed"
+  ) {
+    return null;
+  }
+  const envelope = jsonRecord(intelligence.v19CockpitSnapshot);
+  if (
+    !envelope ||
+    !exactRecordKeys(envelope, ["submission", "version"]) ||
+    envelope.version !== 1
+  ) {
+    return null;
+  }
+  const snapshot = jsonRecord(envelope.submission);
+  return snapshot ? { envelope, intelligence, snapshot } : null;
+}
+
+function canonicalClone(value: JsonRecord) {
+  const serialized = canonicalJson(value);
+  return serialized ? (JSON.parse(serialized) as JsonRecord) : null;
+}
+
+/**
+ * Full snapshot digest with only separately validated action-owned fields
+ * normalized away. Unknown keys and all other nested content remain bound.
+ */
+export function productionDraftSnapshotContentDigest(
+  value: unknown,
+  mode: "export" | "lifecycle",
+) {
+  const canonical = canonicalSnapshot(value);
+  if (!canonical) return null;
+  const snapshot = canonicalClone(canonical.snapshot);
+  if (!snapshot) return null;
+  const applicants = recordArray(snapshot.applicants);
+  if (!applicants) return null;
+  for (const applicant of applicants) {
+    const sections = recordArray(applicant.sections);
+    if (!sections) return null;
+    for (const section of sections) {
+      const fields = recordArray(section.fields);
+      if (!fields) return null;
+      for (const field of fields) {
+        if (!("value" in field)) return null;
+        field.value = "__V19_QUESTIONNAIRE_VALUE__";
+      }
+    }
+  }
+
+  delete snapshot.history;
+  delete snapshot.updatedAt;
+  if (mode === "export") {
+    delete snapshot.exportPackage;
+    delete snapshot.exportState;
+  } else {
+    delete snapshot.issues;
+    delete snapshot.status;
+  }
+  return productionDraftValueDigest(snapshot);
+}
+
 function isIsoTimestamp(value: unknown) {
   return (
     typeof value === "string" &&
@@ -302,14 +549,21 @@ function isIsoTimestamp(value: unknown) {
   );
 }
 
+function isSnapshotTimestamp(value: unknown) {
+  return value === "сейчас" || isIsoTimestamp(value);
+}
+
 function applicantKey(value: ProductionDraftApplicantIdentity) {
-  return identityKey(value.id, value.submissionId);
+  return identityKey(value.id, value.submissionId, value.contentDigest);
 }
 
 function applicantPayloadKey(value: JsonRecord) {
   const id = text(value.id);
   const submissionId = text(value.submission_id);
-  return id && submissionId ? identityKey(id, submissionId) : null;
+  const contentDigest = productionDraftApplicantContentDigest(value);
+  return id && submissionId && contentDigest
+    ? identityKey(id, submissionId, contentDigest)
+    : null;
 }
 
 function mediaKey(value: ProductionDraftMediaIdentity) {
@@ -320,6 +574,7 @@ function mediaKey(value: ProductionDraftMediaIdentity) {
     value.type,
     value.storageBucket,
     value.storagePathDigest,
+    value.contentDigest,
   );
 }
 
@@ -330,32 +585,151 @@ function mediaPayloadKey(value: JsonRecord) {
   const type = text(value.type);
   const storageBucket = text(value.storage_bucket);
   const storagePathDigest = productionDraftValueDigest(value.storage_path);
-  return id && applicantId && submissionId && type && storageBucket && storagePathDigest
-    ? identityKey(id, applicantId, submissionId, type, storageBucket, storagePathDigest)
+  const contentDigest = productionDraftMediaContentDigest(value);
+  return id && applicantId && submissionId && type && storageBucket && storagePathDigest && contentDigest
+    ? identityKey(
+        id,
+        applicantId,
+        submissionId,
+        type,
+        storageBucket,
+        storagePathDigest,
+        contentDigest,
+      )
     : null;
 }
 
-function answerKey(value: ProductionDraftQuestionnaireIdentity) {
-  return identityKey(
-    value.submissionId,
-    value.applicantId,
-    value.sectionId,
-    value.fieldId,
-    value.labelDigest,
-    value.valueDigest,
-  );
+function questionnaireLogicalValue(value: unknown) {
+  const envelope = jsonRecord(value);
+  return envelope?.kind === "v19_questionnaire_field" ? envelope.value : value;
 }
 
-function answerPayloadKey(value: JsonRecord) {
+function submissionPayloadMatchesContract(
+  submission: JsonRecord,
+  contract: ProductionDraftPayloadMutationContract,
+) {
+  if (!exactRecordKeys(submission, submissionPayloadKeys)) return false;
+  const staticContentDigest = productionDraftSubmissionStaticContentDigest(submission);
+  if (staticContentDigest !== contract.draft.submission.staticContentDigest) return false;
+  const expectedStatus =
+    contract.history.snapshotStatus === "returned"
+      ? "returned"
+      : contract.history.snapshotStatus === "ready_for_export"
+        ? "ready_for_excel"
+        : "waiting_review";
+  if (
+    submission.status !== expectedStatus ||
+    submission.priority !== (expectedStatus === "returned" ? "Высокий" : "Средний") ||
+    submission.appointment_status !== "not_started" ||
+    submission.review_started_at !== null ||
+    submission.exported_at !== null ||
+    !isIsoTimestamp(submission.updated_at)
+  ) {
+    return false;
+  }
+  const submittedAtValid =
+    contract.history.snapshotStatus === "submitted_for_review"
+      ? isIsoTimestamp(submission.submitted_at) &&
+        submission.submitted_at === submission.updated_at
+      : submission.submitted_at === null;
+  const acceptedAtValid =
+    contract.history.snapshotStatus === "ready_for_export"
+      ? isIsoTimestamp(submission.accepted_at) &&
+        submission.accepted_at === submission.updated_at
+      : submission.accepted_at === null;
+  return submittedAtValid && acceptedAtValid;
+}
+
+function questionnaireValueStructureDigest(value: unknown) {
+  const envelope = jsonRecord(value);
+  if (envelope?.kind !== "v19_questionnaire_field") {
+    return productionDraftValueDigest("__V19_QUESTIONNAIRE_VALUE__");
+  }
+  const normalized = canonicalClone(envelope);
+  if (!normalized || !("value" in normalized)) return null;
+  normalized.value = "__V19_QUESTIONNAIRE_VALUE__";
+  return productionDraftValueDigest(normalized);
+}
+
+export function productionDraftQuestionnaireValueIdentity(value: unknown) {
+  const logicalValueDigest = productionDraftValueDigest(questionnaireLogicalValue(value));
+  const valueDigest = productionDraftValueDigest(value);
+  const valueStructureDigest = questionnaireValueStructureDigest(value);
+  return logicalValueDigest && valueDigest && valueStructureDigest
+    ? { logicalValueDigest, valueDigest, valueStructureDigest }
+    : null;
+}
+
+function answerPayloadIdentity(value: JsonRecord) {
   const submissionId = text(value.submission_id);
   const applicantId = text(value.applicant_id);
   const sectionId = text(value.section_id);
   const fieldId = text(value.field_id);
   const labelDigest = productionDraftValueDigest(value.label);
-  const valueDigest = productionDraftValueDigest(value.value);
-  return submissionId && applicantId && sectionId && fieldId && labelDigest && valueDigest
-    ? identityKey(submissionId, applicantId, sectionId, fieldId, labelDigest, valueDigest)
+  const valueIdentity = productionDraftQuestionnaireValueIdentity(value.value);
+  return submissionId && applicantId && sectionId && fieldId && labelDigest && valueIdentity
+    ? {
+        applicantId,
+        fieldId,
+        labelDigest,
+        logicalValueDigest: valueIdentity.logicalValueDigest,
+        sectionId,
+        submissionId,
+        valueDigest: valueIdentity.valueDigest,
+        valueStructureDigest: valueIdentity.valueStructureDigest,
+      }
     : null;
+}
+
+function questionnaireAnswersMatch(
+  actualRows: readonly JsonRecord[],
+  contract: ProductionDraftPayloadMutationContract,
+) {
+  if (actualRows.length !== contract.draft.questionnaireAnswers.length) return false;
+  const actualByKey = new Map<string, ReturnType<typeof answerPayloadIdentity>>();
+  for (const row of actualRows) {
+    const identity = answerPayloadIdentity(row);
+    if (!identity) return false;
+    const key = identityKey(
+      identity.submissionId,
+      identity.applicantId,
+      identity.sectionId,
+      identity.fieldId,
+    );
+    if (actualByKey.has(key)) return false;
+    actualByKey.set(key, identity);
+  }
+
+  let replacementCount = 0;
+  const questionnaire = contract.questionnaire;
+  for (const expected of contract.draft.questionnaireAnswers) {
+    const key = identityKey(
+      expected.submissionId,
+      expected.applicantId,
+      expected.sectionId,
+      expected.fieldId,
+    );
+    const actual = actualByKey.get(key);
+    if (!actual || actual.labelDigest !== expected.labelDigest) return false;
+    const isReplacement =
+      questionnaire.mode === "replace" &&
+      expected.applicantId === questionnaire.applicantId &&
+      expected.sectionId === questionnaire.sectionId &&
+      expected.fieldId === questionnaire.fieldId;
+    if (isReplacement) {
+      replacementCount += 1;
+      if (
+        actual.valueStructureDigest !== expected.valueStructureDigest ||
+        (questionnaire.mode === "replace" &&
+          actual.logicalValueDigest !== questionnaire.expectedValueDigest)
+      ) {
+        return false;
+      }
+    } else if (actual.valueDigest !== expected.valueDigest) {
+      return false;
+    }
+  }
+  return questionnaire.mode === "exact" || replacementCount === 1;
 }
 
 function correctionKey(value: ProductionDraftCorrectionIdentity) {
@@ -508,7 +882,7 @@ function expectedHistoryPayload(
       entityType: "submission",
       fromStatus: transition.fromStatus,
       id: productionDraftStableUuid(
-        `history:${contract.submissionId}:и-${contract.submissionId}-${transition.fromStatus}-${transition.toStatus}-${contract.draft.snapshotHistoryCount + 1}`,
+        `history:${contract.submissionId}:и-${contract.submissionId}-${transition.fromStatus}-${transition.toStatus}-${contract.draft.effectiveHistoryCount + 1}`,
       ),
       noteDigest,
       source: contract.history.actorSource,
@@ -619,7 +993,35 @@ function correctionSnapshotKey(value: JsonRecord) {
   );
 }
 
-function snapshotHistorySemanticKey(value: JsonRecord) {
+function normalizedHistorySource(value: unknown): "admin" | "agent" | "bb" | "system" {
+  return value === "admin" || value === "agent" || value === "bb" || value === "system"
+    ? value
+    : "system";
+}
+
+function canonicalHistoryStatus(value: unknown) {
+  const normalized = normalizeLegacySubmissionStatus(value);
+  return normalized.ok ? normalized.data : null;
+}
+
+function snapshotHistoryMatchKey(value: JsonRecord) {
+  return `${text(value.fromStatus) ?? ""}:${text(value.toStatus) ?? ""}:${text(value.source) ?? ""}:${text(value.note) ?? ""}`;
+}
+
+function normalizedSnapshotHistoryContentDigest(value: JsonRecord) {
+  const normalized = canonicalClone(value);
+  if (!normalized) return null;
+  for (const key of ["at", "createdAt"] as const) {
+    if (!(key in normalized)) continue;
+    if (typeof normalized[key] !== "string") return null;
+    normalized[key] = "__V19_HISTORY_TIMESTAMP__";
+  }
+  return productionDraftValueDigest(normalized);
+}
+
+function snapshotHistoryIdentity(
+  value: JsonRecord,
+): ProductionDraftSnapshotHistoryIdentity | null {
   const id = text(value.id);
   const fromStatus = nullableText(value.fromStatus);
   const toStatus = text(value.toStatus);
@@ -633,46 +1035,129 @@ function snapshotHistorySemanticKey(value: JsonRecord) {
   const commentDigest = productionDraftValueDigest(
     textValue === null ? undefined : detail ? `${textValue} — ${detail}` : textValue,
   );
+  const contentDigest = normalizedSnapshotHistoryContentDigest(value);
   return (
     id &&
     fromStatus !== undefined &&
     toStatus &&
     (source === "admin" || source === "agent" || source === "bb" || source === "system") &&
-    commentDigest
-      ? identityKey(id, fromStatus, toStatus, source, commentDigest, noteDigest)
+    commentDigest &&
+    contentDigest
+      ? { commentDigest, contentDigest, fromStatus, id, noteDigest, source, toStatus }
       : null
   );
+}
+
+function snapshotHistoryIdentityKey(value: ProductionDraftSnapshotHistoryIdentity) {
+  return identityKey(
+    value.id,
+    value.fromStatus,
+    value.toStatus,
+    value.source,
+    value.commentDigest,
+    value.noteDigest,
+    value.contentDigest,
+  );
+}
+
+function snapshotHistorySemanticKey(value: JsonRecord) {
+  const identity = snapshotHistoryIdentity(value);
+  return identity ? snapshotHistoryIdentityKey(identity) : null;
+}
+
+/** Mirrors attachDurableStatusHistoryRows without retaining raw snapshot content. */
+export function productionDraftEffectiveSnapshotHistory(input: {
+  familyIntelligence: unknown;
+  statusHistory: readonly unknown[];
+}) {
+  const canonical = canonicalSnapshot(input.familyIntelligence);
+  const snapshotHistory = canonical && recordArray(canonical.snapshot.history);
+  if (!canonical || !snapshotHistory) return null;
+
+  const durableHistory = input.statusHistory
+    .map((rawRow) => {
+      const row = jsonRecord(rawRow);
+      if (!row || row.entity_type !== "submission") return null;
+      const id = text(row.id);
+      const entityId = text(row.entity_id);
+      const changedBy = text(row.changed_by);
+      const changedAt = text(row.changed_at);
+      const comment = text(row.comment);
+      const toStatus = canonicalHistoryStatus(row.to_status);
+      const fromStatus = canonicalHistoryStatus(row.from_status);
+      if (!id || !entityId || !changedBy || !changedAt || !comment || !toStatus) return null;
+      const item: JsonRecord = {
+        actorId: changedBy,
+        at: changedAt,
+        createdAt: changedAt,
+        id,
+        source: normalizedHistorySource(row.source),
+        text: comment,
+        toStatus,
+      };
+      if (fromStatus) item.fromStatus = fromStatus;
+      const note = typeof row.note === "string" ? row.note.trim() : "";
+      if (note) item.note = note;
+      return { changedAt, item };
+    })
+    .filter(
+      (entry): entry is { changedAt: string; item: JsonRecord } => Boolean(entry),
+    )
+    .sort((left, right) => right.changedAt.localeCompare(left.changedAt));
+
+  const durableKeys = new Set(
+    durableHistory.map((entry) => snapshotHistoryMatchKey(entry.item)),
+  );
+  const effectiveHistory =
+    durableHistory.length === 0
+      ? snapshotHistory
+      : [
+          ...durableHistory.map((entry) => entry.item),
+          ...snapshotHistory.filter((item) => {
+            const fromStatus = text(item.fromStatus);
+            const toStatus = text(item.toStatus);
+            if (!fromStatus || !toStatus) return true;
+            return !durableKeys.has(snapshotHistoryMatchKey(item));
+          }),
+        ];
+
+  const typed: ProductionDraftSnapshotHistoryIdentity[] = [];
+  const untypedDigests: string[] = [];
+  for (const item of effectiveHistory) {
+    const identity = snapshotHistoryIdentity(item);
+    if (identity) typed.push(identity);
+    else {
+      const digest = normalizedSnapshotHistoryContentDigest(item);
+      if (!digest) return null;
+      untypedDigests.push(digest);
+    }
+  }
+  return {
+    effectiveHistoryCount: effectiveHistory.length,
+    snapshotHistory: typed,
+    snapshotUntypedHistoryDigests: untypedDigests,
+  };
 }
 
 function expectedSnapshotHistoryKeys(
   contract: ProductionDraftPayloadMutationContract,
 ) {
-  const base = contract.draft.statusHistory.map((item) =>
-    identityKey(
-      item.id,
-      item.fromStatus,
-      item.toStatus,
-      item.source,
-      item.commentDigest,
-      item.noteDigest,
-    ),
-  );
+  const base = contract.draft.snapshotHistory.map(snapshotHistoryIdentityKey);
   const transition = contract.history.transition;
   if (!transition) return base;
-  const commentDigest = productionDraftValueDigest(transition.comment);
-  const noteDigest = productionDraftValueDigest(transition.note);
-  return commentDigest && noteDigest
-    ? [
-        ...base,
-        identityKey(
-          `и-${contract.submissionId}-${transition.fromStatus}-${transition.toStatus}-${contract.draft.snapshotHistoryCount + 1}`,
-          transition.fromStatus,
-          transition.toStatus,
-          contract.history.actorSource,
-          commentDigest,
-          noteDigest,
-        ),
-      ]
+  const transitionIdentity = snapshotHistoryIdentity({
+    actorId: contract.history.actorId,
+    at: "сейчас",
+    createdAt: "сейчас",
+    fromStatus: transition.fromStatus,
+    id: `и-${contract.submissionId}-${transition.fromStatus}-${transition.toStatus}-${contract.draft.effectiveHistoryCount + 1}`,
+    note: transition.note,
+    source: contract.history.actorSource,
+    text: transition.comment,
+    toStatus: transition.toStatus,
+  });
+  return transitionIdentity
+    ? [...base, snapshotHistoryIdentityKey(transitionIdentity)]
     : [];
 }
 
@@ -685,17 +1170,46 @@ function snapshotMatchesDraftPayload(input: {
   questionnaireAnswers: readonly JsonRecord[];
   contract: ProductionDraftPayloadMutationContract;
 }) {
-  const intelligence = jsonRecord(input.payloadSubmission.family_intelligence);
-  if (intelligence?.status !== "unreviewed") return false;
-  const envelope = jsonRecord(intelligence?.v19CockpitSnapshot);
-  if (envelope?.version !== 1) return false;
-  const snapshot = jsonRecord(envelope.submission);
+  const canonical = canonicalSnapshot(input.payloadSubmission.family_intelligence);
+  if (!canonical) return false;
+  const { snapshot } = canonical;
   if (
     snapshot?.id !== input.contract.submissionId ||
     snapshot.agentId !== input.contract.ownerId ||
-    snapshot.status !== input.contract.history.snapshotStatus
+    snapshot.status !== input.contract.history.snapshotStatus ||
+    !isSnapshotTimestamp(snapshot.updatedAt)
   ) {
     return false;
+  }
+  if (input.contract.mode === "export") {
+    const exportPackage = jsonRecord(snapshot.exportPackage);
+    if (
+      snapshot.exportState !== "file_downloaded" ||
+      !exportPackage ||
+      !exactRecordKeys(exportPackage, [
+        "contentFingerprint",
+        "fileName",
+        "format",
+        "idempotencyKey",
+        "rowCount",
+        "submissionIds",
+      ]) ||
+      exportPackage.format !== "xlsx" ||
+      exportPackage.rowCount !== 1 ||
+      !exactIdentitySet(
+        Array.isArray(exportPackage.submissionIds)
+          ? exportPackage.submissionIds.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : [],
+        [input.contract.submissionId],
+      ) ||
+      typeof exportPackage.contentFingerprint !== "string" ||
+      typeof exportPackage.fileName !== "string" ||
+      typeof exportPackage.idempotencyKey !== "string"
+    ) {
+      return false;
+    }
   }
 
   const snapshotApplicants = recordArray(snapshot.applicants);
@@ -709,11 +1223,15 @@ function snapshotMatchesDraftPayload(input: {
   if (!exactIdentitySet(actualApplicantIds, expectedApplicantIds)) return false;
 
   const expectedAnswerKeys = input.questionnaireAnswers.map((answer) => {
-    const applicantId = text(answer.applicant_id);
-    const sectionId = text(answer.section_id);
-    const fieldId = text(answer.field_id);
-    return applicantId && sectionId && fieldId
-      ? identityKey(applicantId, sectionId, fieldId)
+    const identity = answerPayloadIdentity(answer);
+    return identity
+      ? identityKey(
+          identity.applicantId,
+          identity.sectionId,
+          identity.fieldId,
+          identity.labelDigest,
+          identity.logicalValueDigest,
+        )
       : null;
   });
   if (expectedAnswerKeys.some((key) => key === null)) return false;
@@ -728,8 +1246,12 @@ function snapshotMatchesDraftPayload(input: {
       if (!sectionId || !fields) return false;
       for (const field of fields) {
         const fieldId = text(field.id);
-        if (!fieldId) return false;
-        actualAnswerKeys.push(identityKey(applicantId, sectionId, fieldId));
+        const labelDigest = productionDraftValueDigest(field.label);
+        const valueDigest = productionDraftValueDigest(field.value);
+        if (!fieldId || !labelDigest || !valueDigest) return false;
+        actualAnswerKeys.push(
+          identityKey(applicantId, sectionId, fieldId, labelDigest, valueDigest),
+        );
       }
     }
   }
@@ -777,13 +1299,33 @@ function snapshotMatchesDraftPayload(input: {
 
   const snapshotHistory = recordArray(snapshot.history);
   if (!snapshotHistory) return false;
-  const actualHistory = snapshotHistory
-    .filter((item) => item.fromStatus !== undefined || item.toStatus !== undefined)
-    .map(snapshotHistorySemanticKey);
+  const actualHistory: string[] = [];
+  const actualUntypedHistoryDigests: string[] = [];
+  for (const item of snapshotHistory) {
+    const key = snapshotHistorySemanticKey(item);
+    if (key) actualHistory.push(key);
+    else {
+      const digest = normalizedSnapshotHistoryContentDigest(item);
+      if (!digest) return false;
+      actualUntypedHistoryDigests.push(digest);
+    }
+  }
   const expectedHistory = expectedSnapshotHistoryKeys(input.contract);
+  const contentDigest = productionDraftSnapshotContentDigest(
+    input.payloadSubmission.family_intelligence,
+    input.contract.mode,
+  );
+  const expectedContentDigest =
+    input.contract.mode === "export"
+      ? input.contract.draft.snapshot.exportContentDigest
+      : input.contract.draft.snapshot.lifecycleContentDigest;
   return (
-    !actualHistory.some((key) => key === null) &&
-    exactIdentitySet(actualHistory as string[], expectedHistory)
+    exactIdentityMultiset(actualHistory, expectedHistory) &&
+    exactIdentityMultiset(
+      actualUntypedHistoryDigests,
+      input.contract.draft.snapshotUntypedHistoryDigests,
+    ) &&
+    contentDigest === expectedContentDigest
   );
 }
 
@@ -807,6 +1349,7 @@ export function productionDraftPayloadMatches(
     !submission ||
     submission.id !== contract.submissionId ||
     submission.agent_id !== contract.ownerId ||
+    !submissionPayloadMatchesContract(submission, contract) ||
     !applicants ||
     !media ||
     !questionnaireAnswers ||
@@ -820,13 +1363,11 @@ export function productionDraftPayloadMatches(
   const expectedHistoryRows = expectedHistoryPayload(contract);
   const applicantKeys = applicants.map(applicantPayloadKey);
   const mediaKeys = media.map(mediaPayloadKey);
-  const answerKeys = questionnaireAnswers.map(answerPayloadKey);
   const correctionKeys = corrections.map(correctionPayloadKey);
   const historyKeys = history.map(historyPayloadRecordKey);
   if (
     applicantKeys.some((key) => key === null) ||
     mediaKeys.some((key) => key === null) ||
-    answerKeys.some((key) => key === null) ||
     correctionKeys.some((key) => key === null) ||
     historyKeys.some((key) => key === null)
   ) {
@@ -836,15 +1377,12 @@ export function productionDraftPayloadMatches(
   if (
     !exactIdentitySet(applicantKeys as string[], contract.draft.applicants.map(applicantKey)) ||
     !exactIdentitySet(mediaKeys as string[], contract.draft.mediaAssets.map(mediaKey)) ||
-    !exactIdentitySet(
-      answerKeys as string[],
-      contract.draft.questionnaireAnswers.map(answerKey),
-    ) ||
+    !questionnaireAnswersMatch(questionnaireAnswers, contract) ||
     !exactIdentitySet(
       correctionKeys as string[],
       expectedCorrectionRows.map(correctionKey),
     ) ||
-    !exactIdentitySet(
+    !exactIdentityMultiset(
       historyKeys as string[],
       expectedHistoryRows.map(historyPayloadKey),
     )

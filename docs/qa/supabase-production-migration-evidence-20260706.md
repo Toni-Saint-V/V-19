@@ -2,8 +2,8 @@
 
 Result: `APPLIED_WITH_EXPLICIT_USER_AUTHORIZATION`
 Project: `tsymifccglpepvbmrcgh`
-Latest recheck: `2026-07-10T04:15:02Z`
-Latest Supabase plugin migration list: `2026-07-10T04:15:02Z`
+Latest recheck: `2026-07-14T19:23:36Z`
+Latest Supabase plugin migration list: `2026-07-14T19:23:36Z`
 
 No email, password, service-role key, signed URL, or personal identifier is recorded in this artifact.
 
@@ -49,6 +49,13 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 - `20260710004000_harden_document_assets_projection`
 - `20260710021043_harden_media_asset_review_boundary`
 - `20260710022231_add_media_assets_applicant_submission_index`
+- `20260712201203_allow_admin_waiting_review_issue_checkpoint`
+- `20260712225209_save_returned_submission_update_first`
+- `20260713095403_atomic_export_document_completion`
+- `20260714020334_atomic_export_guard_null_safe`
+- `20260714110000_repair_incomplete_export_document_completion`
+- `20260714190000_fix_complete_export_package_zip_suffix_guard`
+- `20260714200000_harden_null_safe_admin_rpc_guards`
 
 ## Applied Remote Migration Order
 
@@ -105,11 +112,20 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 - `20260710041458_20260710004000_harden_document_assets_projection`
 - `20260710041500_20260710021043_harden_media_asset_review_boundary`
 - `20260710041502_20260710022231_add_media_assets_applicant_submission_index`
+- `20260712221327_20260712201203_allow_admin_waiting_review_issue_checkpoint`
+- `20260713033130_20260712225209_save_returned_submission_update_first`
+- `20260714064305_20260712201203_allow_admin_waiting_review_issue_checkpoint`
+- `20260714064308_20260712225209_save_returned_submission_update_first`
+- `20260714065154_20260713095403_atomic_export_document_completion`
+- `20260714065303_20260714020334_atomic_export_guard_null_safe`
+- `20260714065657_20260714110000_repair_incomplete_export_document_completion`
+- `20260714182809_20260714190000_fix_complete_export_package_zip_suffix_guard`
+- `20260714191730_20260714200000_harden_null_safe_admin_rpc_guards`
 
 ## Aggregate Checks
 
-- Public base tables: `16`
-- Public tables with RLS enabled: `16`
+- Public base tables: `22`
+- Public tables with RLS enabled: `22`
 - Public tables without RLS: `0`
 - Private `submission-media` bucket: `1`
 - Public storage buckets: `0`
@@ -124,3 +140,5 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 - `20260706023000_typed_submission_files.sql` was applied remotely as `20260710034513_typed_submission_files`.
 - `20260709234515_agent_return_packages.sql` was applied remotely as `20260710041440_agent_return_packages`; its five dependent migrations were then applied in order.
 - Supabase plugin `list_migrations` against project `tsymifccglpepvbmrcgh` confirmed the complete post-apply order; it did not mutate the project.
+- `20260714191730_20260714200000_harden_null_safe_admin_rpc_guards` is the official Supabase ledger identity for the null-safe authorization hardening applied after independent `DEPLOY ELIGIBLE` and `SECURITY DEPLOY ELIGIBLE` verdicts.
+- Fresh read-only aggregate verification found `22/22` public base tables with RLS, `0` without RLS, one private `submission-media` bucket, zero public buckets, and four matching storage policies.

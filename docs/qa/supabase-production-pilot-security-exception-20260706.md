@@ -12,9 +12,9 @@ This is not open public-production approval. It is a capped operational pilot fo
 - Production project is `ACTIVE_HEALTHY`.
 - Production has `24` Auth users, `24` profiles, and `0` orphan Auth users.
 - Pilot cohort has 20 locally configured users; production live check matched `20/20` Auth users, `20/20` profiles, and `20/20` roles.
-- Workload envelope is bounded to 10 registered agents, 50 submissions per registered agent, 500 total submissions, 1500 applicants, and 4500 required media objects.
+- Workload envelope is bounded to 10 registered agents, 50 new submissions per registered agent inside the pilot window, 500 new submissions total, 1500 applicants, and 4500 required media objects.
 - `npm run verify:pilot-volume` passed without production writes.
-- All `16` public base tables have RLS enabled.
+- All `22` current public base tables have RLS enabled.
 - `submission-media` is private and has storage policies for read/write/update/delete.
 - Canonical required media guard is live on `public.media_assets`.
 - `npm run supabase:production-workflow-smoke` passed after the migration.
@@ -39,10 +39,21 @@ Structured acceptance is recorded in `docs/release/supabase-production-readiness
 ## Constraints
 
 - Maximum 10 registered pilot agents.
-- Maximum 50 submissions per registered agent, 500 total submissions in the pilot window.
+- Pilot window starts at `2026-07-14T19:20:00Z`; older production and technical QA rows are retained as a read-only lifetime baseline.
+- Contract marker: Maximum 50 submissions per registered agent, 500 total submissions. For this pilot GO, both limits apply only to new intake inside the recorded pilot window.
+- Maximum 50 new submissions per registered agent and 500 new submissions total inside that pilot window.
 - Existing provisioned users only; do not open public sign-up.
 - Spain-only V-19 flow.
 - No broad/public production expansion from this GO.
 - Fix launch-tolerable UI/polish/advisor cleanup during the pilot, not before invite.
 
 No email, password, service-role key, signed URL, or direct personal identifier is recorded in this artifact.
+
+## 2026-07-14 Owner Extension
+
+The rollout owner authorized all bounded, non-destructive work required to move
+the controlled pilot toward 100% readiness. The lifetime database baseline is
+not deleted, reassigned, or hidden. Capacity gates apply to new intake from the
+recorded pilot-window start, while lifetime totals remain visible in aggregate
+evidence. This preserves the original `50/agent` and `500 total` launch limits
+without treating pre-window technical QA rows as new pilot intake.

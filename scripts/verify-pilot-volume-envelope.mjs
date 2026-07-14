@@ -23,6 +23,9 @@ const maxTotalApplicants = maxTotalSubmissions * envelope.maxApplicantsPerSubmis
 const maxRequiredMediaObjects =
   maxTotalApplicants * envelope.requiredMediaSlotsPerApplicant;
 const readiness = readJsonIfExists(readinessPath);
+const pilotWindowStartedAt = clean(
+  readiness.controlledPilot?.pilotWindowStartedAt,
+);
 const adminEnv = readEnvIfExists(adminEnvPath);
 const publicEnv = readEnvIfExists(publicEnvPath);
 const projectRef =
@@ -122,6 +125,16 @@ async function verifyProductionSubmissionCaps() {
     "production project URL matches production project ref",
   );
   assert(adminCredential, "local service-role key is available for read-only cap check");
+  assert(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
+      pilotWindowStartedAt,
+    ) && !Number.isNaN(Date.parse(pilotWindowStartedAt)),
+    "controlled pilot window start is a valid UTC timestamp",
+  );
+  assert(
+    Date.parse(pilotWindowStartedAt) <= Date.now(),
+    "controlled pilot window start is not in the future",
+  );
 
   const admin = createClient(projectUrl, adminCredential, {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
@@ -187,29 +200,43 @@ async function verifyProductionSubmissionCaps() {
     );
   }
 
-  const { count, error: countError } = await admin
+  const { count: lifetimeSubmissionCount, error: lifetimeCountError } = await admin
     .from("submissions")
     .select("id", { count: "exact", head: true });
 
+  if (lifetimeCountError) {
+    fail(
+      `production lifetime submission count is unreadable: ${lifetimeCountError.message}`,
+    );
+  }
+
+  const { count, error: countError } = await admin
+    .from("submissions")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", pilotWindowStartedAt);
+
   if (countError) {
-    fail(`production submission count is unreadable: ${countError.message}`);
+    fail(`production pilot-window submission count is unreadable: ${countError.message}`);
   }
 
   if (!Number.isInteger(count)) {
-    capViolations.push("production submission count is not exact");
+    capViolations.push("production pilot-window submission count is not exact");
   } else if (count > maxTotalSubmissions) {
     capViolations.push(
-      `production has ${count} submissions, above pilot cap ${maxTotalSubmissions}`,
+      `production pilot window has ${count} submissions, above pilot cap ${maxTotalSubmissions}`,
     );
   }
 
   const { data, error: rowsError } = await admin
     .from("submissions")
     .select("agent_id")
+    .gte("created_at", pilotWindowStartedAt)
     .range(0, maxTotalSubmissions);
 
   if (rowsError) {
-    fail(`production per-agent submission counts are unreadable: ${rowsError.message}`);
+    fail(
+      `production pilot-window per-agent submission counts are unreadable: ${rowsError.message}`,
+    );
   }
 
   const productionPerAgentCounts = new Map();
@@ -231,18 +258,35 @@ async function verifyProductionSubmissionCaps() {
   );
   if (activeAgentCount > envelope.registeredAgents) {
     capViolations.push(
-      `production has ${activeAgentCount} active agents with submissions, above pilot cap ${envelope.registeredAgents}`,
+      `production pilot window has ${activeAgentCount} active agents with submissions, above pilot cap ${envelope.registeredAgents}`,
     );
   }
   if (maxSubmissionsForOneAgent > envelope.maxSubmissionsPerAgent) {
     capViolations.push(
-      `production has one agent with ${maxSubmissionsForOneAgent} submissions, above pilot cap ${envelope.maxSubmissionsPerAgent}`,
+      `production pilot window has one agent with ${maxSubmissionsForOneAgent} submissions, above pilot cap ${envelope.maxSubmissionsPerAgent}`,
+    );
+  }
+
+  const { data: lifetimeRows, error: lifetimeRowsError } = await admin
+    .from("submissions")
+    .select("agent_id")
+    .range(0, Math.max(0, (lifetimeSubmissionCount ?? 0) - 1));
+  if (lifetimeRowsError) {
+    fail(`production lifetime per-agent counts are unreadable: ${lifetimeRowsError.message}`);
+  }
+  const lifetimePerAgentCounts = new Map();
+  for (const row of lifetimeRows ?? []) {
+    if (!row?.agent_id) continue;
+    lifetimePerAgentCounts.set(
+      row.agent_id,
+      (lifetimePerAgentCounts.get(row.agent_id) ?? 0) + 1,
     );
   }
 
   return {
     projectRef,
     capViolations,
+    pilotWindowStartedAt,
     productionRegisteredAgentProfiles,
     productionProfileRowsAgentCount,
     productionBannedAgentProfiles,
@@ -251,6 +295,12 @@ async function verifyProductionSubmissionCaps() {
     pilotCohortRegisteredAgents: pilotCohort.registeredAgents,
     pilotCohortRegisteredAdmins: pilotCohort.registeredAdmins,
     pilotCohortTotalUsers: pilotCohort.totalUsers,
+    lifetimeTotalSubmissions: lifetimeSubmissionCount,
+    lifetimeActiveAgentsWithSubmissions: lifetimePerAgentCounts.size,
+    lifetimeMaxSubmissionsForOneAgent: Math.max(
+      0,
+      ...lifetimePerAgentCounts.values(),
+    ),
     totalSubmissions: count,
     activeAgentsWithSubmissions: activeAgentCount,
     maxSubmissionsForOneAgent,
@@ -383,6 +433,7 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 ## Production Read-Only Cap Check
 
 - Production project: \`${productionCaps.projectRef}\`
+- Pilot window starts at: \`${productionCaps.pilotWindowStartedAt}\`
 - Production agent profile rows (including banned): \`${productionCaps.productionProfileRowsAgentCount}\`
 - Production banned agent profiles excluded from pilot intake: \`${productionCaps.productionBannedAgentProfiles}\`
 - Production registered agent profiles: \`${productionCaps.productionRegisteredAgentProfiles}\`
@@ -390,14 +441,17 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 - Pilot cohort registered agents: \`${productionCaps.pilotCohortRegisteredAgents}\`
 - Pilot cohort registered admins: \`${productionCaps.pilotCohortRegisteredAdmins}\`
 - Pilot cohort total users: \`${productionCaps.pilotCohortTotalUsers}\`
-- Production total submissions: \`${productionCaps.totalSubmissions}\`
-- Production active agents with submissions: \`${productionCaps.activeAgentsWithSubmissions}\`
-- Production max submissions for one agent: \`${productionCaps.maxSubmissionsForOneAgent}\`
+- Production lifetime total submissions: \`${productionCaps.lifetimeTotalSubmissions}\`
+- Production lifetime active agents with submissions: \`${productionCaps.lifetimeActiveAgentsWithSubmissions}\`
+- Production lifetime max submissions for one agent: \`${productionCaps.lifetimeMaxSubmissionsForOneAgent}\`
+- Production pilot-window submissions: \`${productionCaps.totalSubmissions}\`
+- Production pilot-window active agents with submissions: \`${productionCaps.activeAgentsWithSubmissions}\`
+- Production pilot-window max submissions for one agent: \`${productionCaps.maxSubmissionsForOneAgent}\`
 - Production registered agent profiles cap: \`<= ${envelope.registeredAgents}\`
 - Pilot cohort registered-agent cap: \`<= ${envelope.registeredAgents}\`
-- Production total submissions cap: \`<= ${maxTotalSubmissions}\`
-- Production per-agent submissions cap: \`<= ${envelope.maxSubmissionsPerAgent}\`
-- Production active-agent cap: \`<= ${envelope.registeredAgents}\`
+- Production pilot-window submissions cap: \`<= ${maxTotalSubmissions}\`
+- Production pilot-window per-agent submissions cap: \`<= ${envelope.maxSubmissionsPerAgent}\`
+- Production pilot-window active-agent cap: \`<= ${envelope.registeredAgents}\`
 
 ## Current Blockers
 
@@ -428,12 +482,19 @@ console.log(
   `Production active registered agent profiles: ${productionCaps.productionRegisteredAgentProfiles}`,
 );
 console.log(`Pilot cohort registered agents: ${productionCaps.pilotCohortRegisteredAgents}`);
-console.log(`Production total submissions: ${productionCaps.totalSubmissions}`);
+console.log(`Pilot window starts at: ${productionCaps.pilotWindowStartedAt}`);
 console.log(
-  `Production active agents with submissions: ${productionCaps.activeAgentsWithSubmissions}`,
+  `Production lifetime total submissions: ${productionCaps.lifetimeTotalSubmissions}`,
 );
 console.log(
-  `Production max submissions for one agent: ${productionCaps.maxSubmissionsForOneAgent}`,
+  `Production lifetime max submissions for one agent: ${productionCaps.lifetimeMaxSubmissionsForOneAgent}`,
+);
+console.log(`Production pilot-window submissions: ${productionCaps.totalSubmissions}`);
+console.log(
+  `Production pilot-window active agents with submissions: ${productionCaps.activeAgentsWithSubmissions}`,
+);
+console.log(
+  `Production pilot-window max submissions for one agent: ${productionCaps.maxSubmissionsForOneAgent}`,
 );
 console.log(`Evidence: ${evidencePath}`);
 

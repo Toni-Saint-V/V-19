@@ -29,3 +29,18 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 - PASS admin can accept case
 - PASS agent mutation is blocked after admin handoff
 - PASS family submission with 3 applicants persists applicants and required media
+
+## 2026-07-14 Composite Recheck
+
+Result: `PASS`
+Checked at: `2026-07-14T19:27:45Z`
+
+- PASS the fresh A2-S1 production path completed through the real admin/agent UI and terminal export readback
+- PASS the workbook proof contains one data row and the canonical 56-column row model
+- PASS the ZIP proof contains 7 entries: 4 document assets, 1 questionnaire PDF, the workbook, and the manifest
+- PASS terminal database readback reports `exported`, 3 exported documents, 1 document event, 1 export batch, and 1 exported history event
+- PASS post-export whole-cohort reconciliation remained stable at 12 submissions, 27 applicants, 81 documents, and 81 media rows
+- PASS terminal admin and owner UI sessions produced zero business mutations, zero network-contract violations, and zero browser problems
+- PASS the NULL-safe admin RPC hardening migration is present in the production ledger and fresh negative probes reject both missing-profile and agent-role callers with SQLSTATE `42501`
+
+This section is an aggregate-only composite of the fresh A2-S1 terminal readback and security recheck. It does not repeat the export mutation and records no cohort identifiers, submission identifiers, storage paths, credentials, signed URLs, email addresses, or other personal data.

@@ -31,6 +31,7 @@ import {
   createProductionResponseDiagnosticError,
   evidenceDigest,
   loadOrCreateProductionLifecycleState,
+  productionDraftValueDigest,
   productionLifecycleMutationPayloadMatches,
   productionLifecycleCorrectedNote,
   productionLifecycleIssueMarker,
@@ -546,6 +547,7 @@ async function persistLifecycleStage(state: ProductionLifecycleState) {
 type LifecycleMutationExpectation = {
   actorSource: "admin" | "agent";
   correctionMode: "append" | "existing";
+  correctedQuestionnaireValue?: string;
   snapshotStatus: ProductionLifecycleMutationContract["history"]["snapshotStatus"];
   transition?: NonNullable<ProductionLifecycleMutationContract["history"]["transition"]>;
 };
@@ -569,6 +571,30 @@ async function lifecycleMutationContract(
   });
   const actorId =
     expectation.actorSource === "admin" ? accounts.admin.authUserId : owner.authUserId;
+  let questionnaire: ProductionLifecycleMutationContract["questionnaire"] = {
+    mode: "exact",
+  };
+  if (expectation.correctedQuestionnaireValue !== undefined) {
+    const noteLabelDigest = productionDraftValueDigest("Примечание");
+    const expectedValueDigest = productionDraftValueDigest(
+      expectation.correctedQuestionnaireValue,
+    );
+    const targets = draft.questionnaireAnswers.filter(
+      (answer) => answer.labelDigest === noteLabelDigest,
+    );
+    invariant(
+      noteLabelDigest && expectedValueDigest && targets.length === 1,
+      "Lifecycle note correction must resolve one exact questionnaire field.",
+    );
+    const target = targets[0]!;
+    questionnaire = {
+      applicantId: target.applicantId,
+      expectedValueDigest,
+      fieldId: target.fieldId,
+      mode: "replace",
+      sectionId: target.sectionId,
+    };
+  }
   return {
     correction: {
       mode: expectation.correctionMode,
@@ -582,7 +608,9 @@ async function lifecycleMutationContract(
       snapshotStatus: expectation.snapshotStatus,
       transition: expectation.transition,
     },
+    mode: "lifecycle",
     ownerId: owner.authUserId,
+    questionnaire,
     submissionId: state.case.submissionId,
     submissionStatus,
   };
@@ -948,6 +976,7 @@ async function ensureAgentResubmitted(input: {
           await lifecycleMutationContract(state, "returned", "open", {
             actorSource: "agent",
             correctionMode: "existing",
+            correctedQuestionnaireValue: correctedNote,
             snapshotStatus: "returned",
           }),
           async () => {

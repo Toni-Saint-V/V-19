@@ -69,6 +69,8 @@ Apply migrations only in the repository order declared by
 - `20260713095403_atomic_export_document_completion.sql`
 - `20260714020334_atomic_export_guard_null_safe.sql`
 - `20260714110000_repair_incomplete_export_document_completion.sql`
+- `20260714190000_fix_complete_export_package_zip_suffix_guard.sql`
+- `20260714200000_harden_null_safe_admin_rpc_guards.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

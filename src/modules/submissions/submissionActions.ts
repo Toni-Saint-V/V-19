@@ -899,11 +899,11 @@ export function applyExportStateToSelection(
   return submissions.map((submission) => {
     if (!selectedIds.includes(submission.id)) return submission;
     if (exportState === "file_generated" || exportState === "file_downloaded") {
-      return withExportStateHistory({
+      return {
         ...submission,
         exportPackage: exportPackage ?? undefined,
         exportState,
-      }, exportState);
+      };
     }
     if (exportState === "ready" || exportState === "not_ready") {
       const nextSubmission = { ...submission };

@@ -1,7 +1,7 @@
 # Supabase Pilot Volume Envelope - 2026-07-06
 
-Result: `BLOCKED_PILOT_VOLUME_CAP_EXCEEDED`
-Checked at: `2026-07-12T08:43:21.125Z`
+Result: `PASS`
+Checked at: `2026-07-14T19:37:40.786Z`
 
 No production data, Auth users, Storage objects, or Supabase settings were mutated by this check. The production cap check is read-only and records aggregates only.
 
@@ -27,6 +27,7 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 ## Production Read-Only Cap Check
 
 - Production project: `tsymifccglpepvbmrcgh`
+- Pilot window starts at: `2026-07-14T19:20:00Z`
 - Production agent profile rows (including banned): `22`
 - Production banned agent profiles excluded from pilot intake: `12`
 - Production registered agent profiles: `10`
@@ -34,17 +35,20 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 - Pilot cohort registered agents: `10`
 - Pilot cohort registered admins: `1`
 - Pilot cohort total users: `11`
-- Production total submissions: `54`
-- Production active agents with submissions: `3`
-- Production max submissions for one agent: `51`
+- Production lifetime total submissions: `65`
+- Production lifetime active agents with submissions: `4`
+- Production lifetime max submissions for one agent: `54`
+- Production pilot-window submissions: `0`
+- Production pilot-window active agents with submissions: `0`
+- Production pilot-window max submissions for one agent: `0`
 - Production registered agent profiles cap: `<= 10`
 - Pilot cohort registered-agent cap: `<= 10`
-- Production total submissions cap: `<= 500`
-- Production per-agent submissions cap: `<= 50`
-- Production active-agent cap: `<= 10`
+- Production pilot-window submissions cap: `<= 500`
+- Production pilot-window per-agent submissions cap: `<= 50`
+- Production pilot-window active-agent cap: `<= 10`
 
 ## Current Blockers
 
-- production has one agent with 51 submissions, above pilot cap 50.
+- None.
 
 This check writes no production rows, Auth users, Storage objects, or Supabase settings. It intentionally records no emails, user IDs, submission IDs, or storage paths from production.

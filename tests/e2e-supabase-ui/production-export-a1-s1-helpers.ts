@@ -22,7 +22,13 @@ import {
 import {
   acquireProductionCohortMutationLock,
   assertProductionLifecycleAcceptanceProof,
+  productionDraftApplicantContentDigest,
+  productionDraftEffectiveSnapshotHistory,
+  productionDraftMediaContentDigest,
   productionDraftPayloadMatches,
+  productionDraftQuestionnaireValueIdentity,
+  productionDraftSnapshotContentDigest,
+  productionDraftSubmissionStaticContentDigest,
   productionDraftValueDigest,
   productionLifecycleStatePath,
   requiredProductionLifecycleCaseKey,
@@ -174,12 +180,32 @@ type ObservedMutation = {
   status: number;
 };
 
+type BlockedRequestReason =
+  | "missing-release-gate"
+  | "payload-contract"
+  | "route-contract"
+  | "verified-artifact-contract";
+
 type ProductionSubmissionRow = {
+  accepted_at: string | null;
   agent_id: string;
+  appointment_status: string;
+  city: string;
+  country: string;
   exported_at: string | null;
   family_intelligence: unknown;
   id: string;
+  priority: string;
+  readiness_percent: number;
+  review_started_at: string | null;
   status: string;
+  submitted_at: string | null;
+  title: string;
+  travel_date: string;
+  trip_date_from: string | null;
+  trip_date_to: string | null;
+  type: string;
+  updated_at: string;
 };
 
 type ProductionDocumentAssetRow = {
@@ -195,13 +221,20 @@ type ProductionDocumentAssetRow = {
 
 type ProductionMediaAssetRow = {
   applicant_id: string;
+  generated_file_name: string | null;
   id: string;
+  mime_type: string | null;
+  original_file_name: string | null;
   review_status: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  size_bytes: number | null;
   storage_bucket: string;
   storage_path: string;
   submission_id: string;
   type: string;
   upload_status: string;
+  uploaded_at: string | null;
 };
 
 type ProductionCorrectionRow = {
@@ -217,8 +250,28 @@ type ProductionCorrectionRow = {
 };
 
 type ProductionApplicantRow = {
+  address: string | null;
+  birth_date: string | null;
+  citizenship: string | null;
+  city: string;
+  country: string;
+  email: string | null;
+  full_name: string;
+  hotel_address: string | null;
+  hotel_name: string | null;
   id: string;
+  media_percent: number;
+  passport_expires_at: string | null;
+  passport_issued_at: string | null;
+  passport_number: string;
+  patronymic: string | null;
+  phone: string | null;
+  questionnaire_percent: number;
+  role: string;
+  role_confirmed: boolean;
   submission_id: string;
+  suggested_role: string | null;
+  trip_dates: string;
 };
 
 type ProductionQuestionnaireAnswerRow = {
@@ -251,6 +304,8 @@ type ProductionDocumentExportEventRow = {
 };
 
 type ProductionStatusHistoryRow = {
+  changed_at: string;
+  changed_by: string;
   comment: string;
   entity_id: string;
   entity_type: "submission";
@@ -270,7 +325,10 @@ const stages = new Set<ProductionA1S1ExportStage>([
 ]);
 
 const businessMutationAllowlist = new Map<string, number>([
-  ["POST /rest/v1/rpc/save_submission_draft", 1],
+  // saveCockpitSubmissionsForProfile performs one explicit retry after a
+  // retryable transport failure. Abort-only proof must contract-check and
+  // abort both identical attempts instead of treating the retry as unknown.
+  ["POST /rest/v1/rpc/save_submission_draft", 2],
   ["POST /rest/v1/rpc/complete_export_package", 1],
 ]);
 // signInSupabaseWithPassword retries twice and each request uses three
@@ -343,7 +401,9 @@ function exportDraftPayloadContract(
       actorSource: "admin",
       snapshotStatus: "ready_for_export",
     },
+    mode: "export",
     ownerId: networkContract.ownerId,
+    questionnaire: { mode: "exact" },
     submissionId: networkContract.submissionId,
   };
 }
@@ -557,6 +617,70 @@ function validateA1S1ExportState(
   }
 }
 
+function sameProductionExportPreflight(
+  left: ProductionA1S1ExportPreflight,
+  right: ProductionA1S1ExportPreflight,
+) {
+  return (
+    left.applicantDigest === right.applicantDigest &&
+    left.documentAssetCount === right.documentAssetCount &&
+    left.documentAssetIdentityDigest === right.documentAssetIdentityDigest &&
+    left.mediaAssetCount === right.mediaAssetCount &&
+    left.mediaDigest === right.mediaDigest &&
+    left.rawStatus === right.rawStatus
+  );
+}
+
+/**
+ * A failed browser commit can leave a local artifact checkpoint even though
+ * fresh production read-back is still pre-export. The dedicated resume path
+ * may reuse the independently verified Excel only after an identical read-only
+ * preflight, but it must discard ZIP/UI terminal claims before one retry.
+ */
+export function prepareProductionA2S1ExportRetryCheckpoint(
+  state: ProductionA1S1ExportState,
+  freshPreflight: ProductionA1S1ExportPreflight,
+) {
+  invariant(
+    state.stage === "exporting" ||
+      state.stage === "artifact_verified" ||
+      state.stage === "verified",
+    "A2-S1 retry checkpoint is not in an ambiguous export stage.",
+  );
+  invariant(
+    state.preflight && state.excelProof,
+    "Ambiguous A2-S1 retry requires its prior strict preflight and Excel proof.",
+  );
+  invariant(
+    sameProductionExportPreflight(state.preflight, freshPreflight),
+    "A2-S1 production facts changed after the ambiguous export attempt; retry is forbidden.",
+  );
+  if (state.stage === "exporting") {
+    invariant(
+      !state.zipProof,
+      "An exporting checkpoint cannot carry a completed ZIP proof.",
+    );
+  } else {
+    invariant(
+      state.zipProof,
+      "A post-artifact checkpoint lost the ZIP proof that made it ambiguous.",
+    );
+  }
+
+  state.preflight = freshPreflight;
+  state.stage = "excel_verified";
+  delete state.zipProof;
+  delete state.postCommitUiNoticeVerified;
+  delete state.postCommitTerminalProofVerified;
+  return state;
+}
+
+export function productionA2S1StartsInTerminalReadbackLane(
+  stage: ProductionA1S1ExportState["stage"],
+) {
+  return stage === "artifact_verified" || stage === "verified";
+}
+
 export async function loadAcceptedA1S1ProductionExportCase(): Promise<ResolvedAcceptedA1S1ProductionExportCase> {
   assertProductionA1S1ExportWriteUnlock();
   const runMarker = requiredProductionRunMarker();
@@ -636,6 +760,38 @@ export async function writeProductionA1S1ExportEvidence(runMarker: string, value
   return path;
 }
 
+export async function writeProductionA2S1AbortEvidence(
+  runMarker: string,
+  value: unknown,
+) {
+  const path = resolve(
+    process.cwd(),
+    "output",
+    "playwright",
+    "production-export-a2-s1-abort",
+    runMarker,
+    "evidence.json",
+  );
+  await writeJsonAtomic(path, value);
+  return path;
+}
+
+export async function writeProductionA2S1TerminalReadbackEvidence(
+  runMarker: string,
+  value: unknown,
+) {
+  const path = resolve(
+    process.cwd(),
+    "output",
+    "playwright",
+    "production-export-a2-s1-terminal-readback",
+    runMarker,
+    "evidence.json",
+  );
+  await writeJsonAtomic(path, value);
+  return path;
+}
+
 export async function downloadA1S1ExportBytes(download: Download): Promise<Buffer> {
   const stream = await download.createReadStream();
   invariant(stream, "Browser download stream is unavailable.");
@@ -674,6 +830,20 @@ function isStaticAppRequest(request: Request) {
  * inspection. Only the UI-owned draft and atomic completion RPCs can pass.
  */
 export class StrictProductionA1S1ExportNetworkGate {
+  #acceptedExportDraft: {
+    payloadDigest: string;
+    requestKey: "POST /rest/v1/rpc/save_submission_draft";
+  } | null = null;
+  #acceptedExportDraftPromise: Promise<{
+    payloadDigest: string;
+    requestKey: "POST /rest/v1/rpc/save_submission_draft";
+  }> | null = null;
+  #acceptedExportDraftResolve:
+    | ((proof: {
+        payloadDigest: string;
+        requestKey: "POST /rest/v1/rpc/save_submission_draft";
+      }) => void)
+    | null = null;
   #businessPhase = false;
   #businessReleaseDecision: "cancel" | "release" | null = null;
   #businessReleasePromise: Promise<"cancel" | "release"> | null = null;
@@ -684,7 +854,7 @@ export class StrictProductionA1S1ExportNetworkGate {
   #successfulPasswordLogins = 0;
   readonly #mutations: ObservedMutation[] = [];
   readonly #requestCounts = new Map<string, number>();
-  #violations: string[] = [];
+  #violations: Array<{ digest: string; reason: BlockedRequestReason }> = [];
 
   constructor(networkContract?: ProductionA1S1ExportNetworkContract) {
     if (!networkContract) {
@@ -709,13 +879,19 @@ export class StrictProductionA1S1ExportNetworkGate {
       draft: {
         applicants: networkContract.draft.applicants.map((item) => ({ ...item })),
         corrections: networkContract.draft.corrections.map((item) => ({ ...item })),
+        effectiveHistoryCount: networkContract.draft.effectiveHistoryCount,
         mediaAssets: networkContract.draft.mediaAssets.map((item) => ({ ...item })),
         questionnaireAnswers: networkContract.draft.questionnaireAnswers.map((item) => ({
           ...item,
         })),
-        snapshotHistoryCount: networkContract.draft.snapshotHistoryCount,
+        snapshot: { ...networkContract.draft.snapshot },
+        snapshotHistory: networkContract.draft.snapshotHistory.map((item) => ({ ...item })),
         snapshotIssueCount: networkContract.draft.snapshotIssueCount,
+        snapshotUntypedHistoryDigests: [
+          ...networkContract.draft.snapshotUntypedHistoryDigests,
+        ],
         statusHistory: networkContract.draft.statusHistory.map((item) => ({ ...item })),
+        submission: { ...networkContract.draft.submission },
       },
       documentAssetIds: [...networkContract.documentAssetIds],
       ownerId: networkContract.ownerId,
@@ -724,13 +900,14 @@ export class StrictProductionA1S1ExportNetworkGate {
     };
   }
 
-  #recordBlockedRequest(request: Request, reason: string) {
+  #recordBlockedRequest(request: Request, reason: BlockedRequestReason) {
     const url = new URL(request.url());
-    this.#violations.push(
-      productionA1S1ExportDigest(
+    this.#violations.push({
+      digest: productionA1S1ExportDigest(
         `${request.method().toUpperCase()}:${url.origin}:${url.pathname}:${reason}`,
       ).slice(0, 16),
-    );
+      reason,
+    });
   }
 
   #hasBasePayload(request: Request, key: string) {
@@ -826,13 +1003,33 @@ export class StrictProductionA1S1ExportNetworkGate {
           return;
         }
         this.#requestCounts.set(key, count + 1);
+        if (key === "POST /rest/v1/rpc/save_submission_draft") {
+          const acceptedExportDraft = {
+            payloadDigest: productionA1S1ExportDigest(request.postData() ?? ""),
+            requestKey: key,
+          } as const;
+          if (
+            this.#acceptedExportDraft &&
+            this.#acceptedExportDraft.payloadDigest !==
+              acceptedExportDraft.payloadDigest
+          ) {
+            this.#recordBlockedRequest(request, "payload-contract");
+            await route.abort("blockedbyclient");
+            return;
+          }
+          if (!this.#acceptedExportDraft) {
+            this.#acceptedExportDraft = acceptedExportDraft;
+            this.#acceptedExportDraftResolve?.(acceptedExportDraft);
+            this.#acceptedExportDraftResolve = null;
+          }
+        }
         const decision = await releasePromise;
-        if (decision === "cancel") {
+        if (!this.#hasVerifiedArtifactPayload(request, key)) {
+          this.#recordBlockedRequest(request, "verified-artifact-contract");
           await route.abort("blockedbyclient");
           return;
         }
-        if (!this.#hasVerifiedArtifactPayload(request, key)) {
-          this.#recordBlockedRequest(request, "verified-artifact-contract");
+        if (decision === "cancel") {
           await route.abort("blockedbyclient");
           return;
         }
@@ -901,6 +1098,10 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
     this.#businessPhase = true;
     this.#businessReleaseDecision = null;
+    this.#acceptedExportDraft = null;
+    this.#acceptedExportDraftPromise = new Promise((resolve) => {
+      this.#acceptedExportDraftResolve = resolve;
+    });
     this.#verifiedArtifactContract = null;
     this.#businessReleasePromise = new Promise((resolve) => {
       this.#businessReleaseResolve = resolve;
@@ -920,6 +1121,29 @@ export class StrictProductionA1S1ExportNetworkGate {
       "Verified A2-S1 export artifact contract is invalid.",
     );
     this.#verifiedArtifactContract = { ...contract };
+  }
+
+  async waitForAcceptedExportDraft(timeoutMs = 90_000) {
+    invariant(this.#businessPhase, "Export mutation phase is not active.");
+    const acceptedExportDraftPromise = this.#acceptedExportDraftPromise;
+    invariant(
+      acceptedExportDraftPromise,
+      "Accepted export draft capture is unavailable.",
+    );
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        acceptedExportDraftPromise,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error("Timed out waiting for the accepted export draft.")),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   releaseExportMutations() {
@@ -960,12 +1184,53 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
     this.#businessPhase = false;
     this.#businessReleasePromise = null;
+    this.#acceptedExportDraftPromise = null;
+    this.#acceptedExportDraftResolve = null;
   }
 
   assertReadOnly() {
     invariant(!this.#businessPhase, "Export mutation phase remained active.");
     invariant(this.#mutations.length === 0, "Read-only export phase mutated data.");
     invariant(this.#violations.length === 0, "Unapproved network request was blocked.");
+  }
+
+  assertAbortedExportDraft() {
+    invariant(!this.#businessPhase, "Export mutation phase remained active.");
+    invariant(
+      this.#businessReleaseDecision === "cancel",
+      "Abort-only export did not end with an explicit cancellation.",
+    );
+    invariant(
+      this.#acceptedExportDraft?.requestKey ===
+        "POST /rest/v1/rpc/save_submission_draft" &&
+        /^[a-f0-9]{64}$/.test(this.#acceptedExportDraft.payloadDigest),
+      "Abort-only export did not capture an accepted draft identity.",
+    );
+    invariant(
+      this.#verifiedArtifactContract,
+      "Abort-only export did not bind the accepted draft to verified XLSX/ZIP bytes.",
+    );
+    invariant(this.#violations.length === 0, "Unapproved network request was blocked.");
+    invariant(
+      (this.#requestCounts.get("POST /rest/v1/rpc/save_submission_draft") ?? 0) ===
+        2,
+      "Abort-only export must capture the initial save and its one bounded retry.",
+    );
+    invariant(
+      (this.#requestCounts.get("POST /rest/v1/rpc/complete_export_package") ??
+        0) === 0,
+      "Abort-only export must not start complete_export_package.",
+    );
+    invariant(
+      this.#mutations.length === 2 &&
+        this.#mutations.every(
+          (mutation) =>
+            mutation.method === "POST" &&
+            mutation.path === "/rest/v1/rpc/save_submission_draft" &&
+            mutation.status === 0,
+        ),
+      "Abort-only export must observe two client-aborted save attempts and no business response.",
+    );
   }
 
   assertSuccessfulExport() {
@@ -1022,6 +1287,16 @@ export class StrictProductionA1S1ExportNetworkGate {
         `${right.method} ${right.path} ${right.status}`,
       ),
     );
+  }
+
+  violationSummary() {
+    const counts = new Map<BlockedRequestReason, number>();
+    for (const violation of this.#violations) {
+      counts.set(violation.reason, (counts.get(violation.reason) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([reason, count]) => ({ count, reason }))
+      .sort((left, right) => left.reason.localeCompare(right.reason));
   }
 }
 
@@ -1149,12 +1424,16 @@ async function readA1S1ProductionRowsWithClient(input: {
     await Promise.all([
       input.client
         .from("submissions")
-        .select("id,agent_id,status,exported_at,family_intelligence")
+        .select(
+          "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,submitted_at,review_started_at,accepted_at,exported_at,updated_at",
+        )
         .eq("id", input.submissionId)
         .maybeSingle(),
       input.client
         .from("applicants")
-        .select("id,submission_id")
+        .select(
+          "id,submission_id,full_name,role,suggested_role,role_confirmed,birth_date,patronymic,citizenship,address,phone,email,passport_number,passport_issued_at,passport_expires_at,country,city,trip_dates,hotel_name,hotel_address,questionnaire_percent,media_percent",
+        )
         .eq("submission_id", input.submissionId),
       input.client
         .from("document_assets")
@@ -1165,7 +1444,7 @@ async function readA1S1ProductionRowsWithClient(input: {
       input.client
         .from("media_assets")
         .select(
-          "id,submission_id,applicant_id,type,upload_status,review_status,storage_bucket,storage_path",
+          "id,applicant_id,submission_id,type,original_file_name,generated_file_name,storage_bucket,storage_path,mime_type,size_bytes,upload_status,review_status,uploaded_at,reviewed_at,reviewed_by",
         )
         .eq("submission_id", input.submissionId),
       input.client
@@ -1180,7 +1459,9 @@ async function readA1S1ProductionRowsWithClient(input: {
         .eq("submission_id", input.submissionId),
       input.client
         .from("status_history")
-        .select("id,entity_type,entity_id,from_status,to_status,comment,source,note")
+        .select(
+          "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at,note,source",
+        )
         .eq("entity_type", "submission")
         .eq("entity_id", input.submissionId),
     ]);
@@ -1213,7 +1494,10 @@ async function readA1S1ProductionRows(input: {
   });
 }
 
-function requiredSnapshotCounts(value: unknown) {
+function requiredSnapshotFacts(
+  value: unknown,
+  historyRows: readonly ProductionStatusHistoryRow[],
+) {
   const intelligence = jsonRecord(value);
   const envelope = jsonRecord(intelligence?.v19CockpitSnapshot);
   const snapshot = jsonRecord(envelope?.submission);
@@ -1225,7 +1509,22 @@ function requiredSnapshotCounts(value: unknown) {
     Array.isArray(snapshot.history) && Array.isArray(snapshot.issues),
     "A2-S1 cockpit snapshot is missing history or issues identity arrays.",
   );
-  return { historyCount: snapshot.history.length, issueCount: snapshot.issues.length };
+  const exportContentDigest = productionDraftSnapshotContentDigest(value, "export");
+  const lifecycleContentDigest = productionDraftSnapshotContentDigest(value, "lifecycle");
+  const effectiveHistory = productionDraftEffectiveSnapshotHistory({
+    familyIntelligence: value,
+    statusHistory: historyRows,
+  });
+  invariant(
+    exportContentDigest && lifecycleContentDigest && effectiveHistory,
+    "A2-S1 canonical snapshot identity cannot be resolved.",
+  );
+  return {
+    ...effectiveHistory,
+    exportContentDigest,
+    issueCount: snapshot.issues.length,
+    lifecycleContentDigest,
+  };
 }
 
 function draftPayloadIdentityFromRows(input: {
@@ -1254,7 +1553,10 @@ function draftPayloadIdentityFromRows(input: {
       rows.questionnaireAnswers.every((row) => row.submission_id === submissionId),
     "A2-S1 draft identity requires exactly seventy-seven questionnaire answers.",
   );
-  const snapshotCounts = requiredSnapshotCounts(rows.submission.family_intelligence);
+  const snapshotFacts = requiredSnapshotFacts(
+    rows.submission.family_intelligence,
+    rows.history,
+  );
   const applicantIds = new Set(rows.applicants.map((row) => row.id));
   invariant(
     applicantIds.size === 1 &&
@@ -1265,15 +1567,17 @@ function draftPayloadIdentityFromRows(input: {
 
   const questionnaireAnswers = rows.questionnaireAnswers.map((row) => {
     const labelDigest = productionDraftValueDigest(row.label);
-    const valueDigest = productionDraftValueDigest(row.value);
-    invariant(labelDigest && valueDigest, "A2-S1 questionnaire identity cannot be digested.");
+    const valueIdentity = productionDraftQuestionnaireValueIdentity(row.value);
+    invariant(labelDigest && valueIdentity, "A2-S1 questionnaire identity cannot be digested.");
     return {
       applicantId: row.applicant_id,
       fieldId: row.field_id,
       labelDigest,
+      logicalValueDigest: valueIdentity.logicalValueDigest,
       sectionId: row.section_id,
       submissionId: row.submission_id,
-      valueDigest,
+      valueDigest: valueIdentity.valueDigest,
+      valueStructureDigest: valueIdentity.valueStructureDigest,
     };
   });
   invariant(
@@ -1284,10 +1588,15 @@ function draftPayloadIdentityFromRows(input: {
   );
 
   const mediaAssets = rows.media.map((row) => {
+    const contentDigest = productionDraftMediaContentDigest(row);
     const storagePathDigest = productionDraftValueDigest(row.storage_path);
-    invariant(storagePathDigest, "A2-S1 media storage identity cannot be digested.");
+    invariant(
+      contentDigest && storagePathDigest,
+      "A2-S1 media content identity cannot be digested.",
+    );
     return {
       applicantId: row.applicant_id,
+      contentDigest,
       id: row.id,
       storageBucket: row.storage_bucket,
       storagePathDigest,
@@ -1324,23 +1633,24 @@ function draftPayloadIdentityFromRows(input: {
     "A2-S1 correction identity contains duplicate or cross-submission rows.",
   );
 
-  const statusHistory = rows.history.map((row) => {
-    const commentDigest = productionDraftValueDigest(row.comment);
-    const noteDigest = row.note === null ? null : productionDraftValueDigest(row.note);
-    invariant(
-      commentDigest && (row.note === null || noteDigest),
-      "A2-S1 status-history identity cannot be digested.",
-    );
-    return {
-      commentDigest,
-      entityId: row.entity_id,
-      entityType: row.entity_type,
-      fromStatus: row.from_status,
-      id: row.id,
-      noteDigest,
-      source: row.source,
-      toStatus: row.to_status,
-    };
+  const effectiveHistoryById = new Map(
+    snapshotFacts.snapshotHistory.map((row) => [row.id, row]),
+  );
+  const statusHistory = rows.history.flatMap((row) => {
+    const effective = effectiveHistoryById.get(row.id);
+    if (!effective || effective.fromStatus === null) return [];
+    return [
+      {
+        commentDigest: effective.commentDigest,
+        entityId: row.entity_id,
+        entityType: row.entity_type,
+        fromStatus: effective.fromStatus,
+        id: row.id,
+        noteDigest: effective.noteDigest,
+        source: effective.source,
+        toStatus: effective.toStatus,
+      },
+    ];
   });
   invariant(
     new Set(statusHistory.map((row) => row.id)).size === statusHistory.length &&
@@ -1352,15 +1662,33 @@ function draftPayloadIdentityFromRows(input: {
 
   return {
     applicants: rows.applicants.map((row) => ({
+      contentDigest: (() => {
+        const digest = productionDraftApplicantContentDigest(row);
+        invariant(digest, "A2-S1 applicant content identity cannot be digested.");
+        return digest;
+      })(),
       id: row.id,
       submissionId: row.submission_id,
     })),
     corrections,
+    effectiveHistoryCount: snapshotFacts.effectiveHistoryCount,
     mediaAssets,
     questionnaireAnswers,
-    snapshotHistoryCount: snapshotCounts.historyCount,
-    snapshotIssueCount: snapshotCounts.issueCount,
+    snapshot: {
+      exportContentDigest: snapshotFacts.exportContentDigest,
+      lifecycleContentDigest: snapshotFacts.lifecycleContentDigest,
+    },
+    snapshotHistory: snapshotFacts.snapshotHistory,
+    snapshotIssueCount: snapshotFacts.issueCount,
+    snapshotUntypedHistoryDigests: snapshotFacts.snapshotUntypedHistoryDigests,
     statusHistory,
+    submission: {
+      staticContentDigest: (() => {
+        const digest = productionDraftSubmissionStaticContentDigest(rows.submission);
+        invariant(digest, "A2-S1 root submission identity cannot be digested.");
+        return digest;
+      })(),
+    },
   };
 }
 

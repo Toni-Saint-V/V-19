@@ -488,6 +488,112 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("repairs the terminal ZIP suffix guard without weakening the RPC boundary", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260714190000_fix_complete_export_package_zip_suffix_guard.sql",
+    );
+
+    expect(migration).toContain(
+      "create or replace function public.complete_export_package(payload jsonb)",
+    );
+    expect(migration).toContain("security definer");
+    expect(migration).toContain(
+      "set search_path = pg_catalog, public, app_private",
+    );
+    expect(migration).toContain(
+      "right(lower(document_record.zip_file_name), 4) <> '.zip'",
+    );
+    expect(migration).not.toMatch(
+      /lower\(document_record\.zip_file_name\)\s*!~/,
+    );
+    expect(migration).toContain(
+      "document_record.zip_file_name <> replace(replace(document_record.zip_file_name, '/', ''), chr(92), '')",
+    );
+    expect(migration).toContain(
+      "position('..' in document_record.zip_file_name) > 0",
+    );
+    expect(migration).toContain(
+      "core_result := app_private.complete_export_package_core(payload)",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.complete_export_package(jsonb) from public",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.complete_export_package(jsonb) from anon",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.complete_export_package(jsonb) from authenticated",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.complete_export_package(jsonb) to authenticated",
+    );
+  });
+
+  test("makes every deployed admin RPC guard null-safe and retires browser repair access", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260714200000_harden_null_safe_admin_rpc_guards.sql",
+    );
+    const targetFunctions = [
+      ["app_private.complete_export_package_core(jsonb)", 1],
+      ["app_private.save_submission_draft_without_questionnaire_rows(jsonb)", 2],
+      ["public.complete_export_package(jsonb)", 1],
+      ["public.publish_agent_return_package(jsonb)", 1],
+      ["public.publish_returned_pdf_handoff(jsonb)", 1],
+      ["public.repair_incomplete_export_document_completion(text)", 1],
+      ["public.start_agent_return_package(jsonb)", 1],
+    ] as const;
+
+    for (const [functionIdentity, expectedCount] of targetFunctions) {
+      expect(migration).toContain(
+        `'${functionIdentity}'::regprocedure, ${expectedCount}`,
+      );
+    }
+    expect(
+      targetFunctions.reduce((total, [, expectedCount]) => total + expectedCount, 0),
+    ).toBe(8);
+    expect(migration).toContain(
+      "unsafe_guard constant text := 'actor_role <> ''admin'''",
+    );
+    expect(migration).toContain(
+      "safe_guard constant text := 'actor_role is distinct from ''admin'''",
+    );
+    expect(migration).toContain(
+      "if guard_occurrences <> expected_guard_occurrences then",
+    );
+    expect(migration).toContain(
+      "execute replace(function_definition, unsafe_guard, safe_guard)",
+    );
+    expect(migration).toContain(
+      "raise exception 'A null-unsafe V-19 admin function guard remains after hardening'",
+    );
+    expectSqlStatement(
+      migration,
+      "revoke execute on function public.repair_incomplete_export_document_completion(text) from authenticated, anon, public",
+    );
+  });
+
+  test("binds the complete P1 and A2 proof surface into the readiness hash", () => {
+    const verifier = readProjectFile("scripts/verify-production-readiness.mjs");
+    const requiredProofPaths = [
+      "playwright.supabase-production-export-a1-s1.config.ts",
+      "playwright.supabase-production-export-a2-s1-abort.config.ts",
+      "src/modules/submissions/submissionActions.ts",
+      "tests/e2e-supabase-ui/production-export-a1-s1-helpers.ts",
+      "tests/e2e-supabase-ui/production-export-a1-s1-resumable.spec.ts",
+      "tests/e2e-supabase-ui/production-lifecycle-helpers.ts",
+      "tests/e2e-supabase-ui/production-lifecycle-resumable.spec.ts",
+      "tests/unit/appProductionWorkspaceRuntime.spec.tsx",
+      "tests/unit/productionCohortNetworkContract.spec.ts",
+      "tests/unit/supabaseSecurityContract.spec.ts",
+      "tests/unit/v19SubmissionRules.spec.ts",
+      "tests/unit/v19SupabasePersistence.spec.ts",
+    ];
+
+    for (const proofPath of requiredProofPaths) {
+      expect(verifier).toContain(`"${proofPath}"`);
+    }
+  });
+
   test("keeps incomplete legacy export repair server-owned, admin-only, and forward-only", () => {
     const repairMigration = readProjectFile(
       "supabase/migrations/20260714110000_repair_incomplete_export_document_completion.sql",
