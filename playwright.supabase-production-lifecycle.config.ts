@@ -9,7 +9,10 @@ import {
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
 } from "./tests/e2e-supabase-ui/production-cohort-helpers";
-import { assertProductionLifecycleWriteUnlock } from "./tests/e2e-supabase-ui/production-lifecycle-helpers";
+import {
+  RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
+  assertProductionLifecycleWriteUnlock,
+} from "./tests/e2e-supabase-ui/production-lifecycle-helpers";
 
 if (process.env.V19_PRODUCTION_LIFECYCLE_FRESH_BUILD !== "1") {
   throw new Error(
@@ -101,7 +104,7 @@ function loadProductionEnv() {
 export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
-  outputDir: "test-results/production-lifecycle",
+  outputDir: `test-results/production-lifecycle-${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY.toLowerCase()}`,
   reporter: [["list"]],
   retries: 0,
   testDir: "./tests/e2e-supabase-ui",

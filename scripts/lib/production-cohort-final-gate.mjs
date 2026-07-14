@@ -22,13 +22,31 @@ const lifecycleByCase = Object.freeze([
   ["A3-S3", { stage: "submitted", status: "waiting_review" }],
 ]);
 
+const postExportLifecycle = new Map(
+  lifecycleByCase.map(([caseKey, expected]) =>
+    caseKey === "A1-S1"
+      ? [caseKey, { stage: "exported", status: "exported" }]
+      : [caseKey, expected],
+  ),
+);
+
+const preExportA2S1Lifecycle = new Map(
+  [...postExportLifecycle].map(([caseKey, expected]) =>
+    caseKey === "A2-S1"
+      ? [caseKey, { stage: "ready_for_export", status: "ready_for_excel" }]
+      : [caseKey, expected],
+  ),
+);
+
 const expectedLifecycleByPhase = new Map([
   ["pre_export", new Map(lifecycleByCase)],
+  ["post_export", postExportLifecycle],
+  ["pre_export_a2_s1", preExportA2S1Lifecycle],
   [
-    "post_export",
+    "post_export_a2_s1",
     new Map(
-      lifecycleByCase.map(([caseKey, expected]) =>
-        caseKey === "A1-S1"
+      [...postExportLifecycle].map(([caseKey, expected]) =>
+        caseKey === "A2-S1"
           ? [caseKey, { stage: "exported", status: "exported" }]
           : [caseKey, expected],
       ),

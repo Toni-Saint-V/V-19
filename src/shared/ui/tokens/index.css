@@ -1247,6 +1247,9 @@
   --v19b-motion-loop-slow: 2s;
   --v19b-motion-scan: 2.4s;
   --v19b-z-overlay: 220;
+  --v19b-z-drawer: 260;
+  --v19b-z-modal-backdrop: 270;
+  --v19b-z-modal: 280;
   --v19b-motion-stagger-40: 40ms;
   --v19b-motion-stagger-80: 80ms;
   --v19b-motion-stagger-120: 120ms;
@@ -1264,6 +1267,7 @@
   --v19b-transform-press: translateY(1px);
   --v19b-transform-raise: translateY(-1px);
   --v19b-transform-center-y: translateY(-50%);
+  --v19b-translate-center: -50% -50%;
   --v19b-shadow-none: none;
   --v19b-focus-ring-shadow: 0 0 0 var(--v19b-size-4)
     var(--v19b-color-focus-soft);

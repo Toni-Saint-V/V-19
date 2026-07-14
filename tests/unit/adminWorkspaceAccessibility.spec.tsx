@@ -6,12 +6,23 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { AdminWorkspace } from "../../src/components/AdminWorkspace";
 import { VisaflowBusinessBridgeProvider } from "../../src/integration/visaflowBusinessBridge";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionActions";
+import { saveCockpitSubmissionsForProfile } from "../../src/modules/submissions/supabasePersistence";
 import type { Submission } from "../../src/modules/submissions/types";
+import type { AppProfile } from "../../src/types/session";
+
+const persistenceRuntime = vi.hoisted(() => ({
+  rpc: vi.fn(async () => ({ error: null })),
+}));
+
+vi.mock("../../src/lib/supabase/client", () => ({
+  getSupabaseClient: () => ({ rpc: persistenceRuntime.rpc }),
+}));
 
 const originalInnerWidth = window.innerWidth;
 
@@ -64,6 +75,81 @@ function acceptableReviewSubmission(): Submission {
     issues: [],
   };
 }
+
+function productionLikePartialFamily(): Submission {
+  const source = acceptableReviewSubmission();
+  const sourceApplicant = source.applicants[0];
+  if (!sourceApplicant) throw new Error("Missing source applicant");
+  const id = "production-like-family-review";
+  const applicants = Array.from({ length: 6 }, (_, index) => {
+    const applicantId = `production-like-applicant-${index + 1}`;
+    return {
+      ...sourceApplicant,
+      id: applicantId,
+      fullName: `Production Family Member ${index + 1}`,
+      questionnaireStatus: index < 2 ? ("complete" as const) : ("partial" as const),
+      sections: sourceApplicant.sections.map((section) => ({
+        ...section,
+        id: `${section.id}-${index + 1}`,
+        fields: section.fields.map((field) => ({
+          ...field,
+          id: `${field.id}-${index + 1}`,
+        })),
+      })),
+    };
+  });
+  const files = applicants.flatMap((applicant) =>
+    source.files.map((file) => ({
+      ...file,
+      applicantId: applicant.id,
+      generatedFileName: `${applicant.id}-${file.type}.jpg`,
+      id: `${applicant.id}-${file.type}`,
+      mimeType: "image/jpeg",
+      status: "pending_review" as const,
+      storageAdapter: "supabase-private" as const,
+      storageBucket: "submission-media",
+      storagePath: `${id}/${applicant.id}/${file.type}/${applicant.id}-${file.type}.jpg`,
+      uploadStatus: "uploaded" as const,
+      uploadedAtIso: "2026-07-12T10:00:00.000Z",
+    })),
+  );
+
+  return {
+    ...source,
+    agentId: "00000000-0000-4000-8000-000000000101",
+    applicants,
+    files,
+    history: [
+      {
+        actorId: "00000000-0000-4000-8000-000000000101",
+        at: "2026-07-12T10:00:00.000Z",
+        createdAt: "2026-07-12T10:00:00.000Z",
+        fromStatus: "in_progress",
+        id: "production-like-submit-history",
+        source: "agent",
+        text: "Агент отправил подачу на проверку",
+        toStatus: "submitted_for_review",
+      },
+    ],
+    id,
+    issues: [],
+    title: "Production-like Family Review",
+    type: "family",
+    updatedAt: "2026-07-12T10:00:00.000Z",
+  };
+}
+
+const adminProfile: AppProfile = {
+  displayName: "Production Admin",
+  email: "production-admin@example.test",
+  id: "00000000-0000-4000-8000-000000000201",
+  organizationName: "VisaFlow",
+  role: "admin",
+};
+
+beforeEach(() => {
+  persistenceRuntime.rpc.mockClear();
+});
 
 afterEach(() => {
   cleanup();
@@ -187,6 +273,56 @@ describe("AdminWorkspace production navigation", () => {
       await screen.findByText(/Не удалось добавить замечание/),
     ).toBeInTheDocument();
     expect(onAdminIssueAdd).toHaveBeenCalledTimes(1);
+  });
+
+  test("persists one remark for a submitted six-person partial family", async () => {
+    let submission = productionLikePartialFamily();
+    const onAdminIssueAdd = vi.fn(async ({ input }: { input: Parameters<typeof addPreciseAdminIssue>[1] }) => {
+      submission = addPreciseAdminIssue(submission, input, adminProfile.id);
+      await saveCockpitSubmissionsForProfile(
+        adminProfile,
+        [submission],
+        new Map([[submission.id, submission.agentId]]),
+      );
+    });
+    const { container } = render(
+      <VisaflowBusinessBridgeProvider bridge={{ onAdminIssueAdd }}>
+        <AdminWorkspace
+          currentEmail={adminProfile.email}
+          onSignOut={vi.fn()}
+          submissions={[submission]}
+          usesSupabase
+        />
+      </VisaflowBusinessBridgeProvider>,
+    );
+
+    const card = container.querySelector<HTMLButtonElement>(
+      '[data-submission-id="production-like-family-review"]',
+    );
+    if (!card) throw new Error("Production-like review card was not rendered.");
+    fireEvent.click(card);
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: "Добавить замечание" }))[0]!,
+    );
+    fireEvent.change(
+      await screen.findByPlaceholderText("Опишите, что именно нужно исправить..."),
+      { target: { value: "Production lifecycle field correction" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Отправить замечание" }),
+    );
+
+    await waitFor(() => expect(persistenceRuntime.rpc).toHaveBeenCalledTimes(1));
+    expect(onAdminIssueAdd).toHaveBeenCalledTimes(1);
+    expect(persistenceRuntime.rpc).toHaveBeenCalledWith(
+      "save_submission_draft",
+      expect.objectContaining({ payload: expect.any(Object) }),
+    );
+    expect(submission.issues).toHaveLength(1);
+    expect(submission.issues[0]).toMatchObject({
+      comment: "Production lifecycle field correction",
+      status: "open",
+    });
   });
 
   test("reports a rejected sign-out and keeps the active session UI", async () => {

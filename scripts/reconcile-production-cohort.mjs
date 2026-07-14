@@ -396,7 +396,10 @@ function clean(value) {
 function requiredLifecyclePhase(value) {
   const phase = clean(value) || "pre_export";
   invariant(
-    phase === "pre_export" || phase === "post_export",
+    phase === "pre_export" ||
+      phase === "post_export" ||
+      phase === "pre_export_a2_s1" ||
+      phase === "post_export_a2_s1",
     "The expected production cohort lifecycle phase is invalid.",
   );
   return phase;
@@ -404,7 +407,10 @@ function requiredLifecyclePhase(value) {
 
 function effectiveCohortStage(caseKey, checkpointStage, submissionStatus) {
   if (submissionStatus === "exported") return "exported";
-  if (caseKey === "A1-S1" && submissionStatus === "ready_for_excel") {
+  if (
+    /^A[1-3]-S[1-3]$/.test(caseKey) &&
+    submissionStatus === "ready_for_excel"
+  ) {
     return "ready_for_export";
   }
   if (

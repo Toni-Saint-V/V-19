@@ -1919,6 +1919,12 @@ function questionnaireFormDataFromSubmission(
 
 const focusableQuestionnaireFields: FocusableQuestionnaireField[] = [
   {
+    fieldId: "appointment-note",
+    formKey: "appointmentNote",
+    labels: ["Примечание"],
+    sectionId: "appointment",
+  },
+  {
     fieldId: "passport-type",
     formKey: "passportType",
     labels: ["Тип паспорта", "Тип документа", "Тип проездного документа"],
@@ -2351,6 +2357,7 @@ export function FigmaQuestionnaireScreen({
   const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const queuedSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const onSaveDraftRef = useRef(onSaveDraft);
+  const canSaveDraft = Boolean(onSaveDraft);
   const initialFocusAppliedRef = useRef(false);
   const saveRequestRunnerRef = useRef<(request: QuestionnaireSaveRequest) => void>(
     () => undefined,
@@ -3328,7 +3335,7 @@ export function FigmaQuestionnaireScreen({
 
   useEffect(() => {
     clearAutosaveTimer();
-    if (!pendingUpdates.length || !onSaveDraft) return;
+    if (!pendingUpdates.length || !canSaveDraft) return;
     const revision = autosaveRevisionRef.current;
     const payload = completionPayload("autosave");
     const timer = window.setTimeout(() => {
@@ -3344,9 +3351,9 @@ export function FigmaQuestionnaireScreen({
     };
   }, [
     clearAutosaveTimer,
+    canSaveDraft,
     completionPayload,
     enqueueDraftSave,
-    onSaveDraft,
     pendingUpdates.length,
   ]);
 

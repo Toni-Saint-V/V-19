@@ -21,6 +21,7 @@ import {
   type ProductionCohortAccount,
   type ProductionNetworkLedger,
 } from "./production-cohort-helpers";
+import { resolveProductionCohortDraftPayloadIdentity } from "./production-export-a1-s1-helpers";
 import {
   acquireProductionLifecycleLock,
   assertProductionLifecycleAcceptanceProof,
@@ -30,12 +31,15 @@ import {
   createProductionResponseDiagnosticError,
   evidenceDigest,
   loadOrCreateProductionLifecycleState,
+  productionLifecycleMutationPayloadMatches,
   productionLifecycleCorrectedNote,
   productionLifecycleIssueMarker,
+  RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
   recordProductionLifecycleAcceptanceProof,
   runWithFailurePreservingCleanup,
   saveProductionLifecycleState,
   writeProductionLifecycleEvidence,
+  type ProductionLifecycleMutationContract,
   type ProductionLifecycleState,
 } from "./production-lifecycle-helpers";
 import { clickWorkspaceButton, isVisible } from "./ui-helpers";
@@ -89,7 +93,12 @@ function invariant(condition: unknown, message: string): asserts condition {
 class StrictProductionMutationGate {
   #authPasswordRequests = 0;
   readonly #violations: string[] = [];
-  #window: { label: string; observed: number; path: string } | null = null;
+  #window: {
+    contract: ProductionLifecycleMutationContract;
+    label: string;
+    observed: number;
+    path: string;
+  } | null = null;
 
   async attach(context: BrowserContext) {
     await context.route("**/*", async (route) => {
@@ -105,7 +114,7 @@ class StrictProductionMutationGate {
         url.origin === PRODUCTION_SUPABASE_ORIGIN &&
         url.pathname === "/auth/v1/token" &&
         url.searchParams.get("grant_type") === "password" &&
-        this.#authPasswordRequests < 3 &&
+        this.#authPasswordRequests < 6 &&
         this.#window === null;
       const isLocalStaticAsset =
         method === "GET" &&
@@ -134,10 +143,18 @@ class StrictProductionMutationGate {
         method === "POST" &&
         url.origin === PRODUCTION_SUPABASE_ORIGIN &&
         url.pathname === activeWindow.path &&
+        productionLifecycleMutationPayloadMatches(
+          request.postData(),
+          activeWindow.contract,
+        ) &&
         activeWindow.observed === 0;
       if (!allowedMutation) {
         this.#violations.push(
-          evidenceDigest(`${method}:${url.origin}:${url.pathname}`),
+          evidenceDigest(
+            `${method}:${url.origin}:${url.pathname}:${
+              activeWindow ? "payload-contract" : "route-contract"
+            }`,
+          ),
         );
         await route.abort("blockedbyclient");
         return;
@@ -150,8 +167,8 @@ class StrictProductionMutationGate {
 
   assertLoginCompleted() {
     invariant(
-      this.#authPasswordRequests >= 1 && this.#authPasswordRequests <= 3,
-      "Production lifecycle session must use one to three bounded password-auth attempts.",
+      this.#authPasswordRequests >= 1 && this.#authPasswordRequests <= 6,
+      "Production lifecycle session must use one to six bounded password-auth attempts.",
     );
   }
 
@@ -159,9 +176,13 @@ class StrictProductionMutationGate {
     return this.#authPasswordRequests;
   }
 
-  begin(label: string, path: string) {
+  begin(
+    label: string,
+    path: string,
+    contract: ProductionLifecycleMutationContract,
+  ) {
     invariant(!this.#window, "A production mutation window is already active.");
-    this.#window = { label, observed: 0, path };
+    this.#window = { contract, label, observed: 0, path };
   }
 
   finish(label: string) {
@@ -453,10 +474,11 @@ async function successfulProductionMutation(
   mutationGate: StrictProductionMutationGate,
   expectedPath: string,
   label: string,
+  contract: ProductionLifecycleMutationContract,
   action: () => Promise<void>,
 ) {
   const checkpoint = ledger.checkpoint();
-  mutationGate.begin(label, expectedPath);
+  mutationGate.begin(label, expectedPath, contract);
   const responsePromise = page.waitForResponse(
     (response) => {
       const request = response.request();
@@ -465,7 +487,8 @@ async function successfulProductionMutation(
         /^(POST|PUT|PATCH|DELETE)$/.test(request.method()) &&
         url.origin === PRODUCTION_SUPABASE_ORIGIN &&
         request.method() === "POST" &&
-        url.pathname === expectedPath
+        url.pathname === expectedPath &&
+        productionLifecycleMutationPayloadMatches(request.postData(), contract)
       );
     },
     { timeout: 45_000 },
@@ -520,6 +543,51 @@ async function persistLifecycleStage(state: ProductionLifecycleState) {
   await saveProductionLifecycleState(state);
 }
 
+type LifecycleMutationExpectation = {
+  actorSource: "admin" | "agent";
+  correctionMode: "append" | "existing";
+  snapshotStatus: ProductionLifecycleMutationContract["history"]["snapshotStatus"];
+  transition?: NonNullable<ProductionLifecycleMutationContract["history"]["transition"]>;
+};
+
+async function lifecycleMutationContract(
+  state: ProductionLifecycleState,
+  submissionStatus: ProductionLifecycleMutationContract["submissionStatus"],
+  correctionStatus: ProductionLifecycleMutationContract["correction"]["status"],
+  expectation: LifecycleMutationExpectation,
+): Promise<ProductionLifecycleMutationContract> {
+  const accounts = loadProductionCohortAccounts();
+  const owner = accounts.agents.find(
+    (account) => account.key === state.case.ownerKey,
+  );
+  invariant(owner, "Lifecycle mutation owner account is absent.");
+  const draft = await resolveProductionCohortDraftPayloadIdentity({
+    admin: accounts.admin,
+    correctionMarker: productionLifecycleIssueMarker(state),
+    ownerId: owner.authUserId,
+    submissionId: state.case.submissionId,
+  });
+  const actorId =
+    expectation.actorSource === "admin" ? accounts.admin.authUserId : owner.authUserId;
+  return {
+    correction: {
+      mode: expectation.correctionMode,
+      reasonIncludes: productionLifecycleIssueMarker(state),
+      status: correctionStatus,
+    },
+    draft,
+    history: {
+      actorId,
+      actorSource: expectation.actorSource,
+      snapshotStatus: expectation.snapshotStatus,
+      transition: expectation.transition,
+    },
+    ownerId: owner.authUserId,
+    submissionId: state.case.submissionId,
+    submissionStatus,
+  };
+}
+
 async function verifyInitialOwnerCaseBeforeFirstWrite(input: {
   browser: Browser;
   caseMarker: string;
@@ -540,15 +608,15 @@ async function verifyInitialOwnerCaseBeforeFirstWrite(input: {
     await reloadCanonicalWorkspace(ownerSession);
     expect(
       await agentSubmissionPresence(ownerSession.page, submissionId),
-      "A1-F6 must belong to the checkpoint owner before the first lifecycle write.",
+      `${state.case.caseKey} must belong to the checkpoint owner before the first lifecycle write.`,
     ).toBe(true);
     expect(
       await agentActionPresence(ownerSession.page, submissionId, "Закрыто"),
-      "A1-F6 must be in the completed agent queue while submitted for review.",
+      `${state.case.caseKey} must be in the completed agent queue while submitted for review.`,
     ).toBe(true);
     expect(
       await agentActionPresence(ownerSession.page, submissionId, "Открыто"),
-      "A1-F6 must not already carry an open agent action before the lifecycle starts.",
+      `${state.case.caseKey} must not already carry an open agent action before the lifecycle starts.`,
     ).toBe(false);
     const root = await openAgentSubmissionDrawer(ownerSession.page, submissionId);
     await assertDrawerCaseMarker(root, caseMarker);
@@ -589,6 +657,11 @@ async function addLifecycleIssue(
     session.mutationGate,
     saveDraftRpcPath,
     "add lifecycle issue",
+    await lifecycleMutationContract(state, "waiting_review", "open", {
+      actorSource: "admin",
+      correctionMode: "append",
+      snapshotStatus: "submitted_for_review",
+    }),
     () => remark.getByRole("button", { name: "Отправить замечание" }).click(),
   );
   await expect(remark).toHaveCount(0);
@@ -626,11 +699,11 @@ async function ensureAdminReturned(input: {
       const inExport = await adminExportPresence(session.page, submissionId);
       invariant(
         !inExport,
-        "A1-F6 reached Export before the mandatory return/fix/resubmit lifecycle completed.",
+        `${state.case.caseKey} reached Export before the mandatory return/fix/resubmit lifecycle completed.`,
       );
       invariant(
         state.stage === "returning",
-        "A1-F6 disappeared from Review before the return action was checkpointed.",
+        `${state.case.caseKey} disappeared from Review before the return action was checkpointed.`,
       );
       return;
     }
@@ -683,6 +756,17 @@ async function ensureAdminReturned(input: {
       session.mutationGate,
       saveDraftRpcPath,
       "return with lifecycle issue",
+      await lifecycleMutationContract(state, "returned", "open", {
+        actorSource: "admin",
+        correctionMode: "existing",
+        snapshotStatus: "returned",
+        transition: {
+          comment: "Статус изменен: Возвращено: Администратор вернул подачу с замечаниями",
+          fromStatus: "submitted_for_review",
+          note: "Администратор вернул подачу с замечаниями",
+          toStatus: "returned",
+        },
+      }),
       () => returnButton.click(),
     );
     state.stage = "returned";
@@ -799,7 +883,7 @@ async function ensureAgentResubmitted(input: {
             "agent_fixed",
             "resubmitting",
           ].includes(state.stage),
-          "A1-F6 reached the completed agent queue without a resubmission intent checkpoint.",
+          `${state.case.caseKey} reached the completed agent queue without a resubmission intent checkpoint.`,
         );
         state.stage = "resubmitted";
         await persistLifecycleStage(state);
@@ -809,11 +893,11 @@ async function ensureAgentResubmitted(input: {
         ["fixing_issue", "marking_issue_fixed", "agent_fixed", "resubmitting"].includes(
           state.stage,
         ),
-        "A1-F6 is absent from the open agent queue before a saved issue-fix intent checkpoint.",
+        `${state.case.caseKey} is absent from the open agent queue before a saved issue-fix intent checkpoint.`,
       );
       expect(
         await agentActionPresence(session.page, submissionId, "Открыто"),
-        "A1-F6 must remain in agent actions while a saved fix is awaiting resubmission.",
+        `${state.case.caseKey} must remain in agent actions while a saved fix is awaiting resubmission.`,
       ).toBe(true);
     } else {
       invariant(
@@ -825,7 +909,7 @@ async function ensureAgentResubmitted(input: {
           "agent_fixed",
           "resubmitting",
         ].includes(state.stage),
-        "A1-F6 is in the open agent queue after an incompatible lifecycle checkpoint.",
+        `${state.case.caseKey} is in the open agent queue after an incompatible lifecycle checkpoint.`,
       );
     }
 
@@ -861,6 +945,11 @@ async function ensureAgentResubmitted(input: {
           session.mutationGate,
           saveDraftRpcPath,
           "agent saves lifecycle audit-note correction",
+          await lifecycleMutationContract(state, "returned", "open", {
+            actorSource: "agent",
+            correctionMode: "existing",
+            snapshotStatus: "returned",
+          }),
           async () => {
             await noteControl.fill(correctedNote);
             await noteControl.press("Tab");
@@ -890,6 +979,11 @@ async function ensureAgentResubmitted(input: {
         session.mutationGate,
         saveDraftRpcPath,
         "agent marks lifecycle issue fixed",
+        await lifecycleMutationContract(state, "returned", "fixed", {
+          actorSource: "agent",
+          correctionMode: "existing",
+          snapshotStatus: "returned",
+        }),
         () => markFixed.click(),
       );
       await expect(issueContext.issueCard).toContainText(/Исправлено|Ждет проверки/);
@@ -940,6 +1034,17 @@ async function ensureAgentResubmitted(input: {
       session.mutationGate,
       submitCorrectionsRpcPath,
       "agent resubmits lifecycle corrections",
+      await lifecycleMutationContract(state, "waiting_review", "fixed", {
+        actorSource: "agent",
+        correctionMode: "existing",
+        snapshotStatus: "corrections_received",
+        transition: {
+          comment: "Статус изменен: Исправления получены: Агент отправил исправления",
+          fromStatus: "returned",
+          note: "Агент отправил исправления",
+          toStatus: "corrections_received",
+        },
+      }),
       () => resubmit.click(),
     );
     await expect(
@@ -990,7 +1095,7 @@ async function ensureReturnedAccepted(input: {
       );
       invariant(
         state.stage === "accepting",
-        "A1-F6 reached Export without a saved acceptance intent checkpoint.",
+        `${state.case.caseKey} reached Export without a saved acceptance intent checkpoint.`,
       );
       assertProductionLifecycleAcceptanceProof(state, caseMarker);
       await assertAdminExportCaseReady(session.page, submissionId);
@@ -1001,7 +1106,7 @@ async function ensureReturnedAccepted(input: {
 
     invariant(
       ["resubmitted", "accepting"].includes(state.stage),
-      "A1-F6 returned to admin Review before a resubmission checkpoint.",
+      `${state.case.caseKey} returned to admin Review before a resubmission checkpoint.`,
     );
     state.stage = "resubmitted";
     await persistLifecycleStage(state);
@@ -1025,6 +1130,18 @@ async function ensureReturnedAccepted(input: {
       session.mutationGate,
       saveDraftRpcPath,
       "accept corrected lifecycle record",
+      await lifecycleMutationContract(state, "ready_for_excel", "closed", {
+        actorSource: "admin",
+        correctionMode: "existing",
+        snapshotStatus: "ready_for_export",
+        transition: {
+          comment:
+            "Статус изменен: Готово к выгрузке: Администратор закрыл исправления и принял подачу",
+          fromStatus: "corrections_received",
+          note: "Администратор закрыл исправления и принял подачу",
+          toStatus: "ready_for_export",
+        },
+      }),
       () => accept.click(),
     );
     state.stage = "accepted";
@@ -1062,15 +1179,15 @@ async function verifyFinalStateAfterFreshRelogin(input: {
     await reloadCanonicalWorkspace(ownerSession);
     expect(
       await agentSubmissionPresence(ownerSession.page, state.case.submissionId),
-      "Accepted A1-F6 must remain visible in owner My submissions.",
+      `Accepted ${state.case.caseKey} must remain visible in owner My submissions.`,
     ).toBe(true);
     expect(
       await agentActionPresence(ownerSession.page, state.case.submissionId, "Открыто"),
-      "Accepted A1-F6 must be absent from the owner open queue.",
+      `Accepted ${state.case.caseKey} must be absent from the owner open queue.`,
     ).toBe(false);
     expect(
       await agentActionPresence(ownerSession.page, state.case.submissionId, "Закрыто"),
-      "Accepted A1-F6 must remain visible in the completed owner queue.",
+      `Accepted ${state.case.caseKey} must remain visible in the completed owner queue.`,
     ).toBe(true);
     const root = await openAgentSubmissionDrawer(
       ownerSession.page,
@@ -1107,7 +1224,7 @@ async function verifyFinalStateAfterFreshRelogin(input: {
 }
 
 test.describe("production lifecycle for existing audit cohort records", () => {
-  test("resumes A1-S1 admin-return-agent-fix-admin-accept through UI only", async ({
+  test(`resumes ${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} admin-return-agent-fix-admin-accept through UI only`, async ({
     browser,
   }, testInfo) => {
     test.setTimeout(1_800_000);

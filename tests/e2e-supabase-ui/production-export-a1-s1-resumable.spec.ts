@@ -1,10 +1,13 @@
 import { File } from "node:buffer";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 import {
   expect,
   test,
   type Browser,
   type BrowserContext,
+  type Download,
   type Page,
   type TestInfo,
 } from "@playwright/test";
@@ -29,12 +32,12 @@ import {
 import {
   StrictProductionA1S1ExportNetworkGate,
   acquireProductionA1S1ExportLock,
-  REQUIRED_PRODUCTION_A1_S1_EXPORT_REPAIR_UNLOCK,
+  PRODUCTION_EXPORT_CASE_KEY,
+  assertProductionA2S1ExportResumeUnlock,
   assertProductionA1S1ExportWriteUnlock,
   downloadA1S1ExportBytes,
   loadAcceptedA1S1ProductionExportCase,
   productionA1S1ExportDigest,
-  repairIncompleteA1S1ProductionExport,
   resolveA1S1ProductionExportPreflight,
   saveProductionA1S1ExportState,
   verifyA1S1ProductionExportFinalState,
@@ -43,6 +46,7 @@ import {
   type ProductionA1S1ExportPreflight,
   type ProductionA1S1ExportNetworkContract,
   type ProductionA1S1ExportState,
+  type ProductionA1S1VerifiedArtifactContract,
   type SanitizedA1S1WorkbookProof,
   type SanitizedA1S1ZipProof,
 } from "./production-export-a1-s1-helpers";
@@ -67,15 +71,15 @@ type SessionEvidence = {
 
 type ExportEvidence = {
   case?: {
-    caseKey: "A1-S1";
+    caseKey: typeof PRODUCTION_EXPORT_CASE_KEY;
     caseMarkerDigest: string;
-    city: "Москва";
+    city: ProductionCohortCase["city"];
     submissionDigest: string;
   };
   constraints: {
     credentialsPersistedInEvidence: false;
     directTableWritesFromHarness: false;
-    existingAcceptedA1S1Only: true;
+    existingAcceptedSingleCaseOnly: true;
     mockDemoFixtureDataLayerUsed: false;
     piiArtifactsPersisted: false;
     recoveryRpcWriteFromHarness: boolean;
@@ -87,6 +91,11 @@ type ExportEvidence = {
   excel?: SanitizedA1S1WorkbookProof;
   finalState?: ProductionA1S1ExportFinalStateProof;
   finishedAt?: string;
+  globalReconciliation?: {
+    checkedAt: string;
+    outputDigest: string;
+    phase: "pre_export_a2_s1";
+  };
   postStatus?: "exported";
   preStatus?: "ready_for_excel";
   preflight?: ProductionA1S1ExportPreflight;
@@ -108,12 +117,24 @@ type WorkbookInspection = {
   proof: SanitizedA1S1WorkbookProof;
 };
 
+type ZipInspection = {
+  artifactContract: ProductionA1S1VerifiedArtifactContract;
+  proof: SanitizedA1S1ZipProof;
+};
+
+const execFileAsync = promisify(execFile);
+
 const exportDocumentTypes = [
   "passport_scan",
   "selfie_1",
   "selfie_2",
   "visa_form",
 ] as const;
+const exportLocationByCity: Record<ProductionCohortCase["city"], string> = {
+  "Казань": "KZN",
+  "Москва": "MOW",
+  "Санкт-Петербург": "SPB",
+};
 const zipDownloadTimeoutMs = 180_000;
 
 function invariant(condition: unknown, message: string): asserts condition {
@@ -165,11 +186,11 @@ async function inspectWorkbook(
       cohortCase.type === "single" &&
       rows.length === 1 &&
       rows[0]?.length === EXPORT_WORKBOOK_COLUMN_COUNT,
-    "Workbook does not contain exactly one complete A1-S1 applicant row.",
+    `Workbook does not contain exactly one complete ${cohortCase.caseKey} applicant row.`,
   );
   const row = rows[0]!;
   invariant(
-    workbookValue(headers, row, "Location") === "MOW" &&
+    workbookValue(headers, row, "Location") === exportLocationByCity[cohortCase.city] &&
       workbookValue(headers, row, "Address City") === cohortCase.city &&
       workbookValue(
         headers,
@@ -187,7 +208,7 @@ async function inspectWorkbook(
   invariant(
     passportNumbers.size === 1 &&
       [...passportNumbers].every((passport) => /^\d{9}$/.test(passport)),
-    "Workbook A1-S1 passport identity is absent or malformed.",
+    `Workbook ${cohortCase.caseKey} passport identity is absent or malformed.`,
   );
   return {
     passportNumbers,
@@ -231,7 +252,7 @@ async function inspectZip(
     submissionId: string;
     zipFileName: string;
   },
-): Promise<SanitizedA1S1ZipProof> {
+): Promise<ZipInspection> {
   const zip = await JSZip.loadAsync(bytes, { checkCRC32: true });
   const entries = Object.keys(zip.files)
     .filter((name) => !zip.files[name]?.dir)
@@ -255,8 +276,16 @@ async function inspectZip(
     applicantCount?: number;
     documentEntries?: string[];
     fileCount?: number;
-    package?: { submissionIds?: string[] };
+    package?: {
+      contentFingerprint?: string;
+      fileName?: string;
+      format?: string;
+      idempotencyKey?: string;
+      rowCount?: number;
+      submissionIds?: string[];
+    };
     requiredDocumentTypes?: string[];
+    workbookFileName?: string;
     submissions?: Array<{
       applicants?: Array<{
         documentTypes?: string[];
@@ -279,6 +308,25 @@ async function inspectZip(
         (type, index) => manifest.requiredDocumentTypes?.[index] === type,
       ),
     "ZIP manifest counts, identity, or required document types are incorrect.",
+  );
+  const packageIdentity = manifest.package;
+  const workbookFileName = workbookName.split("/").at(-1) ?? "";
+  invariant(
+    typeof packageIdentity?.contentFingerprint === "string" &&
+      packageIdentity.contentFingerprint.length > 0 &&
+      typeof packageIdentity.idempotencyKey === "string" &&
+      /^[a-z0-9]{7}$/.test(packageIdentity.idempotencyKey) &&
+      packageIdentity.format === "xlsx" &&
+      packageIdentity.rowCount === 1 &&
+      packageIdentity.fileName === workbookFileName &&
+      manifest.workbookFileName === workbookFileName &&
+      packageIdentity.fileName ===
+        `visaflow-export-${packageIdentity.idempotencyKey}.xlsx` &&
+      input.zipFileName ===
+        `visaflow-export-${packageIdentity.idempotencyKey}_documents.zip` &&
+      packageIdentity.submissionIds?.length === 1 &&
+      packageIdentity.submissionIds[0] === input.submissionId,
+    "ZIP package identity does not match its verified XLSX or selected A2-S1 submission.",
   );
   const manifestSubmission = manifest.submissions?.[0];
   const manifestApplicants = manifestSubmission?.applicants ?? [];
@@ -352,7 +400,7 @@ async function inspectZip(
         (types) =>
           types.size === 4 && exportDocumentTypes.every((type) => types.has(type)),
       ),
-    "The A1-S1 tourist must have three source documents and one questionnaire PDF.",
+    `The ${input.cohortCase.caseKey} tourist must have three source documents and one questionnaire PDF.`,
   );
 
   const workbookBytes = await zip.file(workbookName)!.async("uint8array");
@@ -373,18 +421,26 @@ async function inspectZip(
   );
 
   return {
-    applicantCount: 1,
-    byteDigest: productionA1S1ExportDigest(bytes),
-    byteLength: bytes.byteLength,
-    documentCount: 4,
-    downloadWaitMs: 0,
-    entryCount: 7,
-    questionnairePdfCount: 1,
-    workbookDigest: workbook.proof.byteDigest,
-    workbookFileNameDigest: productionA1S1ExportDigest(
-      workbookName.split("/").at(-1) ?? "",
-    ),
-    zipFileNameDigest: productionA1S1ExportDigest(input.zipFileName),
+    artifactContract: {
+      contentFingerprintDigest: productionA1S1ExportDigest(
+        packageIdentity.contentFingerprint,
+      ),
+      idempotencyKeyDigest: productionA1S1ExportDigest(packageIdentity.idempotencyKey),
+      workbookFileNameDigest: productionA1S1ExportDigest(workbookFileName),
+      zipFileNameDigest: productionA1S1ExportDigest(input.zipFileName),
+    },
+    proof: {
+      applicantCount: 1,
+      byteDigest: productionA1S1ExportDigest(bytes),
+      byteLength: bytes.byteLength,
+      documentCount: 4,
+      downloadWaitMs: 0,
+      entryCount: 7,
+      questionnairePdfCount: 1,
+      workbookDigest: workbook.proof.byteDigest,
+      workbookFileNameDigest: productionA1S1ExportDigest(workbookFileName),
+      zipFileNameDigest: productionA1S1ExportDigest(input.zipFileName),
+    },
   };
 }
 
@@ -392,7 +448,7 @@ function baseUrl(testInfo: TestInfo) {
   const value = testInfo.project.use.baseURL;
   invariant(
     typeof value === "string" && value.length > 0,
-    "Production A1-S1 export Playwright baseURL is required.",
+    `Production ${PRODUCTION_EXPORT_CASE_KEY} export Playwright baseURL is required.`,
   );
   return value;
 }
@@ -472,7 +528,10 @@ async function closeSession(session: ExportSession, evidence: ExportEvidence) {
       session.gate.assertReadOnly();
     }
     session.ledger.assertNoOriginViolations();
-    invariant(browserProblems.count === 0, "Production A1-S1 export emitted browser errors.");
+    invariant(
+      browserProblems.count === 0,
+      `Production ${PRODUCTION_EXPORT_CASE_KEY} export emitted browser errors.`,
+    );
   } finally {
     await session.context.close();
   }
@@ -524,7 +583,7 @@ async function openExport(page: Page, submissionId: string) {
   return exportRow(page, submissionId);
 }
 
-async function selectOnlyA1S1(
+async function selectOnlySelectedCase(
   page: Page,
   input: { city: string; submissionId: string },
 ) {
@@ -584,11 +643,50 @@ async function downloadAndInspectZip(
     });
     await expect(button).toBeEnabled();
     const exportStartedAt = Date.now();
-    const downloadPromise = session.page.waitForEvent("download", {
-      timeout: zipDownloadTimeoutMs,
-    });
+    const downloadOutcome = session.page
+      .waitForEvent("download", { timeout: zipDownloadTimeoutMs })
+      .then(
+        (download) => ({ download, kind: "download" as const }),
+        () => ({ kind: "timeout" as const }),
+      );
+    const uiErrorOutcome = session.page
+      .waitForFunction(
+        () => {
+          const browserGlobal = globalThis as unknown as {
+            document: {
+              querySelector: (selector: string) => {
+                classList: { contains: (value: string) => boolean };
+              } | null;
+            };
+          };
+          return (
+            browserGlobal.document
+              .querySelector("#export-action-hint")
+              ?.classList.contains("text-[#d59aa3]") === true
+          );
+        },
+        undefined,
+        { timeout: zipDownloadTimeoutMs },
+      )
+      .then(
+        () => ({ kind: "ui-error" as const }),
+        () => ({ kind: "no-ui-error" as const }),
+      );
     await button.click();
-    const download = await downloadPromise.catch(async () => {
+    const outcome = await Promise.race([downloadOutcome, uiErrorOutcome]);
+    let download: Download | undefined;
+    if (outcome.kind === "download") {
+      download = outcome.download;
+    } else if (outcome.kind === "ui-error") {
+      const hint = await session.page
+        .locator("#export-action-hint")
+        .textContent()
+        .catch(() => "");
+      const hintDigest = productionA1S1ExportDigest(hint ?? "").slice(0, 16);
+      throw new Error(
+        `${PRODUCTION_EXPORT_CASE_KEY} ZIP UI failed before download (hintDigest=${hintDigest}).`,
+      );
+    } else {
       const [buttonText, hint] = await Promise.all([
         button.textContent().catch(() => ""),
         session.page
@@ -601,9 +699,10 @@ async function downloadAndInspectZip(
         : "settled";
       const hintDigest = productionA1S1ExportDigest(hint ?? "").slice(0, 16);
       throw new Error(
-        `A1-S1 ZIP download did not arrive within ${zipDownloadTimeoutMs}ms (phase=${phase}, hintDigest=${hintDigest}).`,
+        `${PRODUCTION_EXPORT_CASE_KEY} ZIP download did not arrive within ${zipDownloadTimeoutMs}ms (phase=${phase}, hintDigest=${hintDigest}).`,
       );
-    });
+    }
+    invariant(download, "ZIP download event resolved without a browser download.");
     invariant(
       /^visaflow-export-.+_documents\.zip$/.test(download.suggestedFilename()),
       "ZIP download filename is not canonical.",
@@ -615,11 +714,15 @@ async function downloadAndInspectZip(
       submissionId,
       zipFileName: download.suggestedFilename(),
     });
-    proof = { ...inspected, downloadWaitMs: Date.now() - exportStartedAt };
+    proof = {
+      ...inspected.proof,
+      downloadWaitMs: Date.now() - exportStartedAt,
+    };
     // Persist byte-level proof before allowing the UI's terminal RPCs through.
     state.zipProof = proof;
     state.stage = "artifact_verified";
     await saveProductionA1S1ExportState(state);
+    session.gate.bindVerifiedArtifact(inspected.artifactContract);
     session.gate.releaseExportMutations();
     await expect(session.page.locator("#export-action-hint")).toContainText(
       /ZIP скачан/,
@@ -705,11 +808,90 @@ function assertNoAutomaticResumeFromAmbiguousExport(
 ): void {
   invariant(
     state.stage !== "exporting",
-    "A1-S1 export checkpoint is ambiguous after ZIP intent. Automatic retry is forbidden; perform a read-only production reconciliation before any new export attempt.",
+    `${PRODUCTION_EXPORT_CASE_KEY} export checkpoint is ambiguous after ZIP intent. Automatic retry is forbidden; perform a read-only production reconciliation before any new export attempt.`,
   );
 }
 
-test.describe("production A1-S1 export artifact gate", () => {
+function sameProductionExportPreflight(
+  left: ProductionA1S1ExportPreflight,
+  right: ProductionA1S1ExportPreflight,
+) {
+  return (
+    left.applicantDigest === right.applicantDigest &&
+    left.documentAssetCount === right.documentAssetCount &&
+    left.documentAssetIdentityDigest === right.documentAssetIdentityDigest &&
+    left.mediaAssetCount === right.mediaAssetCount &&
+    left.mediaDigest === right.mediaDigest &&
+    left.rawStatus === right.rawStatus
+  );
+}
+
+async function recoverAmbiguousA2S1ExportCheckpoint(input: {
+  admin: ProductionCohortAccount;
+  ownerId: string;
+  state: ProductionA1S1ExportState;
+  submissionId: string;
+}) {
+  if (input.state.stage !== "exporting") return;
+  assertProductionA2S1ExportResumeUnlock();
+  invariant(
+    input.state.preflight && input.state.excelProof && !input.state.zipProof,
+    "Ambiguous A2-S1 export retry requires preflight and Excel proof without ZIP proof.",
+  );
+  const fresh = await resolveA1S1ProductionExportPreflight({
+    admin: input.admin,
+    ownerId: input.ownerId,
+    submissionId: input.submissionId,
+  });
+  invariant(
+    sameProductionExportPreflight(input.state.preflight, fresh.preflight),
+    "A2-S1 production facts changed after the ambiguous ZIP attempt; retry is forbidden.",
+  );
+  input.state.preflight = fresh.preflight;
+  input.state.stage = "excel_verified";
+  await saveProductionA1S1ExportState(input.state);
+}
+
+async function assertFreshPreExportA2S1Reconciliation(runMarker: string) {
+  const checkedAt = new Date().toISOString();
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      process.execPath,
+      ["scripts/reconcile-production-cohort.mjs"],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          V19_PRODUCTION_COHORT_EXPECTED_PHASE: "pre_export_a2_s1",
+          V19_PRODUCTION_COHORT_RUN_MARKER: runMarker,
+        },
+        maxBuffer: 1_000_000,
+      },
+    );
+    invariant(
+      stdout.includes("PASS read-only production cohort reconciliation."),
+      "A2-S1 pre-export reconciliation did not emit a PASS attestation.",
+    );
+    return {
+      checkedAt,
+      outputDigest: productionA1S1ExportDigest(`${stdout}\n${stderr}`).slice(0, 16),
+      phase: "pre_export_a2_s1" as const,
+    };
+  } catch (error) {
+    const record = error as { stderr?: unknown; stdout?: unknown };
+    const output = [record.stdout, record.stderr]
+      .filter((value): value is string => typeof value === "string")
+      .join("\n");
+    throw new Error(
+      `A2-S1 pre-export reconciliation failed (digest=${productionA1S1ExportDigest(
+        output || (error instanceof Error ? error.message : String(error)),
+      ).slice(0, 16)}).`,
+    );
+  }
+}
+
+test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} export artifact gate`, () => {
   test("downloads and verifies one real technical tourist package plus exact Excel through real UI", async ({
     browser,
   }, testInfo) => {
@@ -720,7 +902,7 @@ test.describe("production A1-S1 export artifact gate", () => {
       constraints: {
         credentialsPersistedInEvidence: false,
         directTableWritesFromHarness: false,
-        existingAcceptedA1S1Only: true,
+        existingAcceptedSingleCaseOnly: true,
         mockDemoFixtureDataLayerUsed: false,
         piiArtifactsPersisted: false,
         recoveryRpcWriteFromHarness: false,
@@ -743,23 +925,36 @@ test.describe("production A1-S1 export artifact gate", () => {
       releaseLock = await acquireProductionA1S1ExportLock(runMarker);
       const resolved = await loadAcceptedA1S1ProductionExportCase();
       state = resolved.state;
-      assertNoAutomaticResumeFromAmbiguousExport(state);
       const accounts = loadProductionCohortAccounts();
+      const submissionId = resolved.lifecycleState.case.submissionId;
       const owner = accounts.agents.find(
         (account) => account.key === resolved.cohortCase.ownerKey,
       );
-      invariant(owner, "Accepted A1-S1 owner account is unavailable.");
-      const submissionId = resolved.lifecycleState.case.submissionId;
+      invariant(
+        owner,
+        `Accepted ${PRODUCTION_EXPORT_CASE_KEY} owner account is unavailable.`,
+      );
+      evidence.globalReconciliation = await assertFreshPreExportA2S1Reconciliation(
+        runMarker,
+      );
+      await recoverAmbiguousA2S1ExportCheckpoint({
+        admin: accounts.admin,
+        ownerId: owner.authUserId,
+        state,
+        submissionId,
+      });
+      assertNoAutomaticResumeFromAmbiguousExport(state);
       evidence.case = {
-        caseKey: "A1-S1",
+        caseKey: PRODUCTION_EXPORT_CASE_KEY,
         caseMarkerDigest: productionA1S1ExportDigest(resolved.cohortCase.caseMarker),
-        city: "Москва",
+        city: resolved.cohortCase.city,
         submissionDigest: productionA1S1ExportDigest(submissionId),
       };
 
       if (state.stage === "pending" || state.stage === "excel_verified") {
         const resolvedPreflight = await resolveA1S1ProductionExportPreflight({
           admin: accounts.admin,
+          ownerId: owner.authUserId,
           submissionId,
         });
         const { networkContract, preflight } = resolvedPreflight;
@@ -777,7 +972,7 @@ test.describe("production A1-S1 export artifact gate", () => {
           networkContract,
         );
         try {
-          await selectOnlyA1S1(admin.page, {
+          await selectOnlySelectedCase(admin.page, {
             city: resolved.cohortCase.city,
             submissionId,
           });
@@ -829,21 +1024,6 @@ test.describe("production A1-S1 export artifact gate", () => {
         state.preflight && state.excelProof && state.zipProof,
         "Sanitized A1-S1 export proofs are incomplete.",
       );
-      if (
-        state.stage === "artifact_verified" &&
-        process.env.V19_PRODUCTION_A1_S1_EXPORT_REPAIR_UNLOCK ===
-          REQUIRED_PRODUCTION_A1_S1_EXPORT_REPAIR_UNLOCK
-      ) {
-        const repair = await repairIncompleteA1S1ProductionExport({
-          admin: accounts.admin,
-          preflight: state.preflight,
-          state,
-          submissionId,
-        });
-        evidence.repair = repair;
-        evidence.constraints.recoveryRpcWriteFromHarness =
-          repair.outcome === "repaired";
-      }
       const finalState = await verifyA1S1ProductionExportFinalState({
         admin: accounts.admin,
         preflight: state.preflight,

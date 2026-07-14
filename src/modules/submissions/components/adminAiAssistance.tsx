@@ -39,15 +39,13 @@ import type {
   SubmissionAction,
   SubmissionFile,
 } from "../types";
+import {
+  operationalDrawerCompactStatusLabel,
+  operationalDrawerSourceStatus,
+  type OperationalDrawerSourceStatus,
+} from "../operationalDrawerStatus";
 
-type SourceStatus =
-  | "draft"
-  | "in_progress"
-  | "submitted_for_review"
-  | "returned"
-  | "corrections_received"
-  | "ready_for_export"
-  | "exported";
+type SourceStatus = OperationalDrawerSourceStatus;
 
 type TabId = "overview" | "questionnaire" | "files" | "issues" | "history";
 
@@ -71,23 +69,23 @@ const drawerFocusableSelector = [
 
 const figmaSubmissionDrawerStyles = `
   :root {
-    --v20-screen-bg: #101012;
-    --v20-panel-bg: #131315;
-    --v20-card-bg: rgba(255, 255, 255, 0.025);
-    --v20-card-bg-strong: rgba(255, 255, 255, 0.045);
-    --v20-border: rgba(255, 255, 255, 0.105);
-    --v20-border-strong: rgba(255, 255, 255, 0.155);
-    --v20-text: #f4f2f8;
-    --v20-muted: rgba(244, 242, 248, 0.54);
-    --v20-muted-soft: rgba(244, 242, 248, 0.36);
-    --v20-accent: #6f63ff;
-    --v20-accent-soft: rgba(111, 99, 255, 0.18);
-    --v20-accent-border: rgba(111, 99, 255, 0.54);
-    --v20-warning: #eca5b5;
-    --v20-success: #bfc5ff;
-    --v20-radius-xl: 28px;
-    --v20-radius-lg: 22px;
-    --v20-radius-md: 16px;
+    --v20-screen-bg: var(--v19b-color-app);
+    --v20-panel-bg: var(--v19b-color-panel);
+    --v20-card-bg: var(--v19b-color-panel);
+    --v20-card-bg-strong: var(--v19b-color-control);
+    --v20-border: var(--v19b-color-border);
+    --v20-border-strong: var(--v19b-color-border-strong);
+    --v20-text: var(--v19b-color-text-strong);
+    --v20-muted: var(--v19b-color-text-muted);
+    --v20-muted-soft: var(--v19b-color-text-faint);
+    --v20-accent: var(--v19b-color-primary);
+    --v20-accent-soft: var(--vf-accent-soft);
+    --v20-accent-border: var(--vf-accent-border);
+    --v20-warning: var(--v19b-dot-warning);
+    --v20-success: var(--v19b-dot-success);
+    --v20-radius-xl: var(--v19b-radius-panel);
+    --v20-radius-lg: var(--v19b-radius-row);
+    --v20-radius-md: var(--v19b-radius-control);
   }
 
   .v20-drawer-overlay {
@@ -1828,6 +1826,248 @@ const figmaSubmissionDrawerStyles = `
       font-weight: 500;
     }
   }
+
+  /* V-19 operational convergence: keep the existing drawer flow, but align
+     its surfaces, density and action hierarchy with the live queue screens. */
+  .v20-submission-drawer {
+    width: min(var(--v19b-size-full), var(--v19b-size-840));
+    background: var(--v20-screen-bg);
+    border: var(--v19b-size-1) solid var(--v20-border-strong);
+    border-radius: var(--v20-radius-xl);
+    box-shadow: var(--v19b-shadow-panel);
+  }
+
+  .v20-drawer-topbar {
+    gap: var(--v19b-size-12);
+    min-height: var(--v19b-size-64);
+    padding: var(--v19b-size-12) var(--v19b-size-20);
+    border-bottom-color: var(--v20-border);
+    background: var(--v20-panel-bg);
+  }
+
+  .v20-icon-button {
+    width: var(--v19b-size-40);
+    height: var(--v19b-size-40);
+    border-color: var(--v20-border-strong);
+    border-radius: var(--v20-radius-md);
+    color: var(--v20-text);
+    background: var(--v20-card-bg-strong);
+  }
+
+  .v20-icon-button.is-close {
+    border-color: var(--v20-border-strong);
+    color: var(--v20-muted);
+    background: var(--v20-card-bg-strong);
+  }
+
+  .v20-icon-glyph,
+  .v20-icon-glyph.is-close {
+    font-size: var(--v19b-size-24);
+  }
+
+  .v20-title {
+    color: var(--v20-text);
+    font-size: var(--v19b-size-22);
+    font-weight: var(--v19b-weight-title);
+    letter-spacing: var(--v19b-letter-spacing-normal);
+  }
+
+  .v20-subtitle {
+    color: var(--v20-muted-soft);
+    font-size: var(--v19b-size-11);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+  }
+
+  .v20-status-pill {
+    min-height: var(--v19b-size-24);
+    padding: var(--v19b-size-4) var(--v19b-size-8);
+    border-color: var(--v20-border-strong);
+    color: var(--v20-muted);
+    background: var(--v20-card-bg-strong);
+  }
+
+  .v20-tabbar-wrap {
+    padding: var(--v19b-size-12) var(--v19b-size-20) var(--v19b-size-0);
+  }
+
+  .v20-tabbar {
+    gap: var(--v19b-size-2);
+  }
+
+  .v20-tab-button {
+    min-height: var(--v19b-size-40);
+    padding-inline: var(--v19b-size-12);
+    border-color: transparent;
+    border-radius: var(--v20-radius-md);
+    color: var(--v20-muted);
+    background: transparent;
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-tab-button.is-active {
+    border-color: transparent;
+    color: var(--v19b-color-primary-text);
+    background: var(--v20-accent-soft);
+    box-shadow: inset var(--v19b-size-0) calc(var(--v19b-size-2) * -1) var(--v20-accent);
+  }
+
+  .v20-tab-count {
+    min-width: var(--v19b-size-20);
+    height: var(--v19b-size-20);
+    color: var(--v20-text);
+    background: var(--v20-card-bg-strong);
+    font-size: var(--v19b-size-10);
+  }
+
+  .v20-drawer-body {
+    padding: var(--v19b-size-20) var(--v19b-size-24) var(--v19b-size-24);
+  }
+
+  .v20-section-stack {
+    gap: var(--v19b-size-20);
+  }
+
+  .v20-stat-grid {
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-stat-card,
+  .v20-card,
+  .v20-file-section,
+  .v20-questionnaire-card,
+  .v20-issue-card,
+  .v20-history-item {
+    border-color: var(--v20-border-strong);
+    border-radius: var(--v20-radius-lg);
+    background: var(--v20-card-bg);
+    box-shadow: var(--v19b-shadow-row-inner);
+  }
+
+  .v20-stat-card {
+    min-height: var(--v19b-size-92);
+    padding: var(--v19b-size-14);
+  }
+
+  .v20-stat-value {
+    color: var(--v20-text);
+    font-size: var(--v19b-size-28);
+  }
+
+  .v20-stat-label,
+  .v20-section-label,
+  .v20-info-title {
+    color: var(--v20-muted);
+    font-size: var(--v19b-size-11);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+  }
+
+  .v20-info-card {
+    min-height: var(--v19b-size-176);
+    padding: var(--v19b-size-20);
+  }
+
+  .v20-family-card {
+    padding: var(--v19b-size-24);
+  }
+
+  .v20-footer {
+    position: relative;
+    inset: auto;
+    gap: var(--v19b-size-12);
+    padding: var(--v19b-size-14) var(--v19b-size-24);
+    border-top-color: var(--v20-border);
+    background: var(--v20-panel-bg);
+  }
+
+  .v20-footer-note {
+    color: var(--v20-muted);
+    font-size: var(--v19b-size-12);
+  }
+
+  .v20-footer-actions {
+    grid-template-columns: auto minmax(var(--v19b-size-160), 1fr);
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-action-button {
+    min-height: var(--v19b-size-44);
+    padding-inline: var(--v19b-size-16);
+    border-radius: var(--v20-radius-md);
+    font-size: var(--v19b-size-14);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-action-button.is-ghost {
+    border-color: var(--v20-border-strong);
+    color: var(--v20-text);
+    background: var(--v20-card-bg-strong);
+  }
+
+  .v20-action-button.is-primary {
+    border-color: var(--v20-accent-border);
+    background: var(--v20-accent);
+    box-shadow: none;
+  }
+
+  @media (max-width: 760px) {
+    .v20-submission-drawer {
+      width: var(--v19b-size-full);
+      border: var(--v19b-size-0);
+      border-radius: var(--v19b-radius-row) var(--v19b-radius-row) var(--v19b-size-0) var(--v19b-size-0);
+    }
+
+    .v20-drawer-topbar {
+      min-height: var(--v19b-size-56);
+      padding: var(--v19b-size-8) var(--v19b-size-16);
+    }
+
+    .v20-title {
+      font-size: var(--v19b-size-20);
+    }
+
+    .v20-subtitle {
+      display: flex;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .v20-tabbar-wrap {
+      padding-inline: var(--v19b-size-16);
+    }
+
+    .v20-drawer-body {
+      padding: var(--v19b-size-16);
+    }
+
+    .v20-footer {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+      padding: var(--v19b-size-12) var(--v19b-size-16) max(var(--v19b-size-12), env(safe-area-inset-bottom));
+    }
+
+    .v20-footer-note {
+      display: block;
+      overflow: visible;
+      white-space: normal;
+    }
+
+    .v20-footer-actions {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    }
+  }
+
+  @media (max-width: 460px) {
+    .v20-two-col,
+    .v20-questionnaire-grid,
+    .v20-footer-actions {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    }
+
+    .v20-action-button {
+      min-height: var(--v19b-size-48);
+    }
+  }
 `;
 
 function getDrawerFocusableElements(container: HTMLElement | null) {
@@ -1905,15 +2145,6 @@ type FigmaSubmissionDrawerProps = {
   [key: string]: unknown;
 };
 
-function sourceStatus(submission: Submission): SourceStatus {
-  if (submission.status === "draft") return "draft";
-  if (submission.status === "returned") return "returned";
-  if (submission.status === "submitted_for_review") return "submitted_for_review";
-  if (submission.status === "ready_for_export") return "ready_for_export";
-  if (submission.status === "exported") return "exported";
-  return "in_progress";
-}
-
 function applicantRoleLabel(role: string) {
   if (role === "main") return "Основной";
   if (role === "spouse") return "Супруга";
@@ -1950,7 +2181,7 @@ function buildDetail(submission: Submission): FigmaSubmissionDetail {
       (issue) => issue.status !== "closed_by_admin",
     ).length,
     owner: "Татьяна Н.",
-    status: sourceStatus(submission),
+    status: operationalDrawerSourceStatus(submission),
     title: submission.title,
     tripDates: `${submission.tripDateFrom.replace("-", "–")} – ${submission.tripDateTo.replace("-", "–")}`,
     type: submission.type,
@@ -2039,15 +2270,6 @@ const Skeleton = ({
   className?: string;
   variant?: "panel" | "stat" | "title";
 }) => <div className={`v20-skeleton is-${variant} ${className}`} />;
-
-function compactStatusLabel(status: SourceStatus) {
-  if (status === "returned") return "возвращено";
-  if (status === "submitted_for_review") return "проверка";
-  if (status === "ready_for_export") return "готово";
-  if (status === "exported") return "выгружено";
-  if (status === "in_progress") return "в работе";
-  return "черновик";
-}
 
 function isFileReady(file: SubmissionFile) {
   return file.status !== "missing" && file.status !== "needs_replacement";
@@ -2824,7 +3046,7 @@ function screenMeta(data: FigmaSubmissionDetail) {
   return [
     data.id,
     data.type === "family" ? "семейная" : "индивидуальная",
-    compactStatusLabel(data.status),
+    operationalDrawerCompactStatusLabel(data.status),
   ].join(" · ");
 }
 
@@ -3093,7 +3315,7 @@ export function FigmaSubmissionDrawer({
               <div className="v20-subtitle">
                 <span>{screenMeta(data)}</span>
                 <span className={`v20-status-pill ${data.status === "returned" ? "is-warning" : ""}`}>
-                  {compactStatusLabel(data.status)}
+                  {operationalDrawerCompactStatusLabel(data.status)}
                 </span>
               </div>
             </div>
@@ -3190,7 +3412,7 @@ export function FigmaSubmissionDrawer({
                     type="button"
                     onClick={onClose}
                   >
-                    Сохранить черновик
+                    Закрыть
                   </button>
                   <button
                     className={`v20-action-button ${data.status === "returned" ? "is-warning" : "is-primary"}`}

@@ -1,6 +1,6 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
@@ -20,17 +20,39 @@ import {
   type ProductionCohortCase,
 } from "./production-cohort-helpers";
 import {
-  RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
+  acquireProductionCohortMutationLock,
   assertProductionLifecycleAcceptanceProof,
+  productionDraftPayloadMatches,
+  productionDraftValueDigest,
   productionLifecycleStatePath,
+  requiredProductionLifecycleCaseKey,
+  type ProductionDraftPayloadIdentityContract,
+  type ProductionDraftPayloadMutationContract,
+  type ProductionSingleCaseKey,
   type ProductionLifecycleState,
 } from "./production-lifecycle-helpers";
 
 export const REQUIRED_PRODUCTION_A1_S1_EXPORT_WRITE_UNLOCK =
   "I_UNDERSTAND_A1_S1_EXPORT_DOWNLOAD";
+export const REQUIRED_PRODUCTION_A2_S1_EXPORT_WRITE_UNLOCK =
+  "I_UNDERSTAND_A2_S1_EXPORT_DOWNLOAD";
+export const REQUIRED_PRODUCTION_A2_S1_EXPORT_RESUME_UNLOCK =
+  "I_UNDERSTAND_A2_S1_EXPORT_RETRY_AFTER_RECONCILIATION";
 export const REQUIRED_PRODUCTION_A1_S1_EXPORT_REPAIR_UNLOCK =
   "I_UNDERSTAND_A1_S1_TERMINAL_REPAIR";
 export const PRODUCTION_A1_S1_EXPORT_CASE_KEY = "A1-S1";
+export const PRODUCTION_A2_S1_EXPORT_CASE_KEY = "A2-S1";
+
+function requiredProductionExportCaseKey(): typeof PRODUCTION_A2_S1_EXPORT_CASE_KEY {
+  const caseKey = requiredProductionLifecycleCaseKey();
+  invariant(
+    caseKey === PRODUCTION_A2_S1_EXPORT_CASE_KEY,
+    "The production export runner must use the same explicit A2-S1 lifecycle case.",
+  );
+  return PRODUCTION_A2_S1_EXPORT_CASE_KEY;
+}
+
+export const PRODUCTION_EXPORT_CASE_KEY = PRODUCTION_A2_S1_EXPORT_CASE_KEY;
 
 export type ProductionA1S1ExportStage =
   | "pending"
@@ -63,7 +85,7 @@ export type SanitizedA1S1ZipProof = {
 };
 
 export type ProductionA1S1ExportState = {
-  caseKey: typeof PRODUCTION_A1_S1_EXPORT_CASE_KEY;
+  caseKey: ProductionSingleCaseKey;
   caseMarkerDigest: string;
   excelProof?: SanitizedA1S1WorkbookProof;
   /**
@@ -109,9 +131,23 @@ export type ProductionA1S1ExportPreflight = {
  * resumable checkpoint or evidence because it contains raw database IDs.
  */
 export type ProductionA1S1ExportNetworkContract = {
+  adminId: string;
+  draft: ProductionDraftPayloadIdentityContract;
   documentAssetIds: readonly string[];
+  ownerId: string;
   preCommitStatus: "ready_for_excel";
   submissionId: string;
+};
+
+/**
+ * Derived from the already byte-verified ZIP manifest and kept in memory only.
+ * Digests avoid persisting the PII-bearing export content fingerprint.
+ */
+export type ProductionA1S1VerifiedArtifactContract = {
+  contentFingerprintDigest: string;
+  idempotencyKeyDigest: string;
+  workbookFileNameDigest: string;
+  zipFileNameDigest: string;
 };
 
 export type ResolvedA1S1ProductionExportPreflight = {
@@ -139,7 +175,9 @@ type ObservedMutation = {
 };
 
 type ProductionSubmissionRow = {
+  agent_id: string;
   exported_at: string | null;
+  family_intelligence: unknown;
   id: string;
   status: string;
 };
@@ -167,8 +205,29 @@ type ProductionMediaAssetRow = {
 };
 
 type ProductionCorrectionRow = {
+  applicant_id: string | null;
+  field_key: string | null;
+  id: string;
+  media_type: string | null;
+  reason: string;
   severity: string;
+  scope: string;
   status: string;
+  submission_id: string;
+};
+
+type ProductionApplicantRow = {
+  id: string;
+  submission_id: string;
+};
+
+type ProductionQuestionnaireAnswerRow = {
+  applicant_id: string;
+  field_id: string;
+  label: string;
+  section_id: string;
+  submission_id: string;
+  value: unknown;
 };
 
 type ProductionExportBatchRow = {
@@ -192,7 +251,13 @@ type ProductionDocumentExportEventRow = {
 };
 
 type ProductionStatusHistoryRow = {
+  comment: string;
+  entity_id: string;
+  entity_type: "submission";
   from_status: string | null;
+  id: string;
+  note: string | null;
+  source: "admin" | "agent" | "bb" | "system";
   to_status: string;
 };
 
@@ -242,12 +307,8 @@ function exactStringSet(value: unknown, expected: readonly string[]) {
   );
 }
 
-/**
- * Parses only in memory. Callers intentionally receive a boolean rather than
- * an error/body so request payloads cannot leak into test logs or evidence.
- */
-function requestJsonRecord(request: Request): JsonRecord | null {
-  const body = request.postData();
+/** Parses only in memory so request payloads cannot leak into diagnostics. */
+function requestBodyJsonRecord(body: string | null): JsonRecord | null {
   if (!body) return null;
   try {
     return jsonRecord(JSON.parse(body));
@@ -260,6 +321,115 @@ export function productionA1S1ExportDigest(value: string | Uint8Array) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function digestMatches(value: unknown, expectedDigest: string) {
+  return (
+    typeof value === "string" &&
+    productionA1S1ExportDigest(value) === expectedDigest
+  );
+}
+
+function exportPayloadRecord(body: string | null) {
+  return jsonRecord(requestBodyJsonRecord(body)?.payload);
+}
+
+function exportDraftPayloadContract(
+  networkContract: ProductionA1S1ExportNetworkContract,
+): ProductionDraftPayloadMutationContract {
+  return {
+    correction: { mode: "exact", reasonIncludes: "", status: "closed" },
+    draft: networkContract.draft,
+    history: {
+      actorId: networkContract.adminId,
+      actorSource: "admin",
+      snapshotStatus: "ready_for_export",
+    },
+    ownerId: networkContract.ownerId,
+    submissionId: networkContract.submissionId,
+  };
+}
+
+function baseExportPayloadMatches(
+  body: string | null,
+  key: string,
+  networkContract: ProductionA1S1ExportNetworkContract,
+) {
+  const payload = exportPayloadRecord(body);
+  if (!payload) return false;
+
+  if (key === "POST /rest/v1/rpc/save_submission_draft") {
+    const submission = jsonRecord(payload.submission);
+    return (
+      submission?.id === networkContract.submissionId &&
+      submission.agent_id === networkContract.ownerId &&
+      submission.status === networkContract.preCommitStatus &&
+      submission.exported_at === null &&
+      productionDraftPayloadMatches(payload, exportDraftPayloadContract(networkContract))
+    );
+  }
+
+  if (key === "POST /rest/v1/rpc/complete_export_package") {
+    const batch = jsonRecord(payload.batch);
+    const documentExport = jsonRecord(payload.document_export);
+    return (
+      batch?.format === "xlsx" &&
+      batch.row_count === 1 &&
+      exactStringSet(batch.submission_ids, [networkContract.submissionId]) &&
+      documentExport?.applicant_count === 1 &&
+      documentExport.file_count === 4 &&
+      exactStringSet(documentExport.asset_ids, networkContract.documentAssetIds)
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Compares a browser-owned terminal payload with the verified ZIP/XLSX
+ * identity in memory. It deliberately returns only a boolean so raw export
+ * contents and production IDs never reach evidence or diagnostics.
+ */
+export function productionA1S1ExportPayloadMatches(
+  body: string | null,
+  key: string,
+  networkContract: ProductionA1S1ExportNetworkContract,
+  artifactContract: ProductionA1S1VerifiedArtifactContract,
+) {
+  if (!baseExportPayloadMatches(body, key, networkContract)) return false;
+  const payload = exportPayloadRecord(body);
+  if (!payload) return false;
+
+  if (key === "POST /rest/v1/rpc/save_submission_draft") {
+    const submission = jsonRecord(payload.submission);
+    const intelligence = jsonRecord(submission?.family_intelligence);
+    const snapshot = jsonRecord(intelligence?.v19CockpitSnapshot);
+    const snapshotSubmission = jsonRecord(snapshot?.submission);
+    const exportPackage = jsonRecord(snapshotSubmission?.exportPackage);
+    return (
+      snapshotSubmission?.id === networkContract.submissionId &&
+      snapshotSubmission.agentId === networkContract.ownerId &&
+      exportPackage?.format === "xlsx" &&
+      exportPackage.rowCount === 1 &&
+      exactStringSet(exportPackage.submissionIds, [networkContract.submissionId]) &&
+      digestMatches(
+        exportPackage.contentFingerprint,
+        artifactContract.contentFingerprintDigest,
+      ) &&
+      digestMatches(exportPackage.idempotencyKey, artifactContract.idempotencyKeyDigest) &&
+      digestMatches(exportPackage.fileName, artifactContract.workbookFileNameDigest)
+    );
+  }
+
+  const batch = jsonRecord(payload.batch);
+  const documentExport = jsonRecord(payload.document_export);
+  return (
+    digestMatches(batch?.content_fingerprint, artifactContract.contentFingerprintDigest) &&
+    digestMatches(batch?.idempotency_key, artifactContract.idempotencyKeyDigest) &&
+    digestMatches(batch?.file_name, artifactContract.workbookFileNameDigest) &&
+    digestMatches(documentExport?.workbook_file_name, artifactContract.workbookFileNameDigest) &&
+    digestMatches(documentExport?.zip_file_name, artifactContract.zipFileNameDigest)
+  );
+}
+
 function digestFacts(values: string[]) {
   return productionA1S1ExportDigest([...values].sort().join("\n"));
 }
@@ -268,7 +438,9 @@ async function readJson<T>(path: string): Promise<T> {
   try {
     return JSON.parse(await readFile(path, "utf8")) as T;
   } catch {
-    throw new Error(`Required A1-S1 export JSON is missing or invalid: ${path}`);
+    throw new Error(
+      `Required ${PRODUCTION_EXPORT_CASE_KEY} export JSON is missing or invalid: ${path}`,
+    );
   }
 }
 
@@ -282,43 +454,45 @@ async function writeJsonAtomic(path: string, value: unknown) {
 }
 
 export function assertProductionA1S1ExportWriteUnlock() {
+  requiredProductionExportCaseKey();
   invariant(
     process.env.SUPABASE_PRODUCTION_E2E_UNLOCK === "1",
     "SUPABASE_PRODUCTION_E2E_UNLOCK=1 is required.",
   );
   invariant(
-    process.env.V19_PRODUCTION_A1_S1_EXPORT_WRITE_UNLOCK ===
-      REQUIRED_PRODUCTION_A1_S1_EXPORT_WRITE_UNLOCK,
-    "The dedicated A1-S1 production export unlock is absent.",
+    process.env.V19_PRODUCTION_A2_S1_EXPORT_WRITE_UNLOCK ===
+      REQUIRED_PRODUCTION_A2_S1_EXPORT_WRITE_UNLOCK,
+    "The dedicated A2-S1 production export unlock is absent.",
   );
   invariant(
     process.env.V19_PRODUCTION_COHORT_CONFIRM_PROJECT_REF === PRODUCTION_PROJECT_REF,
-    "The A1-S1 production export project-ref confirmation is absent or wrong.",
+    `The ${PRODUCTION_EXPORT_CASE_KEY} production export project-ref confirmation is absent or wrong.`,
   );
 }
 
 export function assertProductionA1S1ExportRepairUnlock() {
+  throw new Error(
+    "Terminal repair is prohibited for the A2-S1 production export rollout.",
+  );
+}
+
+export function assertProductionA2S1ExportResumeUnlock() {
   assertProductionA1S1ExportWriteUnlock();
   invariant(
-    process.env.V19_PRODUCTION_A1_S1_EXPORT_REPAIR_UNLOCK ===
-      REQUIRED_PRODUCTION_A1_S1_EXPORT_REPAIR_UNLOCK,
-    "The dedicated A1-S1 terminal repair unlock is absent.",
+    process.env.V19_PRODUCTION_A2_S1_EXPORT_RESUME_UNLOCK ===
+      REQUIRED_PRODUCTION_A2_S1_EXPORT_RESUME_UNLOCK,
+    "The dedicated A2-S1 post-reconciliation export resume unlock is absent.",
   );
 }
 
-export function productionA1S1ExportStatePath(runMarker: string) {
+export function productionA1S1ExportStatePath(
+  runMarker: string,
+  caseKey = PRODUCTION_EXPORT_CASE_KEY,
+) {
   return resolve(
     process.cwd(),
-    `.production-export-${runMarker}-${PRODUCTION_A1_S1_EXPORT_CASE_KEY}.state.local.json`,
+    `.production-export-${runMarker}-${caseKey}.state.local.json`,
   );
-}
-
-function productionExportLockPath(runMarker: string) {
-  return resolve(process.cwd(), `.production-export-${runMarker}.lock.local`);
-}
-
-function productionLifecycleLockPath(runMarker: string) {
-  return resolve(process.cwd(), `.production-lifecycle-${runMarker}.lock.local`);
 }
 
 /**
@@ -326,49 +500,22 @@ function productionLifecycleLockPath(runMarker: string) {
  * admin/agent lifecycle transition must never run concurrently for this cohort.
  */
 export async function acquireProductionA1S1ExportLock(runMarker: string) {
-  invariant(
-    !existsSync(productionLifecycleLockPath(runMarker)),
-    "The production lifecycle gate is still active; export refuses concurrent state changes.",
-  );
-  const path = productionExportLockPath(runMarker);
-  const token = randomUUID();
-  let handle;
-  try {
-    handle = await open(path, "wx", 0o600);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-      throw new Error("Another production export process holds the run-marker lock.");
-    }
-    throw error;
-  }
-  try {
-    await handle.writeFile(
-      `${JSON.stringify({ acquiredAt: new Date().toISOString(), pid: process.pid, runMarker, token })}\n`,
-    );
-  } finally {
-    await handle.close();
-  }
-
-  return async () => {
-    const lock = await readJson<{ runMarker?: string; token?: string }>(path);
-    invariant(
-      lock.runMarker === runMarker && lock.token === token,
-      "Production export lock ownership changed.",
-    );
-    await unlink(path);
-  };
+  return acquireProductionCohortMutationLock(runMarker, "export");
 }
 
 function focusedA1S1Case(runMarker: string) {
   const cohortCase = buildProductionCohortPlan(runMarker).find(
-    (candidate) => candidate.caseKey === PRODUCTION_A1_S1_EXPORT_CASE_KEY,
+    (candidate) => candidate.caseKey === PRODUCTION_EXPORT_CASE_KEY,
   );
-  invariant(cohortCase, "A1-S1 is absent from the production cohort plan.");
+  invariant(
+    cohortCase,
+    `${PRODUCTION_EXPORT_CASE_KEY} is absent from the production cohort plan.`,
+  );
   invariant(
     cohortCase.applicantCount === 1 &&
       cohortCase.type === "single" &&
-      cohortCase.city === "Москва",
-    "A1-S1 no longer matches the fixed one-person Moscow contract.",
+      /^A[1-3]-S[1-3]$/.test(cohortCase.caseKey),
+    `${PRODUCTION_EXPORT_CASE_KEY} no longer matches the fixed one-person technical-case contract.`,
   );
   return cohortCase;
 }
@@ -384,8 +531,8 @@ function validateA1S1ExportState(
   );
   invariant(state.runMarker === input.runMarker, "A1-S1 export run marker mismatch.");
   invariant(
-    state.caseKey === PRODUCTION_A1_S1_EXPORT_CASE_KEY,
-    "A1-S1 export refuses a case other than A1-S1.",
+    state.caseKey === PRODUCTION_EXPORT_CASE_KEY,
+    `${PRODUCTION_EXPORT_CASE_KEY} export refuses a different case checkpoint.`,
   );
   invariant(stages.has(state.stage), "A1-S1 production export stage is invalid.");
   invariant(
@@ -415,33 +562,33 @@ export async function loadAcceptedA1S1ProductionExportCase(): Promise<ResolvedAc
   const runMarker = requiredProductionRunMarker();
   const cohortCase = focusedA1S1Case(runMarker);
   const cohortState = await loadCohortResumeState(runMarker);
-  const cohortCheckpoint = cohortState.cases[PRODUCTION_A1_S1_EXPORT_CASE_KEY];
+  const cohortCheckpoint = cohortState.cases[PRODUCTION_EXPORT_CASE_KEY];
   invariant(
     cohortCheckpoint?.stage === "submitted" && cohortCheckpoint.submissionId,
-    "A1-S1 must have a durable submitted cohort checkpoint before export.",
+    `${PRODUCTION_EXPORT_CASE_KEY} must have a durable submitted cohort checkpoint before export.`,
   );
   invariant(
     cohortCheckpoint.caseMarker === cohortCase.caseMarker,
-    "A1-S1 cohort marker mismatch.",
+    `${PRODUCTION_EXPORT_CASE_KEY} cohort marker mismatch.`,
   );
 
   const lifecycleState = await readJson<ProductionLifecycleState>(
     productionLifecycleStatePath(
       runMarker,
-      RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
+      PRODUCTION_EXPORT_CASE_KEY,
     ),
   );
   invariant(
     lifecycleState.stage === "accepted",
-    "A1-S1 must complete admin-return-agent-fix-admin-accept before export.",
+    `${PRODUCTION_EXPORT_CASE_KEY} must complete admin-return-agent-fix-admin-accept before export.`,
   );
   invariant(
     lifecycleState.projectRef === PRODUCTION_PROJECT_REF &&
       lifecycleState.runMarker === runMarker &&
-      lifecycleState.case.caseKey === PRODUCTION_A1_S1_EXPORT_CASE_KEY &&
+      lifecycleState.case.caseKey === PRODUCTION_EXPORT_CASE_KEY &&
       lifecycleState.case.ownerKey === cohortCase.ownerKey &&
       lifecycleState.case.submissionId === cohortCheckpoint.submissionId,
-    "Accepted lifecycle checkpoint does not match submitted A1-S1.",
+    `Accepted lifecycle checkpoint does not match submitted ${PRODUCTION_EXPORT_CASE_KEY}.`,
   );
   assertProductionLifecycleAcceptanceProof(lifecycleState, cohortCase.caseMarker);
 
@@ -449,7 +596,7 @@ export async function loadAcceptedA1S1ProductionExportCase(): Promise<ResolvedAc
   const state: ProductionA1S1ExportState = existsSync(path)
     ? await readJson<ProductionA1S1ExportState>(path)
     : {
-        caseKey: PRODUCTION_A1_S1_EXPORT_CASE_KEY,
+        caseKey: PRODUCTION_EXPORT_CASE_KEY,
         caseMarkerDigest: productionA1S1ExportDigest(cohortCase.caseMarker),
         projectRef: PRODUCTION_PROJECT_REF,
         runMarker,
@@ -469,15 +616,19 @@ export async function loadAcceptedA1S1ProductionExportCase(): Promise<ResolvedAc
 
 export async function saveProductionA1S1ExportState(state: ProductionA1S1ExportState) {
   state.updatedAt = new Date().toISOString();
-  await writeJsonAtomic(productionA1S1ExportStatePath(state.runMarker), state);
+  await writeJsonAtomic(
+    productionA1S1ExportStatePath(state.runMarker, state.caseKey),
+    state,
+  );
 }
 
 export async function writeProductionA1S1ExportEvidence(runMarker: string, value: unknown) {
+  const evidenceLane = `production-export-${PRODUCTION_EXPORT_CASE_KEY.toLowerCase()}`;
   const path = resolve(
     process.cwd(),
     "output",
     "playwright",
-    "production-export-a1-s1",
+    evidenceLane,
     runMarker,
     "evidence.json",
   );
@@ -528,6 +679,7 @@ export class StrictProductionA1S1ExportNetworkGate {
   #businessReleasePromise: Promise<"cancel" | "release"> | null = null;
   #businessReleaseResolve: ((decision: "cancel" | "release") => void) | null = null;
   readonly #networkContract: ProductionA1S1ExportNetworkContract | null;
+  #verifiedArtifactContract: ProductionA1S1VerifiedArtifactContract | null = null;
   #passwordLoginAttempts = 0;
   #successfulPasswordLogins = 0;
   readonly #mutations: ObservedMutation[] = [];
@@ -541,6 +693,10 @@ export class StrictProductionA1S1ExportNetworkGate {
     }
     invariant(
       networkContract.preCommitStatus === "ready_for_excel" &&
+        typeof networkContract.adminId === "string" &&
+        networkContract.adminId.length > 0 &&
+        typeof networkContract.ownerId === "string" &&
+        networkContract.ownerId.length > 0 &&
         typeof networkContract.submissionId === "string" &&
         networkContract.submissionId.length > 0 &&
         exactStringSet(networkContract.documentAssetIds, networkContract.documentAssetIds) &&
@@ -549,7 +705,20 @@ export class StrictProductionA1S1ExportNetworkGate {
       "A1-S1 export network gate requires an exact runtime-only preflight contract.",
     );
     this.#networkContract = {
+      adminId: networkContract.adminId,
+      draft: {
+        applicants: networkContract.draft.applicants.map((item) => ({ ...item })),
+        corrections: networkContract.draft.corrections.map((item) => ({ ...item })),
+        mediaAssets: networkContract.draft.mediaAssets.map((item) => ({ ...item })),
+        questionnaireAnswers: networkContract.draft.questionnaireAnswers.map((item) => ({
+          ...item,
+        })),
+        snapshotHistoryCount: networkContract.draft.snapshotHistoryCount,
+        snapshotIssueCount: networkContract.draft.snapshotIssueCount,
+        statusHistory: networkContract.draft.statusHistory.map((item) => ({ ...item })),
+      },
       documentAssetIds: [...networkContract.documentAssetIds],
+      ownerId: networkContract.ownerId,
       preCommitStatus: networkContract.preCommitStatus,
       submissionId: networkContract.submissionId,
     };
@@ -564,36 +733,25 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
   }
 
-  #hasExpectedPayload(request: Request, key: string) {
+  #hasBasePayload(request: Request, key: string) {
     const networkContract = this.#networkContract;
     if (!networkContract) return false;
-    const body = requestJsonRecord(request);
-    const payload = jsonRecord(body?.payload);
-    if (!payload) return false;
+    return baseExportPayloadMatches(request.postData(), key, networkContract);
+  }
 
-    if (key === "POST /rest/v1/rpc/save_submission_draft") {
-      const submission = jsonRecord(payload.submission);
-      return (
-        submission?.id === networkContract.submissionId &&
-        submission.status === networkContract.preCommitStatus &&
-        submission.exported_at === null
-      );
-    }
-
-    if (key === "POST /rest/v1/rpc/complete_export_package") {
-      const batch = jsonRecord(payload.batch);
-      const documentExport = jsonRecord(payload.document_export);
-      return (
-        batch?.format === "xlsx" &&
-        batch.row_count === 1 &&
-        exactStringSet(batch.submission_ids, [networkContract.submissionId]) &&
-        documentExport?.applicant_count === 1 &&
-        documentExport.file_count === 4 &&
-        exactStringSet(documentExport.asset_ids, networkContract.documentAssetIds)
-      );
-    }
-
-    return false;
+  #hasVerifiedArtifactPayload(request: Request, key: string) {
+    const networkContract = this.#networkContract;
+    const artifactContract = this.#verifiedArtifactContract;
+    return Boolean(
+      networkContract &&
+        artifactContract &&
+        productionA1S1ExportPayloadMatches(
+          request.postData(),
+          key,
+          networkContract,
+          artifactContract,
+        ),
+    );
   }
 
   async attach(context: BrowserContext) {
@@ -656,7 +814,7 @@ export class StrictProductionA1S1ExportNetworkGate {
         maxCount !== undefined &&
         count < maxCount
       ) {
-        if (!this.#hasExpectedPayload(request, key)) {
+        if (!this.#hasBasePayload(request, key)) {
           this.#recordBlockedRequest(request, "payload-contract");
           await route.abort("blockedbyclient");
           return;
@@ -670,6 +828,11 @@ export class StrictProductionA1S1ExportNetworkGate {
         this.#requestCounts.set(key, count + 1);
         const decision = await releasePromise;
         if (decision === "cancel") {
+          await route.abort("blockedbyclient");
+          return;
+        }
+        if (!this.#hasVerifiedArtifactPayload(request, key)) {
+          this.#recordBlockedRequest(request, "verified-artifact-contract");
           await route.abort("blockedbyclient");
           return;
         }
@@ -738,9 +901,25 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
     this.#businessPhase = true;
     this.#businessReleaseDecision = null;
+    this.#verifiedArtifactContract = null;
     this.#businessReleasePromise = new Promise((resolve) => {
       this.#businessReleaseResolve = resolve;
     });
+  }
+
+  bindVerifiedArtifact(contract: ProductionA1S1VerifiedArtifactContract) {
+    invariant(this.#businessPhase, "Export mutation phase is not active.");
+    invariant(
+      this.#businessReleaseDecision === null,
+      "Verified artifact cannot bind after the export decision.",
+    );
+    invariant(
+      Object.values(contract).every(
+        (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value),
+      ),
+      "Verified A2-S1 export artifact contract is invalid.",
+    );
+    this.#verifiedArtifactContract = { ...contract };
   }
 
   releaseExportMutations() {
@@ -748,6 +927,10 @@ export class StrictProductionA1S1ExportNetworkGate {
     invariant(
       this.#businessReleaseDecision === null && this.#businessReleaseResolve,
       "Export mutation decision is already fixed.",
+    );
+    invariant(
+      this.#verifiedArtifactContract,
+      "Verified A2-S1 ZIP/XLSX artifact identity is required before release.",
     );
     this.#businessReleaseDecision = "release";
     this.#businessReleaseResolve("release");
@@ -954,13 +1137,25 @@ async function readA1S1ProductionRowsWithClient(input: {
   submissionId: string;
   client: ReturnType<typeof createClient<Database>>;
 }) {
-  const [submissionResult, documentsResult, mediaResult, correctionsResult] =
+  const [
+    submissionResult,
+    applicantsResult,
+    documentsResult,
+    mediaResult,
+    correctionsResult,
+    questionnaireAnswersResult,
+    historyResult,
+  ] =
     await Promise.all([
       input.client
         .from("submissions")
-        .select("id,status,exported_at")
+        .select("id,agent_id,status,exported_at,family_intelligence")
         .eq("id", input.submissionId)
         .maybeSingle(),
+      input.client
+        .from("applicants")
+        .select("id,submission_id")
+        .eq("submission_id", input.submissionId),
       input.client
         .from("document_assets")
         .select(
@@ -975,17 +1170,34 @@ async function readA1S1ProductionRowsWithClient(input: {
         .eq("submission_id", input.submissionId),
       input.client
         .from("corrections")
-        .select("severity,status")
+        .select(
+          "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status",
+        )
         .eq("submission_id", input.submissionId),
+      input.client
+        .from("questionnaire_answers")
+        .select("submission_id,applicant_id,section_id,field_id,label,value")
+        .eq("submission_id", input.submissionId),
+      input.client
+        .from("status_history")
+        .select("id,entity_type,entity_id,from_status,to_status,comment,source,note")
+        .eq("entity_type", "submission")
+        .eq("entity_id", input.submissionId),
     ]);
   invariant(!submissionResult.error && submissionResult.data, "A1-S1 submission is unreadable.");
+  invariant(!applicantsResult.error, "A1-S1 applicants are unreadable.");
   invariant(!documentsResult.error, "A1-S1 document assets are unreadable.");
   invariant(!mediaResult.error, "A1-S1 media assets are unreadable.");
+  invariant(!questionnaireAnswersResult.error, "A1-S1 questionnaire answers are unreadable.");
   invariant(!correctionsResult.error, "A1-S1 corrections are unreadable.");
+  invariant(!historyResult.error, "A1-S1 status history is unreadable.");
   return {
+    applicants: (applicantsResult.data ?? []) as unknown as ProductionApplicantRow[],
     corrections: (correctionsResult.data ?? []) as unknown as ProductionCorrectionRow[],
     documents: (documentsResult.data ?? []) as unknown as ProductionDocumentAssetRow[],
+    history: (historyResult.data ?? []) as unknown as ProductionStatusHistoryRow[],
     media: (mediaResult.data ?? []) as unknown as ProductionMediaAssetRow[],
+    questionnaireAnswers: (questionnaireAnswersResult.data ?? []) as unknown as ProductionQuestionnaireAnswerRow[],
     submission: submissionResult.data as unknown as ProductionSubmissionRow,
   };
 }
@@ -999,6 +1211,168 @@ async function readA1S1ProductionRows(input: {
     client,
     submissionId: input.submissionId,
   });
+}
+
+function requiredSnapshotCounts(value: unknown) {
+  const intelligence = jsonRecord(value);
+  const envelope = jsonRecord(intelligence?.v19CockpitSnapshot);
+  const snapshot = jsonRecord(envelope?.submission);
+  invariant(
+    intelligence?.status === "unreviewed" && envelope?.version === 1 && snapshot,
+    "A2-S1 draft identity requires the canonical v19 cockpit snapshot.",
+  );
+  invariant(
+    Array.isArray(snapshot.history) && Array.isArray(snapshot.issues),
+    "A2-S1 cockpit snapshot is missing history or issues identity arrays.",
+  );
+  return { historyCount: snapshot.history.length, issueCount: snapshot.issues.length };
+}
+
+function draftPayloadIdentityFromRows(input: {
+  correctionMarker?: string;
+  ownerId: string;
+  rows: Awaited<ReturnType<typeof readA1S1ProductionRows>>;
+  submissionId: string;
+}): ProductionDraftPayloadIdentityContract {
+  const { rows, submissionId } = input;
+  invariant(
+    rows.submission.id === submissionId && rows.submission.agent_id === input.ownerId,
+    "A2-S1 draft identity owner or submission no longer matches the declared cohort target.",
+  );
+  invariant(
+    rows.applicants.length === 1 &&
+      rows.applicants.every((row) => row.submission_id === submissionId),
+    "A2-S1 draft identity requires exactly one target applicant.",
+  );
+  invariant(
+    rows.media.length === 3 &&
+      rows.media.every((row) => row.submission_id === submissionId),
+    "A2-S1 draft identity requires exactly three target media assets.",
+  );
+  invariant(
+    rows.questionnaireAnswers.length === 77 &&
+      rows.questionnaireAnswers.every((row) => row.submission_id === submissionId),
+    "A2-S1 draft identity requires exactly seventy-seven questionnaire answers.",
+  );
+  const snapshotCounts = requiredSnapshotCounts(rows.submission.family_intelligence);
+  const applicantIds = new Set(rows.applicants.map((row) => row.id));
+  invariant(
+    applicantIds.size === 1 &&
+      rows.media.every((row) => applicantIds.has(row.applicant_id)) &&
+      rows.questionnaireAnswers.every((row) => applicantIds.has(row.applicant_id)),
+    "A2-S1 draft identity has a child outside its exact applicant set.",
+  );
+
+  const questionnaireAnswers = rows.questionnaireAnswers.map((row) => {
+    const labelDigest = productionDraftValueDigest(row.label);
+    const valueDigest = productionDraftValueDigest(row.value);
+    invariant(labelDigest && valueDigest, "A2-S1 questionnaire identity cannot be digested.");
+    return {
+      applicantId: row.applicant_id,
+      fieldId: row.field_id,
+      labelDigest,
+      sectionId: row.section_id,
+      submissionId: row.submission_id,
+      valueDigest,
+    };
+  });
+  invariant(
+    new Set(
+      questionnaireAnswers.map((row) => `${row.applicantId}\u0000${row.sectionId}\u0000${row.fieldId}`),
+    ).size === questionnaireAnswers.length,
+    "A2-S1 questionnaire identity contains duplicate answer keys.",
+  );
+
+  const mediaAssets = rows.media.map((row) => {
+    const storagePathDigest = productionDraftValueDigest(row.storage_path);
+    invariant(storagePathDigest, "A2-S1 media storage identity cannot be digested.");
+    return {
+      applicantId: row.applicant_id,
+      id: row.id,
+      storageBucket: row.storage_bucket,
+      storagePathDigest,
+      submissionId: row.submission_id,
+      type: row.type,
+    };
+  });
+  invariant(
+    new Set(mediaAssets.map((row) => row.id)).size === mediaAssets.length,
+    "A2-S1 media identity contains duplicate asset IDs.",
+  );
+
+  const corrections = rows.corrections.map((row) => {
+    const reasonDigest = productionDraftValueDigest(row.reason);
+    invariant(reasonDigest, "A2-S1 correction identity cannot be digested.");
+    return {
+      applicantId: row.applicant_id,
+      fieldKey: row.field_key,
+      id: row.id,
+      mediaType: row.media_type,
+      reasonDigest,
+      scope: row.scope,
+      severity: row.severity,
+      status: row.status,
+      submissionId: row.submission_id,
+      targetMarker: Boolean(
+        input.correctionMarker && row.reason.includes(input.correctionMarker),
+      ),
+    };
+  });
+  invariant(
+    new Set(corrections.map((row) => row.id)).size === corrections.length &&
+      corrections.every((row) => row.submissionId === submissionId),
+    "A2-S1 correction identity contains duplicate or cross-submission rows.",
+  );
+
+  const statusHistory = rows.history.map((row) => {
+    const commentDigest = productionDraftValueDigest(row.comment);
+    const noteDigest = row.note === null ? null : productionDraftValueDigest(row.note);
+    invariant(
+      commentDigest && (row.note === null || noteDigest),
+      "A2-S1 status-history identity cannot be digested.",
+    );
+    return {
+      commentDigest,
+      entityId: row.entity_id,
+      entityType: row.entity_type,
+      fromStatus: row.from_status,
+      id: row.id,
+      noteDigest,
+      source: row.source,
+      toStatus: row.to_status,
+    };
+  });
+  invariant(
+    new Set(statusHistory.map((row) => row.id)).size === statusHistory.length &&
+      statusHistory.every(
+        (row) => row.entityType === "submission" && row.entityId === submissionId,
+      ),
+    "A2-S1 status-history identity contains duplicate or cross-submission rows.",
+  );
+
+  return {
+    applicants: rows.applicants.map((row) => ({
+      id: row.id,
+      submissionId: row.submission_id,
+    })),
+    corrections,
+    mediaAssets,
+    questionnaireAnswers,
+    snapshotHistoryCount: snapshotCounts.historyCount,
+    snapshotIssueCount: snapshotCounts.issueCount,
+    statusHistory,
+  };
+}
+
+/** Read-only, runtime-only nested identity for lifecycle and export network gates. */
+export async function resolveProductionCohortDraftPayloadIdentity(input: {
+  admin: ProductionCohortAccount;
+  correctionMarker?: string;
+  ownerId: string;
+  submissionId: string;
+}): Promise<ProductionDraftPayloadIdentityContract> {
+  const rows = await readA1S1ProductionRows(input);
+  return draftPayloadIdentityFromRows({ ...input, rows });
 }
 
 function assertA1S1ApplicantProjection(input: {
@@ -1053,9 +1427,11 @@ function mediaDigest(rows: ProductionMediaAssetRow[]) {
 
 export async function resolveA1S1ProductionExportPreflight(input: {
   admin: ProductionCohortAccount;
+  ownerId: string;
   submissionId: string;
 }): Promise<ResolvedA1S1ProductionExportPreflight> {
   const rows = await readA1S1ProductionRows(input);
+  const draft = draftPayloadIdentityFromRows({ ...input, rows });
   assertA1S1ApplicantProjection({
     documents: rows.documents,
     media: rows.media,
@@ -1064,6 +1440,10 @@ export async function resolveA1S1ProductionExportPreflight(input: {
   invariant(
     rows.submission.status === "ready_for_excel" && !rows.submission.exported_at,
     "A1-S1 must be raw ready_for_excel without exported_at before terminal export.",
+  );
+  invariant(
+    rows.submission.agent_id === input.ownerId,
+    "A1-S1 production owner no longer matches the declared cohort agent.",
   );
   invariant(
     rows.documents.every(
@@ -1099,7 +1479,10 @@ export async function resolveA1S1ProductionExportPreflight(input: {
 
   return {
     networkContract: {
+      adminId: input.admin.authUserId,
+      draft,
       documentAssetIds,
+      ownerId: input.ownerId,
       preCommitStatus: "ready_for_excel",
       submissionId: input.submissionId,
     },
@@ -1121,6 +1504,7 @@ export async function resolveA1S1ProductionExportPreflight(input: {
  */
 export async function verifyA1S1ProductionExportPreflight(input: {
   admin: ProductionCohortAccount;
+  ownerId: string;
   submissionId: string;
 }): Promise<ProductionA1S1ExportPreflight> {
   return (await resolveA1S1ProductionExportPreflight(input)).preflight;
@@ -1138,6 +1522,7 @@ export async function repairIncompleteA1S1ProductionExport(input: {
   state: ProductionA1S1ExportState;
   submissionId: string;
 }): Promise<ProductionA1S1ExportRepairProof> {
+  assertProductionA1S1ExportRepairUnlock();
   invariant(input.state.zipProof, "A1-S1 repair requires verified ZIP proof.");
   const client = await createReadOnlyProductionAdminClient(input.admin);
   const [rows, batchesResult, eventsResult] = await Promise.all([
@@ -1226,8 +1611,6 @@ export async function repairIncompleteA1S1ProductionExport(input: {
       ),
     "A1-S1 repair refuses a mixed terminal document state.",
   );
-
-  assertProductionA1S1ExportRepairUnlock();
 
   const { data, error } = await client.rpc(
     "repair_incomplete_export_document_completion",

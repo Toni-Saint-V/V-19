@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import {
   clearExportSelection,
   clickWorkspaceButton,
@@ -41,6 +41,25 @@ async function firstVisible(locator: Locator): Promise<Locator | null> {
   return null;
 }
 
+async function expectWithinViewport(page: Page, locator: Locator) {
+  const viewport = page.viewportSize();
+  expect(viewport, "Playwright viewport must be available.").not.toBeNull();
+  if (!viewport) return;
+
+  await expect
+    .poll(async () => {
+      const box = await locator.boundingBox();
+      return Boolean(
+        box &&
+          box.x >= -0.5 &&
+          box.y >= -0.5 &&
+          box.x + box.width <= viewport.width + 0.5 &&
+          box.y + box.height <= viewport.height + 0.5,
+      );
+    })
+    .toBe(true);
+}
+
 async function openAdminSubmission(page: Page, preferredText: RegExp) {
   const preferred = await firstVisible(
     page
@@ -70,6 +89,81 @@ async function openAdminSubmission(page: Page, preferredText: RegExp) {
 
   await expect(drawer(page)).toBeVisible();
   await expectBodyMatches(page, [/Анкета|Файлы|Замечания|Обзор|ПД-|SUB-/i]);
+}
+
+async function verifyRemarkSubmitActionability(
+  page: Page,
+  testInfo: TestInfo,
+  evidenceLabel: string,
+  viewport: { height: number; width: number },
+) {
+  await page.setViewportSize(viewport);
+  const browserProblems = collectBrowserProblems(page);
+
+  await openFreshWorkspace(page, {
+    heading: "Проверка",
+    workspaceEmail: "admin@visaflow.local",
+  });
+
+  await expectBodyMatches(page, [/Проверка|Очередь на проверку/i]);
+  if (viewport.width >= 768) {
+    await clickWorkspaceButton(page, /Проверка|Работа|Очередь/);
+  }
+  await expectBodyMatches(page, [/Нина Волкова|ПД-1053|Проверка|Очередь/i]);
+
+  await openAdminSubmission(page, /Нина Волкова|ПД-1053|Смирнов|Петров|Волков/i);
+
+  await openDrawerTab(page, ["Обзор"]).catch(() => undefined);
+  await openDrawerTab(page, ["Файлы"]).catch(() => undefined);
+  await openDrawerTab(page, ["Замечания"]).catch(() => undefined);
+
+  // The "Добавить замечание" action belongs to the questionnaire rows.
+  // Return there before clicking; otherwise Motion may detach the previous
+  // tab content while Playwright waits for actionability.
+  await openDrawerTab(page, ["Анкета", "Данные"]).catch(() => undefined);
+  await page.waitForTimeout(350);
+
+  const addRemarkButton = drawer(page)
+    .locator('[data-testid="admin-review-add-remark"], button[title="Добавить замечание"]')
+    .first();
+
+  await expect(addRemarkButton).toBeVisible();
+  await addRemarkButton.evaluate((element) => {
+    (element as { click(): void }).click();
+  });
+
+  const remarkDialog = page
+    .getByRole("dialog")
+    .filter({ hasText: /Добавить замечание|Новое замечание/i })
+    .last();
+  await expect(remarkDialog).toBeVisible();
+  await expectWithinViewport(page, remarkDialog);
+
+  const submitRemarkButton = remarkDialog
+    .locator('[data-testid="remark-form-submit"]')
+    .or(
+      remarkDialog.getByRole("button", {
+        name: /Отправить замечание|Создать замечание/i,
+      }),
+    )
+    .first();
+
+  await expect(submitRemarkButton).toBeVisible();
+  await expectWithinViewport(page, submitRemarkButton);
+  await testInfo.attach(`remark-submit-${evidenceLabel}`, {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await submitRemarkButton.click();
+
+  await expect(remarkDialog).toHaveCount(0);
+  await expect(drawer(page)).toBeVisible();
+  await openDrawerTab(page, ["Замечания"]).catch(() => undefined);
+  await expectBodyMatches(page, [/Замечания|Исправить|Требуется|Анкета|Файлы|ПД-|SUB-/i]);
+
+  expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
+    [],
+  );
 }
 
 test.describe("V-19 pilot admin review click flow", () => {
@@ -125,74 +219,17 @@ test.describe("V-19 pilot admin review click flow", () => {
     );
   });
 
-  test("admin queue opens drawer tabs and issue action is reachable", async ({
-    page,
-  }) => {
-    const browserProblems = collectBrowserProblems(page);
-
-    await openFreshWorkspace(page, {
-      heading: "Проверка",
-      workspaceEmail: "admin@visaflow.local",
-    });
-
-    await expectBodyMatches(page, [/Проверка|Очередь на проверку/i]);
-    await clickWorkspaceButton(page, /Проверка|Работа|Очередь/);
-    await expectBodyMatches(page, [/Нина Волкова|ПД-1053|Проверка|Очередь/i]);
-
-    await openAdminSubmission(page, /Нина Волкова|ПД-1053|Смирнов|Петров|Волков/i);
-
-    await openDrawerTab(page, ["Обзор"]).catch(() => undefined);
-    await openDrawerTab(page, ["Файлы"]).catch(() => undefined);
-    await openDrawerTab(page, ["Замечания"]).catch(() => undefined);
-
-    // The "Добавить замечание" action belongs to the questionnaire rows.
-    // Return there before clicking; otherwise Motion may detach the previous
-    // tab content while Playwright waits for actionability.
-    await openDrawerTab(page, ["Анкета", "Данные"]).catch(() => undefined);
-    await page.waitForTimeout(350);
-
-    const addRemarkButton = drawer(page)
-      .locator('[data-testid="admin-review-add-remark"], button[title="Добавить замечание"]')
-      .first();
-
-    await expect(addRemarkButton).toBeVisible();
-
-    await addRemarkButton.evaluate((element) => {
-      (element as { click(): void }).click();
-    });
-
-    const remarkDialog = page
-      .getByRole("dialog")
-      .filter({ hasText: /Добавить замечание|Новое замечание/i })
-      .last();
-
-    await expect(remarkDialog).toBeVisible();
-
-    const submitRemarkButton = remarkDialog
-      .locator('[data-testid="remark-form-submit"]')
-      .or(
-        remarkDialog.getByRole("button", {
-          name: /Отправить замечание|Создать замечание/i,
-        }),
-      )
-      .first();
-
-    await expect(submitRemarkButton).toBeVisible();
-
-    await submitRemarkButton.evaluate((element) => {
-      (element as { click(): void }).click();
-    });
-
-    await expect(remarkDialog).toHaveCount(0);
-    await expect(drawer(page)).toBeVisible();
-
-    await openDrawerTab(page, ["Замечания"]).catch(() => undefined);
-    await expectBodyMatches(page, [/Замечания|Исправить|Требуется|Анкета|Файлы|ПД-|SUB-/i]);
-
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
+  for (const [label, viewport] of [
+    ["desktop 1440x900", { height: 900, width: 1440 }],
+    ["mobile 390x844", { height: 844, width: 390 }],
+  ] as const) {
+    test(
+      `admin queue issue submit is actionable at ${label}`,
+      async ({ page }, testInfo) => {
+        await verifyRemarkSubmitActionability(page, testInfo, label, viewport);
+      },
     );
-  });
+  }
 
   test("admin export surface selects a ready package and prepares Excel", async ({
     page,

@@ -1,7 +1,7 @@
 # Supabase Pilot Volume Envelope - 2026-07-06
 
 Result: `BLOCKED_PILOT_VOLUME_CAP_EXCEEDED`
-Checked at: `2026-07-11T09:50:57.412Z`
+Checked at: `2026-07-12T08:43:21.125Z`
 
 No production data, Auth users, Storage objects, or Supabase settings were mutated by this check. The production cap check is read-only and records aggregates only.
 

@@ -261,6 +261,44 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toHaveTextContent("Действителен до");
   });
 
+  test("opens an appointment-note issue on the exact questionnaire field", async () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicantId = draft.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+    const submission = withQuestionnaireIssue(
+      draft,
+      "open",
+      "Примечание",
+      "",
+    );
+
+    render(
+      <FigmaQuestionnaireScreen
+        initialFocus={{ applicantId, field: "Примечание" }}
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Примечание")).toHaveFocus());
+    expect(
+      screen.getByText(
+        "Контекст анкеты: заявитель VOLKOV ANTON; раздел Запись.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Исправьте поле и повторно отправьте анкету."),
+    ).toHaveLength(2);
+  });
+
   test("shows questionnaire answer options from the submission field model", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -795,6 +833,62 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onSaveDraft).toHaveBeenCalledWith(
       expect.objectContaining({ saveIntent: "manual" }),
     );
+  });
+
+  test("does not retry a rejected autosave when the save callback identity changes", async () => {
+    vi.useFakeTimers();
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onBack = vi.fn();
+    const onComplete = vi.fn();
+    const firstSave = vi.fn().mockRejectedValue(new Error("network failure"));
+    const replacementSave = vi
+      .fn()
+      .mockRejectedValue(new Error("network failure"));
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={onBack}
+        onComplete={onComplete}
+        onSaveDraft={firstSave}
+        submission={submission}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "VOLKOV" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    expect(firstSave).toHaveBeenCalledTimes(1);
+
+    result.rerender(
+      <FigmaQuestionnaireScreen
+        onBack={onBack}
+        onComplete={onComplete}
+        onSaveDraft={replacementSave}
+        submission={submission}
+      />,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(firstSave).toHaveBeenCalledTimes(1);
+    expect(replacementSave).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "VOLKOV RETRY" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    expect(replacementSave).toHaveBeenCalledTimes(1);
   });
 
   test("flushes the pending revision before leaving the questionnaire", async () => {
