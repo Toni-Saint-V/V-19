@@ -1339,10 +1339,33 @@ export async function loadCockpitSubmissionsForProfile(
   }
 
   const submissionIds = rows.map((row) => row.id);
-  const { data: applicantRows, error: applicantError } = await client
-    .from("applicants")
-    .select(applicantSelect)
-    .in("submission_id", submissionIds);
+  const [
+    { data: applicantRows, error: applicantError },
+    { data: questionnaireRows, error: questionnaireError },
+    { data: mediaRows, error: mediaError },
+    { data: statusHistoryRows, error: statusHistoryError },
+    exportBatchRows,
+  ] = await Promise.all([
+    client
+      .from("applicants")
+      .select(applicantSelect)
+      .in("submission_id", submissionIds),
+    client
+      .from("questionnaire_answers")
+      .select(questionnaireAnswerSelect)
+      .in("submission_id", submissionIds),
+    client
+      .from("media_assets")
+      .select(mediaAssetSelect)
+      .in("submission_id", submissionIds),
+    client
+      .from("status_history")
+      .select(statusHistorySelect)
+      .in("entity_id", submissionIds),
+    profile.role === "admin"
+      ? loadExportBatchRowsForSubmissions(submissionIds)
+      : Promise.resolve([]),
+  ]);
 
   if (applicantError) {
     throw mapSupabasePersistenceError(applicantError, {
@@ -1351,22 +1374,12 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
-  const { data: questionnaireRows, error: questionnaireError } = await client
-    .from("questionnaire_answers")
-    .select(questionnaireAnswerSelect)
-    .in("submission_id", submissionIds);
-
   if (questionnaireError) {
     throw mapSupabasePersistenceError(questionnaireError, {
       operation: "questionnaire_answers.list",
       fallbackKind: "database",
     });
   }
-
-  const { data: mediaRows, error: mediaError } = await client
-    .from("media_assets")
-    .select(mediaAssetSelect)
-    .in("submission_id", submissionIds);
 
   if (mediaError) {
     throw mapSupabasePersistenceError(mediaError, {
@@ -1375,22 +1388,12 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
-  const { data: statusHistoryRows, error: statusHistoryError } = await client
-    .from("status_history")
-    .select(statusHistorySelect)
-    .in("entity_id", submissionIds);
-
   if (statusHistoryError) {
     throw mapSupabasePersistenceError(statusHistoryError, {
       operation: "status_history.list",
       fallbackKind: "database",
     });
   }
-
-  const exportBatchRows =
-    profile.role === "admin"
-      ? await loadExportBatchRowsForSubmissions(submissionIds)
-      : [];
 
   const ownerIdsBySubmissionId = new Map<string, string>();
   const submissions = rows.map((row) => {

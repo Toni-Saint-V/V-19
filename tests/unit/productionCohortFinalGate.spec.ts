@@ -28,8 +28,18 @@ function submittedReports() {
     "A3-S3",
   ].map((caseKey) => ({
     caseKey,
-    stage: caseKey === "A1-F6" ? "exported" : "submitted",
-    status: caseKey === "A1-F6" ? "exported" : "waiting_review",
+    stage:
+      caseKey === "A1-F6"
+        ? "exported"
+        : caseKey === "A1-S1"
+          ? "ready_for_export"
+          : "submitted",
+    status:
+      caseKey === "A1-F6"
+        ? "exported"
+        : caseKey === "A1-S1"
+          ? "ready_for_excel"
+          : "waiting_review",
   }));
 }
 
@@ -66,13 +76,78 @@ describe("production cohort final gate", () => {
     ).toBe(true);
   });
 
-  test("rejects an exported status for a non-terminal cohort case", () => {
+  test("rejects a lifecycle outside the exact per-case production contract", () => {
     const reports = submittedReports();
     reports[1] = { caseKey: "A1-S1", stage: "exported", status: "exported" };
 
     expect(
       productionCohortFinalGate({
         expectedCaseCount: 12,
+        reports,
+        totals: exactTotals,
+      }),
+    ).toBe(false);
+
+    reports[1] = {
+      caseKey: "A1-S1",
+      stage: "ready_for_export",
+      status: "accepted",
+    };
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        reports,
+        totals: exactTotals,
+      }),
+    ).toBe(false);
+
+    reports[1] = { caseKey: "A1-S1", stage: "submitted", status: "waiting_review" };
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        reports,
+        totals: exactTotals,
+      }),
+    ).toBe(false);
+
+    reports[1] = {
+      caseKey: "A1-S2",
+      stage: "ready_for_export",
+      status: "ready_for_excel",
+    };
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        reports,
+        totals: exactTotals,
+      }),
+    ).toBe(false);
+  });
+
+  test("allows the separately declared terminal state only after A1-S1 export", () => {
+    const reports = submittedReports();
+    reports[1] = { caseKey: "A1-S1", stage: "exported", status: "exported" };
+
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        expectedLifecyclePhase: "pre_export",
+        reports,
+        totals: exactTotals,
+      }),
+    ).toBe(false);
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        expectedLifecyclePhase: "post_export",
+        reports,
+        totals: exactTotals,
+      }),
+    ).toBe(true);
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        expectedLifecyclePhase: "unknown" as never,
         reports,
         totals: exactTotals,
       }),

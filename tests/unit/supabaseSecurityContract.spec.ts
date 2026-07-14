@@ -488,6 +488,37 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("keeps incomplete legacy export repair server-owned, admin-only, and forward-only", () => {
+    const repairMigration = readProjectFile(
+      "supabase/migrations/20260714110000_repair_incomplete_export_document_completion.sql",
+    );
+
+    expect(repairMigration).toContain(
+      "create or replace function public.repair_incomplete_export_document_completion(",
+    );
+    expect(repairMigration).toContain("security definer");
+    expect(repairMigration).toContain(
+      "set search_path = pg_catalog, public, app_private",
+    );
+    expect(repairMigration).toContain("for update");
+    expect(repairMigration).toContain("Only admins can repair export completion");
+    expect(repairMigration).toContain(
+      "Export package submissions are not in the exact terminal state",
+    );
+    expect(repairMigration).toContain(
+      "Incomplete export document states are mixed and cannot be repaired",
+    );
+    expect(repairMigration).toContain(
+      "revoke all on function public.repair_incomplete_export_document_completion(text) from authenticated",
+    );
+    expect(repairMigration).toContain(
+      "grant execute on function public.repair_incomplete_export_document_completion(text) to authenticated",
+    );
+    expect(repairMigration).not.toContain("update public.submissions");
+    expect(repairMigration).not.toContain("insert into public.status_history");
+    expect(repairMigration).not.toContain("insert into public.export_batches");
+  });
+
   test("prevents stale draft saves from downgrading exported submissions", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260616002000_prevent_export_regression.sql",

@@ -100,6 +100,8 @@ export function formatAgentActionRowText(
     subtitle:
       input.status === "corrections_received"
         ? "Исправления отправлены"
+        : input.status === "exported"
+          ? "Пакет выгружен"
         : "Подача передана дальше",
     title: formatSubmissionListTitle(input.submission),
   };

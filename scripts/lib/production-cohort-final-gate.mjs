@@ -7,21 +7,56 @@ export const productionCohortExpectedFinalTotals = Object.freeze({
   submissions: 12,
 });
 
-const exportedCohortCaseKeys = new Set(["A1-F6"]);
+const lifecycleByCase = Object.freeze([
+  ["A1-F6", { stage: "exported", status: "exported" }],
+  ["A1-S1", { stage: "ready_for_export", status: "ready_for_excel" }],
+  ["A1-S2", { stage: "submitted", status: "waiting_review" }],
+  ["A1-S3", { stage: "submitted", status: "waiting_review" }],
+  ["A2-F6", { stage: "submitted", status: "waiting_review" }],
+  ["A2-S1", { stage: "submitted", status: "waiting_review" }],
+  ["A2-S2", { stage: "submitted", status: "waiting_review" }],
+  ["A2-S3", { stage: "submitted", status: "waiting_review" }],
+  ["A3-F6", { stage: "submitted", status: "waiting_review" }],
+  ["A3-S1", { stage: "submitted", status: "waiting_review" }],
+  ["A3-S2", { stage: "submitted", status: "waiting_review" }],
+  ["A3-S3", { stage: "submitted", status: "waiting_review" }],
+]);
+
+const expectedLifecycleByPhase = new Map([
+  ["pre_export", new Map(lifecycleByCase)],
+  [
+    "post_export",
+    new Map(
+      lifecycleByCase.map(([caseKey, expected]) =>
+        caseKey === "A1-S1"
+          ? [caseKey, { stage: "exported", status: "exported" }]
+          : [caseKey, expected],
+      ),
+    ),
+  ],
+]);
 
 export function productionCohortFinalGate({
   expectedCaseCount,
+  expectedLifecyclePhase = "pre_export",
   reports,
   totals,
 }) {
   const expected = productionCohortExpectedFinalTotals;
+  const expectedLifecycle = expectedLifecycleByPhase.get(expectedLifecyclePhase);
   const exactExpectedLifecycle =
+    expectedLifecycle !== undefined &&
+    expectedCaseCount === expectedLifecycle.size &&
     reports.length === expectedCaseCount &&
-    reports.every((report) =>
-      exportedCohortCaseKeys.has(report.caseKey)
-        ? report.stage === "exported" && report.status === "exported"
-        : report.stage === "submitted" && report.status === "waiting_review",
-    );
+    new Set(reports.map((report) => report.caseKey)).size === expectedCaseCount &&
+    reports.every((report) => {
+      const expectedCase = expectedLifecycle.get(report.caseKey);
+      return (
+        expectedCase !== undefined &&
+        report.stage === expectedCase.stage &&
+        report.status === expectedCase.status
+      );
+    });
   const exactFinalTotals =
     totals.answers === expected.answers &&
     totals.applicants === expected.applicants &&

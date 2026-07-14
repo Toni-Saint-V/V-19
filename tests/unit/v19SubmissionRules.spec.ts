@@ -844,6 +844,54 @@ describe("V-19 submission actions", () => {
     expect(queue.open.some((action) => action.cta === "Добавить")).toBe(true);
   });
 
+  it.each<{
+    completedCount: number;
+    openCount: number;
+    status: SubmissionStatus;
+  }>([
+    { completedCount: 0, openCount: 2, status: "draft" },
+    { completedCount: 0, openCount: 2, status: "in_progress" },
+    { completedCount: 0, openCount: 2, status: "returned" },
+    { completedCount: 1, openCount: 0, status: "submitted_for_review" },
+    { completedCount: 1, openCount: 0, status: "corrections_received" },
+    { completedCount: 1, openCount: 0, status: "ready_for_export" },
+    { completedCount: 1, openCount: 0, status: "exported" },
+    { completedCount: 0, openCount: 0, status: "requires_action" },
+  ])(
+    "derives open and closed agent queues for partial data in $status",
+    ({ completedCount, openCount, status }) => {
+      const source = byId("ПД-1053");
+      const submission: Submission = {
+        ...source,
+        id: `queue-matrix-${status}`,
+        status,
+        applicants: source.applicants.map((applicant, index) =>
+          index === 0
+            ? { ...applicant, questionnaireStatus: "partial" }
+            : applicant,
+        ),
+        files: source.files.map((file, index) =>
+          index === 0 ? { ...file, status: "missing" } : file,
+        ),
+      };
+      const queue = agentActionQueue([submission]);
+
+      expect(queue.open).toHaveLength(openCount);
+      expect(queue.completed).toHaveLength(completedCount);
+      expect(queue.open.every((action) => action.completed === false)).toBe(true);
+      expect(queue.completed.every((action) => action.completed === true)).toBe(
+        true,
+      );
+      if (status === "exported") {
+        expect(queue.completed[0]).toMatchObject({
+          context: "Пакет выгружен",
+          cta: "Смотреть",
+          tab: "history",
+        });
+      }
+    },
+  );
+
   it("derives agent action tasks with status, reason, readiness, and fail-closed export CTA", () => {
     const queue = agentActionQueue(
       agentQueue(initialSubmissions, defaultLocalAgentOwnerId),

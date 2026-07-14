@@ -130,6 +130,12 @@ export type Database = {
         };
         Returns: ExportPackageCommitResult;
       };
+      repair_incomplete_export_document_completion: {
+        Args: {
+          p_idempotency_key: string;
+        };
+        Returns: ExportPackageDocumentRepairResult;
+      };
       publish_returned_pdf_handoff: {
         Args: {
           payload: ReturnedPdfHandoffPublishPayload;
@@ -664,6 +670,12 @@ export interface ExportPackageCommitResult extends DbRecord {
   submissions: number;
   statusHistory: number;
   duplicate: boolean;
+}
+
+export interface ExportPackageDocumentRepairResult extends DbRecord {
+  exportBatchId: string;
+  documentExportId: string;
+  repaired: boolean;
 }
 
 export interface ReturnedPdfHandoffPublishPayload extends DbRecord {

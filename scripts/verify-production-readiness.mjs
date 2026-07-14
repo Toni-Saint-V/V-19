@@ -75,6 +75,7 @@ const scopedDiffPaths = [
   "supabase/migrations/20260712225209_save_returned_submission_update_first.sql",
   "supabase/migrations/20260713095403_atomic_export_document_completion.sql",
   "supabase/migrations/20260714020334_atomic_export_guard_null_safe.sql",
+  "supabase/migrations/20260714110000_repair_incomplete_export_document_completion.sql",
   "src/modules/submissions/exportPackageDocumentCommit.ts",
   "src/modules/submissions/exportPackagePersistence.ts",
   "src/modules/submissions/exportWorkflow.ts",
