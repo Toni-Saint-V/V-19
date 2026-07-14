@@ -12,12 +12,31 @@ const exactTotals = {
   storageReadable: productionCohortExpectedFinalTotals.media,
 };
 
+function submittedReports() {
+  return [
+    "A1-F6",
+    "A1-S1",
+    "A1-S2",
+    "A1-S3",
+    "A2-F6",
+    "A2-S1",
+    "A2-S2",
+    "A2-S3",
+    "A3-F6",
+    "A3-S1",
+    "A3-S2",
+    "A3-S3",
+  ].map((caseKey) => ({
+    caseKey,
+    stage: caseKey === "A1-F6" ? "exported" : "submitted",
+    status: caseKey === "A1-F6" ? "exported" : "waiting_review",
+  }));
+}
+
 describe("production cohort final gate", () => {
   test("rejects a remote-only case even when all expected cases were discovered", () => {
-    const reports = Array.from({ length: 12 }, (_, index) => ({
-      stage: index === 0 ? "remote_only" : "submitted",
-      status: "waiting_review",
-    }));
+    const reports = submittedReports();
+    reports[0] = { caseKey: "A1-F6", stage: "remote_only", status: "waiting_review" };
 
     expect(
       productionCohortFinalGate({
@@ -28,11 +47,8 @@ describe("production cohort final gate", () => {
     ).toBe(false);
   });
 
-  test("requires exact aggregate projections and submitted checkpoint stages", () => {
-    const reports = Array.from({ length: 12 }, () => ({
-      stage: "submitted",
-      status: "waiting_review",
-    }));
+  test("requires exact aggregate projections and the expected terminal lifecycle", () => {
+    const reports = submittedReports();
 
     expect(
       productionCohortFinalGate({
@@ -48,5 +64,18 @@ describe("production cohort final gate", () => {
         totals: exactTotals,
       }),
     ).toBe(true);
+  });
+
+  test("rejects an exported status for a non-terminal cohort case", () => {
+    const reports = submittedReports();
+    reports[1] = { caseKey: "A1-S1", stage: "exported", status: "exported" };
+
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        reports,
+        totals: exactTotals,
+      }),
+    ).toBe(false);
   });
 });

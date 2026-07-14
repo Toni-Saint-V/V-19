@@ -108,7 +108,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      "npm run preview -- --host 127.0.0.1 --port 4202 --strictPort",
+      "npm run build:supabase-production && npm run preview -- --host 127.0.0.1 --port 4202 --strictPort",
     env: loadProductionEnv(),
     reuseExistingServer: false,
     timeout: 120_000,

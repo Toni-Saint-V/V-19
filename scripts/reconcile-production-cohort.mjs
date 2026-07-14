@@ -183,9 +183,11 @@ async function main() {
   for (const expected of expectedCases) {
     const found = discovered.get(expected.caseKey);
     if (!found) continue;
-    const stage = checkpoint.cases?.[expected.caseKey]?.stage ?? "remote_only";
+    const checkpointStage =
+      checkpoint.cases?.[expected.caseKey]?.stage ?? "remote_only";
     const submission = submissionById.get(found.submissionId);
     invariant(submission, `The ${expected.caseKey} submission row is absent.`);
+    const stage = effectiveCohortStage(checkpointStage, submission.status);
 
     const caseApplicants = forSubmission(applicants, found.submissionId);
     const caseMedia = forSubmission(media, found.submissionId);
@@ -257,7 +259,15 @@ async function main() {
       `${expected.caseKey} has invalid document projections.`,
     );
 
-    if (stage === "questionnaire_saved" || stage === "submitted") {
+    if (
+      stage === "questionnaire_saved" ||
+      stage === "submitted" ||
+      stage === "exported"
+    ) {
+      const expectedDocumentState =
+        stage === "exported"
+          ? { exportStatus: "exported", validationStatus: "passed" }
+          : { exportStatus: "not_ready", validationStatus: "pending" };
       const expectedAssetCount = expected.applicantCount * 3;
       invariant(
         caseMedia.length === expectedAssetCount &&
@@ -276,6 +286,7 @@ async function main() {
         caseMedia,
         caseDocuments,
         caseAnswers,
+        expectedDocumentState,
       );
       invariant(
         caseAnswers.length === expected.applicantCount * 77,
@@ -289,6 +300,10 @@ async function main() {
         stage !== "questionnaire_saved" || submission.status === "draft",
         `${expected.caseKey} is not in the saved draft database status.`,
       );
+      invariant(
+        stage !== "exported" || submission.status === "exported",
+        `${expected.caseKey} is not in the exported database status.`,
+      );
     }
 
     reports.push({
@@ -296,6 +311,7 @@ async function main() {
       blankAnswerCount: caseAnswers.length - populatedAnswers.length,
       applicantCount: caseApplicants.length,
       caseKey: expected.caseKey,
+      checkpointStage,
       documentAssetCount: caseDocuments.length,
       documentStates,
       legacyFileCount: caseLegacy.length,
@@ -359,6 +375,17 @@ async function main() {
 
 function clean(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function effectiveCohortStage(checkpointStage, submissionStatus) {
+  if (submissionStatus === "exported") return "exported";
+  if (
+    checkpointStage === "questionnaire_saved" &&
+    submissionStatus === "waiting_review"
+  ) {
+    return "submitted";
+  }
+  return checkpointStage;
 }
 
 function invariant(condition, message) {
@@ -615,6 +642,7 @@ function assertExactApplicantProjection(
   media,
   documents,
   answers,
+  expectedDocumentState,
 ) {
   const mediaById = new Map(media.map((row) => [row.id, row]));
   invariant(
@@ -648,8 +676,8 @@ function assertExactApplicantProjection(
           source.storage_path === document.storage_path &&
           expectedType === document.type &&
           document.upload_status === "uploaded" &&
-          document.validation_status === "pending" &&
-          document.export_status === "not_ready"
+          document.validation_status === expectedDocumentState.validationStatus &&
+          document.export_status === expectedDocumentState.exportStatus
         );
       }),
       `${caseKey} has a mismatched document source projection.`,

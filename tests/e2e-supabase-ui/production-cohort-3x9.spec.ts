@@ -11,9 +11,11 @@ import {
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
   signInCohortAccount,
+  verifyAdminDoesNotSeeReviewCase,
   verifyAdminSeesSubmittedCase,
   writeCohortEvidence,
   type BrowserProblemEvidence,
+  type CohortCaseCompletion,
   type CohortMutationSummary,
 } from "./production-cohort-helpers";
 
@@ -21,7 +23,7 @@ type CaseEvidence = {
   applicantCount: number;
   caseKey: string;
   city: string;
-  stage: "submitted";
+  stage: "exported" | "submitted";
   type: "family" | "single";
 };
 
@@ -39,6 +41,7 @@ type CohortEvidence = {
   accounts: AccountEvidence[];
   admin: {
     browserProblems: BrowserProblemEvidence;
+    verifiedExportedOutsideReview: number;
     verifiedSubmittedCards: number;
   };
   constraints: {
@@ -107,6 +110,7 @@ test.describe("production Supabase cohort: three agents, nine applicants each", 
       accounts: [],
       admin: {
         browserProblems: { count: 0, digests: [] },
+        verifiedExportedOutsideReview: 0,
         verifiedSubmittedCards: 0,
       },
       constraints: {
@@ -126,6 +130,7 @@ test.describe("production Supabase cohort: three agents, nine applicants each", 
       startedAt: new Date().toISOString(),
     };
     let failure: unknown;
+    const caseCompletions = new Map<string, CohortCaseCompletion>();
 
     try {
       for (const [accountIndex, account] of accounts.agents.entries()) {
@@ -142,18 +147,19 @@ test.describe("production Supabase cohort: three agents, nine applicants each", 
           const caseEvidence: CaseEvidence[] = [];
 
           for (const cohortCase of accountCases) {
-            await createOrResumeCohortCase({
+            const completion = await createOrResumeCohortCase({
               account,
               cohortCase,
               ledger: session.ledger,
               page: session.page,
               resumeState,
             });
+            caseCompletions.set(cohortCase.caseKey, completion);
             caseEvidence.push({
               applicantCount: cohortCase.applicantCount,
               caseKey: cohortCase.caseKey,
               city: cohortCase.city,
-              stage: "submitted",
+              stage: completion.lifecycle,
               type: cohortCase.type,
             });
           }
@@ -191,6 +197,10 @@ test.describe("production Supabase cohort: three agents, nine applicants each", 
       try {
         const admin = await signInCohortAccount(adminContext, accounts.admin);
         for (const cohortCase of plan) {
+          const completion = caseCompletions.get(cohortCase.caseKey);
+          if (!completion) {
+            throw new Error(`Cohort completion is absent (${cohortCase.caseKey}).`);
+          }
           const checkpoint = resumeState.cases[cohortCase.caseKey];
           if (
             !checkpoint ||
@@ -199,10 +209,18 @@ test.describe("production Supabase cohort: three agents, nine applicants each", 
           ) {
             throw new Error(`Submitted checkpoint is absent (${cohortCase.caseKey}).`);
           }
+          if (completion.lifecycle === "exported") {
+            await verifyAdminDoesNotSeeReviewCase(
+              admin.page,
+              completion.submissionId,
+            );
+            evidence.admin.verifiedExportedOutsideReview += 1;
+            continue;
+          }
           await verifyAdminSeesSubmittedCase(
             admin.page,
             cohortCase,
-            checkpoint.submissionId,
+            completion.submissionId,
           );
           evidence.admin.verifiedSubmittedCards += 1;
         }
@@ -212,7 +230,16 @@ test.describe("production Supabase cohort: three agents, nine applicants each", 
           evidence.admin.browserProblems.count,
           "Admin emitted browser errors",
         ).toBe(0);
-        expect(evidence.admin.verifiedSubmittedCards).toBe(12);
+        expect(evidence.admin.verifiedSubmittedCards).toBe(
+          [...caseCompletions.values()].filter(
+            (completion) => completion.lifecycle === "submitted",
+          ).length,
+        );
+        expect(evidence.admin.verifiedExportedOutsideReview).toBe(
+          [...caseCompletions.values()].filter(
+            (completion) => completion.lifecycle === "exported",
+          ).length,
+        );
       } finally {
         await adminContext.close();
       }
