@@ -662,7 +662,9 @@ function FormField({
   }, [isOpen]);
 
   const usesQuickOptions = Boolean(options && options.length <= 3);
-  const collapsesQuickOptions = Boolean(options && options.length === 3);
+  const collapsesQuickOptions = Boolean(
+    options && options.length === 3 && label !== "Тип принимающей стороны",
+  );
   const usesOptionSearch = Boolean(options && options.length > 8);
   const filteredOptions = useMemo(() => {
     if (!options) return [];
@@ -934,12 +936,8 @@ function FormField({
               }
               type="button"
               onClick={() => {
-                if (
-                  collapsesQuickOptions &&
-                  value === option &&
-                  !quickOptionsExpanded
-                ) {
-                  setQuickOptionsExpanded(true);
+                if (collapsesQuickOptions && value === option) {
+                  setQuickOptionsExpanded((current) => !current);
                   return;
                 }
                 onChange?.(option);
@@ -3989,7 +3987,7 @@ export function FigmaQuestionnaireScreen({
     setSaveStatus("idle");
     setSaveMessage(
       target.label
-        ? `Сначала: ${target.label}${target.reason ? ` — ${target.reason}` : ""}`
+        ? `Сначала: ${target.label}`
         : target.sectionId === "files"
           ? "Сначала: добавьте обязательный файл"
           : "Сначала: устраните блокер",

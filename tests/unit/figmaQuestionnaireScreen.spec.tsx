@@ -1446,7 +1446,9 @@ describe("FigmaQuestionnaireScreen", () => {
 
     expect(screen.getByLabelText("Фамилия")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Черновик" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Готово/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Отправить на проверку" }),
+    ).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "CHANGED" },
     });
@@ -1673,7 +1675,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("keeps company invitation details when the host type is changed and restored", () => {
+  test("keeps company invitation details when the host type is changed and restored", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -1698,16 +1700,29 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Название и адрес компании/организации"), {
       target: { value: "VisaFlow S.L., Calle Mayor 1" },
     });
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-    fireEvent.click(dropdownTrigger(result.container, "Тип принимающей стороны"));
-    fireEvent.click(screen.getByRole("button", { name: "Гостиница/временное жилье" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Приглашающая компания/организация",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Гостиница/временное жилье" }),
+    );
     expect(
       screen.queryByLabelText("Название и адрес компании/организации"),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(dropdownTrigger(result.container, "Тип принимающей стороны"));
     fireEvent.click(
-      screen.getByRole("button", { name: "Приглашающая компания/организация" }),
+      screen.getByRole("button", { name: "Гостиница/временное жилье" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Приглашающая компания/организация",
+      }),
     );
     expect(screen.getByLabelText("Название и адрес компании/организации")).toHaveValue(
       "VisaFlow S.L., Calle Mayor 1",
@@ -2748,7 +2763,9 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Имя"), {
       target: { value: "ANTON" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Готово/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Отправить на проверку" }),
+    );
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
 
     expect(onComplete.mock.calls[0]?.[0]).toEqual(

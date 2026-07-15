@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createQuestionnaireSections } from "../../src/modules/submissions/questionnaire";
 
 const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
@@ -395,6 +396,42 @@ function syncSmokeFilePayload(
   };
 }
 
+function syncSmokeQuestionnaireSections() {
+  const exactValues: Record<string, string> = {
+    "arrival-date": "10.07.2026",
+    "birth-date": "20.08.1990",
+    "departure-date": "18.07.2026",
+    "passport-expiry-date": "26.02.2032",
+    "passport-issue-date": "26.02.2016",
+    "stay-duration": "9",
+  };
+
+  return createQuestionnaireSections(
+    syncSmokeApplicantId,
+    syncSmokeApplicantName,
+    "complete",
+  ).map((section) => ({
+    ...section,
+    fields: section.fields.map((field) => ({
+      ...field,
+      value:
+        exactValues[field.id] ??
+        field.options?.[0] ??
+        (field.id.includes("date") ||
+        field.id.includes("valid") ||
+        field.id.includes("expiry")
+          ? "20.08.2030"
+          : field.label.toLocaleLowerCase("ru-RU").includes("email")
+            ? "sync-smoke@example.test"
+            : field.label.toLocaleLowerCase("ru-RU").includes("телефон")
+              ? "79000000000"
+              : field.id === "passport-no"
+                ? "752869613"
+                : "READY"),
+    })),
+  }));
+}
+
 function syncSmokeSubmittedPayload(agentId: string, nowIso: string) {
   const passport = syncSmokeFilePayload("passport", "passport_scan", nowIso);
   const selfie = syncSmokeFilePayload("selfie", "selfie", nowIso);
@@ -426,55 +463,7 @@ function syncSmokeSubmittedPayload(agentId: string, nowIso: string) {
           status: "unavailable",
           summary: "Smoke fixture uses manually verified passport fields.",
         },
-        sections: [
-          {
-            id: `${syncSmokeApplicantId}-passport`,
-            title: "Паспорт",
-            stepLabel: "2",
-            status: "complete",
-            fields: [
-              {
-                id: "passport-type",
-                label: "Тип паспорта",
-                value: "ORDINARY PASSPORT",
-                required: true,
-              },
-              {
-                id: "passport-no",
-                label: "Номер паспорта",
-                value: "123456789",
-                required: true,
-              },
-              {
-                id: "passport-issue-date",
-                label: "Дата выдачи",
-                value: "2020-01-01",
-                required: true,
-              },
-              {
-                id: "passport-expiry-date",
-                label: "Действителен до",
-                value: "2030-01-01",
-                required: true,
-              },
-            ],
-          },
-          {
-            id: `${syncSmokeApplicantId}-trip`,
-            title: "Поездка",
-            stepLabel: "5",
-            status: "complete",
-            fields: [
-              {
-                id: "route",
-                label: "Маршрут поездки",
-                value: "Москва, Барселона, Москва",
-                required: true,
-                span: "full",
-              },
-            ],
-          },
-        ],
+        sections: syncSmokeQuestionnaireSections(),
       },
     ],
     issues: [],
@@ -557,6 +546,12 @@ async function resetSyncSmokeSubmission() {
   const { userId: agentId } = await signedSmokeAgentClient();
   const { client: adminClient } = await signedSmokeAdminClient();
   const nowIso = new Date().toISOString();
+  const { error: questionnaireAnswersError } = await adminClient
+    .from("questionnaire_answers")
+    .delete()
+    .eq("submission_id", syncSmokeSubmissionId);
+
+  if (questionnaireAnswersError) throw new Error(questionnaireAnswersError.message);
   const { error: correctionsError } = await adminClient
     .from("corrections")
     .update({ fixed_at: nowIso, status: "closed" })
@@ -1113,13 +1108,13 @@ test.describe("Supabase sandbox auth smoke", () => {
         { timeout: 20_000 },
       );
       await page.getByRole("button", { name: "Отправить исправления" }).click();
-      await expect(page.getByText("Исправления отправлены")).toBeVisible();
       const correctionSaveResponse = await correctionSave;
       const correctionSaveBody = await correctionSaveResponse.text();
       expect(
         correctionSaveResponse.ok(),
         `submit_corrections_handoff failed with ${correctionSaveResponse.status()}: ${correctionSaveBody}`,
       ).toBe(true);
+      await expect(page.getByText("· Исправления отправлены", { exact: true })).toBeVisible();
       await waitForSyncSmokeStatus(adminClient, "waiting_review", "corrections_received");
       await page.getByRole("button", { name: "Назад" }).click();
       await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
@@ -1128,9 +1123,10 @@ test.describe("Supabase sandbox auth smoke", () => {
       await signInSmokeAdmin(page);
       await openSyncSmokeSubmission(page, syncSmokeSubmissionId);
       await openSyncSmokeReviewDrawer(page);
+      await openDrawerIssuesSection(page);
       await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
       await page.getByRole("button", { name: "Закрыть и принять" }).click();
-      await expect(drawer(page).getByText("Готово к выгрузке").first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
       await waitForSyncSmokeStatus(adminClient, "ready_for_excel", "ready_for_export");
     } finally {
       await resetSyncSmokeSubmission();
