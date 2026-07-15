@@ -1023,7 +1023,7 @@ async function reopenQuestionnaireFromCanonicalState(page: Page, submissionId: s
 
 function questionnaireSubmitButton(questionnaire: Locator) {
   return questionnaire.getByRole("button", {
-    name: /Готово к проверке|Готово/,
+    name: /Отправить на проверку|Отправить/,
   });
 }
 

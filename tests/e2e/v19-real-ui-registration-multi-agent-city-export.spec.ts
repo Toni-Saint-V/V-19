@@ -198,7 +198,7 @@ async function fillQuestionnaire(page: Page) {
 
   if (await isVisible(modernQuestionnaire)) {
     await modernQuestionnaire
-      .getByRole("button", { name: /Готово к проверке|Готово/ })
+      .getByRole("button", { name: /Отправить на проверку|Отправить/ })
       .click();
     await expect(modernQuestionnaire).toHaveCount(0);
     return;
@@ -208,7 +208,7 @@ async function fillQuestionnaire(page: Page) {
     await openQuestionnaireButton.click();
     await expect(modernQuestionnaire).toBeVisible();
     await modernQuestionnaire
-      .getByRole("button", { name: /Готово к проверке|Готово/ })
+      .getByRole("button", { name: /Отправить на проверку|Отправить/ })
       .click();
     await expect(modernQuestionnaire).toHaveCount(0);
     return;
@@ -361,7 +361,7 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
   await passportNumberField.fill("991234567");
   await expect(passportNumberField).toHaveValue("991234567");
   const completeQuestionnaireButton = page.getByRole("button", {
-    name: /Готово к проверке|Готово/,
+    name: /Отправить на проверку|Отправить/,
   });
   await completeQuestionnaireButton.click();
   await expect

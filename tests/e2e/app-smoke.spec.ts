@@ -515,7 +515,7 @@ async function fillQuestionnaire(page: Page) {
 
   if (await isVisible(modernQuestionnaire)) {
     await modernQuestionnaire
-      .getByRole("button", { name: /Готово к проверке|Готово/ })
+      .getByRole("button", { name: /Отправить на проверку|Отправить/ })
       .click();
     await expect(modernQuestionnaire).toHaveCount(0);
     await expect(drawer(page)).toBeVisible();
@@ -531,7 +531,7 @@ async function fillQuestionnaire(page: Page) {
     await openQuestionnaireButton.click();
     await expect(modernQuestionnaire).toBeVisible();
     await modernQuestionnaire
-      .getByRole("button", { name: /Готово к проверке|Готово/ })
+      .getByRole("button", { name: /Отправить на проверку|Отправить/ })
       .click();
     await expect(modernQuestionnaire).toHaveCount(0);
     await expect(drawer(page)).toBeVisible();

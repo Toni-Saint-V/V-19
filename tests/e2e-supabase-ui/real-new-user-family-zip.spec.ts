@@ -953,7 +953,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
 
       const reopenedQuestionnaire = await openQuestionnaireFromDrawer(owner.page);
       const complete = reopenedQuestionnaire.getByRole("button", {
-        name: /Готово к проверке|Готово/,
+        name: /Отправить на проверку|Отправить/,
       });
       await expect(complete).toBeEnabled({ timeout: 60_000 });
       await clickAndWaitForSupabaseWrite(
