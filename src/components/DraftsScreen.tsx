@@ -120,7 +120,7 @@ function docStatusClass(status: DocStatus) {
   if (status === 'verified') return 'bg-white/[0.045] border-white/10 text-[#b8baff]';
   if (status === 'processing') return 'bg-white/[0.045] border-white/10 text-[#b8baff]';
   if (status === 'error') return 'bg-[#24191b]/60 border-[#5b2b32]/50 text-[#d59aa3]';
-  return 'bg-white/5 border-dashed border-white/20 text-white/30 hover:border-white/50 hover:bg-white/10 hover:text-white';
+  return 'bg-white/5 border-dashed border-white/20 text-white/60 hover:border-white/50 hover:bg-white/10 hover:text-white';
 }
 
 function docStatusLabel(status: DocStatus) {
@@ -448,7 +448,7 @@ const MobileDocSlot = ({
     >
       <span className="v19-mobile-document-slot-copy min-w-0">
         <span className="v19-mobile-document-slot-label block text-[12px] font-semibold text-white/80">{label}</span>
-        <span className="v19-mobile-document-slot-status mt-1 block text-[10px] font-medium text-current opacity-75">
+        <span className="v19-mobile-document-slot-status mt-1 block text-[10px] font-medium text-current">
           {isMissing ? 'Добавить' : docStatusLabel(status)}
         </span>
       </span>
@@ -853,7 +853,7 @@ export function DraftsScreen({
                       <div className="min-w-0">
                         <div className="truncate text-[14px] font-medium text-white/85">{app.name}</div>
                         {mobileApplicantRoleLabel(app) ? (
-                          <div className="mt-0.5 truncate text-[10px] font-medium text-white/40">
+                          <div className="mt-0.5 truncate text-[10px] font-medium text-white/60">
                             {mobileApplicantRoleLabel(app)}
                           </div>
                         ) : null}
@@ -881,7 +881,7 @@ export function DraftsScreen({
               </div>
 
               {sub.applicants.length > 1 ? (
-                <div className="flex items-center justify-between border-t border-[#242529] px-3 py-2 text-[11px] font-medium text-white/45">
+                <div className="flex items-center justify-between border-t border-[#242529] px-3 py-2 text-[11px] font-medium text-white/60">
                   <span>Заявитель</span>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -902,7 +902,7 @@ export function DraftsScreen({
                     </button>
                     <span
                       aria-live="polite"
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/62"
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/70"
                       data-testid="document-applicant-position"
                     >
                       {activeApplicantIndex + 1} / {sub.applicants.length}
