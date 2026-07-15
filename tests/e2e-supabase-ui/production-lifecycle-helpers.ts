@@ -1884,7 +1884,7 @@ function expectedSnapshotUntypedHistoryDigests(
   return digest ? [...base, digest] : [];
 }
 
-function snapshotMatchesDraftPayload(input: {
+type SnapshotDraftPayloadInput = {
   applicants: readonly JsonRecord[];
   corrections: readonly JsonRecord[];
   expectedCorrections: readonly ExpectedCorrectionIdentity[];
@@ -1893,19 +1893,27 @@ function snapshotMatchesDraftPayload(input: {
   payloadSubmission: JsonRecord;
   questionnaireAnswers: readonly JsonRecord[];
   contract: ProductionDraftPayloadMutationContract;
-}) {
+};
+
+function snapshotDraftPayloadMismatchCode(
+  input: SnapshotDraftPayloadInput,
+): string | null {
   const canonical = canonicalSnapshot(input.payloadSubmission.family_intelligence);
-  if (!canonical) return false;
+  if (!canonical) return "shape";
   const { snapshot } = canonical;
   if (
     snapshot?.id !== input.contract.submissionId ||
     snapshot.agentId !== input.contract.ownerId ||
-    snapshot.status !== input.contract.history.snapshotStatus ||
-    (input.contract.timestampWindow
-      ? snapshot.updatedAt !== "сейчас"
-      : !isSnapshotTimestamp(snapshot.updatedAt))
+    snapshot.status !== input.contract.history.snapshotStatus
   ) {
-    return false;
+    return "identity";
+  }
+  if (
+    input.contract.timestampWindow
+      ? snapshot.updatedAt !== "сейчас"
+      : !isSnapshotTimestamp(snapshot.updatedAt)
+  ) {
+    return "timestamp";
   }
   if (input.contract.mode === "export") {
     const exportPackage = jsonRecord(snapshot.exportPackage);
@@ -1934,19 +1942,21 @@ function snapshotMatchesDraftPayload(input: {
       typeof exportPackage.fileName !== "string" ||
       typeof exportPackage.idempotencyKey !== "string"
     ) {
-      return false;
+      return "export_package";
     }
   }
 
   const snapshotApplicants = recordArray(snapshot.applicants);
-  if (!snapshotApplicants) return false;
+  if (!snapshotApplicants) return "applicant_shape";
   const expectedApplicantIds = input.applicants.map((item) => text(item.id)).filter(
     (item): item is string => Boolean(item),
   );
   const actualApplicantIds = snapshotApplicants
     .map((item) => text(item.id))
     .filter((item): item is string => Boolean(item));
-  if (!exactIdentitySet(actualApplicantIds, expectedApplicantIds)) return false;
+  if (!exactIdentitySet(actualApplicantIds, expectedApplicantIds)) {
+    return "applicant_identity";
+  }
 
   const expectedAnswerKeys = input.questionnaireAnswers.map((answer) => {
     const identity = answerPayloadIdentity(answer);
@@ -1960,31 +1970,33 @@ function snapshotMatchesDraftPayload(input: {
         )
       : null;
   });
-  if (expectedAnswerKeys.some((key) => key === null)) return false;
+  if (expectedAnswerKeys.some((key) => key === null)) return "answer_payload";
   const actualAnswerKeys: string[] = [];
   for (const applicant of snapshotApplicants) {
     const applicantId = text(applicant.id);
     const sections = recordArray(applicant.sections);
-    if (!applicantId || !sections) return false;
+    if (!applicantId || !sections) return "answer_shape";
     for (const section of sections) {
       const sectionId = text(section.id);
       const fields = recordArray(section.fields);
-      if (!sectionId || !fields) return false;
+      if (!sectionId || !fields) return "answer_shape";
       for (const field of fields) {
         const fieldId = text(field.id);
         const labelDigest = productionDraftValueDigest(field.label);
         const valueDigest = productionDraftValueDigest(field.value);
-        if (!fieldId || !labelDigest || !valueDigest) return false;
+        if (!fieldId || !labelDigest || !valueDigest) return "answer_shape";
         actualAnswerKeys.push(
           identityKey(applicantId, sectionId, fieldId, labelDigest, valueDigest),
         );
       }
     }
   }
-  if (!exactIdentitySet(actualAnswerKeys, expectedAnswerKeys as string[])) return false;
+  if (!exactIdentitySet(actualAnswerKeys, expectedAnswerKeys as string[])) {
+    return "answers";
+  }
 
   const snapshotFiles = recordArray(snapshot.files);
-  if (!snapshotFiles) return false;
+  if (!snapshotFiles) return "file_shape";
   const expectedFiles = input.media.map((media) => {
     const applicantId = text(media.applicant_id);
     const type = text(media.type);
@@ -2008,7 +2020,7 @@ function snapshotMatchesDraftPayload(input: {
     actualFiles.some((key) => key === null) ||
     !exactIdentitySet(actualFiles as string[], expectedFiles as string[])
   ) {
-    return false;
+    return "files";
   }
 
   if (
@@ -2019,11 +2031,11 @@ function snapshotMatchesDraftPayload(input: {
       input.expectedCorrections,
     )
   ) {
-    return false;
+    return "issues";
   }
 
   const snapshotHistory = recordArray(snapshot.history);
-  if (!snapshotHistory) return false;
+  if (!snapshotHistory) return "history_shape";
   const actualHistory: string[] = [];
   const actualUntypedHistoryDigests: string[] = [];
   for (const item of snapshotHistory) {
@@ -2031,11 +2043,22 @@ function snapshotMatchesDraftPayload(input: {
     if (key) actualHistory.push(key);
     else {
       const digest = normalizedSnapshotHistoryContentDigest(item);
-      if (!digest) return false;
+      if (!digest) return "history_shape";
       actualUntypedHistoryDigests.push(digest);
     }
   }
   const expectedHistory = expectedSnapshotHistoryKeys(input.contract);
+  if (!exactIdentityMultiset(actualHistory, expectedHistory)) {
+    return "history_typed";
+  }
+  if (
+    !exactIdentityMultiset(
+      actualUntypedHistoryDigests,
+      expectedSnapshotUntypedHistoryDigests(input.contract),
+    )
+  ) {
+    return "history_untyped";
+  }
   const contentMatches = input.contract.snapshotMutation
     ? productionDraftSnapshotFullContentDigest(
         input.payloadSubmission.family_intelligence,
@@ -2049,14 +2072,11 @@ function snapshotMatchesDraftPayload(input: {
           : input.contract.mode === "export"
             ? input.contract.draft.snapshot.exportContentDigest
             : input.contract.draft.snapshot.lifecycleContentDigest);
-  return (
-    exactIdentityMultiset(actualHistory, expectedHistory) &&
-    exactIdentityMultiset(
-      actualUntypedHistoryDigests,
-      expectedSnapshotUntypedHistoryDigests(input.contract),
-    ) &&
-    contentMatches
-  );
+  return contentMatches ? null : "content";
+}
+
+function snapshotMatchesDraftPayload(input: SnapshotDraftPayloadInput) {
+  return snapshotDraftPayloadMismatchCode(input) === null;
 }
 
 /**
@@ -2337,7 +2357,18 @@ export function productionLifecycleMutationPayloadMismatchCode(
           }
         }
       }
-      return "snapshot";
+      return `snapshot_${
+        snapshotDraftPayloadMismatchCode({
+          applicants,
+          contract,
+          corrections,
+          expectedCorrections: expectedCorrectionRows,
+          history,
+          media,
+          payloadSubmission: submission,
+          questionnaireAnswers,
+        }) ?? "unknown"
+      }`;
     }
     return "match";
   } catch {
