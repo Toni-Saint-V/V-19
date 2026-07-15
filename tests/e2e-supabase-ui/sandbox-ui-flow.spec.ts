@@ -185,10 +185,10 @@ async function createAndSubmitSubmission(
   const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
   await expect(questionnaire).toBeVisible();
   await expect(
-    questionnaire.getByRole("button", { name: /Готово к проверке|Готово/ }),
+    questionnaire.getByRole("button", { name: /Отправить на проверку|Отправить/ }),
   ).toBeEnabled({ timeout: 30_000 });
   await captureUiEvidence({
-    description: `${typeLabel}: после анкеты и файлов primary CTA «Готово к проверке» доступен.`,
+    description: `${typeLabel}: после анкеты и файлов primary CTA «Отправить на проверку» доступен.`,
     page,
     role: "agent",
     step: `${stepPrefix}-06-ready-to-submit`,
@@ -196,7 +196,7 @@ async function createAndSubmitSubmission(
     testInfo,
   });
   await clickAndWaitForSupabaseWrite(page, () =>
-    questionnaire.getByRole("button", { name: /Готово к проверке|Готово/ }).click(),
+    questionnaire.getByRole("button", { name: /Отправить на проверку|Отправить/ }).click(),
   );
   await questionnaire.getByRole("button", { name: "Назад" }).click();
   await expect(questionnaire).toHaveCount(0);

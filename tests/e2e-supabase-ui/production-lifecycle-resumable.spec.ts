@@ -1088,7 +1088,7 @@ async function ensureAgentResubmitted(input: {
       "The exact lifecycle issue must remain fixed before resubmission.",
     ).toBe("fixed");
     const resubmit = reopened.questionnaire.getByRole("button", {
-      name: "Готово к проверке",
+      name: "Отправить на проверку",
     });
     await expect(resubmit).toBeEnabled();
     state.stage = "resubmitting";

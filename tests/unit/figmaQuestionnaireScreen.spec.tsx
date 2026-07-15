@@ -422,7 +422,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     const completeButton = screen.getByRole("button", {
-      name: /Готово к проверке|Готово/,
+      name: /Отправить на проверку|Отправить/,
     });
     expect(completeButton).toBeEnabled();
 

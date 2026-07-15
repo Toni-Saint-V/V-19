@@ -1081,7 +1081,19 @@ test.describe("Supabase sandbox auth smoke", () => {
       ).toBeVisible();
       await openDrawerIssuesSection(page);
       await drawer(page).getByRole("button", { name: "Исправить в анкете" }).click();
+      const agentDraftSave = page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          response.url().includes("/rest/v1/rpc/save_submission_draft"),
+        { timeout: 20_000 },
+      );
       await chooseQuestionnaireOption(page, "Страна первого въезда", "France");
+      const agentDraftSaveResponse = await agentDraftSave;
+      const agentDraftSaveBody = await agentDraftSaveResponse.text();
+      expect(
+        agentDraftSaveResponse.ok(),
+        `Agent correction draft save must succeed: ${agentDraftSaveResponse.status()}: ${agentDraftSaveBody}`,
+      ).toBe(true);
       await expect(
         page.getByRole("button", { name: "Пометить исправленным" }),
       ).toBeVisible();
