@@ -160,6 +160,34 @@ describe("V-19 domain engine", () => {
     });
   });
 
+  it("fails closed for admin acceptance when required questionnaire data is incomplete", () => {
+    const readyForReview: Submission = {
+      ...completeInProgressSubmission(),
+      status: "submitted_for_review",
+    };
+    const incomplete: Submission = {
+      ...readyForReview,
+      applicants: readyForReview.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "surname" ? { ...field, value: "" } : field,
+          ),
+        })),
+      })),
+    };
+
+    expect(canAdminApproveForExport(incomplete)).toBe(false);
+    expect(acceptSubmission(incomplete, "admin")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Questionnaire and files must be complete.",
+      },
+    });
+  });
+
   it("runs issue lifecycle open to fixed_by_agent to closed_by_admin", () => {
     const submitted = {
       ...completeInProgressSubmission(),
@@ -311,7 +339,9 @@ describe("V-19 domain engine", () => {
   });
 
   it("uses fail-closed export guards and marks exported only after download", () => {
-    const ready = canonicalMediaSubmission(byId("ПД-1056"));
+    const ready = fillRequiredQuestionnaireForTest(
+      canonicalMediaSubmission(byId("ПД-1056")),
+    );
     const notReady = completeInProgressSubmission();
 
     expect(generateExport([notReady], "admin")).toEqual({

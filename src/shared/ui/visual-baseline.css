@@ -287,6 +287,94 @@
   text-transform: uppercase;
 }
 
+/* Review drawer: applicant summaries should scan as one compact identity row
+   followed by three distinct metrics, not as a multiline metadata block. */
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicants-tab header > strong {
+  min-width: var(--v19b-size-0);
+  overflow: hidden;
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-14);
+  font-weight: var(--v19b-weight-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-applicants-tab
+  .admin-review-applicant-metric {
+  min-width: var(--v19b-size-0);
+  padding: var(--v19b-size-10);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire .admin-review-field-section {
+  margin-bottom: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-row);
+  background: var(--v19b-color-panel);
+  padding: var(--v19b-size-12);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-field-section
+  > summary {
+  list-style: none;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-field-section
+  > summary::-webkit-details-marker {
+  display: none;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-field-section:not([open])
+  .lucide-chevron-down {
+  transform: rotate(-90deg);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-stat-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v19b-size-6);
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-applicant-stat-button:not(:disabled):is(:hover, :focus-visible) {
+  color: var(--v19b-color-text-strong);
+  text-decoration: underline;
+  text-underline-offset: var(--v19b-size-4);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-stat-button:disabled {
+  cursor: default;
+  opacity: var(--v19b-opacity-full);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-history-item > button {
+  display: grid;
+  grid-template-columns: var(--v19b-size-76) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  align-items: center;
+  gap: var(--v19b-size-12);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-history-item.is-expanded
+  > button {
+  align-items: start;
+}
+
 [data-admin-review-drawer-surface="workspace"] .admin-review-file-row {
   display: grid;
   grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
@@ -26300,108 +26388,41 @@ body,
   white-space: nowrap;
 }
 
-[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li.is-ready > strong {
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-decision-checklist
+  li.is-ready
+  > strong {
   color: var(--v19b-admin-drawer-green-text);
 }
 
-[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li.is-warning > strong {
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-decision-checklist
+  li.is-warning
+  > strong {
   color: var(--v19b-admin-drawer-orange-text);
 }
 
-.admin-review-mobile-tabs-trigger,
-.admin-review-mobile-tabs-menu {
-  display: none;
-}
-
-@media (max-width: 560px) {
+@media (max-width: 767px) {
   .admin-review-tabs {
-    overflow: visible !important;
+    overflow: hidden !important;
   }
 
-  .admin-review-tabs .admin-review-tab--mobile-secondary {
-    display: none !important;
+  .admin-review-tabs > div {
+    width: var(--v19b-size-full);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
   }
 
-  .admin-review-tabs > div > button .admin-review-tab-count {
-    display: none !important;
+  .admin-review-tabs > div::-webkit-scrollbar {
+    display: none;
   }
 
-  .admin-review-tabs > div > button:not(.admin-review-tab--mobile-secondary) {
+  .admin-review-tabs > div > button {
+    flex: 0 0 auto;
     padding-inline: var(--v19b-size-8) !important;
-  }
-
-  .admin-review-mobile-tabs-trigger {
-    display: inline-flex;
-    min-height: var(--v19b-size-40);
-    align-items: center;
-    justify-content: center;
-    gap: var(--v19b-size-4);
-    border: var(--v19b-size-0);
-    border-radius: var(--v19b-radius-tab-button);
-    background: var(--v19b-color-clear);
-    color: var(--v19b-color-text-muted);
-    font-size: var(--v19b-size-12);
-    font-weight: var(--v19b-weight-control);
-    padding-inline: var(--v19b-size-8);
-  }
-
-  .admin-review-mobile-tabs-trigger:is(:hover, :focus-visible, .is-active) {
-    color: var(--v19b-color-text-strong);
-  }
-
-  .admin-review-mobile-tabs-trigger > svg {
-    width: var(--v19b-size-16);
-    height: var(--v19b-size-16);
-  }
-
-  .admin-review-mobile-tabs-menu {
-    position: absolute;
-    z-index: var(--v19b-z-overlay);
-    top: calc(var(--v19b-size-full) + var(--v19b-size-8));
-    right: var(--v19b-size-14);
-    display: grid;
-    min-width: var(--v19b-size-172);
-    gap: var(--v19b-size-4);
-    border: var(--v19b-size-1) solid var(--v19b-color-border-selected);
-    border-radius: var(--v19b-radius-control);
-    background: var(--v19b-color-panel);
-    box-shadow: var(--v19b-shadow-panel);
-    padding: var(--v19b-size-6);
-  }
-
-  .admin-review-mobile-tabs-menu button {
-    display: grid;
-    grid-template-columns: var(--v19b-size-16) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
-    min-height: var(--v19b-size-40);
-    align-items: center;
-    gap: var(--v19b-size-8);
-    border: var(--v19b-size-0);
-    border-radius: var(--v19b-radius-tab-button);
-    background: var(--v19b-color-clear);
-    color: var(--v19b-color-text-strong);
-    font-size: var(--v19b-size-13);
-    text-align: left;
-    padding-inline: var(--v19b-size-10);
-  }
-
-  .admin-review-mobile-tabs-menu button:is(:hover, :focus-visible) {
-    background: var(--v19b-color-control-hover);
-  }
-
-  .admin-review-mobile-tabs-menu svg {
-    width: var(--v19b-size-16);
-    height: var(--v19b-size-16);
-  }
-
-  .admin-review-mobile-tabs-menu em {
-    min-width: var(--v19b-size-20);
-    border-radius: var(--v19b-radius-pill);
-    background: var(--v19b-color-tag);
-    color: var(--v19b-color-text-muted);
-    font-size: var(--v19b-size-10);
-    font-style: normal;
-    text-align: center;
-    padding: var(--v19b-size-4);
+    scroll-snap-align: start;
   }
 
   [data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist ul {
@@ -26416,5 +26437,722 @@ body,
 
   .v19-admin-export-metrics-v2 .v19-summary-tile-label {
     right: var(--v19b-size-10);
+  }
+}
+
+@media (max-width: 560px) {
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-tabs {
+    overflow: visible !important;
+  }
+}
+
+/* Disabled admin acceptance is deliberately neutral: it must never resemble a live green CTA. */
+.admin-review-drawer .admin-review-primary:disabled {
+  border-color: var(--v19b-color-border) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-faint) !important;
+  opacity: var(--v19b-opacity-disabled) !important;
+  box-shadow: none !important;
+}
+
+/* Admin review drawer polish: semantic signals remain quiet and token-driven. */
+[data-admin-review-drawer-surface="workspace"] .admin-review-tabs
+  > div
+  > button {
+  border-radius: var(--v19b-radius-tab-button) !important;
+  transition:
+    color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    box-shadow var(--v19b-motion-fast),
+    transform var(--v19b-motion-fast) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-tabs
+  > div
+  > button:is(:hover, :focus-visible) {
+  background: var(--v19b-color-control-hover) !important;
+  box-shadow: 0 0 0 var(--v19b-size-2) var(--vf-accent-soft) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-tabs
+  > div
+  > button.is-active {
+  background: var(--vf-accent-soft) !important;
+  color: var(--v19b-color-primary-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-tabs
+  > div
+  > button:active {
+  transform: var(--v19b-transform-press);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-tabs
+  > div
+  > button.is-active
+  .admin-review-tab-count {
+  background: var(--v19b-color-primary-soft-20) !important;
+  color: var(--v19b-color-primary-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-overview-hero {
+  box-shadow: inset var(--v19b-size-3) var(--v19b-size-0) var(--v19b-size-0)
+    var(--vf-accent-border) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric {
+  --admin-review-metric-accent: var(--v19b-dot-review);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric::before,
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-row::before {
+  position: absolute;
+  top: var(--v19b-size-14);
+  bottom: var(--v19b-size-14);
+  left: var(--v19b-size-0);
+  width: var(--v19b-size-3);
+  border-radius: var(--v19b-radius-pill);
+  background: var(--admin-review-metric-accent, var(--admin-review-file-accent));
+  content: "";
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--checked,
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--issues.is-clear {
+  --admin-review-metric-accent: var(--v19b-dot-success);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--pending {
+  --admin-review-metric-accent: var(--v19b-dot-warning);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--applicants {
+  --admin-review-metric-accent: var(--v19b-dot-review);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--issues.is-open {
+  --admin-review-metric-accent: var(--v19b-dot-danger);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-row {
+  --admin-review-file-accent: var(--v19b-dot-review);
+  position: relative;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-file-row[data-file-status="accepted"] {
+  --admin-review-file-accent: var(--v19b-dot-success);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-file-row:is(
+    [data-file-status="missing"],
+    [data-file-status="needs_replacement"]
+  ) {
+  --admin-review-file-accent: var(--v19b-dot-warning);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-status {
+  display: inline-flex;
+  min-height: var(--v19b-size-24);
+  align-items: center;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-pill);
+  background: var(--v19b-color-tag);
+  color: var(--v19b-color-text-muted);
+  padding-inline: var(--v19b-size-8);
+  white-space: nowrap;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-title {
+  color: var(--v19b-color-text-strong) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-applicant {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-tag) !important;
+  color: var(--v19b-color-text-muted) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-name {
+  color: var(--v19b-color-text-muted) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-file-row:is(
+    [data-file-status="uploaded"],
+    [data-file-status="pending_review"]
+  )
+  .admin-review-file-status {
+  border-color: var(--v19b-admin-drawer-blue-border) !important;
+  background: var(--v19b-admin-drawer-blue-bg) !important;
+  color: var(--v19b-admin-drawer-blue-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-file-row[data-file-status="accepted"]
+  .admin-review-file-status,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-applicants-tab
+  em.is-clear {
+  border-color: var(--v19b-status-success-border) !important;
+  background: var(--v19b-status-success-bg) !important;
+  color: var(--v19b-admin-drawer-green-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-file-row:is(
+    [data-file-status="missing"],
+    [data-file-status="needs_replacement"]
+  )
+  .admin-review-file-status,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-applicants-tab
+  em.is-warning {
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-issue-severity.is-blocker {
+  border-color: var(--v19b-status-danger-border) !important;
+  background: var(--v19b-status-danger-bg) !important;
+  color: var(--v19b-status-danger-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-issue-severity.is-warning,
+[data-admin-review-drawer-surface="workspace"] .admin-review-issue-status.is-open {
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-issue-status.is-fixed_by_agent {
+  border-color: var(--v19b-status-review-border) !important;
+  background: var(--v19b-status-review-bg) !important;
+  color: var(--v19b-color-primary-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-empty-state {
+  min-height: var(--v19b-size-220);
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-panel) !important;
+  padding-block: var(--v19b-size-32) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-empty-state.is-success {
+  border-color: var(--v19b-status-success-border) !important;
+  background: var(--v19b-status-success-bg) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-empty-state.is-success
+  svg {
+  color: var(--v19b-dot-success) !important;
+}
+
+.v19-remark-form-error {
+  color: var(--v19b-status-danger-text) !important;
+}
+
+@media (max-width: 560px) {
+  [data-admin-review-drawer-surface="workspace"] .admin-review-drawer-header {
+    padding: var(--v19b-size-12) var(--v19b-size-16) var(--v19b-size-0) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-titlebar {
+    gap: var(--v19b-size-8) !important;
+    margin-bottom: var(--v19b-size-8) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-titlecopy {
+    flex: 1 1 auto !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-titlecopy > p:first-child {
+    display: none !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-titlecopy h2 {
+    flex-wrap: nowrap !important;
+    gap: var(--v19b-size-6) !important;
+    overflow: hidden !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-drawer-heading {
+    min-width: var(--v19b-size-0) !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-status-pill {
+    width: var(--v19b-size-24) !important;
+    min-width: var(--v19b-size-24) !important;
+    height: var(--v19b-size-24) !important;
+    min-height: var(--v19b-size-24) !important;
+    justify-content: center !important;
+    gap: var(--v19b-size-0) !important;
+    font-size: var(--v19b-size-0) !important;
+    padding-inline: var(--v19b-size-0) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"]
+    .admin-review-status-pill
+    .admin-review-status-dot {
+    width: var(--v19b-size-6) !important;
+    height: var(--v19b-size-6) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-tabs > div > button {
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics {
+    grid-template-columns: repeat(
+      2,
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    ) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-empty-state {
+    min-height: var(--v19b-size-200);
+  }
+}
+
+/* Admin review: keep the decision state explicit and the passport check reachable
+   from the file that requires it. */
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-actions {
+  display: flex !important;
+  min-width: var(--v19b-size-0) !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: var(--v19b-size-8) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-verify {
+  display: inline-flex;
+  min-height: var(--v19b-size-40);
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19b-size-6);
+  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-blue-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-admin-drawer-blue-bg);
+  color: var(--v19b-admin-drawer-blue-text);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  padding-inline: var(--v19b-size-12);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-verify:hover,
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-verify:focus-visible {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+  outline: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-file-verify svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-file-verify
+  :is(span, svg) {
+  color: var(--v19b-admin-drawer-blue-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-primary-reason {
+  display: flex;
+  min-width: var(--v19b-size-0);
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--v19b-size-8);
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-12);
+  line-height: var(--v19b-line-height-row);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-primary-reason svg {
+  color: var(--v19b-admin-drawer-orange-text);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-primary-reason strong {
+  color: var(--v19b-color-text-strong);
+  font-weight: var(--v19b-weight-title);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-primary-reason-action {
+  flex: 0 0 auto;
+  min-height: var(--v19b-size-32);
+  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-orange-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-admin-drawer-orange-bg);
+  color: var(--v19b-admin-drawer-orange-text);
+  cursor: pointer;
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  padding-inline: var(--v19b-size-10);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-primary-reason-action:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+  outline: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-footer-actions {
+  display: flex !important;
+  min-width: var(--v19b-size-0) !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-8) !important;
+  margin-left: auto !important;
+}
+
+@media (max-width: 560px) {
+  [data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist > header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--v19b-size-8);
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-file-actions {
+    justify-content: flex-start !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-file-verify {
+    flex: 1 1 auto;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-footer {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: var(--v19b-size-8) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-footer-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    width: var(--v19b-size-full);
+    gap: var(--v19b-size-8) !important;
+    margin-left: var(--v19b-size-0) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-footer-actions > button {
+    min-width: var(--v19b-size-0);
+    width: var(--v19b-size-full);
+  }
+
+}
+
+/* Admin review: the questionnaire is a compact verification grid, not a stack
+   of form-sized cells. The same controls stay legible on narrow drawers. */
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-control {
+  position: relative;
+  display: grid;
+  min-width: var(--v19b-size-240);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-control select {
+  width: var(--v19b-size-full) !important;
+  min-height: var(--v19b-size-40) !important;
+  appearance: none;
+  border-color: var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  cursor: pointer;
+  font-size: var(--v19b-size-13) !important;
+  padding-inline: var(--v19b-size-12) var(--v19b-size-36) !important;
+  transition:
+    border-color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    box-shadow var(--v19b-motion-fast);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-control:is(:hover, :focus-within) select {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  box-shadow: 0 0 0 var(--v19b-size-2) var(--vf-accent-soft);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-control > svg {
+  position: absolute;
+  top: var(--v19b-size-12);
+  right: var(--v19b-size-12);
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  pointer-events: none;
+  color: var(--v19b-color-text-muted);
+}
+
+/* Applicant choice stays within the review drawer instead of delegating a key
+   workflow control to the browser-native select surface. */
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-trigger {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  align-items: center;
+  gap: var(--v19b-size-8);
+  width: var(--v19b-size-full);
+  min-height: var(--v19b-size-44);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+  color: var(--v19b-color-text-strong);
+  cursor: pointer;
+  font-size: var(--v19b-size-14);
+  font-weight: var(--v19b-weight-control);
+  padding-inline: var(--v19b-size-12);
+  text-align: start;
+  transition:
+    border-color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    box-shadow var(--v19b-motion-fast);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-trigger:is(:hover, :focus-visible),
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-trigger[aria-expanded="true"] {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+  box-shadow: 0 0 0 var(--v19b-size-2) var(--vf-accent-soft);
+  outline: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-trigger:disabled {
+  cursor: default;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-value {
+  min-width: var(--v19b-size-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-trigger > svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  color: var(--v19b-color-text-muted);
+  transition: transform var(--v19b-motion-fast);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-trigger > svg.is-open {
+  transform: rotate(180deg);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-menu {
+  position: absolute;
+  z-index: var(--v19b-z-overlay);
+  top: calc(var(--v19b-size-full) + var(--v19b-size-8));
+  right: var(--v19b-size-0);
+  left: var(--v19b-size-0);
+  display: grid;
+  gap: var(--v19b-size-4);
+  max-height: var(--v19b-size-240);
+  overflow-y: auto;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-row);
+  background: var(--v19b-color-panel);
+  box-shadow: var(--v19b-shadow-panel);
+  padding: var(--v19b-size-6);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-menu [role="option"] {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  align-items: center;
+  gap: var(--v19b-size-8);
+  width: var(--v19b-size-full);
+  min-height: var(--v19b-size-40);
+  border: var(--v19b-size-1) solid transparent;
+  border-radius: var(--v19b-radius-control);
+  background: transparent;
+  color: var(--v19b-color-text-strong);
+  cursor: pointer;
+  font-size: var(--v19b-size-13);
+  font-weight: var(--v19b-weight-control);
+  padding-inline: var(--v19b-size-10);
+  text-align: start;
+  transition:
+    border-color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    transform var(--v19b-motion-fast);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-menu [role="option"]:is(:hover, :focus-visible),
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-menu [role="option"].is-selected {
+  border-color: var(--vf-accent-border);
+  background: var(--vf-accent-soft);
+  outline: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-menu [role="option"]:active {
+  transform: var(--v19b-transform-press);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-menu svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  color: var(--vf-success);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-field-table {
+  grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  gap: var(--v19b-size-10) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-field-row {
+  min-height: var(--v19b-size-64) !important;
+  gap: var(--v19b-size-8) !important;
+  padding: var(--v19b-size-12) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-main {
+  min-width: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-actions {
+  gap: var(--v19b-size-6) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-actions .admin-review-remark-action {
+  width: auto !important;
+  min-width: var(--v19b-size-0) !important;
+  height: var(--v19b-size-32) !important;
+  min-height: var(--v19b-size-32) !important;
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+  padding-inline: var(--v19b-size-10) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric {
+  display: grid;
+  gap: var(--v19b-size-6);
+  min-width: var(--v19b-size-0);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-row);
+  background: var(--v19b-color-panel);
+  color: inherit;
+  cursor: pointer;
+  padding: var(--v19b-size-14);
+  text-align: left;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+  outline: var(--v19b-size-0);
+}
+
+/* Overview metrics are a compact scan path: label, value, then action. */
+[data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric {
+  grid-template-rows: min-content min-content;
+  align-content: center;
+  min-height: var(--v19b-size-84);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric > span {
+  display: block;
+  overflow: hidden;
+  background: var(--v19b-color-clear) !important;
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-11) !important;
+  line-height: var(--v19b-line-height-control);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric > strong {
+  display: block;
+  color: var(--v19b-color-text-strong) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-overview-detail-grid strong {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li {
+  padding: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li > button {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  width: var(--v19b-size-full);
+  min-height: var(--v19b-size-72);
+  align-items: center;
+  gap: var(--v19b-size-6) var(--v19b-size-8);
+  border: var(--v19b-size-0);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+  color: var(--v19b-color-text-strong);
+  cursor: pointer;
+  padding: var(--v19b-size-12);
+  text-align: left;
+  transition:
+    background var(--v19b-motion-fast),
+    box-shadow var(--v19b-motion-fast);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li > button > span {
+  grid-column: 1;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li > button > strong {
+  grid-column: 1;
+  min-width: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li > button > svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  color: var(--v19b-color-text-faint);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-decision-checklist li > button:is(:hover, :focus-visible) {
+  background: var(--v19b-color-control-hover);
+  box-shadow: 0 0 0 var(--v19b-size-2) var(--vf-accent-soft);
+  outline: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-history-item {
+  padding: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-history-item > button {
+  border: var(--v19b-size-0);
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: var(--v19b-size-14);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-history-item > button:is(:hover, :focus-visible) {
+  background: var(--v19b-color-control-hover);
+  outline: var(--v19b-size-0);
+}
+
+@media (max-width: 767px) {
+  [data-admin-review-drawer-surface="workspace"] .admin-review-applicant-select-control {
+    min-width: var(--v19b-size-0);
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-field-table {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
   }
 }

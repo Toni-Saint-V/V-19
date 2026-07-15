@@ -305,6 +305,7 @@ export async function selectSubmissionStatus(page: Page, label: string | RegExp)
 export async function openDrawerTab(page: Page, labels: string[]) {
   const drawerTabIds: Record<string, string> = {
     Анкета: "questionnaire",
+    Заявители: "applicants",
     Замечания: "issues",
     История: "history",
     Обзор: "overview",
@@ -316,9 +317,36 @@ export async function openDrawerTab(page: Page, labels: string[]) {
     const tabId = drawerTabIds[label];
     if (!tabId) continue;
 
-    const tabById = drawer(page).locator(`[data-drawer-tab="${tabId}"]`).first();
-    if (await isVisible(tabById)) {
-      await tabById.click();
+    const activeDrawer = drawer(page);
+    const adminReviewTab = activeDrawer.locator(`#admin-review-tab-${tabId}`).first();
+    if (await isVisible(adminReviewTab)) {
+      await adminReviewTab.click();
+      await expect(adminReviewTab).toHaveAttribute("aria-selected", "true");
+      return;
+    }
+
+    // The active AdminReviewDrawer keeps secondary sections in the explicit
+    // mobile "Ещё" menu instead of leaving an off-screen tab strip.
+    if ((await adminReviewTab.count()) > 0) {
+      const more = activeDrawer.getByRole("button", { name: "Ещё", exact: true });
+      if (await isVisible(more)) {
+        await more.click();
+        const menu = activeDrawer.locator(".admin-review-mobile-tabs-menu").first();
+        await expect(menu).toBeVisible();
+        const menuItem = menu.locator("button").filter({ hasText: label }).first();
+        await expect(menuItem).toBeVisible();
+        await menuItem.click();
+        await expect(adminReviewTab).toHaveAttribute("aria-selected", "true");
+        return;
+      }
+    }
+
+    const legacyTab = activeDrawer.locator(`[data-drawer-tab="${tabId}"]`).first();
+    if (await isVisible(legacyTab)) {
+      await legacyTab.click();
+      if ((await legacyTab.getAttribute("role")) === "tab") {
+        await expect(legacyTab).toHaveAttribute("aria-selected", "true");
+      }
       return;
     }
   }
@@ -360,6 +388,24 @@ export async function openDrawerTab(page: Page, labels: string[]) {
     if (await isVisible(byExactText)) {
       await byExactText.click();
       return;
+    }
+  }
+
+  const mobileMore = drawer(page).getByRole("button", {
+    name: "Ещё",
+    exact: true,
+  });
+  if (await isVisible(mobileMore)) {
+    await mobileMore.click();
+    const menu = drawer(page).locator(".admin-review-mobile-tabs-menu").first();
+    await expect(menu).toBeVisible();
+
+    for (const label of labels) {
+      const menuItem = menu.locator("button").filter({ hasText: label }).first();
+      if (await isVisible(menuItem)) {
+        await menuItem.click();
+        return;
+      }
     }
   }
 

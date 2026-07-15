@@ -76,6 +76,7 @@ import {
   canEditSubmissionContent,
   canPerformAction,
   defaultDrawerTab,
+  hasMissingRequiredWork,
   markSubmissionIssueFixedResult,
   transitionMatrix,
 } from "../../src/modules/submissions/status";
@@ -139,7 +140,9 @@ function testStorage() {
 
 function readyClone(patch: Partial<Submission>): Submission {
   return {
-    ...canonicalMediaSubmission(byId("ПД-1056")),
+    ...fillRequiredQuestionnaireForTest(
+      canonicalMediaSubmission(byId("ПД-1056")),
+    ),
     id: patch.id ?? "ПД-ТЕСТ",
     title: patch.title ?? "Тестовая подача",
     ...patch,
@@ -281,7 +284,9 @@ describe("V-19 submission status rules", () => {
   });
 
   it("blocks role-incompatible actions", () => {
-    const submitted = canonicalMediaSubmission(byId("ПД-1053"));
+    const submitted = canonicalMediaSubmission(
+      fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+    );
 
     expect(canPerformAction(submitted, "accept", "agent")).toEqual({
       ok: false,
@@ -295,6 +300,36 @@ describe("V-19 submission status rules", () => {
       ok: false,
       reason: "Есть незаполненные поля или недостающие файлы",
     });
+  });
+
+  it("fails closed for admin acceptance while required questionnaire work is incomplete", () => {
+    const complete = canonicalMediaSubmission(
+      fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+    );
+    const incomplete: Submission = {
+      ...complete,
+      applicants: complete.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "surname" ? { ...field, value: "" } : field,
+          ),
+        })),
+      })),
+    };
+    const corrected: Submission = { ...incomplete, status: "corrections_received" };
+
+    expect(hasMissingRequiredWork(incomplete)).toBe(true);
+    expect(canPerformAction(incomplete, "accept", "admin")).toEqual({
+      ok: false,
+      reason: "Не все обязательные анкеты и файлы готовы",
+    });
+    expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
+      ok: false,
+      reason: "Не все обязательные анкеты и файлы готовы",
+    });
+    expect(applySubmissionAction(incomplete, "accept", "admin")).toBe(incomplete);
   });
 
   it("blocks review submission while trip dates are missing", () => {
@@ -1878,7 +1913,9 @@ describe("V-19 submission actions", () => {
 
   it("records the admin reviewer when accepting uploaded media", () => {
     const adminProfileId = "00000000-0000-4000-8000-000000000002";
-    const submission = canonicalMediaSubmission(byId("ПД-1053"));
+    const submission = canonicalMediaSubmission(
+      fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+    );
     const reviewableFiles = submission.files.filter((file) =>
       ["uploaded", "pending_review", "accepted"].includes(file.status),
     );
