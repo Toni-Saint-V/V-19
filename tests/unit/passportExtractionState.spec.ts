@@ -3,6 +3,7 @@ import {
   applyPassportExtractionField,
   applySafePassportExtractionFields,
   canStartPassportExtraction,
+  confirmApplicantPassportReview,
   finishPassportExtraction,
   hasPassportExtractionReviewPending,
   markPassportExtractionReviewed,
@@ -12,6 +13,7 @@ import {
   requiresPassportExtractionReviewBeforeAction,
   startPassportExtraction,
 } from "../../src/modules/submissions/passportExtraction";
+import { passportGateIssues } from "../../src/modules/submissions/passportExtractionGuards";
 import {
   createDraftSubmission,
   uploadRequiredFile,
@@ -534,6 +536,35 @@ describe("passport extraction state", () => {
     expect(hasPassportExtractionReviewPending(reviewed)).toBe(false);
     expect(reviewed.applicants[0]?.passportExtraction?.verifiedAtIso).toBeTruthy();
     expect(reviewed.history[0]?.text).toContain("проверил");
+  });
+
+  test("allows an explicit manual passport review when OCR state is absent", () => {
+    const base = fillRequiredQuestionnaireForTest(draftSubmission());
+    const file = passportFile(base);
+    const uploaded = uploadRequiredFile(base, file.id, {
+      generatedFileName: "passport-test.png",
+      mimeType: "image/png",
+      originalFileName: "passport-test.png",
+      sizeBytes: 1024,
+      storageBucket: "submission-media",
+      storagePath: `${base.id}/${file.applicantId}/passport_scan/passport-test.png`,
+      uploadedAtIso: "2026-07-15T00:00:00.000Z",
+    });
+
+    expect(passportGateIssues(uploaded).map((issue) => issue.code)).toContain(
+      "passport_not_confirmed",
+    );
+
+    const confirmed = confirmApplicantPassportReview(uploaded, file.applicantId);
+
+    expect(confirmed.applicants[0]?.passportExtraction).toMatchObject({
+      status: "unavailable",
+      verifiedAtIso: expect.any(String),
+    });
+    expect(passportGateIssues(confirmed).map((issue) => issue.code)).not.toContain(
+      "passport_not_confirmed",
+    );
+    expect(confirmed.history[0]?.text).toContain("проверил паспорт");
   });
 
   test("requires review before submitting corrections after passport extraction", () => {

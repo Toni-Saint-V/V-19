@@ -636,6 +636,65 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
+  test("persists the biometrics choice for submissions with legacy fingerprint field ids", async () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["Ирина Петрова"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const submission: Submission = {
+      ...draft,
+      applicants: draft.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) => {
+            if (field.id === "previous-biometrics") {
+              return { ...field, id: "fingerprints-collected", value: "" };
+            }
+            if (field.id === "previous-biometrics-date") {
+              return { ...field, id: "fingerprints-date", value: "" };
+            }
+            return field;
+          }),
+        })),
+      })),
+    };
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Поездка");
+    const biometricsField = result.container.querySelector<HTMLElement>(
+      '[data-field-label="Отпечатки ранее сдавались"]',
+    );
+    if (!biometricsField) throw new Error("expected biometrics field");
+
+    const noButton = within(biometricsField).getByRole("button", { name: "Нет" });
+    fireEvent.click(noButton);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Нет", pressed: true }),
+      ).toBeInTheDocument(),
+    );
+    expect(onFieldChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fieldId: "fingerprints-collected",
+        value: "Нет",
+      }),
+    );
+  });
+
   test("reveals only the follow-up questions required by an answer", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],

@@ -1,3 +1,4 @@
+import { isCompletedFileAsset } from "./fileAsset";
 import { updateQuestionnaireField } from "./submissionActions";
 import type {
   Applicant,
@@ -358,6 +359,67 @@ export function markPassportExtractionReviewed(
           mode === "verified"
             ? "Агент проверил распознанные паспортные данные перед отправкой"
             : "Агент отправил подачу без дополнительной проверки распознанных паспортных данных",
+        at: "сейчас",
+        source: "agent",
+      },
+      ...submission.history,
+    ],
+    updatedAt: "сейчас",
+  };
+}
+
+export function confirmApplicantPassportReview(
+  submission: Submission,
+  applicantId: string,
+): Submission {
+  const applicant = submission.applicants.find((item) => item.id === applicantId);
+  const file = submission.files.find(
+    (item) => item.applicantId === applicantId && item.type === "passport_scan",
+  );
+  const state = applicant?.passportExtraction;
+
+  if (
+    !applicant ||
+    !file ||
+    !isCompletedFileAsset(file) ||
+    state?.status === "extracting"
+  ) {
+    return submission;
+  }
+
+  const timestamp = new Date().toISOString();
+  const hasExtractedFields =
+    state?.status === "ready" && state.extractedFields.length > 0;
+
+  return {
+    ...submission,
+    applicants: submission.applicants.map((candidate) => {
+      if (candidate.id !== applicantId) return candidate;
+
+      return {
+        ...candidate,
+        passportExtraction: hasExtractedFields
+          ? {
+              ...state,
+              verifiedAtIso: timestamp,
+            }
+          : {
+              ...state,
+              appliedFieldKeys: state?.appliedFieldKeys ?? [],
+              extractedFields: [],
+              sourceFileId: file.id,
+              sourceFileName: file.originalFileName ?? file.generatedFileName,
+              sourceStoragePath: file.storagePath,
+              status: "unavailable",
+              summary: "Паспорт проверен вручную по заполненной анкете.",
+              verifiedAtIso: timestamp,
+            },
+      };
+    }),
+    history: [
+      {
+        id: `и-${submission.id}-паспорт-проверен-${applicantId}-${timestamp}`,
+        text: `Агент проверил паспорт заявителя ${applicant.fullName}`,
         at: "сейчас",
         source: "agent",
       },
