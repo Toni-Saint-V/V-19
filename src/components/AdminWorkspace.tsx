@@ -256,6 +256,7 @@ export function AdminWorkspace({
   const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
   const adminFileAcceptPendingRef = useRef(false);
+  const adminQuestionnaireApprovalPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
   const pendingAccessRequestCount = accessRequests.filter(
     (request) => request.status === "pending",
@@ -464,6 +465,40 @@ export function AdminWorkspace({
       return false;
     } finally {
       adminFileAcceptPendingRef.current = false;
+    }
+  };
+
+  const handleQuestionnaireFieldApprove = async (input: {
+    applicantId: string;
+    fieldId: string;
+    sectionId: string;
+  }): Promise<boolean> => {
+    if (!selectedRow || adminQuestionnaireApprovalPendingRef.current) return false;
+    const payload = { submissionId: selectedRow, ...input };
+    setAdminAsyncError("");
+
+    if (!bridge.onAdminQuestionnaireFieldApprove) {
+      setAdminAsyncError(
+        "Апрув поля недоступен: обработчик сохранения не подключён. Состояние подачи не изменено.",
+      );
+      return false;
+    }
+
+    adminQuestionnaireApprovalPendingRef.current = true;
+    try {
+      await bridge.onAdminQuestionnaireFieldApprove(payload);
+      emitVisaflowUiEvent(bridge, {
+        type: "admin.questionnaire.approve",
+        payload,
+      });
+      return true;
+    } catch {
+      setAdminAsyncError(
+        "Не удалось подтвердить поле анкеты. Состояние подачи не изменено. Повторите попытку.",
+      );
+      return false;
+    } finally {
+      adminQuestionnaireApprovalPendingRef.current = false;
     }
   };
 
@@ -751,6 +786,7 @@ export function AdminWorkspace({
         returnFocusTarget={reviewDrawerReturnFocusRef.current}
         onVerifyDocument={handleVerifyDocument}
         onAddRemark={handleOpenRemark}
+        onApproveQuestionnaireField={handleQuestionnaireFieldApprove}
         onPrimaryAction={handleAdminPrimaryAction}
         onOpenExport={() => {
           setAdminDrawerOpen(false);

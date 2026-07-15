@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
 import type { Submission as CanonicalSubmission, SubmissionAction } from '../modules/submissions/types';
-import { fileTypeLabels } from '../modules/submissions/status';
+import { fileTypeLabels, statusLabelFor } from '../modules/submissions/status';
+import { agentDisplayName } from '../modules/submissions/agentDirectory';
 import { actionGate } from './v19BusinessScreenAdapter';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -118,17 +119,23 @@ const Skeleton = ({ className }: { className?: string }) => (
 );
 
 const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
+  const label = statusLabelFor(status);
+
   switch (status) {
     case 'in_progress':
-      return <span className="v19-submission-drawer-status is-in-progress inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><Clock className="w-3.5 h-3.5" /> В работе</span>;
+      return <span className="v19-submission-drawer-status is-in-progress inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><Clock className="w-3.5 h-3.5" /> {label}</span>;
     case 'returned':
-      return <span className="v19-submission-drawer-status is-returned inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[11px] font-medium uppercase tracking-wide"><AlertCircle className="w-3.5 h-3.5" /> Возвращено (Ошибки)</span>;
+      return <span className="v19-submission-drawer-status is-returned inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[11px] font-medium uppercase tracking-wide"><AlertCircle className="w-3.5 h-3.5" /> {label}</span>;
     case 'submitted_for_review':
-      return <span className="v19-submission-drawer-status is-review inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><ShieldAlert className="w-3.5 h-3.5" /> На проверке</span>;
+      return <span className="v19-submission-drawer-status is-review inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><ShieldAlert className="w-3.5 h-3.5" /> {label}</span>;
+    case 'corrections_received':
+      return <span className="v19-submission-drawer-status is-review inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><AlertCircle className="w-3.5 h-3.5" /> {label}</span>;
     case 'ready_for_export':
-      return <span className="v19-submission-drawer-status is-ready inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><CheckCircle2 className="w-3.5 h-3.5" /> Готово к выгрузке</span>;
+      return <span className="v19-submission-drawer-status is-ready inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><CheckCircle2 className="w-3.5 h-3.5" /> {label}</span>;
+    case 'exported':
+      return <span className="v19-submission-drawer-status is-ready inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><CheckCircle2 className="w-3.5 h-3.5" /> {label}</span>;
     default:
-      return <span className="v19-submission-drawer-status is-draft inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-[11px] font-medium uppercase tracking-wide"><FileText className="w-3.5 h-3.5" /> Черновик</span>;
+      return <span className="v19-submission-drawer-status is-draft inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-[11px] font-medium uppercase tracking-wide"><FileText className="w-3.5 h-3.5" /> {label}</span>;
   }
 };
 
@@ -379,7 +386,7 @@ function detailFromCanonicalSubmission(submission: CanonicalSubmission): Submiss
     status: submission.status === 'requires_action' ? 'returned' : submission.status,
     completeness: submission.completeness.total,
     updated: updatedLabel(submission.updatedAt),
-    owner: submission.agentId,
+    owner: agentDisplayName(submission.agentId),
     issuesCount: submission.issues.filter((issue) => issue.status !== 'closed_by_admin').length,
     documents: submission.files.map((file) => ({
       applicantName: submission.applicants.find((applicant) => applicant.id === file.applicantId)?.fullName ?? 'Подача',

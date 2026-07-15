@@ -1,19 +1,26 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import type { Submission } from '../modules/submissions/types';
+import { statusLabelFor } from '../modules/submissions/status';
 import { updatedLabel } from './v19BusinessScreenAdapter';
 import {
   AlertCircle,
   ArrowUpDown,
   Baby,
   CheckCircle2,
+  ChevronRight,
   FileText,
   RotateCcw,
   Shapes,
   UserRound,
   Users,
 } from 'lucide-react';
-import { cityFilterValuesForSubmissions } from '../modules/submissions/selectors';
+import {
+  cityFilterValuesForSubmissions,
+  filterAgentSubmissionQueue,
+  questionnaireCityForSubmission,
+  type AgentSubmissionQueueFilter,
+} from '../modules/submissions/selectors';
 import {
   V19ListHeader,
   V19MetricCard,
@@ -30,7 +37,6 @@ interface ApplicantsScreenProps {
 
 // View types
 type ApplicantStatus = 'ready' | 'missing_docs' | 'in_progress';
-type ApplicantSummaryFilter = 'all' | 'blockers' | 'review' | 'ready';
 type ApplicantMarker = 'male' | 'female' | 'child' | 'person';
 type ApplicantSort = 'tripDate' | 'createdAt';
 
@@ -45,6 +51,7 @@ interface FamilyData {
   city: string;
   createdAt: string;
   id: string;
+  lifecycleStatus: Submission['status'];
   title: string;
   members: FamilyMember[];
   lastActivity: string;
@@ -56,10 +63,10 @@ interface IndividualData {
   city: string;
   createdAt: string;
   id: string;
+  lifecycleStatus: Submission['status'];
   marker: ApplicantMarker;
   name: string;
   readinessPercent: number;
-  status: ApplicantStatus;
   lastActivity: string;
   tripDateFrom: string;
 }
@@ -114,9 +121,10 @@ function runtimeFamiliesFromSubmissions(submissions: Submission[]): FamilyData[]
   return submissions
     .filter((submission) => submission.type === 'family')
     .map((submission) => ({
-      city: submission.city,
+      city: questionnaireCityForSubmission(submission),
       createdAt: submission.createdAt,
       id: submission.id,
+      lifecycleStatus: submission.status,
       title: submission.listTitle ?? submission.title,
       lastActivity: updatedLabel(submission.updatedAt),
       readinessPercent: submission.completeness.total,
@@ -139,13 +147,13 @@ function runtimeIndividualsFromSubmissions(submissions: Submission[]): Individua
     .map((submission) => {
       const applicant = submission.applicants[0];
       return {
-        city: submission.city,
+        city: questionnaireCityForSubmission(submission),
         createdAt: submission.createdAt,
         id: submission.id,
+        lifecycleStatus: submission.status,
         marker: applicant ? applicantMarker(submission, applicant) : 'person',
         name: applicant?.fullName ?? submission.title,
         readinessPercent: submission.completeness.total,
-        status: applicant ? applicantStatusFromSubmission(submission, applicant.id) : 'in_progress',
         lastActivity: updatedLabel(submission.updatedAt),
         tripDateFrom: submission.tripDateFrom,
       };
@@ -160,43 +168,74 @@ const getStatusDot = (status: ApplicantStatus) => {
   }
 };
 
-function applicantStatusLabel(status: ApplicantStatus) {
-  if (status === 'missing_docs') return 'Нужны документы';
-  if (status === 'in_progress') return 'На проверке';
-  return 'Профиль готов';
-}
-
 function metricsFromSubmissions(submissions: Submission[]) {
+  const count = (filter: AgentSubmissionQueueFilter) =>
+    filterAgentSubmissionQueue(submissions, {
+      city: 'Все города',
+      filter,
+      query: '',
+    }).length;
+
   return {
-    blockers: submissions.reduce(
-      (total, submission) =>
-        total +
-        submission.issues.filter(
-          (issue) => issue.status === 'open' && issue.severity === 'blocker',
-        ).length,
-      0,
-    ),
-    exportReady: submissions.filter((submission) => submission.status === 'ready_for_export').length,
-    queue: submissions.length,
-    review: submissions.filter((submission) =>
-      ['submitted_for_review', 'corrections_received'].includes(submission.status),
-    ).length,
+    exportReady: count('ready'),
+    queue: count('all'),
+    review: count('review'),
   };
 }
 
+function profileNoun(count: number) {
+  const lastTwo = count % 100;
+  if (lastTwo >= 11 && lastTwo <= 14) return 'профилей';
+
+  const last = count % 10;
+  if (last === 1) return 'профиль';
+  if (last >= 2 && last <= 4) return 'профиля';
+  return 'профилей';
+}
+
+function profileCountLabel(count: number) {
+  return `${count} ${profileNoun(count)}`;
+}
+
+function peopleCountLabel(count: number) {
+  const lastTwo = count % 100;
+  if (lastTwo >= 11 && lastTwo <= 14) return `${count} человек`;
+
+  const last = count % 10;
+  if (last === 1) return `${count} человек`;
+  if (last >= 2 && last <= 4) return `${count} человека`;
+  return `${count} человек`;
+}
+
+function queueFilterLabel(filter: AgentSubmissionQueueFilter) {
+  if (filter === 'blockers') return 'Блокеры';
+  if (filter === 'review') return 'Проверить';
+  if (filter === 'ready') return 'К выгрузке';
+  return '';
+}
+
 export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreenProps) {
-  const [applicantSummaryFilter, setApplicantSummaryFilter] = useState<ApplicantSummaryFilter>('all');
+  const [applicantSummaryFilter, setApplicantSummaryFilter] = useState<AgentSubmissionQueueFilter>('all');
   const [cityFilter, setCityFilter] = useState('Все города');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<ApplicantSort>('tripDate');
   const canonicalSubmissions = submissions ?? emptySubmissions;
+  const filteredSubmissions = useMemo(
+    () =>
+      filterAgentSubmissionQueue(canonicalSubmissions, {
+        city: cityFilter,
+        filter: applicantSummaryFilter,
+        query: searchQuery,
+      }),
+    [applicantSummaryFilter, canonicalSubmissions, cityFilter, searchQuery],
+  );
   const families = useMemo(
-    () => runtimeFamiliesFromSubmissions(canonicalSubmissions),
-    [canonicalSubmissions],
+    () => runtimeFamiliesFromSubmissions(filteredSubmissions),
+    [filteredSubmissions],
   );
   const individuals = useMemo(
-    () => runtimeIndividualsFromSubmissions(canonicalSubmissions),
-    [canonicalSubmissions],
+    () => runtimeIndividualsFromSubmissions(filteredSubmissions),
+    [filteredSubmissions],
   );
   const cityOptions = useMemo(() => {
     return cityFilterValuesForSubmissions(canonicalSubmissions);
@@ -205,59 +244,33 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
     () => metricsFromSubmissions(canonicalSubmissions),
     [canonicalSubmissions],
   );
-  const searchNeedle = searchQuery.trim().toLowerCase();
   const displayFamilies = useMemo(
     () =>
-      families.filter((family) => {
-        if (cityFilter !== 'Все города' && family.city !== cityFilter) return false;
-        if (applicantSummaryFilter === 'all') return true;
-        if (applicantSummaryFilter === 'blockers') {
-          return family.members.some((member) => member.status === 'missing_docs');
-        }
-        if (applicantSummaryFilter === 'review') {
-          return family.members.some((member) => member.status === 'in_progress');
-        }
-        return family.members.every((member) => member.status === 'ready');
-      }).filter((family) => {
-        if (!searchNeedle) return true;
-        return [
-          family.id,
-          family.title,
-          ...family.members.map((member) => member.name),
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(searchNeedle);
-      }).sort((left, right) =>
+      [...families].sort((left, right) =>
         sortBy === 'tripDate'
           ? left.tripDateFrom.localeCompare(right.tripDateFrom)
           : right.createdAt.localeCompare(left.createdAt),
       ),
-    [applicantSummaryFilter, cityFilter, families, searchNeedle, sortBy],
+    [families, sortBy],
   );
   const displayIndividuals = useMemo(
     () =>
-      individuals.filter((individual) => {
-        if (cityFilter !== 'Все города' && individual.city !== cityFilter) return false;
-        if (applicantSummaryFilter === 'all') return true;
-        if (applicantSummaryFilter === 'blockers') return individual.status === 'missing_docs';
-        if (applicantSummaryFilter === 'review') return individual.status === 'in_progress';
-        return individual.status === 'ready';
-      }).filter((individual) => {
-        if (!searchNeedle) return true;
-        return [individual.id, individual.name]
-          .join(' ')
-          .toLowerCase()
-          .includes(searchNeedle);
-      }).sort((left, right) =>
+      [...individuals].sort((left, right) =>
         sortBy === 'tripDate'
           ? left.tripDateFrom.localeCompare(right.tripDateFrom)
           : right.createdAt.localeCompare(left.createdAt),
       ),
-    [applicantSummaryFilter, cityFilter, individuals, searchNeedle, sortBy],
+    [individuals, sortBy],
   );
   const hasVisibleApplicants = displayFamilies.length > 0 || displayIndividuals.length > 0;
+  const visibleProfileCount = displayFamilies.length + displayIndividuals.length;
   const hasActiveFilters = applicantSummaryFilter !== 'all' || cityFilter !== 'Все города' || searchQuery.trim().length > 0 || sortBy !== 'tripDate';
+  const activeFilterContext = [
+    queueFilterLabel(applicantSummaryFilter),
+    cityFilter !== 'Все города' ? cityFilter : '',
+    searchQuery.trim() ? 'Поиск' : '',
+    sortBy === 'createdAt' ? 'Сначала новые' : '',
+  ].filter(Boolean).join(' · ');
   const resetFilters = () => {
     setApplicantSummaryFilter('all');
     setCityFilter('Все города');
@@ -275,7 +288,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
       <V19MetricStrip className="v19-admin-export-metrics-v2">
         <V19MetricCard
           active={applicantSummaryFilter === 'all'}
-          detail="профили"
+          detail={profileNoun(metrics.queue)}
           icon={FileText}
           label="В очереди"
           value={metrics.queue}
@@ -306,7 +319,11 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           actionDisabled={!hasActiveFilters}
           actionLabel="Все"
           className="v19-admin-export-list-head-v2"
-          countLabel={`${families.length + individuals.length} ${families.length + individuals.length === 1 ? 'профиль' : 'профилей'}`}
+          countLabel={
+            hasActiveFilters
+              ? `${activeFilterContext} · ${visibleProfileCount}/${metrics.queue}`
+              : profileCountLabel(metrics.queue)
+          }
           onAction={resetFilters}
           title="Мои подачи"
         />
@@ -317,7 +334,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           cityOptions={cityOptions}
           controls={
             <>
-              <V19ToolbarSelect<ApplicantSummaryFilter>
+              <V19ToolbarSelect<AgentSubmissionQueueFilter>
                 ariaLabel="Фильтр подач"
                 className={applicantSummaryFilter !== 'all' ? 'is-active' : ''}
                 icon={Shapes}
@@ -379,19 +396,13 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           <h2 id="agent-submissions-families">Семьи</h2>
           {displayFamilies.map((family) => (
             <V19QueueCard
+              as="button"
               aria-label={`Открыть подачу ${family.title}`}
               data-submission-id={family.id}
               key={family.id}
               onClick={() => onOpenDrawer(family.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenDrawer(family.id);
-                }
-              }}
               className="v19-agent-shared-card group"
+              type="button"
             >
               <div className="flex justify-between items-start gap-3 mb-5">
                 <div className="flex gap-3.5 items-center">
@@ -400,10 +411,14 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
                   </div>
                   <div>
                     <h3 className="text-[15px] font-semibold text-white group-hover:text-white transition-colors">{family.title}</h3>
-                    <p className="mt-0.5 text-[12px] text-[var(--v19b-color-text-70)]">{family.members.length} человека</p>
+                    <p className="mt-0.5 text-[12px] text-[var(--v19b-color-text-70)]">{peopleCountLabel(family.members.length)}</p>
                   </div>
                 </div>
-                <span className="v19-applicant-card-city">{family.city}</span>
+                <span className="v19-applicant-card-city">
+                  <span>{family.city}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="v19-applicant-card-status">{statusLabelFor(family.lifecycleStatus, 'compact')}</span>
+                </span>
               </div>
 
               {/* Members List */}
@@ -421,10 +436,15 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
               </div>
 
               {/* Footer */}
-              <div className="pt-4 border-t border-[#242529] flex justify-between items-center text-[11.5px] text-white/40">
+              <div className="v19-applicant-card-footer pt-4 border-t border-[#242529] flex justify-between items-center text-[11.5px] text-white/40">
                 <span>{family.lastActivity}</span>
-                <span className="v19-applicant-readiness">
-                  {family.readinessPercent}% готово
+                <span className="v19-applicant-card-footer-actions">
+                  <span className="v19-applicant-readiness">
+                    {family.readinessPercent}% готово
+                  </span>
+                  <span className="v19-applicant-open-action">
+                    Открыть <ChevronRight aria-hidden="true" />
+                  </span>
                 </span>
               </div>
             </V19QueueCard>
@@ -441,19 +461,13 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           <h2 id="agent-submissions-individuals">Заявители</h2>
           {displayIndividuals.map((ind) => (
             <V19QueueCard
+              as="button"
               aria-label={`Открыть подачу ${ind.name}`}
               data-submission-id={ind.id}
               key={ind.id}
               onClick={() => onOpenDrawer(ind.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenDrawer(ind.id);
-                }
-              }}
-              role="button"
-              tabIndex={0}
               className="v19-agent-shared-card group"
+              type="button"
             >
               <div className="v19-applicant-individual-header flex justify-between items-start gap-3 mb-6">
                 <div className="v19-applicant-individual-main flex gap-3.5 items-center">
@@ -464,8 +478,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
                     <div className="v19-applicant-individual-name-row">
                       <h3 className="text-[15px] font-semibold text-white group-hover:text-white transition-colors">{ind.name}</h3>
                       <span className="v19-applicant-individual-status">
-                        {getStatusDot(ind.status)}
-                        {applicantStatusLabel(ind.status)}
+                        {statusLabelFor(ind.lifecycleStatus, 'compact')}
                       </span>
                     </div>
                   </div>
@@ -473,13 +486,18 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
               </div>
 
               {/* Footer */}
-              <div className="pt-4 border-t border-[#242529] flex justify-between items-center text-[11.5px] text-white/40">
+              <div className="v19-applicant-card-footer pt-4 border-t border-[#242529] flex justify-between items-center text-[11.5px] text-white/40">
                 <div className="v19-applicant-card-footer-meta">
                   <span>{ind.lastActivity}</span>
                   <span className="v19-applicant-card-footer-city">{ind.city}</span>
                 </div>
-                <span className="v19-applicant-readiness">
-                  {ind.readinessPercent}% готово
+                <span className="v19-applicant-card-footer-actions">
+                  <span className="v19-applicant-readiness">
+                    {ind.readinessPercent}% готово
+                  </span>
+                  <span className="v19-applicant-open-action">
+                    Открыть <ChevronRight aria-hidden="true" />
+                  </span>
                 </span>
               </div>
             </V19QueueCard>

@@ -832,7 +832,7 @@ export function AdminExportScreen({
                       onChange={() => toggleItem(item.id)}
                     />
 
-                    <div className="flex min-w-0 items-center gap-2 text-[12px] text-white/55">
+                    <div className="v19-admin-export-row-submission-v2 flex min-w-0 items-center gap-2 text-[12px] text-white/55">
                       <span className="shrink-0 rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/55">
                         {item.id}
                       </span>
@@ -840,7 +840,7 @@ export function AdminExportScreen({
                       <span>{item.city}</span>
                     </div>
 
-                    <div className="min-w-0">
+                    <div className="v19-admin-export-row-applicant-v2 min-w-0">
                       <div className="flex items-center gap-2">
                         {item.type === "family" ? (
                           <Users className="h-3.5 w-3.5 shrink-0 text-[#8fa3ff]" />
@@ -858,11 +858,11 @@ export function AdminExportScreen({
                       ) : null}
                     </div>
 
-                    <div className="text-[12px] text-white/65 lg:text-[13px]">
+                    <div className="v19-admin-export-row-dates-v2 text-[12px] text-white/65 lg:text-[13px]">
                       {item.appointmentDate}
                     </div>
 
-                    <div className="flex items-center gap-2 text-[12px] text-white/65 lg:text-[13px]">
+                    <div className="v19-admin-export-row-agent-v2 flex items-center gap-2 text-[12px] text-white/65 lg:text-[13px]">
                       <User className="h-3.5 w-3.5 shrink-0 text-white/40" />
                       <span>{agentDisplayName(item.agent)}</span>
                     </div>

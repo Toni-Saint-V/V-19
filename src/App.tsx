@@ -6,6 +6,7 @@ import {
 } from "./integration/visaflowBusinessBridge";
 import {
   addPreciseAdminIssue,
+  approveQuestionnaireFieldForAdmin,
   applyExportStateToSelection,
   applyActionToSubmissionListResult,
   markSubmissionFileAccepted,
@@ -940,6 +941,39 @@ export default function App({
           addPreciseAdminIssue(submission, input, activeApprovedSession.userId),
         );
         await bridge.onAdminIssueAdd?.({ submissionId, input });
+      },
+      onAdminQuestionnaireFieldApprove: async ({
+        submissionId,
+        applicantId,
+        sectionId,
+        fieldId,
+      }) => {
+        if (!activeApprovedSession || activeApprovedSession.role !== "admin") {
+          throw new Error("Только активный администратор может подтвердить поле анкеты.");
+        }
+        const approvedAtIso = new Date().toISOString();
+        let approved = false;
+        await updateAdminSubmission(submissionId, (submission) => {
+          const next = approveQuestionnaireFieldForAdmin(
+            submission,
+            { applicantId, sectionId, fieldId },
+            activeApprovedSession.userId,
+            approvedAtIso,
+          );
+          approved = next !== submission;
+          return next;
+        });
+        if (!approved) {
+          throw new Error(
+            "Поле нельзя подтвердить: заполните значение и закройте замечания.",
+          );
+        }
+        await bridge.onAdminQuestionnaireFieldApprove?.({
+          submissionId,
+          applicantId,
+          sectionId,
+          fieldId,
+        });
       },
       onAdminFileAccept: async ({ submissionId, applicantId, fileType }) => {
         if (activeApprovedSession?.role !== "admin") {

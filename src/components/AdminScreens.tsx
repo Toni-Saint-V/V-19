@@ -244,7 +244,7 @@ function ReviewQueueCard({
       <div className="v19-admin-review-card-header">
         <div className="min-w-0">
           <div className="v19-admin-review-card-meta">
-            <span>{item.id}</span>
+            <span className="v19-admin-review-card-id">{item.id}</span>
             <i />
             <span className="shrink-0">{item.city}</span>
             <i />
@@ -561,6 +561,10 @@ export function ReviewScreen({
               const laneItems = visibleReviews.filter(
                 (item) => item.lane === lane.id,
               );
+              const laneApplicantCount = laneItems.reduce(
+                (sum, item) => sum + item.applicants,
+                0,
+              );
               if (
                 (activeLane !== "all" && activeLane !== lane.id) ||
                 laneItems.length === 0
@@ -586,7 +590,7 @@ export function ReviewScreen({
                       </div>
                     </div>
                     <span>
-                      {laneItems.length} {reviewCountLabel(laneItems.length)}
+                      {laneApplicantCount} чел.
                     </span>
                   </div>
 

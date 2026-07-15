@@ -743,7 +743,9 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
 
   const missingFiles = submission.files.filter(isMissingAgentFile);
   const visibleMissingFiles =
-    submission.status === "draft" ? missingFiles.slice(0, 1) : missingFiles;
+    submission.status === "draft"
+      ? missingFiles.slice(0, 1)
+      : firstMissingFilePerApplicant(missingFiles);
   for (const file of visibleMissingFiles) {
     const applicantName = applicantNameForFile(submission, file);
     const rowText = formatAgentActionRowText({
@@ -768,6 +770,17 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
   }
 
   return actions;
+}
+
+function firstMissingFilePerApplicant(files: SubmissionFile[]) {
+  const seenApplicants = new Set<string>();
+
+  return files.filter((file) => {
+    const ownerKey = file.applicantId ?? "submission";
+    if (seenApplicants.has(ownerKey)) return false;
+    seenApplicants.add(ownerKey);
+    return true;
+  });
 }
 
 function agentCompletedActions(submission: Submission): AgentActionItem[] {

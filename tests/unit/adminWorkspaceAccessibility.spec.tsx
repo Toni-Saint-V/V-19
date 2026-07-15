@@ -229,7 +229,9 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Review card was not rendered.");
     fireEvent.click(card);
-    const acceptButton = await screen.findByRole("button", { name: "Принять" });
+    const acceptButton = await screen.findByRole("button", {
+      name: "Принять на выгрузку",
+    });
     fireEvent.click(acceptButton);
     fireEvent.click(acceptButton);
 
@@ -238,7 +240,67 @@ describe("AdminWorkspace production navigation", () => {
     ).toBeInTheDocument();
     expect(onSubmissionAction).toHaveBeenCalledTimes(1);
     expect(onAdminNavChange).not.toHaveBeenCalledWith("export");
-    expect(screen.getByRole("button", { name: "Принять" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Принять на выгрузку" }),
+    ).toBeInTheDocument();
+  });
+
+  test("shows one contextual footer decision and keeps closing on the header icon", async () => {
+    const submission = acceptableReviewSubmission();
+    const { container, rerender } = render(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={vi.fn()}
+        submissions={[submission]}
+        usesSupabase
+      />,
+    );
+
+    const openDrawer = () => {
+      const card = container.querySelector<HTMLButtonElement>(
+        '[data-submission-id="review-async-failure"]',
+      );
+      if (!card) throw new Error("Review card was not rendered.");
+      fireEvent.click(card);
+    };
+
+    openDrawer();
+    expect(
+      await screen.findByRole("button", { name: "Принять на выгрузку" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Отправить на исправление" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Закрыть" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть проверку" }));
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Review applicant was not rendered.");
+    const withIssue = addPreciseAdminIssue(submission, {
+      applicantId: applicant.id,
+      comment: "Исправьте номер паспорта перед повторной проверкой.",
+      field: "Номер паспорта",
+      reason: "Значение не совпадает со сканом паспорта.",
+      severity: "blocker",
+      type: "field",
+    });
+    rerender(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={vi.fn()}
+        submissions={[withIssue]}
+        usesSupabase
+      />,
+    );
+
+    openDrawer();
+    expect(
+      await screen.findByRole("button", { name: "Отправить на исправление" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Принять на выгрузку" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Закрыть" })).not.toBeInTheDocument();
   });
 
   test("reports rejected issue creation without an unhandled promise", async () => {

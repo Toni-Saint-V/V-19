@@ -86,8 +86,19 @@ export async function isVisible(locator: Locator) {
   return locator.isVisible({ timeout: 750 }).catch(() => false);
 }
 
+function mobileMenuTrigger(page: Page) {
+  return page
+    .getByRole("button", { exact: true, name: "Меню" })
+    .or(
+      page.getByRole("button", {
+        exact: true,
+        name: "Открыть меню администратора",
+      }),
+    );
+}
+
 export async function openMobileMenu(page: Page) {
-  const menuButton = page.getByRole("button", { exact: true, name: "Меню" });
+  const menuButton = mobileMenuTrigger(page);
 
   if (await hasAtLeastOneVisible(menuButton)) {
     await clickFirstVisible(menuButton);
@@ -163,15 +174,20 @@ export async function expectVisibleText(
 }
 
 export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
-  const mobileMenuButton = page.getByRole("button", { exact: true, name: "Меню" });
-  const mobileShellOpen = page.locator(".ops-shell.is-mobile-nav-open .ops-sidebar");
+  const mobileMenuButton = mobileMenuTrigger(page);
+  const mobileNavigation = page
+    .locator(".ops-shell.is-mobile-nav-open .ops-sidebar")
+    .or(page.getByRole("dialog", { exact: true, name: "Меню администратора" }));
 
-  if ((await hasAtLeastOneVisible(mobileMenuButton)) || (await hasAtLeastOneVisible(mobileShellOpen))) {
-    if (!(await hasAtLeastOneVisible(mobileShellOpen))) {
+  if (
+    (await hasAtLeastOneVisible(mobileMenuButton)) ||
+    (await hasAtLeastOneVisible(mobileNavigation))
+  ) {
+    if (!(await hasAtLeastOneVisible(mobileNavigation))) {
       await openMobileMenu(page);
     }
 
-    const mobileButton = mobileShellOpen.getByRole("button", { name }).first();
+    const mobileButton = mobileNavigation.getByRole("button", { name }).first();
     await mobileButton.waitFor({ state: "visible", timeout: 2_000 });
     await mobileButton.click({ timeout: 10_000 });
     return;

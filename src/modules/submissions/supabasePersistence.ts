@@ -138,6 +138,8 @@ type CockpitStatusHistoryRow = Pick<
   | "to_status"
 >;
 type QuestionnaireAnswerValueEnvelope = {
+  adminReviewApprovedAtIso?: string;
+  adminReviewApprovedBy?: string;
   kind: typeof questionnaireAnswerEnvelopeKind;
   reviewConfirmedAtIso?: string;
   reviewConfirmedBy?: string;
@@ -148,6 +150,8 @@ type QuestionnaireAnswerValueEnvelope = {
   version: typeof questionnaireAnswerEnvelopeVersion;
 };
 type QuestionnaireAnswerValueResult = {
+  adminReviewApprovedAtIso?: string;
+  adminReviewApprovedBy?: string;
   reviewConfirmedAtIso?: string;
   reviewConfirmedBy?: string;
   reviewOriginSource?: QuestionnaireReviewSource;
@@ -266,6 +270,8 @@ function attachQuestionnaireAnswerRows(
           const value = questionnaireAnswerFieldValue(answer.value);
           return {
             ...field,
+            adminReviewApprovedAtIso: value.adminReviewApprovedAtIso,
+            adminReviewApprovedBy: value.adminReviewApprovedBy,
             reviewConfirmedAtIso: value.reviewConfirmedAtIso,
             reviewConfirmedBy: value.reviewConfirmedBy,
             reviewOriginSource: value.reviewOriginSource,
@@ -1229,6 +1235,8 @@ function questionnaireSectionsFromAnswerRows(
       const value = questionnaireAnswerFieldValue(answer.value);
 
       return {
+        adminReviewApprovedAtIso: value.adminReviewApprovedAtIso,
+        adminReviewApprovedBy: value.adminReviewApprovedBy,
         id: answer.field_id,
         label: answer.label,
         required: true,
@@ -1245,6 +1253,8 @@ function questionnaireSectionsFromAnswerRows(
 
 function questionnaireAnswerJsonForField(field: QuestionnaireField): Json {
   if (
+    !field.adminReviewApprovedAtIso &&
+    !field.adminReviewApprovedBy &&
     !field.reviewState &&
     !field.reviewSource &&
     !field.reviewOriginSource &&
@@ -1259,6 +1269,14 @@ function questionnaireAnswerJsonForField(field: QuestionnaireField): Json {
     value: field.value,
     version: questionnaireAnswerEnvelopeVersion,
   };
+
+  if (field.adminReviewApprovedAtIso) {
+    envelope.adminReviewApprovedAtIso = field.adminReviewApprovedAtIso;
+  }
+
+  if (field.adminReviewApprovedBy) {
+    envelope.adminReviewApprovedBy = field.adminReviewApprovedBy;
+  }
 
   if (field.reviewConfirmedAtIso) {
     envelope.reviewConfirmedAtIso = field.reviewConfirmedAtIso;
@@ -1293,6 +1311,14 @@ function questionnaireAnswerFieldValue(value: Json): QuestionnaireAnswerValueRes
     }
 
     return {
+      adminReviewApprovedAtIso:
+        typeof value.adminReviewApprovedAtIso === "string"
+          ? value.adminReviewApprovedAtIso
+          : undefined,
+      adminReviewApprovedBy:
+        typeof value.adminReviewApprovedBy === "string"
+          ? value.adminReviewApprovedBy
+          : undefined,
       reviewConfirmedAtIso:
         typeof value.reviewConfirmedAtIso === "string"
           ? value.reviewConfirmedAtIso

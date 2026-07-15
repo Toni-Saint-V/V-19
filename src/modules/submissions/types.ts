@@ -312,6 +312,8 @@ export type QuestionnaireField = {
   label: string;
   value: string;
   required: boolean;
+  adminReviewApprovedAtIso?: string;
+  adminReviewApprovedBy?: string;
   control?: "text" | "select";
   options?: string[];
   placeholder?: string;

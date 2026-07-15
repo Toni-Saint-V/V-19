@@ -242,12 +242,86 @@ async function verifyEveryAdminDrawerSubview(
     }
   }
 
+  await openDrawerTab(page, ["Обзор"]);
+  const metricLabels = drawer(page).locator(
+    ".admin-review-overview-metrics .admin-review-metric > span",
+  );
+  await expect(metricLabels).toHaveCount(4);
+  expect(
+    await metricLabels.evaluateAll((labels) =>
+      labels.every((label) => {
+        const card = label.parentElement;
+        if (!card) return false;
+        return (
+          label.scrollWidth <= label.clientWidth &&
+          label.getBoundingClientRect().width >=
+            card.getBoundingClientRect().width / 2
+        );
+      }),
+    ),
+  ).toBe(true);
+
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
   );
 }
 
 test.describe("V-19 pilot admin review click flow", () => {
+  test(
+    "admin navigation reaches every local workspace surface on desktop and mobile",
+    async ({ page }, testInfo) => {
+      const browserProblems = collectBrowserProblems(page);
+      const screens = [
+        { fileName: "review", heading: "Проверка", nav: /^Проверка$/ },
+        { fileName: "export", heading: "Выгрузка", nav: /^Выгрузка$/ },
+        {
+          fileName: "users",
+          heading: "Управление пользователями",
+          nav: /^Пользователи$/,
+        },
+        {
+          fileName: "settings",
+          heading: "Системные настройки",
+          nav: /^Настройки$/,
+        },
+      ] as const;
+
+      for (const viewport of [
+        { height: 900, width: 1440 },
+        { height: 844, width: 390 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await openFreshWorkspace(page, {
+          heading: "Проверка",
+          workspaceEmail: "admin@visaflow.local",
+        });
+
+        for (const screen of screens) {
+          await clickWorkspaceButton(page, screen.nav);
+          await expect(
+            page.getByRole("heading", { level: 1, name: screen.heading }),
+          ).toBeVisible();
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+          ).toBe(true);
+
+          const screenshotPath = testInfo.outputPath(
+            `admin-${viewport.width}-${screen.fileName}.png`,
+          );
+          await page.screenshot({ path: screenshotPath });
+          await testInfo.attach(`admin-${viewport.width}-${screen.fileName}`, {
+            contentType: "image/png",
+            path: screenshotPath,
+          });
+        }
+      }
+
+      expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
+        [],
+      );
+    },
+  );
+
   test("admin passport reconciliation stays blocked without protected evidence", async ({
     page,
   }) => {

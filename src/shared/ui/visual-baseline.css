@@ -417,11 +417,19 @@
   opacity: var(--v19b-opacity-full);
 }
 
-[data-admin-review-drawer-surface="workspace"] .admin-review-history-item > button {
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-history-item
+  > :is(button, .admin-review-history-summary) {
   display: grid;
   grid-template-columns: var(--v19b-size-76) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
   align-items: center;
   gap: var(--v19b-size-12);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-history-item
+  > .admin-review-history-summary {
+  grid-template-columns: var(--v19b-size-76) minmax(var(--v19b-size-0), var(--v19b-grid-fr));
 }
 
 [data-admin-review-drawer-surface="workspace"]
@@ -1915,6 +1923,16 @@
   font-family: var(--v19b-font-mono);
 }
 
+.v19-admin-review-card-meta > .v19-admin-review-card-id {
+  display: inline-flex;
+  min-height: var(--v19b-size-24);
+  align-items: center;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-tag);
+  padding-inline: var(--v19b-size-8);
+}
+
 .v19-admin-review-card-meta i {
   width: var(--v19b-size-4);
   height: var(--v19b-size-4);
@@ -2610,6 +2628,47 @@
 
   .v19-admin-export-rail-v2 [aria-label="Панель контроля выгрузки"] {
     padding: var(--v19b-size-12) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .v19-admin-export-row-v2 {
+    grid-template-columns:
+      var(--v19b-size-24) minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto;
+    grid-template-rows: auto auto auto;
+  }
+
+  .v19-admin-export-row-v2 > input {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+
+  .v19-admin-export-row-v2 > .v19-admin-export-row-submission-v2 {
+    display: grid;
+    grid-column: 2 / 4;
+    grid-row: 1;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto auto;
+    gap: var(--v19b-size-6);
+    align-items: center;
+  }
+
+  .v19-admin-export-row-v2 > .v19-admin-export-row-applicant-v2 {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .v19-admin-export-row-v2 > .v19-admin-export-row-dates-v2 {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .v19-admin-export-row-v2 > .v19-admin-export-row-agent-v2 {
+    grid-column: 3;
+    grid-row: 2 / span 2;
+    align-self: start;
+    justify-self: end;
+    text-align: right;
   }
 }
 
@@ -4232,6 +4291,19 @@
   flex-direction: column;
 }
 
+/* On tablet the city menu has enough room below its trigger. Opening upward
+   hides early options behind the sticky topbar, including the selected city. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .v19-agent-submissions-board
+    .v19-admin-city-filter
+    .v19-admin-toolbar-select-menu {
+    top: calc(100% + var(--v19b-size-6));
+    bottom: auto;
+    max-height: var(--v19b-size-304);
+    overflow-y: auto;
+  }
+}
+
 /* Actions use the same continuous queue shell as Review: header, filters and rows
    sit on one border rather than reading as unrelated floating blocks. */
 .v19-agent-actions-board {
@@ -4317,13 +4389,27 @@
   padding: var(--v19b-size-14);
 }
 
+.v19-agent-submissions-board button.v19-agent-shared-card {
+  width: var(--v19b-size-full);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
 .v19-agent-submissions-board .v19-applicant-card-city {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v19b-size-4);
   align-self: flex-start;
   color: var(--v19b-color-text-muted);
   font-size: var(--v19b-size-11);
   font-weight: var(--v19b-font-weight-medium);
   line-height: var(--v19b-line-height-tight);
   text-align: right;
+}
+
+.v19-agent-submissions-board .v19-applicant-card-status {
+  color: var(--v19b-color-primary-text);
 }
 
 .v19-agent-submissions-board .v19-applicant-member-cell {
@@ -4437,6 +4523,34 @@
   background: var(--v19b-color-control);
   color: var(--v19b-color-text-muted);
   font-weight: var(--v19b-font-weight-medium);
+}
+
+.v19-agent-submissions-board .v19-applicant-card-footer-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--v19b-size-8);
+}
+
+.v19-agent-submissions-board .v19-applicant-open-action {
+  display: inline-flex;
+  min-height: var(--v19b-size-40);
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19b-size-2);
+  padding: var(--v19b-size-0) var(--v19b-size-10);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-control);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-tight);
+}
+
+.v19-agent-submissions-board .v19-applicant-open-action .lucide {
+  width: var(--v19b-size-14);
+  height: var(--v19b-size-14);
 }
 
 /* The token layer owns the warm text palette; these utility fallbacks cover legacy screen markup. */
@@ -23262,6 +23376,9 @@ body,
   border-radius: var(--v19b-size-16) !important;
   background: var(--v19b-admin-drawer-bg) !important;
   box-shadow: var(--v19b-admin-drawer-shadow) !important;
+  opacity: 1 !important;
+  filter: none !important;
+  transform: none !important;
 }
 
 .ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-drawer-header {
@@ -25543,9 +25660,9 @@ body,
 
 .v19-legacy-action-labels {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--v19b-size-2);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--v19b-size-6);
   flex: 0 0 auto;
   min-width: var(--v19b-size-0);
 }
@@ -26631,7 +26748,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   .vf-figma-questionnaire-screen .v19-questionnaire-next-blocker {
     display: grid;
     grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
-    align-items: start;
+    align-items: center;
     gap: var(--v19b-size-8);
     width: var(--v19b-size-full);
     min-height: var(--v19b-size-40);
@@ -26648,7 +26765,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 
   .vf-figma-questionnaire-screen .v19-questionnaire-next-blocker span {
     min-width: var(--v19b-size-0);
-    overflow-wrap: anywhere;
+    white-space: nowrap;
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-next-blocker strong {
@@ -27531,25 +27648,6 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   font-weight: var(--v19b-weight-title);
 }
 
-[data-admin-review-drawer-surface="workspace"] .admin-review-primary-reason-action {
-  flex: 0 0 auto;
-  min-height: var(--v19b-size-32);
-  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-orange-border);
-  border-radius: var(--v19b-radius-control);
-  background: var(--v19b-admin-drawer-orange-bg);
-  color: var(--v19b-admin-drawer-orange-text);
-  cursor: pointer;
-  font-size: var(--v19b-size-12);
-  font-weight: var(--v19b-weight-control);
-  padding-inline: var(--v19b-size-10);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-primary-reason-action:is(:hover, :focus-visible) {
-  border-color: var(--v19b-color-border-selected);
-  background: var(--v19b-color-control-hover);
-  outline: var(--v19b-size-0);
-}
-
 [data-admin-review-drawer-surface="workspace"] .admin-review-footer-actions {
   display: flex !important;
   min-width: var(--v19b-size-0) !important;
@@ -27557,6 +27655,19 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   align-items: center !important;
   gap: var(--v19b-size-8) !important;
   margin-left: auto !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-primary.is-return:not(:disabled) {
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+  box-shadow: none !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-primary.is-return:not(:disabled):is(:hover, :focus-visible) {
+  background: var(--v19b-admin-drawer-orange-bg) !important;
 }
 
 @media (max-width: 560px) {
@@ -27598,7 +27709,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 
   [data-admin-review-drawer-surface="workspace"] .admin-review-footer-actions {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
     width: var(--v19b-size-full);
     gap: var(--v19b-size-8) !important;
     margin-left: var(--v19b-size-0) !important;
@@ -27607,8 +27718,8 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   [data-admin-review-drawer-surface="workspace"] .admin-review-footer-actions > button {
     min-width: var(--v19b-size-0);
     width: var(--v19b-size-full);
+    white-space: nowrap;
   }
-
 }
 
 /* Admin review: the questionnaire is a compact verification grid, not a stack
@@ -28161,6 +28272,36 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   gap: var(--v19b-size-10) !important;
 }
 
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-field-pane,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-field-section,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire-section-title,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-field-table,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-field-row {
+  min-width: var(--v19b-size-0) !important;
+  max-width: var(--v19b-size-full) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire-section-title,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-field-table,
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-field-row {
+  width: var(--v19b-size-full) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-field-section {
+  overflow: hidden !important;
+}
+
 [data-admin-review-drawer-surface="workspace"] .admin-review-field-row {
   min-height: var(--v19b-size-64) !important;
   gap: var(--v19b-size-8) !important;
@@ -28187,6 +28328,148 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   padding-inline: var(--v19b-size-10) !important;
 }
 
+/* Questionnaire review reuses the dark passport-verification cell. Review
+   state lives in the action control; only a persisted approval lights the cell. */
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-field-row {
+  position: relative !important;
+  display: block !important;
+  min-height: var(--v19b-size-72) !important;
+  overflow: hidden !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-panel) !important;
+  background: var(--v19b-admin-drawer-field-bg) !important;
+  box-shadow: none !important;
+  padding: var(--v19b-size-10) var(--v19b-size-88) var(--v19b-size-10)
+    var(--v19b-size-12) !important;
+  transition:
+    border-color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    box-shadow var(--v19b-motion-fast) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-field-row.is-approved {
+  border-color: var(--v19b-admin-drawer-green-border) !important;
+  background: var(--v19b-admin-drawer-field-bg) !important;
+  box-shadow: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-20)
+    var(--v19b-admin-drawer-green-bg) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-main {
+  display: grid !important;
+  gap: var(--v19b-size-2) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-label {
+  color: var(--v19b-admin-drawer-text-40) !important;
+  font-size: var(--v19b-size-11) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  letter-spacing: var(--v19b-letter-spacing-wide) !important;
+  line-height: var(--v19b-line-height-row) !important;
+  text-transform: uppercase !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-value {
+  min-width: var(--v19b-size-0) !important;
+  overflow: visible !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-15) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-title) !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-actions {
+  position: static !important;
+  display: contents !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-actions
+  button {
+  position: absolute !important;
+  min-height: var(--v19b-size-28) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  outline: none !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-remark {
+  top: var(--v19b-size-8) !important;
+  right: var(--v19b-size-8) !important;
+  display: grid !important;
+  width: var(--v19b-size-28) !important;
+  min-width: var(--v19b-size-28) !important;
+  height: var(--v19b-size-28) !important;
+  place-items: center !important;
+  border-color: var(--v19b-admin-drawer-blue-border) !important;
+  background: var(--v19b-admin-drawer-blue-bg) !important;
+  color: var(--v19b-admin-drawer-blue-text) !important;
+  padding: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-approve {
+  right: var(--v19b-size-8) !important;
+  bottom: var(--v19b-size-8) !important;
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: var(--v19b-size-68) !important;
+  height: var(--v19b-size-28) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--v19b-size-6) !important;
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  padding-inline: var(--v19b-size-10) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-field-row.is-approved
+  .admin-review-row-approve {
+  border-color: var(--v19b-admin-drawer-green-border) !important;
+  background: var(--v19b-admin-drawer-green-bg) !important;
+  color: var(--v19b-admin-drawer-green-text) !important;
+  opacity: 1 !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-actions
+  button:is(:hover, :focus-visible):not(:disabled) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  outline: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-questionnaire
+  .admin-review-row-approve:disabled:not([aria-pressed="true"]) {
+  cursor: not-allowed !important;
+  opacity: var(--v19b-opacity-disabled) !important;
+}
+
 [data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric {
   display: grid;
   gap: var(--v19b-size-6);
@@ -28208,6 +28491,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 
 /* Overview metrics are a compact scan path: label, value, then action. */
 [data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric {
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
   grid-template-rows: min-content min-content;
   align-content: center;
   min-height: var(--v19b-size-84);
@@ -28215,13 +28499,14 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric > span {
   display: block;
-  overflow: hidden;
+  min-width: var(--v19b-size-0);
+  overflow: visible;
   background: var(--v19b-color-clear) !important;
   color: var(--v19b-color-text-muted) !important;
   font-size: var(--v19b-size-11) !important;
   line-height: var(--v19b-line-height-control);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-overview-metrics .admin-review-metric > strong {
@@ -28291,6 +28576,12 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   background: transparent;
   color: inherit;
   cursor: pointer;
+  padding: var(--v19b-size-14);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-history-item
+  > .admin-review-history-summary {
   padding: var(--v19b-size-14);
 }
 

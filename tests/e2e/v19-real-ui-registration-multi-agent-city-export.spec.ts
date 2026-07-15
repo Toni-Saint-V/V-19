@@ -326,7 +326,9 @@ async function returnWithIssue(page: Page, submissionId: string, drawerTitle: st
     .click();
   await expect(drawer(page).getByText("Нужно уточнить номер паспорта")).toBeVisible();
   await expect(drawer(page).getByText(/Анкета \/ Номер паспорта/)).toBeVisible();
-  await drawer(page).getByRole("button", { name: "Вернуть", exact: true }).click();
+  await drawer(page)
+    .getByRole("button", { name: "Отправить на исправление", exact: true })
+    .click();
   await expectDrawerStatus(page, "Возвращено");
   await closeDrawer(page);
 }
@@ -419,7 +421,7 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
 async function acceptSubmission(page: Page, submissionId: string, drawerTitle: string) {
   await openAdminSubmission(page, submissionId, drawerTitle);
   await drawer(page)
-    .getByRole("button", { name: /^(Принять|Закрыть и принять)$/ })
+    .getByRole("button", { name: "Принять на выгрузку", exact: true })
     .click();
   await expectDrawerStatus(page, "Готово к выгрузке");
   await closeDrawer(page);

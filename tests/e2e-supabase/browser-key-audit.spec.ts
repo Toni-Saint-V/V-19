@@ -1043,7 +1043,9 @@ test.describe("Supabase sandbox auth smoke", () => {
           response.url().includes("/rest/v1/rpc/save_submission_draft"),
         { timeout: 20_000 },
       );
-      await page.getByRole("button", { name: "Вернуть", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Отправить на исправление", exact: true })
+        .click();
       const returnSaveResponse = await returnSave;
       expect(returnSaveResponse.ok(), "Admin return save must succeed.").toBe(true);
       await expect(
@@ -1125,7 +1127,7 @@ test.describe("Supabase sandbox auth smoke", () => {
       await openSyncSmokeReviewDrawer(page);
       await openDrawerIssuesSection(page);
       await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
-      await page.getByRole("button", { name: "Закрыть и принять" }).click();
+      await page.getByRole("button", { name: "Принять на выгрузку" }).click();
       await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
       await waitForSyncSmokeStatus(adminClient, "ready_for_excel", "ready_for_export");
     } finally {

@@ -73,14 +73,51 @@ export function searchSubmissions(
 ) {
   const normalized = query.trim().toLowerCase();
   return submissions.filter((submission) => {
-    const matchesCity =
-      city === "Все города" ||
-      submission.city === city ||
-      questionnaireCityForSubmission(submission) === city;
-    if (!matchesCity) return false;
+    if (!matchesSubmissionCity(submission, city)) return false;
     if (!normalized) return true;
     return submissionSearchText(submission).includes(normalized);
   });
+}
+
+export type AgentSubmissionQueueFilter = "all" | "blockers" | "review" | "ready";
+
+export type AgentSubmissionQueueFilters = {
+  city: string;
+  filter: AgentSubmissionQueueFilter;
+  query: string;
+};
+
+export function matchesSubmissionCity(submission: Submission, city: string) {
+  const normalizedCity = city.trim();
+
+  return (
+    normalizedCity === "Все города" ||
+    submission.city.trim() === normalizedCity ||
+    questionnaireCityForSubmission(submission).trim() === normalizedCity
+  );
+}
+
+export function matchesAgentSubmissionQueueFilter(
+  submission: Submission,
+  filter: AgentSubmissionQueueFilter,
+) {
+  if (filter === "all") return true;
+  if (filter === "blockers") return blockerCount(submission) > 0;
+  if (filter === "review") {
+    return ["submitted_for_review", "corrections_received"].includes(
+      submission.status,
+    );
+  }
+  return submission.status === "ready_for_export";
+}
+
+export function filterAgentSubmissionQueue(
+  submissions: Submission[],
+  { city, filter, query }: AgentSubmissionQueueFilters,
+) {
+  return searchSubmissions(submissions, query, city).filter((submission) =>
+    matchesAgentSubmissionQueueFilter(submission, filter),
+  );
 }
 
 export function cityFilterValuesForSubmissions(submissions: Submission[]): string[] {
@@ -139,7 +176,7 @@ export function questionnaireCityForSubmission(submission: Submission): string {
     .find((field) => field.id === "appointment-city")
     ?.value.trim();
 
-  return questionnaireCity || submission.city;
+  return questionnaireCity || submission.city.trim();
 }
 
 export function highestPriorityFirst(submissions: Submission[]) {
