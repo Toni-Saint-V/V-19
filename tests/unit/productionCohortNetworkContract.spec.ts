@@ -45,6 +45,77 @@ import {
   productionLifecycleMutationPayloadMatches,
   runWithFailurePreservingCleanup,
 } from "../e2e-supabase-ui/production-lifecycle-helpers";
+import {
+  productionFamilyContactReadbackProvesResubmitted,
+  productionFamilyContactRecoveryState,
+} from "../e2e-supabase-ui/production-family-contact-helpers";
+
+describe("production family contact resumable readback", () => {
+  const exact = {
+    contact: {
+      applicantCount: 6,
+      distinctLayerValueDigestCount: 1,
+      durableExpectedCount: 6,
+      layerAgreementCount: 6,
+      questionnaireExpectedCount: 6,
+      snapshotEmailErrorStates: { absent: 6, expected: 0, other: 0 },
+      snapshotExpectedCount: 6,
+    },
+    lifecycle: {
+      applicantCount: 6,
+      answerCount: 462,
+      mediaCount: 18,
+      snapshotIssueStatuses: ["fixed_by_agent"],
+      submissionStatus: "waiting_review",
+      targetCorrectionCount: 1,
+      targetCorrectionStatuses: ["fixed"],
+    },
+  };
+
+  test("accepts only the exact persisted resubmission contract", () => {
+    expect(productionFamilyContactReadbackProvesResubmitted(exact)).toBe(true);
+    expect(productionFamilyContactRecoveryState(exact)).toBe("resubmitted");
+  });
+
+  test("retries safely when a resubmitting checkpoint still reads as returned", () => {
+    const returned = {
+      ...exact,
+      lifecycle: { ...exact.lifecycle, submissionStatus: "returned" },
+    };
+    expect(productionFamilyContactRecoveryState(returned)).toBe("returned");
+    expect(productionFamilyContactReadbackProvesResubmitted(returned)).toBe(false);
+  });
+
+  test.each([
+    { contact: { ...exact.contact, durableExpectedCount: 5 } },
+    {
+      contact: {
+        ...exact.contact,
+        snapshotEmailErrorStates: { absent: 5, expected: 1, other: 0 },
+      },
+    },
+    {
+      lifecycle: {
+        ...exact.lifecycle,
+        targetCorrectionCount: 2,
+        targetCorrectionStatuses: ["fixed", "fixed"],
+      },
+    },
+    {
+      lifecycle: {
+        ...exact.lifecycle,
+        snapshotIssueStatuses: ["fixed_by_agent", "closed_by_admin"],
+      },
+    },
+  ])("rejects partial or ambiguous readback %#", (override) => {
+    const readback = {
+      contact: override.contact ?? exact.contact,
+      lifecycle: override.lifecycle ?? exact.lifecycle,
+    };
+    expect(productionFamilyContactRecoveryState(readback)).toBe("invalid");
+    expect(productionFamilyContactReadbackProvesResubmitted(readback)).toBe(false);
+  });
+});
 
 function requiredDigest(value: unknown) {
   const digest = productionDraftValueDigest(value);

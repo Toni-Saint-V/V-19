@@ -17,10 +17,13 @@ import {
 } from "lucide-react";
 import { Drawer } from "./Drawer";
 import { QuestionnaireScreen } from "./QuestionnaireScreen";
-import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import type {
+  QuestionnaireDocumentsFilter,
+  QuestionnaireInitialFocus,
+} from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import { ApplicantsScreen } from "./ApplicantsScreen";
 import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
-import { DraftsScreen } from "./DraftsScreen";
+import { DraftsScreen, type DraftSummaryFilter } from "./DraftsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
 import { CreateSubmissionDrawer } from "../modules/submissions/components/CreateSubmissionDrawer";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
@@ -322,6 +325,8 @@ export function CommandCenter({
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
     useState<ActionSummaryFilter>("open");
+  const [documentsFilter, setDocumentsFilter] =
+    useState<DraftSummaryFilter>("missing");
   const [actionCityFilter, setActionCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
@@ -551,6 +556,17 @@ export function CommandCenter({
     id: string,
     initialFocus?: QuestionnaireInitialFocus,
   ) => {
+    if (initialFocus?.fileId || initialFocus?.section === "Файлы") {
+      const targetFile = effectiveCanonicalSubmissions
+        .find((submission) => submission.id === id)
+        ?.files.find((file) => file.id === initialFocus?.fileId);
+      const isReplacement =
+        targetFile?.status === "needs_replacement" ||
+        targetFile?.reviewStatus === "replace_required" ||
+        targetFile?.reviewStatus === "poor_quality";
+      openDocumentsForIssue(isReplacement ? "error" : "missing");
+      return;
+    }
     questionnaireOriginFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     bridge.onQuestionnaireOpen?.(id);
@@ -581,7 +597,20 @@ export function CommandCenter({
     });
   };
 
+  const openDocumentsForIssue = (filter: QuestionnaireDocumentsFilter = "missing") => {
+    setQuestionnaireInitialFocus(undefined);
+    setDrawerOpen(false);
+    setDocumentsFilter(filter);
+    setActiveNav("documents");
+    setMobileNavOpen(false);
+    setCurrentView("main");
+  };
+
   const handleActionOpen = (action: AgentActionItem) => {
+    if (action.tab === "files") {
+      openDocumentsForIssue(action.id.startsWith("replace-") ? "error" : "missing");
+      return;
+    }
     if (isDirectAgentAction(action)) {
       handleOpenQuestionnaire(
         action.submission.id,
@@ -1317,6 +1346,7 @@ export function CommandCenter({
             draft={selectedIntakeDraft}
             submission={selectedCanonicalSubmission}
             onBack={handleQuestionnaireBack}
+            onOpenDocuments={openDocumentsForIssue}
             onSubmissionUpdate={
               onSubmissionUpdate && !selectedIntakeDraft
                 ? (update) => onSubmissionUpdate(selectedRow, update)
@@ -1413,6 +1443,7 @@ export function CommandCenter({
               <div>
                 <AgentReturnPackagesPanel enabled={usesSupabase} />
                 <DraftsScreen
+                  initialFilter={documentsFilter}
                   onOpenDrawer={handleRowClick}
                   onSubmissionsChange={onSubmissionsChange}
                   submissions={canonicalSubmissions}

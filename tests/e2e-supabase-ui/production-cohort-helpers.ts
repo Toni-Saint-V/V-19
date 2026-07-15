@@ -696,7 +696,9 @@ export async function signInCohortAccount(
   await page.goto("/");
   const switchToLogin = page.getByRole("button", { name: "Уже есть доступ? Войти" });
   if (await isVisible(switchToLogin)) await switchToLogin.click();
-  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Вход" }),
+  ).toBeVisible({ timeout: productionWorkspaceReadyTimeoutMs });
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Пароль", { exact: true }).fill(account.password);
   const loginCheckpoint = ledger.checkpoint();

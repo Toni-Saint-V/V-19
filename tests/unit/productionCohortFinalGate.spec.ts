@@ -44,6 +44,44 @@ function submittedReports() {
 }
 
 describe("production cohort final gate", () => {
+  test("supports the new cohort all-submitted and family-export proof phases", () => {
+    const allSubmitted = submittedReports().map((report) => ({
+      ...report,
+      stage: "submitted",
+      status: "waiting_review",
+    }));
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        expectedLifecyclePhase: "all_submitted",
+        reports: allSubmitted,
+        totals: exactTotals,
+      }),
+    ).toBe(true);
+
+    const familyExport = allSubmitted.map((report) =>
+      report.caseKey === "A1-F6"
+        ? { ...report, stage: "exported", status: "exported" }
+        : report,
+    );
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        expectedLifecyclePhase: "family_export_proof",
+        reports: familyExport,
+        totals: exactTotals,
+      }),
+    ).toBe(true);
+    expect(
+      productionCohortFinalGate({
+        expectedCaseCount: 12,
+        expectedLifecyclePhase: "family_export_proof",
+        reports: allSubmitted,
+        totals: exactTotals,
+      }),
+    ).toBe(false);
+  });
+
   test("rejects a remote-only case even when all expected cases were discovered", () => {
     const reports = submittedReports();
     reports[0] = { caseKey: "A1-F6", stage: "remote_only", status: "waiting_review" };

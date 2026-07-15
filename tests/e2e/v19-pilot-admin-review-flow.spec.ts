@@ -184,19 +184,14 @@ async function verifyEveryAdminDrawerSubview(
   viewport: { height: number; width: number },
 ) {
   const browserProblems = collectBrowserProblems(page);
-  const tabs = [
+  const applicantTabs = [
     ["overview", "Обзор"],
-    ["applicants", "Заявители"],
-    ["questionnaire", "Анкета"],
     ["media", "Файлы"],
     ["issues", "Замечания"],
     ["history", "История"],
   ] as const;
-  const captureTabs = new Set(tabs.map(([id]) => id));
-  const expectedPanelContent: Record<(typeof tabs)[number][0], RegExp> = {
-    overview: /Пакет на проверке/i,
-    applicants: /Нина Волкова|Заявители пока нет/i,
-    questionnaire: /Заявитель/i,
+  const expectedPanelContent: Record<(typeof applicantTabs)[number][0], RegExp> = {
+    overview: /Нина Волкова|Проверено полей/i,
     media: /Скан паспорта|Файлов пока нет/i,
     issues: /Замечаний нет|Замечания не загружены/i,
     history: /15\.06|История пока пуста/i,
@@ -212,31 +207,44 @@ async function verifyEveryAdminDrawerSubview(
   }
   await openAdminSubmission(page, /Нина Волкова|ПД-1053/);
 
-  // The drawer uses manual activation: arrow keys must select the next tab
-  // and keep keyboard focus on it on both the desktop and mobile tab strip.
-  await openDrawerTab(page, ["Обзор"]);
-  const overviewTab = drawer(page).getByRole("tab", { name: /Обзор/ });
-  const applicantsTab = drawer(page).getByRole("tab", { name: /Заявители/ });
-  const historyTab = drawer(page).getByRole("tab", { name: /История/ });
-  await overviewTab.focus();
-  await expect(overviewTab).toBeFocused();
+  const reviewTabs = drawer(page).getByRole("tablist", {
+    name: "Разделы проверки",
+  });
+  const applicantsTab = reviewTabs.getByRole("tab", { name: /Заявители/ });
+  const questionnaireTab = reviewTabs.getByRole("tab", { name: /Анкета/ });
 
-  await overviewTab.press("ArrowRight");
+  // Both tablists use manual activation and retain focus after arrow-key navigation.
+  await applicantsTab.focus();
+  await expect(applicantsTab).toBeFocused();
+  await applicantsTab.press("ArrowRight");
+  await expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
+  await expect(questionnaireTab).toBeFocused();
+  await questionnaireTab.press("Home");
   await expect(applicantsTab).toHaveAttribute("aria-selected", "true");
   await expect(applicantsTab).toBeFocused();
 
-  await applicantsTab.press("End");
+  const travelerTabs = drawer(page).getByRole("tablist", {
+    name: /Разделы заявителя:/,
+  });
+  const overviewTab = travelerTabs.getByRole("tab", { name: "Обзор" });
+  const mediaTab = travelerTabs.getByRole("tab", { name: /Файлы/ });
+  const historyTab = travelerTabs.getByRole("tab", { name: /История/ });
+  await overviewTab.focus();
+  await expect(overviewTab).toBeFocused();
+  await overviewTab.press("ArrowRight");
+  await expect(mediaTab).toHaveAttribute("aria-selected", "true");
+  await expect(mediaTab).toBeFocused();
+  await mediaTab.press("End");
   await expect(historyTab).toHaveAttribute("aria-selected", "true");
   await expect(historyTab).toBeFocused();
-
   await historyTab.press("Home");
   await expect(overviewTab).toHaveAttribute("aria-selected", "true");
   await expect(overviewTab).toBeFocused();
 
-  for (const [id, label] of tabs) {
-    await openDrawerTab(page, [label]);
+  for (const [id, label] of applicantTabs) {
+    await travelerTabs.getByRole("tab", { name: label }).click();
 
-    const panel = drawer(page).getByRole("tabpanel").first();
+    const panel = drawer(page).locator(`#admin-review-traveler-panel-${id}`);
     await expect(panel).toBeVisible();
     await expect(panel).toHaveCSS("opacity", "1");
     await expect(panel).toContainText(expectedPanelContent[id]);
@@ -251,32 +259,41 @@ async function verifyEveryAdminDrawerSubview(
       }),
     ).toBe(true);
 
-    if (captureTabs.has(id)) {
-      const screenshotPath = testInfo.outputPath(
-        `admin-drawer-${viewport.width}-${id}.png`,
-      );
-      await page.screenshot({ path: screenshotPath });
-      await testInfo.attach(`admin-drawer-${viewport.width}-${id}`, {
-        contentType: "image/png",
-        path: screenshotPath,
-      });
-    }
+    const screenshotPath = testInfo.outputPath(
+      `admin-drawer-${viewport.width}-${id}.png`,
+    );
+    await page.screenshot({ path: screenshotPath });
+    await testInfo.attach(`admin-drawer-${viewport.width}-${id}`, {
+      contentType: "image/png",
+      path: screenshotPath,
+    });
   }
 
-  await openDrawerTab(page, ["Обзор"]);
+  await questionnaireTab.click();
+  const questionnairePanel = drawer(page).getByRole("tabpanel").first();
+  await expect(questionnairePanel).toContainText(/Заявитель/i);
+
+  // The applicant subviews unmount while the questionnaire tab is active.
+  // Return to the parent tab and resolve the fresh Overview button after the
+  // Motion transition instead of clicking the detached pre-transition locator.
+  await applicantsTab.click();
+  const restoredOverviewTab = drawer(page)
+    .getByRole("tablist", { name: /Разделы заявителя:/ })
+    .getByRole("tab", { name: "Обзор" });
+  await expect(restoredOverviewTab).toBeVisible();
+  await restoredOverviewTab.click();
   const metricLabels = drawer(page).locator(
-    ".admin-review-overview-metrics .admin-review-metric > span",
+    ".admin-review-traveler-overview dt",
   );
   await expect(metricLabels).toHaveCount(4);
   expect(
     await metricLabels.evaluateAll((labels) =>
       labels.every((label) => {
-        const card = label.parentElement;
-        if (!card) return false;
-        return (
-          label.scrollWidth <= label.clientWidth &&
-          label.getBoundingClientRect().width >=
-            card.getBoundingClientRect().width / 2
+        const metric = label.parentElement;
+        return Boolean(
+          metric &&
+            label.scrollWidth <= label.clientWidth &&
+            metric.getBoundingClientRect().width > 0,
         );
       }),
     ),

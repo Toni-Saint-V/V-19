@@ -411,7 +411,9 @@ function requiredLifecyclePhase(value) {
     phase === "pre_export" ||
       phase === "post_export" ||
       phase === "pre_export_a2_s1" ||
-      phase === "post_export_a2_s1",
+      phase === "post_export_a2_s1" ||
+      phase === "all_submitted" ||
+      phase === "family_export_proof",
     "The expected production cohort lifecycle phase is invalid.",
   );
   return phase;

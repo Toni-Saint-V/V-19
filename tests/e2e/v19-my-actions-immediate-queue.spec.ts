@@ -114,7 +114,6 @@ test.describe("V-19 My Actions immediate queue", () => {
       ).toBeVisible();
       const actionId = await action.getAttribute("data-agent-action-id");
       expect(actionId).toBeTruthy();
-      const targetFileId = actionId!.replace("replace-ПД-1048-", "");
       await page.screenshot({
         animations: "disabled",
         fullPage: false,
@@ -160,21 +159,23 @@ test.describe("V-19 My Actions immediate queue", () => {
       }
 
       await action.getByTestId("agent-action-cta").click();
-      const questionnaire = page
-        .locator('.vf-figma-questionnaire-screen[data-submission-id="ПД-1048"]')
+      const documents = page
+        .getByRole("heading", { name: "Сбор документов", exact: true })
         .first();
-      await expect(questionnaire).toBeVisible();
-      const targetSlot = questionnaire.locator(
-        `[data-file-id="${targetFileId}"][data-file-focused="true"]`,
-      );
-      await expect(targetSlot).toBeVisible();
-      await expect(targetSlot).toBeFocused();
+      await expect(documents).toBeVisible();
+      await expect(page.getByTestId("document-collection-matrix")).toBeVisible();
+      await expect(
+        page.locator('[data-document-submission-id="ПД-1048"]:visible').first(),
+      ).toBeVisible();
+      await expect(
+        page.locator('.vf-figma-questionnaire-screen[data-submission-id="ПД-1048"]'),
+      ).toHaveCount(0);
 
       if (viewport.width === 390 || viewport.width === 1440) {
         await page.screenshot({
           animations: "disabled",
           fullPage: false,
-          path: join(evidenceDirectory, `${viewport.label}-exact-file-after.png`),
+          path: join(evidenceDirectory, `${viewport.label}-document-collection-after.png`),
         });
       }
 

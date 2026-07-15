@@ -45,6 +45,35 @@ export type ProductionFamilyContactState = {
   updatedAt: string;
 };
 
+export type ProductionFamilyContactReadback = {
+  applicantCount: number;
+  distinctLayerValueDigestCount: number;
+  durableExpectedCount: number;
+  layerAgreementCount: number;
+  questionnaireExpectedCount: number;
+  snapshotEmailErrorStates: {
+    absent: number;
+    expected: number;
+    other: number;
+  };
+  snapshotExpectedCount: number;
+};
+
+export type ProductionFamilyLifecycleReadback = {
+  applicantCount: number;
+  answerCount: number;
+  mediaCount: number;
+  snapshotIssueStatuses: string[];
+  submissionStatus: string;
+  targetCorrectionCount: number;
+  targetCorrectionStatuses: string[];
+};
+
+export type ProductionFamilyContactRecoveryState =
+  | "returned"
+  | "resubmitted"
+  | "invalid";
+
 const stages = new Set<ProductionFamilyContactStage>([
   "pending_review",
   "adding_issue",
@@ -61,6 +90,44 @@ const stages = new Set<ProductionFamilyContactStage>([
 
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+/** Fail-closed, PII-free proof that the exact family correction was persisted. */
+export function productionFamilyContactRecoveryState(input: {
+  contact: ProductionFamilyContactReadback;
+  lifecycle: ProductionFamilyLifecycleReadback;
+}): ProductionFamilyContactRecoveryState {
+  const { contact, lifecycle } = input;
+  const correctionIsDurable =
+    contact.applicantCount === 6 &&
+    contact.durableExpectedCount === 6 &&
+    contact.questionnaireExpectedCount === 6 &&
+    contact.snapshotExpectedCount === 6 &&
+    contact.layerAgreementCount === 6 &&
+    contact.distinctLayerValueDigestCount === 1 &&
+    contact.snapshotEmailErrorStates.absent === 6 &&
+    contact.snapshotEmailErrorStates.expected === 0 &&
+    contact.snapshotEmailErrorStates.other === 0 &&
+    lifecycle.applicantCount === 6 &&
+    lifecycle.answerCount === 462 &&
+    lifecycle.mediaCount === 18 &&
+    lifecycle.targetCorrectionCount === 1 &&
+    lifecycle.targetCorrectionStatuses.length === 1 &&
+    lifecycle.targetCorrectionStatuses[0] === "fixed" &&
+    lifecycle.snapshotIssueStatuses.length === 1 &&
+    lifecycle.snapshotIssueStatuses[0] === "fixed_by_agent";
+
+  if (!correctionIsDurable) return "invalid";
+  if (lifecycle.submissionStatus === "returned") return "returned";
+  if (lifecycle.submissionStatus === "waiting_review") return "resubmitted";
+  return "invalid";
+}
+
+export function productionFamilyContactReadbackProvesResubmitted(input: {
+  contact: ProductionFamilyContactReadback;
+  lifecycle: ProductionFamilyLifecycleReadback;
+}) {
+  return productionFamilyContactRecoveryState(input) === "resubmitted";
 }
 export function requiredProductionFamilyContactCaseKey(): ProductionFamilyContactCaseKey {
   const caseKey = process.env.V19_PRODUCTION_COHORT_CASE_KEY?.trim();

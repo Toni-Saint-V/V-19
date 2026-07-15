@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
@@ -48,13 +48,14 @@ import {
 import { fileToDocumentStatus } from './v19BusinessScreenAdapter';
 
 interface DraftsScreenProps {
+  initialFilter?: DraftSummaryFilter;
   onOpenDrawer: (id: string) => void;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   submissions?: Submission[];
 }
 
 type DocStatus = 'verified' | 'processing' | 'error' | 'missing';
-type DraftSummaryFilter = 'missing' | 'processing' | 'error';
+export type DraftSummaryFilter = 'missing' | 'processing' | 'error';
 
 type MatrixApplicant = {
   docs: Record<CollectionDocType, DocStatus>;
@@ -463,6 +464,7 @@ const MobileDocSlot = ({
 };
 
 export function DraftsScreen({
+  initialFilter = 'missing',
   onOpenDrawer,
   onSubmissionsChange,
   submissions = [],
@@ -473,7 +475,10 @@ export function DraftsScreen({
   const [pendingCellTarget, setPendingCellTarget] = useState<PendingCellTarget | null>(null);
   const [mobileApplicantIndex, setMobileApplicantIndex] = useState<Record<string, number>>({});
   const mobileApplicantCarouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>('missing');
+  const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>(initialFilter);
+  useEffect(() => {
+    setDraftSummaryFilter(initialFilter);
+  }, [initialFilter]);
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
   const allDrafts = useMemo(() => buildMatrixSubmissions(submissions), [submissions]);

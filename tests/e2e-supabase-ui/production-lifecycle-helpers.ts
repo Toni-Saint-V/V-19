@@ -22,24 +22,37 @@ export const REQUIRED_PRODUCTION_LIFECYCLE_WRITE_UNLOCK =
   "I_UNDERSTAND_EXISTING_COHORT_LIFECYCLE_MUTATIONS";
 export const REQUIRED_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK =
   "I_UNDERSTAND_A2_S1_EXISTING_COHORT_LIFECYCLE_MUTATIONS";
+export const REQUIRED_PRODUCTION_A1_F6_LIFECYCLE_WRITE_UNLOCK =
+  "I_APPROVE_NEW_A1_F6_LIFECYCLE_FOR_FAMILY_EXPORT_PROOF";
 /** Legacy terminal case kept exclusively for the A1-F6 export proof. */
 export const FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY = "A1-F6";
-/** The only production mutation target authorized for this rollout. */
+/** The original single-record production mutation target. */
 export const PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY = "A2-S1";
+
+const allowedProductionLifecycleCaseKeys = [
+  FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY,
+  PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY,
+] as const;
 
 export type ProductionSingleCaseKey = `A${1 | 2 | 3}-S${1 | 2 | 3}`;
 
-export function requiredProductionLifecycleCaseKey(): typeof PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY {
+export function requiredProductionLifecycleCaseKey():
+  (typeof allowedProductionLifecycleCaseKeys)[number] {
   const caseKey = process.env.V19_PRODUCTION_COHORT_CASE_KEY?.trim();
   invariant(
-    caseKey === PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY,
-    "V19_PRODUCTION_COHORT_CASE_KEY=A2-S1 is required for this production lifecycle rollout.",
+    allowedProductionLifecycleCaseKeys.includes(
+      caseKey as (typeof allowedProductionLifecycleCaseKeys)[number],
+    ),
+    "V19_PRODUCTION_COHORT_CASE_KEY must be exactly A2-S1 or A1-F6 for this production lifecycle rollout.",
   );
-  return PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY;
+  return caseKey as (typeof allowedProductionLifecycleCaseKeys)[number];
 }
 
 export const RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY =
-  PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY;
+  process.env.V19_PRODUCTION_COHORT_CASE_KEY ===
+  FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
+    ? FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
+    : PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY;
 
 export type ProductionLifecycleCaseKey =
   | typeof FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
@@ -2544,7 +2557,7 @@ async function writeJsonAtomic(path: string, value: unknown) {
 }
 
 export function assertProductionLifecycleWriteUnlock() {
-  requiredProductionLifecycleCaseKey();
+  const caseKey = requiredProductionLifecycleCaseKey();
   invariant(
     process.env.SUPABASE_PRODUCTION_E2E_UNLOCK === "1",
     "SUPABASE_PRODUCTION_E2E_UNLOCK=1 is required.",
@@ -2554,11 +2567,19 @@ export function assertProductionLifecycleWriteUnlock() {
       REQUIRED_PRODUCTION_LIFECYCLE_WRITE_UNLOCK,
     "The dedicated production lifecycle write unlock is absent.",
   );
-  invariant(
-    process.env.V19_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK ===
-      REQUIRED_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK,
-    "The dedicated A2-S1 production lifecycle write unlock is absent.",
-  );
+  if (caseKey === PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY) {
+    invariant(
+      process.env.V19_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK ===
+        REQUIRED_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK,
+      "The dedicated A2-S1 production lifecycle write unlock is absent.",
+    );
+  } else {
+    invariant(
+      process.env.V19_PRODUCTION_A1_F6_LIFECYCLE_WRITE_UNLOCK ===
+        REQUIRED_PRODUCTION_A1_F6_LIFECYCLE_WRITE_UNLOCK,
+      "The dedicated A1-F6 production lifecycle write unlock is absent.",
+    );
+  }
   invariant(
     process.env.V19_PRODUCTION_COHORT_CONFIRM_PROJECT_REF === PRODUCTION_PROJECT_REF,
     "The production lifecycle project-ref confirmation is absent or wrong.",
@@ -2644,9 +2665,15 @@ function focusedSubmittedCase(runMarker: string) {
     cohortCase,
     `Focused ${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} case is absent from the production plan.`,
   );
+  const expectedApplicantCount =
+    RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY ===
+    FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
+      ? 6
+      : 1;
   invariant(
-    cohortCase.type === "single" && cohortCase.applicantCount === 1,
-    `${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} is not the expected one-person technical case.`,
+    cohortCase.applicantCount === expectedApplicantCount &&
+      cohortCase.type === (expectedApplicantCount === 6 ? "family" : "single"),
+    `${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} has an unexpected technical case shape.`,
   );
   return cohortCase;
 }

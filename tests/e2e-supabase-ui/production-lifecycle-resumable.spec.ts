@@ -557,6 +557,7 @@ function lifecycleSnapshotMutationIntent(
   state: ProductionLifecycleState,
   requested: LifecycleMutationExpectation["snapshotMutation"],
 ): {
+  applicantId?: string;
   comment: string;
   fieldLabel: string;
   mode: "add_issue" | "mark_issue_fixed";
@@ -590,16 +591,31 @@ async function lifecycleMutationContract(
     (account) => account.key === state.case.ownerKey,
   );
   invariant(owner, "Lifecycle mutation owner account is absent.");
-  const resolved = await resolveProductionCohortDraftPayloadIdentity({
+  const expectedApplicantCount = state.case.caseKey === "A1-F6" ? 6 : 1;
+  const baseline = await resolveProductionCohortDraftPayloadIdentity({
     admin: accounts.admin,
     correctionMarker: productionLifecycleIssueMarker(state),
+    expectedApplicantCount,
     ownerId: owner.authUserId,
-    snapshotMutationIntent: lifecycleSnapshotMutationIntent(
-      state,
-      expectation.snapshotMutation,
-    ),
     submissionId: state.case.submissionId,
   });
+  const issueApplicantId = baseline.applicantIdsInSnapshotOrder[0];
+  invariant(issueApplicantId, "Lifecycle issue applicant cannot be resolved.");
+  const snapshotMutationIntent = lifecycleSnapshotMutationIntent(
+    state,
+    expectation.snapshotMutation,
+  );
+  if (snapshotMutationIntent) snapshotMutationIntent.applicantId = issueApplicantId;
+  const resolved = snapshotMutationIntent
+    ? await resolveProductionCohortDraftPayloadIdentity({
+        admin: accounts.admin,
+        correctionMarker: productionLifecycleIssueMarker(state),
+        expectedApplicantCount,
+        ownerId: owner.authUserId,
+        snapshotMutationIntent,
+        submissionId: state.case.submissionId,
+      })
+    : baseline;
   const { draft, snapshotMutation } = resolved;
   const actorId =
     expectation.actorSource === "admin" ? accounts.admin.authUserId : owner.authUserId;
@@ -612,7 +628,9 @@ async function lifecycleMutationContract(
       expectation.correctedQuestionnaireValue,
     );
     const targets = draft.questionnaireAnswers.filter(
-      (answer) => answer.labelDigest === noteLabelDigest,
+      (answer) =>
+        answer.applicantId === issueApplicantId &&
+        answer.labelDigest === noteLabelDigest,
     );
     invariant(
       noteLabelDigest && expectedValueDigest && targets.length === 1,
@@ -629,6 +647,9 @@ async function lifecycleMutationContract(
   }
   return {
     correction: {
+      ...(expectation.correctionMode === "append"
+        ? { applicantId: issueApplicantId }
+        : {}),
       mode: expectation.correctionMode,
       reasonIncludes: productionLifecycleIssueMarker(state),
       status: correctionStatus,
@@ -1091,7 +1112,7 @@ async function ensureAgentResubmitted(input: {
       "The exact lifecycle issue must remain fixed before resubmission.",
     ).toBe("fixed");
     const resubmit = reopened.questionnaire.getByRole("button", {
-      name: "Отправить на проверку",
+      name: /^(?:Отправить на проверку|Отправить исправления)$/,
     });
     await expect(resubmit).toBeEnabled();
     state.stage = "resubmitting";
@@ -1115,13 +1136,13 @@ async function ensureAgentResubmitted(input: {
       }),
       () => resubmit.click(),
     );
-    await expect(
-      reopened.questionnaire.locator(
-        '.v19-questionnaire-screen-header [role="status"]',
-      ),
-    ).toContainText("Отправлено на проверку", { timeout: 60_000 });
     state.stage = "resubmitted";
     await persistLifecycleStage(state);
+    await expect(
+      reopened.questionnaire.getByTestId("questionnaire-read-only-status"),
+    ).toContainText(/Исправления на проверке|Отправлено на проверку/, {
+      timeout: 60_000,
+    });
 
     await reopened.questionnaire.getByRole("button", { name: "Назад" }).click();
     await reloadCanonicalWorkspace(session);
