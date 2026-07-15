@@ -16,6 +16,7 @@ import {
 } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
+import { decodeVisaApplicationFormTemplate } from "../../src/modules/submissions/visaApplicationFormReferencePdf";
 import {
   PRODUCTION_PROJECT_REF,
   loadProductionCohortAccounts,
@@ -312,6 +313,7 @@ async function inspectZip(
       manifest.documentEntries?.every((entry) => documentEntries.includes(entry)),
     "ZIP document entries do not match the manifest.",
   );
+  const canonicalTemplate = decodeVisaApplicationFormTemplate();
   const typesByPassport = new Map<string, Set<string>>();
   for (const entry of documentEntries) {
     const fileName = entry.split("/").at(-1) ?? "";
@@ -335,13 +337,25 @@ async function inspectZip(
         { type: "application/pdf" },
       ) as unknown as globalThis.File;
       const extraction = await extractPdfTextFromFile(file);
+      const pdfChecks = {
+        marker: extraction.text.includes(input.cohortCase.caseMarker),
+        pageCount: extraction.pageCount === 4,
+        passport: extraction.text.includes(identity.passportNumber),
+        referenceTemplate:
+          entryBytes.byteLength > canonicalTemplate.byteLength &&
+          productionExportDigest(
+            entryBytes.slice(0, canonicalTemplate.byteLength),
+          ) === productionExportDigest(canonicalTemplate),
+        textLayer: extraction.source === "text_layer",
+      };
       invariant(
-        extraction.pageCount === 4 &&
-          extraction.source === "text_layer" &&
-          extraction.text.includes("APPLICATION FOR SCHENGEN VISA") &&
-          extraction.text.includes(input.cohortCase.caseMarker) &&
-          extraction.text.includes(identity.passportNumber),
-        "Generated questionnaire PDF does not contain the expected applicant data.",
+        Object.values(pdfChecks).every(Boolean),
+        `Generated questionnaire PDF failed sanitized checks (` +
+          `entry=${productionExportDigest(entry).slice(0, 16)};` +
+          `checks=${Object.entries(pdfChecks)
+            .filter(([, passed]) => !passed)
+            .map(([name]) => name)
+            .join(",")}).`,
       );
     } else {
       invariant(
@@ -484,8 +498,11 @@ function exportRow(page: Page, submissionId: string) {
 }
 
 async function openExport(page: Page, submissionId: string) {
-  await clickWorkspaceButton(page, /Выгрузка/);
-  await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
+  const heading = page.getByRole("heading", { level: 1, name: "Выгрузка" });
+  if (!(await isVisible(heading))) {
+    await clickWorkspaceButton(page, /Выгрузка/);
+  }
+  await expect(heading).toBeVisible();
   await waitForWorkspaceData(page);
   await setSearch(page, submissionId);
   return exportRow(page, submissionId);
@@ -622,15 +639,34 @@ async function assertOwnerExportedState(
     page.getByRole("heading", { level: 1, name: "Мои подачи" }),
   ).toBeVisible();
   await waitForWorkspaceData(page);
-  await setSearch(page, input.submissionId);
+  const search = page
+    .getByRole("searchbox")
+    .or(page.getByRole("textbox", { name: "ID, семья или агент" }))
+    .first();
+  if (await isVisible(search)) {
+    await search.fill(input.submissionId);
+    await page.waitForTimeout(300);
+  }
   const card = page.locator(`[data-submission-id="${input.submissionId}"]`).first();
   await expect(card).toBeVisible({ timeout: 45_000 });
   await card.click();
   const root = drawer(page);
   await expect(root).toBeVisible();
-  await expect(root).toContainText(input.caseMarker);
   await expect(root).toContainText(input.city);
   await expect(root.locator(".v20-status-pill")).toHaveText(/выгружено/i);
+  await root.getByRole("tab", { name: "Анкета" }).click();
+  await root.getByRole("button", { name: "Открыть анкету" }).click();
+  const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
+  await expect(questionnaire).toBeVisible();
+  const personalSection = questionnaire
+    .locator(".v19-questionnaire-section-tab:visible")
+    .filter({ hasText: /Личные данные/ })
+    .first();
+  await expect(personalSection).toBeVisible();
+  await personalSection.click();
+  await expect(
+    questionnaire.locator('[data-field-label="Фамилия"] input').first(),
+  ).toHaveValue(new RegExp(input.caseMarker));
 }
 
 async function reconcileInterruptedExport(

@@ -47,6 +47,7 @@ import {
   productionDraftApplicantContentDigest,
   productionDraftEffectiveSnapshotHistory,
   productionDraftMediaContentDigest,
+  productionDraftMediaStaticContentDigest,
   productionDraftPayloadMatches,
   productionDraftQuestionnaireValueIdentity,
   productionDraftSnapshotFieldErrorIdentities,
@@ -1858,6 +1859,9 @@ export type ResolvedProductionCohortDraftPayloadIdentity = {
   historyTransition?: NonNullable<
     ProductionDraftHistoryExpectation["transition"]
   >;
+  mediaProjection?: NonNullable<
+    ProductionDraftPayloadMutationContract["mediaProjection"]
+  >;
   questionnaireProjection?: NonNullable<
     ProductionDraftPayloadMutationContract["questionnaireProjection"]
   >;
@@ -1882,7 +1886,7 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
     allowedDriftFields: readonly ("email" | "questionnaire_percent")[];
   };
   questionnaireSerializerProjection?: {
-    allowedLabelDriftFieldIds: readonly "hotel-name"[];
+    allowedLabelDriftFieldIds: readonly ("appointment-note" | "hotel-name")[];
   };
   submissionProjectionIntent?:
     | {
@@ -1893,7 +1897,7 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
     | {
         actorId: string;
         applicantId: string;
-        fieldId: "email";
+        fieldId: string;
         mode: "questionnaire_replace";
         value: string;
       }
@@ -2069,6 +2073,31 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
       intent.actorId === input.ownerId ? "agent" : "admin",
     ).status_history;
   })();
+  const mediaProjection = (() => {
+    const intent = input.submissionProjectionIntent;
+    if (
+      !intent ||
+      intent.mode !== "submission_action" ||
+      (intent.action !== "accept" && intent.action !== "close_issues_accept") ||
+      !projectedSubmission
+    ) {
+      return undefined;
+    }
+    return {
+      actorId: intent.actorId,
+      media: rows.media.map((row) => {
+        const mediaId = typeof row.id === "string" ? row.id : "";
+        const expectedStaticContentDigest =
+          productionDraftMediaStaticContentDigest(row);
+        invariant(
+          mediaId && expectedStaticContentDigest,
+          "Production accepted-media projection cannot be digested.",
+        );
+        return { expectedStaticContentDigest, mediaId };
+      }),
+      mode: "accept_exact" as const,
+    };
+  })();
   const historyProjection = (() => {
     if (!projectedHistoryPayload) return undefined;
     const baselineIds = new Set(draft.statusHistory.map((row) => row.id));
@@ -2141,9 +2170,12 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
     const expectedLifecycleContentDigest = productionDraftSnapshotContentDigest(
       persistedProjectedIntelligence,
       "lifecycle",
+      { normalizeFileReviewTimestamps: Boolean(mediaProjection) },
     );
-    const projectionDigests =
-      productionDraftSnapshotProjectionDigests(persistedProjectedIntelligence);
+    const projectionDigests = productionDraftSnapshotProjectionDigests(
+      persistedProjectedIntelligence,
+      { normalizeFileReviewTimestamps: Boolean(mediaProjection) },
+    );
     invariant(
       expectedLifecycleContentDigest,
       "Production lifecycle snapshot content projection cannot be digested.",
@@ -2229,7 +2261,13 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
             expectedContentDigest,
             "Production applicant projection cannot be digested.",
           );
-          return { applicantId, expectedContentDigest };
+          const expectedFieldDigests = Object.fromEntries(
+            Object.entries(row).map(([field, value]) => [
+              field,
+              productionDraftValueDigest(value),
+            ]),
+          );
+          return { applicantId, expectedContentDigest, expectedFieldDigests };
         }),
         mode: "replace_exact" as const,
       };
@@ -2277,13 +2315,17 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
           answer.fieldId === row.field_id,
       );
       invariant(baseline, "Production questionnaire projection changed answer identity.");
+      const questionnaireReplacement =
+        input.submissionProjectionIntent?.mode === "questionnaire_replace" &&
+        input.submissionProjectionIntent.applicantId === row.applicant_id &&
+        input.submissionProjectionIntent.fieldId === row.field_id
+          ? input.submissionProjectionIntent.value
+          : input.applicantEmailReplacement?.applicantId === row.applicant_id &&
+              row.field_id === "email"
+            ? input.applicantEmailReplacement.email
+            : undefined;
       const value = (() => {
-        if (
-          input.applicantEmailReplacement?.applicantId !== row.applicant_id ||
-          row.field_id !== "email"
-        ) {
-          return row.value;
-        }
+        if (questionnaireReplacement === undefined) return row.value;
         if (
           row.value &&
           typeof row.value === "object" &&
@@ -2292,10 +2334,10 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
         ) {
           return {
             ...(row.value as Record<string, unknown>),
-            value: input.applicantEmailReplacement.email,
+            value: questionnaireReplacement,
           };
         }
-        return input.applicantEmailReplacement.email;
+        return questionnaireReplacement;
       })();
       const identity = productionDraftQuestionnaireValueIdentity(value);
       const labelDigest = productionDraftValueDigest(row.label);
@@ -2328,9 +2370,14 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
         projected.logicalValueDigest !== baseline.logicalValueDigest ||
         projected.valueDigest !== baseline.valueDigest ||
         projected.valueStructureDigest !== baseline.valueStructureDigest;
+      const questionnaireReplacementMatches =
+        input.submissionProjectionIntent?.mode === "questionnaire_replace" &&
+        input.submissionProjectionIntent.applicantId === projected.applicantId &&
+        input.submissionProjectionIntent.fieldId === projected.fieldId;
       invariant(
         (!labelChanged || allowedLabelDriftFieldIds.has(projected.fieldId)) &&
           (!valueChanged ||
+            questionnaireReplacementMatches ||
             (projected.fieldId === "email" &&
               projected.applicantId ===
                 input.applicantEmailReplacement?.applicantId)),
@@ -2399,6 +2446,7 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
     draft,
     historyProjection,
     historyTransition,
+    mediaProjection,
     questionnaireProjection,
     snapshotMutation: snapshotMutation ?? undefined,
     snapshotHistoryProjection,

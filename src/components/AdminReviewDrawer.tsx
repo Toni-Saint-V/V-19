@@ -1219,9 +1219,10 @@ export function AdminReviewDrawer({
     () => (submission ? getAdminReviewActions(submission) : null),
     [submission],
   );
-  const hasUnresolvedReviewIssues = unresolvedIssues(submission).length > 0;
+  const hasOpenReviewIssues =
+    unresolvedIssues(submission).some((issue) => issue.status === "open");
   const footerReviewAction = adminReviewActions
-    ? hasUnresolvedReviewIssues
+    ? hasOpenReviewIssues
       ? adminReviewActions.returnForCorrection
       : adminReviewActions.acceptForExport
     : null;
@@ -1238,7 +1239,7 @@ export function AdminReviewDrawer({
     primaryAction.disabled ||
     primaryAction.action === "open_history";
   const reviewActionBlockerReason =
-    !hasUnresolvedReviewIssues &&
+    !hasOpenReviewIssues &&
     adminReviewActions?.acceptForExport.disabled &&
     adminReviewActions.acceptForExport.reason
       ? adminReviewActions.acceptForExport.reason
@@ -1253,7 +1254,7 @@ export function AdminReviewDrawer({
   const showPrimaryReason = Boolean(
     primaryReason &&
       (adminReviewActions
-        ? !hasUnresolvedReviewIssues && adminReviewActions.acceptForExport.disabled
+        ? !hasOpenReviewIssues && adminReviewActions.acceptForExport.disabled
         : primaryDisabled),
   );
   const currentStatusTone = submission

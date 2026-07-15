@@ -940,7 +940,11 @@ async function fillApplicantQuestionnaire(
   await chooseQuestionnaireField(questionnaire, "Количество въездов", "Однократная");
   await fillQuestionnaireField(questionnaire, "Дата въезда", futureDate(120));
   await fillQuestionnaireField(questionnaire, "Дата выезда", futureDate(127));
-  await fillQuestionnaireField(questionnaire, "Длительность пребывания", "8");
+  await expect(
+    questionnaire.getByRole("spinbutton", {
+      name: "Длительность пребывания",
+    }),
+  ).toHaveValue("8");
   await chooseQuestionnaireField(questionnaire, "Отпечатки ранее сдавались", "Нет");
 
   await clickQuestionnaireSection(questionnaire, /Отель \/ приглашение/);
@@ -968,6 +972,14 @@ async function fillApplicantQuestionnaire(
     "Сам заявитель",
   );
   await chooseQuestionnaireField(questionnaire, "Средства заявителя", "Наличные");
+
+  const confirmPassportReview = questionnaire.getByTestId(
+    "questionnaire-confirm-passport-review",
+  );
+  if (await isVisible(confirmPassportReview)) {
+    await confirmPassportReview.click();
+    await expect(confirmPassportReview).toHaveCount(0, { timeout: 45_000 });
+  }
 }
 
 async function uploadApplicantRequiredFiles(
@@ -1008,7 +1020,7 @@ async function uploadApplicantRequiredFiles(
 async function openQuestionnaireFromDrawer(page: Page) {
   await openDrawerTab(page, /Анкета/);
   const open = drawer(page).getByRole("button", {
-    name: /Открыть анкету|Продолжить анкету/,
+    name: /Открыть анкету|Продолжить анкету|Смотреть анкету|Исправить анкету/,
   });
   await expect(open).toBeVisible({ timeout: 15_000 });
   await open.click();
@@ -1032,9 +1044,9 @@ async function reopenQuestionnaireFromCanonicalState(page: Page, submissionId: s
 }
 
 function questionnaireSubmitButton(questionnaire: Locator) {
-  return questionnaire.getByRole("button", {
-    name: /Отправить на проверку|Отправить/,
-  });
+  return questionnaire.locator(
+    '.v19-questionnaire-complete-button.is-ready[aria-label="Отправить на проверку"]',
+  );
 }
 
 async function questionnaireReadinessDiagnostic(
@@ -1068,11 +1080,13 @@ async function fillAndSaveQuestionnaire(
   for (let index = 0; index < cohortCase.applicantCount; index += 1) {
     await fillApplicantQuestionnaire(questionnaire, cohortCase, index);
   }
-  const save = questionnaire.getByRole("button", { name: "Черновик", exact: true });
+  const save = questionnaire.getByRole("button", {
+    name: "Сохранить и выйти",
+    exact: true,
+  });
+  await expect(save).toBeEnabled();
   await save.click();
-  await expect(
-    questionnaire.locator('.v19-questionnaire-screen-header [role="status"]'),
-  ).toContainText("Сохранено", { timeout: 45_000 });
+  await expect(questionnaire).toHaveCount(0, { timeout: 45_000 });
 }
 
 async function findCaseSubmissionId(page: Page, cohortCase: ProductionCohortCase) {
@@ -1120,7 +1134,16 @@ async function findCreatingCaseByPassportMarker(
   for (const submissionId of uniqueIds) {
     await openSubmissionById(page, submissionId);
     await expect(drawer(page)).toContainText(submissionId, { timeout: 45_000 });
-    await openDrawerTab(page, /Файлы/);
+    const filesTab = drawer(page).getByRole("tab", { name: /Файлы/ }).first();
+    const filesButton = drawer(page)
+      .getByRole("button", { name: /Файлы/ })
+      .first();
+    const filesControl = (await isVisible(filesTab)) ? filesTab : filesButton;
+    if (!(await isVisible(filesControl))) {
+      await closeDrawerIfOpen(page);
+      continue;
+    }
+    await filesControl.click();
     if ((await drawer(page).innerText()).includes(cohortCase.caseMarker)) {
       matches.push(submissionId);
     }
@@ -1260,11 +1283,32 @@ async function closeDrawerIfOpen(page: Page) {
 async function assertCheckpointMatchesCohortCase(
   page: Page,
   cohortCase: ProductionCohortCase,
+  submissionId: string,
 ) {
-  await openDrawerTab(page, /Файлы/);
-  await expect(drawer(page)).toContainText(cohortCase.caseMarker, {
-    timeout: 45_000,
-  });
+  const filesTab = drawer(page).getByRole("tab", { name: /Файлы/ }).first();
+  const filesButton = drawer(page)
+    .getByRole("button", { name: /Файлы/ })
+    .first();
+  const filesControl = (await isVisible(filesTab)) ? filesTab : filesButton;
+  if (await isVisible(filesControl)) {
+    await filesControl.click();
+    await expect(drawer(page)).toContainText(cohortCase.caseMarker, {
+      timeout: 45_000,
+    });
+  } else {
+    const questionnaire = await openQuestionnaireFromDrawer(page);
+    await clickQuestionnaireSection(questionnaire, /Личные данные/);
+    await expect(
+      questionnaire
+        .locator('[data-field-label="Фамилия"] input')
+        .first(),
+    ).toHaveValue(new RegExp(cohortCase.caseMarker), { timeout: 45_000 });
+    await questionnaire.getByRole("button", { name: "Назад" }).click();
+    await expect(questionnaire).toHaveCount(0);
+    await openSubmissionById(page, submissionId);
+    await expect(drawer(page)).toBeVisible();
+    return;
+  }
   await openDrawerTab(page, /Обзор/);
 }
 
@@ -1326,9 +1370,16 @@ export async function createOrResumeCohortCase(input: {
     await clickWorkspaceButton(page, /Мои подачи/);
     await waitForAgentSubmissionsSettled(page);
     await openSubmissionById(page, checkpoint.submissionId);
-    await assertCheckpointMatchesCohortCase(page, cohortCase);
+    await assertCheckpointMatchesCohortCase(
+      page,
+      cohortCase,
+      checkpoint.submissionId,
+    );
     const visibleDrawerText = await drawer(page).innerText();
     const statusPill = drawer(page).locator(".v20-status-pill").first();
+    const statusPillText = (await isVisible(statusPill))
+      ? (await statusPill.innerText()).trim()
+      : "";
     if (
       (await isVisible(statusPill)) &&
       /выгружено/i.test(await statusPill.innerText())
@@ -1340,9 +1391,20 @@ export async function createOrResumeCohortCase(input: {
     }
     if (
       checkpoint.stage === "submitted" ||
-      /На проверке|Отправлено на проверку/.test(visibleDrawerText)
+      /^(?:На проверке|Отправлено на проверку|проверка)$/i.test(
+        statusPillText,
+      ) ||
+      /На проверке|Отправлено на проверку/i.test(visibleDrawerText)
     ) {
-      await expect(drawer(page)).toContainText(/На проверке|Отправлено на проверку/);
+      if (statusPillText) {
+        await expect(statusPill).toHaveText(
+          /^(?:На проверке|Отправлено на проверку|проверка)$/i,
+        );
+      } else {
+        await expect(drawer(page)).toContainText(
+          /На проверке|Отправлено на проверку/i,
+        );
+      }
       await assertAgentDrawerCaseContract(page, cohortCase);
       checkpoint.stage = "submitted";
       await saveCohortResumeState(resumeState);
@@ -1440,7 +1502,7 @@ export async function createOrResumeCohortCase(input: {
 
   if (checkpoint.stage === "questionnaire_saved") {
     let submit = questionnaireSubmitButton(questionnaire);
-    if (!(await submit.isEnabled())) {
+    if ((await submit.count()) !== 1 || !(await submit.isEnabled())) {
       const mutationCheckpoint = ledger.checkpoint();
       await fillAndSaveQuestionnaire(questionnaire, cohortCase);
       ledger.assertHealthySince(
@@ -1456,7 +1518,7 @@ export async function createOrResumeCohortCase(input: {
         checkpoint.submissionId,
       );
       submit = questionnaireSubmitButton(questionnaire);
-      if (!(await submit.isEnabled())) {
+      if ((await submit.count()) !== 1 || !(await submit.isEnabled())) {
         throw new Error(
           await questionnaireReadinessDiagnostic(questionnaire, cohortCase),
         );
@@ -1466,8 +1528,8 @@ export async function createOrResumeCohortCase(input: {
     const mutationCheckpoint = ledger.checkpoint();
     await submit.click();
     await expect(
-      questionnaire.locator('.v19-questionnaire-screen-header [role="status"]'),
-    ).toContainText("Отправлено на проверку", { timeout: 60_000 });
+      questionnaire.getByTestId("questionnaire-read-only-status"),
+    ).toContainText("На проверке", { timeout: 60_000 });
     await questionnaire.getByRole("button", { name: "Назад" }).click();
     await expect(questionnaire).toHaveCount(0);
     invariant(
@@ -1481,7 +1543,11 @@ export async function createOrResumeCohortCase(input: {
       timeout: 45_000,
     });
     ledger.assertHealthySince(mutationCheckpoint, `submit ${cohortCase.caseKey}`);
-    await assertCheckpointMatchesCohortCase(page, cohortCase);
+    await assertCheckpointMatchesCohortCase(
+      page,
+      cohortCase,
+      checkpoint.submissionId,
+    );
     await assertAgentDrawerCaseContract(page, cohortCase);
     checkpoint.stage = "submitted";
     await saveCohortResumeState(resumeState);
@@ -1523,7 +1589,14 @@ export async function verifyAdminSeesSubmittedCase(
   await expect(row).toContainText(/На проверке|Проверить|Новая/);
   await row.click();
   await expect(drawer(page)).toBeVisible();
-  await openDrawerTab(page, /Обзор/);
+  const overviewTab = drawer(page).getByRole("tab", { name: /Обзор/ }).first();
+  const overviewButton = drawer(page)
+    .getByRole("button", { name: /Обзор/ })
+    .first();
+  const overviewControl = (await isVisible(overviewTab))
+    ? overviewTab
+    : overviewButton;
+  if (await isVisible(overviewControl)) await overviewControl.click();
   await expect(drawer(page)).toContainText(cohortCase.city);
   await expect(
     drawer(page).getByRole("tab", {
@@ -1531,13 +1604,30 @@ export async function verifyAdminSeesSubmittedCase(
     }),
   ).toBeVisible();
   await openDrawerTab(page, /Заявители/);
-  await expect(
-    drawer(page).locator(".admin-review-applicants-tab > article"),
-  ).toHaveCount(cohortCase.applicantCount);
+  const applicantCards = drawer(page).locator(
+    ".admin-review-applicants-tab > article",
+  );
+  if ((await applicantCards.count()) > 0) {
+    await expect(applicantCards).toHaveCount(cohortCase.applicantCount);
+  } else {
+    const applicantOptions = drawer(page).locator(
+      '[aria-label="Заявители в проверке"] select option',
+    );
+    if ((await applicantOptions.count()) > 0) {
+      await expect(applicantOptions).toHaveCount(cohortCase.applicantCount);
+    } else {
+      await expect(
+        drawer(page)
+          .getByTestId("admin-review-travelers")
+          .getByRole("navigation", { name: "Заявители пакета" })
+          .locator("button"),
+      ).toHaveCount(cohortCase.applicantCount);
+    }
+  }
   if (!(await drawer(page).innerText()).includes(cohortCase.caseMarker)) {
     await openDrawerTab(page, /Анкета/);
   }
   await expect(drawer(page)).toContainText(cohortCase.caseMarker);
-  await expect(drawer(page)).toContainText(/На проверке/);
+  await expect(drawer(page)).toContainText(/На проверке|проверка/i);
   await closeDrawerIfOpen(page);
 }
