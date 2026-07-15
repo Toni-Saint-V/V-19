@@ -42,7 +42,8 @@ export default defineConfig({
   webServer: {
     command: `npx vite --host ${e2eServerHost} --port ${e2ePort} --strictPort`,
     url: e2eUrl,
-    reuseExistingServer: process.env.CI ? false : true,
+    // Keep fastlane evidence bound to its own local-demo server as well.
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       VITE_SUPABASE_BACKEND_TARGET: "local-demo",

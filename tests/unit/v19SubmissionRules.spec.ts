@@ -795,6 +795,27 @@ describe("V-19 export rules", () => {
 
     expect(downloaded[0]?.exportState).toBe("file_downloaded");
     expect(downloaded[0]?.exportPackage).toEqual(generated[0]?.exportPackage);
+    expect(generated[0]?.updatedAt).toBe("сейчас");
+    expect(downloaded[0]?.updatedAt).toBe("сейчас");
+    const exportDraftPayload = toCockpitDraftPersistencePayload(
+      downloaded[0]!,
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "admin",
+    );
+    const persistedUpdatedAt = exportDraftPayload.submission.updated_at;
+    if (typeof persistedUpdatedAt !== "string") {
+      throw new Error("Expected export persistence timestamp.");
+    }
+    expect(Date.parse(persistedUpdatedAt)).not.toBeNaN();
+    expect(exportDraftPayload.submission.accepted_at).toBe(
+      persistedUpdatedAt,
+    );
+    expect(
+      readCockpitSnapshot(
+        exportDraftPayload.submission.family_intelligence as Json,
+      )?.updatedAt,
+    ).toBe("сейчас");
     expect(generated[0]?.history).toEqual(submissions[0]?.history);
     expect(downloaded[0]?.history).toEqual(submissions[0]?.history);
     expect(

@@ -8,6 +8,7 @@ import {
   firstActionableIdentityFinding,
   type IdentityConsistencyReport,
 } from "./identityConsistency";
+import { passportGateIssues } from "./passportExtractionGuards";
 import {
   blockerCount,
   fixedIssueCount,
@@ -165,6 +166,11 @@ function passportPrimaryAction(
   }
 
   if (brief.status === "failed" || brief.status === "unavailable") {
+    // An unavailable OCR result may already have an explicit manual decision.
+    // Do not send the operator back to the passport step when the canonical
+    // passport gate confirms that the manually entered data is valid.
+    if (passportGateIssues(submission).length === 0) return null;
+
     const applicant = submission.applicants.find((item) =>
       ["failed", "unavailable"].includes(item.passportExtraction?.status ?? ""),
     );

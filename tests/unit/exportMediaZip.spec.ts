@@ -15,6 +15,7 @@ import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { mediaStorageBucket } from "../../src/modules/submissions/mediaStoragePolicy";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type {
+  Applicant,
   Submission,
   SubmissionFile,
 } from "../../src/modules/submissions/types";
@@ -26,7 +27,75 @@ const rootFolder = `VisaFlow_Export_${exportDate}`;
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
   if (!submission) throw new Error(`Missing fixture ${id}`);
-  return submission;
+  return withVisaFormReady(submission);
+}
+
+function withVisaFormReady(submission: Submission): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: [
+        ...applicant.sections,
+        {
+          id: "pdf-export-ready",
+          title: "pdf-export-ready",
+          status: "complete",
+          fields: [
+            questionnaireField("surname", "TEST"),
+            questionnaireField("surname-at-birth", "TEST"),
+            questionnaireField("first-name", "APPLICANT"),
+            questionnaireField("birth-date", "1990-01-01"),
+            questionnaireField("birth-place", "MOSCOW"),
+            questionnaireField("birth-country", "Russian Federation"),
+            questionnaireField("nationality", "Russian Federation"),
+            questionnaireField("gender", "Male"),
+            questionnaireField("marital-status", "Single"),
+            questionnaireField("passport-type", "Ordinary Passport"),
+            questionnaireField("passport-no", passportNumberFor(applicant)),
+            questionnaireField("passport-issue-date", "2020-01-01"),
+            questionnaireField("passport-expiry-date", "2030-01-01"),
+            questionnaireField("passport-issue-country", "Russian Federation"),
+            questionnaireField("passport-issue-place", "MVD"),
+            questionnaireField("home-address", "1 TEST STREET"),
+            questionnaireField("home-city", "MOSCOW"),
+            questionnaireField("home-country", "Russian Federation"),
+            questionnaireField("postal-code", "100000"),
+            questionnaireField("email", "TEST@EXAMPLE.COM"),
+            questionnaireField("contact-number", "70000000000"),
+            questionnaireField("occupation", "ENGINEER"),
+            questionnaireField("employer-name", "TEST EMPLOYER"),
+            questionnaireField("purpose", "TOURISM"),
+            questionnaireField("main-destination", "Spain"),
+            questionnaireField("first-entry-country", "Spain"),
+            questionnaireField("entry-count", "Multiple Entry"),
+            questionnaireField("arrival-date", "2026-07-20"),
+            questionnaireField("departure-date", "2026-07-27"),
+            questionnaireField("stay-duration", "7"),
+            questionnaireField("hotel-name", "TEST HOTEL"),
+            questionnaireField("hotel-address", "1 HOTEL ROAD"),
+            questionnaireField("hotel-city", "MADRID"),
+            questionnaireField("hotel-country", "Spain"),
+            questionnaireField("cost-covered-by", "Applicant"),
+            questionnaireField("means-of-support", "Cash"),
+          ],
+        },
+      ],
+    })),
+  };
+}
+
+function passportNumberFor(applicant: Applicant) {
+  return (
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "passport-no")
+      ?.value.trim() || "AA1234567"
+  );
+}
+
+function questionnaireField(id: string, value: string) {
+  return { id, label: id, value, required: true };
 }
 
 function withCanonicalStorage(submission: Submission): Submission {
@@ -39,8 +108,7 @@ function withCanonicalStorage(submission: Submission): Submission {
         return {
           ...file,
           generatedFileName,
-          mimeType:
-            file.type === "passport_scan" ? "application/pdf" : "image/jpeg",
+          mimeType: file.type === "passport_scan" ? "application/pdf" : "image/jpeg",
           originalFileName:
             file.type === "passport_scan" ? "passport.pdf" : `${file.type}.jpg`,
           reviewStatus: "accepted" as const,
@@ -80,8 +148,7 @@ function documentAssetsFor(submissions: Submission[]): DocumentAsset[] {
   return submissions.flatMap((submission) =>
     submission.files.flatMap((file) => {
       if (!canonicalTypes.some((type) => type === file.type)) return [];
-      if (!file.storagePath || file.storageBucket !== mediaStorageBucket)
-        return [];
+      if (!file.storagePath || file.storageBucket !== mediaStorageBucket) return [];
 
       const type = normalizeDocumentType(file.type);
       const filename =
@@ -158,9 +225,7 @@ function mediaEntryNames(fileNames: string[]): string[] {
 }
 
 function manifestName(fileNames: string[]): string {
-  const name = fileNames.find((candidate) =>
-    candidate.endsWith("/manifest.json"),
-  );
+  const name = fileNames.find((candidate) => candidate.endsWith("/manifest.json"));
   if (!name) throw new Error("Missing archive manifest");
   return name;
 }
@@ -177,12 +242,8 @@ describe("export media mega ZIP", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.safeMessage);
-    expect(result.artifact.fileName).toMatch(
-      /^visaflow-export-.+_documents\.zip$/,
-    );
-    expect(result.artifact.workbookFileName).toMatch(
-      /^visaflow-export-.+\.xlsx$/,
-    );
+    expect(result.artifact.fileName).toMatch(/^visaflow-export-.+_documents\.zip$/);
+    expect(result.artifact.workbookFileName).toMatch(/^visaflow-export-.+\.xlsx$/);
     expect(result.artifact).toMatchObject({
       applicantCount: 1,
       fileCount: 4,
@@ -231,9 +292,7 @@ describe("export media mega ZIP", () => {
   });
 
   test("keeps a family together with applicant prefixes", async () => {
-    const selection = generatedSelection(
-      withCanonicalStorage(byId("SUB-1102")),
-    );
+    const selection = generatedSelection(withCanonicalStorage(byId("SUB-1102")));
     const result = await createExportMediaZipArtifact(selection, {
       documentAssets: documentAssetsFor(selection),
       downloadDocument: documentDownloader(),
@@ -286,12 +345,8 @@ describe("export media mega ZIP", () => {
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
     expect(mediaNames).toHaveLength(16);
-    expect(mediaNames.some((name) => name.includes("/Ольга Фролова/"))).toBe(
-      true,
-    );
-    expect(mediaNames.some((name) => name.includes("/Семья Волковых/"))).toBe(
-      true,
-    );
+    expect(mediaNames.some((name) => name.includes("/Ольга Фролова/"))).toBe(true);
+    expect(mediaNames.some((name) => name.includes("/Семья Волковых/"))).toBe(true);
   });
 
   test("keeps ZIP entries and manifest deterministic for reversed input order", async () => {
@@ -337,10 +392,7 @@ describe("export media mega ZIP", () => {
         manifestName(secondNames.fileNames),
       ),
     ).toEqual(
-      await zipTextEntry(
-        firstResult.artifact.blob,
-        manifestName(firstNames.fileNames),
-      ),
+      await zipTextEntry(firstResult.artifact.blob, manifestName(firstNames.fileNames)),
     );
   });
 
@@ -352,6 +404,70 @@ describe("export media mega ZIP", () => {
     });
 
     expect(result).toMatchObject({ ok: false, reason: "storage_unavailable" });
+  });
+
+  test("returns a safe field-level correction message for an unrenderable PDF value", async () => {
+    const source = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
+    const selection = source.map((submission) => ({
+      ...submission,
+      applicants: submission.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "home-address" ? { ...field, value: "A".repeat(500) } : field,
+          ),
+        })),
+      })),
+    }));
+    const downloadDocument = documentDownloader();
+    const result = await createExportMediaZipArtifact(selection, {
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument,
+      expectedIdentity: identityFor(selection),
+      exportDate,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "questionnaire_incomplete" });
+    if (result.ok)
+      throw new Error("Expected the invalid PDF field to block ZIP creation.");
+    expect(result.safeMessage).toContain("Домашний адрес");
+    expect(downloadDocument).not.toHaveBeenCalled();
+  });
+
+  test("blocks invalid passport and telephone input instead of silently rewriting it", async () => {
+    const source = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
+    const selection = source.map((submission) => ({
+      ...submission,
+      applicants: submission.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) => {
+            if (field.id === "passport-no") return { ...field, value: "I".repeat(33) };
+            if (field.id === "contact-number") return { ...field, value: "CALL ME" };
+            if (field.id === "arrival-date") {
+              return { ...field, value: "2026-07-20junk" };
+            }
+            return field;
+          }),
+        })),
+      })),
+    }));
+    const downloadDocument = documentDownloader();
+    const result = await createExportMediaZipArtifact(selection, {
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument,
+      expectedIdentity: identityFor(selection),
+      exportDate,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "questionnaire_incomplete" });
+    if (result.ok) throw new Error("Expected unsafe questionnaire data to block ZIP creation.");
+    expect(result.safeMessage).toContain("Номер паспорта");
+    expect(result.safeMessage).toContain("Телефон");
+    expect(result.safeMessage).toContain("Дата въезда");
+    expect(downloadDocument).not.toHaveBeenCalled();
   });
 
   test("uses document repository assets and maps ZIP facts into the terminal RPC contract", async () => {
@@ -370,9 +486,7 @@ describe("export media mega ZIP", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.safeMessage);
-    expect(repository.getReadyForExport).toHaveBeenCalledWith([
-      selection[0]!.id,
-    ]);
+    expect(repository.getReadyForExport).toHaveBeenCalledWith([selection[0]!.id]);
     expect(toExportPackageDocumentCommit(result.artifact)).toEqual({
       applicantCount: 1,
       assetIds: result.artifact.documentAssetIds,
@@ -434,15 +548,11 @@ describe("export media mega ZIP", () => {
     });
 
     try {
-      const result = await downloadExportMediaZip(
-        selection,
-        identityFor(selection),
-        {
-          documentAssets: brokenAssets,
-          downloadDocument: documentDownloader(),
-          exportDate,
-        },
-      );
+      const result = await downloadExportMediaZip(selection, identityFor(selection), {
+        documentAssets: brokenAssets,
+        downloadDocument: documentDownloader(),
+        exportDate,
+      });
 
       expect(result).toMatchObject({ ok: false, reason: "media_not_ready" });
       expect(createObjectURL).not.toHaveBeenCalled();
@@ -479,15 +589,11 @@ describe("export media mega ZIP", () => {
     });
 
     try {
-      const result = await downloadExportMediaZip(
-        selection,
-        identityFor(selection),
-        {
-          documentAssets: brokenAssets,
-          downloadDocument: documentDownloader(),
-          exportDate,
-        },
-      );
+      const result = await downloadExportMediaZip(selection, identityFor(selection), {
+        documentAssets: brokenAssets,
+        downloadDocument: documentDownloader(),
+        exportDate,
+      });
 
       expect(result).toMatchObject({ ok: false, reason: "media_not_ready" });
       expect(createObjectURL).not.toHaveBeenCalled();
@@ -510,15 +616,11 @@ describe("export media mega ZIP", () => {
     });
 
     try {
-      const result = await downloadExportMediaZip(
-        selection,
-        identityFor(selection),
-        {
-          documentAssets: documentAssetsFor(selection),
-          downloadDocument: vi.fn(async () => new Blob([])),
-          exportDate,
-        },
-      );
+      const result = await downloadExportMediaZip(selection, identityFor(selection), {
+        documentAssets: documentAssetsFor(selection),
+        downloadDocument: vi.fn(async () => new Blob([])),
+        exportDate,
+      });
 
       expect(result).toMatchObject({ ok: false, reason: "empty_file" });
       expect(createObjectURL).not.toHaveBeenCalled();

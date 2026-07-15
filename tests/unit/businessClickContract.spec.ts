@@ -347,7 +347,8 @@ function submittedFixture(): Submission {
 }
 
 function submittedWithOpenIssueFixture(): Submission {
-  return addPreciseAdminIssue(submittedFixture(), routeIssueInput(submittedFixture()));
+  const submitted = submittedFixture();
+  return addPreciseAdminIssue(submitted, routeIssueInput(submitted));
 }
 
 function returnedWithFixedIssueFixture(): Submission {

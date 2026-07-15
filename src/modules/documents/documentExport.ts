@@ -2,13 +2,12 @@
 import JSZip from "jszip";
 import type { Submission, Applicant } from "../submissions/types";
 import { mediaStorageBucket } from "../submissions/mediaStoragePolicy";
-import {
-  documentExtension,
-  DOCUMENT_TYPES,
-  type DocumentAsset,
-} from "./documentTypes";
+import { documentExtension, DOCUMENT_TYPES, type DocumentAsset } from "./documentTypes";
 import { validateDocumentAsset, validateDocuments } from "./documentValidation";
-import { validateVisaApplicationFormData } from "../submissions/visaApplicationFormPdf";
+import {
+  validateVisaApplicationFormData,
+  visaApplicationFormValidationMessage,
+} from "../submissions/visaApplicationFormPdf";
 
 export const GENERATED_DOCUMENT_TYPES = ["visa_form"] as const;
 export const EXPORT_DOCUMENT_TYPES = [
@@ -53,6 +52,8 @@ export type DocumentZipDownloader = (
   context: {
     applicant: Applicant;
     applicantIndex: number;
+    /** ISO calendar date used by this ZIP root folder. */
+    exportDate: string;
     submission: Submission;
     type: ExportDocumentType;
   },
@@ -80,7 +81,8 @@ export async function buildDocumentsZip(
 ): Promise<BuildDocumentsZipResult> {
   const passportNumbers = passportNumbersForExport(input.submissions);
   const zip = input.zip ?? new JSZip();
-  const rootFolder = `VisaFlow_Export_${exportDateLabel(input.exportDate)}`;
+  const exportDate = exportDateLabel(input.exportDate);
+  const rootFolder = `VisaFlow_Export_${exportDate}`;
   const entries: string[] = [];
   const documentAssetIds: string[] = [];
   let applicantCount = 0;
@@ -96,28 +98,23 @@ export async function buildDocumentsZip(
     );
 
     for (const [applicantIndex, applicant] of submission.applicants.entries()) {
-      const visaFormValidation = validateVisaApplicationFormData(
-        submission,
-        applicant,
-      );
+      const visaFormValidation = validateVisaApplicationFormData(submission, applicant);
       if (!visaFormValidation.ok) {
         throw new DocumentZipBuilderError(
           "questionnaire_incomplete",
-          "Required questionnaire values for the visa application form are missing.",
+          visaApplicationFormValidationMessage(visaFormValidation.missingFields),
         );
       }
 
       const applicantDocs = input.assets.filter(
         (asset) =>
-          asset.submissionId === submission.id &&
-          asset.applicantId === applicant.id,
+          asset.submissionId === submission.id && asset.applicantId === applicant.id,
       );
       const readiness = validateDocuments(applicantDocs);
       if (!readiness.ok) {
         throw new DocumentZipBuilderError(
           "media_not_ready",
-          readiness.failures[0]?.message ??
-            "Applicant documents are not ready.",
+          readiness.failures[0]?.message ?? "Applicant documents are not ready.",
         );
       }
 
@@ -148,6 +145,7 @@ export async function buildDocumentsZip(
           blob = await input.downloadAsset(asset, {
             applicant,
             applicantIndex,
+            exportDate,
             submission,
             type,
           });
@@ -165,10 +163,7 @@ export async function buildDocumentsZip(
           );
         }
         if (blob.size <= 0) {
-          throw new DocumentZipBuilderError(
-            "empty_file",
-            "Document file is empty.",
-          );
+          throw new DocumentZipBuilderError("empty_file", "Document file is empty.");
         }
 
         const entryName = [
@@ -310,10 +305,8 @@ function passportNumbersForExport(
 }
 
 export function exportDateLabel(value: Date | string | undefined): string {
-  const date =
-    value instanceof Date ? value : value ? new Date(value) : new Date();
-  if (Number.isNaN(date.getTime()))
-    return new Date().toISOString().slice(0, 10);
+  const date = value instanceof Date ? value : value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
   return date.toISOString().slice(0, 10);
 }
 
@@ -322,9 +315,7 @@ export function safeArchiveName(value: string, fallback: string): string {
     .normalize("NFKC")
     .split("")
     .map((character) =>
-      /[\\/:*?"<>|]/.test(character) || character.charCodeAt(0) < 32
-        ? "_"
-        : character,
+      /[\\/:*?"<>|]/.test(character) || character.charCodeAt(0) < 32 ? "_" : character,
     )
     .join("")
     .replace(/\s+/g, " ")

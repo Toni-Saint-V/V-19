@@ -60,19 +60,17 @@ function submissionFixture(
 }
 
 function acceptableReviewSubmission(): Submission {
-  const source = submissionFixture(
-    "submitted_for_review",
-    "review-async-failure",
-    "Асинхронная проверка",
-  );
+  const source = initialSubmissions.find((submission) => submission.id === "ПД-1056");
+  if (!source) throw new Error("Missing acceptance-ready admin review fixture.");
 
   return {
     ...source,
-    completeness: { ...source.completeness, files: 100, total: 100 },
-    files: source.files.filter((file) =>
-      ["passport_scan", "selfie", "selfie_2"].includes(file.type),
-    ),
+    id: "review-async-failure",
     issues: [],
+    listTitle: "Асинхронная проверка",
+    status: "submitted_for_review",
+    exportState: "not_ready",
+    title: "Асинхронная проверка",
   };
 }
 
@@ -263,7 +261,7 @@ describe("AdminWorkspace production navigation", () => {
     if (!card) throw new Error("Review card was not rendered.");
     fireEvent.click(card);
     fireEvent.click(
-      (await screen.findAllByRole("button", { name: "Добавить замечание" }))[0]!,
+      (await screen.findAllByRole("button", { name: /^Добавить замечание/ }))[0]!,
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Отправить замечание" }),
@@ -302,7 +300,7 @@ describe("AdminWorkspace production navigation", () => {
     if (!card) throw new Error("Production-like review card was not rendered.");
     fireEvent.click(card);
     fireEvent.click(
-      (await screen.findAllByRole("button", { name: "Добавить замечание" }))[0]!,
+      (await screen.findAllByRole("button", { name: /^Добавить замечание/ }))[0]!,
     );
     fireEvent.change(
       await screen.findByPlaceholderText("Опишите, что именно нужно исправить..."),

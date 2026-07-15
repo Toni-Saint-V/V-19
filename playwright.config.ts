@@ -29,7 +29,9 @@ export default defineConfig({
       VITE_SUPABASE_RELEASE_ENABLED: "false",
     },
     url: e2eUrl,
-    reuseExistingServer: process.env.CI ? false : true,
+    // Release evidence must come from the local-demo server configured above,
+    // never from an arbitrary developer server already bound to the port.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [

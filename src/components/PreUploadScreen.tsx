@@ -549,15 +549,15 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                         animate={{ opacity: 1, x: 0, scale: 1 }}
                         exit={{ opacity: 0, x: -12, scale: 0.98 }}
                         transition={{ delay: index * 0.025 }}
-                        className={`rounded-2xl border p-3 ${field.state === 'warning' ? 'border-[#6f64ff]/25 bg-[#6f64ff]/[0.08]' : 'border-[#242529] bg-[#1a1a1d]'}`}
+                        className={`v19-prefill-preview-field rounded-2xl border p-3 ${field.state === 'warning' ? 'border-[#6f64ff]/25 bg-[#6f64ff]/[0.08]' : 'border-[#242529] bg-[#1a1a1d]'}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-[10.5px] uppercase tracking-wider text-white/38 font-medium">{field.label}</div>
-                            <div className="mt-1 text-[13px] font-medium text-white break-words">{field.value}</div>
+                            <div className="v19-prefill-preview-value mt-1 text-[13px] font-medium break-words">{field.value}</div>
                             <div className="mt-1 text-[11px] text-white/35 truncate">{field.sourceFileName ?? productFileKindLabels[field.sourceKind]}</div>
                           </div>
-                          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10.5px] text-[#b8baff]">
+                          <span className="v19-prefill-preview-confidence shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10.5px]">
                             {Math.round(field.confidence * 100)}%
                           </span>
                         </div>
@@ -567,12 +567,12 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 </AnimatePresence>
               </div>
 
-              <div className="mt-4 shrink-0 rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+              <div className="v19-prefill-ready-callout mt-4 shrink-0 rounded-2xl border p-4">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-white/62 shrink-0 mt-0.5" />
+                  <AlertCircle className="v19-prefill-ready-callout-icon w-5 h-5 shrink-0 mt-0.5" />
                   <div>
-                    <div className="text-[13px] font-semibold text-white/75">{draft.statusLabel}</div>
-                    <p className="text-[12px] text-white/45 leading-relaxed mt-1">
+                    <div className="v19-prefill-ready-callout-title text-[13px] font-semibold">{draft.statusLabel}</div>
+                    <p className="v19-prefill-ready-callout-copy text-[12px] leading-relaxed mt-1">
                       {draft.issues[0]?.description ?? 'Критичных расхождений нет. Можно переходить к автозаполненной анкете.'}
                     </p>
                   </div>

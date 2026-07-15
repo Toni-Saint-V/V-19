@@ -30,6 +30,7 @@ import {
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
 import {
+  blsStayDurationFromDates,
   isBlsQuestionnaireFieldBlockingIssue,
   isBlsQuestionnaireFieldReady,
   isBlsQuestionnaireFieldRequired,
@@ -248,6 +249,7 @@ type QuestionnaireFieldUiContract = {
   confirmReview: (fieldId: string) => void;
   errorMessage: (fieldId: string, label: string) => string | undefined;
   focused: (fieldId: string) => boolean;
+  revealRequiredErrors: boolean;
   required: (fieldId: string) => boolean;
   reviewSource: (fieldId: string, label: string) => string | undefined;
   state: (fieldId: string, label: string) => FieldState;
@@ -308,6 +310,7 @@ type FamilyCopyPreview = {
 
 export type QuestionnaireInitialFocus = {
   applicantId?: string;
+  fileId?: string;
   field?: string;
   section?: string;
 };
@@ -600,6 +603,8 @@ function optionMatchesSearch(option: string, query: string) {
 function inputAutocomplete(label: string, type: FormFieldProps["type"]) {
   if (type === "email" || label.toLocaleLowerCase("ru-RU").includes("email"))
     return "email";
+  if (type === "tel" || label.toLocaleLowerCase("ru-RU").includes("телефон"))
+    return "tel";
   if (label === "Фамилия") return "family-name";
   if (label === "Имя") return "given-name";
   if (label.toLocaleLowerCase("ru-RU").includes("адрес")) return "street-address";
@@ -710,8 +715,11 @@ function FormField({
   });
   const isEmptyRequiredField =
     validationMessage === "Обязательное поле" && !value.trim();
+  const shouldRevealRequiredError =
+    isEmptyRequiredField && Boolean(fieldContract?.revealRequiredErrors);
   const effectiveState: FieldState =
-    (validationMessage && !isEmptyRequiredField) || canonicalState === "invalid"
+    (validationMessage && (!isEmptyRequiredField || shouldRevealRequiredError)) ||
+    canonicalState === "invalid"
       ? "invalid"
       : canonicalState;
   const effectiveErrorMessage =
@@ -720,7 +728,8 @@ function FormField({
     canonicalReviewSource ??
     "Нужно исправить значение";
   const shouldShowError =
-    effectiveState === "invalid" && (!isEmptyRequiredField || Boolean(errorMessage));
+    effectiveState === "invalid" &&
+    (!isEmptyRequiredField || Boolean(errorMessage) || shouldRevealRequiredError);
   const baseClasses = "v19-questionnaire-field-control";
   const stateClasses =
     effectiveState === "needs_review"
@@ -1000,6 +1009,7 @@ function FormField({
           aria-required={canonicalRequired ? "true" : undefined}
           className={`${baseClasses} is-textarea ${compact ? "is-compact-address" : ""} ${stateClasses}`}
           id={fieldId}
+          name={modelFieldId}
           onBlur={onBlur}
           placeholder={placeholder}
           readOnly={readOnly ?? !onChange}
@@ -1008,7 +1018,7 @@ function FormField({
         />
       ) : (
         <div
-          className={inputSuggestions.length ? "relative" : undefined}
+          className="relative"
           ref={inputSuggestions.length ? suggestionsRef : undefined}
         >
           <input
@@ -1025,6 +1035,7 @@ function FormField({
             inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
             id={fieldId}
             maxLength={phonePrefix ? (phonePrefix === "+7" ? 17 : 15) : undefined}
+            name={modelFieldId}
             placeholder={
               placeholder ??
               (dateField
@@ -1328,6 +1339,67 @@ type QuestionnaireModelField = NonNullable<ReturnType<typeof questionnaireField>
 const requiredQuestionnaireFileTypes = ["passport_scan", "selfie", "selfie_2"] as const;
 type RequiredQuestionnaireFileType = (typeof requiredQuestionnaireFileTypes)[number];
 
+type QuestionnaireBlockerTarget = {
+  applicantId: string;
+  comment?: string;
+  fileId?: string;
+  fileType?: RequiredQuestionnaireFileType;
+  label?: string;
+  reason?: string;
+  sectionId: SectionId;
+};
+
+const requiredQuestionnaireFileLabels: Record<
+  RequiredQuestionnaireFileType,
+  string
+> = {
+  passport_scan: "Загранпаспорт",
+  selfie: "Селфи 1",
+  selfie_2: "Селфи 2",
+};
+
+function requiredQuestionnaireFileTypeForIssue(
+  issue: Submission["issues"][number],
+): RequiredQuestionnaireFileType | undefined {
+  const fileType = issue.target.fileType;
+  if (
+    fileType === "passport_scan" ||
+    fileType === "selfie" ||
+    fileType === "selfie_2"
+  ) {
+    return fileType;
+  }
+
+  const target = `${issue.target.field ?? ""}`
+    .toLocaleLowerCase("ru-RU")
+    .replace(/ё/g, "е");
+  if (
+    target.includes("скан пасп") ||
+    target.includes("passport scan") ||
+    target.includes("passport_scan")
+  ) {
+    return "passport_scan";
+  }
+  if (target.includes("селфи 2") || target.includes("профил")) return "selfie_2";
+  if (target.includes("селфи") || target.includes("selfie")) return "selfie";
+  return undefined;
+}
+
+function questionnaireFileIssue(
+  issues: Submission["issues"],
+  applicantId: string,
+  file: Submission["files"][number] | undefined,
+  fileType: RequiredQuestionnaireFileType,
+) {
+  return issues.find(
+    (issue) =>
+      (issue.status === "open" || issue.status === "fixed_by_agent") &&
+      issue.target.applicantId === applicantId &&
+      (file?.linkedIssueId === issue.id ||
+        requiredQuestionnaireFileTypeForIssue(issue) === fileType),
+  );
+}
+
 function questionnaireUpdateKey(
   update: Pick<QuestionnaireFieldUpdate, "applicantId" | "fieldId" | "sectionId">,
 ) {
@@ -1366,11 +1438,11 @@ function parseQuestionnaireDate(value: string) {
   return date;
 }
 
-function passportExpiryFromIssueDate(value: string) {
+function passportExpiryFromIssueDate(value: string, validityYears = 10) {
   const issuedAt = parseQuestionnaireDate(value);
   if (!issuedAt) return "";
 
-  const expiryYear = issuedAt.getFullYear() + 10;
+  const expiryYear = issuedAt.getFullYear() + validityYears;
   const month = issuedAt.getMonth();
   const lastDayOfExpiryMonth = new Date(expiryYear, month + 1, 0).getDate();
   const day = Math.min(issuedAt.getDate(), lastDayOfExpiryMonth);
@@ -1383,7 +1455,27 @@ function passportExpiryFromIssueDate(value: string) {
 function defaultBirthCountryForDate(value: string) {
   const birthDate = parseQuestionnaireDate(value);
   if (!birthDate) return undefined;
-  return birthDate.getFullYear() <= 1990 ? "USSR" : "Russian Federation";
+  const ussrDissolution = new Date(1991, 11, 26);
+  return birthDate < ussrDissolution ? "USSR" : "Russian Federation";
+}
+
+function historicalBirthPlaceForDate(value: string, birthDateValue: string) {
+  const birthDate = parseQuestionnaireDate(birthDateValue);
+  if (!birthDate || birthDate >= new Date(1991, 8, 6)) return value;
+
+  const normalized = value
+    .trim()
+    .toLocaleLowerCase("ru-RU")
+    .replace(/[.-]/g, " ")
+    .replace(/\s+/g, " ");
+  const saintPetersburgAliases = new Set([
+    "санкт петербург",
+    "saint petersburg",
+    "st petersburg",
+    "sankt peterburg",
+    "спб",
+  ]);
+  return saintPetersburgAliases.has(normalized) ? "LENINGRAD" : value;
 }
 
 function validationMessageForQuestionnaireField(
@@ -1488,6 +1580,8 @@ function QuestionnaireFileSlot({
   description,
   file,
   fileType,
+  focused,
+  issue,
   label,
   onUploadFile,
   submission,
@@ -1495,6 +1589,8 @@ function QuestionnaireFileSlot({
   description: string;
   file?: Submission["files"][number];
   fileType: RequiredQuestionnaireFileType;
+  focused?: boolean;
+  issue?: Submission["issues"][number];
   label: string;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   submission: Submission;
@@ -1527,7 +1623,13 @@ function QuestionnaireFileSlot({
   }
 
   return (
-    <article className="v19-questionnaire-file-slot" data-file-slot={fileType}>
+    <article
+      className={`v19-questionnaire-file-slot${focused ? " is-focus-target" : ""}`}
+      data-file-focused={focused ? "true" : undefined}
+      data-file-id={file?.id}
+      data-file-slot={fileType}
+      tabIndex={focused ? -1 : undefined}
+    >
       <span className="v19-questionnaire-file-icon" aria-hidden="true">
         <FileText />
       </span>
@@ -1554,6 +1656,25 @@ function QuestionnaireFileSlot({
             onChange={handleFileChange}
           />
         </label>
+      ) : null}
+      {issue ? (
+        <div
+          aria-live={issue.status === "fixed_by_agent" ? "polite" : undefined}
+          className={`v19-questionnaire-file-issue${
+            issue.status === "fixed_by_agent" ? " is-awaiting" : ""
+          }`}
+          data-file-issue={issue.id}
+          role={issue.status === "open" ? "alert" : "status"}
+        >
+          <strong>
+            {issue.status === "fixed_by_agent"
+              ? `Исправление отправлено: ${issue.reason}`
+              : `Что исправить: ${issue.reason}`}
+          </strong>
+          {issue.comment && issue.comment !== issue.reason ? (
+            <span>{issue.comment}</span>
+          ) : null}
+        </div>
       ) : null}
       {uploadError ? (
         <span className="v19-questionnaire-file-error" role="alert">
@@ -1599,7 +1720,7 @@ function questionnaireFormDataFromSubmission(
     appointmentCity: submissionFieldValue(
       applicant,
       "appointment-city",
-      fallback.appointmentCity,
+      submission.city || fallback.appointmentCity,
     ),
     appointmentNote: submissionFieldValue(
       applicant,
@@ -2122,9 +2243,10 @@ function dependentFieldKeysFor(
   if (key === "paymentSponsor" && value !== "Спонсор") {
     return ["sponsorInHostFields", "otherSponsor", "sponsorMeans"];
   }
-  if (key === "invitingPartyType" && value !== "Приглашающая компания/организация") {
-    return ["companyOrgDetails", "companyContactPerson", "companyPhone"];
-  }
+  // Changing the host type must not discard an already entered company contact.
+  // The company-only controls are hidden outside the company type and appear again
+  // if the user switches back, so the draft remains recoverable while comparing
+  // hotel, private-host, and company options.
   if (
     key === "dob" &&
     !isBlsQuestionnaireMinorApplicant(applicantRole, {
@@ -2224,12 +2346,40 @@ function issueFieldMatches(fieldId: string, label: string, target?: string) {
   );
 }
 
-function focusableFieldFor(field?: string) {
-  return focusableQuestionnaireFields.find(
+function focusableFieldFor(
+  field: string | undefined,
+  applicant?: Submission["applicants"][number],
+) {
+  const explicitTarget = focusableQuestionnaireFields.find(
     (target) =>
       sameFieldLabel(target.fieldId, field) ||
       target.labels.some((label) => sameFieldLabel(label, field)),
   );
+  if (explicitTarget) return explicitTarget;
+
+  const binding = questionnaireFieldBindings.find((candidate) =>
+    issueFieldMatches(
+      candidate.fieldId,
+      questionnaireField(applicant, candidate.fieldId)?.label ?? "",
+      field,
+    ),
+  );
+  if (!binding) return undefined;
+
+  const section = sectionDefinitions.find(
+    (definition) => definition.canonicalId === binding.sectionId,
+  );
+  if (!section) return undefined;
+
+  const label = questionnaireField(applicant, binding.fieldId)?.label;
+  return {
+    fieldId: binding.fieldId,
+    formKey: binding.formKey,
+    labels: [label, ...(questionnaireFieldLabelAliases[binding.fieldId] ?? [])].filter(
+      (candidate): candidate is string => Boolean(candidate?.trim()),
+    ),
+    sectionId: section.id,
+  } satisfies FocusableQuestionnaireField;
 }
 
 function sectionForFocus(
@@ -2310,7 +2460,6 @@ export function FigmaQuestionnaireScreen({
   onSaveDraft,
   submission,
 }: FigmaQuestionnaireScreenProps) {
-  const initialFieldTarget = focusableFieldFor(initialFocus?.field);
   const [pendingFieldUpdates, setPendingFieldUpdates] = useState<
     Record<string, QuestionnaireFieldUpdate>
   >({});
@@ -2326,9 +2475,26 @@ export function FigmaQuestionnaireScreen({
   const isEditable = canAgentEditSubmissionContent(draftSubmission);
   const applicants = useMemo(() => applicantTabs(draftSubmission), [draftSubmission]);
   const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
+  const initialFocusApplicant =
+    draftSubmission.applicants.find((applicant) => applicant.id === initialApplicantId) ??
+    draftSubmission.applicants[0];
+  const initialFieldTarget = focusableFieldFor(
+    initialFocus?.field,
+    initialFocusApplicant,
+  );
+  const isCorrectionResubmission = draftSubmission.status === "returned";
+  const completeActionLabel = isCorrectionResubmission
+    ? "Отправить исправления"
+    : "Готово к проверке";
+  const completeActionMobileLabel = completeActionLabel;
   const [activeApplicant, setActiveApplicant] = useState(initialApplicantId);
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
+  );
+  const [focusedFileTarget, setFocusedFileTarget] = useState<
+    Pick<QuestionnaireBlockerTarget, "fileId" | "fileType"> | undefined
+  >(() =>
+    initialFocus?.fileId ? { fileId: initialFocus.fileId } : undefined,
   );
   const [euRelativeApplicantIds, setEuRelativeApplicantIds] = useState<Set<string>>(
     () => new Set(),
@@ -2340,6 +2506,7 @@ export function FigmaQuestionnaireScreen({
     useState<FamilyCopyPreview>();
   const [lastFamilyCopyTarget, setLastFamilyCopyTarget] =
     useState<FamilyCopyPreview["firstTarget"]>();
+  const [revealRequiredErrors, setRevealRequiredErrors] = useState(false);
   const [issueResolutionError, setIssueResolutionError] = useState("");
   const [pendingIssueResolutionId, setPendingIssueResolutionId] = useState<
     string | null
@@ -2382,6 +2549,7 @@ export function FigmaQuestionnaireScreen({
     setFamilyCopyMessage(undefined);
     setFamilyCopyPreview(undefined);
     setLastFamilyCopyTarget(undefined);
+    setRevealRequiredErrors(false);
     setSaveStatus("idle");
     setSaveMessage("Изменений нет");
   }, [submission.id]);
@@ -2412,6 +2580,12 @@ export function FigmaQuestionnaireScreen({
   }, [activeApplicant]);
 
   useEffect(() => {
+    setFocusedFileTarget(
+      initialFocus?.fileId ? { fileId: initialFocus.fileId } : undefined,
+    );
+  }, [initialFocus?.fileId, initialFocus?.section]);
+
+  useEffect(() => {
     for (const element of [
       activePinnedSectionTabRef.current,
       activeSidebarSectionTabRef.current,
@@ -2434,39 +2608,65 @@ export function FigmaQuestionnaireScreen({
 
   useEffect(() => {
     if (initialFocusAppliedRef.current) return;
-    initialFocusAppliedRef.current = true;
-    const timer = window.setTimeout(() => {
+    let attempt = 0;
+    let timer: number | undefined;
+    const applyInitialFocus = () => {
       const activeElement = document.activeElement;
       if (
         activeElement instanceof HTMLElement &&
         activeElement !== document.body &&
         screenRef.current?.contains(activeElement)
       ) {
+        initialFocusAppliedRef.current = true;
         return;
       }
       const fieldLabel = initialFieldTarget
         ? (questionnaireField(activeApplicantModel, initialFieldTarget.fieldId)?.label ??
           initialFieldTarget.labels[0])
         : undefined;
+      const focusedFile = screenRef.current?.querySelector<HTMLElement>(
+        '[data-file-focused="true"]',
+      );
+      if (focusedFile) {
+        focusedFile.focus({ preventScroll: true });
+        focusedFile.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        initialFocusAppliedRef.current = true;
+        return;
+      }
       if (fieldLabel) {
-        const element = screenRef.current?.querySelector<HTMLElement>(
-          `[data-field-label="${CSS.escape(fieldLabel)}"]`,
-        );
+        const element =
+          screenRef.current?.querySelector<HTMLElement>('[data-field-focused="true"]') ??
+          screenRef.current?.querySelector<HTMLElement>(
+            `[data-field-label="${CSS.escape(fieldLabel)}"]`,
+          );
         const target = element?.querySelector<HTMLElement>(
           "input, textarea, button, [tabindex]",
         );
         if (target) {
           target.focus({ preventScroll: true });
           element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+          initialFocusAppliedRef.current = true;
           return;
         }
       }
+
+      if (attempt < 4) {
+        attempt += 1;
+        timer = window.setTimeout(applyInitialFocus, 16);
+        return;
+      }
+
       screenRef.current
         ?.querySelector<HTMLButtonElement>('button[aria-label="Назад"]')
         ?.focus({ preventScroll: true });
-    }, 0);
+      initialFocusAppliedRef.current = true;
+    };
 
-    return () => window.clearTimeout(timer);
+    timer = window.setTimeout(applyInitialFocus, 0);
+
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [activeApplicantModel, activeSection, initialFieldTarget]);
 
   const selectOptions = useMemo(
@@ -2598,15 +2798,18 @@ export function FigmaQuestionnaireScreen({
     [activeApplicantModel],
   );
 
-  const activeBlockingFieldIssues = useMemo(
+  const activeBlockingIssues = useMemo(
     () =>
       draftSubmission.issues.filter(
         (issue) =>
           (issue.status === "open" || issue.status === "fixed_by_agent") &&
-          issue.target.applicantId === activeApplicant &&
-          issue.target.field,
+          issue.target.applicantId === activeApplicant,
       ),
     [activeApplicant, draftSubmission.issues],
+  );
+  const activeBlockingFieldIssues = useMemo(
+    () => activeBlockingIssues.filter((issue) => issue.target.field),
+    [activeBlockingIssues],
   );
   const openFieldIssues = useMemo(
     () => activeBlockingFieldIssues.filter((issue) => issue.status === "open"),
@@ -2767,7 +2970,6 @@ export function FigmaQuestionnaireScreen({
     (applicant) => applicant.id === activeApplicant,
   );
   const activeSectionContext = sections.find((section) => section.id === activeSection);
-  const isCompleteButtonDisabled = !readinessStats.canSubmit;
   const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
   const showPurposeDetails = formData.stayPurpose === "OTHER";
   const showPreviousBiometricsDetails = formData.previousBiometrics === "Да";
@@ -2781,13 +2983,7 @@ export function FigmaQuestionnaireScreen({
       activeApplicantModel?.role,
       formData as unknown as BlsFormData,
     ) || Boolean(formData.guardianInfo.trim());
-  const showCompanyInviteFields =
-    isBlsQuestionnaireInvitingCompanySelected(formData) ||
-    Boolean(
-      formData.companyOrgDetails.trim() ||
-      formData.companyContactPerson.trim() ||
-      formData.companyPhone.trim(),
-    );
+  const showCompanyInviteFields = isBlsQuestionnaireInvitingCompanySelected(formData);
   const primaryApplicant = draftSubmission.applicants[0];
   const canCopyFamilyWide =
     draftSubmission.type === "family" &&
@@ -2801,7 +2997,18 @@ export function FigmaQuestionnaireScreen({
       (definition) => definition.id === activeSection,
     )?.canonicalId;
 
-    return activeBlockingFieldIssues.find((issue) => {
+    return activeBlockingIssues.find((issue) => {
+      const issueFileType = requiredQuestionnaireFileTypeForIssue(issue);
+      if (
+        currentSection.id === "files" &&
+        (issue.type === "file" ||
+          issue.type === "media" ||
+          Boolean(issueFileType) ||
+          sectionForFocus({ section: issue.target.section }, undefined) === "files")
+      ) {
+        return true;
+      }
+      if (!issue.target.field) return false;
       if (issue.target.section === currentSection.title) return true;
 
       return questionnaireFieldBindings
@@ -2815,7 +3022,7 @@ export function FigmaQuestionnaireScreen({
           );
         });
     });
-  }, [activeApplicantModel, activeBlockingFieldIssues, activeSection, sections]);
+  }, [activeApplicantModel, activeBlockingIssues, activeSection, sections]);
 
   const clearAutosaveTimer = useCallback(() => {
     if (autosaveTimerRef.current === undefined) return;
@@ -2924,6 +3131,14 @@ export function FigmaQuestionnaireScreen({
     updateField("passportExpiry", suggestedExpiry);
   }
 
+  function applyPassportValidityYears(validityYears: 5 | 10) {
+    const expiry = passportExpiryFromIssueDate(
+      formData.passportIssued,
+      validityYears,
+    );
+    if (expiry) updateField("passportExpiry", expiry);
+  }
+
   function updateBirthDate(value: string) {
     const suggestedBirthCountry = defaultBirthCountryForDate(value);
     const birthCountryIsUntouchedDefault =
@@ -2934,6 +3149,25 @@ export function FigmaQuestionnaireScreen({
     if (suggestedBirthCountry && birthCountryIsUntouchedDefault) {
       updateField("birthCountry", suggestedBirthCountry);
     }
+  }
+
+  function normalizeBirthPlaceField() {
+    const normalized = historicalBirthPlaceForDate(
+      formData.birthPlace,
+      formData.dob,
+    );
+    if (normalized !== formData.birthPlace) updateField("birthPlace", normalized);
+  }
+
+  function updateTravelDate(key: "travelStart" | "travelEnd", value: string) {
+    const travelStart = key === "travelStart" ? value : formData.travelStart;
+    const travelEnd = key === "travelEnd" ? value : formData.travelEnd;
+
+    updateField(key, value);
+    updateField(
+      "stayDuration",
+      blsStayDurationFromDates(travelStart, travelEnd),
+    );
   }
 
   function normalizeAddressField(key: "contactAddress" | "employerAddress") {
@@ -3429,13 +3663,49 @@ export function FigmaQuestionnaireScreen({
     }, 0);
   }
 
-  function focusQuestionnaireTarget(target: {
-    applicantId: string;
-    label?: string;
-    sectionId: SectionId;
-  }) {
+  function focusFileTarget(
+    fileId: string | undefined,
+    fileType: RequiredQuestionnaireFileType | undefined,
+  ) {
+    if (!fileId && !fileType) return;
+    setFocusedFileTarget({ fileId, fileType });
+
+    let attempt = 0;
+    const applyFocus = () => {
+      const byId = fileId
+        ? screenRef.current?.querySelector<HTMLElement>(
+            `[data-file-id="${CSS.escape(fileId)}"]`,
+          )
+        : undefined;
+      const slot =
+        byId ??
+        (fileType
+          ? screenRef.current?.querySelector<HTMLElement>(
+              `[data-file-slot="${fileType}"]`,
+            )
+          : undefined);
+      if (slot) {
+        slot.focus({ preventScroll: true });
+        slot.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        return;
+      }
+      if (attempt < 4) {
+        attempt += 1;
+        window.setTimeout(applyFocus, 16);
+      }
+    };
+
+    window.setTimeout(applyFocus, 0);
+  }
+
+  function focusQuestionnaireTarget(target: QuestionnaireBlockerTarget) {
     setActiveApplicant(target.applicantId);
     setActiveSection(target.sectionId);
+    if (target.sectionId === "files" && (target.fileId || target.fileType)) {
+      focusFileTarget(target.fileId, target.fileType);
+      return;
+    }
+    setFocusedFileTarget(undefined);
     focusFieldLabel(target.label);
   }
 
@@ -3445,7 +3715,9 @@ export function FigmaQuestionnaireScreen({
     focusQuestionnaireTarget(target);
   }
 
-  function firstQuestionnaireBlockerTarget(applicantId?: string) {
+  function firstQuestionnaireBlockerTarget(
+    applicantId?: string,
+  ): QuestionnaireBlockerTarget | undefined {
     const scopedApplicants = applicantId
       ? draftSubmission.applicants.filter((applicant) => applicant.id === applicantId)
       : draftSubmission.applicants;
@@ -3503,19 +3775,34 @@ export function FigmaQuestionnaireScreen({
     }
 
     for (const applicant of scopedApplicants) {
-      const hasMissingFile = requiredQuestionnaireFileTypes.some(
-        (type) =>
-          !fileIsReadyForQuestionnaire(
-            draftSubmission.files.find(
-              (file) => file.applicantId === applicant.id && file.type === type,
-            ),
-          ),
-      );
-      if (hasMissingFile) {
-        return {
-          applicantId: applicant.id,
-          sectionId: "files" as const,
-        };
+      for (const fileType of requiredQuestionnaireFileTypes) {
+        const file = draftSubmission.files.find(
+          (candidate) =>
+            candidate.applicantId === applicant.id && candidate.type === fileType,
+        );
+        if (!fileIsReadyForQuestionnaire(file)) {
+          const issue = questionnaireFileIssue(
+            draftSubmission.issues,
+            applicant.id,
+            file,
+            fileType,
+          );
+          return {
+            applicantId: applicant.id,
+            comment: issue?.comment,
+            fileId: file?.id,
+            fileType,
+            label: requiredQuestionnaireFileLabels[fileType],
+            reason:
+              issue?.reason ??
+              (file?.status === "needs_replacement" ||
+              file?.reviewStatus === "replace_required" ||
+              file?.reviewStatus === "poor_quality"
+                ? "Замените этот файл"
+                : "Добавьте этот файл"),
+            sectionId: "files" as const,
+          } satisfies QuestionnaireBlockerTarget;
+        }
       }
     }
 
@@ -3531,6 +3818,24 @@ export function FigmaQuestionnaireScreen({
         (!applicantId || candidate.target.applicantId === applicantId),
     );
     if (!issue?.target.applicantId) return undefined;
+
+    const issueFileType = requiredQuestionnaireFileTypeForIssue(issue);
+    if (issueFileType) {
+      const file = draftSubmission.files.find(
+        (candidate) =>
+          candidate.applicantId === issue.target.applicantId &&
+          candidate.type === issueFileType,
+      );
+      return {
+        applicantId: issue.target.applicantId,
+        comment: issue.comment,
+        fileId: file?.id,
+        fileType: issueFileType,
+        label: requiredQuestionnaireFileLabels[issueFileType],
+        reason: issue.reason,
+        sectionId: "files" as const,
+      } satisfies QuestionnaireBlockerTarget;
+    }
 
     const issueApplicant = draftSubmission.applicants.find(
       (applicant) => applicant.id === issue.target.applicantId,
@@ -3573,17 +3878,17 @@ export function FigmaQuestionnaireScreen({
       sectionId: issueBinding
         ? sectionIdForQuestionnaireField(issueBinding.sectionId, issueBinding.fieldId)
         : issueSectionId,
-    };
+    } satisfies QuestionnaireBlockerTarget;
   }
 
   function focusNextIncomplete() {
-    const target = firstQuestionnaireBlockerTarget();
-    if (target) focusQuestionnaireTarget(target);
+    focusFirstBlocker();
   }
 
   function focusApplicantNextIncomplete(applicantId: string) {
     const target = firstQuestionnaireBlockerTarget(applicantId);
     if (target) {
+      setRevealRequiredErrors(true);
       focusQuestionnaireTarget(target);
       return;
     }
@@ -3593,7 +3898,17 @@ export function FigmaQuestionnaireScreen({
 
   function focusFirstBlocker() {
     const target = firstQuestionnaireBlockerTarget();
-    if (target) focusQuestionnaireTarget(target);
+    if (!target) return;
+    setRevealRequiredErrors(true);
+    setSaveStatus("idle");
+    setSaveMessage(
+      target.label
+        ? `Сначала: ${target.label}${target.reason ? ` — ${target.reason}` : ""}`
+        : target.sectionId === "files"
+          ? "Сначала: добавьте обязательный файл"
+          : "Сначала: устраните блокер",
+    );
+    focusQuestionnaireTarget(target);
   }
 
   async function saveDraftFromButton() {
@@ -3635,6 +3950,10 @@ export function FigmaQuestionnaireScreen({
 
   async function completeFromButton() {
     if (!isEditable || completionInFlightRef.current) return;
+    if (!readinessStats.canSubmit) {
+      focusFirstBlocker();
+      return;
+    }
     completionInFlightRef.current = true;
     clearAutosaveTimer();
     const revision = autosaveRevisionRef.current;
@@ -3650,17 +3969,29 @@ export function FigmaQuestionnaireScreen({
         await enqueueDraftSave(payload, revision);
       }
       setSaveStatus("saving");
-      setSaveMessage("Отправляем на проверку...");
+      setSaveMessage(
+        isCorrectionResubmission
+          ? "Отправляем исправления..."
+          : "Отправляем на проверку...",
+      );
       await onComplete(payload);
       if (autosaveRevisionRef.current === revision) {
         replacePendingFieldUpdates({});
         setSaveStatus("saved");
-        setSaveMessage("Отправлено на проверку");
+        setSaveMessage(
+          isCorrectionResubmission
+            ? "Исправления отправлены"
+            : "Отправлено на проверку",
+        );
       }
     } catch (error) {
       setSaveStatus("error");
       setSaveMessage(
-        error instanceof Error ? error.message : "Не удалось отправить анкету",
+        error instanceof Error
+          ? error.message
+          : isCorrectionResubmission
+            ? "Не удалось отправить исправления"
+            : "Не удалось отправить анкету",
       );
       throw error;
     } finally {
@@ -3679,8 +4010,11 @@ export function FigmaQuestionnaireScreen({
       const revision = autosaveRevisionRef.current;
       try {
         await enqueueDraftSave(completionPayload("navigation"), revision);
-      } catch {
-        return;
+      } catch (error) {
+        setSaveStatus("error");
+        setSaveMessage(
+          error instanceof Error ? error.message : "Не удалось сохранить анкету",
+        );
       }
     }
 
@@ -3700,6 +4034,17 @@ export function FigmaQuestionnaireScreen({
             description="Главная страница загранпаспорта с фото"
             file={requiredFileForActiveApplicant("passport_scan")}
             fileType="passport_scan"
+            focused={
+              focusedFileTarget?.fileId ===
+                requiredFileForActiveApplicant("passport_scan")?.id ||
+              focusedFileTarget?.fileType === "passport_scan"
+            }
+            issue={questionnaireFileIssue(
+              draftSubmission.issues,
+              activeApplicant,
+              requiredFileForActiveApplicant("passport_scan"),
+              "passport_scan",
+            )}
             label="Загранпаспорт"
             onUploadFile={onUploadFile}
             submission={draftSubmission}
@@ -3708,6 +4053,16 @@ export function FigmaQuestionnaireScreen({
             description="Фото анфас"
             file={requiredFileForActiveApplicant("selfie")}
             fileType="selfie"
+            focused={
+              focusedFileTarget?.fileId === requiredFileForActiveApplicant("selfie")?.id ||
+              focusedFileTarget?.fileType === "selfie"
+            }
+            issue={questionnaireFileIssue(
+              draftSubmission.issues,
+              activeApplicant,
+              requiredFileForActiveApplicant("selfie"),
+              "selfie",
+            )}
             label="Селфи 1"
             onUploadFile={onUploadFile}
             submission={draftSubmission}
@@ -3716,6 +4071,17 @@ export function FigmaQuestionnaireScreen({
             description="Фото в профиль"
             file={requiredFileForActiveApplicant("selfie_2")}
             fileType="selfie_2"
+            focused={
+              focusedFileTarget?.fileId ===
+                requiredFileForActiveApplicant("selfie_2")?.id ||
+              focusedFileTarget?.fileType === "selfie_2"
+            }
+            issue={questionnaireFileIssue(
+              draftSubmission.issues,
+              activeApplicant,
+              requiredFileForActiveApplicant("selfie_2"),
+              "selfie_2",
+            )}
             label="Селфи 2"
             onUploadFile={onUploadFile}
             submission={draftSubmission}
@@ -3834,21 +4200,45 @@ export function FigmaQuestionnaireScreen({
             value={formData.passportIssued}
             onChange={updatePassportIssueDate}
           />
-          <FormField
-            excelMap="Cell: C5"
-            errorMessage={fieldErrorMessage("passport-expiry-date", "Действителен до")}
-            focused={
-              fieldReviewState("passport-expiry-date", "Действителен до") ===
-              "needs_review"
-            }
-            label="Действителен до"
-            modelFieldId="passport-expiry-date"
-            number="4"
-            reviewSource={fieldReviewSource("passport-expiry-date", "Действителен до")}
-            state={fieldReviewState("passport-expiry-date", "Действителен до")}
-            value={formData.passportExpiry}
-            onChange={(value) => updateField("passportExpiry", value)}
-          />
+          <div className="v19-questionnaire-passport-validity-cell">
+            <FormField
+              excelMap="Cell: C5"
+              errorMessage={fieldErrorMessage("passport-expiry-date", "Действителен до")}
+              focused={
+                fieldReviewState("passport-expiry-date", "Действителен до") ===
+                "needs_review"
+              }
+              label="Действителен до"
+              modelFieldId="passport-expiry-date"
+              number="4"
+              reviewSource={fieldReviewSource("passport-expiry-date", "Действителен до")}
+              state={fieldReviewState("passport-expiry-date", "Действителен до")}
+              value={formData.passportExpiry}
+              onChange={(value) => updateField("passportExpiry", value)}
+            />
+            {passportExpiryFromIssueDate(formData.passportIssued) ? (
+              <div aria-label="Срок действия паспорта" role="group">
+                {[5, 10].map((validityYears) => {
+                  const expiry = passportExpiryFromIssueDate(
+                    formData.passportIssued,
+                    validityYears,
+                  );
+                  return (
+                    <button
+                      aria-pressed={formData.passportExpiry === expiry}
+                      className="v19-questionnaire-draft-button v19-questionnaire-passport-validity-option"
+                      disabled={!isEditable}
+                      key={validityYears}
+                      type="button"
+                      onClick={() => applyPassportValidityYears(validityYears as 5 | 10)}
+                    >
+                      {validityYears} лет
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
           <FormField
             excelMap="Анкета: passport-issue-country"
             label="Страна выдачи"
@@ -3927,6 +4317,7 @@ export function FigmaQuestionnaireScreen({
             modelFieldId="contact-number"
             number="3"
             phonePrefix="+7"
+            placeholder="900 000-00-00"
             value={formData.contactPhone}
             onChange={(value) => updateField("contactPhone", value)}
           />
@@ -4117,7 +4508,7 @@ export function FigmaQuestionnaireScreen({
             reviewSource={fieldReviewSource("arrival-date", "Дата въезда")}
             state={fieldReviewState("arrival-date", "Дата въезда")}
             value={formData.travelStart}
-            onChange={(value) => updateField("travelStart", value)}
+            onChange={(value) => updateTravelDate("travelStart", value)}
           />
           <FormField
             excelMap="Cell: F4"
@@ -4131,16 +4522,17 @@ export function FigmaQuestionnaireScreen({
             reviewSource={fieldReviewSource("departure-date", "Дата выезда")}
             state={fieldReviewState("departure-date", "Дата выезда")}
             value={formData.travelEnd}
-            onChange={(value) => updateField("travelEnd", value)}
+            onChange={(value) => updateTravelDate("travelEnd", value)}
           />
           <FormField
             excelMap="Анкета: stay-duration"
             label="Длительность пребывания"
             modelFieldId="stay-duration"
             number="8"
+            hint="Рассчитывается автоматически по датам въезда и выезда"
+            readOnly
             type="number"
             value={formData.stayDuration}
-            onChange={(value) => updateField("stayDuration", value)}
           />
           <FormField
             excelMap="Анкета: previous-biometrics"
@@ -4453,9 +4845,11 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: B5"
             errorMessage={fieldErrorMessage("birth-place", "Место рождения")}
+            hint="Для рождения до 06.09.1991 Санкт-Петербург подставляется как LENINGRAD; сверяйте с загранпаспортом"
             label="Место рождения"
             modelFieldId="birth-place"
             number="5"
+            onBlur={normalizeBirthPlaceField}
             reviewSource={fieldReviewSource("birth-place", "Место рождения")}
             state={fieldReviewState("birth-place", "Место рождения")}
             value={formData.birthPlace}
@@ -4549,6 +4943,7 @@ export function FigmaQuestionnaireScreen({
     focused: (fieldId) =>
       initialFieldTarget?.fieldId === fieldId &&
       (initialFocus?.applicantId ?? activeApplicant) === activeApplicant,
+    revealRequiredErrors,
     required: fieldIsRequired,
     reviewSource: fieldReviewSource,
     state: fieldReviewState,
@@ -4561,6 +4956,7 @@ export function FigmaQuestionnaireScreen({
     readinessStats.completionReason ??
     sections.find((section) => section.id === mobileBlockerTarget?.sectionId)?.title ??
     "Следующее обязательное поле";
+  const mobileBlockerReason = mobileBlockerTarget?.reason?.trim();
 
   return (
     <motion.div
@@ -4612,15 +5008,14 @@ export function FigmaQuestionnaireScreen({
             {saveStatus === "saving" ? "Сохраняем" : "Черновик"}
           </button>
           <button
-            className={`v19-questionnaire-complete-button ${readinessStats.canSubmit ? "is-ready" : "is-blocked"}`}
-            disabled={
-              !isEditable || isCompleteButtonDisabled || saveStatus === "saving"
-            }
+            aria-label={completeActionLabel}
+            className={`v19-questionnaire-complete-button ${readinessStats.canSubmit ? "is-ready" : "is-blocked"}${isCorrectionResubmission ? " is-correction-submit" : ""}`}
+            disabled={!isEditable || saveStatus === "saving"}
             type="button"
             onClick={() => void completeFromButton().catch(() => undefined)}
           >
-            <span className="hidden sm:inline">Готово к проверке</span>
-            <span className="sm:hidden">Готово</span>
+            <span className="hidden sm:inline">{completeActionLabel}</span>
+            <span className="sm:hidden">{completeActionMobileLabel}</span>
           </button>
         </div>
       </header>
@@ -4659,7 +5054,7 @@ export function FigmaQuestionnaireScreen({
             type="button"
             onClick={focusFirstBlocker}
           >
-            {mobileBlockerLabel}
+            К блокеру
           </button>
         ) : null}
       </div>
@@ -4821,7 +5216,7 @@ export function FigmaQuestionnaireScreen({
                 />
                 <div
                   aria-live="polite"
-                  className="text-[var(--v19b-size-11)] text-white/42"
+                  className="v19-questionnaire-sidebar-status"
                   role="status"
                 >
                   {fieldSearchQuery.trim()
@@ -4832,14 +5227,14 @@ export function FigmaQuestionnaireScreen({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    className="v19-questionnaire-draft-button"
+                    className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
                     type="button"
                     onClick={focusNextIncomplete}
                   >
                     Следующее поле
                   </button>
                   <button
-                    className="v19-questionnaire-draft-button"
+                    className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
                     disabled={readinessStats.canSubmit}
                     type="button"
                     onClick={focusFirstBlocker}
@@ -4905,6 +5300,22 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel">
+              {!readinessStats.canSubmit && !currentSectionIssue ? (
+                <button
+                  aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}`}
+                  className="v19-questionnaire-next-blocker"
+                  data-testid="questionnaire-next-blocker"
+                  type="button"
+                  onClick={focusFirstBlocker}
+                >
+                  <AlertCircle aria-hidden="true" className="w-4 h-4" />
+                  <span>
+                    Сначала: <strong>{mobileBlockerLabel}</strong>
+                    {mobileBlockerReason ? ` — ${mobileBlockerReason}` : ""}
+                  </span>
+                  <ArrowRight aria-hidden="true" className="w-4 h-4" />
+                </button>
+              ) : null}
               {currentSectionIssue ? (
                 <div
                   aria-atomic={
@@ -5020,7 +5431,7 @@ export function FigmaQuestionnaireScreen({
                     {familyCopyMessage ? (
                       <p
                         aria-live="polite"
-                        className="text-[var(--v19b-size-11)] text-white/50"
+                        className="v19-questionnaire-family-copy-status"
                         id={familyCopyStatusId}
                         role="status"
                       >

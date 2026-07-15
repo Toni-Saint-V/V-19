@@ -636,7 +636,7 @@ export function DraftsScreen({
         onChange={handleBulkFileInput}
       />
 
-      <V19SummaryTileGrid className="grid-cols-3">
+      <V19SummaryTileGrid className="v19-documents-summary-grid grid-cols-3">
         <V19SummaryTile
           active={draftSummaryFilter === 'missing'}
           detail={`ожидают · ${summary.submissions}`}

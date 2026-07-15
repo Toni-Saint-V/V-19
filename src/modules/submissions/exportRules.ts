@@ -13,6 +13,7 @@ import {
   canonicalRequiredMediaReadiness,
   normalizeLegacySubmissionStatus,
 } from "./domainContract";
+import { passportGateIssues } from "./passportExtractionGuards";
 import { hasUsableTripDateRange } from "./status";
 import {
   buildExportContractRows,
@@ -103,6 +104,9 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   const missingTripDateRange = submissions.filter(
     (submission) => !hasUsableTripDateRange(submission),
   );
+  const submissionsWithPassportGateIssues = submissions.filter(
+    (submission) => passportGateIssues(submission).length > 0,
+  );
   const rows = buildExportRows(submissions);
   const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
   const applicantsWithIncompleteVisaForm = submissions.flatMap((submission) =>
@@ -142,6 +146,12 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
 
   if (missingTripDateRange.length > 0) {
     blockers.push({ reason: "В выборке есть подачи без дат поездки" });
+  }
+
+  if (submissionsWithPassportGateIssues.length > 0) {
+    blockers.push({
+      reason: "В выборке есть подачи с непроверенным или некорректным паспортом",
+    });
   }
 
   if (rowsWithMissingApplicantName.length > 0) {

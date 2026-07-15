@@ -10,6 +10,7 @@ import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type { ExportPackageDocumentCommit } from "../../src/modules/submissions/exportPackageDocumentCommit";
 import type { Submission } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const createdAt = "2026-06-16T09:00:00.000Z";
 const createdBy = "00000000-0000-4000-8000-000000000010";
@@ -42,7 +43,9 @@ function canonicalMediaSubmission(submission: Submission): Submission {
 }
 
 function readySubmission(): Submission {
-  return canonicalMediaSubmission(byId("ПД-1056"));
+  return fillRequiredQuestionnaireForTest(
+    canonicalMediaSubmission(byId("ПД-1056")),
+  );
 }
 
 function downloadedSelection(): Submission[] {

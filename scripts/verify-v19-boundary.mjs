@@ -23,6 +23,7 @@ const forbiddenRuntimeRoots = [
 ];
 const promotedRuntimeFiles = [
   path.join(root, "src/assets/v-logo-premium-black-style.png"),
+  path.join(root, "src/assets/v-logo-premium-black-style.webp"),
   path.join(root, "src/assets/visaflow-logo.png"),
   path.join(root, "src/lib/export/exportContractCore.ts"),
   path.join(root, "src/lib/export/blsExcelTemplate.ts"),

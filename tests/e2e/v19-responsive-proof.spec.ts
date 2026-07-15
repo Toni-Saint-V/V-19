@@ -148,6 +148,37 @@ async function expectSettingsReady(page: Page) {
   await expect(page.getByRole("switch", { name: "Возврат подачи" })).toBeVisible();
 }
 
+async function selectAdminReviewLane(page: Page, name: "Ревью" | "Правки") {
+  const lane = page.getByRole("button", { name, exact: true });
+
+  await expect(lane).toBeVisible({ timeout: 5_000 });
+  await lane.click();
+  await expect(lane).toHaveAttribute("aria-pressed", "true");
+}
+
+async function selectReadyExportPackage(page: Page) {
+  const packageCheckbox = page.getByRole("checkbox", { name: /^Выбрать / }).first();
+
+  await expect(packageCheckbox).toBeEnabled();
+  await packageCheckbox.check();
+  await expect(packageCheckbox).toBeChecked();
+
+  const controlRail = page.locator('aside[aria-label="Контроль пакета"]');
+  if (!(await controlRail.isVisible())) {
+    const controlToggle = page
+      .getByRole("button", { name: /^Контроль пакета/ })
+      .first();
+    await expect(controlToggle).toBeVisible();
+    await controlToggle.click();
+  }
+
+  await expect(controlRail).toBeVisible();
+  return controlRail
+    .locator("button")
+    .filter({ hasText: /^Сформировать\s+Excel$/ })
+    .first();
+}
+
 test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
@@ -237,33 +268,25 @@ test.describe("V-19 responsive proof", () => {
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
       await screenshot(page, viewport, "admin-review");
 
-      await page.getByRole("tab", { name: /К проверке/ }).click();
+      await selectAdminReviewLane(page, "Ревью");
       await expect(
         page.getByRole("heading", { level: 1, name: "Проверка" }),
       ).toBeVisible();
-      await expect(page.getByRole("tab", { name: /К проверке/ })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
       await expectNoHorizontalDocumentOverflow(
         page,
         `${viewport.label}: admin review tab`,
       );
       await screenshot(page, viewport, "admin-review-tab");
 
-      await page.getByRole("tab", { name: /Исправления/ }).click();
-      await expect(page.getByRole("tab", { name: /Исправления/ })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      await selectAdminReviewLane(page, "Правки");
       await expectNoHorizontalDocumentOverflow(
         page,
         `${viewport.label}: admin corrections tab`,
       );
       await screenshot(page, viewport, "admin-corrections-tab");
 
-      await page.getByRole("tab", { name: /К проверке/ }).click();
-      await expect(page.locator(".v17-admin-work-row, .v17-admin-empty-state").first()).toBeVisible();
+      await selectAdminReviewLane(page, "Ревью");
+      await expect(page.locator(".v19-admin-review-card").first()).toBeVisible();
       await expect(
         page.getByRole("heading", { level: 1, name: "Проверка" }),
       ).toBeVisible();
@@ -273,8 +296,8 @@ test.describe("V-19 responsive proof", () => {
       );
       await screenshot(page, viewport, "admin-review-filter");
 
-      await page.getByRole("tab", { name: /Исправления/ }).click();
-      await expect(page.locator(".v17-admin-work-row, .v17-admin-empty-state").first()).toBeVisible();
+      await selectAdminReviewLane(page, "Правки");
+      await expect(page.locator(".v19-admin-review-card").first()).toBeVisible();
       await expectNoHorizontalDocumentOverflow(
         page,
         `${viewport.label}: admin corrections filter`,
@@ -284,31 +307,10 @@ test.describe("V-19 responsive proof", () => {
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
-      const generateButton = page
-        .getByRole("button", { name: "Сформировать Excel" })
-        .first();
-      if (!(await generateButton.isVisible().catch(() => false))) {
-        const choosePackageButton = page
-          .getByRole("button", { name: "Выбрать пакет" })
-          .first();
-        const openContractButton = page
-          .getByRole("button", { name: "Открыть контракт выгрузки" })
-          .first();
-
-        if (await choosePackageButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
-          await expect(choosePackageButton).toBeVisible();
-        } else if (
-          await openContractButton.isVisible({ timeout: 1_000 }).catch(() => false)
-        ) {
-          await openContractButton.click();
-          await expect(generateButton).toBeVisible();
-        } else {
-          await expect(generateButton).toBeVisible();
-        }
-      } else {
-        await generateButton.scrollIntoViewIfNeeded();
-        await expect(generateButton).toBeVisible();
-      }
+      const generateButton = await selectReadyExportPackage(page);
+      await generateButton.scrollIntoViewIfNeeded();
+      await expect(generateButton).toBeEnabled();
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: selected export`);
       await screenshot(page, viewport, "export");
     }
 

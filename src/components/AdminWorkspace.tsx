@@ -255,6 +255,7 @@ export function AdminWorkspace({
   const reviewDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
+  const adminFileAcceptPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
   const pendingAccessRequestCount = accessRequests.filter(
     (request) => request.status === "pending",
@@ -276,7 +277,9 @@ export function AdminWorkspace({
 
   const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
+  const [reviewApplicantId, setReviewApplicantId] = useState<string>();
   const [remarkContext, setRemarkContext] = useState<{
+    applicantId?: string;
     field?: string;
     fileType?: SubmissionFileType;
     applicant?: string;
@@ -328,12 +331,15 @@ export function AdminWorkspace({
     setAdminDrawerOpen(true);
   };
 
-  const handleVerifyDocument = () => {
+  const handleVerifyDocument = (applicantId?: string) => {
     bridge.onVerifyDocument?.(selectedRow);
     emitVisaflowUiEvent(bridge, {
       type: "admin.document.verify",
       submissionId: selectedRow,
     });
+    setReviewApplicantId(
+      applicantId ?? selectedSubmission?.applicants[0]?.id,
+    );
     setAdminDrawerOpen(false);
     setCurrentView("review_workspace");
   };
@@ -347,11 +353,12 @@ export function AdminWorkspace({
     field?: string,
     applicant?: string,
     fileType?: SubmissionFileType,
+    applicantId?: string,
   ) => {
-    const payload = { submissionId: selectedRow, field, fileType, applicant };
+    const payload = { submissionId: selectedRow, applicantId, field, fileType, applicant };
     bridge.onRemarkOpen?.(payload);
     emitVisaflowUiEvent(bridge, { type: "remark.open", payload });
-    setRemarkContext({ field, fileType, applicant });
+    setRemarkContext({ applicantId, field, fileType, applicant });
     setRemarkFormOpen(true);
   };
 
@@ -430,6 +437,36 @@ export function AdminWorkspace({
     }
   };
 
+  const handleReviewFileAccept = async (input: {
+    applicantId: string;
+    fileType: SubmissionFileType;
+  }): Promise<boolean> => {
+    if (!selectedRow || adminFileAcceptPendingRef.current) return false;
+    const payload = { submissionId: selectedRow, ...input };
+    setAdminAsyncError("");
+
+    if (!bridge.onAdminFileAccept) {
+      setAdminAsyncError(
+        "Подтверждение файла недоступно: обработчик сохранения не подключён. Состояние подачи не изменено.",
+      );
+      return false;
+    }
+
+    adminFileAcceptPendingRef.current = true;
+    try {
+      await bridge.onAdminFileAccept(payload);
+      emitVisaflowUiEvent(bridge, { type: "admin.file.accept", payload });
+      return true;
+    } catch {
+      setAdminAsyncError(
+        "Не удалось подтвердить файл. Состояние подачи не изменено. Повторите попытку.",
+      );
+      return false;
+    } finally {
+      adminFileAcceptPendingRef.current = false;
+    }
+  };
+
   const handleSignOut = () => {
     if (signOutPendingRef.current) return;
     setAdminAsyncError("");
@@ -451,6 +488,7 @@ export function AdminWorkspace({
   };
 
   const handleRemarkSubmit = async (input: {
+    applicantId?: string;
     field?: string;
     fileType?: SubmissionFileType;
     applicant?: string;
@@ -458,9 +496,13 @@ export function AdminWorkspace({
     severity: "warning" | "critical";
   }): Promise<boolean> => {
     if (!selectedSubmission) return false;
-    const applicant =
-      selectedSubmission.applicants.find((item) => item.fullName === input.applicant) ??
-      selectedSubmission.applicants[0];
+    const applicant = input.applicantId
+      ? selectedSubmission.applicants.find((item) => item.id === input.applicantId)
+      : input.applicant
+        ? selectedSubmission.applicants.find((item) => item.fullName === input.applicant)
+        : selectedSubmission.applicants.length === 1
+          ? selectedSubmission.applicants[0]
+          : undefined;
     if (!applicant) return false;
 
     return handleAddIssue({
@@ -690,10 +732,14 @@ export function AdminWorkspace({
       ) : null}
       {currentView === "review_workspace" && selectedRow && (
         <ReviewWorkspace
+          applicantId={reviewApplicantId}
           submissionId={selectedRow}
           submission={selectedSubmission}
           onBack={handleBackToDrawer}
-          onAddRemark={(field) => handleOpenRemark(field)}
+          onAcceptFile={handleReviewFileAccept}
+          onAddRemark={(field, applicant, fileType, applicantId) =>
+            handleOpenRemark(field, applicant, fileType, applicantId)
+          }
         />
       )}
 
@@ -719,6 +765,7 @@ export function AdminWorkspace({
         defaultField={remarkContext.field}
         defaultFileType={remarkContext.fileType}
         defaultApplicant={remarkContext.applicant}
+        defaultApplicantId={remarkContext.applicantId}
         onSubmit={handleRemarkSubmit}
       />
 

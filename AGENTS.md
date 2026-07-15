@@ -139,6 +139,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 
 ## Verification
 - Use targeted proof first: file inspection, focused scripts/tests, typecheck/build when relevant, browser/runtime proof for UI, screenshots under `docs/qa/`.
+- For UI/browser acceptance, exercise the full claimed flow through real browser clicks, taps, typing, uploads, and downloads. Capture fresh screenshots after the latest code change in a new per-run folder under `docs/qa/`, with a step description and a strict UI assessment. Unit tests are regression support, not a substitute for UI evidence.
 - Release/security gates: `npm run verify:security` or `npm run verify:full` only when risk requires it.
 - Do not claim done while relevant tests fail or product-ready proof is incomplete.
 

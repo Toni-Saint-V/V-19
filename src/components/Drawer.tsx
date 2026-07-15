@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
 import type { Submission as CanonicalSubmission, SubmissionAction } from '../modules/submissions/types';
+import { fileTypeLabels } from '../modules/submissions/status';
 import { actionGate } from './v19BusinessScreenAdapter';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -36,6 +37,37 @@ export interface SubmissionDetail {
   issues: CanonicalSubmission['issues'];
   history: CanonicalSubmission['history'];
   isDemo: boolean;
+}
+
+function tripDatesLabel(from: string, to: string) {
+  if (from && to) return `${from} — ${to}`;
+  if (from) return `С ${from}`;
+  if (to) return `До ${to}`;
+  return 'Даты не указаны';
+}
+
+function updatedLabel(updatedAt: string) {
+  const parsed = new Date(updatedAt);
+  if (Number.isNaN(parsed.getTime())) return updatedAt || 'недавно';
+  return parsed.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function historyPresentation(event: CanonicalSubmission['history'][number]) {
+  if (event.text.startsWith('Файл загружен') || event.text.startsWith('Файл заменён')) {
+    return { icon: UploadCloud, tone: 'document', label: 'Документ' } as const;
+  }
+  if (event.text.startsWith('Статус изменён') || event.fromStatus || event.toStatus) {
+    return { icon: CheckCircle2, tone: 'status', label: 'Статус' } as const;
+  }
+  if (event.source === 'system') {
+    return { icon: ShieldAlert, tone: 'system', label: 'Система' } as const;
+  }
+  return { icon: FileText, tone: 'activity', label: 'Действие' } as const;
 }
 
 interface DrawerProps {
@@ -88,56 +120,50 @@ const Skeleton = ({ className }: { className?: string }) => (
 const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
   switch (status) {
     case 'in_progress':
-      return <span className="v19-submission-drawer-status inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><Clock className="w-3.5 h-3.5" /> В работе</span>;
+      return <span className="v19-submission-drawer-status is-in-progress inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><Clock className="w-3.5 h-3.5" /> В работе</span>;
     case 'returned':
-      return <span className="v19-submission-drawer-status inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[11px] font-medium uppercase tracking-wide"><AlertCircle className="w-3.5 h-3.5" /> Возвращено (Ошибки)</span>;
+      return <span className="v19-submission-drawer-status is-returned inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[11px] font-medium uppercase tracking-wide"><AlertCircle className="w-3.5 h-3.5" /> Возвращено (Ошибки)</span>;
     case 'submitted_for_review':
-      return <span className="v19-submission-drawer-status inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><ShieldAlert className="w-3.5 h-3.5" /> На проверке</span>;
+      return <span className="v19-submission-drawer-status is-review inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><ShieldAlert className="w-3.5 h-3.5" /> На проверке</span>;
     case 'ready_for_export':
-      return <span className="v19-submission-drawer-status inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><CheckCircle2 className="w-3.5 h-3.5" /> Готово к выгрузке</span>;
+      return <span className="v19-submission-drawer-status is-ready inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><CheckCircle2 className="w-3.5 h-3.5" /> Готово к выгрузке</span>;
     default:
-      return <span className="v19-submission-drawer-status inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-[11px] font-medium uppercase tracking-wide"><FileText className="w-3.5 h-3.5" /> Черновик</span>;
+      return <span className="v19-submission-drawer-status is-draft inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-[11px] font-medium uppercase tracking-wide"><FileText className="w-3.5 h-3.5" /> Черновик</span>;
   }
 };
 
 // --- Sub-components for Tabs ---
 const OverviewTab = ({ data }: { data: SubmissionDetail }) => (
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="v19-submission-drawer-card bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
-        <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-5">Маршрут и подача</h3>
-        <div className="space-y-4 text-sm">
-          <div className="flex gap-4">
-            <Calendar className="w-5 h-5 text-white/30 shrink-0" />
-            <div>
-              <div className="text-white/90 font-medium">{data.tripDates}</div>
-              <div className="text-white/40 text-[11px] mt-0.5">Даты поездки</div>
-            </div>
+  <div className="v19-submission-drawer-overview">
+    <div className="v19-submission-drawer-overview-grid">
+      <section className="v19-submission-drawer-card v19-submission-drawer-overview-card" aria-labelledby="drawer-route-title">
+        <h3 id="drawer-route-title">Маршрут и подача</h3>
+        <dl className="v19-submission-drawer-route-list">
+          <div className={data.tripDates === 'Даты не указаны' ? 'is-missing' : undefined}>
+            <Calendar aria-hidden="true" />
+            <div><dt>Даты поездки</dt><dd>{data.tripDates}</dd></div>
           </div>
-          <div className="flex gap-4">
-            <MapPin className="w-5 h-5 text-white/30 shrink-0" />
-            <div>
-              <div className="text-white/90 font-medium">{data.city}</div>
-              <div className="text-white/40 text-[11px] mt-0.5">Визовый центр подачи</div>
-            </div>
+          <div>
+            <MapPin aria-hidden="true" />
+            <div><dt>Визовый центр подачи</dt><dd>{data.city}</dd></div>
           </div>
-        </div>
-      </div>
+        </dl>
+      </section>
 
-      <div className="v19-submission-drawer-card bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Чеклист документов</h3>
-          <span className="text-[11px] font-mono text-[#b8baff] font-medium bg-white/[0.045] px-2 py-0.5 rounded-md">{data.documents.filter((document) => document.status === 'done').length}/{data.documents.length}</span>
-        </div>
-        <div className="space-y-3 flex-1 flex flex-col justify-center">
+      <section className="v19-submission-drawer-card v19-submission-drawer-overview-card" aria-labelledby="drawer-documents-title">
+        <header>
+          <h3 id="drawer-documents-title">Чеклист документов</h3>
+          <span aria-label={`Готово документов: ${data.documents.filter((document) => document.status === 'done').length} из ${data.documents.length}`}>{data.documents.filter((document) => document.status === 'done').length}/{data.documents.length}</span>
+        </header>
+        <div className="v19-submission-drawer-document-list">
           {data.documents.length > 0 ? data.documents.slice(0, 4).map((doc, i) => (
-            <div key={i} className="flex items-center gap-3">
+            <div key={i} className={doc.status === 'done' ? 'is-ready' : undefined}>
               {doc.status === 'done' ? (
-                <CheckCircle2 className="w-4 h-4 text-[#b8baff]" />
+                <CheckCircle2 aria-hidden="true" />
               ) : (
-                <div className="w-4 h-4 rounded-full border border-white/20" />
+                <i aria-hidden="true" />
               )}
-              <span className={`text-[13px] ${doc.status === 'done' ? 'text-white/70' : 'text-white'}`}>{doc.label}</span>
+              <span>{doc.label}</span>
             </div>
           )) : (
             <div className="v19-submission-drawer-empty is-compact">
@@ -147,12 +173,12 @@ const OverviewTab = ({ data }: { data: SubmissionDetail }) => (
             </div>
           )}
         </div>
-      </div>
+      </section>
     </div>
 
     <section className="v19-submission-drawer-summary" aria-label="Сводка по подаче">
       <div><span>Заявителей</span><strong>{data.applicantsCount}</strong></div>
-      <div><span>Общая готовность</span><strong>{data.completeness}%</strong></div>
+      <div className="v19-submission-drawer-completeness"><span>Общая готовность</span><strong>{data.completeness}%</strong><i aria-hidden="true"><b style={{ width: `${data.completeness}%` }} /></i></div>
       <div><span>Ответственный</span><strong>{data.owner}</strong></div>
     </section>
   </div>
@@ -260,31 +286,31 @@ const FilesTab = ({ data, onOpenDocuments }: { data: SubmissionDetail; onOpenDoc
 
 function getIssuesEmptyCopy(status: SubmissionStatus) {
   if (status === 'draft' || status === 'in_progress') {
-    return { title: 'Замечаний пока нет', description: 'Подача ещё не отправлялась на проверку.' };
+    return { title: 'Замечаний пока нет', description: 'Подача ещё не отправлялась на проверку.', stage: 'До первой проверки', tone: 'awaiting' };
   }
   if (status === 'submitted_for_review' || status === 'corrections_received') {
-    return { title: 'Проверка продолжается', description: 'Открытых замечаний пока нет.' };
+    return { title: 'Проверка продолжается', description: 'Открытых замечаний пока нет.', stage: 'На проверке', tone: 'review' };
   }
   if (status === 'ready_for_export' || status === 'exported') {
-    return { title: 'Открытых замечаний нет', description: 'Проверка завершена, подача готова к следующему этапу.' };
+    return { title: 'Открытых замечаний нет', description: 'Проверка завершена, подача готова к следующему этапу.', stage: 'Проверка завершена', tone: 'complete' };
   }
-  return { title: 'Открытых замечаний нет', description: 'Все замечания исправлены или закрыты.' };
+  return { title: 'Открытых замечаний нет', description: 'Все замечания исправлены или закрыты.', stage: 'Все задачи закрыты', tone: 'complete' };
 }
 
 const IssuesTab = ({ data, onOpenQuestionnaire }: { data: SubmissionDetail, onOpenQuestionnaire?: () => void }) => {
   const emptyCopy = getIssuesEmptyCopy(data.status);
   return (
-  <div className="space-y-6">
-    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+  <div className="v19-submission-drawer-issues">
+    <div className="v19-submission-drawer-issues-heading">
       <div>
-        <h3 className="text-[16px] font-semibold text-white">Список задач по замечаниям</h3>
-        <p className="text-[12px] text-white/50 mt-1">
+        <h3>Список задач по замечаниям</h3>
+        <p>
           {data.status === 'draft' || data.status === 'in_progress'
             ? 'Задачи появятся после первой проверки администратором'
             : 'Замечания, выявленные администратором при проверке'}
         </p>
       </div>
-      <div className="px-3 py-1 bg-white/[0.045] text-white/62 rounded-lg text-[12px] font-medium border border-white/10">
+      <div className="v19-submission-drawer-issues-count">
         Требуют исправления: {data.issuesCount}
       </div>
     </div>
@@ -320,16 +346,17 @@ const IssuesTab = ({ data, onOpenQuestionnaire }: { data: SubmissionDetail, onOp
         ))}
       </div>
     ) : (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-16 h-16 bg-white/[0.045] rounded-full flex items-center justify-center mb-4 border border-white/10">
-          <CheckCircle2 className="w-8 h-8 text-[#b8baff]" />
+      <section className={`v19-submission-drawer-issues-empty is-${emptyCopy.tone}`} aria-labelledby="drawer-issues-empty-title">
+        <div className="v19-submission-drawer-issues-empty-icon" aria-hidden="true">
+          {emptyCopy.tone === 'awaiting' || emptyCopy.tone === 'review' ? <Clock /> : <CheckCircle2 />}
         </div>
-        <h4 className="text-[16px] font-semibold text-white mb-2">{emptyCopy.title}</h4>
-        <p className="text-[13px] text-white/50 max-w-sm">{emptyCopy.description}</p>
-      </div>
+        <span className="v19-submission-drawer-issues-empty-stage" role="status">{emptyCopy.stage}</span>
+        <h4 id="drawer-issues-empty-title">{emptyCopy.title}</h4>
+        <p>{emptyCopy.description}</p>
+      </section>
     )}
   </div>
-  );
+);
 };
 
 
@@ -348,15 +375,15 @@ function detailFromCanonicalSubmission(submission: CanonicalSubmission): Submiss
         : submission.completeness.questionnaire,
     })),
     city: submission.city,
-    tripDates: `${submission.tripDateFrom || 'не указано'} – ${submission.tripDateTo || 'не указано'}`,
+    tripDates: tripDatesLabel(submission.tripDateFrom, submission.tripDateTo),
     status: submission.status === 'requires_action' ? 'returned' : submission.status,
     completeness: submission.completeness.total,
-    updated: new Date(submission.updatedAt).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+    updated: updatedLabel(submission.updatedAt),
     owner: submission.agentId,
     issuesCount: submission.issues.filter((issue) => issue.status !== 'closed_by_admin').length,
     documents: submission.files.map((file) => ({
       applicantName: submission.applicants.find((applicant) => applicant.id === file.applicantId)?.fullName ?? 'Подача',
-      label: file.originalFileName || file.generatedFileName || file.type.replaceAll('_', ' '),
+      label: fileTypeLabels[file.type],
       status: file.status === 'accepted' ? 'done' : 'pending',
     })),
     issues: submission.issues.filter((issue) => issue.status !== 'closed_by_admin'),
@@ -366,24 +393,29 @@ function detailFromCanonicalSubmission(submission: CanonicalSubmission): Submiss
 }
 
 const HistoryTab = ({ data }: { data: SubmissionDetail }) => data.history.length > 0 ? (
-  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-white/10">
-    {data.history.map((event) => (
-      <div key={event.id} className="relative flex gap-5">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10 border-white/10">
-          <History className="w-4 h-4 text-white/60" />
-        </div>
-        <div className="pt-1.5">
-          <div className="text-[14px] font-medium text-white/90">{event.text}</div>
-          {event.detail || event.note ? <p className="text-[12px] text-white/50 mt-1">{event.detail || event.note}</p> : null}
-          <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
-            <span>{new Date(event.createdAt || event.at).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-            <span className="w-1 h-1 rounded-full bg-white/20" />
-            <span>{event.actorId || (event.source === 'system' ? 'Система' : 'Оператор')}</span>
+  <ol className="v19-submission-drawer-history" aria-label="История подачи">
+    {data.history.map((event) => {
+      const presentation = historyPresentation(event);
+      const EventIcon = presentation.icon;
+      return (
+        <li key={event.id} className={`v19-submission-drawer-history-item is-${presentation.tone}`}>
+          <div className="v19-submission-drawer-history-icon" aria-hidden="true">
+            <EventIcon />
           </div>
-        </div>
-      </div>
-    ))}
-  </div>
+          <div className="v19-submission-drawer-history-copy">
+            <span className="v19-submission-drawer-history-label">{presentation.label}</span>
+            <strong>{event.text}</strong>
+            {event.detail || event.note ? <p>{event.detail || event.note}</p> : null}
+            <div className="v19-submission-drawer-history-meta">
+              <time>{updatedLabel(event.createdAt || event.at)}</time>
+              <i aria-hidden="true" />
+              <span>{event.actorId || (event.source === 'system' ? 'Система' : 'Оператор')}</span>
+            </div>
+          </div>
+        </li>
+      );
+    })}
+  </ol>
 ) : (
   <div className="v19-submission-drawer-empty">
     <History aria-hidden="true" />
@@ -490,13 +522,13 @@ export function Drawer({
     }
   }, [allowDemoFallback, isOpen, submission, submissionId]);
 
-  const tabs: { id: TabId; label: string; getCount?: (d: SubmissionDetail) => number; isWarning?: boolean }[] = [
-    { id: 'overview', label: 'Обзор' },
-    { id: 'applicants', label: 'Заявители', getCount: (d) => d.applicantsCount },
-    { id: 'questionnaire', label: 'Анкета' },
-    { id: 'files', label: 'Файлы', getCount: (d) => d.documents.length },
-    { id: 'issues', label: 'Замечания', getCount: (d) => d.issuesCount, isWarning: true },
-    { id: 'history', label: 'История' }
+  const tabs: { id: TabId; label: string; getCount?: (d: SubmissionDetail) => number; isWarning?: boolean; tone: string }[] = [
+    { id: 'overview', label: 'Обзор', tone: 'overview' },
+    { id: 'applicants', label: 'Заявители', getCount: (d) => d.applicantsCount, tone: 'applicants' },
+    { id: 'questionnaire', label: 'Анкета', tone: 'questionnaire' },
+    { id: 'files', label: 'Файлы', getCount: (d) => d.documents.length, tone: 'files' },
+    { id: 'issues', label: 'Замечания', getCount: (d) => d.issuesCount, isWarning: true, tone: 'issues' },
+    { id: 'history', label: 'История', tone: 'history' }
   ];
 
   useEffect(() => {
@@ -709,7 +741,7 @@ export function Drawer({
 
                   {/* Tabs */}
                   <div className="v19-submission-drawer-tabs-scroll w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
-                    <div aria-label="Разделы подачи" className="flex items-center gap-1.5 w-max mb-[-1px]" onKeyDown={handleTabsKeyDown} role="tablist">
+                    <div aria-label="Разделы подачи" className="v19-submission-drawer-tabs flex items-center gap-1.5 w-max mb-[-1px]" onKeyDown={handleTabsKeyDown} role="tablist">
                       {tabs.map(tab => {
                         const count = tab.getCount ? tab.getCount(data) : 0;
                         const isActive = activeTab === tab.id;
@@ -723,20 +755,20 @@ export function Drawer({
                             role="tab"
                             tabIndex={isActive ? 0 : -1}
                             type="button"
-                            className={`relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap
+                            className={`v19-submission-drawer-tab is-${tab.tone} ${isActive ? 'is-active' : ''} relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap
                               ${isActive ? 'text-white' : 'text-white/50 hover:text-white/80'}
                             `}
                           >
                             <span>{tab.label}</span>
                             {count > 0 && (
-                              <span className={`px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${tab.isWarning ? 'bg-white/[0.06] text-white/62' : 'bg-white/10 text-white/70'}`}>
+                              <span className={`v19-submission-drawer-tab-count ${tab.isWarning ? 'is-warning' : ''} px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1`}>
                                 {count}
                               </span>
                             )}
                             {isActive && (
                               <motion.div
                                 layoutId="drawerAgentActiveTab"
-                                className="absolute bottom-0 inset-x-0 h-0.5 bg-white"
+                                className="v19-submission-drawer-tab-indicator absolute bottom-0 inset-x-0 h-0.5 bg-white"
                                 initial={false}
                                 transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
                               />
@@ -748,7 +780,7 @@ export function Drawer({
                   </div>
                 </header>
 
-                  <div className="v19-submission-drawer-body lg:flex-1 lg:overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10">
+                  <div className={`v19-submission-drawer-body is-${activeTab} lg:flex-1 lg:overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10`}>
                   <AnimatePresence mode="wait">
                     <motion.div
                       aria-label={tabs.find((tab) => tab.id === activeTab)?.label}

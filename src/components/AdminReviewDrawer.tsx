@@ -48,11 +48,12 @@ interface AdminReviewDrawerProps {
   submissionId: string | null;
   submission?: Submission | null;
   returnFocusTarget?: HTMLElement | null;
-  onVerifyDocument: () => void;
+  onVerifyDocument: (applicantId?: string) => void;
   onAddRemark: (
     field?: string,
     applicant?: string,
     fileType?: SubmissionFileType,
+    applicantId?: string,
   ) => void;
   onPrimaryAction?: (
     submissionId: string,
@@ -504,8 +505,13 @@ function QuestionnaireTab({
   onAddRemark,
 }: {
   submission: Submission | null;
-  onVerifyDocument: () => void;
-  onAddRemark: (field?: string, applicant?: string) => void;
+  onVerifyDocument: (applicantId?: string) => void;
+  onAddRemark: (
+    field?: string,
+    applicant?: string,
+    fileType?: SubmissionFileType,
+    applicantId?: string,
+  ) => void;
 }) {
   const [applicantId, setApplicantId] = useState("");
   const [isApplicantMenuOpen, setApplicantMenuOpen] = useState(false);
@@ -710,8 +716,10 @@ function QuestionnaireTab({
                     value={reviewValueFor(field)}
                     status={fieldStatus(field, applicantIssues)}
                     hasDocument={isPassportRelatedField(field)}
-                    onVerify={onVerifyDocument}
-                    onRemark={() => onAddRemark(field.label, applicant.fullName)}
+                    onVerify={() => onVerifyDocument(applicant.id)}
+                    onRemark={() =>
+                      onAddRemark(field.label, applicant.fullName, undefined, applicant.id)
+                    }
                   />
                 ))}
               </div>
@@ -791,7 +799,7 @@ function MediaTab({
                   data-testid="admin-review-verify-passport"
                   title="Открыть сверку паспорта"
                   type="button"
-                  onClick={onVerifyDocument}
+                  onClick={() => onVerifyDocument(applicant?.id ?? file.applicantId)}
                 >
                   <ScanText aria-hidden="true" />
                   <span>Сверить</span>
@@ -804,7 +812,12 @@ function MediaTab({
                 title="Добавить замечание к файлу"
                 type="button"
                 onClick={() =>
-                  onAddRemark(fileTypeLabels[file.type], applicant?.fullName, file.type)
+                  onAddRemark(
+                    fileTypeLabels[file.type],
+                    applicant?.fullName,
+                    file.type,
+                    file.applicantId,
+                  )
                 }
               >
                 <MessageSquarePlus className="h-4 w-4" />
@@ -951,8 +964,9 @@ export function AdminReviewDrawer({
 }: AdminReviewDrawerProps) {
   const bridge = useVisaflowBusinessBridge();
   const drawerRef = useRef<HTMLDivElement>(null);
+  const tabListRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>("questionnaire");
+  const [activeTab, setActiveTab] = useState<TabId>("media");
   const activeSubmissionId = submission?.id ?? submissionId;
   const primaryAction = useMemo(
     () => (submission ? getPrimaryAction(submission, "admin", "review") : null),
@@ -1053,8 +1067,15 @@ export function AdminReviewDrawer({
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab("questionnaire");
+      setActiveTab("media");
+      const animationFrame = window.requestAnimationFrame(() => {
+        tabListRef.current
+          ?.querySelector<HTMLElement>("[role='tab'][aria-selected='true']")
+          ?.scrollIntoView?.({ block: "nearest", inline: "center" });
+      });
+      return () => window.cancelAnimationFrame(animationFrame);
     }
+    return undefined;
   }, [isOpen, activeSubmissionId]);
 
   const tabs = useMemo<DrawerTabDefinition[]>(
@@ -1127,6 +1148,9 @@ export function AdminReviewDrawer({
   const selectTab = (tab: TabId) => {
     setActiveTab(tab);
     window.requestAnimationFrame(() => {
+      tabListRef.current
+        ?.querySelector<HTMLElement>("[role='tab'][aria-selected='true']")
+        ?.scrollIntoView?.({ block: "nearest", inline: "center" });
       const drawer = drawerRef.current;
       if (!drawer) return;
       if (typeof drawer.scrollTo === "function") {
@@ -1214,6 +1238,7 @@ export function AdminReviewDrawer({
               <div
                 aria-label="Разделы проверки"
                 className="admin-review-tabs relative -mx-5 w-full overflow-visible px-5 lg:mx-0 lg:px-0"
+                ref={tabListRef}
                 role="tablist"
               >
                 <div className="mb-[-1px] flex min-w-0 w-full items-center gap-1.5">

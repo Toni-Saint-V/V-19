@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const suiteDir = path.join(root, "tests/e2e-supabase-ui");
+const suiteEntryPath = path.join(suiteDir, "sandbox-ui-flow.spec.ts");
 const configPath = path.join(root, "playwright.supabase-ui.config.ts");
 const violations = [];
 
@@ -22,8 +23,10 @@ const forbiddenPatterns = [
 
 if (!fs.existsSync(suiteDir)) {
   violations.push("tests/e2e-supabase-ui is missing");
+} else if (!fs.existsSync(suiteEntryPath)) {
+  violations.push("tests/e2e-supabase-ui/sandbox-ui-flow.spec.ts is missing");
 } else {
-  for (const file of listFiles(suiteDir).filter((candidate) => /\.(?:ts|tsx)$/.test(candidate))) {
+  for (const file of collectTypeScriptDependencies(suiteEntryPath)) {
     const source = fs.readFileSync(file, "utf8");
     for (const [pattern, description] of forbiddenPatterns) {
       if (pattern.test(source)) {
@@ -60,11 +63,38 @@ if (violations.length) {
 
 console.log("Supabase UI E2E contract passed: UI-only sandbox suite is clean.");
 
-function listFiles(directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const fullPath = path.join(directory, entry.name);
-    return entry.isDirectory() ? listFiles(fullPath) : [fullPath];
-  });
+function collectTypeScriptDependencies(entryPath) {
+  const pending = [entryPath];
+  const visited = new Set();
+
+  while (pending.length) {
+    const file = pending.pop();
+    if (!file || visited.has(file)) continue;
+    visited.add(file);
+
+    const source = fs.readFileSync(file, "utf8");
+    const importPattern = /(?:from\s+|import\s*\()\s*["'](\.[^"']+)["']/g;
+    for (const match of source.matchAll(importPattern)) {
+      const dependency = resolveTypeScriptImport(path.dirname(file), match[1]);
+      if (dependency) pending.push(dependency);
+    }
+  }
+
+  return [...visited];
+}
+
+function resolveTypeScriptImport(directory, specifier) {
+  const base = path.resolve(directory, specifier);
+  for (const candidate of [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    path.join(base, "index.ts"),
+    path.join(base, "index.tsx"),
+  ]) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+  }
+  return undefined;
 }
 
 function relative(filePath) {

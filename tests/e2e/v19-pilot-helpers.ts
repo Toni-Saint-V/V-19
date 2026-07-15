@@ -42,29 +42,14 @@ export async function openFreshWorkspace(
   const switchToLogin = page.getByRole("button", {
     name: "Уже есть доступ? Войти",
   });
-  if (await isVisible(switchToLogin)) {
-    await switchToLogin.click();
-  }
+  await expect(switchToLogin).toBeVisible({ timeout: 5_000 });
+  await switchToLogin.click();
 
   const emailField = page.locator("#workspace-email");
-  if (await isVisible(emailField)) {
-    try {
-      await emailField.fill(workspaceEmail, {
-        timeout: 2_000,
-      });
-      await page.locator("#workspace-password").fill(workspacePassword, {
-        timeout: 2_000,
-      });
-      await page.getByRole("button", { name: "Войти" }).click();
-    } catch (error) {
-      const workspaceNav = page
-        .getByRole("button", { name: /^(Мои действия|Проверка|Выгрузка)/ })
-        .first();
-      if (!(await isVisible(workspaceNav))) {
-        throw error;
-      }
-    }
-  }
+  await expect(emailField).toBeVisible({ timeout: 5_000 });
+  await emailField.fill(workspaceEmail);
+  await page.locator("#workspace-password").fill(workspacePassword);
+  await page.getByRole("button", { name: "Войти в кабинет" }).click();
 
   const expectedHeading =
     options.heading ??

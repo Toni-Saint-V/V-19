@@ -34,6 +34,7 @@ export interface VisaflowSubmissionSummary {
 
 export interface RemarkBridgePayload {
   submissionId: string | null;
+  applicantId?: string;
   field?: string;
   fileType?: SubmissionFileType;
   applicant?: string;

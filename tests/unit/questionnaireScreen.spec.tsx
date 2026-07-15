@@ -343,9 +343,9 @@ describe("QuestionnaireScreen", () => {
       />,
     );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Готово/ })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Отправить исправления" })).toBeEnabled(),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Готово/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить исправления" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));
 
     const corrections = onSubmissionChange.mock.calls[1]?.[0] as Submission;
@@ -371,7 +371,10 @@ describe("QuestionnaireScreen", () => {
     );
 
     const completeButton = screen.getByRole("button", { name: /Готово/ });
-    expect(completeButton).toBeDisabled();
+    expect(completeButton).toBeEnabled();
+    expect(onSubmissionChange).not.toHaveBeenCalled();
+
+    fireEvent.click(completeButton);
     expect(onSubmissionChange).not.toHaveBeenCalled();
 
     const passportSectionButton = screen
@@ -380,9 +383,11 @@ describe("QuestionnaireScreen", () => {
     if (!passportSectionButton) throw new Error("expected passport section button");
     fireEvent.click(passportSectionButton);
     fireEvent.click(
-      await screen.findByRole("button", { name: /Подтвердить поле:/ }),
+      await screen.findByRole("button", {
+        name: "Подтвердить поле: Номер паспорта",
+      }),
     );
-    await waitFor(() => expect(completeButton).toBeEnabled());
+    await waitFor(() => expect(completeButton).toHaveClass("is-ready"));
     fireEvent.click(completeButton);
 
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));

@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { randomUUID } from "node:crypto";
+import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import {
+  addPreciseAdminIssue,
+  updateQuestionnaireField,
+} from "../../src/modules/submissions/submissionActions";
+import { markSubmissionIssueFixedResult } from "../../src/modules/submissions/status";
+import type { Submission } from "../../src/modules/submissions/types";
 import {
   PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
@@ -26,6 +33,9 @@ import {
   productionDraftMediaContentDigest,
   productionDraftQuestionnaireValueIdentity,
   productionDraftSnapshotContentDigest,
+  productionDraftSnapshotFullContentDigest,
+  productionDraftSnapshotIssueIdentities,
+  productionDraftSnapshotMutationFromBaseline,
   productionDraftSubmissionStaticContentDigest,
   productionDraftStableUuid,
   productionDraftValueDigest,
@@ -41,6 +51,8 @@ function requiredDigest(value: unknown) {
 
 function draftFixture(input: {
   correctionStatus: "closed" | "fixed" | "open";
+  fieldError?: string;
+  includeTargetCorrection?: boolean;
   ownerId: string;
   snapshotStatus:
     | "corrections_received"
@@ -51,6 +63,7 @@ function draftFixture(input: {
 }) {
   const applicantId = "applicant-a2-s1";
   const timestamp = "2026-07-14T12:00:00.000Z";
+  const includeTargetCorrection = input.includeTargetCorrection ?? true;
   const correctionReason = "Требуется исправить поле «Примечание» — RUN A2-S1: correct the note";
   const applicant = {
     address: "Санкт-Петербург",
@@ -99,14 +112,19 @@ function draftFixture(input: {
     label: "Примечание",
     section_id: "section-1",
     submission_id: input.submissionId,
+    updated_by: input.ownerId,
     value: "answer",
   };
   const correction = {
     applicant_id: applicantId,
+    created_at: timestamp,
+    created_by: input.ownerId,
     field_key: "Примечание",
     fixed_at:
       input.correctionStatus === "open" ? null : timestamp,
-    id: "correction-a2-s1",
+    id: productionDraftStableUuid(
+      `correction:${input.submissionId}:зм-${input.submissionId}-новое-1`,
+    ),
     media_type: null,
     reason: correctionReason,
     scope: "field",
@@ -139,7 +157,12 @@ function draftFixture(input: {
             sections: [
               {
                 fields: [
-                  { id: answer.field_id, label: answer.label, value: answer.value },
+                  {
+                    ...(input.fieldError ? { error: input.fieldError } : {}),
+                    id: answer.field_id,
+                    label: answer.label,
+                    value: answer.value,
+                  },
                 ],
                 id: answer.section_id,
               },
@@ -159,16 +182,22 @@ function draftFixture(input: {
         ],
         history: [] as Array<Record<string, unknown>>,
         id: input.submissionId,
-        issues: [
-          {
-            comment: "RUN A2-S1: correct the note",
-            reason: "Требуется исправить поле «Примечание»",
-            severity: "blocker",
-            status: snapshotIssueStatus,
-            target: { applicantId, field: "Примечание" },
-            type: "field",
-          },
-        ],
+        issues: includeTargetCorrection
+          ? [
+              {
+                comment: "RUN A2-S1: correct the note",
+                createdAt: timestamp,
+                createdBy: "admin",
+                id: `зм-${input.submissionId}-новое-1`,
+                reason: "Требуется исправить поле «Примечание»",
+                severity: "blocker",
+                snapshot: answer.value,
+                status: snapshotIssueStatus,
+                target: { applicantId, field: "Примечание" },
+                type: "field",
+              },
+            ]
+          : [],
         status: snapshotStatus,
         title: "A2-S1 technical case",
         updatedAt: timestamp,
@@ -178,7 +207,7 @@ function draftFixture(input: {
   };
   const payload = {
     applicants: [applicant],
-    corrections: [correction],
+    corrections: includeTargetCorrection ? [correction] : [],
     media_assets: [media],
     questionnaire_answers: [answer],
     status_history: [] as Array<Record<string, unknown>>,
@@ -221,6 +250,7 @@ function draftFixture(input: {
     familyIntelligence,
     statusHistory: [],
   });
+  const snapshotIssues = productionDraftSnapshotIssueIdentities(familyIntelligence);
   const submissionStaticContentDigest =
     productionDraftSubmissionStaticContentDigest(payload.submission);
   if (
@@ -230,6 +260,7 @@ function draftFixture(input: {
     !exportContentDigest ||
     !lifecycleContentDigest ||
     !historyIdentity ||
+    !snapshotIssues ||
     !submissionStaticContentDigest
   ) {
     throw new Error("Unit fixture canonical identity is incomplete.");
@@ -244,20 +275,24 @@ function draftFixture(input: {
           submissionId: input.submissionId,
         },
       ],
-      corrections: [
-        {
-          applicantId,
-          fieldKey: correction.field_key,
-          id: correction.id,
-          mediaType: correction.media_type,
-          reasonDigest: requiredDigest(correction.reason),
-          scope: correction.scope,
-          severity: correction.severity,
-          status: correction.status,
-          submissionId: input.submissionId,
-          targetMarker: true,
-        },
-      ],
+      corrections: includeTargetCorrection
+        ? [
+            {
+              applicantId,
+              createdAt: correction.created_at,
+              fieldKey: correction.field_key,
+              fixedAt: correction.fixed_at,
+              id: correction.id,
+              mediaType: correction.media_type,
+              reasonDigest: requiredDigest(correction.reason),
+              scope: correction.scope,
+              severity: correction.severity,
+              status: correction.status,
+              submissionId: input.submissionId,
+              targetMarker: true,
+            },
+          ]
+        : [],
       effectiveHistoryCount: historyIdentity.effectiveHistoryCount,
       mediaAssets: [
         {
@@ -277,6 +312,9 @@ function draftFixture(input: {
           labelDigest: requiredDigest(answer.label),
           logicalValueDigest: questionnaireValueIdentity.logicalValueDigest,
           sectionId: answer.section_id,
+          snapshotErrorDigest: input.fieldError
+            ? requiredDigest(input.fieldError)
+            : null,
           submissionId: input.submissionId,
           valueDigest: questionnaireValueIdentity.valueDigest,
           valueStructureDigest: questionnaireValueIdentity.valueStructureDigest,
@@ -284,7 +322,8 @@ function draftFixture(input: {
       ],
       snapshot: { exportContentDigest, lifecycleContentDigest },
       snapshotHistory: historyIdentity.snapshotHistory,
-      snapshotIssueCount: 1,
+      snapshotIssueCount: includeTargetCorrection ? 1 : 0,
+      snapshotIssues,
       snapshotUntypedHistoryDigests: historyIdentity.snapshotUntypedHistoryDigests,
       statusHistory: [],
       submission: { staticContentDigest: submissionStaticContentDigest },
@@ -371,6 +410,12 @@ describe("production lifecycle mutation audit", () => {
     expect(
       productionLifecycleMutationPayloadMatches(JSON.stringify(payload), contract),
     ).toBe(true);
+    expect(
+      productionLifecycleMutationPayloadMatches(
+        JSON.stringify({ ...payload, unexpected: true }),
+        contract,
+      ),
+    ).toBe(false);
     expect(
       productionLifecycleMutationPayloadMatches(
         JSON.stringify({
@@ -607,6 +652,441 @@ describe("production lifecycle mutation audit", () => {
     ).toBe(false);
   });
 
+  test("allows only the exact snapshot side effect for adding a lifecycle issue", () => {
+    const submissionId = "submission-a2-s1";
+    const applicantId = "applicant-a2-s1";
+    const adminId = "admin-a2-s1";
+    const actionTimestamp = "2026-07-14T12:00:00.000Z";
+    const issueMarker = "RUN A2-S1: add lifecycle issue";
+    const issueReason = "Требуется исправить поле «Примечание»";
+    const fixture = draftFixture({
+      correctionStatus: "open",
+      includeTargetCorrection: false,
+      ownerId: "owner-a2-s1",
+      snapshotStatus: "submitted_for_review",
+      submissionId,
+    });
+    const contract = {
+      correction: {
+        mode: "append" as const,
+        reasonIncludes: issueMarker,
+        status: "open" as const,
+      },
+      draft: fixture.draft,
+      history: {
+        actorId: adminId,
+        actorSource: "admin" as const,
+        snapshotStatus: "submitted_for_review" as const,
+      },
+      mode: "lifecycle" as const,
+      ownerId: "owner-a2-s1",
+      questionnaire: { mode: "exact" as const },
+      snapshotMutation: {
+        expectedContentDigest: "pending",
+        fieldError: {
+          applicantId,
+          expectedValue: issueReason,
+          fieldId: "field-1",
+          sectionId: "section-1",
+        },
+        mode: "add_issue" as const,
+        untypedHistory: {
+          id: `и-${submissionId}-замечание`,
+          source: "admin" as const,
+          text: "Администратор добавил точное замечание",
+        },
+      },
+      submissionId,
+      submissionStatus: "waiting_review" as const,
+      timestampWindow: {
+        notAfter: "2026-07-14T12:01:00.000Z",
+        notBefore: "2026-07-14T11:59:00.000Z",
+      },
+    };
+    const issueId = `зм-${submissionId}-новое-1`;
+    const request = { payload: structuredClone(fixture.payload) };
+    request.payload.questionnaire_answers[0]!.updated_by = adminId;
+    request.payload.corrections = [
+      {
+        applicant_id: applicantId,
+        created_at: actionTimestamp,
+        created_by: adminId,
+        field_key: "Примечание",
+        fixed_at: null,
+        id: productionDraftStableUuid(`correction:${submissionId}:${issueId}`),
+        media_type: null,
+        reason: `${issueReason} — ${issueMarker}`,
+        scope: "field",
+        severity: "blocking",
+        status: "open",
+        submission_id: submissionId,
+      },
+    ];
+    const snapshot =
+      request.payload.submission.family_intelligence.v19CockpitSnapshot.submission;
+    snapshot.updatedAt = "сейчас";
+    snapshot.applicants[0]!.sections[0]!.fields[0]!.error = issueReason;
+    snapshot.issues = [
+      {
+        comment: issueMarker,
+        createdAt: "сейчас",
+        createdBy: "admin",
+        id: issueId,
+        reason: issueReason,
+        severity: "blocker",
+        snapshot: "answer",
+        status: "open",
+        target: { applicantId, field: "Примечание" },
+        type: "field",
+      },
+    ];
+    snapshot.history = [
+      {
+        at: "сейчас",
+        id: `и-${submissionId}-замечание`,
+        source: "admin",
+        text: "Администратор добавил точное замечание",
+      },
+    ];
+    const expectedContentDigest = productionDraftSnapshotFullContentDigest(
+      request.payload.submission.family_intelligence,
+    );
+    if (!expectedContentDigest) throw new Error("Expected add-issue snapshot digest.");
+    contract.snapshotMutation.expectedContentDigest = expectedContentDigest;
+
+    const matches = (candidate: typeof request) =>
+      productionLifecycleMutationPayloadMatches(JSON.stringify(candidate), contract);
+    expect(matches(request)).toBe(true);
+
+    const changedError = structuredClone(request);
+    changedError.payload.submission.family_intelligence.v19CockpitSnapshot.submission
+      .applicants[0]!.sections[0]!.fields[0]!.error = "other error";
+    expect(matches(changedError)).toBe(false);
+
+    const changedHistory = structuredClone(request);
+    changedHistory.payload.submission.family_intelligence.v19CockpitSnapshot.submission.history[0]!.text =
+      "unexpected history";
+    expect(matches(changedHistory)).toBe(false);
+
+    const changedIssueSnapshot = structuredClone(request);
+    changedIssueSnapshot.payload.submission.family_intelligence.v19CockpitSnapshot.submission
+      .issues[0]!.snapshot = "tampered-snapshot";
+    expect(matches(changedIssueSnapshot)).toBe(false);
+
+    const staleRootTimestamp = structuredClone(request);
+    staleRootTimestamp.payload.submission.updated_at = "2025-01-01T00:00:00.000Z";
+    staleRootTimestamp.payload.submission.submitted_at =
+      staleRootTimestamp.payload.submission.updated_at;
+    expect(matches(staleRootTimestamp)).toBe(false);
+  });
+
+  test("allows only the exact snapshot side effect for marking an issue fixed", () => {
+    const submissionId = "submission-a2-s1";
+    const issueReason = "Требуется исправить поле «Примечание»";
+    const actionTimestamp = "2026-07-14T12:00:00.000Z";
+    const fixture = draftFixture({
+      correctionStatus: "open",
+      fieldError: issueReason,
+      ownerId: "owner-a2-s1",
+      snapshotStatus: "returned",
+      submissionId,
+    });
+    const contract = {
+      correction: {
+        mode: "existing" as const,
+        reasonIncludes: "RUN A2-S1",
+        status: "fixed" as const,
+      },
+      draft: fixture.draft,
+      history: {
+        actorId: "owner-a2-s1",
+        actorSource: "agent" as const,
+        snapshotStatus: "returned" as const,
+      },
+      mode: "lifecycle" as const,
+      ownerId: "owner-a2-s1",
+      questionnaire: { mode: "exact" as const },
+      snapshotMutation: {
+        expectedContentDigest: "pending",
+        fieldError: {
+          applicantId: "applicant-a2-s1",
+          expectedValue: issueReason,
+          fieldId: "field-1",
+          sectionId: "section-1",
+        },
+        mode: "mark_issue_fixed" as const,
+        untypedHistory: {
+          id: `и-${submissionId}-зм-${submissionId}-новое-1-исправлено`,
+          source: "agent" as const,
+          text: "Агент отметил замечание исправленным",
+        },
+      },
+      submissionId,
+      submissionStatus: "returned" as const,
+      timestampWindow: {
+        notAfter: "2026-07-14T12:01:00.000Z",
+        notBefore: "2026-07-14T11:59:00.000Z",
+      },
+    };
+    const request = { payload: structuredClone(fixture.payload) };
+    request.payload.corrections[0]!.fixed_at = actionTimestamp;
+    request.payload.corrections[0]!.status = "fixed";
+    const snapshot =
+      request.payload.submission.family_intelligence.v19CockpitSnapshot.submission;
+    snapshot.updatedAt = "сейчас";
+    delete snapshot.applicants[0]!.sections[0]!.fields[0]!.error;
+    snapshot.issues[0]!.status = "fixed_by_agent";
+    snapshot.history = [
+      {
+        at: "сейчас",
+        id: `и-${submissionId}-зм-${submissionId}-новое-1-исправлено`,
+        source: "agent",
+        text: "Агент отметил замечание исправленным",
+      },
+    ];
+    const expectedContentDigest = productionDraftSnapshotFullContentDigest(
+      request.payload.submission.family_intelligence,
+    );
+    if (!expectedContentDigest) throw new Error("Expected mark-fixed snapshot digest.");
+    contract.snapshotMutation.expectedContentDigest = expectedContentDigest;
+
+    const matches = (candidate: typeof request) =>
+      productionLifecycleMutationPayloadMatches(JSON.stringify(candidate), contract);
+    expect(matches(request)).toBe(true);
+
+    const retainedError = structuredClone(request);
+    retainedError.payload.submission.family_intelligence.v19CockpitSnapshot.submission
+      .applicants[0]!.sections[0]!.fields[0]!.error = issueReason;
+    expect(matches(retainedError)).toBe(false);
+
+    const staleFixedAt = structuredClone(request);
+    staleFixedAt.payload.corrections[0]!.fixed_at = "2025-01-01T00:00:00.000Z";
+    expect(matches(staleFixedAt)).toBe(false);
+  });
+
+  test("derives questionnaire recalculation and complete issue metadata from source actions", () => {
+    const sourceBaseline = initialSubmissions.find(
+      (submission) => submission.id === "ПД-1053",
+    );
+    if (!sourceBaseline) throw new Error("Expected canonical lifecycle fixture.");
+    const baseline = JSON.parse(JSON.stringify(sourceBaseline)) as Submission;
+    const issueReason = "Нужно уточнить маршрут поездки";
+    const issueComment = "Маршрут поездки должен быть конкретным.";
+    const envelope = (submission: Submission) => ({
+      status: "unreviewed",
+      v19CockpitSnapshot: { submission, version: 1 },
+    });
+    const persistedEnvelope = (submission: Submission) =>
+      JSON.parse(JSON.stringify(envelope(submission)));
+    const addIntent = {
+      comment: issueComment,
+      fieldLabel: "Маршрут поездки",
+      mode: "add_issue" as const,
+      reason: issueReason,
+      section: "Поездка",
+    };
+    const addMutation = productionDraftSnapshotMutationFromBaseline(
+      envelope(baseline),
+      addIntent,
+    );
+    if (!addMutation) throw new Error("Expected source-derived add-issue mutation.");
+
+    const applicant = baseline.applicants[0];
+    if (!applicant) throw new Error("Expected lifecycle applicant.");
+    const added = addPreciseAdminIssue(baseline, {
+      applicantId: applicant.id,
+      comment: issueComment,
+      field: "Страна первого въезда",
+      reason: issueReason,
+      section: "Поездка",
+      severity: "blocker",
+      type: "field",
+    });
+    const addedDigest = productionDraftSnapshotFullContentDigest(persistedEnvelope(added));
+    expect(addedDigest).toBe(addMutation.expectedContentDigest);
+    const addedIssue = added.issues[0];
+    if (!addedIssue) throw new Error("Expected added lifecycle issue.");
+    const addedTarget = added.applicants
+      .find((item) => item.id === addedIssue.target.applicantId)
+      ?.sections.flatMap((section) => section.fields.map((field) => ({ field, section })))
+      .find(({ field }) => field.label === addedIssue.target.field);
+    if (!addedTarget) throw new Error("Expected exact added issue target.");
+    expect(addedTarget.field.error).toBe(issueReason);
+    expect(addedTarget.section.status).toBe("needs_fix");
+    expect(addedTarget.section.missing).toBe(issueReason);
+    expect(added.applicants[0]?.questionnaireStatus).toBe("needs_fix");
+
+    const tamperedAdded = structuredClone(added);
+    tamperedAdded.issues[0]!.snapshot = "tampered-snapshot";
+    expect(
+      productionDraftSnapshotFullContentDigest(persistedEnvelope(tamperedAdded)),
+    ).not.toBe(
+      addMutation.expectedContentDigest,
+    );
+
+    const corrected = updateQuestionnaireField(added, {
+      applicantId: addedIssue.target.applicantId,
+      fieldId: addedTarget.field.id,
+      sectionId: addedTarget.section.id,
+      value: "Москва — Барселона — Москва",
+    });
+    const returned: Submission = { ...corrected, status: "returned" };
+    const markMutation = productionDraftSnapshotMutationFromBaseline(
+      persistedEnvelope(returned),
+      { ...addIntent, mode: "mark_issue_fixed" },
+    );
+    if (!markMutation) throw new Error("Expected source-derived mark-fixed mutation.");
+    const fixed = markSubmissionIssueFixedResult(returned, addedIssue.id, "agent");
+    if (!fixed.ok) throw new Error(fixed.error.message);
+    expect(productionDraftSnapshotFullContentDigest(persistedEnvelope(fixed.data))).toBe(
+      markMutation.expectedContentDigest,
+    );
+    const fixedTarget = fixed.data.applicants
+      .find((item) => item.id === addedIssue.target.applicantId)
+      ?.sections.flatMap((section) => section.fields)
+      .find((field) => field.id === addedTarget.field.id);
+    expect(fixedTarget?.error).toBeUndefined();
+
+    const tamperedFixed = structuredClone(fixed.data);
+    tamperedFixed.issues[0]!.target.applicantName = "tampered-applicant";
+    expect(
+      productionDraftSnapshotFullContentDigest(persistedEnvelope(tamperedFixed)),
+    ).not.toBe(
+      markMutation.expectedContentDigest,
+    );
+  });
+
+  test("derives the active field-remark shape without an implicit section", () => {
+    const sourceBaseline = initialSubmissions.find(
+      (submission) => submission.id === "ПД-1053",
+    );
+    if (!sourceBaseline) throw new Error("Expected canonical lifecycle fixture.");
+    const baseline = JSON.parse(JSON.stringify(sourceBaseline)) as Submission;
+    const envelope = {
+      status: "unreviewed",
+      v19CockpitSnapshot: { submission: baseline, version: 1 },
+    };
+    const reason = "Требуется исправить поле «Примечание»";
+    const comment = "RUN A2-S1: add lifecycle issue";
+    const mutation = productionDraftSnapshotMutationFromBaseline(envelope, {
+      comment,
+      fieldLabel: "Примечание",
+      mode: "add_issue",
+      reason,
+    });
+    if (!mutation) throw new Error("Expected runtime-shaped add-issue mutation.");
+
+    const applicant = baseline.applicants[0];
+    if (!applicant) throw new Error("Expected lifecycle applicant.");
+    const actual = addPreciseAdminIssue(baseline, {
+      applicantId: applicant.id,
+      comment,
+      field: "Примечание",
+      reason,
+      severity: "blocker",
+      type: "field",
+    });
+    const persisted = JSON.parse(
+      JSON.stringify({ status: "unreviewed", v19CockpitSnapshot: { submission: actual, version: 1 } }),
+    );
+    expect(productionDraftSnapshotFullContentDigest(persisted)).toBe(
+      mutation.expectedContentDigest,
+    );
+    expect(Object.hasOwn(actual.issues[0]!.target, "section")).toBe(true);
+    expect(Object.hasOwn(persisted.v19CockpitSnapshot.submission.issues[0].target, "section")).toBe(
+      false,
+    );
+  });
+
+  test("rejects stale durable and snapshot transition timestamps", () => {
+    const submissionId = "submission-a2-s1";
+    const adminId = "admin-a2-s1";
+    const actionTimestamp = "2026-07-14T12:00:00.000Z";
+    const fixture = draftFixture({
+      correctionStatus: "open",
+      ownerId: "owner-a2-s1",
+      snapshotStatus: "returned",
+      submissionId,
+    });
+    const transition = {
+      comment: "Статус изменен: Возвращено",
+      fromStatus: "submitted_for_review",
+      note: "Администратор вернул подачу",
+      toStatus: "returned",
+    };
+    const contract = {
+      correction: {
+        mode: "existing" as const,
+        reasonIncludes: "RUN A2-S1",
+        status: "open" as const,
+      },
+      draft: fixture.draft,
+      history: {
+        actorId: adminId,
+        actorSource: "admin" as const,
+        snapshotStatus: "returned" as const,
+        transition,
+      },
+      mode: "lifecycle" as const,
+      ownerId: "owner-a2-s1",
+      questionnaire: { mode: "exact" as const },
+      submissionId,
+      submissionStatus: "returned" as const,
+      timestampWindow: {
+        notAfter: "2026-07-14T12:01:00.000Z",
+        notBefore: "2026-07-14T11:59:00.000Z",
+      },
+    };
+    const request = { payload: structuredClone(fixture.payload) };
+    request.payload.questionnaire_answers[0]!.updated_by = adminId;
+    request.payload.corrections[0]!.created_by = adminId;
+    const transitionId = `и-${submissionId}-${transition.fromStatus}-${transition.toStatus}-1`;
+    request.payload.status_history = [
+      {
+        changed_at: actionTimestamp,
+        changed_by: adminId,
+        comment: transition.comment,
+        entity_id: submissionId,
+        entity_type: "submission",
+        from_status: transition.fromStatus,
+        id: productionDraftStableUuid(`history:${submissionId}:${transitionId}`),
+        note: transition.note,
+        source: "admin",
+        to_status: transition.toStatus,
+      },
+    ];
+    const snapshot =
+      request.payload.submission.family_intelligence.v19CockpitSnapshot.submission;
+    snapshot.updatedAt = "сейчас";
+    snapshot.history = [
+      {
+        actorId: adminId,
+        at: "сейчас",
+        createdAt: "сейчас",
+        fromStatus: transition.fromStatus,
+        id: transitionId,
+        note: transition.note,
+        source: "admin",
+        text: transition.comment,
+        toStatus: transition.toStatus,
+      },
+    ];
+
+    const matches = (candidate: typeof request) =>
+      productionLifecycleMutationPayloadMatches(JSON.stringify(candidate), contract);
+    expect(matches(request)).toBe(true);
+
+    const staleDurableHistory = structuredClone(request);
+    staleDurableHistory.payload.status_history[0]!.changed_at =
+      "2025-01-01T00:00:00.000Z";
+    expect(matches(staleDurableHistory)).toBe(false);
+
+    const changedSnapshotHistoryTimestamp = structuredClone(request);
+    changedSnapshotHistoryTimestamp.payload.submission.family_intelligence.v19CockpitSnapshot.submission.history[0]!.at =
+      "2025-01-01T00:00:00.000Z";
+    expect(matches(changedSnapshotHistoryTimestamp)).toBe(false);
+  });
+
   test("preserves duplicate durable semantics by UUID and rejects UUID rehash", () => {
     const submissionId = "submission-a2-s1";
     const ownerId = "owner-a2-s1";
@@ -665,6 +1145,7 @@ describe("production lifecycle mutation audit", () => {
         snapshotUntypedHistoryDigests:
           effectiveHistory.snapshotUntypedHistoryDigests,
         statusHistory: durableRows.map((row) => ({
+          changedAt: row.changed_at,
           commentDigest: requiredDigest(row.comment),
           entityId: row.entity_id,
           entityType: "submission" as const,
@@ -960,10 +1441,34 @@ describe("production A2-S1 export artifact contract", () => {
     workbookFileNameDigest: productionA1S1ExportDigest(packageIdentity.fileName),
     zipFileNameDigest: productionA1S1ExportDigest(packageIdentity.zipFileName),
   };
+  const exportTimestampWindow = {
+    notAfter: "2026-07-14T12:01:00.000Z",
+    notBefore: "2026-07-14T11:59:00.000Z",
+  };
+  const exportPayloadMatches = (
+    body: string | null,
+    key: string,
+    currentNetworkContract: typeof networkContract,
+    currentArtifactContract: typeof artifactContract,
+  ) =>
+    productionA1S1ExportPayloadMatches(
+      body,
+      key,
+      currentNetworkContract,
+      currentArtifactContract,
+      exportTimestampWindow,
+    );
 
   const draftPayload = {
     payload: {
       ...exportFixture.payload,
+      corrections: exportFixture.payload.corrections.map((correction) => ({
+        ...correction,
+        created_by: networkContract.adminId,
+      })),
+      questionnaire_answers: exportFixture.payload.questionnaire_answers.map(
+        (answer) => ({ ...answer, updated_by: networkContract.adminId }),
+      ),
       submission: {
         ...exportFixture.payload.submission,
         exported_at: null,
@@ -983,6 +1488,7 @@ describe("production A2-S1 export artifact contract", () => {
                 submissionIds: [networkContract.submissionId],
               },
               exportState: "file_downloaded",
+              updatedAt: "сейчас",
             },
           },
         },
@@ -997,6 +1503,7 @@ describe("production A2-S1 export artifact contract", () => {
         content_fingerprint: packageIdentity.contentFingerprint,
         file_name: packageIdentity.fileName,
         format: "xlsx",
+        id: "00000000-0000-4000-8000-000000000901",
         idempotency_key: packageIdentity.idempotencyKey,
         row_count: 1,
         submission_ids: [networkContract.submissionId],
@@ -1013,7 +1520,7 @@ describe("production A2-S1 export artifact contract", () => {
 
   test("requires the verified ZIP/XLSX identity on every released export RPC", () => {
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify(draftPayload),
         "POST /rest/v1/rpc/save_submission_draft",
         networkContract,
@@ -1021,7 +1528,7 @@ describe("production A2-S1 export artifact contract", () => {
       ),
     ).toBe(true);
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify(terminalPayload),
         "POST /rest/v1/rpc/complete_export_package",
         networkContract,
@@ -1029,7 +1536,52 @@ describe("production A2-S1 export artifact contract", () => {
       ),
     ).toBe(true);
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
+        JSON.stringify({ ...terminalPayload, unexpected: true }),
+        "POST /rest/v1/rpc/complete_export_package",
+        networkContract,
+        artifactContract,
+      ),
+    ).toBe(false);
+
+    const unexpectedTerminalPayloadKey = structuredClone(terminalPayload);
+    (unexpectedTerminalPayloadKey.payload as Record<string, unknown>).unexpected = true;
+    expect(
+      exportPayloadMatches(
+        JSON.stringify(unexpectedTerminalPayloadKey),
+        "POST /rest/v1/rpc/complete_export_package",
+        networkContract,
+        artifactContract,
+      ),
+    ).toBe(false);
+
+    const unexpectedBatchKey = structuredClone(terminalPayload);
+    (
+      unexpectedBatchKey.payload.batch as Record<string, unknown>
+    ).unexpected = true;
+    expect(
+      exportPayloadMatches(
+        JSON.stringify(unexpectedBatchKey),
+        "POST /rest/v1/rpc/complete_export_package",
+        networkContract,
+        artifactContract,
+      ),
+    ).toBe(false);
+
+    const unexpectedDocumentExportKey = structuredClone(terminalPayload);
+    (
+      unexpectedDocumentExportKey.payload.document_export as Record<string, unknown>
+    ).unexpected = true;
+    expect(
+      exportPayloadMatches(
+        JSON.stringify(unexpectedDocumentExportKey),
+        "POST /rest/v1/rpc/complete_export_package",
+        networkContract,
+        artifactContract,
+      ),
+    ).toBe(false);
+    expect(
+      exportPayloadMatches(
         JSON.stringify({
           ...terminalPayload,
           payload: {
@@ -1045,8 +1597,19 @@ describe("production A2-S1 export artifact contract", () => {
         artifactContract,
       ),
     ).toBe(false);
+
+    const unexpectedDraftPayloadKey = structuredClone(draftPayload);
+    (unexpectedDraftPayloadKey.payload as Record<string, unknown>).unexpected = true;
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
+        JSON.stringify(unexpectedDraftPayloadKey),
+        "POST /rest/v1/rpc/save_submission_draft",
+        networkContract,
+        artifactContract,
+      ),
+    ).toBe(false);
+    expect(
+      exportPayloadMatches(
         JSON.stringify({
           ...draftPayload,
           payload: {
@@ -1060,7 +1623,7 @@ describe("production A2-S1 export artifact contract", () => {
       ),
     ).toBe(false);
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify({
           ...draftPayload,
           payload: {
@@ -1079,7 +1642,7 @@ describe("production A2-S1 export artifact contract", () => {
       ),
     ).toBe(false);
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify({
           ...draftPayload,
           payload: {
@@ -1108,7 +1671,7 @@ describe("production A2-S1 export artifact contract", () => {
     wrongExportState.payload.submission.family_intelligence.v19CockpitSnapshot.submission.exportState =
       "file_generated";
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify(wrongExportState),
         "POST /rest/v1/rpc/save_submission_draft",
         networkContract,
@@ -1121,7 +1684,7 @@ describe("production A2-S1 export artifact contract", () => {
       { at: "сейчас", id: "unexpected-export-history", text: "unexpected" },
     );
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify(unexpectedHistory),
         "POST /rest/v1/rpc/save_submission_draft",
         networkContract,
@@ -1135,7 +1698,7 @@ describe("production A2-S1 export artifact contract", () => {
         .submission as Record<string, unknown>
     ).unexpected = true;
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify(unknownSnapshotKey),
         "POST /rest/v1/rpc/save_submission_draft",
         networkContract,
@@ -1147,7 +1710,7 @@ describe("production A2-S1 export artifact contract", () => {
     invalidUpdatedAt.payload.submission.family_intelligence.v19CockpitSnapshot.submission.updatedAt =
       "not-a-timestamp";
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify(invalidUpdatedAt),
         "POST /rest/v1/rpc/save_submission_draft",
         networkContract,
@@ -1159,11 +1722,57 @@ describe("production A2-S1 export artifact contract", () => {
     detachedAcceptedAt.payload.submission.accepted_at =
       "2026-07-14T13:00:00.000Z";
     expect(
-      productionA1S1ExportPayloadMatches(
+      exportPayloadMatches(
         JSON.stringify(detachedAcceptedAt),
         "POST /rest/v1/rpc/save_submission_draft",
         networkContract,
         artifactContract,
+      ),
+    ).toBe(false);
+
+    const staleExportTimestamp = structuredClone(draftPayload);
+    staleExportTimestamp.payload.submission.updated_at =
+      "2026-07-14T11:58:59.000Z";
+    staleExportTimestamp.payload.submission.accepted_at =
+      "2026-07-14T11:58:59.000Z";
+    expect(
+      exportPayloadMatches(
+        JSON.stringify(staleExportTimestamp),
+        "POST /rest/v1/rpc/save_submission_draft",
+        networkContract,
+        artifactContract,
+      ),
+    ).toBe(false);
+  });
+
+  test("anchors a slow ZIP export timestamp window to the persistence request", () => {
+    const slowZipPersistence = structuredClone(draftPayload);
+    slowZipPersistence.payload.submission.updated_at =
+      "2026-07-14T12:03:00.000Z";
+    slowZipPersistence.payload.submission.accepted_at =
+      "2026-07-14T12:03:00.000Z";
+    expect(
+      productionA1S1ExportPayloadMatches(
+        JSON.stringify(slowZipPersistence),
+        "POST /rest/v1/rpc/save_submission_draft",
+        networkContract,
+        artifactContract,
+        {
+          notAfter: "2026-07-14T12:05:00.000Z",
+          notBefore: "2026-07-14T12:02:59.000Z",
+        },
+      ),
+    ).toBe(true);
+    expect(
+      productionA1S1ExportPayloadMatches(
+        JSON.stringify(slowZipPersistence),
+        "POST /rest/v1/rpc/save_submission_draft",
+        networkContract,
+        artifactContract,
+        {
+          notAfter: "2026-07-14T12:02:00.000Z",
+          notBefore: "2026-07-14T11:59:00.000Z",
+        },
       ),
     ).toBe(false);
   });

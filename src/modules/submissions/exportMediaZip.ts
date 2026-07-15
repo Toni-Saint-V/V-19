@@ -19,7 +19,11 @@ import {
 } from "./exportRules";
 import type { ExportPackageDocumentCommit } from "./exportPackageDocumentCommit";
 import { createExportWorkbookArtifact } from "./exportWorkbook";
-import { createVisaApplicationFormPdfBlob } from "./visaApplicationFormPdf";
+import {
+  createVisaApplicationFormPdfBlob,
+  validateVisaApplicationFormData,
+  visaApplicationFormValidationMessage,
+} from "./visaApplicationFormPdf";
 import {
   downloadMediaFromStorage,
   mediaStorageBucket,
@@ -157,10 +161,7 @@ export async function createExportMediaZipArtifact(
   );
   if (!documentAssetsResult.ok) return documentAssetsResult;
 
-  const downloadAsset = documentDownloaderForOptions(
-    orderedSubmissions,
-    options,
-  );
+  const downloadAsset = documentDownloaderForOptions(orderedSubmissions, options);
   const outerZip = new JSZip();
 
   try {
@@ -229,10 +230,7 @@ export async function createExportMediaZipArtifact(
     return { ok: true, artifact };
   } catch (error) {
     if (error instanceof DocumentZipBuilderError) {
-      return blocked(
-        error.reason,
-        safeMessageForDocumentZipError(error.reason),
-      );
+      return blocked(error.reason, safeMessageForDocumentZipError(error));
     }
     return blocked("zip_failed", "Не удалось сформировать ZIP-файл.");
   }
@@ -308,6 +306,19 @@ function validateExportMediaZipIdentity(
       reason: ExportMediaZipBlockedReason;
       safeMessage: string;
     } {
+  const incompleteVisaForms = submissions.flatMap((submission) =>
+    submission.applicants.flatMap((applicant) => {
+      const validation = validateVisaApplicationFormData(submission, applicant);
+      return validation.ok ? [] : validation.missingFields;
+    }),
+  );
+  if (incompleteVisaForms.length > 0) {
+    return blocked(
+      "questionnaire_incomplete",
+      visaApplicationFormValidationMessage(incompleteVisaForms),
+    );
+  }
+
   if (!canDownloadExportMediaZip(submissions)) {
     return blocked(
       "export_not_ready",
@@ -373,8 +384,7 @@ async function resolveDocumentAssetsForZip(
     };
   }
 
-  const repository =
-    options.documentRepository ?? DocumentRepository.optional();
+  const repository = options.documentRepository ?? DocumentRepository.optional();
   if (!repository) {
     return blocked(
       "storage_unavailable",
@@ -403,10 +413,9 @@ function documentDownloaderForOptions(
     const legacyDownload = options.downloadMedia;
     return async (asset, context) => {
       if (asset.type === "visa_form") {
-        return createVisaApplicationFormPdfBlob(
-          context.submission,
-          context.applicant,
-        );
+        return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
+          exportDate: context.exportDate,
+        });
       }
 
       const frontendType = documentTypeToFrontendMediaType(asset.type);
@@ -437,10 +446,9 @@ function documentDownloaderForOptions(
 
   return async (asset, context) => {
     if (asset.type === "visa_form") {
-      return createVisaApplicationFormPdfBlob(
-        context.submission,
-        context.applicant,
-      );
+      return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
+        exportDate: context.exportDate,
+      });
     }
 
     return downloadMediaFromStorage({
@@ -450,18 +458,12 @@ function documentDownloaderForOptions(
   };
 }
 
-function documentAssetsFromSubmissionFiles(
-  submissions: Submission[],
-): DocumentAsset[] {
+function documentAssetsFromSubmissionFiles(submissions: Submission[]): DocumentAsset[] {
   const now = "1970-01-01T00:00:00.000Z";
   return submissions.flatMap((submission) =>
     submission.files.flatMap((file) => {
       const type = tryNormalizeDocumentType(file.type);
-      if (
-        !type ||
-        file.storageBucket !== mediaStorageBucket ||
-        !file.storagePath
-      ) {
+      if (!type || file.storageBucket !== mediaStorageBucket || !file.storagePath) {
         return [];
       }
 
@@ -485,13 +487,9 @@ function documentAssetsFromSubmissionFiles(
           },
           uploadStatus: "uploaded" as const,
           validationStatus:
-            file.status === "accepted"
-              ? ("passed" as const)
-              : ("pending" as const),
+            file.status === "accepted" ? ("passed" as const) : ("pending" as const),
           exportStatus:
-            file.status === "accepted"
-              ? ("ready" as const)
-              : ("not_ready" as const),
+            file.status === "accepted" ? ("ready" as const) : ("not_ready" as const),
           mime:
             file.mimeType ??
             (type === "passport_scan" ? "application/pdf" : "image/jpeg"),
@@ -540,9 +538,8 @@ function buildArchiveManifest(
   };
 }
 
-function safeMessageForDocumentZipError(
-  reason: ExportMediaZipBlockedReason,
-): string {
+function safeMessageForDocumentZipError(error: DocumentZipBuilderError): string {
+  const { reason } = error;
   if (reason === "empty_file") {
     return "В приватном хранилище найден пустой файл. ZIP не сформирован.";
   }
@@ -556,7 +553,7 @@ function safeMessageForDocumentZipError(
     return "У каждого заявителя должен быть проверенный номер паспорта. ZIP не сформирован.";
   }
   if (reason === "questionnaire_incomplete") {
-    return "В анкете не заполнены обязательные данные для PDF. ZIP не сформирован.";
+    return error.message;
   }
   return "В выбранном пакете не все обязательные документы прошли проверку.";
 }

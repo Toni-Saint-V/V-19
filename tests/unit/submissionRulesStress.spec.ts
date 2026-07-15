@@ -31,6 +31,7 @@ import type {
   Submission,
   SubmissionFile,
 } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const canonicalMediaTypes = ["passport_scan", "selfie", "selfie_2"] as const;
 
@@ -54,7 +55,9 @@ function canonicalMediaSubmission(submission: Submission): Submission {
 
 function readyClone(patch: Partial<Submission> = {}): Submission {
   return {
-    ...canonicalMediaSubmission(byId("ПД-1056")),
+    ...fillRequiredQuestionnaireForTest(
+      canonicalMediaSubmission(byId("ПД-1056")),
+    ),
     agentId: defaultLocalAgentOwnerId,
     exportState: "ready",
     id: patch.id ?? "ПД-STRESS",
