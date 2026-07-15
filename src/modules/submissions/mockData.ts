@@ -3,6 +3,58 @@ import { alternateLocalAgentOwnerId, defaultLocalAgentOwnerId } from "./ownershi
 import { buildMediaStoragePath, mediaStorageBucket } from "./mediaStoragePolicy";
 import type { Applicant, Issue, Submission, SubmissionFile } from "./types";
 
+const conditionallyRequiredBlsFieldIds = new Set([
+  "company-contact-person",
+  "company-org-details",
+  "company-phone",
+  "employer-address",
+  "employer-contact",
+  "employer-name",
+  "guardian-info",
+]);
+
+const completeDemoQuestionnaireValues: Record<string, string> = {
+  "appointment-city": "Москва",
+  "arrival-date": "10.07.2026",
+  "birth-citizenship": "Russian Federation",
+  "birth-country": "USSR",
+  "birth-date": "20.08.1990",
+  "birth-place": "MOSCOW",
+  "company-contact-person": "DEMO CONTACT",
+  "company-org-details": "DEMO COMPANY, MADRID",
+  "company-phone": "+34 900 000 001",
+  "contact-number": "+7 900 000-00-00",
+  "departure-date": "18.07.2026",
+  "desired-date-1": "05.08.2026",
+  email: "demo@example.com",
+  "employer-address": "MOSCOW",
+  "employer-contact": "+7 900 000-00-01",
+  "employer-name": "DEMO COMPANY",
+  "first-entry-country": "Spain",
+  "first-name": "IVAN",
+  "guardian-info": "DEMO GUARDIAN",
+  "home-address": "DEMO ADDRESS",
+  "home-city": "MOSCOW",
+  "home-country": "Russian Federation",
+  "hotel-address": "DEMO HOTEL ADDRESS",
+  "hotel-city": "MADRID",
+  "hotel-contact": "+34 900 000 000",
+  "hotel-country": "Spain",
+  "hotel-email": "hotel@example.com",
+  "hotel-name": "DEMO HOTEL",
+  "hotel-postal-code": "28001",
+  "main-destination": "Spain",
+  nationality: "Russian Federation",
+  "occupation-specify": "MANAGER",
+  "passport-expiry-date": "26.02.2032",
+  "passport-issue-country": "Russian Federation",
+  "passport-issue-date": "26.02.2016",
+  "passport-issue-place": "FMS 78039",
+  "postal-code": "119991",
+  "stay-duration": "9",
+  surname: "IVANOV",
+};
+
 function applicant(
   id: string,
   fullName: string,
@@ -10,6 +62,7 @@ function applicant(
   questionnaireStatus: Applicant["questionnaireStatus"],
   fileStatus: Applicant["fileStatus"],
   missing?: string,
+  readyForExportFixture = false,
 ): Applicant {
   return {
     id,
@@ -17,14 +70,39 @@ function applicant(
     role,
     questionnaireStatus,
     fileStatus,
+    passportExtraction:
+      readyForExportFixture && questionnaireStatus === "complete"
+        ? {
+            appliedFieldKeys: [],
+            dismissedAtIso: "2026-06-15T10:00:00.000Z",
+            extractedFields: [],
+            status: "unavailable",
+            summary: "Демо-скан проверен вручную; данные анкеты подтверждены.",
+          }
+        : undefined,
     sections: createQuestionnaireSections(id, fullName, questionnaireStatus, missing).map(
       (section) => ({
         ...section,
-        fields: section.fields.map((field) =>
-          field.id === "passport-no"
-            ? { ...field, value: mockPassportNumber(id) }
-            : field,
-        ),
+        fields: section.fields.map((field) => {
+          if (field.id === "passport-no") {
+            return { ...field, value: mockPassportNumber(id) };
+          }
+          if (
+            !readyForExportFixture ||
+            questionnaireStatus !== "complete" ||
+            field.value.trim() ||
+            (!field.required && !conditionallyRequiredBlsFieldIds.has(field.id))
+          ) {
+            return field;
+          }
+          return {
+            ...field,
+            value:
+              completeDemoQuestionnaireValues[field.id] ??
+              field.options?.[0] ??
+              `DEMO ${field.id.toUpperCase()}`,
+          };
+        }),
       }),
     ),
   };
@@ -313,8 +391,8 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1054-1", "Ирина Петрова", "main", "complete", "complete"),
-      applicant("з-1054-2", "Павел Петров", "spouse", "complete", "complete"),
+      applicant("з-1054-1", "Ирина Петрова", "main", "complete", "complete", undefined, true),
+      applicant("з-1054-2", "Павел Петров", "spouse", "complete", "complete", undefined, true),
     ],
     issues: [],
     files: localDemoStoredFiles("ПД-1054", [
@@ -409,14 +487,14 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "12.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1056-1", "Дмитрий Орлов", "main", "complete", "complete"),
+      applicant("з-1056-1", "Дмитрий Орлов", "main", "complete", "complete", undefined, true),
     ],
     issues: [],
-    files: [
+    files: localDemoStoredFiles("ПД-1056", [
       file("ф-1056-2", "з-1056-1", "selfie", "accepted"),
       file("ф-1056-3", "з-1056-1", "selfie_2", "accepted"),
       file("ф-1056-4", "з-1056-1", "passport_scan", "accepted"),
-    ],
+    ]),
     completeness: { questionnaire: 100, files: 100, total: 100 },
     exportState: "ready",
     createdAt: "09.06",
@@ -442,7 +520,7 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1101-1", "Ольга Фролова", "main", "complete", "complete"),
+      applicant("з-1101-1", "Ольга Фролова", "main", "complete", "complete", undefined, true),
     ],
     issues: [],
     files: localDemoStoredFiles("SUB-1101", [
@@ -471,9 +549,9 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1102-1", "Анна Волкова", "main", "complete", "complete"),
-      applicant("з-1102-2", "Игорь Волков", "spouse", "complete", "complete"),
-      applicant("з-1102-3", "Мила Волкова", "child", "complete", "complete"),
+      applicant("з-1102-1", "Анна Волкова", "main", "complete", "complete", undefined, true),
+      applicant("з-1102-2", "Игорь Волков", "spouse", "complete", "complete", undefined, true),
+      applicant("з-1102-3", "Мила Волкова", "child", "complete", "complete", undefined, true),
     ],
     issues: [],
     files: localDemoStoredFiles("SUB-1102", [
@@ -507,14 +585,14 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1103-1", "Никита Морозов", "main", "complete", "complete"),
+      applicant("з-1103-1", "Никита Морозов", "main", "complete", "complete", undefined, true),
     ],
     issues: [],
-    files: [
+    files: localDemoStoredFiles("SUB-1103", [
       file("ф-1103-2", "з-1103-1", "selfie", "accepted"),
       file("ф-1103-3", "з-1103-1", "selfie_2", "accepted"),
       file("ф-1103-4", "з-1103-1", "passport_scan", "accepted"),
-    ],
+    ]),
     completeness: { questionnaire: 100, files: 100, total: 100 },
     exportState: "ready",
     createdAt: "13.06",

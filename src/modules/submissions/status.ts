@@ -400,6 +400,7 @@ export function canAdminApproveForExport(submission: Submission) {
     (submission.status === "submitted_for_review" ||
       submission.status === "corrections_received") &&
     !hasBlockingIssues(submission) &&
+    !hasMissingRequiredWork(submission) &&
     hasRequiredDocuments(submission) &&
     hasUsableTripDateRange(submission)
   );
@@ -603,6 +604,13 @@ function validateSubmissionActionPolicy(
 
   if (action === "close_issues_accept" && openIssueCount(submission) > 0) {
     return { ok: false, reason: "Есть незакрытые замечания" };
+  }
+
+  if (
+    (action === "accept" || action === "close_issues_accept") &&
+    hasMissingRequiredWork(submission)
+  ) {
+    return { ok: false, reason: "Не все обязательные анкеты и файлы готовы" };
   }
 
   if (

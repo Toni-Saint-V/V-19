@@ -18,7 +18,7 @@ import { ReviewWorkspace } from "./ReviewWorkspace";
 import { AdminReviewDrawer } from "./AdminReviewDrawer";
 import { AdminReturnPackagesScreen } from "./AdminReturnPackagesScreen";
 import { RemarkForm } from "./RemarkForm";
-import visaflowLogo from "../assets/v-logo-premium-black-style.png";
+import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import type { AccessRequest } from "../shared/authContract";
 import type {
   IssueInput,
@@ -112,8 +112,8 @@ function AdminUsersAccessPanel({
             Заявки на доступ
           </h2>
           <p className="m-0 mt-2 max-w-[680px] text-[13px] leading-5 text-white/52">
-            Новые агенты попадают сюда после формы регистрации. До одобрения они
-            не видят рабочий кабинет.
+            Новые агенты попадают сюда после формы регистрации. До одобрения они не
+            видят рабочий кабинет.
           </p>
         </div>
         <div className="grid gap-1 text-right">
@@ -201,9 +201,7 @@ function AdminUsersAccessPanel({
                 </div>
               ) : (
                 <div className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white/54">
-                  {request.status === "approved"
-                    ? "Доступ выдан"
-                    : "Заявка отклонена"}
+                  {request.status === "approved" ? "Доступ выдан" : "Заявка отклонена"}
                 </div>
               )}
             </article>
@@ -212,9 +210,7 @@ function AdminUsersAccessPanel({
       ) : (
         <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#242529] bg-[#161617] p-8 text-center">
           <Users className="mb-4 h-10 w-10 text-white/20" />
-          <h3 className="m-0 text-[16px] font-medium text-white">
-            {emptyTitle}
-          </h3>
+          <h3 className="m-0 text-[16px] font-medium text-white">{emptyTitle}</h3>
           <p className="m-0 mt-2 max-w-[420px] text-[13px] leading-5 text-white/50">
             {emptyCopy}
           </p>
@@ -256,6 +252,7 @@ export function AdminWorkspace({
   const [adminAsyncError, setAdminAsyncError] = useState("");
   const mobileNavPanelRef = useRef<HTMLElement | null>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const reviewDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
@@ -320,6 +317,8 @@ export function AdminWorkspace({
   }, [mobileNavOpen]);
 
   const handleOpenReviewDrawer = (id: string) => {
+    reviewDrawerReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     bridge.onAdminReviewOpen?.(id);
     emitVisaflowUiEvent(bridge, {
       type: "admin.review.open",
@@ -404,32 +403,31 @@ export function AdminWorkspace({
     }
   };
 
-  const handleAddIssue = (input: IssueInput) => {
-    if (!selectedRow || adminIssuePendingRef.current) return;
+  const handleAddIssue = async (input: IssueInput): Promise<boolean> => {
+    if (!selectedRow || adminIssuePendingRef.current) return false;
     const payload = { submissionId: selectedRow, input };
     setAdminAsyncError("");
 
-    const addIssue = async () => {
-      if (!bridge.onAdminIssueAdd) {
-        setAdminAsyncError(
-          "Добавление замечаний недоступно: обработчик сохранения не подключён.",
-        );
-        return;
-      }
-      adminIssuePendingRef.current = true;
-      try {
-        await bridge.onAdminIssueAdd(payload);
-        emitVisaflowUiEvent(bridge, { type: "admin.issue.add", payload });
-      } catch {
-        setAdminAsyncError(
-          "Не удалось добавить замечание. Подача не была изменена. Повторите попытку.",
-        );
-      } finally {
-        adminIssuePendingRef.current = false;
-      }
-    };
+    if (!bridge.onAdminIssueAdd) {
+      setAdminAsyncError(
+        "Добавление замечаний недоступно: обработчик сохранения не подключён.",
+      );
+      return false;
+    }
 
-    void addIssue();
+    adminIssuePendingRef.current = true;
+    try {
+      await bridge.onAdminIssueAdd(payload);
+      emitVisaflowUiEvent(bridge, { type: "admin.issue.add", payload });
+      return true;
+    } catch {
+      setAdminAsyncError(
+        "Не удалось добавить замечание. Подача не была изменена. Повторите попытку.",
+      );
+      return false;
+    } finally {
+      adminIssuePendingRef.current = false;
+    }
   };
 
   const handleSignOut = () => {
@@ -452,20 +450,20 @@ export function AdminWorkspace({
     void signOut();
   };
 
-  const handleRemarkSubmit = (input: {
+  const handleRemarkSubmit = async (input: {
     field?: string;
     fileType?: SubmissionFileType;
     applicant?: string;
     message: string;
     severity: "warning" | "critical";
-  }) => {
-    if (!selectedSubmission) return;
-    const applicant = selectedSubmission.applicants.find(
-      (item) => item.fullName === input.applicant,
-    ) ?? selectedSubmission.applicants[0];
-    if (!applicant) return;
+  }): Promise<boolean> => {
+    if (!selectedSubmission) return false;
+    const applicant =
+      selectedSubmission.applicants.find((item) => item.fullName === input.applicant) ??
+      selectedSubmission.applicants[0];
+    if (!applicant) return false;
 
-    handleAddIssue({
+    return handleAddIssue({
       type: input.fileType ? "file" : input.field ? "field" : "section",
       applicantId: applicant.id,
       field: input.fileType ? undefined : input.field,
@@ -474,8 +472,8 @@ export function AdminWorkspace({
       reason: input.fileType
         ? `Требуется заменить файл «${input.field ?? input.fileType}»`
         : input.field
-        ? `Требуется исправить поле «${input.field}»`
-        : "Требуется исправить данные",
+          ? `Требуется исправить поле «${input.field}»`
+          : "Требуется исправить данные",
       comment: input.message,
       severity: input.severity === "critical" ? "blocker" : "warning",
     });
@@ -501,9 +499,7 @@ export function AdminWorkspace({
           className="h-8 w-8 rounded-lg object-cover shadow-[0_0_24px_rgba(111,100,255,0.10)]"
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[16px] font-[500] tracking-tight">
-            VisaFlow V-19
-          </div>
+          <div className="text-[16px] font-[500] tracking-tight">VisaFlow V-19</div>
         </div>
         <button
           aria-label="Закрыть меню администратора"
@@ -614,8 +610,7 @@ export function AdminWorkspace({
                   }}
                   className="flex h-10 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
                 >
-                  <ArrowLeftRight className="h-4 w-4 text-white/55" />В
-                  агентскую зону
+                  <ArrowLeftRight className="h-4 w-4 text-white/55" />В агентскую зону
                 </button>
               ) : null}
               <button
@@ -707,6 +702,7 @@ export function AdminWorkspace({
         onClose={() => setAdminDrawerOpen(false)}
         submissionId={selectedRow}
         submission={selectedSubmission}
+        returnFocusTarget={reviewDrawerReturnFocusRef.current}
         onVerifyDocument={handleVerifyDocument}
         onAddRemark={handleOpenRemark}
         onPrimaryAction={handleAdminPrimaryAction}
@@ -794,12 +790,8 @@ export function AdminWorkspace({
                 onOpenExport={() => navigateTo("export")}
               />
             )}
-            {activeNav === "export" && (
-              <AdminExportScreen submissions={submissions} />
-            )}
-            {usesSupabase && activeNav === "returns" && (
-              <AdminReturnPackagesScreen />
-            )}
+            {activeNav === "export" && <AdminExportScreen submissions={submissions} />}
+            {usesSupabase && activeNav === "returns" && <AdminReturnPackagesScreen />}
             {activeNav === "users" && (
               <AdminUsersAccessPanel
                 busy={accessRequestsBusy}

@@ -123,9 +123,21 @@ async function verifyRemarkSubmitActionability(
   await openDrawerTab(page, ["Анкета", "Данные"]).catch(() => undefined);
   await page.waitForTimeout(350);
 
-  const addRemarkButton = drawer(page)
-    .locator('[data-testid="admin-review-add-remark"], button[title="Добавить замечание"]')
-    .first();
+  const collapsedQuestionnaireSection = await firstVisible(
+    drawer(page).locator("details:not([open])"),
+  );
+  if (collapsedQuestionnaireSection) {
+    await collapsedQuestionnaireSection.locator("summary").click();
+  }
+
+  const addRemarkButton = await firstVisible(
+    drawer(page).locator(
+      '[data-testid="admin-review-add-remark"], button[title="Добавить замечание"]',
+    ),
+  );
+  if (!addRemarkButton) {
+    throw new Error("No visible in-drawer remark action was rendered.");
+  }
 
   await expect(addRemarkButton).toBeVisible();
   await addRemarkButton.evaluate((element) => {
@@ -166,8 +178,77 @@ async function verifyRemarkSubmitActionability(
   );
 }
 
+async function verifyEveryAdminDrawerSubview(
+  page: Page,
+  testInfo: TestInfo,
+  viewport: { height: number; width: number },
+) {
+  const browserProblems = collectBrowserProblems(page);
+  const tabs = [
+    ["overview", "Обзор"],
+    ["applicants", "Заявители"],
+    ["questionnaire", "Анкета"],
+    ["media", "Файлы"],
+    ["issues", "Замечания"],
+    ["history", "История"],
+  ] as const;
+  const captureTabs = new Set(tabs.map(([id]) => id));
+  const expectedPanelContent: Record<(typeof tabs)[number][0], RegExp> = {
+    overview: /Пакет на проверке/i,
+    applicants: /Нина Волкова|Заявители пока нет/i,
+    questionnaire: /Заявитель/i,
+    media: /Скан паспорта|Файлов пока нет/i,
+    issues: /Замечаний нет|Замечания не загружены/i,
+    history: /15\.06|История пока пуста/i,
+  };
+
+  await page.setViewportSize(viewport);
+  await openFreshWorkspace(page, {
+    heading: "Проверка",
+    workspaceEmail: "admin@visaflow.local",
+  });
+  if (viewport.width >= 768) {
+    await clickWorkspaceButton(page, /Проверка|Работа|Очередь/);
+  }
+  await openAdminSubmission(page, /Нина Волкова|ПД-1053/);
+
+  for (const [id, label] of tabs) {
+    await openDrawerTab(page, [label]);
+
+    const panel = drawer(page).getByRole("tabpanel").first();
+    await expect(panel).toBeVisible();
+    await expect(panel).toHaveCSS("opacity", "1");
+    await expect(panel).toContainText(expectedPanelContent[id]);
+
+    expect(
+      await page.evaluate(() => {
+        const browser = globalThis as unknown as {
+          document: { documentElement: { scrollWidth: number } };
+          innerWidth: number;
+        };
+        return browser.document.documentElement.scrollWidth <= browser.innerWidth;
+      }),
+    ).toBe(true);
+
+    if (captureTabs.has(id)) {
+      const screenshotPath = testInfo.outputPath(
+        `admin-drawer-${viewport.width}-${id}.png`,
+      );
+      await page.screenshot({ path: screenshotPath });
+      await testInfo.attach(`admin-drawer-${viewport.width}-${id}`, {
+        contentType: "image/png",
+        path: screenshotPath,
+      });
+    }
+  }
+
+  expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
+    [],
+  );
+}
+
 test.describe("V-19 pilot admin review click flow", () => {
-  test("admin passport reconciliation accepts the real passport scan", async ({
+  test("admin passport reconciliation stays blocked without protected evidence", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
@@ -185,18 +266,23 @@ test.describe("V-19 pilot admin review click flow", () => {
     await expect(drawer(page)).toBeVisible();
 
     await openDrawerTab(page, ["Файлы"]);
-    const passportRow = drawer(page)
-      .locator(".v19-drawer-file-item")
-      .filter({ hasText: "Скан паспорта" })
+    const verifyPassport = drawer(page)
+      .getByTestId("admin-review-verify-passport")
       .first();
-    await expect(passportRow).toBeVisible();
-    await passportRow.getByRole("button", { name: "Проверить" }).click();
+    await expect(verifyPassport).toBeVisible();
+    await verifyPassport.click();
 
-    await drawer(page).getByRole("button", { name: "Сверить" }).click();
-    const passportWorkspace = page.getByRole("dialog", {
-      name: "Сверка паспорта",
-    });
+    const passportWorkspace = page.locator(".v19-admin-passport-workspace");
     await expect(passportWorkspace).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Сверка паспорта", exact: true }),
+    ).toBeVisible();
+    await expect(
+      passportWorkspace.getByText("Предпросмотр оригинала недоступен"),
+    ).toBeVisible();
+    await expect(
+      passportWorkspace.getByRole("button", { name: "Завершить сверку" }),
+    ).toHaveCount(0);
 
     expect(
       await page.evaluate(() => {
@@ -208,15 +294,26 @@ test.describe("V-19 pilot admin review click flow", () => {
       }),
     ).toBe(true);
 
-    await passportWorkspace
-      .getByRole("button", { name: "Завершить сверку" })
-      .last()
-      .click();
-    await expect(passportWorkspace.getByText("Принято", { exact: true })).toBeVisible();
+    await passportWorkspace.getByRole("button", { name: "Вернуться к подаче" }).click();
+    await expect(drawer(page)).toBeVisible();
 
     expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
       [],
     );
+  });
+
+  test("admin drawer opens every subview without overflow on desktop and mobile", async (
+    { page },
+    testInfo,
+  ) => {
+    await verifyEveryAdminDrawerSubview(page, testInfo, {
+      height: 900,
+      width: 1440,
+    });
+    await verifyEveryAdminDrawerSubview(page, testInfo, {
+      height: 844,
+      width: 390,
+    });
   });
 
   for (const [label, viewport] of [

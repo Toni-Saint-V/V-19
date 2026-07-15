@@ -11,6 +11,7 @@ import {
   calculateSubmissionProgress,
   defaultDrawerTab,
   hasBlockingIssues,
+  hasMissingRequiredWork,
   hasUsableTripDateRange,
   isFixedIssueStatus,
   transitionSubmissionStatus,
@@ -300,7 +301,7 @@ export function acceptSubmission(
       "Acceptance is blocked until all issues are closed by admin.",
     );
   }
-  if (!canonicalRequiredMediaReadiness(submission).ok) {
+  if (hasMissingRequiredWork(submission)) {
     return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
   }
   if (!hasUsableTripDateRange(submission)) {
