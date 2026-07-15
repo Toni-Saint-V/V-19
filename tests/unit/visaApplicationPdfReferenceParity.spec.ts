@@ -2,13 +2,15 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 
-import { createReferenceVisaApplicationFormPdfBlob } from "../../src/modules/submissions/visaApplicationFormReferencePdf";
+import {
+  createReferenceVisaApplicationFormPdfBlob,
+  decodeVisaApplicationFormTemplate,
+} from "../../src/modules/submissions/visaApplicationFormReferencePdf";
 import {
   resolveVisaFormSelections,
   VisaApplicationFormRenderError,
   visaFormTextFits,
 } from "../../src/modules/submissions/visaApplicationFormRenderContract";
-import { VISA_APPLICATION_FORM_TEMPLATE_BASE64 } from "../../src/modules/submissions/visaApplicationFormTemplate";
 import type { VisaFormData } from "../../src/modules/submissions/visaApplicationFormPdf";
 
 type PdfTextItem = {
@@ -95,6 +97,21 @@ describe("visa application PDF reference parity", () => {
     for (const coordinate of sourceFieldCoordinates) {
       expect(templateCoordinates).not.toContain(coordinate);
     }
+  });
+
+  test("retains the exact EU flag image stream from the approved reference", async () => {
+    const filledReference = await readFile(filledReferencePath);
+    const template = decodeVisaApplicationFormTemplate();
+    const generated = new Uint8Array(
+      await createReferenceVisaApplicationFormPdfBlob(formData).arrayBuffer(),
+    );
+
+    expect(sha256(pdfObjectStream(template, 6))).toBe(
+      sha256(pdfObjectStream(filledReference, 6)),
+    );
+    expect(Buffer.from(generated).toString("latin1")).toContain(
+      "250 0 0 -168 0 168 cm /Im6 Do",
+    );
   });
 
   test("preserves the sanitised source bytes and writes data at extracted field baselines", async () => {
@@ -311,9 +328,18 @@ describe("visa application PDF reference parity", () => {
 });
 
 function decodeTemplate() {
-  return Uint8Array.from(atob(VISA_APPLICATION_FORM_TEMPLATE_BASE64), (character) =>
-    character.charCodeAt(0),
+  return decodeVisaApplicationFormTemplate();
+}
+
+function pdfObjectStream(bytes: Uint8Array, objectNumber: number) {
+  const source = Buffer.from(bytes).toString("latin1");
+  const match = source.match(
+    new RegExp(
+      `(?:^|\\n)${objectNumber} 0 obj\\n[\\s\\S]*?stream\\n([\\s\\S]*?)\\nendstream`,
+    ),
   );
+  if (!match?.[1]) throw new Error(`PDF object ${objectNumber} has no stream.`);
+  return Buffer.from(match[1], "latin1");
 }
 
 function sha256(bytes: Uint8Array) {

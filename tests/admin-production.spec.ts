@@ -3,9 +3,12 @@ import JSZip from "jszip";
 
 import {
   applySubmissionActionResult,
+  calculateSubmissionProgress,
   getPrimaryAction,
   markSubmissionIssueFixedResult,
 } from "../src/modules/submissions/status";
+import { canonicalRequiredMediaReadiness } from "../src/modules/submissions/domainContract";
+import { blsQuestionnaireReadiness } from "../src/modules/submissions/questionnaireBlsRules";
 import {
   applyExportStateToSelection,
 } from "../src/modules/submissions/submissionActions";
@@ -48,8 +51,9 @@ const defaultTripTo = "28.05.2026";
 function makeApplicant(index: number, passportNo: string, familyName: string): Applicant {
   const firstName = `Applicant${index}`;
   const surname = familyName.replace(/\s+/g, "") || `Family${index}`;
+  const applicantId = `app-${passportNo}`;
   return {
-    id: `app-${passportNo}`,
+    id: applicantId,
     fullName: `${firstName} ${surname}`,
     questionnaireStatus: "complete",
     fileStatus: "complete",
@@ -72,7 +76,7 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
     },
     sections: [
       {
-        id: "personal",
+        id: `${applicantId}-personal`,
         title: "Personal",
         status: "complete",
         fields: [
@@ -87,7 +91,7 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
         ],
       },
       {
-        id: "appointment",
+        id: `${applicantId}-appointment`,
         title: "Appointment",
         status: "complete",
         fields: [
@@ -95,10 +99,11 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
           field("visa-type", "Schengen"),
           field("visa-sub-type", "Tourism"),
           field("category", "Normal"),
+          field("desired-date-1", defaultTripFrom),
         ],
       },
       {
-        id: "passport",
+        id: `${applicantId}-passport`,
         title: "Passport",
         status: "complete",
         fields: [
@@ -111,7 +116,7 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
         ],
       },
       {
-        id: "contacts",
+        id: `${applicantId}-contacts`,
         title: "Contacts",
         status: "complete",
         fields: [
@@ -124,7 +129,7 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
         ],
       },
       {
-        id: "trip",
+        id: `${applicantId}-trip`,
         title: "Trip",
         status: "complete",
         fields: [
@@ -136,13 +141,15 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
           field("departure-date", defaultTripTo),
           field("travel-date", defaultTripFrom),
           field("stay-duration", "9"),
+          field("previous-biometrics", "Нет"),
         ],
       },
       {
-        id: "hotel",
+        id: `${applicantId}-hotel`,
         title: "Hotel",
         status: "complete",
         fields: [
+          field("inviting-party-type", "Гостиница/временное жилье"),
           field("hotel-name", "HOTEL"),
           field("hotel-country", "Spain"),
           field("hotel-city", "Madrid"),
@@ -154,7 +161,7 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
         ],
       },
       {
-        id: "employment",
+        id: `${applicantId}-employment`,
         title: "Employment",
         status: "complete",
         fields: [
@@ -163,7 +170,7 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
         ],
       },
       {
-        id: "payment",
+        id: `${applicantId}-payment`,
         title: "Payment",
         status: "complete",
         fields: [
@@ -235,7 +242,7 @@ function makeFilesForApplicant(
   const reviewStatus = status === "ready_for_export" ? "accepted" : "not_reviewed";
   const fileStatus = status === "ready_for_export" ? "accepted" : "pending_review";
   return [
-    makeFile(submissionId, applicantId, passportNo, "passport_scan", fileStatus, reviewStatus, "application/pdf", "pdf"),
+    makeFile(submissionId, applicantId, passportNo, "passport_scan", fileStatus, reviewStatus, "image/jpeg", "jpg"),
     makeFile(submissionId, applicantId, passportNo, "selfie", fileStatus, reviewStatus, "image/jpeg", "jpg"),
     makeFile(submissionId, applicantId, passportNo, "selfie_2", fileStatus, reviewStatus, "image/jpeg", "jpg"),
   ];
@@ -316,7 +323,17 @@ test("admin review cycle: return with issue, agent correction, admin acceptance 
   expect(corrections.data.status).toBe("corrections_received");
 
   const accepted = applySubmissionActionResult(corrections.data, "close_issues_accept", "admin", "admin-prod-test");
-  expect(accepted.ok).toBe(true);
+  expect(
+    accepted.ok,
+    accepted.ok
+      ? undefined
+      : JSON.stringify({
+          error: accepted.error.message,
+          media: canonicalRequiredMediaReadiness(corrections.data),
+          progress: calculateSubmissionProgress(corrections.data),
+          questionnaire: blsQuestionnaireReadiness(corrections.data),
+        }),
+  ).toBe(true);
   if (!accepted.ok) throw new Error(accepted.error.message);
   expect(accepted.data.status).toBe("ready_for_export");
   expect(accepted.data.exportState).toBe("ready");
@@ -435,7 +452,7 @@ test("admin export package: same-city sorting, Excel state, ZIP folders, passpor
   const zip = await JSZip.loadAsync(await zipResult.artifact.blob.arrayBuffer());
   const files = Object.keys(zip.files).filter((name) => !zip.files[name]!.dir);
   expect(files.some((name) => name.endsWith(".xlsx"))).toBe(true);
-  expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_passport_scan.pdf");
+  expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_passport_scan.jpg");
   expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_selfie_1.jpg");
   expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_selfie_2.jpg");
   expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_visa_form.pdf");
@@ -450,6 +467,14 @@ test("admin export package: same-city sorting, Excel state, ZIP folders, passpor
 
   const formPdf = await zip.file("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_visa_form.pdf")!.async("uint8array");
   expect(new TextDecoder().decode(formPdf.slice(0, 8))).toBe("%PDF-1.4");
+
+  const selfie = await zip.file("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_selfie_1.jpg")!.async("uint8array");
+  expect(Array.from(selfie.slice(0, 3))).toEqual([0xff, 0xd8, 0xff]);
+  expect(Array.from(selfie.slice(-2))).toEqual([0xff, 0xd9]);
+
+  const passport = await zip.file("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_passport_scan.jpg")!.async("uint8array");
+  expect(Array.from(passport.slice(0, 3))).toEqual([0xff, 0xd8, 0xff]);
+  expect(Array.from(passport.slice(-2))).toEqual([0xff, 0xd9]);
 
   const downloaded = applyExportStateToSelection(selectedGenerated, ids, "file_downloaded");
   expect(exportSummary(downloaded).canMarkExported).toBe(true);

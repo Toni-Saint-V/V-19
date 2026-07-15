@@ -806,7 +806,10 @@ export function AdminWorkspace({
       </aside>
 
       {/* Main Content */}
-      <main className="v19-admin-main flex-1 min-w-0 flex flex-col bg-[#141416]">
+      <main
+        aria-label="Рабочая область подач"
+        className="v19-admin-main flex-1 min-w-0 flex flex-col bg-[#141416]"
+      >
         {/* Topbar */}
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
           <div className="flex items-center gap-3">

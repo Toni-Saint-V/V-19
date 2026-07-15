@@ -397,6 +397,9 @@ describe("App production workspace runtime", () => {
   test("shows a blocking retry state instead of a false empty workspace on initial load failure", async () => {
     render(<App />);
     await screen.findByText("Загрузка данных Supabase...");
+    await waitFor(() => {
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    });
 
     await act(async () => {
       runtime.rejectLoad(new Error("Supabase read failed safely"));

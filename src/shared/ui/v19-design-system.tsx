@@ -330,6 +330,7 @@ export function V19PriorityHero({
   actionAriaLabel,
   actionDisabled = false,
   actionIcon: ActionIcon = Flame,
+  actionLabel,
   eyebrow,
   eyebrowIcon: EyebrowIcon,
   hasBlockers,
@@ -340,6 +341,7 @@ export function V19PriorityHero({
   actionAriaLabel: string;
   actionDisabled?: boolean;
   actionIcon?: V19SurfaceIcon;
+  actionLabel?: string;
   eyebrow: string;
   eyebrowIcon: V19SurfaceIcon;
   hasBlockers: boolean;
@@ -350,7 +352,7 @@ export function V19PriorityHero({
   return (
     <section
       aria-label={eyebrow}
-      className={`v19-admin-review-hero ${hasBlockers ? 'has-blockers' : 'is-clear'}`}
+      className={`v19-admin-review-hero ${hasBlockers ? 'has-blockers' : 'is-clear'} ${actionLabel ? 'has-action-label' : ''}`}
     >
       <div className="v19-admin-review-hero-copy">
         <span className="v19-admin-review-eyebrow">
@@ -361,7 +363,7 @@ export function V19PriorityHero({
       </div>
       <button
         aria-label={actionAriaLabel}
-        className={`v19-admin-review-priority-card ${hasBlockers ? 'has-blockers' : 'is-empty'}`}
+        className={`v19-admin-review-priority-card ${hasBlockers ? 'has-blockers' : 'is-empty'} ${actionLabel ? 'has-action-label' : ''}`}
         disabled={actionDisabled}
         type="button"
         onClick={onAction}
@@ -369,6 +371,9 @@ export function V19PriorityHero({
         <span className="v19-admin-review-priority-icon">
           <ActionIcon aria-hidden="true" />
         </span>
+        {actionLabel ? (
+          <span className="v19-admin-review-priority-action-label">{actionLabel}</span>
+        ) : null}
         <ChevronRight aria-hidden="true" />
       </button>
     </section>

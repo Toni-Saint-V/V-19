@@ -900,6 +900,7 @@ export function toCockpitDraftPersistencePayload(
     ensureSubmissionOwner(submission, ownerId),
     ownerId,
   );
+  const persistenceTimestamp = timestampOrNow(ownedSubmission.updatedAt);
 
   return {
     submission: {
@@ -923,19 +924,19 @@ export function toCockpitDraftPersistencePayload(
       appointment_status: appointmentStatusForSubmission(ownedSubmission),
       submitted_at:
         ownedSubmission.status === "submitted_for_review"
-          ? timestampOrNow(ownedSubmission.updatedAt)
+          ? persistenceTimestamp
           : null,
       review_started_at: null,
       accepted_at:
         ownedSubmission.status === "ready_for_export" ||
         ownedSubmission.status === "exported"
-          ? timestampOrNow(ownedSubmission.updatedAt)
+          ? persistenceTimestamp
           : null,
       exported_at:
         ownedSubmission.status === "exported"
-          ? timestampOrNow(ownedSubmission.updatedAt)
+          ? persistenceTimestamp
           : null,
-      updated_at: timestampOrNow(ownedSubmission.updatedAt),
+      updated_at: persistenceTimestamp,
     },
     applicants: ownedSubmission.applicants.map((applicant) =>
       toApplicantInsert(ownedSubmission, applicant),

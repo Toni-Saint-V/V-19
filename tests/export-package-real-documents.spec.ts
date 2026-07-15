@@ -42,7 +42,7 @@ test("ZIP contains real workbook and four real document files per applicant", as
   );
 
   const summary = exportSummary([submission]);
-  expect(summary.ready).toBe(true);
+  expect(summary.ready, JSON.stringify(summary.blockers)).toBe(true);
   expect(summary.canDownload).toBe(true);
   expect(summary.rowCount).toBe(2);
   expect(summary.rows[0].location).toBe("SPB");
@@ -255,6 +255,23 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
     role: id.endsWith("1") ? "main" : "spouse",
     questionnaireStatus: "complete",
     fileStatus: "complete",
+    passportExtraction: {
+      appliedFieldKeys: [
+        "passportNumber",
+        "passportType",
+        "passportIssuedAt",
+        "passportExpiresAt",
+      ],
+      attemptCount: 1,
+      extractedFields: [
+        verifiedPassportField("passportNumber", passportNo),
+        verifiedPassportField("passportType", "Ordinary Passport"),
+        verifiedPassportField("passportIssuedAt", "2016-02-26"),
+        verifiedPassportField("passportExpiresAt", "2032-02-26"),
+      ],
+      status: "ready",
+      verifiedAtIso: "2026-05-12T00:00:00.000Z",
+    },
     sections: [
       section("personal", [
         field("surname", surname),
@@ -271,7 +288,7 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
         field("passport-type", "Ordinary Passport"),
         field("passport-no", passportNo),
         field("passport-issue-date", "2016-02-26"),
-        field("passport-expiry-date", "2026-02-26"),
+        field("passport-expiry-date", "2032-02-26"),
         field("passport-issue-place", "MVD 78039"),
         field("passport-issue-country", "Russian Federation"),
       ]),
@@ -317,6 +334,20 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
         field("means-of-support", "Cash"),
       ]),
     ],
+  };
+}
+
+function verifiedPassportField(
+  key: "passportNumber" | "passportType" | "passportIssuedAt" | "passportExpiresAt",
+  value: string,
+) {
+  return {
+    confidence: "high" as const,
+    key,
+    needsManualReview: false,
+    source: "passport_scan" as const,
+    value,
+    verified: true,
   };
 }
 

@@ -1403,6 +1403,22 @@
     transform var(--v19b-motion-fast);
 }
 
+.v19-admin-review-priority-card.has-action-label {
+  grid-template-columns: var(--v19b-size-40) minmax(var(--v19b-size-0), auto) var(
+      --v19b-size-16
+    );
+}
+
+.v19-admin-review-priority-action-label {
+  overflow: hidden;
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-control);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (hover: hover) {
   .v19-admin-review-priority-card:hover {
     border-color: var(--v19b-admin-red);
@@ -2709,6 +2725,10 @@
     border-radius: var(--v19b-radius-control);
   }
 
+  .v19-admin-review-hero.has-action-label {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  }
+
   .v19-admin-review-hero h2 {
     font-size: var(--v19b-size-16);
     line-height: var(--v19b-line-height-row);
@@ -2739,6 +2759,25 @@
 
   .v19-admin-review-priority-card > svg {
     display: none;
+  }
+
+  .v19-admin-review-priority-card.has-action-label {
+    grid-template-columns: var(--v19b-size-32) auto;
+    gap: var(--v19b-size-6);
+    min-width: var(--v19b-size-0);
+    padding: var(--v19b-size-6) var(--v19b-size-8);
+    border-radius: var(--v19b-radius-control);
+  }
+
+  .v19-admin-review-priority-card.has-action-label .v19-admin-review-priority-icon {
+    width: var(--v19b-size-32);
+    height: var(--v19b-size-32);
+  }
+
+  .v19-admin-review-priority-card.has-action-label
+    .v19-admin-review-priority-action-label {
+    display: block;
+    font-size: var(--v19b-size-11);
   }
 
   :is(.v19-admin-review-metrics, .v19-admin-export-metrics-v2) .v19-summary-tile {
@@ -25463,6 +25502,15 @@ body,
   gap: var(--v19b-size-4);
 }
 
+.v19-legacy-action-context {
+  overflow: hidden;
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-11);
+  line-height: var(--v19b-line-height-row);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .v19-legacy-action-title-line {
   display: flex;
   align-items: center;
@@ -25619,11 +25667,18 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   white-space: nowrap;
 }
 
-.v19-legacy-action-city > span {
+.v19-legacy-action-city > span[aria-hidden="true"] {
   width: var(--v19b-size-4);
   height: var(--v19b-size-4);
   border-radius: var(--v19b-radius-pill);
   background: var(--v19b-color-text-faint);
+}
+
+.v19-legacy-action-city-label {
+  min-width: var(--v19b-size-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .v19-legacy-action-badges {
@@ -25901,6 +25956,19 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 
   .v19-legacy-actions-summary .v19-summary-tile-label {
     font-size: var(--v19b-size-8);
+  }
+
+  .v19-legacy-action-city-label {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .v19-legacy-action-context {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
   }
 }
 
@@ -28215,5 +28283,62 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 
   [data-admin-review-drawer-surface="workspace"] .admin-review-field-table {
     grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+}
+
+/* Agent actions keeps the active queue state legible beside the tablet sidebar. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-review-board
+    .v19-two-row-toolbar-filters {
+    grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-review-board
+    .v19-admin-city-filter {
+    width: var(--v19b-size-full) !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-review-board
+    .v19-admin-city-filter
+    .v19-admin-toolbar-select-trigger {
+    justify-content: flex-start !important;
+    gap: var(--v19b-size-6);
+    padding-inline: var(--v19b-size-8) !important;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-review-board
+    .v19-admin-city-filter
+    .v19-admin-toolbar-select-chevron {
+    display: none !important;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-review-board
+    .v19-admin-city-filter
+    .v19-admin-toolbar-select-value {
+    display: block !important;
+    min-width: var(--v19b-size-0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 360px) {
+  section[data-testid="agent-actions-screen"] .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    grid-template-rows: var(--v19b-size-40) auto !important;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-admin-queue-toolbar .v19-two-row-toolbar-filters {
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-admin-queue-toolbar .v19-admin-city-filter {
+    grid-column: 1 / -1;
   }
 }

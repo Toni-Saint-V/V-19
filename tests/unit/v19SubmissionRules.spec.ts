@@ -332,6 +332,27 @@ describe("V-19 submission status rules", () => {
     expect(applySubmissionAction(incomplete, "accept", "admin")).toBe(incomplete);
   });
 
+  it("keeps the corrected demo family ready for explicit admin closeout", () => {
+    const corrected = byId("ПД-1055");
+
+    expect(hasMissingRequiredWork(corrected)).toBe(false);
+    expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
+      ok: true,
+    });
+
+    const accepted = applySubmissionAction(
+      corrected,
+      "close_issues_accept",
+      "admin",
+      "local-demo-admin",
+    );
+
+    expect(accepted.status).toBe("ready_for_export");
+    expect(accepted.issues.every((issue) => issue.status === "closed_by_admin")).toBe(
+      true,
+    );
+  });
+
   it("blocks review submission while trip dates are missing", () => {
     const draft = createDraftSubmission({
       city: "Москва",
