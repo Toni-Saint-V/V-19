@@ -104,6 +104,30 @@ function withQuestionnaireFieldValues(
   };
 }
 
+function withApplicantQuestionnaireFieldValues(
+  submission: Submission,
+  applicantIndex: number,
+  values: Record<string, string>,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant, index) =>
+      index === applicantIndex
+        ? {
+            ...applicant,
+            sections: applicant.sections.map((section) => ({
+              ...section,
+              fields: section.fields.map((field) => ({
+                ...field,
+                value: values[field.id] ?? field.value,
+              })),
+            })),
+          }
+        : applicant,
+    ),
+  };
+}
+
 function withApplicantPassports(
   submission: Submission,
   passportNumbers: string[],
@@ -289,6 +313,232 @@ describe("V-19 export workbook contract", () => {
       applicantMobile: "9001112233",
       addressContactNo: "79001112233",
     });
+  });
+
+  test("preserves canonical identity and sponsor fields in the parsed workbook", async () => {
+    const submission = withQuestionnaireFieldValues(readySubmission(), {
+      "arrival-date": "04.09.2026",
+      "birth-citizenship": "USSR",
+      "birth-country": "Russian Federation",
+      "birth-date": "17.06.1993",
+      "birth-place": "TULA",
+      category: "Normal",
+      "company-contact-person": "MARIA LOPEZ",
+      "company-phone": "+34 900 000 777",
+      "contact-number": "+7 900 111-22-33",
+      "cost-covered-by": "Спонсор",
+      "departure-date": "14.09.2026",
+      email: "olga@example.com",
+      "employer-address": "10 WORK ROAD",
+      "employer-contact": "+7 900 222-33-44",
+      "employer-name": "EXAMPLE LLC",
+      "entry-count": "Двукратная",
+      "first-name": "OLGA",
+      gender: "Женский",
+      "home-address": "1 HOME STREET",
+      "home-city": "MOSCOW",
+      "home-country": "Russian Federation",
+      "hotel-address": "1 HOTEL ROAD",
+      "hotel-city": "MADRID",
+      "hotel-contact": "+34 900 000 111",
+      "hotel-country": "Spain",
+      "hotel-email": "hotel@example.com",
+      "hotel-name": "HOST COMPANY",
+      "hotel-postal-code": "28001",
+      "inviting-party-type": "Приглашающая компания/организация",
+      "marital-status": "Холост/не замужем",
+      "means-of-support": "",
+      nationality: "Russian Federation",
+      occupation: "OTHER",
+      "occupation-specify": "PRODUCT MANAGER",
+      "passport-no": "AB 12-34 567",
+      "passport-expiry-date": "20.02.2034",
+      "passport-issue-country": "Russian Federation",
+      "passport-issue-date": "20.02.2024",
+      "passport-issue-place": "MVD 77001",
+      "passport-type": "Ordinary Passport",
+      "postal-code": "119991",
+      "previous-surname": "SMITH",
+      purpose: "OTHER",
+      "sponsor-in-host-fields": "Да",
+      "sponsor-means": "Все расходы оплачиваются",
+      "stay-duration": "11",
+      "stay-purpose-details": "CONFERENCE",
+      surname: "MOROZOVA",
+    });
+    const rows = buildExportContractRows([submission]);
+    const identity = buildExportPackageIdentity([submission]);
+    if (!identity) throw new Error("expected package identity");
+
+    const parsed = await parseExportWorkbookArtifact(
+      createExportWorkbookArtifact(rows, identity),
+    );
+    const headers = parsed.rows[0] ?? [];
+    const row = parsed.rows[1] ?? [];
+    const valueFor = (header: string) => row[headers.indexOf(header)] ?? "";
+
+    const expectedByHeader: Record<string, string> = {
+      Location: "MOW",
+      "Visa Type": "C",
+      "Visa Sub Type": "CONFERENCE",
+      "Appointment Category(Normal)": "NORMAL",
+      "Applicant Email": "olga@example.com",
+      "Applicant Mobile(10 Digit, No space or -,leading zero)": "9001112233",
+      "Passport No": "AB1234567",
+      "Surname (Family Name)": "MOROZOVA",
+      "Surname At Birth": "SMITH",
+      FirstName: "OLGA",
+      LastName: "MOROZOVA",
+      "Date of Birth(YYYY-MM-DD)": "1993-06-17",
+      "Place Of Birth": "TULA",
+      "Country Of Birth": "Russian Federation",
+      "Current Nationality": "Russian Federation",
+      "Gender(Male/Female)": "Female",
+      "Marital Status(Single/Married)": "Single",
+      "TravelDate(YYYY-MM-DD)": "2026-09-04",
+      "Passport Type(Ordinary Passport)": "Ordinary Passport",
+      "Passport Issue Date(YYYY-MM-DD)": "2024-02-20",
+      "Passport Expiry Date(YYYY-MM-DD)": "2034-02-20",
+      "Passport Issue Place": "MVD 77001",
+      "Passport Issue Country": "Russian Federation",
+      "Address Line 1": "1 HOME STREET",
+      "Address City": "MOSCOW",
+      "Address Postal Code": "119991",
+      "Address Contact No": "79001112233",
+      "Address Country": "Russian Federation",
+      "Employer Name": "EXAMPLE LLC",
+      "Employer Contact No": "79002223344",
+      "Employer Address": "10 WORK ROAD",
+      "Employer Occupation": "PRODUCT MANAGER",
+      "Purpose of journey": "OTHER",
+      "Stay Duration in Days": "11",
+      "Number of Entries Requested(Single Entry/Two Entry/Multiple Entry)": "TWO",
+      "Intended Date Of Arrival": "2026-09-04",
+      "Intended Date Of Departure": "2026-09-14",
+      "Inviting Company Name": "HOST COMPANY",
+      "Inviting Company Country": "Spain",
+      "Inviting Company City": "MADRID",
+      "Inviting Company Zip Code": "28001",
+      "Inviting Company Email": "hotel@example.com",
+      "Inviting Company Address": "1 HOTEL ROAD",
+      "Inviting Company Contact No": "34900000777",
+      "Contact Person First Name": "MARIA LOPEZ",
+      "Contact Person Last Name": "",
+      "Contact Person Country": "Spain",
+      "Contact Person City": "MADRID",
+      "Contact Person Zip Code": "28001",
+      "Contact Person address": "1 HOTEL ROAD",
+      "Contact Person Email": "hotel@example.com",
+      "Contact Person Mobile": "34900000777",
+      "Cost Covered By(Sponsor/Applicant)": "Sponsor",
+      "Means Of Support(Accommodation Provided/All expenses covered/Cash/CreditCard)":
+        "All expenses covered",
+      "Appointment Type(For Family, applicant email and contact number should be same for all family members)":
+        "Individual",
+      "Nationality At Birth": "USSR",
+    };
+
+    expect(Object.keys(expectedByHeader)).toEqual(headers);
+    for (const [header, expected] of Object.entries(expectedByHeader)) {
+      expect(valueFor(header), header).toBe(expected);
+    }
+  });
+
+  test("does not leak hidden stale company contact fields into hotel rows", () => {
+    const [row] = buildExportContractRows([
+      withQuestionnaireFieldValues(readySubmission(), {
+        "company-contact-person": "STALE COMPANY CONTACT",
+        "company-phone": "+34 900 000 999",
+        "hotel-contact": "+34 900 000 111",
+        "hotel-name": "HOTEL MADRID",
+        "inviting-party-type": "Гостиница/временное жилье",
+        purpose: "TOURISM",
+      }),
+    ]);
+
+    expect(row?.contactPersonFirstName).toBe("HOTEL MADRID");
+    expect(row?.contactPersonMobile).toBe("34900000111");
+    expect(row?.invitingCompanyContactNo).toBe("34900000111");
+  });
+
+  test("fails closed when questionnaire means cannot be represented by the Excel contract", () => {
+    const applicantMeans = exportSummary([
+      withQuestionnaireFieldValues(readySubmission(), {
+        "cost-covered-by": "Сам заявитель",
+        "means-of-support": "Дорожные чеки",
+      }),
+    ]);
+    const sponsorMeans = exportSummary([
+      withQuestionnaireFieldValues(readySubmission(), {
+        "cost-covered-by": "Спонсор",
+        "means-of-support": "",
+        "sponsor-in-host-fields": "Да",
+        "sponsor-means": "Транспорт предоплачен",
+      }),
+    ]);
+
+    for (const plan of [applicantMeans, sponsorMeans]) {
+      expect(plan.ready).toBe(false);
+      expect(plan.canGenerate).toBe(false);
+      expect(plan.blockers.map((blocker) => blocker.reason)).toContain(
+        "В строках выгрузки есть способ оплаты, который не поддерживается Excel-контрактом",
+      );
+    }
+  });
+
+  test("fails closed for duplicate passports and repeated applicant identity profiles", () => {
+    const primary = readySubmission();
+    const duplicatePassport = withSubmissionIdentity(
+      primary,
+      "ПД-DUPLICATE-PASSPORT",
+      "Duplicate passport",
+    );
+    const repeatedIdentity = withQuestionnaireFieldValues(
+      withSubmissionIdentity(primary, "ПД-DUPLICATE-IDENTITY", "Duplicate identity"),
+      { "passport-no": "AB9876543" },
+    );
+
+    const passportPlan = exportSummary([primary, duplicatePassport]);
+    const identityPlan = exportSummary([primary, repeatedIdentity]);
+
+    expect(passportPlan.ready).toBe(false);
+    expect(passportPlan.blockers.map((blocker) => blocker.reason)).toContain(
+      "В строках выгрузки повторяется номер паспорта у разных заявителей",
+    );
+    expect(identityPlan.ready).toBe(false);
+    expect(identityPlan.blockers.map((blocker) => blocker.reason)).toContain(
+      "В строках выгрузки повторяются ФИО и дата рождения у разных заявителей",
+    );
+  });
+
+  test("fails closed when family contacts differ or applicant mobile is not 10 digits", () => {
+    const familyWithDifferentEmail = withApplicantQuestionnaireFieldValues(
+      byId("SUB-1102"),
+      1,
+      { email: "another-family-member@example.com" },
+    );
+    const familyWithDifferentPhone = withApplicantQuestionnaireFieldValues(
+      byId("SUB-1102"),
+      2,
+      { "contact-number": "+7 900 555-01-02" },
+    );
+    const invalidMobile = withQuestionnaireFieldValues(readySubmission(), {
+      "contact-number": "+34 600 123 456",
+    });
+
+    for (const family of [familyWithDifferentEmail, familyWithDifferentPhone]) {
+      const plan = exportSummary([family]);
+      expect(plan.ready).toBe(false);
+      expect(plan.blockers.map((blocker) => blocker.reason)).toContain(
+        "В семейной подаче email и телефон должны совпадать у всех заявителей",
+      );
+    }
+
+    const mobilePlan = exportSummary([invalidMobile]);
+    expect(mobilePlan.ready).toBe(false);
+    expect(mobilePlan.blockers.map((blocker) => blocker.reason)).toContain(
+      "В строках выгрузки есть телефон заявителя не в формате 10 цифр",
+    );
   });
 
   test("does not pre-fill questionnaire name fields from applicant display names", () => {
@@ -675,25 +925,33 @@ describe("V-19 export workbook contract", () => {
   test("allows same-city mixed-agent export with warning and no external Agent column", () => {
     const primary = readySubmission();
     const alternateApplicantId = "з-mixed-agent-1";
-    const alternate: Submission = {
-      ...primary,
-      agentId: "local-agent-partner",
-      applicants: primary.applicants.map((applicant) => ({
-        ...applicant,
-        fullName: "OLGA MOROZOVA",
-        id: alternateApplicantId,
-      })),
-      files: primary.files.map((file) => ({
-        ...file,
-        applicantId: alternateApplicantId,
-        id: `mixed-agent-${file.id}`,
-      })),
-      id: "ПД-MIXED-AGENT",
-      title: "Ольга Морозова",
-    };
+    const alternate = withQuestionnaireFieldValues(
+      {
+        ...primary,
+        agentId: "local-agent-partner",
+        applicants: primary.applicants.map((applicant) => ({
+          ...applicant,
+          fullName: "OLGA MOROZOVA",
+          id: alternateApplicantId,
+        })),
+        files: primary.files.map((file) => ({
+          ...file,
+          applicantId: alternateApplicantId,
+          id: `mixed-agent-${file.id}`,
+        })),
+        id: "ПД-MIXED-AGENT",
+        title: "Ольга Морозова",
+      },
+      {
+        "birth-date": "1993-06-17",
+        "first-name": "OLGA",
+        "passport-no": "675450001",
+        surname: "MOROZOVA",
+      },
+    );
     const plan = exportSummary([primary, alternate]);
 
-    expect(plan.ready).toBe(true);
+    expect(plan.ready, JSON.stringify(plan.blockers)).toBe(true);
     expect(plan.canGenerate).toBe(true);
     expect(plan.blockers.map((blocker) => blocker.reason)).not.toContain(
       "Нельзя смешивать подачи разных агентов",
@@ -811,21 +1069,29 @@ describe("V-19 export workbook contract", () => {
   test("keeps generated multi-row package members selectable while blocker rows are hidden", () => {
     const primary = readySubmission();
     const alternateApplicantId = "з-generated-selection-2";
-    const secondary: Submission = {
-      ...primary,
-      applicants: primary.applicants.map((applicant) => ({
-        ...applicant,
-        fullName: "IVAN PETROV",
-        id: alternateApplicantId,
-      })),
-      files: primary.files.map((file) => ({
-        ...file,
-        applicantId: alternateApplicantId,
-        id: `generated-package-${file.id}`,
-      })),
-      id: "ПД-GENERATED-2",
-      title: "Иван Петров",
-    };
+    const secondary = withQuestionnaireFieldValues(
+      {
+        ...primary,
+        applicants: primary.applicants.map((applicant) => ({
+          ...applicant,
+          fullName: "IVAN PETROV",
+          id: alternateApplicantId,
+        })),
+        files: primary.files.map((file) => ({
+          ...file,
+          applicantId: alternateApplicantId,
+          id: `generated-package-${file.id}`,
+        })),
+        id: "ПД-GENERATED-2",
+        title: "Иван Петров",
+      },
+      {
+        "birth-date": "1987-04-12",
+        "first-name": "IVAN",
+        "passport-no": "675450002",
+        surname: "PETROV",
+      },
+    );
     const generated = applyExportStateToSelection(
       [primary, secondary],
       [primary.id, secondary.id],
@@ -836,7 +1102,12 @@ describe("V-19 export workbook contract", () => {
       files: primary.files.filter((file) => file.type !== "selfie_2"),
     };
 
-    expect(generated.every(isSubmissionSelectableForExport)).toBe(true);
+    expect(
+      generated.every(isSubmissionSelectableForExport),
+      JSON.stringify(
+        generated.map((submission) => exportSummary([submission]).blockers),
+      ),
+    ).toBe(true);
     expect(exportSummary([generated[0]!]).ready).toBe(false);
     expect(isSubmissionSelectableForExport(missingMedia)).toBe(false);
   });

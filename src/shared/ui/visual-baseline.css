@@ -4419,6 +4419,21 @@
   color: var(--v19b-color-primary-text);
 }
 
+.v19-agent-submissions-board
+  :is(.v19-applicant-card-status, .v19-applicant-individual-status).is-review {
+  color: var(--vf-warning);
+}
+
+.v19-agent-submissions-board
+  :is(.v19-applicant-card-status, .v19-applicant-individual-status).is-ready {
+  color: var(--vf-success);
+}
+
+.v19-agent-submissions-board
+  :is(.v19-applicant-card-status, .v19-applicant-individual-status).is-returned {
+  color: var(--vf-danger);
+}
+
 .v19-agent-submissions-board .v19-applicant-member-cell {
   display: flex;
   min-width: var(--v19b-size-0);

@@ -16,6 +16,51 @@ afterEach(() => {
 });
 
 describe("AdminReviewDrawer visual hierarchy", () => {
+  test("uses roving tab focus and arrow, Home, and End navigation", async () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
+    if (!submission) throw new Error("Expected admin review fixture.");
+
+    render(
+      <AdminReviewDrawer
+        isOpen
+        submission={submission}
+        submissionId={submission.id}
+        onAddRemark={vi.fn()}
+        onClose={vi.fn()}
+        onVerifyDocument={vi.fn()}
+      />,
+    );
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(6);
+    expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
+
+    const mediaTab = screen.getByRole("tab", { name: /Файлы/ });
+    fireEvent.keyDown(mediaTab, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /Замечания/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+
+    fireEvent.keyDown(screen.getByRole("tab", { name: /Замечания/ }), { key: "Home" });
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Обзор" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Обзор" }), { key: "End" });
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /История/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+  });
+
   test("renders queue ids as tags and lane totals as applicant counts", () => {
     const review = initialSubmissions.find((item) => item.id === "ПД-1053");
     const returned = initialSubmissions.find((item) => item.id === "ПД-1055");

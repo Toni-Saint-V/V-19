@@ -272,17 +272,29 @@ test.describe("V-19 pilot admin review click flow", () => {
     async ({ page }, testInfo) => {
       const browserProblems = collectBrowserProblems(page);
       const screens = [
-        { fileName: "review", heading: "Проверка", nav: /^Проверка$/ },
-        { fileName: "export", heading: "Выгрузка", nav: /^Выгрузка$/ },
+        {
+          fileName: "review",
+          heading: "Проверка",
+          nav: /^Проверка$/,
+          readyText: "Очередь готова к проверке",
+        },
+        {
+          fileName: "export",
+          heading: "Выгрузка",
+          nav: /^Выгрузка$/,
+          readyText: "Пакеты к выгрузке",
+        },
         {
           fileName: "users",
           heading: "Управление пользователями",
           nav: /^Пользователи$/,
+          readyText: "Заявки на доступ",
         },
         {
           fileName: "settings",
           heading: "Системные настройки",
           nav: /^Настройки$/,
+          readyText: "Уведомления",
         },
       ] as const;
 
@@ -301,6 +313,14 @@ test.describe("V-19 pilot admin review click flow", () => {
           await expect(
             page.getByRole("heading", { level: 1, name: screen.heading }),
           ).toBeVisible();
+          await expect(page.getByText(screen.readyText, { exact: true }).first()).toBeVisible();
+          if (viewport.width < 768 && screen.fileName === "settings") {
+            const activeSettingsTab = page.locator(
+              ".settings-nav button[aria-current='page']",
+            );
+            await expect(activeSettingsTab).toHaveText("Уведомления");
+            await expectWithinViewport(page, activeSettingsTab);
+          }
           expect(
             await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
           ).toBe(true);

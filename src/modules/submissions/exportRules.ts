@@ -18,6 +18,7 @@ import { hasUsableTripDateRange } from "./status";
 import {
   buildExportContractRows,
   buildExportPreview,
+  exportContractDataIssues,
   exportContractColumns,
   exportContractFingerprint,
   type ExportContractColumnKey,
@@ -109,6 +110,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   );
   const rows = buildExportRows(submissions);
   const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
+  const rowDataIssues = new Set(exportContractDataIssues(rows));
   const applicantsWithIncompleteVisaForm = submissions.flatMap((submission) =>
     submission.applicants.filter(
       (applicant) => !validateVisaApplicationFormData(submission, applicant).ok,
@@ -156,6 +158,39 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
 
   if (rowsWithMissingApplicantName.length > 0) {
     blockers.push({ reason: "В строках выгрузки есть заявители без ФИО" });
+  }
+
+  if (rowDataIssues.has("unsupported_means")) {
+    blockers.push({
+      reason:
+        "В строках выгрузки есть способ оплаты, который не поддерживается Excel-контрактом",
+    });
+  }
+
+  if (rowDataIssues.has("invalid_applicant_mobile")) {
+    blockers.push({
+      reason: "В строках выгрузки есть телефон заявителя не в формате 10 цифр",
+    });
+  }
+
+  if (rowDataIssues.has("duplicate_passport")) {
+    blockers.push({
+      reason: "В строках выгрузки повторяется номер паспорта у разных заявителей",
+    });
+  }
+
+  if (rowDataIssues.has("duplicate_identity")) {
+    blockers.push({
+      reason:
+        "В строках выгрузки повторяются ФИО и дата рождения у разных заявителей",
+    });
+  }
+
+  if (rowDataIssues.has("family_contact_mismatch")) {
+    blockers.push({
+      reason:
+        "В семейной подаче email и телефон должны совпадать у всех заявителей",
+    });
   }
 
   if (applicantsWithIncompleteVisaForm.length > 0) {

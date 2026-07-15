@@ -3,6 +3,7 @@ import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/v
 import type { Submission as CanonicalSubmission, SubmissionAction } from '../modules/submissions/types';
 import { fileTypeLabels, statusLabelFor } from '../modules/submissions/status';
 import { agentDisplayName } from '../modules/submissions/agentDirectory';
+import { questionnaireCityForSubmission } from '../modules/submissions/selectors';
 import { actionGate } from './v19BusinessScreenAdapter';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -254,6 +255,7 @@ const QuestionnaireTab = ({ data, onOpenQuestionnaire }: { data: SubmissionDetai
 
 const FilesTab = ({ data, onOpenDocuments }: { data: SubmissionDetail; onOpenDocuments?: () => void }) => {
   const readyCount = data.documents.filter((document) => document.status === 'done').length;
+  const hasPendingDocuments = readyCount < data.documents.length;
   return (
     <section className="v19-submission-drawer-stack" aria-labelledby="drawer-files-title">
       <div className="v19-submission-drawer-section-head">
@@ -263,6 +265,11 @@ const FilesTab = ({ data, onOpenDocuments }: { data: SubmissionDetail; onOpenDoc
         </div>
         <span className="v19-submission-drawer-count">{readyCount}/{data.documents.length}</span>
       </div>
+      {hasPendingDocuments && onOpenDocuments ? (
+        <button className="v19-submission-drawer-secondary" onClick={onOpenDocuments} type="button">
+          Перейти к сбору документов
+        </button>
+      ) : null}
       {data.documents.length > 0 ? (
         <div className="v19-submission-drawer-files">
           {data.documents.map((document, index) => (
@@ -304,7 +311,15 @@ function getIssuesEmptyCopy(status: SubmissionStatus) {
   return { title: 'Открытых замечаний нет', description: 'Все замечания исправлены или закрыты.', stage: 'Все задачи закрыты', tone: 'complete' };
 }
 
-const IssuesTab = ({ data, onOpenQuestionnaire }: { data: SubmissionDetail, onOpenQuestionnaire?: () => void }) => {
+const IssuesTab = ({
+  data,
+  onOpenDocuments,
+  onOpenQuestionnaire,
+}: {
+  data: SubmissionDetail;
+  onOpenDocuments?: () => void;
+  onOpenQuestionnaire?: () => void;
+}) => {
   const emptyCopy = getIssuesEmptyCopy(data.status);
   return (
   <div className="v19-submission-drawer-issues">
@@ -349,6 +364,15 @@ const IssuesTab = ({ data, onOpenQuestionnaire }: { data: SubmissionDetail, onOp
                 Исправить в анкете
               </button>
             </div> : null}
+            {(issue.type === 'file' || issue.type === 'media') && onOpenDocuments ? <div className="sm:w-[180px] shrink-0 flex items-center">
+              <button
+                onClick={onOpenDocuments}
+                className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[13px] font-medium text-white transition-colors"
+                type="button"
+              >
+                Исправить файл
+              </button>
+            </div> : null}
           </div>
         ))}
       </div>
@@ -381,7 +405,7 @@ function detailFromCanonicalSubmission(submission: CanonicalSubmission): Submiss
         ? Math.round((applicant.sections.filter((section) => section.status === 'complete').length / applicant.sections.length) * 100)
         : submission.completeness.questionnaire,
     })),
-    city: submission.city,
+    city: questionnaireCityForSubmission(submission),
     tripDates: tripDatesLabel(submission.tripDateFrom, submission.tripDateTo),
     status: submission.status === 'requires_action' ? 'returned' : submission.status,
     completeness: submission.completeness.total,
@@ -828,7 +852,13 @@ export function Drawer({
                       {activeTab === 'applicants' && <ApplicantsTab data={data} />}
                       {activeTab === 'questionnaire' && <QuestionnaireTab data={data} onOpenQuestionnaire={onOpenQuestionnaire} />}
                       {activeTab === 'files' && <FilesTab data={data} onOpenDocuments={onOpenDocuments} />}
-                      {activeTab === 'issues' && <IssuesTab data={data} onOpenQuestionnaire={onOpenQuestionnaire} />}
+                      {activeTab === 'issues' && (
+                        <IssuesTab
+                          data={data}
+                          onOpenDocuments={onOpenDocuments}
+                          onOpenQuestionnaire={onOpenQuestionnaire}
+                        />
+                      )}
                       {activeTab === 'history' && <HistoryTab data={data} />}
                     </motion.div>
                   </AnimatePresence>
