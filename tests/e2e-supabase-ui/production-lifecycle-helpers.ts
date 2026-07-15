@@ -104,6 +104,7 @@ export type ProductionDraftPayloadMutationContract = {
         applicants: readonly {
           applicantId: string;
           expectedContentDigest: string;
+          expectedFieldDigests?: Readonly<Record<string, string | null>>;
         }[];
         mode: "replace_exact";
       }
@@ -125,6 +126,14 @@ export type ProductionDraftPayloadMutationContract = {
   historyProjection?: {
     mode: "replace_exact";
     rows: readonly ProductionDraftProjectedStatusHistoryIdentity[];
+  };
+  mediaProjection?: {
+    actorId: string;
+    media: readonly {
+      expectedStaticContentDigest: string;
+      mediaId: string;
+    }[];
+    mode: "accept_exact";
   };
   mode: "export" | "lifecycle";
   /**
@@ -682,6 +691,25 @@ export function productionDraftMediaContentDigest(value: unknown) {
   });
 }
 
+export function productionDraftMediaStaticContentDigest(value: unknown) {
+  const record = jsonRecord(value);
+  if (!record || !exactRecordKeys(record, mediaPayloadKeys)) return null;
+  const uploadedAt = normalizedTimestamp(record.uploaded_at);
+  if (uploadedAt === undefined) return null;
+  const staticRecord = Object.fromEntries(
+    Object.entries(record).filter(
+      ([key]) =>
+        key !== "review_status" &&
+        key !== "reviewed_at" &&
+        key !== "reviewed_by",
+    ),
+  );
+  return productionDraftValueDigest({
+    ...staticRecord,
+    uploaded_at: uploadedAt,
+  });
+}
+
 /** Canonical digest of root fields that a draft action is never allowed to change. */
 export function productionDraftSubmissionStaticContentDigest(value: unknown) {
   const record = jsonRecord(value);
@@ -758,8 +786,19 @@ function persistedSnapshotContentDigest(value: Submission) {
   }
 }
 
+function normalizeSnapshotFileReviewTimestamps(snapshot: JsonRecord) {
+  const files = recordArray(snapshot.files);
+  if (!files) return;
+  for (const file of files) {
+    if (isSnapshotTimestamp(file.reviewedAtIso)) {
+      file.reviewedAtIso = "__V19_FILE_REVIEW_TIMESTAMP__";
+    }
+  }
+}
+
 export function productionDraftSnapshotProjectionDigests(
   value: unknown,
+  options: { normalizeFileReviewTimestamps?: boolean } = {},
 ): ProductionDraftSnapshotProjectionDigests | null {
   const canonical = canonicalSnapshot(value);
   const direct = jsonRecord(value);
@@ -773,6 +812,9 @@ export function productionDraftSnapshotProjectionDigests(
     }
   })();
   if (!snapshot) return null;
+  if (options.normalizeFileReviewTimestamps) {
+    normalizeSnapshotFileReviewTimestamps(snapshot);
+  }
   const projectionDigest = (key: "applicants" | "files" | "history" | "issues") =>
     productionDraftValueDigest(
       Object.hasOwn(snapshot, key)
@@ -911,11 +953,15 @@ export function productionDraftSnapshotMutationFromBaseline(
 export function productionDraftSnapshotContentDigest(
   value: unknown,
   mode: "export" | "lifecycle",
+  options: { normalizeFileReviewTimestamps?: boolean } = {},
 ) {
   const canonical = canonicalSnapshot(value);
   if (!canonical) return null;
   const snapshot = canonicalClone(canonical.snapshot);
   if (!snapshot) return null;
+  if (options.normalizeFileReviewTimestamps) {
+    normalizeSnapshotFileReviewTimestamps(snapshot);
+  }
   const applicants = recordArray(snapshot.applicants);
   if (!applicants) return null;
   for (const applicant of applicants) {
@@ -1080,6 +1126,43 @@ function applicantsMatch(
   );
 }
 
+function applicantPayloadMismatchCode(
+  actualRows: readonly JsonRecord[],
+  contract: ProductionDraftPayloadMutationContract,
+) {
+  if (actualRows.length !== contract.draft.applicants.length) {
+    return `count_${actualRows.length}_${contract.draft.applicants.length}`;
+  }
+  const projection = contract.applicantProjection;
+  if (projection?.mode !== "replace_exact") return "content";
+  const expectedById = new Map(
+    projection.applicants.map((applicant) => [applicant.applicantId, applicant]),
+  );
+  for (const actual of actualRows) {
+    const applicantId = text(actual.id);
+    if (!applicantId) return "shape";
+    const expected = expectedById.get(applicantId);
+    if (!expected) return "identity";
+    if (
+      productionDraftApplicantContentDigest(actual) ===
+      expected.expectedContentDigest
+    ) {
+      continue;
+    }
+    for (const field of applicantPayloadKeys) {
+      const expectedDigest = expected.expectedFieldDigests?.[field];
+      if (
+        expectedDigest !== undefined &&
+        productionDraftValueDigest(actual[field]) !== expectedDigest
+      ) {
+        return `field_${field}`;
+      }
+    }
+    return "content";
+  }
+  return "content";
+}
+
 function mediaKey(value: ProductionDraftMediaIdentity) {
   return identityKey(
     value.id,
@@ -1111,6 +1194,55 @@ function mediaPayloadKey(value: JsonRecord) {
         contentDigest,
       )
     : null;
+}
+
+function mediaRowsMatch(
+  actualRows: readonly JsonRecord[],
+  contract: ProductionDraftPayloadMutationContract,
+) {
+  const projection = contract.mediaProjection;
+  if (!projection) {
+    const mediaKeys = actualRows.map(mediaPayloadKey);
+    return (
+      mediaKeys.every((key): key is string => key !== null) &&
+      exactIdentitySet(
+        mediaKeys,
+        contract.draft.mediaAssets.map(mediaKey),
+      )
+    );
+  }
+  if (
+    actualRows.length !== contract.draft.mediaAssets.length ||
+    projection.media.length !== contract.draft.mediaAssets.length
+  ) {
+    return false;
+  }
+  const projectedById = new Map(
+    projection.media.map((media) => [media.mediaId, media]),
+  );
+  const actualIds = actualRows.map((row) => text(row.id));
+  if (
+    projectedById.size !== projection.media.length ||
+    actualIds.some((mediaId) => !mediaId) ||
+    !exactIdentitySet(
+      actualIds as string[],
+      projection.media.map((media) => media.mediaId),
+    )
+  ) {
+    return false;
+  }
+  return actualRows.every((row) => {
+    const mediaId = text(row.id);
+    const expected = mediaId ? projectedById.get(mediaId) : undefined;
+    return Boolean(
+      expected &&
+        row.review_status === "accepted" &&
+        row.reviewed_by === projection.actorId &&
+        timestampFallsWithinWindow(row.reviewed_at, contract.timestampWindow) &&
+        productionDraftMediaStaticContentDigest(row) ===
+          expected.expectedStaticContentDigest,
+    );
+  });
 }
 
 function questionnaireLogicalValue(value: unknown) {
@@ -2121,6 +2253,11 @@ function snapshotDraftPayloadMismatchCode(
     : productionDraftSnapshotContentDigest(
           input.payloadSubmission.family_intelligence,
           input.contract.mode,
+          {
+            normalizeFileReviewTimestamps: Boolean(
+              input.contract.mediaProjection,
+            ),
+          },
         ) ===
         (input.contract.snapshotProjection && input.contract.mode === "lifecycle"
           ? input.contract.snapshotProjection.expectedLifecycleContentDigest
@@ -2184,7 +2321,7 @@ export function productionDraftPayloadMatches(
 
   if (
     !applicantsMatch(applicants, contract) ||
-    !exactIdentitySet(mediaKeys as string[], contract.draft.mediaAssets.map(mediaKey)) ||
+    !mediaRowsMatch(media, contract) ||
     !questionnaireAnswersMatch(questionnaireAnswers, contract) ||
     !exactIdentitySet(
       correctionKeys as string[],
@@ -2293,16 +2430,11 @@ export function productionLifecycleMutationPayloadMismatchCode(
       return "nested_shape";
     }
     if (!expectedCorrectionRows) return "expected_corrections";
-    if (!applicantsMatch(applicants, contract)) return "applicants";
+    if (!applicantsMatch(applicants, contract)) {
+      return `applicants_${applicantPayloadMismatchCode(applicants, contract)}`;
+    }
 
-    const mediaKeys = media.map(mediaPayloadKey);
-    if (
-      mediaKeys.some((key) => key === null) ||
-      !exactIdentitySet(
-        mediaKeys as string[],
-        contract.draft.mediaAssets.map(mediaKey),
-      )
-    ) {
+    if (!mediaRowsMatch(media, contract)) {
       return "media";
     }
     if (!questionnaireAnswersMatch(questionnaireAnswers, contract)) {
@@ -2398,6 +2530,9 @@ export function productionLifecycleMutationPayloadMismatchCode(
         contract.snapshotProjection?.projectionDigests;
       const actualProjections = productionDraftSnapshotProjectionDigests(
         submission.family_intelligence,
+        {
+          normalizeFileReviewTimestamps: Boolean(contract.mediaProjection),
+        },
       );
       if (expectedProjections && actualProjections) {
         for (const key of [

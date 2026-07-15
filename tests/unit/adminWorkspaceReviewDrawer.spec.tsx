@@ -16,6 +16,35 @@ afterEach(() => {
 });
 
 describe("AdminReviewDrawer visual hierarchy", () => {
+  test("offers close-and-accept when all remaining issues are fixed by the agent", () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1055");
+    if (!submission) throw new Error("Expected corrections-received fixture.");
+    const onPrimaryAction = vi.fn();
+
+    render(
+      <AdminReviewDrawer
+        isOpen
+        submission={submission}
+        submissionId={submission.id}
+        onAddRemark={vi.fn()}
+        onClose={vi.fn()}
+        onPrimaryAction={onPrimaryAction}
+        onVerifyDocument={vi.fn()}
+      />,
+    );
+
+    const accept = screen.getByRole("button", { name: "Принять на выгрузку" });
+    expect(accept).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Отправить на исправление" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(accept);
+    expect(onPrimaryAction).toHaveBeenCalledWith(
+      submission.id,
+      "close_issues_accept",
+    );
+  });
+
   test("uses roving tab focus and arrow, Home, and End navigation", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");

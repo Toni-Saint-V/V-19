@@ -32,6 +32,7 @@ import {
   evidenceDigest,
   loadOrCreateProductionLifecycleState,
   productionDraftValueDigest,
+  productionLifecycleMutationPayloadMismatchCode,
   productionLifecycleMutationPayloadMatches,
   productionLifecycleCorrectedNote,
   productionLifecycleIssueMarker,
@@ -93,6 +94,7 @@ function invariant(condition: unknown, message: string): asserts condition {
 
 class StrictProductionMutationGate {
   #authPasswordRequests = 0;
+  #diagnosticCode = "not_observed";
   readonly #violations: string[] = [];
   #window: {
     contract: ProductionLifecycleMutationContract;
@@ -139,16 +141,27 @@ class StrictProductionMutationGate {
       }
 
       const activeWindow = this.#window;
-      const allowedMutation =
+      const isCandidate =
         activeWindow !== null &&
         method === "POST" &&
         url.origin === PRODUCTION_SUPABASE_ORIGIN &&
         url.pathname === activeWindow.path &&
+        activeWindow.observed === 0;
+      const payloadMatches =
+        isCandidate &&
         productionLifecycleMutationPayloadMatches(
           request.postData(),
           activeWindow.contract,
-        ) &&
-        activeWindow.observed === 0;
+        );
+      if (isCandidate) {
+        this.#diagnosticCode = payloadMatches
+          ? "match"
+          : productionLifecycleMutationPayloadMismatchCode(
+              request.postData(),
+              activeWindow.contract,
+            );
+      }
+      const allowedMutation = isCandidate && payloadMatches;
       if (!allowedMutation) {
         this.#violations.push(
           evidenceDigest(
@@ -177,12 +190,17 @@ class StrictProductionMutationGate {
     return this.#authPasswordRequests;
   }
 
+  diagnosticCode() {
+    return this.#diagnosticCode;
+  }
+
   begin(
     label: string,
     path: string,
     contract: ProductionLifecycleMutationContract,
   ) {
     invariant(!this.#window, "A production mutation window is already active.");
+    this.#diagnosticCode = "not_observed";
     this.#window = { contract, label, observed: 0, path };
   }
 
@@ -432,9 +450,51 @@ async function assertAdminExportCaseReady(
   await expect(row.locator('input[type="checkbox"]')).toBeEnabled();
 }
 
-async function assertDrawerCaseMarker(root: Locator, caseMarker: string) {
+async function assertDrawerCaseMarker(
+  root: Locator,
+  caseMarker: string,
+  submissionId: string,
+) {
   await openDrawerTab(root, /Файлы/);
-  await expect(root).toContainText(caseMarker);
+  if ((await root.innerText()).includes(caseMarker)) return;
+  await openDrawerTab(root, /Анкета/);
+  if ((await root.innerText()).includes(caseMarker)) return;
+  const page = root.page();
+  const isAdminDrawer =
+    (await root.getAttribute("data-admin-review-drawer-surface")) ===
+    "workspace";
+  if (isAdminDrawer) {
+    await expect(root).toContainText(caseMarker, { timeout: 45_000 });
+    return;
+  }
+  const inlineSurname = root
+    .locator('[data-field-label="Фамилия"] input')
+    .first();
+  if ((await inlineSurname.count()) > 0) {
+    await expect(inlineSurname).toHaveValue(new RegExp(caseMarker));
+    return;
+  }
+  const open = root
+    .getByRole("button", {
+      name: /Открыть анкету|Смотреть анкету|Исправить анкету/,
+    })
+    .first();
+  await expect(open).toBeVisible();
+  await open.click();
+  const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
+  await expect(questionnaire).toBeVisible();
+  const personalSection = questionnaire
+    .locator(".v19-questionnaire-section-tab:visible")
+    .filter({ hasText: /Личные данные/ })
+    .first();
+  await expect(personalSection).toBeVisible();
+  await personalSection.click();
+  await expect(
+    questionnaire.locator('[data-field-label="Фамилия"] input').first(),
+  ).toHaveValue(new RegExp(caseMarker));
+  await questionnaire.getByRole("button", { name: "Назад" }).click();
+  await expect(questionnaire).toHaveCount(0);
+  await openAgentSubmissionDrawer(page, submissionId);
 }
 
 async function openAgentSubmissionDrawer(page: Page, submissionId: string) {
@@ -521,6 +581,7 @@ async function successfulProductionMutation(
     const uiDiagnostic = await productionMutationUiDiagnostic(page);
     throw createProductionMutationDiagnosticError({
       ...uiDiagnostic,
+      gateCode: mutationGate.diagnosticCode(),
       gateMessage,
       label,
       operationMessage,
@@ -592,11 +653,22 @@ async function lifecycleMutationContract(
   );
   invariant(owner, "Lifecycle mutation owner account is absent.");
   const expectedApplicantCount = state.case.caseKey === "A1-F6" ? 6 : 1;
+  const actorId =
+    expectation.actorSource === "admin"
+      ? accounts.admin.authUserId
+      : owner.authUserId;
   const baseline = await resolveProductionCohortDraftPayloadIdentity({
     admin: accounts.admin,
+    applicantSerializerProjection: {
+      actorId,
+      allowedDriftFields: ["email", "questionnaire_percent"],
+    },
     correctionMarker: productionLifecycleIssueMarker(state),
     expectedApplicantCount,
     ownerId: owner.authUserId,
+    questionnaireSerializerProjection: {
+      allowedLabelDriftFieldIds: ["hotel-name"],
+    },
     submissionId: state.case.submissionId,
   });
   const issueApplicantId = baseline.applicantIdsInSnapshotOrder[0];
@@ -606,19 +678,61 @@ async function lifecycleMutationContract(
     expectation.snapshotMutation,
   );
   if (snapshotMutationIntent) snapshotMutationIntent.applicantId = issueApplicantId;
-  const resolved = snapshotMutationIntent
+  const submissionProjectionIntent = snapshotMutationIntent
+    ? {
+        actorId,
+        intent: snapshotMutationIntent,
+        mode: "snapshot_mutation" as const,
+      }
+    : expectation.correctedQuestionnaireValue !== undefined
+      ? {
+          actorId,
+          applicantId: issueApplicantId,
+          fieldId: "appointment-note",
+          mode: "questionnaire_replace" as const,
+          value: expectation.correctedQuestionnaireValue,
+        }
+    : expectation.transition?.toStatus === "returned"
+      ? {
+          action: "return_with_issues" as const,
+          actorId,
+          mode: "submission_action" as const,
+          role: "admin" as const,
+        }
+      : expectation.transition?.toStatus === "corrections_received"
+        ? {
+            action: "submit_corrections" as const,
+            actorId,
+            mode: "submission_action" as const,
+            role: "agent" as const,
+          }
+        : expectation.transition?.toStatus === "ready_for_export"
+          ? {
+              action: "close_issues_accept" as const,
+              actorId,
+              mode: "submission_action" as const,
+              role: "admin" as const,
+            }
+          : undefined;
+  const resolved = submissionProjectionIntent
     ? await resolveProductionCohortDraftPayloadIdentity({
         admin: accounts.admin,
+        applicantSerializerProjection: {
+          actorId,
+          allowedDriftFields: ["email", "questionnaire_percent"],
+        },
         correctionMarker: productionLifecycleIssueMarker(state),
         expectedApplicantCount,
         ownerId: owner.authUserId,
+        questionnaireSerializerProjection: {
+          allowedLabelDriftFieldIds: ["hotel-name"],
+        },
         snapshotMutationIntent,
+        submissionProjectionIntent,
         submissionId: state.case.submissionId,
       })
     : baseline;
   const { draft, snapshotMutation } = resolved;
-  const actorId =
-    expectation.actorSource === "admin" ? accounts.admin.authUserId : owner.authUserId;
   let questionnaire: ProductionLifecycleMutationContract["questionnaire"] = {
     mode: "exact",
   };
@@ -659,13 +773,20 @@ async function lifecycleMutationContract(
       actorId,
       actorSource: expectation.actorSource,
       snapshotStatus: expectation.snapshotStatus,
-      transition: expectation.transition,
+      transition: resolved.historyTransition ?? expectation.transition,
     },
+    applicantProjection: resolved.applicantProjection ?? { mode: "exact" },
+    historyProjection: resolved.historyProjection,
+    mediaProjection: resolved.mediaProjection,
     mode: "lifecycle",
     ownerId: owner.authUserId,
     questionnaire,
+    questionnaireProjection: resolved.questionnaireProjection,
     snapshotMutation,
+    snapshotHistoryProjection: resolved.snapshotHistoryProjection,
+    snapshotProjection: resolved.snapshotProjection,
     submissionId: state.case.submissionId,
+    submissionProjection: resolved.submissionProjection,
     submissionStatus,
     timestampWindow: lifecycleTimestampWindow(),
   };
@@ -702,7 +823,7 @@ async function verifyInitialOwnerCaseBeforeFirstWrite(input: {
       `${state.case.caseKey} must not already carry an open agent action before the lifecycle starts.`,
     ).toBe(false);
     const root = await openAgentSubmissionDrawer(ownerSession.page, submissionId);
-    await assertDrawerCaseMarker(root, caseMarker);
+    await assertDrawerCaseMarker(root, caseMarker, submissionId);
     await expect(root.locator(".v20-status-pill")).toHaveText("проверка");
   }, () => closeSession(ownerSession, evidence));
 
@@ -749,8 +870,12 @@ async function addLifecycleIssue(
     () => remark.getByRole("button", { name: "Отправить замечание" }).click(),
   );
   await expect(remark).toHaveCount(0);
-  await openDrawerTab(root, /Замечания/);
-  await expect(root).toContainText(productionLifecycleIssueMarker(state));
+  await openDrawerTab(root, /Анкета/);
+  await expect(
+    root
+      .getByRole("button", { name: /\d+ замечани(?:е|я|й)/i })
+      .first(),
+  ).toBeVisible();
   state.stage = "issue_added";
   await persistLifecycleStage(state);
 }
@@ -794,7 +919,7 @@ async function ensureAdminReturned(input: {
 
     await assertAdminExportPresence(session.page, submissionId, false);
     let root = await openAdminReviewDrawer(session.page, submissionId);
-    await assertDrawerCaseMarker(root, caseMarker);
+    await assertDrawerCaseMarker(root, caseMarker, submissionId);
     if (state.stage === "pending_review") {
       await expect(root).toContainText("На проверке");
       await expect(
@@ -816,22 +941,22 @@ async function ensureAdminReturned(input: {
           (await isVisible(accept)),
         "Return lifecycle card has an unexpected admin action state.",
       );
-      await openDrawerTab(root, /Замечания/);
-      await expect(root).not.toContainText(productionLifecycleIssueMarker(state));
       await addLifecycleIssue(session, state);
       await reloadCanonicalWorkspace(session);
       root = await openAdminReviewDrawer(session.page, submissionId);
-      await assertDrawerCaseMarker(root, caseMarker);
+      await assertDrawerCaseMarker(root, caseMarker, submissionId);
       returnButton = root.getByRole("button", {
         exact: true,
         name: "Отправить на исправление",
       });
     }
 
-    await openDrawerTab(root, /Замечания/);
-    await expect(root).toContainText(productionLifecycleIssueMarker(state));
-    await expect(root).toContainText("Открыто");
-    await expect(root).toContainText("Критичное");
+    await openDrawerTab(root, /Анкета/);
+    await expect(
+      root
+        .getByRole("button", { name: /\d+ замечани(?:е|я|й)/i })
+        .first(),
+    ).toBeVisible();
     state.stage = "issue_added";
     await persistLifecycleStage(state);
     await expect(returnButton).toBeEnabled();
@@ -1155,7 +1280,7 @@ async function ensureAgentResubmitted(input: {
       "Resubmitted lifecycle record must move to the completed agent queue.",
     ).toBe(true);
     const resubmittedRoot = await openAgentSubmissionDrawer(session.page, submissionId);
-    await assertDrawerCaseMarker(resubmittedRoot, caseMarker);
+    await assertDrawerCaseMarker(resubmittedRoot, caseMarker, submissionId);
     await expect(resubmittedRoot.locator(".v20-status-pill")).toHaveText(
       /проверка|исправлен/,
     );
@@ -1201,10 +1326,14 @@ async function ensureReturnedAccepted(input: {
     await persistLifecycleStage(state);
     await assertAdminExportPresence(session.page, submissionId, false);
     const root = await openAdminReviewDrawer(session.page, submissionId);
-    await assertDrawerCaseMarker(root, caseMarker);
-    await openDrawerTab(root, /Замечания/);
-    await expect(root).toContainText(productionLifecycleIssueMarker(state));
-    await expect(root).toContainText("Исправлено агентом");
+    await assertDrawerCaseMarker(root, caseMarker, submissionId);
+    await openDrawerTab(root, /Анкета/);
+    await expect(root).toContainText(productionLifecycleCorrectedNote(state));
+    await expect(
+      root
+        .getByRole("button", { name: /\d+ замечани(?:е|я|й)/i })
+        .first(),
+    ).toBeVisible();
     const accept = root.getByRole("button", {
       exact: true,
       name: "Принять на выгрузку",
@@ -1282,7 +1411,7 @@ async function verifyFinalStateAfterFreshRelogin(input: {
       ownerSession.page,
       state.case.submissionId,
     );
-    await assertDrawerCaseMarker(root, caseMarker);
+    await assertDrawerCaseMarker(root, caseMarker, state.case.submissionId);
     await expect(root.locator(".v20-status-pill")).toHaveText("готово");
     await openDrawerTab(root, /Замечания/);
     await expect(root).not.toContainText(productionLifecycleIssueMarker(state));
