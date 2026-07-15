@@ -654,6 +654,25 @@ async function openDrawerIssuesSection(page: Page) {
   await drawer(page).getByRole("button", { name: /Замечания/ }).click();
 }
 
+async function chooseQuestionnaireOption(
+  page: Page,
+  label: string,
+  value: string,
+) {
+  const field = page.locator(`[data-field-label="${label}"]`).first();
+  await expect(field).toBeVisible();
+  const dropdown = field.getByRole("combobox");
+  await expect(dropdown).toBeVisible();
+  if ((await dropdown.innerText()).trim().includes(value)) return;
+
+  await dropdown.click();
+  const search = field.getByRole("textbox", { name: `Поиск: ${label}` });
+  if (await search.isVisible().catch(() => false)) await search.fill(value);
+  const option = field.getByRole("option", { name: value, exact: true });
+  await expect(option).toBeVisible();
+  await option.click();
+}
+
 async function signInSmokeAgent(page: Page) {
   const smokeEnv = loadSmokeEnv();
   const smokeAgentEmail = requiredSmokeValue(smokeEnv, "SUPABASE_SMOKE_AGENT_EMAIL");
@@ -1013,7 +1032,7 @@ test.describe("Supabase sandbox auth smoke", () => {
       await tripSection.locator("summary").click();
       const routeReviewRow = reviewDrawer
         .locator(".admin-review-field-row")
-        .filter({ hasText: "Маршрут поездки" })
+        .filter({ hasText: "Страна первого въезда" })
         .first();
       await expect(routeReviewRow).toBeVisible();
       await routeReviewRow.getByTestId("admin-review-add-remark").click();
@@ -1062,15 +1081,15 @@ test.describe("Supabase sandbox auth smoke", () => {
       ).toBeVisible();
       await openDrawerIssuesSection(page);
       await drawer(page).getByRole("button", { name: "Исправить в анкете" }).click();
-      const routeField = page.getByLabel(/Маршрут поездки/).first();
-      await expect(routeField).toBeVisible();
-      await routeField.fill("Москва, Барселона, Мадрид, Москва");
+      await chooseQuestionnaireOption(page, "Страна первого въезда", "France");
       await expect(
         page.getByRole("button", { name: "Пометить исправленным" }),
       ).toBeVisible();
       await page.getByRole("button", { name: "Пометить исправленным" }).click();
       await expect(
-        page.getByText("Исправление по полю «Маршрут поездки»", { exact: false }),
+        page.getByText("Исправление по полю «Страна первого въезда»", {
+          exact: false,
+        }),
       ).toBeVisible();
       await expect(
         page.getByRole("button", { name: "Отправить исправления" }),

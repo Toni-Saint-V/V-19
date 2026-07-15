@@ -211,8 +211,12 @@ test.describe("V-19 document collection screen", () => {
         await page.getByRole("button", { name: "Следующий заявитель" }).first().click();
         await expect(firstPager).toHaveText(/^2 \/ [2-9]/);
         await expect
-          .poll(() => firstCarousel.evaluate((element) => element.scrollLeft))
-          .toBeGreaterThan(0);
+          .poll(() =>
+            firstCarousel.evaluate((element) =>
+              Math.abs(element.scrollLeft - element.clientWidth) <= 1,
+            ),
+          )
+          .toBe(true);
         await page.screenshot({
           animations: "disabled",
           fullPage: false,
