@@ -263,6 +263,7 @@ type FigmaQuestionnaireScreenProps = {
   initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
   onComplete: (values: QuestionnaireCommitPayload) => void | Promise<void>;
+  onConfirmPassportReview?: (applicantId: string) => void | Promise<void>;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
   onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
@@ -2221,6 +2222,37 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "form-filler-phone", formKey: "formFillerPhone", sectionId: "filler" },
 ];
 
+const questionnaireFieldAliasesByFormKey: Partial<
+  Record<keyof QuestionnaireFormData, readonly string[]>
+> = {
+  previousBiometrics: ["fingerprints-collected"],
+  previousBiometricsDate: ["fingerprints-date"],
+};
+
+function questionnaireFieldBindingForApplicant(
+  applicant: Submission["applicants"][number] | undefined,
+  formKey: keyof QuestionnaireFormData,
+) {
+  const binding = questionnaireFieldBindings.find((item) => item.formKey === formKey);
+  if (!binding || !applicant) return binding;
+
+  const candidateIds = [
+    binding.fieldId,
+    ...(questionnaireFieldAliasesByFormKey[formKey] ?? []),
+  ];
+  for (const section of applicant.sections) {
+    const field = section.fields.find((candidate) => candidateIds.includes(candidate.id));
+    if (field) {
+      return {
+        ...binding,
+        fieldId: field.id,
+      };
+    }
+  }
+
+  return binding;
+}
+
 function dependentFieldKeysFor(
   key: keyof QuestionnaireFormData,
   value: string,
@@ -2280,8 +2312,9 @@ function conditionalFieldClearsFor(
       applicant?.role,
       formData,
     ).flatMap((fieldKey) => {
-      const binding = questionnaireFieldBindings.find(
-        (item) => item.formKey === fieldKey,
+      const binding = questionnaireFieldBindingForApplicant(
+        applicant,
+        fieldKey,
       );
       if (!binding || !questionnaireField(applicant, binding.fieldId)) return [];
 
@@ -2454,12 +2487,14 @@ export function FigmaQuestionnaireScreen({
   initialFocus,
   onBack,
   onComplete,
+  onConfirmPassportReview,
   onFieldChange,
   onMarkIssueFixed,
   onUploadFile,
   onSaveDraft,
   submission,
 }: FigmaQuestionnaireScreenProps) {
+  const [passportReviewPending, setPassportReviewPending] = useState(false);
   const [pendingFieldUpdates, setPendingFieldUpdates] = useState<
     Record<string, QuestionnaireFieldUpdate>
   >({});
@@ -3060,8 +3095,9 @@ export function FigmaQuestionnaireScreen({
       formData,
     );
     const buildUpdate = (fieldKey: keyof QuestionnaireFormData, fieldValue: string) => {
-      const binding = questionnaireFieldBindings.find(
-        (item) => item.formKey === fieldKey,
+      const binding = questionnaireFieldBindingForApplicant(
+        activeApplicantModel,
+        fieldKey,
       );
       if (!binding) return undefined;
 
@@ -3747,6 +3783,12 @@ export function FigmaQuestionnaireScreen({
       return {
         applicantId: validationRisk.applicant.id,
         label: validationRisk.field.label,
+        reason:
+          validateBlsQuestionnaireField({
+            applicantRole: validationRisk.applicant.role,
+            field: validationRisk.field,
+            formData: validationRisk.formData,
+          }) ?? "Исправьте значение поля",
         sectionId: sectionIdForQuestionnaireField(
           validationRisk.section.id,
           validationRisk.field.id,
@@ -3764,9 +3806,16 @@ export function FigmaQuestionnaireScreen({
         }),
     );
     if (requiredEmpty) {
+      const quickOptions = requiredEmpty.field.options?.filter((option) =>
+        option.trim(),
+      );
       return {
         applicantId: requiredEmpty.applicant.id,
         label: requiredEmpty.field.label,
+        reason:
+          quickOptions && quickOptions.length >= 2 && quickOptions.length <= 3
+            ? `Выберите ${quickOptions.map((option) => `«${option}»`).join(" или ")}`
+            : "Заполните обязательное поле",
         sectionId: sectionIdForQuestionnaireField(
           requiredEmpty.section.id,
           requiredEmpty.field.id,
@@ -3916,6 +3965,29 @@ export function FigmaQuestionnaireScreen({
     clearAutosaveTimer();
     const revision = autosaveRevisionRef.current;
     await enqueueDraftSave(completionPayload("manual"), revision);
+  }
+
+  async function confirmPassportReviewFromButton(applicantId: string) {
+    if (!onConfirmPassportReview || passportReviewPending) return;
+
+    setPassportReviewPending(true);
+    setSaveStatus("saving");
+    setSaveMessage("Сохраняем проверку паспорта...");
+    try {
+      await saveDraftFromButton();
+      await onConfirmPassportReview(applicantId);
+      setSaveStatus("saved");
+      setSaveMessage("Паспорт проверен");
+    } catch (error) {
+      setSaveStatus("error");
+      setSaveMessage(
+        error instanceof Error
+          ? error.message
+          : "Не удалось сохранить проверку паспорта.",
+      );
+    } finally {
+      setPassportReviewPending(false);
+    }
   }
 
   async function resolveCurrentIssue() {
@@ -4951,6 +5023,12 @@ export function FigmaQuestionnaireScreen({
   const mobileBlockerTarget = readinessStats.canSubmit
     ? undefined
     : firstQuestionnaireBlockerTarget();
+  const activePassportReviewIssue = passportGateIssues(draftSubmission).find(
+    (issue) =>
+      issue.applicantId === activeApplicant &&
+      (issue.code === "passport_not_confirmed" ||
+        issue.code === "passport_extraction_not_reviewed"),
+  );
   const mobileBlockerLabel =
     mobileBlockerTarget?.label ??
     readinessStats.completionReason ??
@@ -5300,6 +5378,24 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel">
+              {activePassportReviewIssue && onConfirmPassportReview ? (
+                <button
+                  className="v19-questionnaire-passport-review-button"
+                  data-testid="questionnaire-confirm-passport-review"
+                  disabled={!isEditable || passportReviewPending}
+                  type="button"
+                  onClick={() =>
+                    void confirmPassportReviewFromButton(
+                      activePassportReviewIssue.applicantId,
+                    )
+                  }
+                >
+                  <CheckCircle2 aria-hidden="true" />
+                  <span>
+                    {passportReviewPending ? "Сохраняем..." : "Паспорт проверен"}
+                  </span>
+                </button>
+              ) : null}
               {!readinessStats.canSubmit && !currentSectionIssue ? (
                 <button
                   aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}`}

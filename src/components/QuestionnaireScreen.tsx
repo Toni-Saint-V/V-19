@@ -14,6 +14,7 @@ import {
   type QuestionnaireFieldUpdate,
 } from "../modules/submissions/questionnaire";
 import { defaultLocalAgentOwnerId } from "../modules/submissions/ownership";
+import { confirmApplicantPassportReview } from "../modules/submissions/passportExtraction";
 import {
   applySubmissionActionResult,
   markSubmissionIssueFixedResult,
@@ -472,12 +473,22 @@ export function QuestionnaireScreen({
     [onMarkIssueFixed, persistSubmissionUpdate],
   );
 
+  const handleConfirmPassportReview = useCallback(
+    async (applicantId: string) => {
+      await persistSubmissionUpdate((currentSubmission) =>
+        confirmApplicantPassportReview(currentSubmission, applicantId),
+      );
+    },
+    [persistSubmissionUpdate],
+  );
+
   return (
     <FigmaQuestionnaireScreen
       initialFocus={initialFocus}
       submission={workingSubmission}
       onBack={onBack}
       onComplete={handleComplete}
+      onConfirmPassportReview={handleConfirmPassportReview}
       onMarkIssueFixed={handleMarkIssueFixed}
       onSaveDraft={handleSaveDraft}
       onUploadFile={onUploadFile}

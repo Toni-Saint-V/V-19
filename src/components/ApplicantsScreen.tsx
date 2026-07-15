@@ -455,12 +455,12 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
               tabIndex={0}
               className="v19-agent-shared-card group"
             >
-              <div className="flex justify-between items-start gap-3 mb-6">
-                <div className="flex gap-3.5 items-center">
+              <div className="v19-applicant-individual-header flex justify-between items-start gap-3 mb-6">
+                <div className="v19-applicant-individual-main flex gap-3.5 items-center">
                   <div className="v19-applicant-individual-icon">
                     <ApplicantMarkerIcon marker={ind.marker} />
                   </div>
-                  <div>
+                  <div className="v19-applicant-individual-copy">
                     <div className="v19-applicant-individual-name-row">
                       <h3 className="text-[15px] font-semibold text-white group-hover:text-white transition-colors">{ind.name}</h3>
                       <span className="v19-applicant-individual-status">
