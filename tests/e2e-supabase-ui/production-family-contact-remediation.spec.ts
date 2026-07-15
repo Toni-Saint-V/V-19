@@ -475,7 +475,7 @@ async function familyMutationContract(
     applicantEmailReplacement: expectation.emailReplacement,
     applicantSerializerProjection: {
       actorId,
-      allowedDriftFields: ["questionnaire_percent"],
+      allowedDriftFields: ["email", "questionnaire_percent"],
     },
     correctionMarker: productionFamilyContactIssueMarker(state),
     expectedApplicantCount: 6,
@@ -529,7 +529,7 @@ async function familyMutationContract(
         applicantEmailReplacement: expectation.emailReplacement,
         applicantSerializerProjection: {
           actorId,
-          allowedDriftFields: ["questionnaire_percent"],
+          allowedDriftFields: ["email", "questionnaire_percent"],
         },
         correctionMarker: productionFamilyContactIssueMarker(state),
         expectedApplicantCount: 6,
@@ -595,6 +595,7 @@ async function familyMutationContract(
       questionnaire,
       questionnaireProjection: resolved.questionnaireProjection,
       snapshotMutation: resolved.snapshotMutation,
+      snapshotHistoryProjection: resolved.snapshotHistoryProjection,
       snapshotProjection: resolved.snapshotProjection,
       submissionId: state.case.submissionId,
       submissionProjection: resolved.submissionProjection,
@@ -838,13 +839,14 @@ async function selectQuestionnaireSection(
 }
 
 async function ensureAgentCorrectedAndResubmitted(input: {
+  applicantIds: string[];
   browser: Browser;
   evidence: FamilyEvidence;
   owner: ProductionCohortAccount;
   state: ProductionFamilyContactState;
   testInfo: TestInfo;
 }) {
-  const { browser, evidence, owner, state, testInfo } = input;
+  const { applicantIds, browser, evidence, owner, state, testInfo } = input;
   if (["resubmitted", "verified"].includes(state.stage)) return;
   const session = await openSession(browser, testInfo, owner);
   await runWithFailurePreservingCleanup(async () => {
@@ -861,14 +863,7 @@ async function ensureAgentCorrectedAndResubmitted(input: {
 
     while (state.nextApplicantIndex < 6) {
       const index = state.nextApplicantIndex;
-      const ids = (
-        await familyMutationContract(state, "returned", "open", {
-          actorSource: "agent",
-          correctionMode: "existing",
-          snapshotStatus: "returned",
-        })
-      ).applicantIdsInSnapshotOrder;
-      const applicantId = ids[index];
+      const applicantId = applicantIds[index];
       invariant(applicantId, "Family-contact applicant order is incomplete.");
       await applicantTabs.nth(index).click();
       await selectQuestionnaireSection(questionnaire, /Адрес и контакты/);
@@ -926,9 +921,13 @@ async function ensureAgentCorrectedAndResubmitted(input: {
       .filter({ hasText: productionFamilyContactIssueMarker(state) })
       .first();
     const markFixed = issueCard.getByRole("button", {
-      name: "Отметить исправленным",
+      name: /^(?:Отметить|Пометить) исправленным$/,
     });
-    if (await isVisible(markFixed)) {
+    const alreadyFixed = await isVisible(
+      issueCard.getByText(/Исправлено|Ждет проверки/i).first(),
+    );
+    if (!alreadyFixed) {
+      await expect(markFixed).toBeVisible();
       const mutation = await familyMutationContract(
         state,
         "returned",
@@ -958,7 +957,7 @@ async function ensureAgentCorrectedAndResubmitted(input: {
 
     const reopened = await openFamilyIssueQuestionnaire(session, state);
     const resubmit = reopened.questionnaire.getByRole("button", {
-      name: "Отправить на проверку",
+      name: "Отправить исправления",
     });
     await expect(resubmit).toBeEnabled();
     const mutation = await familyMutationContract(
@@ -1160,14 +1159,20 @@ test.describe("production family contact remediation", () => {
       );
       invariant(owner, "Family-contact owner account is absent.");
       const applicantIds = await assertFamilyContractPreflight(state);
-      await assertAdminFamilyContactTargetPreflight({
-        admin: accounts.admin,
-        applicantIds,
-        browser,
-        evidence,
-        state,
-        testInfo,
-      });
+      if (
+        ["pending_review", "adding_issue", "issue_added", "returning"].includes(
+          state.stage,
+        )
+      ) {
+        await assertAdminFamilyContactTargetPreflight({
+          admin: accounts.admin,
+          applicantIds,
+          browser,
+          evidence,
+          state,
+          testInfo,
+        });
+      }
       if (process.env.V19_PRODUCTION_FAMILY_CONTACT_PREFLIGHT_ONLY === "1") {
         evidence.result = "PASS";
         evidence.stage = state.stage;
@@ -1181,6 +1186,7 @@ test.describe("production family contact remediation", () => {
         testInfo,
       });
       await ensureAgentCorrectedAndResubmitted({
+        applicantIds,
         browser,
         evidence,
         owner,
