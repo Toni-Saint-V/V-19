@@ -22893,6 +22893,49 @@ body,
   color: var(--v19b-color-text-strong);
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-quick-option.is-invalid {
+  background: transparent !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-quick-options.is-collapsed {
+  position: relative;
+  isolation: isolate;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  padding-right: var(--v19b-size-8);
+  padding-bottom: var(--v19b-size-8);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-quick-options.is-collapsed::before,
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-quick-options.is-collapsed::after {
+  position: absolute;
+  inset: var(--v19b-size-4);
+  z-index: auto;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19-control-radius);
+  background: var(--v19b-color-control);
+  content: "";
+  pointer-events: none;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-quick-options.is-collapsed::before {
+  transform: translate(var(--v19b-size-4), var(--v19b-size-4));
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-quick-options.is-collapsed::after {
+  transform: translate(var(--v19b-size-8), var(--v19b-size-8));
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-quick-options.is-collapsed
+  .v19-questionnaire-quick-option {
+  position: relative;
+  z-index: var(--v19b-z-base);
+}
+
 @keyframes v19-questionnaire-popup-cell-enter {
   from {
     opacity: 0;
@@ -23005,14 +23048,19 @@ body,
   opacity: var(--v19b-opacity-disabled);
 }
 
-/* Keep the active blocker or review remark available while its fields scroll. */
-.vf-figma-questionnaire-screen .v19-questionnaire-work-panel > :is(
-  .v19-questionnaire-next-blocker,
-  .v19-questionnaire-review-alert
-) {
+/* Review remarks stay visible; the next blocker remains in normal flow. */
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-panel
+  > .v19-questionnaire-review-alert {
   position: sticky;
   top: var(--v19b-size-0);
   z-index: var(--v19b-z-base);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-panel
+  > .v19-questionnaire-next-blocker {
+  position: static;
 }
 
 @media (min-width: 768px) {

@@ -647,13 +647,37 @@ export function Drawer({
       );
     }
 
+    if (data.status === 'submitted_for_review') {
+      return (
+        <button className="v19-submission-drawer-primary" disabled type="button">
+          Отправлено на проверку
+        </button>
+      );
+    }
+
+    if (data.status === 'corrections_received') {
+      return (
+        <button className="v19-submission-drawer-primary" disabled type="button">
+          Исправления на проверке
+        </button>
+      );
+    }
+
+    if (data.status === 'ready_for_export') {
+      return (
+        <button className="v19-submission-drawer-primary" disabled type="button">
+          Готово к выгрузке
+        </button>
+      );
+    }
+
     return (
       <button
-        onClick={() => data.status === 'draft' ? void handleAction('save_progress') : undefined}
+        onClick={() => void handleAction('save_progress')}
         disabled={actionPending || data.status === 'exported'}
         className="v19-submission-drawer-primary flex-1 sm:flex-none h-11 px-8 bg-white/10 hover:bg-white/15 disabled:bg-white/5 disabled:text-white/30 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl transition-colors"
       >
-        {data.status === 'exported' ? 'Подача выгружена' : data.status === 'draft' ? 'Сохранить прогресс' : 'Сохранить черновик'}
+        {data.status === 'exported' ? 'Подача выгружена' : 'Сохранить прогресс'}
       </button>
     );
   };

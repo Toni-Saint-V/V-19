@@ -637,6 +637,7 @@ function FormField({
 }: FormFieldProps) {
   const fieldContract = useContext(QuestionnaireFieldUiContext);
   const [isOpen, setIsOpen] = useState(false);
+  const [quickOptionsExpanded, setQuickOptionsExpanded] = useState(() => !value);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const [optionQuery, setOptionQuery] = useState("");
   const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
@@ -661,6 +662,7 @@ function FormField({
   }, [isOpen]);
 
   const usesQuickOptions = Boolean(options && options.length <= 3);
+  const collapsesQuickOptions = Boolean(options && options.length === 3);
   const usesOptionSearch = Boolean(options && options.length > 8);
   const filteredOptions = useMemo(() => {
     if (!options) return [];
@@ -701,6 +703,10 @@ function FormField({
     });
   }, [filteredOptions, isOpen]);
 
+  useEffect(() => {
+    if (!value) setQuickOptionsExpanded(true);
+  }, [value]);
+
   const canonicalRequired = fieldContract?.required(modelFieldId) ?? false;
   const canonicalFocused = fieldContract?.focused(modelFieldId) ?? focused;
   const canonicalState = fieldContract?.state(modelFieldId, label) ?? state;
@@ -738,6 +744,10 @@ function FormField({
       : effectiveState === "invalid"
         ? "is-invalid"
         : "is-normal";
+  const visibleQuickOptions =
+    collapsesQuickOptions && value && !quickOptionsExpanded
+      ? options?.filter((option) => option === value)
+      : options;
   const activeOptionId =
     isOpen && activeOptionIndex >= 0 && activeOptionIndex < filteredOptions.length
       ? `${optionsListboxId}-option-${activeOptionIndex}`
@@ -896,18 +906,45 @@ function FormField({
           aria-invalid={effectiveState === "invalid" ? "true" : undefined}
           aria-labelledby={fieldLabelId}
           aria-required={canonicalRequired ? "true" : undefined}
-          className="v19-questionnaire-quick-options"
+          className={`v19-questionnaire-quick-options${
+            collapsesQuickOptions && value ? " has-selection" : ""
+          }${
+            collapsesQuickOptions && value && !quickOptionsExpanded
+              ? " is-collapsed"
+              : ""
+          }`}
           role="group"
         >
-          {options.map((option) => (
+          {visibleQuickOptions?.map((option) => (
             <button
+              aria-expanded={
+                collapsesQuickOptions && value === option
+                  ? quickOptionsExpanded
+                  : undefined
+              }
               aria-pressed={value === option}
               className={`v19-questionnaire-field-control v19-questionnaire-quick-option ${
                 value === option ? "is-selected" : stateClasses
               }`}
               key={option}
+              title={
+                collapsesQuickOptions && value === option && !quickOptionsExpanded
+                  ? "Изменить выбор"
+                  : undefined
+              }
               type="button"
-              onClick={() => onChange?.(option)}
+              onClick={() => {
+                if (
+                  collapsesQuickOptions &&
+                  value === option &&
+                  !quickOptionsExpanded
+                ) {
+                  setQuickOptionsExpanded(true);
+                  return;
+                }
+                onChange?.(option);
+                if (collapsesQuickOptions) setQuickOptionsExpanded(false);
+              }}
             >
               {option}
             </button>
@@ -2520,7 +2557,7 @@ export function FigmaQuestionnaireScreen({
   const isCorrectionResubmission = draftSubmission.status === "returned";
   const completeActionLabel = isCorrectionResubmission
     ? "Отправить исправления"
-    : "Готово к проверке";
+    : "Отправить на проверку";
   const completeActionMobileLabel = completeActionLabel;
   const [activeApplicant, setActiveApplicant] = useState(initialApplicantId);
   const [activeSection, setActiveSection] = useState<SectionId>(
@@ -5398,7 +5435,9 @@ export function FigmaQuestionnaireScreen({
               ) : null}
               {!readinessStats.canSubmit && !currentSectionIssue ? (
                 <button
-                  aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}`}
+                  aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
+                    mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
+                  }`}
                   className="v19-questionnaire-next-blocker"
                   data-testid="questionnaire-next-blocker"
                   type="button"
@@ -5407,7 +5446,6 @@ export function FigmaQuestionnaireScreen({
                   <AlertCircle aria-hidden="true" className="w-4 h-4" />
                   <span>
                     Сначала: <strong>{mobileBlockerLabel}</strong>
-                    {mobileBlockerReason ? ` — ${mobileBlockerReason}` : ""}
                   </span>
                   <ArrowRight aria-hidden="true" className="w-4 h-4" />
                 </button>
