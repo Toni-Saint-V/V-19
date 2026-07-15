@@ -430,7 +430,13 @@ export function V19ToolbarSelect<T extends string>({
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedOption = options.find((option) => option.value === value);
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -450,12 +456,65 @@ export function V19ToolbarSelect<T extends string>({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      optionRefs.current[selectedIndex]?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, selectedIndex]);
+
+  const closeAndRestoreTriggerFocus = () => {
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const moveOptionFocus = (index: number) => {
+    optionRefs.current[index]?.focus();
+  };
+
+  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!options.length) return;
+
+    const focusedIndex = optionRefs.current.findIndex(
+      (option) => option === document.activeElement,
+    );
+    const currentIndex = focusedIndex >= 0 ? focusedIndex : selectedIndex;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveOptionFocus((currentIndex + 1) % options.length);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveOptionFocus((currentIndex - 1 + options.length) % options.length);
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      moveOptionFocus(0);
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      moveOptionFocus(options.length - 1);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeAndRestoreTriggerFocus();
+    }
+  };
+
   return (
     <div
       ref={rootRef}
       className={`v19-admin-toolbar-select ${Icon ? 'has-icon' : ''} ${open ? 'is-open' : ''} ${className}`}
     >
       <button
+        ref={triggerRef}
         aria-controls={menuId}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -471,17 +530,27 @@ export function V19ToolbarSelect<T extends string>({
         <ChevronDown aria-hidden="true" className="v19-admin-toolbar-select-chevron" />
       </button>
       {open ? (
-        <div id={menuId} className="v19-admin-toolbar-select-menu" role="listbox" aria-label={ariaLabel ?? label}>
-          {options.map((option) => (
+        <div
+          id={menuId}
+          className="v19-admin-toolbar-select-menu"
+          role="listbox"
+          aria-label={ariaLabel ?? label}
+          onKeyDown={handleMenuKeyDown}
+        >
+          {options.map((option, index) => (
             <button
+              ref={(element) => {
+                optionRefs.current[index] = element;
+              }}
               key={option.value}
               aria-selected={option.value === value}
               className={option.value === value ? 'is-selected' : ''}
               role="option"
+              tabIndex={option.value === value ? 0 : -1}
               type="button"
               onClick={() => {
                 onChange(option.value);
-                setOpen(false);
+                closeAndRestoreTriggerFocus();
               }}
             >
               <span>{option.label}</span>

@@ -33,7 +33,7 @@ function byId(id: string): Submission {
 function withVisaFormReady(submission: Submission): Submission {
   return {
     ...submission,
-    applicants: submission.applicants.map((applicant) => ({
+    applicants: submission.applicants.map((applicant, applicantIndex) => ({
       ...applicant,
       sections: [
         ...applicant.sections,
@@ -42,10 +42,13 @@ function withVisaFormReady(submission: Submission): Submission {
           title: "pdf-export-ready",
           status: "complete",
           fields: [
-            questionnaireField("surname", "TEST"),
-            questionnaireField("surname-at-birth", "TEST"),
-            questionnaireField("first-name", "APPLICANT"),
-            questionnaireField("birth-date", "1990-01-01"),
+            questionnaireField("surname", `TEST-${applicant.id}`),
+            questionnaireField("surname-at-birth", `TEST-${applicant.id}`),
+            questionnaireField("first-name", `APPLICANT${applicantIndex + 1}`),
+            questionnaireField(
+              "birth-date",
+              `1990-01-${String(applicantIndex + 1).padStart(2, "0")}`,
+            ),
             questionnaireField("birth-place", "MOSCOW"),
             questionnaireField("birth-country", "Russian Federation"),
             questionnaireField("nationality", "Russian Federation"),

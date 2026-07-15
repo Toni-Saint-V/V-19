@@ -79,6 +79,13 @@ function buildExportContractRow(
   const hotelEmail = field("hotel-email");
   const hotelAddress = field("hotel-address");
   const hotelContact = digitsOnly(field("hotel-contact"));
+  const companyContactPerson = field("company-contact-person");
+  const companyPhone = digitsOnly(field("company-phone"));
+  const costCoveredBySource = field("cost-covered-by");
+  const useCompanyContact = isCompanyInvitation(
+    field("inviting-party-type"),
+    field("purpose"),
+  );
   const groupLabel = submission.type === "family" ? "Семья" : "Один заявитель";
   const intendedDateOfArrival = normalizeExportContractDate(
     field("arrival-date", submission.tripDateFrom),
@@ -86,7 +93,10 @@ function buildExportContractRow(
   const intendedDateOfDeparture = normalizeExportContractDate(
     field("departure-date", submission.tripDateTo),
   );
-  const passportNumber = digitsOnly(field("passport-no"));
+  const passportNumber = normalizePassportNumber(field("passport-no"));
+  const meansOfSupportSource = isSponsorCost(costCoveredBySource)
+    ? field("sponsor-means")
+    : field("means-of-support");
   const familyGroupId = submission.type === "family" ? submission.id : undefined;
 
   return {
@@ -108,11 +118,12 @@ function buildExportContractRow(
     contactPersonCity: hotelCity,
     contactPersonCountry: hotelCountry,
     contactPersonEmail: hotelEmail,
-    contactPersonFirstName: hotelName,
-    contactPersonLastName: field("hotel-contact-last-name"),
-    contactPersonMobile: hotelContact,
+    contactPersonFirstName:
+      (useCompanyContact ? companyContactPerson : "") || hotelName,
+    contactPersonLastName: "",
+    contactPersonMobile: (useCompanyContact ? companyPhone : "") || hotelContact,
     contactPersonZipCode: hotelPostalCode,
-    costCoveredBy: normalizeCost(field("cost-covered-by")),
+    costCoveredBy: normalizeCost(costCoveredBySource),
     countryOfBirth: normalizeCountry(field("birth-country")),
     currentNationality: normalizeCountry(field("nationality")),
     dateOfBirth: normalizeExportContractDate(field("birth-date")),
@@ -131,7 +142,7 @@ function buildExportContractRow(
     intendedDateOfDeparture,
     invitingCompanyAddress: hotelAddress,
     invitingCompanyCity: hotelCity,
-    invitingCompanyContactNo: hotelContact,
+    invitingCompanyContactNo: (useCompanyContact ? companyPhone : "") || hotelContact,
     invitingCompanyCountry: hotelCountry,
     invitingCompanyEmail: hotelEmail,
     invitingCompanyName: hotelName,
@@ -139,8 +150,15 @@ function buildExportContractRow(
     lastName: surname,
     location: exportLocationCode(submission.city),
     maritalStatus: normalizeMaritalStatus(field("marital-status")),
-    meansOfSupport: normalizeMeans(field("means-of-support")),
-    nationalityAtBirth: normalizeCountry(field("birth-country")),
+    meansOfSupport: normalizeMeans(meansOfSupportSource),
+    nationalityAtBirth: normalizeCountry(
+      firstNonEmpty(
+        field("birth-citizenship"),
+        field("nationality-at-birth"),
+        field("nationality"),
+        field("birth-country"),
+      ),
+    ),
     ownerAgentId: submission.agentId,
     ownerAgentName: agentOwnerDisplayName(submission.agentId),
     passportLast3: passportNumber.slice(-3),
@@ -160,14 +178,22 @@ function buildExportContractRow(
       submission.type === "family" ? `${submission.id}-${index + 1}` : submission.id,
     submissionId: submission.id,
     submissionTitle: submission.title,
-    surnameAtBirth: field("surname-at-birth", surname),
-    surnameFamilyName: surname,
-    travelDate: normalizeExportContractDate(
-      field("travel-date", submission.tripDateFrom),
+    surnameAtBirth: firstNonEmpty(
+      field("previous-surname"),
+      field("surname-at-birth"),
+      surname,
     ),
+    surnameFamilyName: surname,
+    travelDate: intendedDateOfArrival,
     tripDates: `${submission.tripDateFrom}-${submission.tripDateTo}`,
     type: groupLabel,
-    visaSubType: normalizeVisaSubType(field("visa-sub-type")),
+    visaSubType: normalizeVisaSubType(
+      firstNonEmpty(
+        field("stay-purpose-details"),
+        field("visa-sub-type"),
+        field("purpose"),
+      ),
+    ),
     visaType: normalizeVisaType(field("visa-type")),
   };
 }
@@ -181,6 +207,10 @@ function fieldReader(applicant: Applicant) {
   }
 
   return (id: string, fallback = "") => values.get(id)?.trim() || fallback;
+}
+
+function firstNonEmpty(...values: string[]): string {
+  return values.find((value) => value.trim())?.trim() ?? "";
 }
 
 function applicantNameParts(fullName: string) {
@@ -247,10 +277,13 @@ function normalizeGender(value: string): string {
 }
 
 function normalizeMaritalStatus(value: string): string {
-  if (/married|женат|замуж/i.test(value)) return "Married";
-  if (/divorced|развед/i.test(value)) return "Divorced";
   if (/single|холост|не замуж/i.test(value)) return "Single";
+  if (/married|женат|замуж/i.test(value)) return "Married";
+  if (/registered|partner|партнер/i.test(value)) return "Registered Partnership";
+  if (/separated|раздель/i.test(value)) return "Separated";
+  if (/divorced|развед/i.test(value)) return "Divorced";
   if (/widow|вдов/i.test(value)) return "Widowed";
+  if (/^other$|^иное$/i.test(value.trim())) return "Other";
   return value;
 }
 
@@ -263,12 +296,127 @@ function normalizeEntryCount(value: string): string {
 
 function normalizeCost(value: string): string {
   if (!value.trim()) return "";
-  return /sponsor|спонсор/i.test(value) ? "Sponsor" : "Applicant";
+  return isSponsorCost(value) ? "Sponsor" : "Applicant";
+}
+
+function isSponsorCost(value: string): boolean {
+  return /sponsor|спонсор/i.test(value);
+}
+
+function isCompanyInvitation(invitingPartyType: string, purpose: string): boolean {
+  return (
+    /company|organization|компан|организа/i.test(invitingPartyType) ||
+    /business|cultural|medical treatment|official visit|sports|study/i.test(purpose)
+  );
 }
 
 function normalizeMeans(value: string): string {
+  if (/all expenses|все расходы/i.test(value)) return "All expenses covered";
   if (/credit|кредит/i.test(value)) return "CreditCard";
   if (/accommodation|жиль/i.test(value)) return "Accommodation Provided";
   if (/cash|налич/i.test(value)) return "Cash";
   return value;
+}
+
+const supportedExportMeans = new Set([
+  "Accommodation Provided",
+  "All expenses covered",
+  "Cash",
+  "CreditCard",
+]);
+
+export type ExportContractDataIssue =
+  | "duplicate_identity"
+  | "duplicate_passport"
+  | "family_contact_mismatch"
+  | "invalid_applicant_mobile"
+  | "unsupported_means";
+
+export function exportContractDataIssues(
+  rows: readonly ExportContractRow[],
+): ExportContractDataIssue[] {
+  const issues = new Set<ExportContractDataIssue>();
+
+  if (
+    rows.some(
+      (row) =>
+        Boolean(row.meansOfSupport.trim()) &&
+        !supportedExportMeans.has(row.meansOfSupport),
+    )
+  ) {
+    issues.add("unsupported_means");
+  }
+
+  if (rows.some((row) => !/^\d{10}$/.test(row.applicantMobile))) {
+    issues.add("invalid_applicant_mobile");
+  }
+
+  if (hasRepeatedValueForDifferentApplicants(rows, (row) => row.passportNo)) {
+    issues.add("duplicate_passport");
+  }
+
+  if (
+    hasRepeatedValueForDifferentApplicants(rows, (row) =>
+      [row.surnameFamilyName, row.firstName, row.dateOfBirth]
+        .map(normalizedComparisonValue)
+        .join("|"),
+    )
+  ) {
+    issues.add("duplicate_identity");
+  }
+
+  if (familyContactsDiffer(rows)) {
+    issues.add("family_contact_mismatch");
+  }
+
+  return [...issues];
+}
+
+function hasRepeatedValueForDifferentApplicants(
+  rows: readonly ExportContractRow[],
+  valueFor: (row: ExportContractRow) => string,
+): boolean {
+  const applicantIdsByValue = new Map<string, Set<string>>();
+
+  for (const row of rows) {
+    const value = normalizedComparisonValue(valueFor(row));
+    if (!value || value === "||") continue;
+    const applicantIds = applicantIdsByValue.get(value) ?? new Set<string>();
+    applicantIds.add(row.applicantId);
+    applicantIdsByValue.set(value, applicantIds);
+    if (applicantIds.size > 1) return true;
+  }
+
+  return false;
+}
+
+function familyContactsDiffer(rows: readonly ExportContractRow[]): boolean {
+  const rowsByFamily = new Map<string, ExportContractRow[]>();
+
+  for (const row of rows) {
+    const familyId = row.familyGroupId ?? row.familySubmissionId;
+    if (!familyId) continue;
+    const familyRows = rowsByFamily.get(familyId) ?? [];
+    familyRows.push(row);
+    rowsByFamily.set(familyId, familyRows);
+  }
+
+  return [...rowsByFamily.values()].some((familyRows) => {
+    const emails = new Set(
+      familyRows.map((row) => normalizedComparisonValue(row.applicantEmail)),
+    );
+    const mobiles = new Set(familyRows.map((row) => row.applicantMobile));
+    return emails.size > 1 || mobiles.size > 1;
+  });
+}
+
+function normalizedComparisonValue(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleUpperCase("ru-RU");
+}
+
+function normalizePassportNumber(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleUpperCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
 }

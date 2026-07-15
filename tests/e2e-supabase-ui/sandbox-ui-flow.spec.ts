@@ -886,6 +886,30 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     expect(browserProblems()).toEqual([]);
   });
 
+  test("admin opens return packages without sandbox writes", async ({ page }, testInfo) => {
+    const browserProblems = collectBrowserProblems(page);
+    const mutations = collectSupabaseMutations(page);
+    const viewportWidth = page.viewportSize()?.width ?? 0;
+
+    await signIn(page, "admin");
+    await clickWorkspaceButton(page, /Возврат/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Возврат документов" }),
+    ).toBeVisible();
+    await waitForAdminReturnScreenToSettle(page);
+    await assertNoOverflow(page);
+
+    const screenshotPath = testInfo.outputPath(`admin-return-${viewportWidth}.png`);
+    await page.screenshot({ path: screenshotPath });
+    await testInfo.attach(`admin-return-${viewportWidth}`, {
+      contentType: "image/png",
+      path: screenshotPath,
+    });
+
+    expect(mutations()).toEqual([]);
+    expect(browserProblems()).toEqual([]);
+  });
+
   test("AdminReviewDrawer opens every subview through real controls without writing sandbox data", async ({
     page,
   }, testInfo) => {

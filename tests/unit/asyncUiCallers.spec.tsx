@@ -49,6 +49,12 @@ function correctionsSubmission(): Submission {
   return submission;
 }
 
+function appointmentCitySubmission(): Submission {
+  const submission = initialSubmissions.find((item) => item.id === "SUB-1103");
+  if (!submission) throw new Error("Missing appointment-city fixture SUB-1103.");
+  return submission;
+}
+
 describe("async UI callers", () => {
   test("legacy Drawer moves focus into the modal and exposes roving tabs", async () => {
     const trigger = document.createElement("button");
@@ -104,6 +110,34 @@ describe("async UI callers", () => {
     expect(screen.queryByText("storage-token-should-not-be-visible")).not.toBeInTheDocument();
   });
 
+  test("legacy Drawer routes incomplete files and file issues to document collection", async () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1048");
+    if (!submission) throw new Error("Missing returned fixture ПД-1048.");
+    const onOpenDocuments = vi.fn();
+
+    render(
+      <Drawer
+        isOpen
+        onClose={vi.fn()}
+        onOpenDocuments={onOpenDocuments}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Перейти к сбору документов" }),
+    );
+    expect(onOpenDocuments).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Замечания/ }));
+    const fileActions = await screen.findAllByRole("button", { name: "Исправить файл" });
+    expect(fileActions).toHaveLength(2);
+    fireEvent.click(fileActions[0]);
+    expect(onOpenDocuments).toHaveBeenCalledTimes(2);
+  });
+
   test("legacy Drawer keeps the corrections lifecycle label from the canonical submission", async () => {
     const submission = correctionsSubmission();
 
@@ -120,6 +154,23 @@ describe("async UI callers", () => {
     expect(screen.queryByText("Черновик")).not.toBeInTheDocument();
     expect(screen.getByText("Агент Тони")).toBeInTheDocument();
     expect(screen.queryByText("local-agent-tony")).not.toBeInTheDocument();
+  });
+
+  test("legacy Drawer presents the appointment city used by the submission queue", async () => {
+    const submission = appointmentCitySubmission();
+
+    render(
+      <Drawer
+        isOpen
+        onClose={vi.fn()}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const cityLabel = await screen.findByText("Визовый центр подачи");
+    expect(cityLabel.parentElement).toHaveTextContent("Москва");
+    expect(cityLabel.parentElement).not.toHaveTextContent("Санкт-Петербург");
   });
 
   test("legacy Drawer history keeps compact event types and valid fallback dates", async () => {

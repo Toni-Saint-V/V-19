@@ -214,6 +214,13 @@ function queueFilterLabel(filter: AgentSubmissionQueueFilter) {
   return '';
 }
 
+function lifecycleStatusTone(status: Submission['status']) {
+  if (status === 'submitted_for_review' || status === 'corrections_received') return 'is-review';
+  if (status === 'ready_for_export' || status === 'exported') return 'is-ready';
+  if (status === 'returned' || status === 'requires_action') return 'is-returned';
+  return 'is-progress';
+}
+
 export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreenProps) {
   const [applicantSummaryFilter, setApplicantSummaryFilter] = useState<AgentSubmissionQueueFilter>('all');
   const [cityFilter, setCityFilter] = useState('Все города');
@@ -417,7 +424,9 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
                 <span className="v19-applicant-card-city">
                   <span>{family.city}</span>
                   <span aria-hidden="true">·</span>
-                  <span className="v19-applicant-card-status">{statusLabelFor(family.lifecycleStatus, 'compact')}</span>
+                  <span className={`v19-applicant-card-status ${lifecycleStatusTone(family.lifecycleStatus)}`}>
+                    {statusLabelFor(family.lifecycleStatus, 'compact')}
+                  </span>
                 </span>
               </div>
 
@@ -477,7 +486,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
                   <div className="v19-applicant-individual-copy">
                     <div className="v19-applicant-individual-name-row">
                       <h3 className="text-[15px] font-semibold text-white group-hover:text-white transition-colors">{ind.name}</h3>
-                      <span className="v19-applicant-individual-status">
+                      <span className={`v19-applicant-individual-status ${lifecycleStatusTone(ind.lifecycleStatus)}`}>
                         {statusLabelFor(ind.lifecycleStatus, 'compact')}
                       </span>
                     </div>

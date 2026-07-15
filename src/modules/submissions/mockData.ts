@@ -55,6 +55,120 @@ const completeDemoQuestionnaireValues: Record<string, string> = {
   surname: "IVANOV",
 };
 
+const completeDemoApplicantValues: Record<string, Record<string, string>> = {
+  "з-1054-1": {
+    "birth-date": "14.03.1991",
+    "birth-place": "MOSCOW",
+    "contact-number": "+7 900 000-10-54",
+    email: "petrovy@example.com",
+    "first-name": "IRINA",
+    gender: "Женский",
+    "marital-status": "Женат/замужем",
+    surname: "PETROVA",
+  },
+  "з-1054-2": {
+    "birth-date": "22.11.1988",
+    "birth-place": "TULA",
+    "contact-number": "+7 900 000-10-54",
+    email: "petrovy@example.com",
+    "first-name": "PAVEL",
+    gender: "Мужской",
+    "marital-status": "Женат/замужем",
+    surname: "PETROV",
+  },
+  "з-1055-1": {
+    "birth-date": "09.04.1987",
+    "birth-place": "KAZAN",
+    "contact-number": "+7 900 000-10-55",
+    email: "smirnovy@example.com",
+    "first-name": "ELENA",
+    gender: "Женский",
+    "marital-status": "Женат/замужем",
+    surname: "SMIRNOVA",
+  },
+  "з-1055-2": {
+    "birth-date": "18.12.1985",
+    "birth-place": "SAMARA",
+    "contact-number": "+7 900 000-10-55",
+    email: "smirnovy@example.com",
+    "first-name": "ALEXEY",
+    gender: "Мужской",
+    "marital-status": "Женат/замужем",
+    surname: "SMIRNOV",
+  },
+  "з-1056-1": {
+    "birth-date": "05.06.1990",
+    "birth-place": "MOSCOW",
+    "contact-number": "+7 900 000-10-56",
+    email: "orlov@example.com",
+    "first-name": "DMITRY",
+    gender: "Мужской",
+    "marital-status": "Холост/не замужем",
+    surname: "ORLOV",
+  },
+  "з-1101-1": {
+    "birth-date": "27.09.1993",
+    "birth-place": "MOSCOW",
+    "contact-number": "+7 900 000-11-01",
+    email: "frolova@example.com",
+    "first-name": "OLGA",
+    gender: "Женский",
+    "marital-status": "Холост/не замужем",
+    surname: "FROLOVA",
+  },
+  "з-1102-1": {
+    "birth-date": "08.02.1989",
+    "birth-place": "MOSCOW",
+    "contact-number": "+7 900 000-11-02",
+    email: "volkovy@example.com",
+    "first-name": "ANNA",
+    gender: "Женский",
+    "marital-status": "Женат/замужем",
+    surname: "VOLKOVA",
+  },
+  "з-1102-2": {
+    "birth-date": "16.07.1987",
+    "birth-place": "TVER",
+    "contact-number": "+7 900 000-11-02",
+    email: "volkovy@example.com",
+    "first-name": "IGOR",
+    gender: "Мужской",
+    "marital-status": "Женат/замужем",
+    surname: "VOLKOV",
+  },
+  "з-1102-3": {
+    "birth-date": "19.05.2015",
+    "birth-place": "MOSCOW",
+    "contact-number": "+7 900 000-11-02",
+    email: "volkovy@example.com",
+    "first-name": "MILA",
+    gender: "Женский",
+    "marital-status": "Холост/не замужем",
+    surname: "VOLKOVA",
+  },
+  "з-1103-1": {
+    "birth-date": "03.10.1992",
+    "birth-place": "ST PETERSBURG",
+    "contact-number": "+7 900 000-11-03",
+    email: "morozov@example.com",
+    "first-name": "NIKITA",
+    gender: "Мужской",
+    "marital-status": "Холост/не замужем",
+    surname: "MOROZOV",
+  },
+};
+
+const legacySharedDemoApplicantValues: Record<string, string> = {
+  "birth-date": "20.08.1990",
+  "birth-place": "MOSCOW",
+  "contact-number": "+7 900 000-00-00",
+  email: "demo@example.com",
+  "first-name": "IVAN",
+  gender: "Мужской",
+  "marital-status": "Холост/не замужем",
+  surname: "IVANOV",
+};
+
 function applicant(
   id: string,
   fullName: string,
@@ -64,6 +178,11 @@ function applicant(
   missing?: string,
   readyForExportFixture = false,
 ): Applicant {
+  const applicantValues = completeDemoApplicantValues[id];
+  if (readyForExportFixture && !applicantValues) {
+    throw new Error(`Missing ready-for-export demo values for ${id}`);
+  }
+
   return {
     id,
     fullName,
@@ -98,6 +217,7 @@ function applicant(
           return {
             ...field,
             value:
+              applicantValues?.[field.id] ??
               completeDemoQuestionnaireValues[field.id] ??
               field.options?.[0] ??
               `DEMO ${field.id.toUpperCase()}`,
@@ -652,3 +772,66 @@ export const initialSubmissions: Submission[] = [
     ],
   },
 ];
+
+export function migrateLegacyDuplicateDemoQuestionnaireData(
+  submissions: Submission[],
+): Submission[] {
+  const seededApplicants = new Map(
+    initialSubmissions.flatMap((submission) =>
+      submission.applicants.map((applicant) => [applicant.id, applicant] as const),
+    ),
+  );
+  let changed = false;
+
+  const migrated = submissions.map((submission) => ({
+    ...submission,
+    applicants: submission.applicants.map((applicant) => {
+      const seededApplicant = seededApplicants.get(applicant.id);
+      if (!seededApplicant || !hasLegacySharedDemoIdentity(applicant)) {
+        return applicant;
+      }
+
+      const seededValues = questionnaireValues(seededApplicant);
+      let applicantChanged = false;
+      const sections = applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          const legacyValue = legacySharedDemoApplicantValues[field.id];
+          const seededValue = seededValues.get(field.id);
+          if (
+            legacyValue === undefined ||
+            field.value !== legacyValue ||
+            !seededValue ||
+            seededValue === field.value
+          ) {
+            return field;
+          }
+
+          applicantChanged = true;
+          return { ...field, value: seededValue };
+        }),
+      }));
+
+      if (!applicantChanged) return applicant;
+      changed = true;
+      return { ...applicant, sections };
+    }),
+  }));
+
+  return changed ? migrated : submissions;
+}
+
+function hasLegacySharedDemoIdentity(applicant: Applicant): boolean {
+  const values = questionnaireValues(applicant);
+  return ["first-name", "surname", "birth-date"].every(
+    (fieldId) => values.get(fieldId) === legacySharedDemoApplicantValues[fieldId],
+  );
+}
+
+function questionnaireValues(applicant: Applicant): Map<string, string> {
+  return new Map(
+    applicant.sections.flatMap((section) =>
+      section.fields.map((field) => [field.id, field.value] as const),
+    ),
+  );
+}

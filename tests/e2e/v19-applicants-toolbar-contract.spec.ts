@@ -112,13 +112,35 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       await expect(statusFilter).toHaveAttribute("aria-expanded", "true");
       const statusListbox = page.getByRole("listbox", { name: "Фильтр подач" });
       await expect(statusListbox).toBeVisible();
+      const reviewOption = statusListbox.getByRole("option", { name: "Проверить" });
+      const readyOption = statusListbox.getByRole("option", { name: "К выгрузке" });
+      await expect(reviewOption).toBeFocused();
+      await page.keyboard.press("ArrowDown");
+      await expect(readyOption).toBeFocused();
+      await page.keyboard.press("End");
+      await expect(readyOption).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(statusFilter).toBeFocused();
+
+      await statusFilter.click();
       await statusListbox.getByRole("option", { name: "К выгрузке" }).click();
       await expect(cards).toHaveCount(readyCount);
-      await page.getByRole("button", { name: "Фильтр подач: К выгрузке" }).click();
+      const readyStatusFilter = page.getByRole("button", {
+        name: "Фильтр подач: К выгрузке",
+      });
+      await readyStatusFilter.click();
       await expect(
         page.getByRole("option", { name: "К выгрузке" }),
       ).toHaveAttribute("aria-selected", "true");
       await page.keyboard.press("Escape");
+
+      for (const key of ["Enter", "Space"]) {
+        await readyStatusFilter.click();
+        await expect(readyOption).toBeFocused();
+        await page.keyboard.press(key);
+        await expect(readyStatusFilter).toBeFocused();
+        await expect(readyStatusFilter).toHaveAttribute("aria-expanded", "false");
+      }
 
       await page.getByRole("button", { exact: true, name: "В очереди" }).click();
       const cityFilter = page.getByRole("button", {
@@ -133,10 +155,25 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       await expect(appointmentCitySubmission).toBeVisible();
       await expect(appointmentCitySubmission).toContainText("Москва");
       await expect(listHeaderCount).toContainText("Москва");
+      await page.screenshot({
+        fullPage: true,
+        path: join(evidenceDir, `${viewport.label}-city-filter.png`),
+      });
+      await appointmentCitySubmission.click();
+      const appointmentCityDrawer = drawer(page);
+      await expect(appointmentCityDrawer).toBeVisible();
+      await expect(appointmentCityDrawer).toContainText("Москва");
+      await appointmentCityDrawer
+        .getByRole("button", { name: /Закрыть (подачу|панель)/ })
+        .click();
 
       await page.getByLabel("Поиск по подачам").fill("__no_matching_submission__");
       const emptyState = page.getByRole("status").filter({ hasText: "Ничего не найдено" });
       await expect(emptyState).toBeVisible();
+      await page.screenshot({
+        fullPage: true,
+        path: join(evidenceDir, `${viewport.label}-empty-reset.png`),
+      });
       await emptyState.getByRole("button", { name: "Сбросить фильтры" }).click();
       await expect(cards).toHaveCount(totalCards);
 
@@ -172,6 +209,30 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         fullPage: false,
         path: join(evidenceDir, `${viewport.label}-drawer.png`),
       });
+
+      const drawerTabs = [
+        { label: "Заявители", panelText: "Состав подачи и готовность анкеты каждого участника.", screenshot: "applicants" },
+        { label: "Анкета", panelText: "Открыть анкету", screenshot: "questionnaire" },
+        { label: "Файлы", panelText: "Файлы подачи", screenshot: "files" },
+        { label: "Замечания", panelText: "Список задач по замечаниям", screenshot: "issues" },
+        { label: "История", panelText: undefined, screenshot: "history" },
+      ] as const;
+
+      for (const tabProof of drawerTabs) {
+        const tab = submissionDrawer.getByRole("tab", {
+          name: new RegExp(`^${tabProof.label}`),
+        });
+        await tab.click();
+        await expect(tab).toHaveAttribute("aria-selected", "true");
+        const panel = submissionDrawer.getByRole("tabpanel", { name: tabProof.label });
+        await expect(panel).toBeVisible();
+        if (tabProof.panelText) await expect(panel).toContainText(tabProof.panelText);
+        await page.screenshot({
+          fullPage: false,
+          path: join(evidenceDir, `${viewport.label}-drawer-${tabProof.screenshot}.png`),
+        });
+      }
+
       await submissionDrawer.getByRole("button", { name: /Закрыть (подачу|панель)/ }).click();
 
       const dimensions = await page.evaluate(() => ({

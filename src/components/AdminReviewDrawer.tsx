@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -1229,6 +1235,30 @@ export function AdminReviewDrawer({
     });
   };
 
+  const handleTabKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentTab: TabId,
+  ) => {
+    const currentIndex = tabs.findIndex((tab) => tab.id === currentTab);
+    if (currentIndex < 0) return;
+
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    } else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex]?.id;
+    if (!nextTab) return;
+    selectTab(nextTab);
+    window.requestAnimationFrame(() => {
+      document.getElementById(drawerTabId(nextTab))?.focus({ preventScroll: true });
+    });
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -1317,8 +1347,10 @@ export function AdminReviewDrawer({
                       id={drawerTabId(tab.id)}
                       key={tab.id}
                       role="tab"
+                      tabIndex={activeTab === tab.id ? 0 : -1}
                       type="button"
                       onClick={() => selectTab(tab.id)}
+                      onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
                       className={`relative flex min-h-[44px] items-center gap-2 whitespace-nowrap px-4 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#3a45b4]
                         ${activeTab === tab.id ? "is-active text-white" : "text-white/50 hover:text-white/80"}
                       `}

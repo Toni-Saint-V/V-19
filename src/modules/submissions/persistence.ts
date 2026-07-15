@@ -1,4 +1,7 @@
-import { initialSubmissions } from "./mockData";
+import {
+  initialSubmissions,
+  migrateLegacyDuplicateDemoQuestionnaireData,
+} from "./mockData";
 import { defaultLocalAgentOwnerId, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionForCanonicalRuntime } from "./submissionActions";
 import type { Submission } from "./types";
@@ -35,7 +38,9 @@ export function loadSubmissions(): Submission[] {
     ) {
       return normalizeLoadedSubmissions(initialSubmissions);
     }
-    return normalizeLoadedSubmissions(parsed);
+    return normalizeLoadedSubmissions(
+      migrateLegacyDuplicateDemoQuestionnaireData(parsed),
+    );
   } catch {
     return normalizeLoadedSubmissions(initialSubmissions);
   }

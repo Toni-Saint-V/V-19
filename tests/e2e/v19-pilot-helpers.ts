@@ -153,6 +153,29 @@ async function hasAtLeastOneVisible(locator: Locator) {
   return false;
 }
 
+async function waitForStableInViewport(locator: Locator) {
+  let previousBox: Awaited<ReturnType<Locator["boundingBox"]>> = null;
+
+  await expect
+    .poll(
+      async () => {
+        const nextBox = await locator.boundingBox().catch(() => null);
+        const isStable = Boolean(
+          nextBox &&
+            previousBox &&
+            Math.abs(nextBox.x - previousBox.x) < 0.5 &&
+            Math.abs(nextBox.y - previousBox.y) < 0.5 &&
+            Math.abs(nextBox.width - previousBox.width) < 0.5 &&
+            Math.abs(nextBox.height - previousBox.height) < 0.5,
+        );
+        previousBox = nextBox;
+        return isStable;
+      },
+      { timeout: 2_000 },
+    )
+    .toBe(true);
+}
+
 export async function expectVisibleText(
   scope: Locator,
   text: string | RegExp,
@@ -190,7 +213,8 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
     const mobileButton = mobileNavigation.getByRole("button", { name }).first();
     await mobileButton.waitFor({ state: "visible", timeout: 2_000 });
     await expect(mobileButton).toBeInViewport({ timeout: 2_000 });
-    await mobileButton.click({ force: true, timeout: 10_000 });
+    await waitForStableInViewport(mobileButton);
+    await mobileButton.click({ timeout: 10_000 });
     await mobileNavigation.waitFor({ state: "hidden", timeout: 2_000 });
     return;
   }

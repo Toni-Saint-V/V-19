@@ -85,11 +85,26 @@ export default function SettingsScreen({
   const activeSectionSafe = sections.includes(activeSection)
     ? activeSection
     : sections[0];
+  const activeSectionButtonRef = useRef<HTMLButtonElement>(null);
   const displayEmail = email || "t.novikova@example.test";
   const userDisplayName = useMemo(
     () => (role === "agent" ? "Татьяна Новикова" : "Ирина Лебедева"),
     [role],
   );
+
+  useEffect(() => {
+    if (
+      typeof window.matchMedia !== "function" ||
+      !window.matchMedia("(max-width: 860px)").matches
+    ) {
+      return;
+    }
+
+    activeSectionButtonRef.current?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [activeSectionSafe]);
 
   return (
     <section className="workspace-settings" aria-labelledby="settings-title">
@@ -100,6 +115,7 @@ export default function SettingsScreen({
               aria-current={activeSectionSafe === section ? "page" : undefined}
               className={activeSectionSafe === section ? "active" : undefined}
               key={section}
+              ref={activeSectionSafe === section ? activeSectionButtonRef : undefined}
               type="button"
               onClick={() => setActiveSection(section)}
             >
