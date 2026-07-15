@@ -234,6 +234,12 @@ describe("admin-approved local/dev auth registration", () => {
     await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toEqual(
       [],
     );
+    await expect(accessRequestRepository.listAccessRequests()).resolves.toMatchObject([
+      {
+        id: request.id,
+        status: "approved",
+      },
+    ]);
   });
 
   test("approved active agent can login and restore approved session", async () => {

@@ -6,6 +6,7 @@ import {
   productionCohortExpectedFinalTotals,
   productionCohortFinalGate,
 } from "./lib/production-cohort-final-gate.mjs";
+import { productionCohortExportDataGate } from "./lib/production-cohort-export-data-gate.mjs";
 
 const productionProjectRef = "tsymifccglpepvbmrcgh";
 const productionUrl = `https://${productionProjectRef}.supabase.co`;
@@ -141,7 +142,7 @@ async function main() {
       readRows(
         client,
         "applicants",
-        "id,submission_id",
+        "id,submission_id,birth_date,email,passport_number,phone",
         "submission_id",
         submissionIds,
       ),
@@ -176,6 +177,17 @@ async function main() {
     ]);
 
   const submissionById = new Map(submissions.map((row) => [row.id, row]));
+  const exportDataGate = productionCohortExportDataGate({
+    answers,
+    applicants,
+    submissions,
+  });
+  invariant(
+    exportDataGate.ok,
+    `Production cohort questionnaire/Excel data contract failed (${[
+      ...new Set(exportDataGate.findings.map((finding) => finding.code)),
+    ].join(",")}).`,
+  );
   const rangeResults = await verifyStorageObjects(
     media,
     publishableKey,

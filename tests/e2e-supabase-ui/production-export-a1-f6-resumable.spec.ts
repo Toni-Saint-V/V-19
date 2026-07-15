@@ -174,6 +174,25 @@ async function inspectWorkbook(
       [...passportNumbers].every((passport) => /^\d{9}$/.test(passport)),
     "Workbook passport identities are incomplete or duplicated.",
   );
+  const applicantEmails = new Set(
+    rows.map((row) => workbookValue(headers, row, "Applicant Email")),
+  );
+  const applicantMobiles = new Set(
+    rows.map((row) =>
+      workbookValue(
+        headers,
+        row,
+        "Applicant Mobile(10 Digit, No space or -,leading zero)",
+      ),
+    ),
+  );
+  invariant(
+    applicantEmails.size === 1 &&
+      [...applicantEmails].every((email) => /^[^@\s]+@[^@\s]+$/.test(email)) &&
+      applicantMobiles.size === 1 &&
+      [...applicantMobiles].every((mobile) => /^\d{10}$/.test(mobile)),
+    "Workbook family applicant email or mobile is not shared and canonical.",
+  );
   return {
     passportNumbers,
     proof: {

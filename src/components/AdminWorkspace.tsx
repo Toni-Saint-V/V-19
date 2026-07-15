@@ -41,9 +41,9 @@ const SettingsScreen = lazy(
 const adminMobileNavigationId = "admin-mobile-navigation";
 
 const accessRequestStatusCopy: Record<AccessRequest["status"], string> = {
-  approved: "approved",
-  pending: "pending",
-  rejected: "rejected",
+  approved: "Одобрена",
+  pending: "На рассмотрении",
+  rejected: "Отклонена",
 };
 
 const accessRequestStatusClassName: Record<AccessRequest["status"], string> = {
@@ -162,7 +162,7 @@ function AdminUsersAccessPanel({
                     {request.fullName}
                   </strong>
                   <span className="rounded-full border border-[#2e2f34] bg-[#202126] px-2 py-0.5 text-[11px] font-medium text-[#b8baff]">
-                    agent
+                    агент
                   </span>
                   <span
                     className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${accessRequestStatusClassName[request.status]}`}

@@ -118,7 +118,7 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
 
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
 
@@ -173,7 +173,7 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
 
     await waitFor(() => expect(onSubmissionUpdate).toHaveBeenCalledTimes(1));
     expect(fieldValue(latestSubmission, "surname")).toBe("VOLKOV");
@@ -215,7 +215,7 @@ describe("QuestionnaireScreen", () => {
     expect(autosaved.history).toHaveLength(submission.history.length);
     expect(fieldValue(autosaved, "surname")).toBe("VOLKOV");
 
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));
 
     const manuallySaved = onSubmissionChange.mock.calls[1]?.[0] as Submission;
@@ -238,8 +238,15 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Отправить на проверку" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Черновик" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Отправить на проверку" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Сохранить и выйти" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("questionnaire-read-only-status")).toHaveTextContent(
+      "На проверке",
+    );
     expect(screen.getByLabelText("Фамилия")).toBeDisabled();
     expect(onSubmissionChange).not.toHaveBeenCalled();
     expect(onSubmitForReview).not.toHaveBeenCalled();
@@ -267,7 +274,7 @@ describe("QuestionnaireScreen", () => {
       expect(screen.getAllByText("Supabase недоступен").length).toBeGreaterThan(0),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));
 
     const retrySubmission = onSubmissionChange.mock.calls[1]?.[0] as Submission;
@@ -319,7 +326,7 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: `${surname.value}A` },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
 
     const edited = onSubmissionChange.mock.calls[0]?.[0] as Submission;

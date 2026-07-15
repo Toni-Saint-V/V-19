@@ -74,4 +74,61 @@ describe("Supabase auth registration adapter", () => {
       },
     });
   });
+
+  test("lists reviewed requests as well as pending requests for the admin history", async () => {
+    const order = vi.fn(async () => ({
+      data: [
+        {
+          city: "Мадрид",
+          company_name: "Visa Test",
+          created_at: "2026-07-07T00:00:00.000Z",
+          email: "approved.agent@example.com",
+          full_name: "Одобренный Агент",
+          id: "access-request-approved",
+          phone: "+7 900 000-00-00",
+          rejection_reason: null,
+          requested_role: "agent",
+          reviewed_at: "2026-07-08T00:00:00.000Z",
+          reviewed_by_admin_id: "admin-1",
+          status: "approved",
+          updated_at: "2026-07-08T00:00:00.000Z",
+          user_id: "agent-1",
+        },
+        {
+          city: "Москва",
+          company_name: "Visa Test",
+          created_at: "2026-07-06T00:00:00.000Z",
+          email: "pending.agent@example.com",
+          full_name: "Новый Агент",
+          id: "access-request-pending",
+          phone: "+7 900 000-00-01",
+          rejection_reason: null,
+          requested_role: "agent",
+          reviewed_at: null,
+          reviewed_by_admin_id: null,
+          status: "pending",
+          updated_at: "2026-07-06T00:00:00.000Z",
+          user_id: null,
+        },
+      ],
+      error: null,
+    }));
+    const select = vi.fn(() => ({ order }));
+    const from = vi.fn(() => ({ select }));
+    supabaseMock.client = {
+      from,
+      functions: {
+        invoke: supabaseMock.invoke,
+      },
+    } as never;
+
+    const requests = await new SupabaseAccessRequestAdapter().listAccessRequests();
+
+    expect(requests).toMatchObject([
+      { id: "access-request-approved", status: "approved" },
+      { id: "access-request-pending", status: "pending" },
+    ]);
+    expect(from).toHaveBeenCalledWith("access_requests");
+    expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
+  });
 });

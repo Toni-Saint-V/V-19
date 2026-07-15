@@ -172,6 +172,121 @@ export function canAgentEditSubmissionContent(submission: Submission) {
   return canAgentEditSubmission(submission);
 }
 
+export type AgentQuestionnaireStatusPresentation = {
+  canEdit: boolean;
+  completionLabel: "Отправить исправления" | "Отправить на проверку";
+  drawerActionLabel: "Исправить анкету" | "Открыть анкету" | "Смотреть анкету";
+  drawerDescription: string;
+  readOnly?: {
+    label: string;
+    mobileLabel: string;
+    message: string;
+  };
+};
+
+/**
+ * One role-aware presentation contract for the agent questionnaire entrypoint.
+ * It keeps the read-only admin stages from looking like broken agent work.
+ */
+export function agentQuestionnaireStatusPresentation(
+  status: SubmissionStatus,
+): AgentQuestionnaireStatusPresentation {
+  if (status === "returned") {
+    return {
+      canEdit: true,
+      completionLabel: "Отправить исправления",
+      drawerActionLabel: "Исправить анкету",
+      drawerDescription:
+        "Исправьте замечания в анкете и отправьте пакет на повторную проверку.",
+    };
+  }
+
+  if (status === "requires_action") {
+    return {
+      canEdit: false,
+      completionLabel: "Отправить исправления",
+      drawerActionLabel: "Смотреть анкету",
+      drawerDescription:
+        "Статус подачи обновляется. Откройте актуальную подачу после синхронизации.",
+      readOnly: {
+        label: "Статус обновляется",
+        mobileLabel: "Обновляется",
+        message:
+          "Подача временно доступна только для просмотра, пока статус не синхронизирован.",
+      },
+    };
+  }
+
+  if (status === "submitted_for_review") {
+    return {
+      canEdit: false,
+      completionLabel: "Отправить на проверку",
+      drawerActionLabel: "Смотреть анкету",
+      drawerDescription:
+        "Подача уже отправлена. Сейчас её проверяет администратор; редактирование недоступно.",
+      readOnly: {
+        label: "На проверке",
+        mobileLabel: "На проверке",
+        message:
+          "Подача отправлена на проверку. Редактирование станет доступно, если администратор вернёт её с замечаниями.",
+      },
+    };
+  }
+
+  if (status === "corrections_received") {
+    return {
+      canEdit: false,
+      completionLabel: "Отправить исправления",
+      drawerActionLabel: "Смотреть анкету",
+      drawerDescription:
+        "Исправления отправлены. Сейчас подачу проверяет администратор; редактирование недоступно.",
+      readOnly: {
+        label: "Исправления на проверке",
+        mobileLabel: "Исправления",
+        message:
+          "Исправления отправлены администратору. Пока идёт проверка, анкета доступна только для просмотра.",
+      },
+    };
+  }
+
+  if (status === "ready_for_export") {
+    return {
+      canEdit: false,
+      completionLabel: "Отправить на проверку",
+      drawerActionLabel: "Смотреть анкету",
+      drawerDescription:
+        "Подача принята к выгрузке и доступна только для просмотра.",
+      readOnly: {
+        label: "Готово к выгрузке",
+        mobileLabel: "К выгрузке",
+        message: "Подача принята администратором и ожидает выгрузки.",
+      },
+    };
+  }
+
+  if (status === "exported") {
+    return {
+      canEdit: false,
+      completionLabel: "Отправить на проверку",
+      drawerActionLabel: "Смотреть анкету",
+      drawerDescription: "Подача выгружена и доступна только для просмотра.",
+      readOnly: {
+        label: "Выгружено",
+        mobileLabel: "Выгружено",
+        message: "Подача уже выгружена. История и данные остаются доступны для просмотра.",
+      },
+    };
+  }
+
+  return {
+    canEdit: true,
+    completionLabel: "Отправить на проверку",
+    drawerActionLabel: "Открыть анкету",
+    drawerDescription:
+      "Проверьте готовность заявителей и продолжите заполнение в рабочей анкете.",
+  };
+}
+
 export function canEditSubmissionContent(submission: Submission, role: Role) {
   return role === "agent" && canAgentEditSubmissionContent(submission);
 }

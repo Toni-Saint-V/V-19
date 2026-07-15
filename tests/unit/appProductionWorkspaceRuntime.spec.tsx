@@ -296,13 +296,13 @@ vi.mock("../../src/lib/supabase/config", () => ({
 }));
 
 vi.mock("../../src/shared/authRegistration", () => ({
-  accessRequestRepository: { listPendingAccessRequests: vi.fn(async () => []) },
+  accessRequestRepository: { listAccessRequests: vi.fn(async () => []) },
   authRepository: {},
 }));
 
 vi.mock("../../src/shared/supabaseAuthRegistration", () => ({
   supabaseAccessRequestRepository: {
-    listPendingAccessRequests: vi.fn(async () => []),
+    listAccessRequests: vi.fn(async () => []),
   },
 }));
 

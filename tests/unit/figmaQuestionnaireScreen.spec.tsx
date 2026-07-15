@@ -437,7 +437,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  test("exposes compact progress, save state, and the next blocker for mobile layouts", () => {
+  test("keeps save state and the next blocker available in the compact header", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -454,11 +454,10 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    const mobileStatus = result.container.querySelector(
-      ".v19-questionnaire-mobile-status",
+    const headerActions = result.container.querySelector(
+      ".v19-questionnaire-header-actions",
     );
-    expect(mobileStatus).toHaveTextContent(/\d+% · \d+\/\d+/);
-    expect(mobileStatus).toHaveTextContent("Изменений нет");
+    expect(headerActions).toHaveTextContent("Изменений нет");
     expect(
       screen.getByRole("button", { name: /Перейти к блокеру:/ }),
     ).toBeInTheDocument();
@@ -591,7 +590,7 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Отель / приглашение");
     expect(visibleFieldLabels(result.container)).toEqual([
       "Тип принимающей стороны",
-      "ФИО приглашающего лица или название отеля",
+      "ФИО приглашающего лица или название отеля/компании",
       "Адрес",
       "Страна",
       "Город",
@@ -884,7 +883,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "USSR",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     const payload = onSaveDraft.mock.calls[0]?.[0];
     expect(payload).toEqual(
@@ -919,7 +918,7 @@ describe("FigmaQuestionnaireScreen", () => {
       target: { value: "россия" },
     });
     fireEvent.click(screen.getByRole("option", { name: "Russian Federation" }));
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(legacySave).toHaveBeenCalledTimes(1));
     expect(legacySave.mock.calls[0]?.[0].fieldUpdates).toEqual(
       expect.arrayContaining([
@@ -970,7 +969,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
 
     expect(onSaveDraft).toHaveBeenCalledWith(
@@ -1011,7 +1010,7 @@ describe("FigmaQuestionnaireScreen", () => {
       target: { value: "VOLKOV" },
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+      fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
       await Promise.resolve();
     });
     await act(async () => {
@@ -1445,10 +1444,15 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     expect(screen.getByLabelText("Фамилия")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Черновик" })).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Отправить на проверку" }),
-    ).toBeDisabled();
+      screen.queryByRole("button", { name: "Сохранить и выйти" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Отправить на проверку" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("questionnaire-read-only-status")).toHaveTextContent(
+      "На проверке",
+    );
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "CHANGED" },
     });
@@ -2136,7 +2140,7 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Действителен до"), {
       target: { value: "31.12.2035" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
 
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     const payload = onSaveDraft.mock.calls[0]?.[0];
@@ -2341,7 +2345,7 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Отель / приглашение");
     expect(screen.getByLabelText("Город")).toHaveValue("Barcelona");
 
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     expect(onSaveDraft.mock.calls[0]?.[0].fieldUpdates).toEqual(
       expect.arrayContaining(copiedUpdates),
@@ -2698,7 +2702,7 @@ describe("FigmaQuestionnaireScreen", () => {
       screen.getByRole("button", { name: "Подтвердить поле: Дата рождения" }),
     );
     expect(birthDate).not.toHaveClass("is-review");
-    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
 
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     expect(onSaveDraft).toHaveBeenCalledWith(

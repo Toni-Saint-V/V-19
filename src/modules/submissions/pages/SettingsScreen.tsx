@@ -413,6 +413,8 @@ function AccessRequestsSection({
   onApprove: (requestId: string) => void;
   onReject: (requestId: string) => void;
 }) {
+  const pendingRequests = requests.filter((request) => request.status === "pending");
+
   return (
     <section
       className="settings-block settings-access-requests"
@@ -424,12 +426,14 @@ function AccessRequestsSection({
           <h2 id="settings-title">Заявки на доступ</h2>
           <p>Администратор одобряет доступ агента до входа в рабочий кабинет.</p>
         </div>
-        <span aria-label={`Новых заявок: ${requests.length}`}>{requests.length}</span>
+        <span aria-label={`Новых заявок: ${pendingRequests.length}`}>
+          {pendingRequests.length}
+        </span>
       </div>
 
-      {requests.length ? (
+      {pendingRequests.length ? (
         <div className="settings-access-list">
-          {requests.map((request) => (
+          {pendingRequests.map((request) => (
             <article className="settings-access-row" key={request.id}>
               <div className="settings-access-main">
                 <strong>{request.fullName}</strong>
@@ -437,7 +441,7 @@ function AccessRequestsSection({
                   {request.companyName} · {request.city} · {request.phone}
                 </span>
                 <small>
-                  {request.email} · agent · pending · {formatAccessRequestDate(request.createdAt)}
+                  {request.email} · агент · на рассмотрении · {formatAccessRequestDate(request.createdAt)}
                 </small>
               </div>
               <div className="settings-access-actions">

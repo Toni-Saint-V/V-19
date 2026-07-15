@@ -322,8 +322,14 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Review card was not rendered.");
     fireEvent.click(card);
+    const applicantTabs = await screen.findByRole("tablist", {
+      name: /Разделы заявителя/,
+    });
     fireEvent.click(
-      (await screen.findAllByRole("button", { name: /^Добавить замечание/ }))[0]!,
+      within(applicantTabs).getByRole("tab", { name: /Файлы/ }),
+    );
+    fireEvent.click(
+      (await screen.findAllByTestId("admin-review-add-file-remark"))[0]!,
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Отправить замечание" }),
@@ -361,8 +367,14 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Production-like review card was not rendered.");
     fireEvent.click(card);
+    const applicantTabs = await screen.findByRole("tablist", {
+      name: /Разделы заявителя/,
+    });
     fireEvent.click(
-      (await screen.findAllByRole("button", { name: /^Добавить замечание/ }))[0]!,
+      within(applicantTabs).getByRole("tab", { name: /Файлы/ }),
+    );
+    fireEvent.click(
+      (await screen.findAllByTestId("admin-review-add-file-remark"))[0]!,
     );
     fireEvent.change(
       await screen.findByPlaceholderText("Опишите, что именно нужно исправить..."),

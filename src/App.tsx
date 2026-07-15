@@ -238,16 +238,15 @@ export default function App({
 
   const loadAccessRequests = useCallback(
     async (session: Session | null) => {
+      if (session?.role !== "admin") return [];
+
       if (supabaseEnabled) {
-        if (session?.role !== "admin") {
-          return [];
-        }
-        return supabaseAccessRequestRepository.listPendingAccessRequests();
+        return supabaseAccessRequestRepository.listAccessRequests();
       }
 
       if (!__V19_LOCAL_DEMO_BUILD__) return [];
       const { accessRequestRepository } = await import("./shared/authRegistration");
-      return accessRequestRepository.listPendingAccessRequests();
+      return accessRequestRepository.listAccessRequests();
     },
     [supabaseEnabled],
   );

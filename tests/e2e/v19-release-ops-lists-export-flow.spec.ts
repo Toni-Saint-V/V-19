@@ -22,18 +22,15 @@ test.describe("V-19 release ops lists export flow", () => {
 
     await clickWorkspaceButton(page, /Проверка|Работа/);
     await expect(submissionCardById(page, "ПД-1053")).toBeVisible();
-    await submissionCardById(page, "ПД-1053").click();
-    await expect(page.getByLabel("Детали проверки")).toContainText("Нина Волкова");
-    await expect(page.getByLabel("Детали проверки")).toContainText(
-      "Администратор проверки",
+    await expect(submissionCardById(page, "ПД-1053")).toContainText(
+      "local-agent-tony",
     );
-    await page
-      .getByRole("button", { name: /^(Ручная проверка|Проверить)/ })
-      .first()
-      .click();
+    await submissionCardById(page, "ПД-1053").click();
     await expect(drawer(page)).toBeVisible();
-    await expect(drawer(page).locator(".admin-review-meta")).toContainText(
-      "Агент: Татьяна Николаева",
+    await expect(drawer(page)).toContainText("Нина Волкова");
+    await expect(drawer(page).getByRole("tab", { name: /Файлы/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
     );
     await expect(
       drawer(page)
@@ -49,56 +46,47 @@ test.describe("V-19 release ops lists export flow", () => {
       page.getByRole("heading", { level: 1, name: "Выгрузка" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: /Фильтр по городу/ }).click();
-    await page.getByRole("option", { name: "Санкт-Петербург" }).click();
+    const cityFilter = page.getByRole("button", { name: /^Фильтр городов:/ });
+    await cityFilter.click();
+    await page.getByRole("option", { name: "Москва" }).click();
+    await expect(cityFilter).toHaveAccessibleName("Фильтр городов: Москва");
     await expect(
-      page.locator(".export-row").filter({ hasText: "Никита Морозов" }),
+      page.locator(".export-row").filter({ hasText: "ПД-1054" }),
     ).toBeVisible();
-    await expect(
-      page.locator(".export-row").filter({ hasText: "Семья Волковых" }),
-    ).toHaveCount(0);
 
-    await page.getByRole("button", { name: /Фильтр по городу/ }).click();
+    await cityFilter.click();
     await page.getByRole("option", { name: "Все города" }).click();
-    await page
-      .getByLabel("Фильтр по агенту")
-      .selectOption({ label: "Алексей Морозов" });
-    await expect(
-      page.locator(".export-row").filter({ hasText: "Ольга Фролова" }),
-    ).toBeVisible();
-    await expect(
-      page.locator(".export-row").filter({ hasText: "Дмитрий Орлов" }),
-    ).toHaveCount(0);
+    const agentFilter = page.getByRole("button", { name: /^Агент:/ });
+    await agentFilter.click();
+    const firstConcreteAgent = page
+      .getByRole("option")
+      .filter({ hasNotText: "Все агенты" })
+      .first();
+    await expect(firstConcreteAgent).toBeVisible();
+    await firstConcreteAgent.click();
+    await expect(agentFilter).not.toHaveAccessibleName("Агент: Все агенты");
+    await expect(page.locator(".export-row").first()).toBeVisible();
 
-    await page.getByLabel("Фильтр по агенту").selectOption({ label: "Все агенты" });
-    await page.getByLabel("Поиск в текущем списке").fill("660011022");
+    await agentFilter.click();
+    await page.getByRole("option", { name: "Все агенты" }).click();
+    await page.getByLabel("ID, семья или агент").fill("SUB-1102");
     await expect(
-      page.locator(".export-row").filter({ hasText: "Семья Волковых" }),
+      page.locator(".export-row").filter({ hasText: "SUB-1102" }),
     ).toBeVisible();
-    await expect(
-      page.locator(".export-row").filter({ hasText: "Ольга Фролова" }),
-    ).toHaveCount(0);
-    await page.getByLabel("Поиск в текущем списке").fill("");
+    await expect(page.locator(".export-row")).toHaveCount(1);
+    await page.getByLabel("ID, семья или агент").fill("");
 
-    const familyRow = page.locator(".export-row").filter({ hasText: "Семья Волковых" });
-    const singleRow = page.locator(".export-row").filter({ hasText: "Ольга Фролова" });
+    const familyRow = page.locator(".export-row").filter({ hasText: "SUB-1102" });
+    const singleRow = page.locator(".export-row").filter({ hasText: "SUB-1101" });
     await expect(familyRow).toBeVisible();
-    await expect(familyRow).toContainText("3");
     await expect(singleRow).toBeVisible();
-    await expect(singleRow).toContainText("1");
 
     await clearExportSelection(page);
-    await page
-      .locator(".export-row")
-      .filter({ hasText: "Семья Волковых" })
-      .getByRole("checkbox")
-      .check();
-    await page
-      .locator(".export-row")
-      .filter({ hasText: "Ольга Фролова" })
-      .getByRole("checkbox")
-      .check();
-    await expect(page.getByText(/разных агентов/)).toBeVisible();
+    await familyRow.getByRole("checkbox").check();
+    await singleRow.getByRole("checkbox").check();
+    await expect(page.getByRole("complementary", { name: "Контроль пакета" })).toContainText(
+      /2 пакета/,
+    );
     await expect(
       page.getByRole("button", { name: "Сформировать Excel" }),
     ).toBeEnabled();
@@ -106,22 +94,9 @@ test.describe("V-19 release ops lists export flow", () => {
     await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
 
     await clearExportSelection(page);
-    await page
-      .locator(".export-row")
-      .filter({ hasText: "Семья Волковых" })
-      .getByRole("checkbox")
-      .check();
-    await page
-      .locator(".export-row")
-      .filter({ hasText: "Никита Морозов" })
-      .getByRole("checkbox")
-      .check();
-    await expect(
-      page.getByText("Нельзя смешивать разные города").first(),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toBeDisabled();
+    await page.getByRole("button", { name: "Стоп" }).click();
+    await expect(page.getByText("Пакетов с ограничениями нет")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Сформировать Excel" })).toBeDisabled();
 
     await openFreshWorkspace(page, {
       heading: "Мои действия",

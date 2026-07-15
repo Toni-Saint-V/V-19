@@ -14,6 +14,8 @@ import {
 import { buildLocalDemoExportMediaZipOptions } from "../src/modules/submissions/exportMediaZipLocalDemo";
 import { parseExportWorkbookBlob } from "../src/lib/export/exportWorkbookCore";
 import { createVisaApplicationFormPdfBlob } from "../src/modules/submissions/visaApplicationFormPdf";
+import { normalizeSubmissionQuestionnaire } from "../src/modules/submissions/questionnaire";
+import { fillRequiredQuestionnaireForTest } from "./unit/helpers/questionnaireTestFill";
 import type {
   Applicant,
   City,
@@ -30,15 +32,19 @@ const fixtureRoot = path.resolve(testDir, "../src/assets/export-demo");
 
 test("ZIP contains real workbook and four real document files per applicant", async () => {
   const submission = withGeneratedExportPackage(
-    makeSubmission({
-      applicants: [
-        makeApplicant("app-1", "VOLKOV ANTON", "752869613"),
-        makeApplicant("app-2", "VOLKOVA IRINA", "752869614"),
-      ],
-      id: "PD-REAL-1",
-      title: "Семья Волковых",
-      type: "family",
-    }),
+    fillRequiredQuestionnaireForTest(
+      normalizeSubmissionQuestionnaire(
+        makeSubmission({
+          applicants: [
+            makeApplicant("app-1", "VOLKOV ANTON", "752869613"),
+            makeApplicant("app-2", "VOLKOVA IRINA", "752869614"),
+          ],
+          id: "PD-REAL-1",
+          title: "Семья Волковых",
+          type: "family",
+        }),
+      ),
+    ),
   );
 
   const summary = exportSummary([submission]);
@@ -273,7 +279,13 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
       verifiedAtIso: "2026-05-12T00:00:00.000Z",
     },
     sections: [
-      section("personal", [
+      section(id, "appointment", [
+        field("appointment-city", city),
+        field("visa-type", "Шенгенская"),
+        field("category", "Normal"),
+        field("desired-date-1", "2026-05-20"),
+      ]),
+      section(id, "personal", [
         field("surname", surname),
         field("surname-at-birth", surname),
         field("first-name", firstName),
@@ -284,7 +296,7 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
         field("gender", "Male"),
         field("marital-status", "Single"),
       ]),
-      section("passport", [
+      section(id, "passport", [
         field("passport-type", "Ordinary Passport"),
         field("passport-no", passportNo),
         field("passport-issue-date", "2016-02-26"),
@@ -292,7 +304,7 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
         field("passport-issue-place", "MVD 78039"),
         field("passport-issue-country", "Russian Federation"),
       ]),
-      section("contacts", [
+      section(id, "contacts", [
         field("home-address", "KOMENDANTSKII AVENUE 60 1 1 879"),
         field("home-city", "ST PETERSBURG"),
         field("home-country", "Russian Federation"),
@@ -300,13 +312,13 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
         field("email", "olga.gubko@gmail.com"),
         field("contact-number", "79213434543"),
       ]),
-      section("work", [
+      section(id, "employment", [
         field("occupation", "NO OCCUPATION"),
         field("employer-name", "NO OCCUPATION"),
         field("employer-contact", ""),
         field("employer-address", "NO OCCUPATION"),
       ]),
-      section("trip", [
+      section(id, "trip", [
         field("visa-type", "Schengen"),
         field("visa-sub-type", "Tourism"),
         field("category", "Normal"),
@@ -318,8 +330,10 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
         field("departure-date", "2026-05-28"),
         field("travel-date", "2026-05-20"),
         field("stay-duration", "9"),
+        field("previous-biometrics", "Нет"),
       ]),
-      section("hotel", [
+      section(id, "hotel", [
+        field("inviting-party-type", "Гостиница/временное жилье"),
         field("hotel-name", "HOTEL"),
         field("hotel-country", "Spain"),
         field("hotel-city", "BARCELONA"),
@@ -329,7 +343,7 @@ function makeApplicant(id: string, fullName: string, passportNo: string): Applic
         field("hotel-contact", "34111223344"),
         field("hotel-contact-last-name", "HOTEL BARCELONA"),
       ]),
-      section("payment", [
+      section(id, "payment", [
         field("cost-covered-by", "Applicant"),
         field("means-of-support", "Cash"),
       ]),
@@ -374,10 +388,11 @@ function makeFile(applicant: Applicant, type: SubmissionFile["type"]): Submissio
 }
 
 function section(
+  applicantId: string,
   id: string,
   fields: Array<ReturnType<typeof field>>,
 ): Applicant["sections"][number] {
-  return { id, title: id, status: "complete", fields };
+  return { id: `${applicantId}-${id}`, title: id, status: "complete", fields };
 }
 
 function field(id: string, value: string): Applicant["sections"][number]["fields"][number] {

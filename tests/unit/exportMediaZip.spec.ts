@@ -15,10 +15,10 @@ import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { mediaStorageBucket } from "../../src/modules/submissions/mediaStoragePolicy";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type {
-  Applicant,
   Submission,
   SubmissionFile,
 } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const canonicalTypes = ["passport_scan", "selfie", "selfie_2"] as const;
 const exportDate = "2026-07-07";
@@ -27,78 +27,7 @@ const rootFolder = `VisaFlow_Export_${exportDate}`;
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
   if (!submission) throw new Error(`Missing fixture ${id}`);
-  return withVisaFormReady(submission);
-}
-
-function withVisaFormReady(submission: Submission): Submission {
-  return {
-    ...submission,
-    applicants: submission.applicants.map((applicant, applicantIndex) => ({
-      ...applicant,
-      sections: [
-        ...applicant.sections,
-        {
-          id: "pdf-export-ready",
-          title: "pdf-export-ready",
-          status: "complete",
-          fields: [
-            questionnaireField("surname", `TEST-${applicant.id}`),
-            questionnaireField("surname-at-birth", `TEST-${applicant.id}`),
-            questionnaireField("first-name", `APPLICANT${applicantIndex + 1}`),
-            questionnaireField(
-              "birth-date",
-              `1990-01-${String(applicantIndex + 1).padStart(2, "0")}`,
-            ),
-            questionnaireField("birth-place", "MOSCOW"),
-            questionnaireField("birth-country", "Russian Federation"),
-            questionnaireField("nationality", "Russian Federation"),
-            questionnaireField("gender", "Male"),
-            questionnaireField("marital-status", "Single"),
-            questionnaireField("passport-type", "Ordinary Passport"),
-            questionnaireField("passport-no", passportNumberFor(applicant)),
-            questionnaireField("passport-issue-date", "2020-01-01"),
-            questionnaireField("passport-expiry-date", "2030-01-01"),
-            questionnaireField("passport-issue-country", "Russian Federation"),
-            questionnaireField("passport-issue-place", "MVD"),
-            questionnaireField("home-address", "1 TEST STREET"),
-            questionnaireField("home-city", "MOSCOW"),
-            questionnaireField("home-country", "Russian Federation"),
-            questionnaireField("postal-code", "100000"),
-            questionnaireField("email", "TEST@EXAMPLE.COM"),
-            questionnaireField("contact-number", "70000000000"),
-            questionnaireField("occupation", "ENGINEER"),
-            questionnaireField("employer-name", "TEST EMPLOYER"),
-            questionnaireField("purpose", "TOURISM"),
-            questionnaireField("main-destination", "Spain"),
-            questionnaireField("first-entry-country", "Spain"),
-            questionnaireField("entry-count", "Multiple Entry"),
-            questionnaireField("arrival-date", "2026-07-20"),
-            questionnaireField("departure-date", "2026-07-27"),
-            questionnaireField("stay-duration", "7"),
-            questionnaireField("hotel-name", "TEST HOTEL"),
-            questionnaireField("hotel-address", "1 HOTEL ROAD"),
-            questionnaireField("hotel-city", "MADRID"),
-            questionnaireField("hotel-country", "Spain"),
-            questionnaireField("cost-covered-by", "Applicant"),
-            questionnaireField("means-of-support", "Cash"),
-          ],
-        },
-      ],
-    })),
-  };
-}
-
-function passportNumberFor(applicant: Applicant) {
-  return (
-    applicant.sections
-      .flatMap((section) => section.fields)
-      .find((field) => field.id === "passport-no")
-      ?.value.trim() || "AA1234567"
-  );
-}
-
-function questionnaireField(id: string, value: string) {
-  return { id, label: id, value, required: true };
+  return fillRequiredQuestionnaireForTest(submission);
 }
 
 function withCanonicalStorage(submission: Submission): Submission {

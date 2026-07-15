@@ -27,6 +27,7 @@ import {
   validateExportContractShape,
 } from "./exportContract";
 import { validateVisaApplicationFormData } from "./visaApplicationFormPdf";
+import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
 
 export type ExportSelectionState = ExportState | "mixed";
 export type ExportMappingState = "mapped" | "derived" | "unresolved";
@@ -116,6 +117,9 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
       (applicant) => !validateVisaApplicationFormData(submission, applicant).ok,
     ),
   );
+  const submissionsWithIncompleteQuestionnaire = submissions.filter(
+    (submission) => !blsQuestionnaireReadiness(submission).ready,
+  );
   const openBlockingIssues = submissions.filter((submission) =>
     submission.issues.some(
       (issue) => issue.status === "open" || issue.status === "fixed_by_agent",
@@ -197,6 +201,12 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     blockers.push({
       reason:
         "В выборке есть анкеты без обязательных данных для PDF. ZIP не сформирован.",
+    });
+  }
+
+  if (submissionsWithIncompleteQuestionnaire.length > 0) {
+    blockers.push({
+      reason: "В выборке есть анкеты, которые не прошли актуальную BLS-проверку",
     });
   }
 
