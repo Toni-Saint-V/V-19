@@ -238,7 +238,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Готово/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Отправить на проверку" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Черновик" })).toBeDisabled();
     expect(screen.getByLabelText("Фамилия")).toBeDisabled();
     expect(onSubmissionChange).not.toHaveBeenCalled();
@@ -262,7 +262,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Готово/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить на проверку" }));
     await waitFor(() =>
       expect(screen.getAllByText("Supabase недоступен").length).toBeGreaterThan(0),
     );
@@ -370,7 +370,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    const completeButton = screen.getByRole("button", { name: /Готово/ });
+    const completeButton = screen.getByRole("button", { name: "Отправить на проверку" });
     expect(completeButton).toBeEnabled();
     expect(onSubmissionChange).not.toHaveBeenCalled();
 
