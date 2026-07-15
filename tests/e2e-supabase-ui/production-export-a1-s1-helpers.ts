@@ -14,7 +14,9 @@ import {
 import {
   applySubmissionActionResult,
   markSubmissionIssueFixedResult,
+  withRecalculatedSubmissionProgress,
 } from "../../src/modules/submissions/status";
+import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
 import type {
   Role,
   Submission,
@@ -49,6 +51,7 @@ import {
   productionDraftQuestionnaireValueIdentity,
   productionDraftSnapshotFieldErrorIdentities,
   productionDraftSnapshotContentDigest,
+  productionDraftSnapshotHistoryProjection,
   productionDraftSnapshotProjectionDigests,
   productionDraftSnapshotIssueIdentities,
   productionDraftSnapshotMutationFromBaseline,
@@ -1859,6 +1862,9 @@ export type ResolvedProductionCohortDraftPayloadIdentity = {
     ProductionDraftPayloadMutationContract["questionnaireProjection"]
   >;
   snapshotMutation?: ProductionDraftSnapshotMutation;
+  snapshotHistoryProjection?: NonNullable<
+    ProductionDraftPayloadMutationContract["snapshotHistoryProjection"]
+  >;
   snapshotProjection?: NonNullable<
     ProductionDraftPayloadMutationContract["snapshotProjection"]
   >;
@@ -1873,7 +1879,7 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
   applicantEmailReplacement?: { applicantId: string; email: string };
   applicantSerializerProjection?: {
     actorId: string;
-    allowedDriftFields: readonly "questionnaire_percent"[];
+    allowedDriftFields: readonly ("email" | "questionnaire_percent")[];
   };
   questionnaireSerializerProjection?: {
     allowedLabelDriftFieldIds: readonly "hotel-name"[];
@@ -1944,12 +1950,17 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
         candidate.fields.some((field) => field.id === intent.fieldId),
       );
       invariant(section, "Production questionnaire projection target is absent.");
-      projected = updateQuestionnaireField(hydratedSnapshot, {
-        applicantId: intent.applicantId,
-        fieldId: intent.fieldId,
-        sectionId: section.id,
-        value: intent.value,
-      });
+      projected = withRecalculatedSubmissionProgress(
+        normalizeSubmissionQuestionnaire({
+          ...updateQuestionnaireField(hydratedSnapshot, {
+            applicantId: intent.applicantId,
+            fieldId: intent.fieldId,
+            sectionId: section.id,
+            value: intent.value,
+          }),
+          updatedAt: "сейчас",
+        }),
+      );
     } else if (intent.intent.mode === "add_issue") {
       const applicant = hydratedSnapshot.applicants.find(
         (item) =>
@@ -2006,6 +2017,10 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
   const submissionProjection = (() => {
     const intent = input.submissionProjectionIntent;
     if (!intent || !projectedSubmission) return undefined;
+    // The questionnaire autosave persists the already-derived root readiness
+    // unchanged; only the applicant/questionnaire/snapshot projections own
+    // the exact field replacement in this action window.
+    if (intent.mode === "questionnaire_replace") return undefined;
     const projectedPayload = toCockpitDraftPersistencePayload(
       projectedSubmission,
       intent.actorId,
@@ -2137,7 +2152,35 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
       projectionDigests,
       "Production lifecycle snapshot structural projections cannot be digested.",
     );
-    return { expectedLifecycleContentDigest, projectionDigests };
+    return {
+      expectedLifecycleContentDigest,
+      projectionDigests,
+      updatedAtMode:
+        intent.mode === "questionnaire_replace"
+          ? ("action_iso" as const)
+          : ("now_literal" as const),
+    };
+  })();
+  const snapshotHistoryProjection = (() => {
+    const intent = input.submissionProjectionIntent;
+    if (!intent || !projectedSubmission) return undefined;
+    const projectedIntelligence = toCockpitDraftPersistencePayload(
+      projectedSubmission,
+      intent.actorId,
+      input.ownerId,
+      intent.actorId === input.ownerId ? "agent" : "admin",
+    ).submission.family_intelligence;
+    const persistedProjectedIntelligence = JSON.parse(
+      JSON.stringify(projectedIntelligence),
+    ) as unknown;
+    const projection = productionDraftSnapshotHistoryProjection(
+      persistedProjectedIntelligence,
+    );
+    invariant(
+      projection,
+      "Production lifecycle snapshot history projection cannot be derived.",
+    );
+    return projection;
   })();
   const applicantProjection = (() => {
     if (input.applicantSerializerProjection) {
@@ -2358,6 +2401,7 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
     historyTransition,
     questionnaireProjection,
     snapshotMutation: snapshotMutation ?? undefined,
+    snapshotHistoryProjection,
     snapshotProjection,
     submissionProjection,
   };
@@ -2385,6 +2429,101 @@ export async function resolveProductionLifecycleMarkerReadback(input: {
     submissionStatus: rows.submission.status,
     targetCorrectionCount: targetCorrections.length,
     targetCorrectionStatuses: targetCorrections.map((row) => row.status),
+  };
+}
+
+/** Read-only, PII-free agreement proof for one exact family contact value. */
+export async function resolveProductionFamilyContactReadback(input: {
+  admin: ProductionCohortAccount;
+  expectedEmail: string;
+  expectedIssueReason?: string;
+  submissionId: string;
+}) {
+  const rows = await readA1S1ProductionRows(input);
+  const snapshot = readCockpitSnapshot(
+    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+  );
+  invariant(snapshot, "Production cockpit snapshot is unreadable for contact readback.");
+  const durableByApplicant = new Map(
+    rows.applicants.map((row) => [row.id, row.email]),
+  );
+  const questionnaireByApplicant = new Map(
+    rows.questionnaireAnswers
+      .filter((row) => row.field_id === "email")
+      .map((row) => {
+        const envelope = jsonRecord(row.value);
+        return [
+          row.applicant_id,
+          envelope?.kind === "v19_questionnaire_field"
+            ? envelope.value
+            : row.value,
+        ];
+      }),
+  );
+  const snapshotEmailEntries = snapshot.applicants.map((applicant) => {
+    const matches = applicant.sections.flatMap((section) =>
+      section.fields.filter((field) => field.id === "email"),
+    );
+    invariant(
+      matches.length === 1,
+      "Production snapshot must contain one personal Email field per applicant.",
+    );
+    return [applicant.id, matches[0]!.value] as const;
+  });
+  const snapshotEmailErrorStates = snapshot.applicants.reduce(
+    (counts, applicant) => {
+      const matches = applicant.sections.flatMap((section) =>
+        section.fields.filter((field) => field.id === "email"),
+      );
+      invariant(
+        matches.length === 1,
+        "Production snapshot must contain one personal Email field per applicant.",
+      );
+      const error = matches[0]!.error;
+      if (error === undefined) counts.absent += 1;
+      else if (input.expectedIssueReason && error === input.expectedIssueReason) {
+        counts.expected += 1;
+      } else counts.other += 1;
+      return counts;
+    },
+    { absent: 0, expected: 0, other: 0 },
+  );
+  const snapshotByApplicant = new Map(snapshotEmailEntries);
+  const expectedDigest = productionDraftValueDigest(input.expectedEmail);
+  invariant(expectedDigest, "Expected family contact cannot be digested.");
+  const digest = (value: unknown) => productionDraftValueDigest(value);
+  const applicantIds = snapshot.applicants.map((applicant) => applicant.id);
+  const allDigests = applicantIds.flatMap((applicantId) => [
+    digest(durableByApplicant.get(applicantId)),
+    digest(questionnaireByApplicant.get(applicantId)),
+    digest(snapshotByApplicant.get(applicantId)),
+  ]);
+  invariant(
+    allDigests.every((value): value is string => Boolean(value)),
+    "Production family contact layers contain an undigestible value.",
+  );
+  return {
+    applicantCount: applicantIds.length,
+    durableExpectedCount: applicantIds.filter(
+      (applicantId) => digest(durableByApplicant.get(applicantId)) === expectedDigest,
+    ).length,
+    layerAgreementCount: applicantIds.filter((applicantId) => {
+      const values = [
+        digest(durableByApplicant.get(applicantId)),
+        digest(questionnaireByApplicant.get(applicantId)),
+        digest(snapshotByApplicant.get(applicantId)),
+      ];
+      return new Set(values).size === 1;
+    }).length,
+    questionnaireExpectedCount: applicantIds.filter(
+      (applicantId) =>
+        digest(questionnaireByApplicant.get(applicantId)) === expectedDigest,
+    ).length,
+    snapshotExpectedCount: applicantIds.filter(
+      (applicantId) => digest(snapshotByApplicant.get(applicantId)) === expectedDigest,
+    ).length,
+    snapshotEmailErrorStates,
+    distinctLayerValueDigestCount: new Set(allDigests).size,
   };
 }
 

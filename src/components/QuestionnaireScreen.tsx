@@ -6,6 +6,7 @@ import {
 import {
   FigmaQuestionnaireScreen,
   type QuestionnaireInitialFocus,
+  type QuestionnaireDocumentsFilter,
 } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import {
   createQuestionnaireSections,
@@ -33,6 +34,7 @@ interface QuestionnaireScreenProps {
   initialFocus?: QuestionnaireInitialFocus;
   submissionId: string;
   onBack: () => void;
+  onOpenDocuments?: (filter?: QuestionnaireDocumentsFilter) => void;
   draft?: ProductIntakeDraft;
   submission?: Submission;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
@@ -332,6 +334,7 @@ export function QuestionnaireScreen({
   initialFocus,
   submissionId,
   onBack,
+  onOpenDocuments,
   draft,
   submission,
   onUploadFile,
@@ -490,6 +493,7 @@ export function QuestionnaireScreen({
       onComplete={handleComplete}
       onConfirmPassportReview={handleConfirmPassportReview}
       onMarkIssueFixed={handleMarkIssueFixed}
+      onOpenDocuments={onOpenDocuments}
       onSaveDraft={handleSaveDraft}
       onUploadFile={onUploadFile}
     />
