@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { AdminReviewDrawer } from "../../src/components/AdminReviewDrawer";
+import { ReviewScreen } from "../../src/components/AdminScreens";
 import { AdminWorkspace } from "../../src/components/AdminWorkspace";
 import { ReviewWorkspace } from "../../src/components/ReviewWorkspace";
 import { VisaflowBusinessBridgeProvider } from "../../src/integration/visaflowBusinessBridge";
@@ -15,6 +16,58 @@ afterEach(() => {
 });
 
 describe("AdminReviewDrawer visual hierarchy", () => {
+  test("renders queue ids as tags and lane totals as applicant counts", () => {
+    const review = initialSubmissions.find((item) => item.id === "ПД-1053");
+    const returned = initialSubmissions.find((item) => item.id === "ПД-1055");
+    if (!review || !returned) throw new Error("Expected review queue fixtures.");
+
+    const { container } = render(
+      <ReviewScreen
+        onOpenDrawer={vi.fn()}
+        onOpenExport={vi.fn()}
+        submissions={[review, returned]}
+      />,
+    );
+
+    expect(
+      container.querySelector(
+        '[data-submission-id="ПД-1053"] .v19-admin-review-card-id',
+      ),
+    ).toHaveTextContent("ПД-1053");
+    expect(
+      Array.from(
+        container.querySelectorAll(".v19-admin-review-lane-header > span"),
+      ).map((element) => element.textContent?.trim()),
+    ).toEqual(["1 чел.", "2 чел."]);
+  });
+
+  test("does not expose internal questionnaire status values", async () => {
+    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
+    const applicant = source?.applicants[0];
+    if (!source || !applicant) throw new Error("Expected admin review fixture.");
+    const submission = {
+      ...source,
+      applicants: [{ ...applicant, questionnaireStatus: "needs_fix" as const }],
+    };
+
+    render(
+      <AdminReviewDrawer
+        isOpen
+        submission={submission}
+        submissionId={submission.id}
+        onAddRemark={() => undefined}
+        onClose={() => undefined}
+        onVerifyDocument={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Заявители/ }));
+    await waitFor(() => {
+      expect(screen.getByText("Нужны исправления")).toBeVisible();
+    });
+    expect(screen.queryByText("needs_fix")).not.toBeInTheDocument();
+  });
+
   test("uses truthful field labels and an accessible review dialog", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
