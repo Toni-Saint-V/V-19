@@ -24,7 +24,7 @@ import { DraftsScreen } from "./DraftsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
 import { CreateSubmissionDrawer } from "../modules/submissions/components/CreateSubmissionDrawer";
 import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from "../modules/submissions/components/adminAiAssistance";
-import visaflowLogo from "../assets/v-logo-premium-black-style.png";
+import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
@@ -110,6 +110,85 @@ type CommandCenterProps = {
   onNavigateSettings?: () => void;
   usesSupabase?: boolean;
 };
+
+const agentMobileNavigationId = "v19-agent-mobile-navigation";
+
+function questionnaireFocusForAgentAction(
+  action: AgentActionItem,
+): QuestionnaireInitialFocus | undefined {
+  const { submission } = action;
+  const openIssue = (applicantId?: string) =>
+    submission.issues.find(
+      (issue) =>
+        issue.status === "open" &&
+        (!applicantId || issue.target.applicantId === applicantId),
+    );
+  const focusForIssue = (issue: ReturnType<typeof openIssue>) =>
+    issue?.target.applicantId
+      ? {
+          applicantId: issue.target.applicantId,
+          field: issue.target.field,
+          section: issue.target.fileType ? "Файлы" : issue.target.section,
+        }
+      : undefined;
+
+  for (const prefix of ["replace", "missing-file"]) {
+    const file = submission.files.find(
+      (candidate) => action.id === `${prefix}-${submission.id}-${candidate.id}`,
+    );
+    if (file) {
+      return {
+        applicantId: file.applicantId,
+        fileId: file.id,
+        section: "Файлы",
+      };
+    }
+  }
+
+  const questionnaireApplicant = submission.applicants.find(
+    (candidate) => action.id === `questionnaire-${submission.id}-${candidate.id}`,
+  );
+  if (questionnaireApplicant) {
+    const issueFocus = focusForIssue(openIssue(questionnaireApplicant.id));
+    if (issueFocus) return issueFocus;
+
+    const incompleteSection = questionnaireApplicant.sections.find(
+      (section) => section.status !== "complete",
+    );
+    const incompleteField = incompleteSection?.fields.find(
+      (field) =>
+        field.reviewState === "needs_review" ||
+        Boolean(field.error?.trim()) ||
+        !field.value.trim(),
+    );
+    return {
+      applicantId: questionnaireApplicant.id,
+      field: incompleteField?.id,
+      section: incompleteSection?.title,
+    };
+  }
+
+  if (action.id === `submit-corrections-${submission.id}`) {
+    const fixedIssue = submission.issues.find(
+      (issue) => issue.status === "fixed_by_agent",
+    );
+    if (fixedIssue?.target.applicantId) {
+      return {
+        applicantId: fixedIssue.target.applicantId,
+        field: fixedIssue.target.field,
+        section: fixedIssue.target.fileType ? "Файлы" : fixedIssue.target.section,
+      };
+    }
+  }
+
+  return focusForIssue(openIssue());
+}
+
+function isDirectAgentAction(action: AgentActionItem) {
+  return ["replace-", "missing-file-", "questionnaire-", "submit-corrections-"].some(
+    (prefix) => action.id.startsWith(prefix),
+  );
+}
 
 const fallbackSubmissions: SubmissionListItem[] = [
   {
@@ -354,6 +433,23 @@ export function CommandCenter({
     () => intakeDrafts.find((draft) => draft.id === selectedRow),
     [intakeDrafts, selectedRow],
   );
+
+  useEffect(() => {
+    if (
+      !usesSupabase ||
+      currentView !== "questionnaire" ||
+      !selectedRow ||
+      selectedCanonicalSubmission
+    ) {
+      return;
+    }
+
+    // A refresh can remove a submission from the current agent's visible scope
+    // while its questionnaire is still mounted. Do not leave the user on a
+    // screen where every persistence action is guaranteed to be rejected.
+    setQuestionnaireInitialFocus(undefined);
+    setCurrentView("main");
+  }, [currentView, selectedCanonicalSubmission, selectedRow, usesSupabase]);
   const intakeSubmissionsForCards = useMemo(
     () =>
       intakeDrafts.map((draft) =>
@@ -451,8 +547,11 @@ export function CommandCenter({
   };
 
   const handleActionOpen = (action: AgentActionItem) => {
-    if (action.tab === "questionnaire") {
-      handleOpenQuestionnaire(action.submission.id);
+    if (isDirectAgentAction(action)) {
+      handleOpenQuestionnaire(
+        action.submission.id,
+        questionnaireFocusForAgentAction(action),
+      );
       return;
     }
     handleRowClick(action.submission.id);
@@ -768,7 +867,9 @@ export function CommandCenter({
           <div className="text-[11px] text-white/50">Agent workspace</div>
         </div>
         <button
+          aria-label="Закрыть меню"
           onClick={() => setMobileNavOpen(false)}
+          type="button"
           className="md:hidden p-2 text-white/50 hover:text-white"
         >
           <X className="w-5 h-5" />
@@ -834,7 +935,11 @@ export function CommandCenter({
         </button>
         {onSwitchWorkspace ? (
           <button
-            onClick={onSwitchWorkspace}
+            onClick={() => {
+              setMobileNavOpen(false);
+              onSwitchWorkspace();
+            }}
+            type="button"
             className="v19-agent-sidebar-workspace w-full h-10 px-3 border rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
           >
             <ArrowLeftRight className="v19-agent-sidebar-workspace-icon w-4 h-4" />В
@@ -843,7 +948,11 @@ export function CommandCenter({
         ) : null}
         {onSignOut ? (
           <button
-            onClick={() => void onSignOut()}
+            onClick={() => {
+              setMobileNavOpen(false);
+              void onSignOut();
+            }}
+            type="button"
             className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white/82 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
           >
             Выйти
@@ -1001,6 +1110,7 @@ export function CommandCenter({
                     }
                   }}
                   className={`v19-legacy-action-row severity-${action.severity}`}
+                  data-agent-action-id={action.id}
                   data-testid="agent-action-row"
                 >
                   <div className="v19-legacy-action-main">
@@ -1164,7 +1274,7 @@ export function CommandCenter({
             submission={selectedCanonicalSubmission}
             onBack={handleQuestionnaireBack}
             onSubmissionUpdate={
-              onSubmissionUpdate
+              onSubmissionUpdate && !selectedIntakeDraft
                 ? (update) => onSubmissionUpdate(selectedRow, update)
                 : undefined
             }
@@ -1191,17 +1301,23 @@ export function CommandCenter({
       <AnimatePresence>
         {mobileNavOpen && (
           <div className="md:hidden">
-            <motion.div
+            <motion.button
+              aria-label="Закрыть меню"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileNavOpen(false)}
+              type="button"
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
             />
             <motion.aside
+              aria-label="Меню агента"
+              aria-modal="true"
+              id={agentMobileNavigationId}
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
+              role="dialog"
               transition={{ type: "spring", damping: 25, stiffness: 250 }}
               className="fixed inset-y-0 left-0 w-[280px] bg-[#141416] border-r border-[#202124] z-50 flex flex-col py-3 font-medium shadow-[0_0_40px_rgba(0,0,0,0.5)]"
             >
@@ -1219,8 +1335,11 @@ export function CommandCenter({
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
           <div className="flex items-center gap-3">
             <button
+              aria-controls={agentMobileNavigationId}
+              aria-expanded={mobileNavOpen}
               aria-label="Меню"
               onClick={() => setMobileNavOpen(true)}
+              type="button"
               className="md:hidden w-10 h-10 -ml-2 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/70"
             >
               <Menu className="w-5 h-5" />

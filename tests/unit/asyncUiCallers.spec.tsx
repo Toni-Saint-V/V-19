@@ -73,6 +73,71 @@ describe("async UI callers", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test("legacy Drawer presents missing dates and document types without storage noise", async () => {
+    const submission = draftSubmission();
+    const sourceFile = initialSubmissions.find((item) => item.id === "ПД-1053")?.files[0];
+    if (!sourceFile) throw new Error("Missing document fixture.");
+
+    render(
+      <Drawer
+        isOpen
+        onClose={vi.fn()}
+        submission={{
+          ...submission,
+          tripDateFrom: "",
+          tripDateTo: "",
+          updatedAt: "15.06",
+          files: [{ ...sourceFile, originalFileName: "storage-token-should-not-be-visible" }],
+        }}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(await screen.findByText("Даты не указаны")).toBeInTheDocument();
+    expect(screen.getByText("Обновлено 15.06")).toBeInTheDocument();
+    expect(screen.queryByText("storage-token-should-not-be-visible")).not.toBeInTheDocument();
+  });
+
+  test("legacy Drawer history keeps compact event types and valid fallback dates", async () => {
+    const submission = draftSubmission();
+    render(
+      <Drawer
+        isOpen
+        onClose={vi.fn()}
+        submission={{
+          ...submission,
+          history: [
+            { id: "file", at: "15.06", source: "agent", text: "Файл загружен: Селфи 2 · Антон" },
+            { id: "status", at: "сейчас", source: "agent", text: "Статус изменён: В работе" },
+          ],
+        }}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("tab", { name: "История" }));
+    expect(await screen.findByText("Документ")).toBeInTheDocument();
+    expect(screen.getByText("Статус")).toBeInTheDocument();
+    expect(screen.getByText("15.06")).toBeInTheDocument();
+    expect(screen.queryByText("Invalid Date")).not.toBeInTheDocument();
+  });
+
+  test("legacy Drawer makes the empty issue state explain the review stage", async () => {
+    const submission = draftSubmission();
+    render(
+      <Drawer
+        isOpen
+        onClose={vi.fn()}
+        submission={{ ...submission, issues: [], status: "in_progress" }}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Замечания" }));
+    expect(await screen.findByText("До первой проверки")).toHaveAttribute("role", "status");
+    expect(screen.getByText("Подача ещё не отправлялась на проверку.")).toBeInTheDocument();
+  });
+
   test("legacy Drawer keeps demo fallback explicit and fail-closed", async () => {
     const onSubmissionAction = vi.fn();
     render(
@@ -166,6 +231,40 @@ describe("async UI callers", () => {
     ).toBeInTheDocument();
     expect(onAction).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(primaryButton).not.toBeDisabled());
+  });
+
+  test("operational drawer keeps an accessible tab-panel contract and keyboard navigation", async () => {
+    const submission = draftSubmission();
+    render(
+      <FigmaSubmissionDrawer
+        activeTab="overview"
+        onAction={vi.fn()}
+        onClose={vi.fn()}
+        onOpenQuestionnaireWorkspace={vi.fn()}
+        role="agent"
+        submission={submission}
+        surface="agent"
+      />,
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-labelledby", "v20-submission-drawer-heading");
+
+    const tabs = await screen.findAllByRole("tab");
+    expect(tabs).toHaveLength(5);
+    expect(tabs[0]).toHaveAttribute("aria-controls", "v20-submission-drawer-panel-overview");
+    expect(tabs[0]).toHaveAttribute("tabindex", "0");
+
+    const overviewPanel = await screen.findByRole("tabpanel");
+    expect(overviewPanel).toHaveAttribute("aria-labelledby", "v20-submission-drawer-tab-overview");
+
+    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
+    await waitFor(() => expect(tabs[1]).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() =>
+      expect(
+        document.getElementById("v20-submission-drawer-panel-questionnaire"),
+      ).toHaveAttribute("aria-labelledby", "v20-submission-drawer-tab-questionnaire"),
+    );
   });
 
   test("operational drawer catches a rejected file upload", async () => {

@@ -93,7 +93,7 @@ describe("CreateSubmissionDrawer passport readiness", () => {
     });
   });
 
-  test("keeps incomplete extracted OCR under operator review", async () => {
+  test("lets a family continue to the draft when one passport needs operator review", async () => {
     vi.mocked(invokePassportExtraction).mockResolvedValueOnce({
       fields: [
         {
@@ -108,7 +108,7 @@ describe("CreateSubmissionDrawer passport readiness", () => {
       status: "extracted",
       summary: "Partial passport extraction.",
     });
-    const { input, nextButton } = renderCreateDrawer();
+    const { input, nextButton, onCreate } = renderCreateDrawer();
 
     fireEvent.change(input, {
       target: { files: [passportFile("partial.jpg")] },
@@ -119,10 +119,15 @@ describe("CreateSubmissionDrawer passport readiness", () => {
       expect(screen.getAllByText("Проверка оператором").length).toBeGreaterThan(0);
     });
     expect(screen.queryByText("Паспорт принят")).not.toBeInTheDocument();
-    expect(nextButton).toBeDisabled();
+    expect(nextButton).toBeEnabled();
+
+    fireEvent.click(nextButton);
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledTimes(1);
+    });
   });
 
-  test("keeps failed OCR under operator review without accepted copy", async () => {
+  test("lets a family continue to the draft when OCR fails", async () => {
     vi.mocked(invokePassportExtraction).mockRejectedValueOnce(new Error("OCR failed."));
     const { input, nextButton } = renderCreateDrawer();
 
@@ -135,7 +140,7 @@ describe("CreateSubmissionDrawer passport readiness", () => {
       expect(screen.getAllByText("Проверка оператором").length).toBeGreaterThan(0);
     });
     expect(screen.queryByText("Паспорт принят")).not.toBeInTheDocument();
-    expect(nextButton).toBeDisabled();
+    expect(nextButton).toBeEnabled();
   });
 
   test("allows accepted JPEG files to move to manual operator check without fake OCR", async () => {
@@ -167,7 +172,7 @@ describe("CreateSubmissionDrawer passport readiness", () => {
     });
     expect(screen.queryByText("Паспорт принят")).not.toBeInTheDocument();
     expect(invokePassportExtraction).toHaveBeenCalledTimes(1);
-    expect(nextButton).toBeDisabled();
+    expect(nextButton).toBeEnabled();
 
     fireEvent.click(screen.getAllByRole("button", { name: /Заявитель 2/ })[0]!);
     fireEvent.change(input, {

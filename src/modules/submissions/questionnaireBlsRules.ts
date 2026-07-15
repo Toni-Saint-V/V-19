@@ -324,6 +324,16 @@ function daysInclusive(from: Date, to: Date) {
   return Math.round((toUtc - fromUtc) / dayMs) + 1;
 }
 
+export function blsStayDurationFromDates(
+  travelStartValue: string,
+  travelEndValue: string,
+) {
+  const travelStart = parseBlsQuestionnaireDate(travelStartValue);
+  const travelEnd = parseBlsQuestionnaireDate(travelEndValue);
+  if (!travelStart || !travelEnd || travelEnd < travelStart) return "";
+  return String(daysInclusive(travelStart, travelEnd));
+}
+
 function occupationRequiresEmployer(formData: BlsFormData) {
   const occupation = read(formData, 'occupation').toUpperCase();
   if (!occupation) return true;
@@ -468,11 +478,12 @@ export function validateBlsQuestionnaireField({
     const duration = Number(trimmed);
     if (duration <= 0 || duration > 365) return 'Проверьте длительность пребывания';
 
-    const arrivalDate = parseBlsQuestionnaireDate(read(formData, 'travelStart'));
-    const departureDate = parseBlsQuestionnaireDate(read(formData, 'travelEnd'));
-    if (arrivalDate && departureDate && departureDate >= arrivalDate) {
-      const expected = daysInclusive(arrivalDate, departureDate);
-      if (duration !== expected) return `Длительность должна быть ${expected} дн.`;
+    const expected = blsStayDurationFromDates(
+      read(formData, 'travelStart'),
+      read(formData, 'travelEnd'),
+    );
+    if (expected && trimmed !== expected) {
+      return `Длительность должна быть ${expected} дн.`;
     }
   }
 

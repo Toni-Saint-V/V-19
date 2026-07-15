@@ -1,8 +1,12 @@
-import { mediaStorageBucket } from "./mediaStoragePolicy";
+import {
+  buildMediaStoragePath,
+  mediaStorageBucket,
+} from "./mediaStoragePolicy";
 import type {
   QuestionnaireStatus,
   Submission,
   SubmissionFile,
+  SubmissionFileType,
 } from "./types";
 
 export type PersistablePrivateFileAsset = SubmissionFile & {
@@ -30,6 +34,42 @@ export function isPersistablePrivateFileAsset(
     file.storageBucket === mediaStorageBucket &&
     Boolean(file.generatedFileName && file.storagePath)
   );
+}
+
+/**
+ * An admin can review an asset only if the private storage object belongs to
+ * the exact submission, applicant, and document slot currently on screen.
+ */
+export function isPersistablePrivateFileAssetAtSubmissionTarget(
+  file: SubmissionFile,
+  input: {
+    applicantId: string;
+    fileType: SubmissionFileType;
+    submissionId: string;
+  },
+): file is PersistablePrivateFileAsset {
+  if (
+    !isPersistablePrivateFileAsset(file) ||
+    file.applicantId !== input.applicantId ||
+    file.type !== input.fileType
+  ) {
+    return false;
+  }
+
+  try {
+    const expectedTarget = buildMediaStoragePath(
+      input.submissionId,
+      input.applicantId,
+      input.fileType,
+      file.generatedFileName,
+    );
+    return (
+      file.storageBucket === expectedTarget.bucket &&
+      file.storagePath === expectedTarget.path
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function fileCompletenessPercent(files: SubmissionFile[]): number {

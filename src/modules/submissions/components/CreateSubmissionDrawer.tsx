@@ -283,6 +283,11 @@ export function CreateSubmissionDrawer({
       : [],
   );
   const passportReady = allApplicantPassportsReady(passportUploads, applicantCount);
+  const hasProcessedPassport = passportUploads.some(isPassportUploadReady);
+  const passportProcessingFinished = passportUploads.every(
+    (upload) => upload.status !== "extracting",
+  );
+  const canCreateDraft = hasProcessedPassport && passportProcessingFinished;
   const missingPassportLabels = missingApplicantPassportLabels(
     passportUploads,
     applicantCount,
@@ -290,6 +295,8 @@ export function CreateSubmissionDrawer({
   );
   const passportReadinessSummary = passportReady
     ? "Все паспорта приняты. Данные проверит оператор."
+    : canCreateDraft
+      ? `Черновик можно открыть. Добавьте паспорта: ${missingPassportLabels.join(", ")}.`
     : type === "family"
       ? `Нужен файл паспорта: ${missingPassportLabels.join(", ")}.`
       : "Нужен файл паспорта.";
@@ -424,12 +431,12 @@ export function CreateSubmissionDrawer({
 
   function showPassportNotReadyAlert() {
     window.alert(
-      `Паспорт еще не принят. Загрузите ${passportScanUploadFormatLabel} для каждого заявителя и дождитесь завершения проверки. Если OCR недоступен, файл уйдет на ручную проверку оператора.`,
+      `Чтобы открыть черновик, добавьте хотя бы один ${passportScanUploadFormatLabel} и дождитесь завершения обработки. Остальные паспорта можно загрузить в анкете; без них отправка и выгрузка будут заблокированы.`,
     );
   }
 
   async function saveCreation(options?: { openQuestionnaire?: boolean }) {
-    if (!passportReady) {
+    if (!canCreateDraft) {
       showPassportNotReadyAlert();
       return;
     }
@@ -1065,9 +1072,9 @@ export function CreateSubmissionDrawer({
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <button
-            disabled={!passportReady || createBusy}
+            disabled={!canCreateDraft || createBusy}
             className={`v19-create-footer-action v19-create-footer-action--secondary ${
-              passportReady ? "is-enabled" : "is-disabled"
+              canCreateDraft ? "is-enabled" : "is-disabled"
             }`}
             type="button"
             onClick={() => void saveCreation()}
@@ -1075,9 +1082,9 @@ export function CreateSubmissionDrawer({
             {createBusy ? "Сохраняем..." : "Сохранить черновик"}
           </button>
           <button
-            disabled={!passportReady || createBusy}
+            disabled={!canCreateDraft || createBusy}
             className={`create-passport-next v19-create-footer-action v19-create-footer-action--primary ${
-              passportReady ? "is-enabled" : "is-disabled"
+              canCreateDraft ? "is-enabled" : "is-disabled"
             }`}
             type="button"
             onClick={() => void saveCreation({ openQuestionnaire: true })}

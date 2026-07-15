@@ -2,6 +2,11 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import {
+  questionnaireFixturePreferredOption,
+  questionnaireFixtureTextValue,
+} from "./questionnaire-fixture-values";
+
 type SmokeRole = "agent" | "otherAgent" | "admin";
 
 type SmokeCredentials = {
@@ -60,6 +65,10 @@ export function smokeCredentials(role: SmokeRole): SmokeCredentials {
 
 function supabaseOrigin() {
   return new URL(requiredValue("VITE_SUPABASE_URL")).origin;
+}
+
+function supabaseEdgeFunctionsOrigin() {
+  return new URL(requiredValue("VITE_SUPABASE_EDGE_FUNCTIONS_URL")).origin;
 }
 
 export function drawer(page: Page): Locator {
@@ -168,6 +177,8 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
         ? { exact: true, name: exactNavigationLabel }
         : { name }),
     );
+    await expect(dialog).toBeHidden();
+    await expect(adminMenu).toHaveAttribute("aria-expanded", "false");
     return;
   }
 
@@ -176,8 +187,19 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
       name: /^(Меню|Открыть меню)$/,
     })
     .first();
-  if (await isVisible(menu)) await menu.click();
-  await clickFirstVisible(page.getByRole("button", { name }));
+  const agentDialog = page.getByRole("dialog", { name: "Меню агента" });
+  if (await isVisible(menu)) {
+    await expect(menu).toHaveAttribute("aria-expanded", "false");
+    await expect(agentDialog).toBeHidden();
+    await menu.click();
+    await expect(agentDialog).toBeVisible();
+  }
+  const navigationScope = (await isVisible(agentDialog)) ? agentDialog : page;
+  await clickFirstVisible(navigationScope.getByRole("button", { name }));
+  if (await agentDialog.count()) {
+    await expect(agentDialog).toBeHidden();
+    if (await isVisible(menu)) await expect(menu).toHaveAttribute("aria-expanded", "false");
+  }
 }
 
 export async function signIn(page: Page, role: SmokeRole) {
@@ -228,11 +250,20 @@ export async function signOut(page: Page) {
   if (await isVisible(directLogout)) {
     await directLogout.click();
   } else {
-    await clickWorkspaceButton(page, /Настройки/);
+    const mobileMenu = page
+      .getByRole("button", { name: /^(Меню|Открыть меню|Открыть меню администратора)$/ })
+      .first();
+    if (await isVisible(mobileMenu)) await mobileMenu.click();
+    else await clickWorkspaceButton(page, /Настройки/);
     await clickFirstVisible(page.getByRole("button", { name: /^Выйти$/ }));
   }
 
-  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: /^(Вход|Заявка на доступ)$/,
+    }),
+  ).toBeVisible({ timeout: 45_000 });
 }
 
 export async function clickAndWaitForSupabaseWrite(
@@ -240,15 +271,18 @@ export async function clickAndWaitForSupabaseWrite(
   action: () => Promise<void>,
   expectedPath?: RegExp,
 ) {
-  const response = page.waitForResponse(
+  const responsePromise = page.waitForResponse(
     (candidate) => {
       const method = candidate.request().method();
+      const url = new URL(candidate.url());
+      const isSupabaseDataApi =
+        url.origin === supabaseOrigin() &&
+        /\/(?:rest\/v1|storage\/v1|functions\/v1)\//.test(url.pathname);
+      const isSupabaseEdgeFunction = url.origin === supabaseEdgeFunctionsOrigin();
       return (
-        candidate.url().startsWith(supabaseOrigin()) &&
-        /\/(?:rest\/v1|storage\/v1|functions\/v1)\//.test(candidate.url()) &&
-        (!expectedPath || expectedPath.test(new URL(candidate.url()).pathname)) &&
-        method !== "GET" &&
-        method !== "HEAD" &&
+        (isSupabaseDataApi || isSupabaseEdgeFunction) &&
+        (!expectedPath || expectedPath.test(url.pathname)) &&
+        ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
         candidate.status() >= 200 &&
         candidate.status() < 300
       );
@@ -256,7 +290,7 @@ export async function clickAndWaitForSupabaseWrite(
     { timeout: 30_000 },
   );
 
-  await action();
+  const [, response] = await Promise.all([action(), responsePromise]);
   return response;
 }
 
@@ -289,7 +323,24 @@ export async function openCreateSubmission(page: Page) {
   await expect(drawer(page).getByRole("heading", { name: /Загрузка и первичная сборка/ })).toBeVisible();
 }
 
-export async function fillQuestionnaire(page: Page, runId: string): Promise<string> {
+type QuestionnaireSectionEvidence = {
+  applicantCount: number;
+  applicantIndex: number;
+  sectionCount: number;
+  sectionIndex: number;
+  sectionLabel: string;
+  submissionId: string;
+};
+
+export async function fillQuestionnaire(
+  page: Page,
+  runId: string,
+  onSectionComplete?: (step: QuestionnaireSectionEvidence) => Promise<void>,
+  onFamilyCopyState?: (
+    state: "preview" | "complete",
+    submissionId: string,
+  ) => Promise<void>,
+): Promise<string> {
   const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
   if (!(await isVisible(questionnaire))) {
     const open = drawer(page).getByRole("button", { name: "Открыть анкету" }).first();
@@ -301,6 +352,7 @@ export async function fillQuestionnaire(page: Page, runId: string): Promise<stri
   const submissionId = await questionnaire.getAttribute("data-submission-id");
   const applicants = questionnaire.locator(".v19-questionnaire-applicant-tab");
   const applicantCount = await applicants.count();
+  if (!submissionId) throw new Error("Created submission id was not rendered in the questionnaire UI.");
   let fieldIndex = 0;
 
   for (let applicantIndex = 0; applicantIndex < Math.max(applicantCount, 1); applicantIndex += 1) {
@@ -312,26 +364,46 @@ export async function fillQuestionnaire(page: Page, runId: string): Promise<stri
     const sectionCount = await sections.count();
     for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
       await sections.nth(sectionIndex).click();
+      const sectionLabel = (await sections.nth(sectionIndex).innerText())
+        .replace(/\s+/g, " ")
+        .trim();
       const fields = questionnaire.locator(
         ".v19-questionnaire-work-panel [data-field-label]",
       );
-      const fieldCount = await fields.count();
-      for (let index = 0; index < fieldCount; index += 1) {
-        const field = fields.nth(index);
-        const label = (await field.getAttribute("data-field-label")) ?? "";
+      const fieldLabels = await fields.evaluateAll((elements) =>
+        elements
+          .map(
+            (element) =>
+              (element as unknown as { dataset?: { fieldLabel?: string } }).dataset
+                ?.fieldLabel ?? "",
+          )
+          .filter(Boolean),
+      );
+      for (const label of fieldLabels) {
+        const escapedLabel = label.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        const field = questionnaire
+          .locator(`.v19-questionnaire-work-panel [data-field-label="${escapedLabel}"]`)
+          .first();
+        if ((await field.count()) === 0) continue;
+        const requiredControl = field.locator('[aria-required="true"]').first();
+        if ((await requiredControl.count()) === 0) continue;
+
         const textControl = field.locator("input:not([readonly]), textarea:not([readonly])").first();
         if (await isVisible(textControl)) {
-          const controlType = await textControl.getAttribute("type");
-          await textControl.fill(
-            controlType === "number"
-              ? "30"
-              : questionnaireValue(label, runId, fieldIndex),
-          );
-          fieldIndex += 1;
+          if (!(await textControl.inputValue()).trim()) {
+            await textControl.fill(
+              questionnaireFixtureTextValue(label, runId, fieldIndex, sectionLabel),
+            );
+            fieldIndex += 1;
+          }
           continue;
         }
 
-        const quickOption = field.locator("button.v19-questionnaire-quick-option").first();
+        const preferredOption = questionnaireFixturePreferredOption(label);
+        const quickOptions = field.locator("button.v19-questionnaire-quick-option");
+        const quickOption = preferredOption
+          ? quickOptions.getByText(preferredOption, { exact: true })
+          : quickOptions.first();
         if (await isVisible(quickOption)) {
           if ((await field.locator('button[aria-pressed="true"]').count()) === 0) {
             await quickOption.click();
@@ -345,14 +417,40 @@ export async function fillQuestionnaire(page: Page, runId: string): Promise<stri
           const currentValue = (await dropdown.innerText()).trim();
           if (currentValue.includes("Выберите")) {
             await dropdown.click();
-            await questionnaire
-              .locator(".v19-questionnaire-dropdown:visible .v19-questionnaire-dropdown-option")
-              .first()
-              .click();
+            const options = questionnaire.locator(
+              ".v19-questionnaire-dropdown:visible .v19-questionnaire-dropdown-option",
+            );
+            const option = preferredOption
+              ? options.getByText(preferredOption, { exact: true })
+              : options.first();
+            await option.click();
             fieldIndex += 1;
           }
         }
       }
+      await onSectionComplete?.({
+        applicantCount: Math.max(applicantCount, 1),
+        applicantIndex,
+        sectionCount,
+        sectionIndex,
+        sectionLabel,
+        submissionId,
+      });
+    }
+
+    if (applicantIndex === 0 && applicantCount > 1) {
+      const copyShared = questionnaire.getByRole("button", {
+        name: "Заполнить общие поля семьи",
+      });
+      await expect(copyShared).toBeVisible();
+      await copyShared.click();
+      await onFamilyCopyState?.("preview", submissionId);
+      const confirmCopy = questionnaire.getByRole("button", {
+        name: "Подтвердить копирование",
+      });
+      await expect(confirmCopy).toBeVisible();
+      await confirmCopy.click();
+      await onFamilyCopyState?.("complete", submissionId);
     }
   }
 
@@ -364,25 +462,7 @@ export async function fillQuestionnaire(page: Page, runId: string): Promise<stri
   );
   await questionnaire.getByRole("button", { name: "Назад" }).click();
   await expect(questionnaire).toHaveCount(0);
-  if (!submissionId) throw new Error("Created submission id was not rendered in the questionnaire UI.");
   return submissionId;
-}
-
-function questionnaireValue(label: string, runId: string, index: number) {
-  const normalizedLabel = label.toLowerCase();
-  if (normalizedLabel.includes("дата") || normalizedLabel.includes("действител")) {
-    return "01.01.2030";
-  }
-  if (label.includes("ФИО")) return `Sandbox ${runId}`;
-  if (label.includes("Номер паспорта")) return String(800_000_000 + index).slice(0, 9);
-  if (normalizedLabel.includes("email") || label.includes("Почта")) {
-    return `sandbox-${runId.replace(/[^a-z0-9]/gi, "-")}@example.com`;
-  }
-  if (label.includes("Маршрут")) return "Москва, Мадрид, Москва";
-  if (label.includes("Адрес")) return "Calle de Sandbox, 1";
-  if (label.includes("Телефон")) return "+7 900 000 00 00";
-  if (label.includes("Индекс") || label.includes("код")) return "101000";
-  return `Sandbox ${runId} ${index + 1}`;
 }
 
 export async function openDrawerTab(page: Page, name: string | RegExp) {

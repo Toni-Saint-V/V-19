@@ -525,6 +525,10 @@ describe("local Case Copilot", () => {
     expect(readyExport.status).toBe("ready");
     expect(readyExport.nextStep.submissionAction).toBe("generate_export");
     expect(readyExport.reason).toContain("блокеры закрыты");
+    expect(readyExport.highlights.find((item) => item.kind === "passport")).toMatchObject({
+      source: "manual_review",
+      status: "ready",
+    });
     expect(readyExport.highlights.find((item) => item.kind === "export")).toMatchObject({
       status: "ready",
       summary: expect.stringContaining("1 строк"),

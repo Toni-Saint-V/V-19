@@ -1,10 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessGate } from "./components/AccessGate";
-import { CommandCenter } from "./components/CommandCenter";
-import { AdminWorkspace } from "./components/AdminWorkspace";
 import {
-  VisaflowBusinessBridgeProvider,
   noopVisaflowBusinessBridge,
   type VisaflowBusinessBridge,
 } from "./integration/visaflowBusinessBridge";
@@ -14,6 +10,7 @@ import {
   applyActionToSubmissionListResult,
   markSubmissionFileAccepted,
 } from "./modules/submissions/submissionActions";
+import { isPersistablePrivateFileAssetAtSubmissionTarget } from "./modules/submissions/fileAsset";
 import {
   acceptAiSuggestionAsIssue,
   dismissAiSuggestion,
@@ -122,6 +119,11 @@ export interface AppProps {
 }
 
 const noInviteSetupPromise = Promise.resolve(null);
+
+const WorkspaceSurface = lazy(async () => {
+  const module = await import("./components/WorkspaceSurface");
+  return { default: module.WorkspaceSurface };
+});
 
 export default function App({
   bridge = noopVisaflowBusinessBridge,
@@ -940,14 +942,47 @@ export default function App({
         await bridge.onAdminIssueAdd?.({ submissionId, input });
       },
       onAdminFileAccept: async ({ submissionId, applicantId, fileType }) => {
-        if (activeApprovedSession?.role !== "admin") return;
-        await updateAdminSubmission(submissionId, (submission) =>
-          markSubmissionFileAccepted(submission, {
+        if (activeApprovedSession?.role !== "admin") {
+          throw new Error("Только активный администратор может подтвердить файл.");
+        }
+
+        let foundSubmission = false;
+        await updateAdminSubmission(submissionId, (submission) => {
+          foundSubmission = true;
+          const applicantExists = submission.applicants.some(
+            (applicant) => applicant.id === applicantId,
+          );
+          const file = submission.files.find(
+            (candidate) =>
+              candidate.applicantId === applicantId && candidate.type === fileType,
+          );
+          const isReviewableStatus =
+            file?.status === "uploaded" || file?.status === "pending_review";
+
+          if (
+            !applicantExists ||
+            !file ||
+            !isReviewableStatus ||
+            !isPersistablePrivateFileAssetAtSubmissionTarget(file, {
+              applicantId,
+              fileType,
+              submissionId,
+            })
+          ) {
+            throw new Error(
+              "Нельзя подтвердить файл без защищённого оригинала выбранного заявителя.",
+            );
+          }
+
+          return markSubmissionFileAccepted(submission, {
             applicantId,
             fileType,
             reviewedBy: activeApprovedSession.userId,
-          }),
-        );
+          });
+        });
+        if (!foundSubmission) {
+          throw new Error("Подача для подтверждения файла не найдена.");
+        }
         await bridge.onAdminFileAccept?.({ submissionId, applicantId, fileType });
       },
       onAdminAiReviewRun: async (submissionId) => {
@@ -1263,72 +1298,43 @@ export default function App({
   }
 
   return (
-    <VisaflowBusinessBridgeProvider bridge={appBridge}>
-      <div className="h-dvh w-full bg-[#101011] text-white overflow-hidden">
-        <div aria-live="polite" className="sr-only" role="status">
-          {workspaceDataState.status === "loading"
-            ? "Загрузка данных Supabase"
-            : workspaceDataState.status === "empty"
-              ? "Supabase вернул пустую рабочую область"
-              : workspaceDataState.status === "ready"
-                ? "Данные Supabase загружены"
-                : ""}
+    <Suspense
+      fallback={
+        <div
+          aria-busy="true"
+          aria-live="polite"
+          className="min-h-dvh bg-[#101011] text-white grid place-items-center"
+          role="status"
+        >
+          <span className="text-sm text-white/50">Загрузка рабочей области...</span>
         </div>
-        {workspaceDataState.status === "error" ? (
-          <div
-            className="fixed left-1/2 top-3 z-[80] w-[min(92vw,560px)] -translate-x-1/2 rounded-[12px] border border-[#7f3d45] bg-[#211416] px-4 py-3 text-[13px] text-white shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
-            role="alert"
-          >
-            <div className="flex items-center gap-3">
-              <span className="min-w-0 flex-1">
-                {workspaceDataState.error ?? "Не удалось синхронизировать Supabase."}
-              </span>
-              <button
-                className="h-10 shrink-0 rounded-[10px] border border-[#7f3d45] px-3 text-[12px] font-semibold text-white"
-                type="button"
-                onClick={() => void refreshCanonicalSubmissions()}
-              >
-                Повторить
-              </button>
-            </div>
-          </div>
-        ) : null}
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={workspace}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="v19-fullscreen-app h-full w-full"
-          >
-            {workspace === "agent" ? (
-              <CommandCenter
-                agentId={
-                  activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId
-                }
-                onSubmissionUpdate={updateVisibleAgentSubmission}
-                onSubmissionsChange={persistVisibleAgentSubmissions}
-                submissions={visibleSubmissions}
-                usesSupabase={supabaseEnabled}
-                onSignOut={handleSignOut}
-              />
-            ) : (
-              <AdminWorkspace
-                accessRequests={accessRequests}
-                accessRequestsBusy={accessRequestsBusy}
-                currentEmail={activeApprovedSession.email}
-                currentDisplayName={activeApprovedSession.fullName}
-                onApproveAccessRequest={handleApproveAccessRequest}
-                onRejectAccessRequest={handleRejectAccessRequest}
-                onSignOut={handleSignOut}
-                submissions={submissions}
-                usesSupabase={supabaseEnabled}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </VisaflowBusinessBridgeProvider>
+      }
+    >
+      <WorkspaceSurface
+        adminWorkspaceProps={{
+          accessRequests,
+          accessRequestsBusy,
+          currentEmail: activeApprovedSession.email,
+          currentDisplayName: activeApprovedSession.fullName,
+          onApproveAccessRequest: handleApproveAccessRequest,
+          onRejectAccessRequest: handleRejectAccessRequest,
+          onSignOut: handleSignOut,
+          submissions,
+          usesSupabase: supabaseEnabled,
+        }}
+        agentWorkspaceProps={{
+          agentId: activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId,
+          onSubmissionUpdate: updateVisibleAgentSubmission,
+          onSubmissionsChange: persistVisibleAgentSubmissions,
+          submissions: visibleSubmissions,
+          usesSupabase: supabaseEnabled,
+          onSignOut: handleSignOut,
+        }}
+        bridge={appBridge}
+        onRetryWorkspace={refreshCanonicalSubmissions}
+        workspace={workspace}
+        workspaceDataState={workspaceDataState}
+      />
+    </Suspense>
   );
 }

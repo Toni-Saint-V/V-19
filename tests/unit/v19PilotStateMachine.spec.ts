@@ -193,7 +193,9 @@ describe("V-19 pilot click logic state machine", () => {
   });
 
   it("keeps export package-level, Excel-only, and download-gated", () => {
-    const ready = canonicalMediaSubmission(byId("ПД-1056"));
+    const ready = fillRequiredQuestionnaireForTest(
+      canonicalMediaSubmission(byId("ПД-1056")),
+    );
     const packageIdentity = buildExportPackageIdentity([ready], "xlsx");
     if (!packageIdentity) throw new Error("Missing package identity");
 

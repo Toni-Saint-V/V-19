@@ -43,6 +43,7 @@ import type {
   ExportPackageIdentity,
   Submission,
 } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -63,7 +64,9 @@ function canonicalMediaSubmission(submission: Submission): Submission {
 }
 
 function readySubmission(): Submission {
-  return canonicalMediaSubmission(byId("ПД-1056"));
+  return fillRequiredQuestionnaireForTest(
+    canonicalMediaSubmission(byId("ПД-1056")),
+  );
 }
 
 function withoutQuestionnaireField(

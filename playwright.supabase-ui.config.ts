@@ -2,7 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
+const sandboxProjectId = "oevvaowoklqttqkraxho";
+const sandboxOrigin = `https://${sandboxProjectId}.supabase.co`;
+const smokeEnvPath = resolve(
+  process.cwd(),
+  process.env.SUPABASE_UI_E2E_ENV_FILE ?? ".env.supabase-smoke.local",
+);
+const uiEvidenceRunId = `sandbox-${new Date().toISOString().replace(/[:.]/g, "-")}`;
 const browserSafeEnvNames = [
   "VITE_SUPABASE_PROJECT_ID",
   "VITE_SUPABASE_URL",
@@ -31,6 +37,44 @@ function loadEnvFile(path: string): Record<string, string> {
 
 function loadSandboxBrowserEnv(): Record<string, string> {
   const smokeEnv = loadEnvFile(smokeEnvPath);
+  if (smokeEnv.VITE_SUPABASE_PROJECT_ID?.trim() !== sandboxProjectId) {
+    throw new Error("Supabase UI E2E refused: project id is not the approved sandbox.");
+  }
+  const supabaseUrl = smokeEnv.VITE_SUPABASE_URL?.trim();
+  if (!supabaseUrl) throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is missing.");
+  try {
+    if (new URL(supabaseUrl).origin !== sandboxOrigin) {
+      throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is not the approved sandbox.");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Supabase UI E2E refused:")) {
+      throw error;
+    }
+    throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is not a valid URL.");
+  }
+  const edgeFunctionsUrl = smokeEnv.VITE_SUPABASE_EDGE_FUNCTIONS_URL?.trim();
+  if (!edgeFunctionsUrl) {
+    throw new Error("Supabase UI E2E refused: VITE_SUPABASE_EDGE_FUNCTIONS_URL is missing.");
+  }
+  try {
+    const edgeUrl = new URL(edgeFunctionsUrl);
+    const approvedEdgeHost =
+      edgeUrl.protocol === "https:" &&
+      edgeUrl.hostname.includes(sandboxProjectId) &&
+      edgeUrl.hostname.endsWith(".supabase.co");
+    if (!approvedEdgeHost) {
+      throw new Error(
+        "Supabase UI E2E refused: VITE_SUPABASE_EDGE_FUNCTIONS_URL is not the approved sandbox.",
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Supabase UI E2E refused:")) {
+      throw error;
+    }
+    throw new Error(
+      "Supabase UI E2E refused: VITE_SUPABASE_EDGE_FUNCTIONS_URL is not a valid URL.",
+    );
+  }
   const selectedEnv: Record<string, string> = {};
 
   for (const name of browserSafeEnvNames) {
@@ -48,14 +92,16 @@ function loadSandboxBrowserEnv(): Record<string, string> {
 }
 
 export default defineConfig({
+  metadata: { uiEvidenceRunId },
   testDir: "./tests/e2e-supabase-ui",
   reporter: [["list"]],
   timeout: 300_000,
+  workers: 1,
   use: {
     baseURL: "http://127.0.0.1:4199",
     launchOptions: { args: ["--disable-ipv6"] },
-    screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    screenshot: "off",
+    trace: "off",
     video: "off",
   },
   testMatch: /sandbox-ui-flow\.spec\.ts/,
@@ -69,11 +115,26 @@ export default defineConfig({
   projects: [
     {
       name: "supabase-ui-desktop",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+      },
+    },
+    {
+      name: "supabase-ui-mobile-320",
+      use: {
+        ...devices["iPhone 13"],
+        browserName: "chromium",
+        viewport: { width: 320, height: 740 },
+      },
     },
     {
       name: "supabase-ui-mobile-390",
-      use: { ...devices["iPhone 13"], browserName: "chromium" },
+      use: {
+        ...devices["iPhone 13"],
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+      },
     },
     {
       name: "supabase-ui-mobile-430",
@@ -81,6 +142,14 @@ export default defineConfig({
         ...devices["iPhone 13"],
         browserName: "chromium",
         viewport: { width: 430, height: 932 },
+      },
+    },
+    {
+      name: "supabase-ui-tablet-768",
+      use: {
+        ...devices["iPad (gen 7)"],
+        browserName: "chromium",
+        viewport: { width: 768, height: 1024 },
       },
     },
   ],

@@ -27,13 +27,19 @@ import {
   productionDraftMediaContentDigest,
   productionDraftPayloadMatches,
   productionDraftQuestionnaireValueIdentity,
+  productionDraftSnapshotFieldErrorIdentities,
   productionDraftSnapshotContentDigest,
+  productionDraftSnapshotIssueIdentities,
+  productionDraftSnapshotMutationFromBaseline,
   productionDraftSubmissionStaticContentDigest,
   productionDraftValueDigest,
   productionLifecycleStatePath,
   requiredProductionLifecycleCaseKey,
   type ProductionDraftPayloadIdentityContract,
   type ProductionDraftPayloadMutationContract,
+  type ProductionDraftSnapshotMutation,
+  type ProductionDraftSnapshotMutationIntent,
+  type ProductionMutationTimestampWindow,
   type ProductionSingleCaseKey,
   type ProductionLifecycleState,
 } from "./production-lifecycle-helpers";
@@ -239,7 +245,10 @@ type ProductionMediaAssetRow = {
 
 type ProductionCorrectionRow = {
   applicant_id: string | null;
+  created_at: string;
+  created_by: string;
   field_key: string | null;
+  fixed_at: string | null;
   id: string;
   media_type: string | null;
   reason: string;
@@ -342,9 +351,46 @@ function invariant(condition: unknown, message: string): asserts condition {
 
 type JsonRecord = Record<string, unknown>;
 
+const rpcEnvelopeKeys = ["payload"] as const;
+const terminalPayloadKeys = ["batch", "document_export"] as const;
+const terminalBatchKeys = [
+  "content_fingerprint",
+  "file_name",
+  "format",
+  "id",
+  "idempotency_key",
+  "row_count",
+  "submission_ids",
+] as const;
+const terminalDocumentExportKeys = [
+  "applicant_count",
+  "asset_ids",
+  "file_count",
+  "workbook_file_name",
+  "zip_file_name",
+] as const;
+
 function jsonRecord(value: unknown): JsonRecord | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as JsonRecord;
+}
+
+function exactRecordKeys(value: JsonRecord, expected: readonly string[]) {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return (
+    actual.length === sortedExpected.length &&
+    actual.every((key, index) => key === sortedExpected[index])
+  );
+}
+
+function isUuid(value: unknown) {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  );
 }
 
 function exactStringSet(value: unknown, expected: readonly string[]) {
@@ -387,12 +433,25 @@ function digestMatches(value: unknown, expectedDigest: string) {
 }
 
 function exportPayloadRecord(body: string | null) {
-  return jsonRecord(requestBodyJsonRecord(body)?.payload);
+  const envelope = requestBodyJsonRecord(body);
+  if (!envelope || !exactRecordKeys(envelope, rpcEnvelopeKeys)) return null;
+  return jsonRecord(envelope.payload);
+}
+
+/** Starts only at the explicit ZIP intent; preflight time is never accepted. */
+function exportMutationTimestampWindow(): ProductionMutationTimestampWindow {
+  const now = Date.now();
+  return {
+    notAfter: new Date(now + 120_000).toISOString(),
+    notBefore: new Date(now - 1_000).toISOString(),
+  };
 }
 
 function exportDraftPayloadContract(
   networkContract: ProductionA1S1ExportNetworkContract,
-): ProductionDraftPayloadMutationContract {
+  timestampWindow: ProductionMutationTimestampWindow | null,
+): ProductionDraftPayloadMutationContract | null {
+  if (!timestampWindow) return null;
   return {
     correction: { mode: "exact", reasonIncludes: "", status: "closed" },
     draft: networkContract.draft,
@@ -405,6 +464,7 @@ function exportDraftPayloadContract(
     ownerId: networkContract.ownerId,
     questionnaire: { mode: "exact" },
     submissionId: networkContract.submissionId,
+    timestampWindow,
   };
 }
 
@@ -412,18 +472,21 @@ function baseExportPayloadMatches(
   body: string | null,
   key: string,
   networkContract: ProductionA1S1ExportNetworkContract,
+  timestampWindow: ProductionMutationTimestampWindow | null,
 ) {
   const payload = exportPayloadRecord(body);
   if (!payload) return false;
 
   if (key === "POST /rest/v1/rpc/save_submission_draft") {
     const submission = jsonRecord(payload.submission);
-    return (
+    const draftContract = exportDraftPayloadContract(networkContract, timestampWindow);
+    return Boolean(
+      draftContract &&
       submission?.id === networkContract.submissionId &&
       submission.agent_id === networkContract.ownerId &&
       submission.status === networkContract.preCommitStatus &&
       submission.exported_at === null &&
-      productionDraftPayloadMatches(payload, exportDraftPayloadContract(networkContract))
+      productionDraftPayloadMatches(payload, draftContract),
     );
   }
 
@@ -431,9 +494,15 @@ function baseExportPayloadMatches(
     const batch = jsonRecord(payload.batch);
     const documentExport = jsonRecord(payload.document_export);
     return (
+      exactRecordKeys(payload, terminalPayloadKeys) &&
+      batch !== null &&
+      exactRecordKeys(batch, terminalBatchKeys) &&
+      isUuid(batch.id) &&
       batch?.format === "xlsx" &&
       batch.row_count === 1 &&
       exactStringSet(batch.submission_ids, [networkContract.submissionId]) &&
+      documentExport !== null &&
+      exactRecordKeys(documentExport, terminalDocumentExportKeys) &&
       documentExport?.applicant_count === 1 &&
       documentExport.file_count === 4 &&
       exactStringSet(documentExport.asset_ids, networkContract.documentAssetIds)
@@ -453,8 +522,9 @@ export function productionA1S1ExportPayloadMatches(
   key: string,
   networkContract: ProductionA1S1ExportNetworkContract,
   artifactContract: ProductionA1S1VerifiedArtifactContract,
+  timestampWindow: ProductionMutationTimestampWindow | null,
 ) {
-  if (!baseExportPayloadMatches(body, key, networkContract)) return false;
+  if (!baseExportPayloadMatches(body, key, networkContract, timestampWindow)) return false;
   const payload = exportPayloadRecord(body);
   if (!payload) return false;
 
@@ -848,6 +918,7 @@ export class StrictProductionA1S1ExportNetworkGate {
   #businessReleaseDecision: "cancel" | "release" | null = null;
   #businessReleasePromise: Promise<"cancel" | "release"> | null = null;
   #businessReleaseResolve: ((decision: "cancel" | "release") => void) | null = null;
+  #exportMutationTimestampWindow: ProductionMutationTimestampWindow | null = null;
   readonly #networkContract: ProductionA1S1ExportNetworkContract | null;
   #verifiedArtifactContract: ProductionA1S1VerifiedArtifactContract | null = null;
   #passwordLoginAttempts = 0;
@@ -887,6 +958,7 @@ export class StrictProductionA1S1ExportNetworkGate {
         snapshot: { ...networkContract.draft.snapshot },
         snapshotHistory: networkContract.draft.snapshotHistory.map((item) => ({ ...item })),
         snapshotIssueCount: networkContract.draft.snapshotIssueCount,
+        snapshotIssues: networkContract.draft.snapshotIssues.map((item) => ({ ...item })),
         snapshotUntypedHistoryDigests: [
           ...networkContract.draft.snapshotUntypedHistoryDigests,
         ],
@@ -913,7 +985,20 @@ export class StrictProductionA1S1ExportNetworkGate {
   #hasBasePayload(request: Request, key: string) {
     const networkContract = this.#networkContract;
     if (!networkContract) return false;
-    return baseExportPayloadMatches(request.postData(), key, networkContract);
+    const timestampWindow =
+      key === "POST /rest/v1/rpc/save_submission_draft"
+        ? (this.#exportMutationTimestampWindow ?? exportMutationTimestampWindow())
+        : null;
+    const matches = baseExportPayloadMatches(
+      request.postData(),
+      key,
+      networkContract,
+      timestampWindow,
+    );
+    if (matches && timestampWindow && !this.#exportMutationTimestampWindow) {
+      this.#exportMutationTimestampWindow = timestampWindow;
+    }
+    return matches;
   }
 
   #hasVerifiedArtifactPayload(request: Request, key: string) {
@@ -927,6 +1012,7 @@ export class StrictProductionA1S1ExportNetworkGate {
           key,
           networkContract,
           artifactContract,
+          this.#exportMutationTimestampWindow,
         ),
     );
   }
@@ -1183,6 +1269,7 @@ export class StrictProductionA1S1ExportNetworkGate {
       "Export mutation phase ended without an explicit release or cancellation.",
     );
     this.#businessPhase = false;
+    this.#exportMutationTimestampWindow = null;
     this.#businessReleasePromise = null;
     this.#acceptedExportDraftPromise = null;
     this.#acceptedExportDraftResolve = null;
@@ -1450,7 +1537,7 @@ async function readA1S1ProductionRowsWithClient(input: {
       input.client
         .from("corrections")
         .select(
-          "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status",
+          "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at",
         )
         .eq("submission_id", input.submissionId),
       input.client
@@ -1557,6 +1644,26 @@ function draftPayloadIdentityFromRows(input: {
     rows.submission.family_intelligence,
     rows.history,
   );
+  const snapshotFieldErrors = productionDraftSnapshotFieldErrorIdentities(
+    rows.submission.family_intelligence,
+  );
+  const snapshotIssues = productionDraftSnapshotIssueIdentities(
+    rows.submission.family_intelligence,
+  );
+  invariant(
+    snapshotFieldErrors && snapshotIssues,
+    "A2-S1 snapshot field-error or issue identity cannot be resolved.",
+  );
+  invariant(
+    snapshotIssues.length === snapshotFacts.issueCount,
+    "A2-S1 snapshot issue identity count is inconsistent.",
+  );
+  const snapshotErrorByQuestionnaireKey = new Map(
+    snapshotFieldErrors.map((field) => [
+      `${field.applicantId}\u0000${field.sectionId}\u0000${field.fieldId}`,
+      field.errorDigest,
+    ]),
+  );
   const applicantIds = new Set(rows.applicants.map((row) => row.id));
   invariant(
     applicantIds.size === 1 &&
@@ -1569,12 +1676,23 @@ function draftPayloadIdentityFromRows(input: {
     const labelDigest = productionDraftValueDigest(row.label);
     const valueIdentity = productionDraftQuestionnaireValueIdentity(row.value);
     invariant(labelDigest && valueIdentity, "A2-S1 questionnaire identity cannot be digested.");
+    const snapshotErrorDigest = snapshotErrorByQuestionnaireKey.get(
+      `${row.applicant_id}\u0000${row.section_id}\u0000${row.field_id}`,
+    );
+    invariant(
+      snapshotErrorDigest !== undefined ||
+        snapshotErrorByQuestionnaireKey.has(
+          `${row.applicant_id}\u0000${row.section_id}\u0000${row.field_id}`,
+        ),
+      "A2-S1 questionnaire row is absent from the cockpit snapshot.",
+    );
     return {
       applicantId: row.applicant_id,
       fieldId: row.field_id,
       labelDigest,
       logicalValueDigest: valueIdentity.logicalValueDigest,
       sectionId: row.section_id,
+      snapshotErrorDigest: snapshotErrorDigest ?? null,
       submissionId: row.submission_id,
       valueDigest: valueIdentity.valueDigest,
       valueStructureDigest: valueIdentity.valueStructureDigest,
@@ -1583,7 +1701,8 @@ function draftPayloadIdentityFromRows(input: {
   invariant(
     new Set(
       questionnaireAnswers.map((row) => `${row.applicantId}\u0000${row.sectionId}\u0000${row.fieldId}`),
-    ).size === questionnaireAnswers.length,
+    ).size === questionnaireAnswers.length &&
+      snapshotErrorByQuestionnaireKey.size === questionnaireAnswers.length,
     "A2-S1 questionnaire identity contains duplicate answer keys.",
   );
 
@@ -1614,7 +1733,9 @@ function draftPayloadIdentityFromRows(input: {
     invariant(reasonDigest, "A2-S1 correction identity cannot be digested.");
     return {
       applicantId: row.applicant_id,
+      createdAt: row.created_at,
       fieldKey: row.field_key,
+      fixedAt: row.fixed_at,
       id: row.id,
       mediaType: row.media_type,
       reasonDigest,
@@ -1641,6 +1762,7 @@ function draftPayloadIdentityFromRows(input: {
     if (!effective || effective.fromStatus === null) return [];
     return [
       {
+        changedAt: row.changed_at,
         commentDigest: effective.commentDigest,
         entityId: row.entity_id,
         entityType: row.entity_type,
@@ -1680,6 +1802,7 @@ function draftPayloadIdentityFromRows(input: {
     },
     snapshotHistory: snapshotFacts.snapshotHistory,
     snapshotIssueCount: snapshotFacts.issueCount,
+    snapshotIssues,
     snapshotUntypedHistoryDigests: snapshotFacts.snapshotUntypedHistoryDigests,
     statusHistory,
     submission: {
@@ -1692,15 +1815,32 @@ function draftPayloadIdentityFromRows(input: {
   };
 }
 
+export type ResolvedProductionCohortDraftPayloadIdentity = {
+  draft: ProductionDraftPayloadIdentityContract;
+  snapshotMutation?: ProductionDraftSnapshotMutation;
+};
+
 /** Read-only, runtime-only nested identity for lifecycle and export network gates. */
 export async function resolveProductionCohortDraftPayloadIdentity(input: {
   admin: ProductionCohortAccount;
   correctionMarker?: string;
   ownerId: string;
+  snapshotMutationIntent?: ProductionDraftSnapshotMutationIntent;
   submissionId: string;
-}): Promise<ProductionDraftPayloadIdentityContract> {
+}): Promise<ResolvedProductionCohortDraftPayloadIdentity> {
   const rows = await readA1S1ProductionRows(input);
-  return draftPayloadIdentityFromRows({ ...input, rows });
+  const draft = draftPayloadIdentityFromRows({ ...input, rows });
+  const snapshotMutation = input.snapshotMutationIntent
+    ? productionDraftSnapshotMutationFromBaseline(
+        rows.submission.family_intelligence,
+        input.snapshotMutationIntent,
+      )
+    : undefined;
+  invariant(
+    !input.snapshotMutationIntent || snapshotMutation,
+    "A2-S1 lifecycle snapshot mutation cannot be derived from the current read-only state.",
+  );
+  return { draft, snapshotMutation: snapshotMutation ?? undefined };
 }
 
 function assertA1S1ApplicantProjection(input: {

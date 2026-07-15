@@ -52,8 +52,24 @@ function splitLargeCssAssets(): Plugin {
     name: "visaflow-css-runtime-split",
     enforce: "post" as const,
     generateBundle(_options, bundle: BuildBundle) {
+      const htmlAssets = Object.entries(bundle).flatMap(([fileName, asset]) =>
+        fileName.endsWith(".html") &&
+        isBundleAsset(asset) &&
+        typeof asset.source === "string"
+          ? [asset]
+          : [],
+      );
+
       for (const [fileName, asset] of Object.entries(bundle)) {
         if (!isBundleAsset(asset) || !fileName.endsWith(".css")) continue;
+
+        // Dynamic CSS is linked from Vite's lazy-import runtime, not HTML.
+        // Rewriting only its asset would leave that runtime pointing at a
+        // removed file. Keep it intact so an authenticated workspace can
+        // preload its visual layer before the lazy boundary resolves.
+        if (!htmlAssets.some((htmlAsset) => String(htmlAsset.source).includes(fileName))) {
+          continue;
+        }
 
         const source = String(asset.source ?? "");
         if (
@@ -83,11 +99,8 @@ function splitLargeCssAssets(): Plugin {
           return chunkFileName;
         });
 
-        for (const htmlAsset of Object.values(bundle)) {
-          if (!isBundleAsset(htmlAsset)) continue;
-          const htmlSource = htmlAsset.source;
-          if (typeof htmlSource !== "string") continue;
-
+        for (const htmlAsset of htmlAssets) {
+          const htmlSource = String(htmlAsset.source);
           htmlAsset.source = htmlSource.replace(
             /<link\s+[^>]*href=["']([^"']+\.css)["'][^>]*>/g,
             (tag: string, href: string) => {

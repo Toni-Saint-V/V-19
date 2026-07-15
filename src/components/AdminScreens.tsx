@@ -219,7 +219,7 @@ function ProgressLine({ label, value }: { label: string; value: number }) {
 function reviewActionLabel(item: ReviewCard) {
   if (item.lane === "urgent") return "Разобрать критические замечания";
   if (item.lane === "returned") return "Проверить исправления агента";
-  return "Сверить анкету и документы";
+  return "Открыть файлы для сверки";
 }
 
 function ReviewQueueCard({

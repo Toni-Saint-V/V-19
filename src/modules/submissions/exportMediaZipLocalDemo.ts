@@ -16,10 +16,9 @@ export function buildLocalDemoExportMediaZipOptions(
     documentAssets: localDemoDocumentAssetsFromSubmissionFiles(submissions),
     downloadDocument: async (asset, context) => {
       if (asset.type === "visa_form") {
-        return createVisaApplicationFormPdfBlob(
-          context.submission,
-          context.applicant,
-        );
+        return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
+          exportDate: context.exportDate,
+        });
       }
 
       const lines = [

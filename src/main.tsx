@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './shared/ui/tokens/index.css';
 import './shared/ui/system.css';
-import './shared/ui/visual-baseline.css';
 import { createVisaflowRuntimeBridge } from './integration/createVisaflowRuntimeBridge';
 import { getSupabaseClient } from './lib/supabase/client';
 import {

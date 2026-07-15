@@ -1,0 +1,28 @@
+# Sandbox full-flow UI evidence
+
+Run: `sandbox-2026-07-14T20-58-08-951Z`
+
+Evidence rule: every row comes from a real browser state reached through UI interaction. Data is synthetic sandbox data; credentials are never captured.
+
+| Step | Role | Project / viewport | Submission | Description | Screenshot |
+| --- | --- | --- | --- | --- | --- |
+| 10-tour-1440-auth-register | auth | supabase-ui-desktop / 1440x900 | - | Экран заявки на доступ открыт без отправки формы. | [supabase-ui-desktop-10-tour-1440-auth-register.png](./supabase-ui-desktop-10-tour-1440-auth-register.png) |
+| 10-tour-1440-auth-login | auth | supabase-ui-desktop / 1440x900 | - | Экран входа открыт; credentials ещё не введены и не попадают в screenshot. | [supabase-ui-desktop-10-tour-1440-auth-login.png](./supabase-ui-desktop-10-tour-1440-auth-login.png) |
+| 10-tour-1440-auth-reset | auth | supabase-ui-desktop / 1440x900 | - | Экран восстановления доступа открыт без отправки email. | [supabase-ui-desktop-10-tour-1440-auth-reset.png](./supabase-ui-desktop-10-tour-1440-auth-reset.png) |
+| 10-tour-1440-agent-actions | agent | supabase-ui-desktop / 1440x900 | - | Agent screen «Мои действия» открыт через навигацию. | [supabase-ui-desktop-10-tour-1440-agent-actions.png](./supabase-ui-desktop-10-tour-1440-agent-actions.png) |
+| 10-tour-1440-agent-actions-open | agent | supabase-ui-desktop / 1440x900 | - | Вкладка «Открыто» на экране «Мои действия» открыта реальным кликом. | [supabase-ui-desktop-10-tour-1440-agent-actions-open.png](./supabase-ui-desktop-10-tour-1440-agent-actions-open.png) |
+| 10-tour-1440-agent-actions-today | agent | supabase-ui-desktop / 1440x900 | - | Вкладка «Сегодня» на экране «Мои действия» открыта реальным кликом. | [supabase-ui-desktop-10-tour-1440-agent-actions-today.png](./supabase-ui-desktop-10-tour-1440-agent-actions-today.png) |
+| 10-tour-1440-agent-actions-closed | agent | supabase-ui-desktop / 1440x900 | - | Вкладка «Закрыто» на экране «Мои действия» открыта реальным кликом. | [supabase-ui-desktop-10-tour-1440-agent-actions-closed.png](./supabase-ui-desktop-10-tour-1440-agent-actions-closed.png) |
+| 10-tour-1440-agent-documents | agent | supabase-ui-desktop / 1440x900 | - | Agent screen «Сбор документов» с матрицей/полученными пакетами открыт через навигацию. | [supabase-ui-desktop-10-tour-1440-agent-documents.png](./supabase-ui-desktop-10-tour-1440-agent-documents.png) |
+| 10-tour-1440-agent-submissions | agent | supabase-ui-desktop / 1440x900 | - | Agent screen «Мои подачи» открыт через навигацию. | [supabase-ui-desktop-10-tour-1440-agent-submissions.png](./supabase-ui-desktop-10-tour-1440-agent-submissions.png) |
+| 10-tour-1440-agent-drawer-overview | agent | supabase-ui-desktop / 1440x900 | VF-11111114-mrl32t9l-1-1iocesd | Agent submission drawer: вкладка «Обзор» открыта кликом. | [supabase-ui-desktop-10-tour-1440-agent-drawer-overview.png](./supabase-ui-desktop-10-tour-1440-agent-drawer-overview.png) |
+| 10-tour-1440-agent-drawer-questionnaire | agent | supabase-ui-desktop / 1440x900 | VF-11111114-mrl32t9l-1-1iocesd | Agent submission drawer: вкладка «Анкета» открыта кликом. | [supabase-ui-desktop-10-tour-1440-agent-drawer-questionnaire.png](./supabase-ui-desktop-10-tour-1440-agent-drawer-questionnaire.png) |
+| 10-tour-1440-agent-drawer-files | agent | supabase-ui-desktop / 1440x900 | VF-11111114-mrl32t9l-1-1iocesd | Agent submission drawer: вкладка «Файлы» открыта кликом. | [supabase-ui-desktop-10-tour-1440-agent-drawer-files.png](./supabase-ui-desktop-10-tour-1440-agent-drawer-files.png) |
+| 10-tour-1440-agent-drawer-issues | agent | supabase-ui-desktop / 1440x900 | VF-11111114-mrl32t9l-1-1iocesd | Agent submission drawer: вкладка «Замечания» открыта кликом. | [supabase-ui-desktop-10-tour-1440-agent-drawer-issues.png](./supabase-ui-desktop-10-tour-1440-agent-drawer-issues.png) |
+| 10-tour-1440-agent-drawer-history | agent | supabase-ui-desktop / 1440x900 | VF-11111114-mrl32t9l-1-1iocesd | Agent submission drawer: вкладка «История» открыта кликом. | [supabase-ui-desktop-10-tour-1440-agent-drawer-history.png](./supabase-ui-desktop-10-tour-1440-agent-drawer-history.png) |
+| 10-tour-1440-create-single | agent | supabase-ui-desktop / 1440x900 | - | Create submission drawer: режим одного заявителя. | [supabase-ui-desktop-10-tour-1440-create-single.png](./supabase-ui-desktop-10-tour-1440-create-single.png) |
+| 10-tour-1440-create-family | agent | supabase-ui-desktop / 1440x900 | - | Create submission drawer: семейный режим и общие ответы. | [supabase-ui-desktop-10-tour-1440-create-family.png](./supabase-ui-desktop-10-tour-1440-create-family.png) |
+| 10-tour-1440-create-family-added-applicant | agent | supabase-ui-desktop / 1440x900 | - | В семейной подаче добавлен ещё один applicant только в локальном UI draft. | [supabase-ui-desktop-10-tour-1440-create-family-added-applicant.png](./supabase-ui-desktop-10-tour-1440-create-family-added-applicant.png) |
+| 10-tour-1440-agent-settings | agent | supabase-ui-desktop / 1440x900 | - | Agent screen «Настройки рабочего места» открыт. | [supabase-ui-desktop-10-tour-1440-agent-settings.png](./supabase-ui-desktop-10-tour-1440-agent-settings.png) |
+| 10-tour-1440-agent-settings-dirty | agent | supabase-ui-desktop / 1440x900 | - | Настройки изменены через UI; показано несохранённое состояние. | [supabase-ui-desktop-10-tour-1440-agent-settings-dirty.png](./supabase-ui-desktop-10-tour-1440-agent-settings-dirty.png) |
+| 10-tour-1440-agent-profile | agent | supabase-ui-desktop / 1440x900 | - | Agent profile menu открыт реальным кликом. | [supabase-ui-desktop-10-tour-1440-agent-profile.png](./supabase-ui-desktop-10-tour-1440-agent-profile.png) |

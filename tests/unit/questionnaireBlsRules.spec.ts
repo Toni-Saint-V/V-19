@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  blsStayDurationFromDates,
   blsQuestionnaireReadiness,
   isBlsQuestionnaireFieldRequired,
   type BlsFormData,
@@ -62,6 +63,13 @@ function expectReadyParity(submission: Submission) {
 }
 
 describe("canonical BLS questionnaire readiness", () => {
+  test("derives an inclusive stay duration from valid travel dates", () => {
+    expect(blsStayDurationFromDates("15.01.2027", "22.01.2027")).toBe("8");
+    expect(blsStayDurationFromDates("15.01.2027", "15.01.2027")).toBe("1");
+    expect(blsStayDurationFromDates("22.01.2027", "15.01.2027")).toBe("");
+    expect(blsStayDurationFromDates("15.01", "22.01.2027")).toBe("");
+  });
+
   test("keeps adult working-applicant readiness aligned with submit policy", () => {
     expectReadyParity(readySingleSubmission());
   });

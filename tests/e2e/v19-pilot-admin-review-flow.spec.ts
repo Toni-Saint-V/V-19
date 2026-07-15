@@ -281,8 +281,8 @@ test.describe("V-19 pilot admin review click flow", () => {
       passportWorkspace.getByText("Предпросмотр оригинала недоступен"),
     ).toBeVisible();
     await expect(
-      passportWorkspace.getByRole("button", { name: "Завершить сверку" }),
-    ).toHaveCount(0);
+      passportWorkspace.getByRole("button", { name: "Завершить сверку паспорта" }),
+    ).toBeDisabled();
 
     expect(
       await page.evaluate(() => {

@@ -1,0 +1,18 @@
+# Sandbox full-flow UI evidence
+
+Run: `sandbox-2026-07-15T01-00-03-461Z`
+
+Evidence rule: every row comes from a real browser state reached through UI interaction. Data is synthetic sandbox data; credentials are never captured.
+
+| Step | Role | Project / viewport | Submission | Description | Screenshot |
+| --- | --- | --- | --- | --- | --- |
+| drawer-polish-390-tab-overview | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: вкладка «Обзор» открыта реальным UI-кликом; layout и overflow проверены. | [supabase-ui-mobile-390-drawer-polish-390-tab-overview.png](./supabase-ui-mobile-390-drawer-polish-390-tab-overview.png) |
+| drawer-polish-390-more-menu | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: мобильное меню «Ещё» открыто реальным кликом и показывает скрытые разделы. | [supabase-ui-mobile-390-drawer-polish-390-more-menu.png](./supabase-ui-mobile-390-drawer-polish-390-more-menu.png) |
+| drawer-polish-390-tab-applicants | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: вкладка «Заявители» открыта реальным UI-кликом; layout и overflow проверены. | [supabase-ui-mobile-390-drawer-polish-390-tab-applicants.png](./supabase-ui-mobile-390-drawer-polish-390-tab-applicants.png) |
+| drawer-polish-390-questionnaire-empty-remark | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: форма замечания блокирует пустой текст и объясняет причину без записи данных. | [supabase-ui-mobile-390-drawer-polish-390-questionnaire-empty-remark.png](./supabase-ui-mobile-390-drawer-polish-390-questionnaire-empty-remark.png) |
+| drawer-polish-390-document-compare-entry | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: действие «Сверить с паспортом» видно отдельно от «Добавить замечание» до перехода в рабочий экран сверки. | [supabase-ui-mobile-390-drawer-polish-390-document-compare-entry.png](./supabase-ui-mobile-390-drawer-polish-390-document-compare-entry.png) |
+| drawer-polish-390-document-compare | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: действие «Сверить с паспортом» открывает рабочий экран сверки, а не форму замечания. | [supabase-ui-mobile-390-drawer-polish-390-document-compare.png](./supabase-ui-mobile-390-drawer-polish-390-document-compare.png) |
+| drawer-polish-390-tab-questionnaire | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: вкладка «Анкета» открыта реальным UI-кликом; layout и overflow проверены. | [supabase-ui-mobile-390-drawer-polish-390-tab-questionnaire.png](./supabase-ui-mobile-390-drawer-polish-390-tab-questionnaire.png) |
+| drawer-polish-390-tab-media | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: вкладка «Файлы» открыта реальным UI-кликом; layout и overflow проверены. | [supabase-ui-mobile-390-drawer-polish-390-tab-media.png](./supabase-ui-mobile-390-drawer-polish-390-tab-media.png) |
+| drawer-polish-390-tab-issues | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: вкладка «Замечания» открыта реальным UI-кликом; layout и overflow проверены. | [supabase-ui-mobile-390-drawer-polish-390-tab-issues.png](./supabase-ui-mobile-390-drawer-polish-390-tab-issues.png) |
+| drawer-polish-390-tab-history | admin | supabase-ui-mobile-390 / 390x844 | VF-BROWSER-SYNC-SMOKE-SANDBOX | Drawer: вкладка «История» открыта реальным UI-кликом; layout и overflow проверены. | [supabase-ui-mobile-390-drawer-polish-390-tab-history.png](./supabase-ui-mobile-390-drawer-polish-390-tab-history.png) |

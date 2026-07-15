@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
-import visaflowLogo from '../assets/visaflow-logo.png';
+import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import type { AccessRequestRegistrationInput, Session } from '../shared/authContract';
 
 type AccessGateMode = 'invite' | 'login' | 'register' | 'reset' | 'pending' | 'recovery';

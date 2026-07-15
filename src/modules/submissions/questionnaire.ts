@@ -172,7 +172,7 @@ const questionnaireBlueprint: Array<{
     stepLabel: "1 из 10",
     fields: [
       { id: "appointment-city", label: "Город подачи", placeholder: "Выберите город", control: "select", options: BLS_CITY_OPTIONS },
-      { id: "visa-type", label: "Тип визы", placeholder: "Выберите тип визы", control: "select", options: ["Национальная", "Шенгенская"] },
+      { id: "visa-type", label: "Тип визы", placeholder: "Выберите тип визы", control: "select", options: ["Национальная", "Шенгенская"], value: "Шенгенская" },
       { id: "category", label: "Категория обслуживания", placeholder: "Выберите категорию", control: "select", options: ["Premium", "Normal"] },
       { id: "desired-date-1", label: "Желаемая дата 1", placeholder: "ДД.ММ.ГГГГ" },
       { id: "desired-date-2", label: "Желаемая дата 2", placeholder: "ДД.ММ.ГГГГ", required: false },
@@ -233,7 +233,7 @@ const questionnaireBlueprint: Array<{
       { id: "home-country", label: "Страна проживания", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Russian Federation" },
       { id: "home-city", label: "Город проживания", placeholder: "Введите город проживания" },
       { id: "postal-code", label: "Почтовый индекс", placeholder: "Введите почтовый индекс" },
-      { id: "lives-outside-citizenship", label: "Проживание не в стране гражданства", placeholder: "Выберите ответ", control: "select", options: yesNoOptions },
+      { id: "lives-outside-citizenship", label: "Проживание не в стране гражданства", placeholder: "Выберите ответ", control: "select", options: yesNoOptions, value: "Нет" },
       { id: "residence-permit-type", label: "Вид на жительство / документ", placeholder: "Если Да", required: false },
       { id: "residence-permit-number", label: "Номер документа", placeholder: "Если Да", required: false },
       { id: "residence-permit-valid-until", label: "Действителен до", placeholder: "ДД.ММ.ГГГГ, если Да", required: false },
@@ -256,10 +256,10 @@ const questionnaireBlueprint: Array<{
     title: "Поездка",
     stepLabel: "7 из 10",
     fields: [
-      { id: "purpose", label: "Цель поездки", placeholder: "Выберите цель", control: "select", options: ["TOURISM", "BUSINESS", "VISITING FAMILY OR FRIENDS", "STUDY", "MEDICAL TREATMENT", "OFFICIAL VISIT", "CULTURAL", "SPORTS", "TRANSIT", "OTHER"] },
+      { id: "purpose", label: "Цель поездки", placeholder: "Выберите цель", control: "select", options: ["TOURISM", "BUSINESS", "VISITING FAMILY OR FRIENDS", "STUDY", "MEDICAL TREATMENT", "OFFICIAL VISIT", "CULTURAL", "SPORTS", "TRANSIT", "OTHER"], value: "TOURISM" },
       { id: "stay-purpose-details", label: "Дополнительные сведения о цели", placeholder: "Введите дополнительные сведения", required: false, span: "full" },
-      { id: "main-destination", label: "Основная страна назначения", placeholder: "Выберите или введите страну", control: "select", options: blsCountryOptions },
-      { id: "first-entry-country", label: "Страна первого въезда", placeholder: "Выберите или введите страну", control: "select", options: blsCountryOptions },
+      { id: "main-destination", label: "Основная страна назначения", placeholder: "Выберите или введите страну", control: "select", options: blsCountryOptions, value: "Spain" },
+      { id: "first-entry-country", label: "Страна первого въезда", placeholder: "Выберите или введите страну", control: "select", options: blsCountryOptions, value: "Spain" },
       { id: "entry-count", label: "Количество въездов", placeholder: "Выберите количество въездов", control: "select", options: ["Однократная", "Двукратная", "Многократная"] },
       { id: "arrival-date", label: "Дата въезда", placeholder: "ДД.ММ.ГГГГ" },
       { id: "departure-date", label: "Дата выезда", placeholder: "ДД.ММ.ГГГГ" },
@@ -445,7 +445,14 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
     ...submission,
     applicants: submission.applicants.map((applicant) => ({
       ...applicant,
-      sections: normalizeApplicantSections(applicant),
+      sections: normalizeApplicantSections(applicant).map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === "appointment-city" && !field.value.trim()
+            ? { ...field, value: submission.city }
+            : field,
+        ),
+      })),
     })),
   });
 }

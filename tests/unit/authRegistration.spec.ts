@@ -8,6 +8,11 @@ import {
   userRepository,
   type AccessRequestRegistrationInput,
 } from "../../src/shared/authRegistration";
+import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import {
+  alternateLocalAgentOwnerId,
+  defaultLocalAgentOwnerId,
+} from "../../src/modules/submissions/ownership";
 
 const localDevAdminPassword = "22";
 const localDevAgentPassword = "11";
@@ -57,7 +62,7 @@ describe("admin-approved local/dev auth registration", () => {
     ).resolves.toMatchObject({
       approvalStatus: "approved",
       email: "1@1.ru",
-      ownerAgentId: "local-agent-tony",
+      ownerAgentId: defaultLocalAgentOwnerId,
       role: "agent",
       status: "active",
     });
@@ -69,6 +74,28 @@ describe("admin-approved local/dev auth registration", () => {
       role: "admin",
       status: "active",
     });
+  });
+
+  test("keeps local demo fixture ownership aligned with approved agent accounts", async () => {
+    const primaryAgent = await authRepository.loginApprovedUser(
+      "1@1.ru",
+      localDevAgentPassword,
+    );
+    const secondaryAgent = await authRepository.loginApprovedUser(
+      "agent2@visaflow.local",
+      localDevAgentPassword,
+    );
+
+    expect(primaryAgent.ownerAgentId).toBe(defaultLocalAgentOwnerId);
+    expect(secondaryAgent.ownerAgentId).toBe(alternateLocalAgentOwnerId);
+    expect(initialSubmissions.find((submission) => submission.id === "ПД-1048")?.agentId).toBe(
+      defaultLocalAgentOwnerId,
+    );
+    expect(
+      initialSubmissions.some(
+        (submission) => submission.agentId === alternateLocalAgentOwnerId,
+      ),
+    ).toBe(true);
   });
 
   test("public registration creates one pending request and no active agent", async () => {

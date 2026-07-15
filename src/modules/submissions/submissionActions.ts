@@ -709,9 +709,10 @@ export function addPreciseAdminIssue(
   const issueInput = hasExplicitIssueTarget
     ? input
     : { ...input, field: "Маршрут поездки" };
-  const applicant =
-    submission.applicants.find((item) => item.id === issueInput.applicantId) ??
-    firstApplicant;
+  const applicant = submission.applicants.find(
+    (item) => item.id === issueInput.applicantId,
+  );
+  if (!applicant) return submission;
 
   const newIssue: Issue = {
     id: `зм-${submission.id}-новое-${submission.issues.length + 1}`,

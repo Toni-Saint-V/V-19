@@ -60,7 +60,13 @@ test("ZIP contains real workbook and four real document files per applicant", as
       documentAssets: localDemoOptions.documentAssets,
       downloadDocument: async (asset, context) => {
         if (asset.type === "visa_form") {
-          return createVisaApplicationFormPdfBlob(context.submission, context.applicant);
+          return createVisaApplicationFormPdfBlob(
+            context.submission,
+            context.applicant,
+            {
+              exportDate: context.exportDate,
+            },
+          );
         }
 
         const fixturePath = {
@@ -162,7 +168,8 @@ test("ZIP contains real workbook and four real document files per applicant", as
     expect(formText.startsWith("%PDF-1.4")).toBe(true);
     expect(formText).toContain("/Count 4");
     expect(formText).toContain(passport);
-    expect(formText).toContain("APPLICATION FOR SCHENGEN VISA");
+    expect(formText).toContain("/VF");
+    expect(formText).toContain("ST PETERSBURG, 20-05-2026");
   }
 
   const manifest = JSON.parse(
@@ -194,7 +201,7 @@ test("generated visa form is a four-page filled PDF, not a text placeholder", as
   expect(text).toContain("PETROV");
   expect(text).toContain("IVAN");
   expect(text).toContain("751234567");
-  expect(text).toContain("APPLICATION FOR SCHENGEN VISA");
+  expect(text).toContain("/VF");
 });
 
 function withGeneratedExportPackage(submission: Submission): Submission {

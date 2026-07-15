@@ -548,9 +548,36 @@ type LifecycleMutationExpectation = {
   actorSource: "admin" | "agent";
   correctionMode: "append" | "existing";
   correctedQuestionnaireValue?: string;
+  snapshotMutation?: "add_issue" | "mark_issue_fixed";
   snapshotStatus: ProductionLifecycleMutationContract["history"]["snapshotStatus"];
   transition?: NonNullable<ProductionLifecycleMutationContract["history"]["transition"]>;
 };
+
+function lifecycleSnapshotMutationIntent(
+  state: ProductionLifecycleState,
+  requested: LifecycleMutationExpectation["snapshotMutation"],
+): {
+  comment: string;
+  fieldLabel: string;
+  mode: "add_issue" | "mark_issue_fixed";
+  reason: string;
+} | undefined {
+  if (!requested) return undefined;
+  return {
+    comment: productionLifecycleIssueMarker(state),
+    fieldLabel: "Примечание",
+    mode: requested,
+    reason: "Требуется исправить поле «Примечание»",
+  };
+}
+
+function lifecycleTimestampWindow() {
+  const now = Date.now();
+  return {
+    notAfter: new Date(now + 120_000).toISOString(),
+    notBefore: new Date(now - 1_000).toISOString(),
+  };
+}
 
 async function lifecycleMutationContract(
   state: ProductionLifecycleState,
@@ -563,12 +590,17 @@ async function lifecycleMutationContract(
     (account) => account.key === state.case.ownerKey,
   );
   invariant(owner, "Lifecycle mutation owner account is absent.");
-  const draft = await resolveProductionCohortDraftPayloadIdentity({
+  const resolved = await resolveProductionCohortDraftPayloadIdentity({
     admin: accounts.admin,
     correctionMarker: productionLifecycleIssueMarker(state),
     ownerId: owner.authUserId,
+    snapshotMutationIntent: lifecycleSnapshotMutationIntent(
+      state,
+      expectation.snapshotMutation,
+    ),
     submissionId: state.case.submissionId,
   });
+  const { draft, snapshotMutation } = resolved;
   const actorId =
     expectation.actorSource === "admin" ? accounts.admin.authUserId : owner.authUserId;
   let questionnaire: ProductionLifecycleMutationContract["questionnaire"] = {
@@ -611,8 +643,10 @@ async function lifecycleMutationContract(
     mode: "lifecycle",
     ownerId: owner.authUserId,
     questionnaire,
+    snapshotMutation,
     submissionId: state.case.submissionId,
     submissionStatus,
+    timestampWindow: lifecycleTimestampWindow(),
   };
 }
 
@@ -688,6 +722,7 @@ async function addLifecycleIssue(
     await lifecycleMutationContract(state, "waiting_review", "open", {
       actorSource: "admin",
       correctionMode: "append",
+      snapshotMutation: "add_issue",
       snapshotStatus: "submitted_for_review",
     }),
     () => remark.getByRole("button", { name: "Отправить замечание" }).click(),
@@ -1011,6 +1046,7 @@ async function ensureAgentResubmitted(input: {
         await lifecycleMutationContract(state, "returned", "fixed", {
           actorSource: "agent",
           correctionMode: "existing",
+          snapshotMutation: "mark_issue_fixed",
           snapshotStatus: "returned",
         }),
         () => markFixed.click(),

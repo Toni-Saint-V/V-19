@@ -8,6 +8,7 @@ import {
   buildPassportExtractionBrief,
   type PassportExtractionBrief,
 } from "./passportExtractionBrief";
+import { passportGateIssues } from "./passportExtractionGuards";
 import {
   buildSubmissionNextStepBrief,
   type SubmissionNextStepAction,
@@ -239,6 +240,21 @@ function passportHighlight(
   }
 
   if (brief.status === "failed" || brief.status === "unavailable") {
+    if (
+      passportGateIssues(submission).length === 0 &&
+      !passportFilesMissing(submission)
+    ) {
+      return {
+        detail,
+        kind: "passport",
+        label: "Паспорт",
+        owner: "agent",
+        source: "manual_review",
+        status: "ready",
+        summary: "Паспортные данные проверены вручную после недоступного OCR.",
+      };
+    }
+
     return {
       detail,
       kind: "passport",

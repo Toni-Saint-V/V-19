@@ -11,6 +11,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
+  ArrowLeft,
   Briefcase,
   Calendar,
   CheckCircle2,
@@ -20,12 +21,16 @@ import {
   FileText,
   History,
   Image as ImageIcon,
+  Info,
   MapPin,
+  MoreHorizontal,
   Plane,
   UploadCloud,
   User,
+  X,
 } from "lucide-react";
 import { getPrimaryAction, statusLabels } from "../status";
+import { historyDetailForUser, historyTimestampForUser } from "../historyPresentation";
 import {
   targetElementId,
   tabForTarget,
@@ -49,8 +54,21 @@ type SourceStatus = OperationalDrawerSourceStatus;
 
 type TabId = "overview" | "questionnaire" | "files" | "issues" | "history";
 
+const mobileSecondaryDrawerTabs = new Set<TabId>(["files", "issues", "history"]);
+const mobileSecondaryDrawerTabsMenuId = "v20-drawer-secondary-tabs";
+const drawerHeadingId = "v20-submission-drawer-heading";
+
+function drawerTabId(tab: TabId) {
+  return `v20-submission-drawer-tab-${tab}`;
+}
+
+function drawerPanelId(tab: TabId) {
+  return `v20-submission-drawer-panel-${tab}`;
+}
+
 type DrawerTabConfig = {
   getCount?: (detail: FigmaSubmissionDetail) => number;
+  icon: IconComponent;
   id: TabId;
   isWarning?: boolean;
   label: string;
@@ -257,6 +275,10 @@ const figmaSubmissionDrawerStyles = `
   }
 
   .v20-tabbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .v20-tabbar-more {
     display: none;
   }
 
@@ -750,32 +772,6 @@ const figmaSubmissionDrawerStyles = `
     letter-spacing: -0.026em;
   }
 
-  .v20-yes-no {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 144px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.028);
-  }
-
-  .v20-yes-no span {
-    display: inline-flex;
-    min-height: 61px;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255, 255, 255, 0.48);
-    font-size: 21px;
-    font-weight: 690;
-    letter-spacing: -0.025em;
-  }
-
-  .v20-yes-no span.is-active {
-    color: rgba(255, 255, 255, 0.86);
-    background: rgba(111, 99, 255, 0.35);
-  }
-
   .v20-dropzone {
     position: relative;
     display: grid;
@@ -858,8 +854,8 @@ const figmaSubmissionDrawerStyles = `
     padding: 0 39px;
     border: 0;
     border-radius: 14px;
-    color: #111114;
-    background: #ffffff;
+    color: var(--v20-text);
+    background: var(--v20-accent);
     font-size: 25px;
     font-weight: 760;
     letter-spacing: -0.04em;
@@ -1138,6 +1134,16 @@ const figmaSubmissionDrawerStyles = `
     margin-top: 11px;
   }
 
+  .v20-questionnaire-card-remaining,
+  .v20-history-detail {
+    display: block;
+    margin-top: 6px;
+    color: rgba(255, 255, 255, 0.46);
+    font-size: 13px;
+    font-weight: 560;
+    line-height: 1.35;
+  }
+
   .v20-progress-track {
     height: 7px;
     overflow: hidden;
@@ -1146,24 +1152,32 @@ const figmaSubmissionDrawerStyles = `
   }
 
   .v20-progress-fill {
+    display: block;
+    width: 100%;
     height: 100%;
+    padding: 0;
+    appearance: none;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+  }
+
+  .v20-progress-fill::-webkit-progress-bar {
+    background: transparent;
+  }
+
+  .v20-progress-fill::-webkit-progress-value {
     border-radius: inherit;
     background: var(--v20-accent);
   }
 
-  .v20-progress-fill.is-p-0 {
-    width: 0%;
+  .v20-progress-fill::-moz-progress-bar {
+    border-radius: inherit;
+    background: var(--v20-accent);
   }
 
-  .v20-progress-fill.is-p-40 {
-    width: 40%;
-  }
-
-  .v20-progress-fill.is-p-100 {
-    width: 100%;
-  }
-
-  .v20-progress-fill.is-done {
+  .v20-progress-fill.is-done::-webkit-progress-value,
+  .v20-progress-fill.is-done::-moz-progress-bar {
     background: var(--v20-success);
   }
 
@@ -1212,6 +1226,15 @@ const figmaSubmissionDrawerStyles = `
     font-size: 25px;
     font-weight: 500;
     letter-spacing: -0.035em;
+  }
+
+  .v20-files-empty-state {
+    gap: 16px;
+  }
+
+  .v20-files-empty-state p {
+    max-width: 560px;
+    margin: 0;
   }
 
   .v20-issue-list {
@@ -1629,15 +1652,6 @@ const figmaSubmissionDrawerStyles = `
       grid-template-columns: 1fr;
     }
 
-    .v20-yes-no {
-      width: 132px;
-    }
-
-    .v20-yes-no span {
-      min-height: 48px;
-      font-size: 17px;
-    }
-
     .v20-dropzone {
       min-height: 440px;
       padding: 44px 24px;
@@ -1872,6 +1886,27 @@ const figmaSubmissionDrawerStyles = `
     letter-spacing: var(--v19b-letter-spacing-normal);
   }
 
+  .v20-drawer-title-line {
+    display: flex;
+    min-width: var(--v19b-size-0);
+    align-items: center;
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-drawer-title-line .v20-title {
+    min-width: var(--v19b-size-0);
+    flex: 1 1 auto;
+  }
+
+  .v20-subtitle-separator {
+    color: var(--v20-border-strong);
+  }
+
+  .v20-icon-button svg {
+    width: var(--v19b-size-20);
+    height: var(--v19b-size-20);
+  }
+
   .v20-subtitle {
     color: var(--v20-muted-soft);
     font-size: var(--v19b-size-11);
@@ -1920,6 +1955,23 @@ const figmaSubmissionDrawerStyles = `
     font-size: var(--v19b-size-10);
   }
 
+  .v20-tab-icon {
+    width: var(--v19b-size-16);
+    height: var(--v19b-size-16);
+    flex: none;
+  }
+
+  .v20-tabbar-more-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--v19b-size-4);
+  }
+
+  .v20-tabbar-more-trigger svg {
+    width: var(--v19b-size-16);
+    height: var(--v19b-size-16);
+  }
+
   .v20-drawer-body {
     padding: var(--v19b-size-20) var(--v19b-size-24) var(--v19b-size-24);
   }
@@ -1965,6 +2017,117 @@ const figmaSubmissionDrawerStyles = `
   .v20-info-card {
     min-height: var(--v19b-size-176);
     padding: var(--v19b-size-20);
+  }
+
+  .v20-upload-stage {
+    gap: var(--v19b-size-16);
+  }
+
+  .v20-mode-toggle {
+    justify-self: start;
+    padding: var(--v19b-size-0);
+    border-color: var(--v20-border-strong);
+    border-radius: var(--v20-radius-md);
+    background: var(--v20-card-bg-strong);
+    box-shadow: none;
+  }
+
+  .v20-mode-button {
+    min-height: var(--v19b-size-40);
+    gap: var(--v19b-size-8);
+    padding-inline: var(--v19b-size-12);
+    border-radius: var(--v20-radius-md);
+    color: var(--v20-text);
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-mode-button svg {
+    width: var(--v19b-size-16);
+    height: var(--v19b-size-16);
+  }
+
+  .v20-dropzone {
+    min-height: var(--v19b-size-176);
+    padding: var(--v19b-size-20);
+    border: var(--v19b-size-1) dashed var(--v20-border-strong);
+    border-radius: var(--v20-radius-lg);
+    background: var(--v20-card-bg);
+  }
+
+  .v20-dropzone::before {
+    display: none;
+  }
+
+  .v20-upload-icon-box {
+    width: var(--v19b-size-40);
+    height: var(--v19b-size-40);
+    margin-bottom: var(--v19b-size-12);
+    border: var(--v19b-size-1) solid var(--v20-accent-border);
+    border-radius: var(--v20-radius-md);
+    color: var(--v20-accent);
+    background: var(--v20-accent-soft);
+  }
+
+  .v20-upload-icon-box svg {
+    width: var(--v19b-size-20);
+    height: var(--v19b-size-20);
+  }
+
+  .v20-dropzone-title {
+    color: var(--v20-text);
+    font-size: var(--v19b-size-16);
+    font-weight: var(--v19b-weight-title);
+    letter-spacing: var(--v19b-letter-spacing-normal);
+  }
+
+  .v20-dropzone-helper {
+    margin-top: var(--v19b-size-8);
+    color: var(--v20-muted);
+    font-size: var(--v19b-size-13);
+    letter-spacing: var(--v19b-letter-spacing-normal);
+  }
+
+  .v20-upload-button {
+    min-height: var(--v19b-size-40);
+    margin-top: var(--v19b-size-12);
+    padding-inline: var(--v19b-size-16);
+    border-radius: var(--v20-radius-md);
+    color: var(--v19b-color-primary-text);
+    background: var(--v20-accent);
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-normal);
+  }
+
+  .v20-subview-intro {
+    display: grid;
+    gap: var(--v19b-size-8);
+    padding: var(--v19b-size-16);
+    border: var(--v19b-size-1) solid var(--v20-border-strong);
+    border-radius: var(--v20-radius-lg);
+    background: var(--v20-card-bg);
+  }
+
+  .v20-subview-eyebrow {
+    color: var(--v20-muted);
+    font-size: var(--v19b-size-11);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+    text-transform: uppercase;
+  }
+
+  .v20-subview-title {
+    margin: var(--v19b-size-0);
+    color: var(--v20-text);
+    font-size: var(--v19b-size-16);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  .v20-subview-copy {
+    margin: var(--v19b-size-0);
+    color: var(--v20-muted);
+    font-size: var(--v19b-size-13);
   }
 
   .v20-family-card {
@@ -2026,6 +2189,11 @@ const figmaSubmissionDrawerStyles = `
       font-size: var(--v19b-size-20);
     }
 
+    .v20-drawer-title-line {
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
     .v20-subtitle {
       display: flex;
       overflow: hidden;
@@ -2037,11 +2205,96 @@ const figmaSubmissionDrawerStyles = `
       padding-inline: var(--v19b-size-16);
     }
 
+    .v20-tabbar-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: var(--v19b-size-8);
+    }
+
+    .v20-tabbar {
+      min-width: var(--v19b-size-0);
+      flex: 1;
+      overflow: visible;
+    }
+
+    .v20-tab-button.is-mobile-secondary {
+      display: none;
+    }
+
+    .v20-tabbar-more {
+      position: relative;
+      display: block;
+      flex: none;
+    }
+
+    .v20-tabbar-more-trigger,
+    .v20-tabbar-more-menu button {
+      min-height: var(--v19b-size-40);
+      border: var(--v19b-size-0);
+      border-radius: var(--v20-radius-md);
+      color: var(--v20-muted);
+      background: transparent;
+      font: inherit;
+      font-size: var(--v19b-size-13);
+      font-weight: var(--v19b-weight-control);
+      cursor: pointer;
+    }
+
+    .v20-tabbar-more-trigger {
+      padding-inline: var(--v19b-size-12);
+    }
+
+    .v20-tabbar-more-trigger.is-active {
+      color: var(--v19b-color-primary-text);
+      background: var(--v20-accent-soft);
+      box-shadow: inset var(--v19b-size-0) calc(var(--v19b-size-2) * -1) var(--v20-accent);
+    }
+
+    .v20-tabbar-more-menu {
+      position: absolute;
+      z-index: 2;
+      top: calc(var(--v19b-size-40) + var(--v19b-size-8));
+      right: var(--v19b-size-0);
+      display: grid;
+      width: max-content;
+      gap: var(--v19b-size-2);
+      padding: var(--v19b-size-4);
+      border: 1px solid var(--v20-border-strong);
+      border-radius: var(--v20-radius-md);
+      background: var(--v20-card-bg-strong);
+    }
+
+    .v20-tabbar-more-menu button {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: var(--v19b-size-16);
+      padding-inline: var(--v19b-size-12);
+      text-align: left;
+    }
+
+    .v20-tabbar-more-menu .v20-tab-count {
+      margin-left: auto;
+    }
+
+    .v20-tabbar-more-menu button[aria-current="page"] {
+      color: var(--v19b-color-primary-text);
+      background: var(--v20-accent-soft);
+    }
+
     .v20-drawer-body {
       padding: var(--v19b-size-16);
     }
 
+    .v20-dropzone {
+      min-height: var(--v19b-size-160);
+      padding: var(--v19b-size-16);
+    }
+
     .v20-footer {
+      position: relative !important;
+      inset: auto !important;
       grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
       padding: var(--v19b-size-12) var(--v19b-size-16) max(var(--v19b-size-12), env(safe-area-inset-bottom));
     }
@@ -2058,14 +2311,45 @@ const figmaSubmissionDrawerStyles = `
   }
 
   @media (max-width: 460px) {
+    .v20-stat-grid {
+      grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    }
+
     .v20-two-col,
     .v20-questionnaire-grid,
     .v20-footer-actions {
       grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
     }
 
+    .v20-questionnaire-head {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+      gap: var(--v19b-size-16);
+    }
+
+    .v20-questionnaire-head .v20-questionnaire-open {
+      width: var(--v19b-size-full);
+    }
+
     .v20-action-button {
       min-height: var(--v19b-size-48);
+    }
+  }
+
+  @media (max-width: 360px) {
+    .v20-title {
+      font-size: var(--v19b-size-18);
+    }
+
+    .v20-status-pill {
+      gap: var(--v19b-size-4);
+      min-height: var(--v19b-size-22);
+      padding: var(--v19b-size-4) var(--v19b-size-8);
+      font-size: var(--v19b-size-10);
+    }
+
+    .v20-status-pill::before {
+      width: var(--v19b-size-4);
+      height: var(--v19b-size-4);
     }
   }
 `;
@@ -2353,13 +2637,6 @@ const MetricCard = ({
   </div>
 );
 
-const YesNoToggle = ({ active = true }: { active?: boolean }) => (
-  <span className="v20-yes-no" aria-hidden="true">
-    <span className={active ? "is-active" : ""}>Да</span>
-    <span className={!active ? "is-active" : ""}>Нет</span>
-  </span>
-);
-
 const OverviewTab = ({
   data,
   submission,
@@ -2471,32 +2748,111 @@ const OverviewTab = ({
   );
 };
 
+type QuestionnaireDrawerSection = {
+  Icon: IconComponent;
+  progress: number;
+  remaining?: string;
+  status: "done" | "in_progress" | "pending";
+  title: string;
+};
+
+const questionnaireSectionIcons: IconComponent[] = [
+  User,
+  FileDigit,
+  Briefcase,
+  CreditCard,
+  Plane,
+  History,
+];
+
+function questionnaireSectionProgress(
+  section: Submission["applicants"][number]["sections"][number],
+) {
+  if (section.status === "complete") return 100;
+  if (section.status === "empty") return 0;
+
+  const requiredFields = section.fields.filter((field) => field.required);
+  if (!requiredFields.length) return section.status === "needs_fix" ? 0 : 50;
+
+  return Math.round(
+    (requiredFields.filter((field) => field.value.trim().length > 0).length /
+      requiredFields.length) *
+      100,
+  );
+}
+
+function questionnaireDrawerSections(submission: Submission): QuestionnaireDrawerSection[] {
+  const sectionsByTitle = new Map<
+    string,
+    Submission["applicants"][number]["sections"]
+  >();
+
+  for (const applicant of submission.applicants) {
+    for (const section of applicant.sections) {
+      const current = sectionsByTitle.get(section.title) ?? [];
+      current.push(section);
+      sectionsByTitle.set(section.title, current);
+    }
+  }
+
+  return Array.from(sectionsByTitle.entries()).map(([title, sections], index) => {
+    const statuses = sections.map((section) => section.status);
+    const progress = Math.round(
+      sections.reduce((total, section) => total + questionnaireSectionProgress(section), 0) /
+        sections.length,
+    );
+    const hasNeedsFix = statuses.includes("needs_fix");
+    const hasPartial = statuses.includes("partial");
+    const allComplete = statuses.every((status) => status === "complete");
+    const missingFields = sections.reduce(
+      (total, section) =>
+        total +
+        section.fields.filter((field) => field.required && !field.value.trim()).length,
+      0,
+    );
+    const status: QuestionnaireDrawerSection["status"] = allComplete
+      ? "done"
+      : hasNeedsFix || hasPartial
+        ? "in_progress"
+        : "pending";
+    const remaining = hasNeedsFix
+      ? "нужно исправить"
+      : missingFields > 0
+        ? `${missingFields} ${missingFields === 1 ? "поле" : "поля"}`
+        : undefined;
+
+    return {
+      Icon: questionnaireSectionIcons[index % questionnaireSectionIcons.length],
+      progress,
+      remaining,
+      status,
+      title,
+    };
+  });
+}
+
 const QuestionnaireTab = ({
   onOpenQuestionnaire,
+  submission,
 }: {
   onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
+  submission: Submission;
 }) => {
-  const sections = [
-    { title: "Личные данные", icon: User, progress: 100, status: "done" },
-    { title: "Паспортные данные", icon: FileDigit, progress: 100, status: "done" },
-    {
-      title: "Место работы / Учебы",
-      icon: Briefcase,
-      progress: 40,
-      remaining: "3 поля",
-      status: "in_progress",
-    },
-    { title: "Спонсоры и финансы", icon: CreditCard, progress: 0, status: "pending" },
-    { title: "Детали поездки", icon: Plane, progress: 100, status: "done" },
-    { title: "Визовая история", icon: History, progress: 100, status: "done" },
-  ];
+  const sections = questionnaireDrawerSections(submission);
+  const incompleteSections = sections.filter((section) => section.progress < 100).length;
 
   return (
     <div className="v20-section-stack">
       <div className="v20-card v20-questionnaire-head">
         <div>
           <h3 className="v20-questionnaire-title">Прогресс заполнения</h3>
-          <p className="v20-questionnaire-helper">Осталось заполнить 2 блока данных</p>
+          <p className="v20-questionnaire-helper">
+            {sections.length
+              ? incompleteSections > 0
+                ? `Незаполненных разделов: ${incompleteSections}.`
+                : "Все разделы заполнены."
+              : `Готовность анкеты: ${submission.completeness.questionnaire}%`}
+          </p>
         </div>
         <button
           className="v20-questionnaire-open"
@@ -2508,7 +2864,7 @@ const QuestionnaireTab = ({
         </button>
       </div>
 
-      <div className="v20-questionnaire-grid">
+      {sections.length ? <div className="v20-questionnaire-grid">
         {sections.map((section) => (
           <button
             className="v20-questionnaire-card"
@@ -2525,34 +2881,44 @@ const QuestionnaireTab = ({
                     : ""
               }`}
             >
-              <section.icon aria-hidden="true" />
+              <section.Icon aria-hidden="true" />
             </span>
             <span>
               <span className="v20-questionnaire-card-title">{section.title}</span>
               <span className="v20-progress-line">
                 <span className="v20-progress-track">
-                  <span
-                    className={`v20-progress-fill is-p-${section.progress} ${
-                      section.status === "done" ? "is-done" : ""
-                    }`}
+                  <progress
+                    aria-label={`${section.title}: ${section.progress}%`}
+                    className={`v20-progress-fill ${section.status === "done" ? "is-done" : ""}`}
+                    max={100}
+                    value={section.progress}
                   />
                 </span>
                 <span className="v20-progress-percent">{section.progress}%</span>
               </span>
+              {section.remaining ? (
+                <span className="v20-questionnaire-card-remaining">{section.remaining}</span>
+              ) : null}
             </span>
           </button>
         ))}
-      </div>
+      </div> : (
+        <div className="v20-empty-state">
+          Детализация разделов появится после сохранения анкеты.
+        </div>
+      )}
     </div>
   );
 };
 
 const FilesTab = ({
   focusTarget,
+  onOpenQuestionnaire,
   onUploadFile,
   submission,
 }: {
   focusTarget?: WorkspaceTarget;
+  onOpenQuestionnaire: () => void;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   submission: Submission;
 }) => {
@@ -2655,59 +3021,66 @@ const FilesTab = ({
           {uploadError}
         </div>
       ) : null}
-      <div className="v20-mode-toggle" aria-label="Тип подачи">
-        <span className={`v20-mode-button ${submission.type === "family" ? "is-active" : ""}`}>
+      <div className="v20-mode-toggle" role="status">
+        <span className="v20-mode-button is-active">
           <User aria-hidden="true" />
-          Семья
-        </span>
-        <span className={`v20-mode-button ${submission.type === "single" ? "is-active" : ""}`}>
-          <User aria-hidden="true" />
-          Один
+          {submission.type === "family" ? "Семейная подача" : "Один заявитель"}
         </span>
       </div>
 
-      <div className="v20-card v20-question-card">
-        <div className="v20-question-row">
-          <span className="v20-question-text">У вас одинаковый адрес проживания в России?</span>
-          <YesNoToggle active />
+      {submission.type === "family" ? (
+        <div className="v20-card v20-question-card">
+          <div className="v20-question-row">
+            <span className="v20-question-text">
+              Общие адреса семьи заполняются один раз и копируются только после подтверждения.
+            </span>
+            <button className="v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
+              Открыть анкету
+            </button>
+          </div>
         </div>
-        <div className="v20-question-row">
-          <span className="v20-question-text">В Испании?</span>
-          <YesNoToggle active />
-        </div>
-      </div>
+      ) : null}
 
-      <div
-        className={`v20-dropzone ${canDropUpload ? "" : "is-disabled"}`}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={handleDrop}
-      >
-        <input
-          accept={firstActionFile ? fileAccept(firstActionFile) : "image/jpeg,image/png,application/pdf"}
-          className="v20-hidden-file-input"
-          disabled={!canDropUpload}
-          ref={dropInputRef}
-          type="file"
-          onChange={handleDropInputChange}
-        />
-        <div className="v20-dropzone-inner">
-          <span className="v20-upload-icon-box">
-            <UploadCloud aria-hidden="true" />
-          </span>
-          <h3 className="v20-dropzone-title">Перетащи документы сюда</h3>
-          <p className="v20-dropzone-helper">
-            PDF, JPG, PNG. После выбора файлы автоматически пройдут upload → OCR → prefill mapping.
-          </p>
-          <button
-            className="v20-upload-button"
+      {submission.files.length ? (
+        <div
+          className={`v20-dropzone ${canDropUpload ? "" : "is-disabled"}`}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={handleDrop}
+        >
+          <input
+            accept={firstActionFile ? fileAccept(firstActionFile) : "image/jpeg,image/png,application/pdf"}
+            className="v20-hidden-file-input"
             disabled={!canDropUpload}
-            type="button"
-            onClick={() => dropInputRef.current?.click()}
-          >
-            Выбрать файлы
-          </button>
+            ref={dropInputRef}
+            type="file"
+            onChange={handleDropInputChange}
+          />
+          <div className="v20-dropzone-inner">
+            <span className="v20-upload-icon-box">
+              <UploadCloud aria-hidden="true" />
+            </span>
+            <h3 className="v20-dropzone-title">Перетащи документы сюда</h3>
+            <p className="v20-dropzone-helper">
+              PDF, JPG, PNG. Статус загрузки и требуемое действие появятся в списке ниже.
+            </p>
+            <button
+              className="v20-upload-button"
+              disabled={!canDropUpload}
+              type="button"
+              onClick={() => dropInputRef.current?.click()}
+            >
+              Выбрать файлы
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <section className="v20-empty-state v20-files-empty-state" aria-label="Файлы ещё не сформированы">
+          <p>Для этой подачи ещё не сформированы слоты документов.</p>
+          <button className="v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
+            Открыть анкету
+          </button>
+        </section>
+      )}
 
       <section>
         <h3 className="v20-section-label">Файлы подачи</h3>
@@ -2863,10 +3236,17 @@ const IssuesTab = ({
         <MetricCard Icon={CheckCircle2} label="закрыто" tone="accent" value={closedIssues.length} />
       </div>
 
-      <div className="v20-search-row" aria-hidden="true">
-        <FileText aria-hidden="true" />
-        Поиск по действиям...
-      </div>
+      <section className="v20-subview-intro" aria-label="Порядок работы с замечаниями">
+        <span className="v20-subview-eyebrow">Порядок работы</span>
+        <h3 className="v20-subview-title">
+          {openIssues.length > 0 ? "Сначала устраните открытые замечания" : "Открытых замечаний нет"}
+        </h3>
+        <p className="v20-subview-copy">
+          {openIssues.length > 0
+            ? "Откройте точное место, сохраните исправление и только затем отметьте замечание исправленным."
+            : "Новые действия появятся здесь, если администратор вернёт подачу на исправление."}
+        </p>
+      </section>
 
       {issueFixError ? (
         <div className="v20-upload-error" role="alert">
@@ -2962,55 +3342,57 @@ function issueTargetLine(issue: Submission["issues"][number]) {
   return parts.filter(Boolean).join(" · ");
 }
 
-const HistoryTab = () => {
-  const events = [
-    {
-      Icon: AlertCircle,
-      time: "Сегодня, 14:30",
-      title: "Возвращено с замечаниями",
-      tone: "warning",
-      user: "Система",
-    },
-    {
-      Icon: UploadCloud,
-      time: "Вчера, 18:45",
-      title: "Отправлено на проверку",
-      tone: "info",
-      user: "Вы",
-    },
-    {
-      Icon: ImageIcon,
-      time: "Вчера, 15:10",
-      title: "Загружены сканы паспортов",
-      tone: "neutral",
-      user: "Вы",
-    },
-    {
-      Icon: FileText,
-      time: "Вчера, 12:00",
-      title: "Создан черновик",
-      tone: "neutral",
-      user: "Вы",
-    },
-  ];
+function historyActorLabel(source: Submission["history"][number]["source"]) {
+  if (source === "admin") return "Администратор";
+  if (source === "agent") return "Агент";
+  if (source === "bb") return "BLS";
+  return "Система";
+}
+
+function historyVisualTone(event: Submission["history"][number]) {
+  if (event.toStatus === "returned" || event.source === "admin") return "warning";
+  if (event.toStatus === "submitted_for_review" || event.source === "agent") return "info";
+  return "neutral";
+}
+
+function historyVisualIcon(event: Submission["history"][number]): IconComponent {
+  if (event.toStatus === "returned" || event.source === "admin") return AlertCircle;
+  if (event.toStatus === "submitted_for_review" || event.source === "agent") return UploadCloud;
+  if (/файл|паспорт|скан/i.test(event.text)) return ImageIcon;
+  return FileText;
+}
+
+const HistoryTab = ({ submission }: { submission: Submission }) => {
+  const events = submission.history;
+
+  if (!events.length) {
+    return <div className="v20-empty-state">История появится после первого действия по подаче.</div>;
+  }
 
   return (
     <section className="v20-history-list" aria-label="История подачи">
-      {events.map((event) => (
-        <div className="v20-history-item" key={event.title}>
-          <span className={`v20-history-icon is-${event.tone}`}>
-            <event.Icon aria-hidden="true" />
-          </span>
-          <span>
-            <span className="v20-history-title">{event.title}</span>
-            <span className="v20-history-meta">
-              {event.time}
-              <i className="v20-history-dot" aria-hidden="true" />
-              {event.user}
+      {events.map((event) => {
+        const detail = historyDetailForUser(event);
+        return (
+          <div className="v20-history-item" key={event.id}>
+            <span className={`v20-history-icon is-${historyVisualTone(event)}`}>
+              {(() => {
+                const Icon = historyVisualIcon(event);
+                return <Icon aria-hidden="true" />;
+              })()}
             </span>
-          </span>
-        </div>
-      ))}
+            <span>
+              <span className="v20-history-title">{event.text}</span>
+              <span className="v20-history-meta">
+                {historyTimestampForUser(event.at)}
+                <i className="v20-history-dot" aria-hidden="true" />
+                {historyActorLabel(event.source)}
+              </span>
+              {detail ? <span className="v20-history-detail">{detail}</span> : null}
+            </span>
+          </div>
+        );
+      })}
     </section>
   );
 };
@@ -3036,17 +3418,10 @@ function questionnaireFocusFromTarget(target: WorkspaceTarget): QuestionnaireFoc
   };
 }
 
-function screenTitle(tab: TabId, data: FigmaSubmissionDetail) {
-  if (tab === "files") return "Загрузка и первичная сборка";
-  if (tab === "issues") return "Мои действия";
-  return data.title;
-}
-
 function screenMeta(data: FigmaSubmissionDetail) {
   return [
     data.id,
     data.type === "family" ? "семейная" : "индивидуальная",
-    operationalDrawerCompactStatusLabel(data.status),
   ].join(" · ");
 }
 
@@ -3065,6 +3440,7 @@ export function FigmaSubmissionDrawer({
   surface,
 }: FigmaSubmissionDrawerProps) {
   const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
+  const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
   const [status, setStatus] = useState<"loading" | "success">("loading");
   const [localActionError, setLocalActionError] = useState("");
   const [actionPending, setActionPending] = useState(false);
@@ -3072,6 +3448,8 @@ export function FigmaSubmissionDrawer({
   const actionPendingRef = useRef(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerTabsRef = useRef<HTMLDivElement>(null);
+  const mobileTabsRef = useRef<HTMLDivElement>(null);
+  const mobileTabsTriggerRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const isDesktopDrawer = useDrawerDesktopQuery();
   const prefersReducedMotion = useReducedMotion();
@@ -3127,6 +3505,7 @@ export function FigmaSubmissionDrawer({
     actionRequestIdRef.current += 1;
     setStatus("loading");
     setTab(initialTab(activeTab));
+    setMobileTabsOpen(false);
     setLocalActionError("");
     setActionPending(false);
     actionPendingRef.current = false;
@@ -3165,7 +3544,18 @@ export function FigmaSubmissionDrawer({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+
+      if (mobileTabsOpen) {
+        event.preventDefault();
+        setMobileTabsOpen(false);
+        window.requestAnimationFrame(() => {
+          mobileTabsTriggerRef.current?.focus({ preventScroll: true });
+        });
+        return;
+      }
+
+      onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     document.body.style.overflow = "hidden";
@@ -3173,7 +3563,20 @@ export function FigmaSubmissionDrawer({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, [mobileTabsOpen, onClose]);
+
+  useEffect(() => {
+    if (!mobileTabsOpen) return;
+
+    const closeOnPointerOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !mobileTabsRef.current?.contains(event.target)) {
+        setMobileTabsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnPointerOutside, true);
+    return () => document.removeEventListener("pointerdown", closeOnPointerOutside, true);
+  }, [mobileTabsOpen]);
 
   useEffect(() => {
     if (status !== "success") return;
@@ -3197,6 +3600,13 @@ export function FigmaSubmissionDrawer({
   function handleDrawerKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.stopPropagation();
+      if (mobileTabsOpen) {
+        setMobileTabsOpen(false);
+        window.requestAnimationFrame(() => {
+          mobileTabsTriggerRef.current?.focus({ preventScroll: true });
+        });
+        return;
+      }
       onClose();
       return;
     }
@@ -3233,17 +3643,48 @@ export function FigmaSubmissionDrawer({
   }
 
   const tabs: DrawerTabConfig[] = [
-    { id: "overview", label: "Обзор" },
-    { id: "questionnaire", label: "Анкета" },
-    { id: "files", label: "Файлы" },
+    { icon: Info, id: "overview", label: "Обзор" },
+    { icon: FileText, id: "questionnaire", label: "Анкета" },
+    { icon: ImageIcon, id: "files", label: "Файлы" },
     {
       getCount: (detail) => detail.issuesCount,
+      icon: AlertCircle,
       id: "issues",
       isWarning: true,
       label: "Замечания",
     },
-    { id: "history", label: "История" },
+    { icon: History, id: "history", label: "История" },
   ];
+  const activeSecondaryTab = mobileSecondaryDrawerTabs.has(tab);
+
+  function selectDrawerTab(nextTab: TabId) {
+    setTab(nextTab);
+    setMobileTabsOpen(false);
+  }
+
+  function focusDrawerTab(nextTab: TabId) {
+    window.requestAnimationFrame(() => {
+      document.getElementById(drawerTabId(nextTab))?.focus({ preventScroll: true });
+    });
+  }
+
+  function handleDrawerTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, currentTab: TabId) {
+    const currentIndex = tabs.findIndex((item) => item.id === currentTab);
+    if (currentIndex < 0) return;
+
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex]?.id;
+    if (!nextTab) return;
+    selectDrawerTab(nextTab);
+    focusDrawerTab(nextTab);
+  }
 
   const visibleActionError = localActionError || actionError;
   const footerStatusText =
@@ -3254,7 +3695,7 @@ export function FigmaSubmissionDrawer({
       : statusLabels[submission.status]);
   const primaryFooterLabel =
     data.status === "returned" ? "Отправить исправления" : (primaryAction.label || "Далее");
-  const currentScreenTitle = screenTitle(tab, data);
+  const currentTabLabel = tabs.find((item) => item.id === tab)?.label ?? "Обзор";
 
   async function handlePrimaryAction() {
     if (primaryAction.disabled || actionPendingRef.current) return;
@@ -3300,7 +3741,7 @@ export function FigmaSubmissionDrawer({
           key="figma-drawer-panel"
           ref={drawerRef}
           role="dialog"
-          aria-label={`Подача ${data.id}`}
+          aria-labelledby={drawerHeadingId}
           aria-modal="true"
           tabIndex={-1}
           transition={drawerPanelTransition}
@@ -3308,38 +3749,48 @@ export function FigmaSubmissionDrawer({
         >
           <header className="v20-drawer-topbar">
             <button className="v20-icon-button" aria-label="Назад" type="button" onClick={onClose}>
-              <span className="v20-icon-glyph" aria-hidden="true">←</span>
+              <ArrowLeft aria-hidden="true" />
             </button>
             <div className="v20-title-wrap">
-              <h2 className="v20-title">{currentScreenTitle}</h2>
               <div className="v20-subtitle">
                 <span>{screenMeta(data)}</span>
+                <span className="v20-subtitle-separator" aria-hidden="true">·</span>
+                <span>{currentTabLabel}</span>
+              </div>
+              <div className="v20-drawer-title-line">
+                <h2 className="v20-title" id={drawerHeadingId}>{data.title}</h2>
                 <span className={`v20-status-pill ${data.status === "returned" ? "is-warning" : ""}`}>
                   {operationalDrawerCompactStatusLabel(data.status)}
                 </span>
               </div>
             </div>
             <button className="v20-icon-button is-close" aria-label="Закрыть" type="button" onClick={onClose}>
-              <span className="v20-icon-glyph is-close" aria-hidden="true">×</span>
+              <X aria-hidden="true" />
             </button>
           </header>
 
           <div className="v20-tabbar-wrap">
-            <nav className="v20-tabbar" ref={drawerTabsRef} aria-label="Разделы подачи">
+            <nav className="v20-tabbar" ref={drawerTabsRef} aria-label="Разделы подачи" role="tablist">
               {tabs.map((item) => {
                 const count = item.getCount ? item.getCount(data) : undefined;
                 const isActive = tab === item.id;
+                const Icon = item.icon;
 
                 return (
                   <button
+                    aria-controls={drawerPanelId(item.id)}
                     aria-selected={isActive}
-                    className={`v20-tab-button ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""}`}
+                    className={`v20-tab-button ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""} ${mobileSecondaryDrawerTabs.has(item.id) ? "is-mobile-secondary" : ""}`}
                     data-drawer-tab={item.id}
+                    id={drawerTabId(item.id)}
                     key={item.id}
                     role="tab"
+                    tabIndex={isActive ? 0 : -1}
                     type="button"
-                    onClick={() => setTab(item.id)}
+                    onClick={() => selectDrawerTab(item.id)}
+                    onKeyDown={(event) => handleDrawerTabKeyDown(event, item.id)}
                   >
+                    <Icon className="v20-tab-icon" aria-hidden="true" />
                     {item.label}
                     {typeof count === "number" && count > 0 ? (
                       <span className="v20-tab-count">{count}</span>
@@ -3348,6 +3799,46 @@ export function FigmaSubmissionDrawer({
                 );
               })}
             </nav>
+            <div className="v20-tabbar-more" ref={mobileTabsRef}>
+              <button
+                aria-controls={mobileSecondaryDrawerTabsMenuId}
+                aria-expanded={mobileTabsOpen}
+                aria-haspopup="menu"
+                aria-label={activeSecondaryTab ? `Ещё: ${tabs.find((item) => item.id === tab)?.label ?? "раздел"}` : "Ещё"}
+                className={`v20-tabbar-more-trigger ${activeSecondaryTab ? "is-active" : ""}`}
+                ref={mobileTabsTriggerRef}
+                type="button"
+                onClick={() => setMobileTabsOpen((current) => !current)}
+              >
+                <MoreHorizontal aria-hidden="true" />
+                <span>Ещё</span>
+              </button>
+              {mobileTabsOpen ? (
+                <div className="v20-tabbar-more-menu" id={mobileSecondaryDrawerTabsMenuId} role="menu">
+                  {tabs
+                    .filter((item) => mobileSecondaryDrawerTabs.has(item.id))
+                    .map((item) => {
+                      const count = item.getCount ? item.getCount(data) : undefined;
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          aria-current={tab === item.id ? "page" : undefined}
+                          key={item.id}
+                          role="menuitem"
+                          type="button"
+                          onClick={() => selectDrawerTab(item.id)}
+                        >
+                          <Icon className="v20-tab-icon" aria-hidden="true" />
+                          <span>{item.label}</span>
+                          {typeof count === "number" && count > 0 ? (
+                            <span className="v20-tab-count">{count}</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {status === "loading" ? (
@@ -3366,21 +3857,29 @@ export function FigmaSubmissionDrawer({
               <main className="v20-drawer-body">
                 <AnimatePresence mode="wait">
                   <motion.div
+                    aria-labelledby={drawerTabId(tab)}
                     animate={{ opacity: 1, y: 0 }}
                     exit={tabContentExit}
+                    id={drawerPanelId(tab)}
                     initial={tabContentInitial}
                     key={tab}
+                    role="tabpanel"
+                    tabIndex={0}
                     transition={{ duration: shouldReduceMotion ? 0.01 : 0.2 }}
                   >
                     {tab === "overview" ? (
                       <OverviewTab data={data} submission={submission} />
                     ) : null}
                     {tab === "questionnaire" ? (
-                      <QuestionnaireTab onOpenQuestionnaire={onOpenQuestionnaireWorkspace} />
+                      <QuestionnaireTab
+                        onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
+                        submission={submission}
+                      />
                     ) : null}
                     {tab === "files" ? (
                       <FilesTab
                         focusTarget={pendingTargetRef.current ?? undefined}
+                        onOpenQuestionnaire={() => onOpenQuestionnaireWorkspace()}
                         onUploadFile={onUploadFile}
                         submission={submission}
                       />
@@ -3394,7 +3893,7 @@ export function FigmaSubmissionDrawer({
                         submission={submission}
                       />
                     ) : null}
-                    {tab === "history" ? <HistoryTab /> : null}
+                    {tab === "history" ? <HistoryTab submission={submission} /> : null}
                   </motion.div>
                 </AnimatePresence>
               </main>

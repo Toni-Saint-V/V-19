@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   buildDocumentsZip,
   normalizePassportNumberForExport,
+  type DocumentZipDownloader,
 } from "../../src/modules/documents/documentExport";
 import {
   DOCUMENT_TYPES,
@@ -14,10 +15,7 @@ import {
 import { validateDocuments } from "../../src/modules/documents/documentValidation";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { mediaStorageBucket } from "../../src/modules/submissions/mediaStoragePolicy";
-import type {
-  Applicant,
-  Submission,
-} from "../../src/modules/submissions/types";
+import type { Applicant, Submission } from "../../src/modules/submissions/types";
 
 const exportDate = "2026-07-07";
 const now = "2026-07-07T00:00:00.000Z";
@@ -25,7 +23,75 @@ const now = "2026-07-07T00:00:00.000Z";
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
   if (!submission) throw new Error(`Missing fixture ${id}`);
-  return submission;
+  return withVisaFormReady(submission);
+}
+
+function withVisaFormReady(submission: Submission): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: [
+        ...applicant.sections,
+        {
+          id: "pdf-export-ready",
+          title: "pdf-export-ready",
+          status: "complete",
+          fields: [
+            questionnaireField("surname", "TEST"),
+            questionnaireField("surname-at-birth", "TEST"),
+            questionnaireField("first-name", "APPLICANT"),
+            questionnaireField("birth-date", "1990-01-01"),
+            questionnaireField("birth-place", "MOSCOW"),
+            questionnaireField("birth-country", "Russian Federation"),
+            questionnaireField("nationality", "Russian Federation"),
+            questionnaireField("gender", "Male"),
+            questionnaireField("marital-status", "Single"),
+            questionnaireField("passport-type", "Ordinary Passport"),
+            questionnaireField("passport-no", passportNumberFor(applicant)),
+            questionnaireField("passport-issue-date", "2020-01-01"),
+            questionnaireField("passport-expiry-date", "2030-01-01"),
+            questionnaireField("passport-issue-country", "Russian Federation"),
+            questionnaireField("passport-issue-place", "MVD"),
+            questionnaireField("home-address", "1 TEST STREET"),
+            questionnaireField("home-city", "MOSCOW"),
+            questionnaireField("home-country", "Russian Federation"),
+            questionnaireField("postal-code", "100000"),
+            questionnaireField("email", "TEST@EXAMPLE.COM"),
+            questionnaireField("contact-number", "70000000000"),
+            questionnaireField("occupation", "ENGINEER"),
+            questionnaireField("employer-name", "TEST EMPLOYER"),
+            questionnaireField("purpose", "TOURISM"),
+            questionnaireField("main-destination", "Spain"),
+            questionnaireField("first-entry-country", "Spain"),
+            questionnaireField("entry-count", "Multiple Entry"),
+            questionnaireField("arrival-date", "2026-07-20"),
+            questionnaireField("departure-date", "2026-07-27"),
+            questionnaireField("stay-duration", "7"),
+            questionnaireField("hotel-name", "TEST HOTEL"),
+            questionnaireField("hotel-address", "1 HOTEL ROAD"),
+            questionnaireField("hotel-city", "MADRID"),
+            questionnaireField("hotel-country", "Spain"),
+            questionnaireField("cost-covered-by", "Applicant"),
+            questionnaireField("means-of-support", "Cash"),
+          ],
+        },
+      ],
+    })),
+  };
+}
+
+function passportNumberFor(applicant: Applicant) {
+  return (
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "passport-no")
+      ?.value.trim() || "AA1234567"
+  );
+}
+
+function questionnaireField(id: string, value: string) {
+  return { id, label: id, value, required: true };
 }
 
 function documentAssetsFor(submission: Submission): DocumentAsset[] {
@@ -124,15 +190,13 @@ describe("document export ZIP builder", () => {
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) =>
-            index === 1 && field.id === "passport-no"
-              ? { ...field, value: "" }
-              : field,
+            index === 1 && field.id === "passport-no" ? { ...field, value: "" } : field,
           ),
         })),
       })),
     };
-    const downloadAsset = vi.fn(async () =>
-      new Blob(["bytes"], { type: "image/jpeg" }),
+    const downloadAsset = vi.fn(
+      async () => new Blob(["bytes"], { type: "image/jpeg" }),
     );
 
     await expect(
@@ -146,7 +210,7 @@ describe("document export ZIP builder", () => {
     expect(downloadAsset).not.toHaveBeenCalled();
   });
 
-  test("uses the normalized passport number as every document filename prefix", async () => {
+  test("fails closed before download when a PDF field would be truncated", async () => {
     const source = byId("ПД-1056");
     const submission: Submission = {
       ...source,
@@ -155,24 +219,60 @@ describe("document export ZIP builder", () => {
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) =>
-            field.id === "passport-no"
-              ? { ...field, value: " ab 12-34/56 " }
-              : field,
+            field.id === "home-address" ? { ...field, value: "A".repeat(500) } : field,
           ),
         })),
       })),
     };
-    const result = await buildDocumentsZip({
-      assets: documentAssetsFor(submission),
-      downloadAsset: async (asset) =>
-        new Blob([asset.id], { type: asset.mime ?? "image/jpeg" }),
-      exportDate,
-      submissions: [submission],
-    });
+    const downloadAsset = vi.fn(
+      async () => new Blob(["bytes"], { type: "image/jpeg" }),
+    );
 
-    const names = await zipFileNames(result.zip);
-    expect(names).toHaveLength(4);
-    expect(names.every((name) => /\/AB123456_(?:passport_scan|selfie_1|selfie_2|visa_form)\.(?:jpg|pdf)$/.test(name))).toBe(true);
+    await expect(
+      buildDocumentsZip({
+        assets: documentAssetsFor(submission),
+        downloadAsset,
+        exportDate,
+        submissions: [submission],
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("Домашний адрес"),
+      reason: "questionnaire_incomplete",
+    });
+    expect(downloadAsset).not.toHaveBeenCalled();
+  });
+
+  test("blocks an unsafe passport number instead of rewriting every filename prefix", async () => {
+    const source = byId("ПД-1056");
+    const submission: Submission = {
+      ...source,
+      applicants: source.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "passport-no" ? { ...field, value: " ab 12-34/56 " } : field,
+          ),
+        })),
+      })),
+    };
+    const downloadAsset = vi.fn(
+      async (asset: Parameters<DocumentZipDownloader>[0]) =>
+        new Blob([asset.id], { type: asset.mime ?? "image/jpeg" }),
+    );
+
+    await expect(
+      buildDocumentsZip({
+        assets: documentAssetsFor(submission),
+        downloadAsset,
+        exportDate,
+        submissions: [submission],
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("Номер паспорта"),
+      reason: "questionnaire_incomplete",
+    });
+    expect(downloadAsset).not.toHaveBeenCalled();
   });
 
   test("blocks missing selfie_2", () => {

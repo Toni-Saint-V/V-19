@@ -21,7 +21,9 @@ interface RemarkFormProps {
   defaultField?: string;
   defaultFileType?: SubmissionFileType;
   defaultApplicant?: string;
+  defaultApplicantId?: string;
   onSubmit?: (input: {
+    applicantId?: string;
     field?: string;
     fileType?: SubmissionFileType;
     applicant?: string;
@@ -53,6 +55,7 @@ export function RemarkForm({
   defaultField,
   defaultFileType,
   defaultApplicant,
+  defaultApplicantId,
   onSubmit,
 }: RemarkFormProps) {
   const bridge = useVisaflowBusinessBridge();
@@ -147,6 +150,7 @@ export function RemarkForm({
     setIsSubmitting(true);
     const payload = {
       submissionId: submissionId || null,
+      applicantId: defaultApplicantId,
       field: defaultField,
       fileType: defaultFileType,
       applicant: defaultApplicant,
@@ -156,6 +160,7 @@ export function RemarkForm({
 
     try {
       const submitted = await onSubmit({
+        applicantId: defaultApplicantId,
         field: defaultField,
         fileType: defaultFileType,
         applicant: defaultApplicant,
