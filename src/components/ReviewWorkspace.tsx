@@ -82,10 +82,11 @@ function reviewFieldsForSubmission(
 }
 
 function passportFileName(passportFile?: SubmissionFile): string {
+  if (!passportFile) return "Паспорт не загружен";
   return (
-    passportFile?.originalFileName ??
-    passportFile?.generatedFileName ??
-    "Паспорт не загружен"
+    passportFile.originalFileName ??
+    passportFile.generatedFileName ??
+    "Скан паспорта"
   );
 }
 

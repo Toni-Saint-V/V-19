@@ -18,6 +18,11 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("uses truthful field labels and an accessible review dialog", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
+    const expectedFieldCount = submission.applicants[0]?.sections.reduce(
+      (count, section) => count + section.fields.length,
+      0,
+    ) ?? 0;
+    const onApproveQuestionnaireField = vi.fn();
 
     const { container } = render(
       <AdminReviewDrawer
@@ -25,6 +30,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         submission={submission}
         submissionId={submission.id}
         onAddRemark={() => undefined}
+        onApproveQuestionnaireField={onApproveQuestionnaireField}
         onClose={() => undefined}
         onVerifyDocument={() => undefined}
       />,
@@ -54,15 +60,31 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect((await screen.findAllByTestId("admin-review-add-remark")).length).toBeGreaterThan(
       0,
     );
-    expect(screen.getAllByText("Заполнено").length).toBeGreaterThan(0);
-    expect(screen.queryByTitle("Пометить как проверенное")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".admin-review-field-row")).toHaveLength(
+      expectedFieldCount,
+    );
+    expect(screen.queryByText("Заполнено")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("admin-review-approve-field")).toHaveLength(
+      expectedFieldCount,
+    );
+    expect(
+      container.querySelectorAll('.admin-review-field-row[data-review-state="approved"]'),
+    ).toHaveLength(0);
     expect(screen.getByRole("status")).toHaveTextContent(
       "Не все обязательные анкеты и файлы готовы",
     );
-    expect(screen.getByRole("button", { name: "Принять" })).toHaveAttribute(
-      "aria-describedby",
-      "admin-review-primary-action-reason",
-    );
+    expect(
+      screen.getByRole("button", { name: "Принять на выгрузку" }),
+    ).toHaveAttribute("aria-describedby", "admin-review-primary-action-reason");
+    expect(
+      screen.queryByRole("button", { name: "Отправить на исправление" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Закрыть" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Закрыть проверку" }),
+    ).toBeInTheDocument();
     expect(container.querySelectorAll("details")).not.toHaveLength(0);
   });
 
@@ -80,6 +102,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     };
     const onClose = vi.fn();
     const onVerifyDocument = vi.fn();
+    const onApproveQuestionnaireField = vi.fn();
 
     render(
       <AdminReviewDrawer
@@ -87,6 +110,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         submission={twoApplicantSubmission}
         submissionId={twoApplicantSubmission.id}
         onAddRemark={() => undefined}
+        onApproveQuestionnaireField={onApproveQuestionnaireField}
         onClose={onClose}
         onVerifyDocument={onVerifyDocument}
       />,
@@ -116,12 +140,17 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         name: "Выбранный заявитель: Ирина Петрова",
       }),
     ).toBeInTheDocument();
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: "Сверить с паспортом" }))[0]!,
+    const approveButton = (await screen.findAllByRole("button", { name: /^Апрув:/ })).find(
+      (button) => !(button as HTMLButtonElement).disabled,
     );
-    expect(onVerifyDocument).toHaveBeenLastCalledWith(
-      "applicant-review-menu-second",
+    if (!approveButton) throw new Error("Expected an approvable questionnaire field.");
+    fireEvent.click(approveButton);
+    await waitFor(() =>
+      expect(onApproveQuestionnaireField).toHaveBeenCalledWith(
+        expect.objectContaining({ applicantId: "applicant-review-menu-second" }),
+      ),
     );
+    expect(onVerifyDocument).not.toHaveBeenCalled();
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -141,11 +170,79 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  test("keeps cells red until persisted admin approval and shows blank fields", async () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
+    if (!submission) throw new Error("Expected admin review fixture.");
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected questionnaire applicant.");
+    const field = applicant.sections
+      .flatMap((section) => section.fields)
+      .find((candidate) => candidate.value.trim());
+    const blankField = applicant.sections
+      .flatMap((section) => section.fields)
+      .find((candidate) => !candidate.value.trim());
+    if (!field || !blankField) {
+      throw new Error("Expected filled and blank questionnaire fields.");
+    }
+
+    const approvedSubmission = {
+      ...submission,
+      applicants: submission.applicants.map((candidate) =>
+        candidate.id !== applicant.id
+          ? candidate
+          : {
+              ...candidate,
+              sections: candidate.sections.map((section) => ({
+                ...section,
+                fields: section.fields.map((candidateField) =>
+                  candidateField.id === field.id
+                    ? {
+                        ...candidateField,
+                        adminReviewApprovedAtIso: "2026-07-15T06:30:00.000Z",
+                        adminReviewApprovedBy: "admin-reviewer",
+                      }
+                    : candidateField,
+                ),
+              })),
+            },
+      ),
+    };
+
+    const { container } = render(
+      <AdminReviewDrawer
+        isOpen
+        submission={approvedSubmission}
+        submissionId={approvedSubmission.id}
+        onAddRemark={() => undefined}
+        onApproveQuestionnaireField={() => true}
+        onClose={() => undefined}
+        onVerifyDocument={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Анкета/ }));
+    await waitFor(() => {
+      expect(
+        container.querySelector(`#admin-review-field-${applicant.id}-${field.id}`),
+      ).toHaveAttribute("data-review-state", "approved");
+    });
+    expect(
+      container.querySelector(`#admin-review-field-${applicant.id}-${blankField.id}`),
+    ).toHaveAttribute("data-review-state", "pending");
+    expect(
+      screen.getByRole("button", { name: `Проверено: ${field.label}` }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: `Апрув: ${blankField.label}` }),
+    ).toBeDisabled();
+  });
+
   test("keeps document comparison and remarks on distinct controls", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
     const onVerifyDocument = vi.fn();
     const onAddRemark = vi.fn();
+    const onApproveQuestionnaireField = vi.fn();
 
     render(
       <AdminReviewDrawer
@@ -153,6 +250,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         submission={submission}
         submissionId={submission.id}
         onAddRemark={onAddRemark}
+        onApproveQuestionnaireField={onApproveQuestionnaireField}
         onClose={() => undefined}
         onVerifyDocument={onVerifyDocument}
       />,
@@ -169,6 +267,16 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     fireEvent.click(screen.getAllByTestId("admin-review-add-remark")[0]!);
     expect(onAddRemark).toHaveBeenCalledTimes(1);
     expect(onVerifyDocument).toHaveBeenCalledTimes(1);
+
+    const approveButton = screen
+      .getAllByTestId("admin-review-approve-field")
+      .find((button) => !(button as HTMLButtonElement).disabled);
+    if (!approveButton) throw new Error("Expected an approvable questionnaire field.");
+    fireEvent.click(approveButton);
+    await waitFor(() =>
+      expect(onApproveQuestionnaireField).toHaveBeenCalledTimes(1),
+    );
+    expect(onAddRemark).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("tab", { name: /Файлы/ }));
     await waitFor(() => {
@@ -260,6 +368,12 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     await waitFor(() => {
       expect(historyTab).toHaveAttribute("aria-selected", "true");
     });
+    await waitFor(() => {
+      expect(screen.getByText("Агент отправил подачу на проверку")).toBeVisible();
+    });
+    expect(
+      screen.queryByRole("button", { name: /Агент отправил подачу на проверку/ }),
+    ).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -367,6 +481,8 @@ describe("ReviewWorkspace safety boundary", () => {
     );
 
     expect(screen.getByText("Предпросмотр оригинала недоступен")).toBeInTheDocument();
+    expect(screen.getByText("Скан паспорта")).toBeInTheDocument();
+    expect(screen.queryByText("Паспорт не загружен")).not.toBeInTheDocument();
     expect(screen.queryByText("PETROV")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Завершить сверку паспорта" }),
@@ -594,10 +710,8 @@ describe("AdminReviewDrawer document comparison", () => {
     opener.focus();
     fireEvent.click(opener);
 
-    fireEvent.click(await screen.findByRole("tab", { name: /Анкета/ }));
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: "Сверить с паспортом" }))[0]!,
-    );
+    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
+    fireEvent.click((await screen.findAllByTestId("admin-review-verify-passport"))[0]!);
 
     expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
     expect(

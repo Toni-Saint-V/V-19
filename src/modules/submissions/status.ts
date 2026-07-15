@@ -1000,24 +1000,11 @@ export function getPrimaryAction(
     };
   }
 
-  if (submission.status === "corrections_received") {
-    const shouldReturnAgain = openIssueCount(submission) > 0;
-    const decision = {
-      action: shouldReturnAgain ? "return_again" : "close_issues_accept",
-      label: shouldReturnAgain ? "Вернуть снова" : "Закрыть и принять",
-    } as const;
-    const guard = canPerformAction(submission, decision.action, role);
-    return { ...decision, disabled: !guard.ok, reason: guard.reason };
-  }
-
-  if (submission.status === "submitted_for_review") {
-    const shouldReturn = openIssueCount(submission) > 0;
-    const decision = {
-      action: shouldReturn ? "return_with_issues" : "accept",
-      label: shouldReturn ? "Вернуть" : "Принять",
-    } as const;
-    const guard = canPerformAction(submission, decision.action, role);
-    return { ...decision, disabled: !guard.ok, reason: guard.reason };
+  const adminReviewActions = getAdminReviewActions(submission, role);
+  if (adminReviewActions) {
+    return openIssueCount(submission) > 0
+      ? adminReviewActions.returnForCorrection
+      : adminReviewActions.acceptForExport;
   }
 
   if (submission.status === "ready_for_export") {
@@ -1027,6 +1014,47 @@ export function getPrimaryAction(
   const decision = { action: "open_history", label: "Смотреть статус" } as const;
   const guard = canPerformAction(submission, decision.action, role);
   return { ...decision, disabled: !guard.ok, reason: guard.reason };
+}
+
+export function getAdminReviewActions(
+  submission: Submission,
+  role: Role = "admin",
+): {
+  acceptForExport: ActionDecision;
+  returnForCorrection: ActionDecision;
+} | null {
+  if (
+    submission.status !== "submitted_for_review" &&
+    submission.status !== "corrections_received"
+  ) {
+    return null;
+  }
+
+  const acceptAction =
+    submission.status === "corrections_received"
+      ? "close_issues_accept"
+      : "accept";
+  const returnAction =
+    submission.status === "corrections_received"
+      ? "return_again"
+      : "return_with_issues";
+  const acceptGuard = canPerformAction(submission, acceptAction, role);
+  const returnGuard = canPerformAction(submission, returnAction, role);
+
+  return {
+    acceptForExport: {
+      action: acceptAction,
+      label: "Принять на выгрузку",
+      disabled: !acceptGuard.ok,
+      reason: acceptGuard.reason,
+    },
+    returnForCorrection: {
+      action: returnAction,
+      label: "Отправить на исправление",
+      disabled: !returnGuard.ok,
+      reason: returnGuard.reason,
+    },
+  };
 }
 
 export function applySubmissionAction(

@@ -910,7 +910,7 @@ describe("V-19 submission actions", () => {
     );
 
     expect(queue.summary).toMatchObject({
-      open: 7,
+      open: 6,
       overdue: 1,
       today: 3,
       week: 4,
@@ -925,6 +925,19 @@ describe("V-19 submission actions", () => {
     );
     expect(queue.open.some((action) => action.title.includes("Заполнить"))).toBe(false);
     expect(queue.open.some((action) => action.cta === "Добавить")).toBe(true);
+  });
+
+  it("shows one next missing-file action per applicant instead of duplicate rows", () => {
+    const queue = agentActionQueue([byId("ПД-1051")]);
+    const missingFileActions = queue.open.filter((action) =>
+      action.id.startsWith("missing-file-"),
+    );
+
+    expect(missingFileActions).toHaveLength(1);
+    expect(missingFileActions[0]).toMatchObject({
+      context: "Добавить селфи 1",
+      title: "Артём Соколов",
+    });
   });
 
   it.each<{

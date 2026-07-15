@@ -1272,7 +1272,10 @@ test.describe("V-19 operations workspace", () => {
       0,
     );
     await expect(
-      page.getByRole("button", { name: "Вернуть", exact: true }),
+      page.getByRole("button", {
+        name: "Отправить на исправление",
+        exact: true,
+      }),
     ).toHaveCount(0);
     await expect(drawer(page)).toHaveCount(0);
   });
@@ -1379,7 +1382,9 @@ test.describe("V-19 operations workspace", () => {
     );
     const issueSummary = issueArticle(page, "Нина Волкова", "Требуется уточнение");
     await expect(issueSummary).toBeVisible();
-    await drawer(page).getByRole("button", { name: "Вернуть", exact: true }).click();
+    await drawer(page)
+      .getByRole("button", { name: "Отправить на исправление", exact: true })
+      .click();
     await expectDrawerStatus(page, "Возвращено");
   });
 
@@ -1395,7 +1400,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.getByText("Адрес отеля был неполным").first()).toBeVisible();
     await expect(page.getByText("Ирина Петрова · Анкета · Данные").first()).toBeVisible();
     await expect(page.getByText("Исправлено агентом").first()).toBeVisible();
-    await page.getByRole("button", { name: "Закрыть и принять" }).click();
+    await page.getByRole("button", { name: "Принять на выгрузку" }).click();
     await expectDrawerStatus(page, "Готово к выгрузке");
     await closeDrawer(page);
 
@@ -1471,9 +1476,11 @@ test.describe("V-19 operations workspace", () => {
         .first(),
     ).toBeVisible();
     await expect(
-      drawer(page).getByRole("button", { name: "Вернуть снова" }),
+      drawer(page).getByRole("button", { name: "Отправить на исправление" }),
     ).toBeEnabled();
-    await drawer(page).getByRole("button", { name: "Вернуть снова" }).click();
+    await drawer(page)
+      .getByRole("button", { name: "Отправить на исправление" })
+      .click();
     await expectDrawerStatus(page, "Возвращено");
   });
 
@@ -1519,7 +1526,7 @@ test.describe("V-19 operations workspace", () => {
     await switchToAdmin(page);
     await openCorrectionsTab(page);
     await openAdminSubmission(page, "Петровы", "Семья Петровых");
-    await page.getByRole("button", { name: "Закрыть и принять" }).click();
+    await page.getByRole("button", { name: "Принять на выгрузку" }).click();
     await closeDrawer(page);
 
     await clickWorkspaceButton(page, /Выгрузка/);
@@ -1587,7 +1594,9 @@ test.describe("V-19 operations workspace", () => {
         .filter({ hasText: "Открыто" })
         .first(),
     ).toBeVisible();
-    await drawer(page).getByRole("button", { name: "Вернуть", exact: true }).click();
+    await drawer(page)
+      .getByRole("button", { name: "Отправить на исправление", exact: true })
+      .click();
     await expectDrawerStatus(page, "Возвращено");
     await closeDrawer(page);
     await expect(drawer(page)).toHaveCount(0);
@@ -1605,7 +1614,9 @@ test.describe("V-19 operations workspace", () => {
     await switchToAdmin(page);
     await openCorrectionsTab(page);
     await openAdminSubmission(page, submittedId, submissionTitle);
-    await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
+    await drawer(page)
+      .getByRole("button", { name: "Принять на выгрузку" })
+      .click();
     await expectDrawerStatus(page, "Готово к выгрузке");
     await closeDrawer(page);
 
@@ -1753,7 +1764,9 @@ test.describe("V-19 operations workspace", () => {
           .filter({ hasText: "Открыто" })
           .first(),
       ).toBeVisible();
-      await drawer(page).getByRole("button", { name: "Вернуть", exact: true }).click();
+      await drawer(page)
+        .getByRole("button", { name: "Отправить на исправление", exact: true })
+        .click();
       await expectDrawerStatus(page, "Возвращено");
       await closeDrawer(page);
     });
@@ -1766,7 +1779,7 @@ test.describe("V-19 operations workspace", () => {
       ] as const) {
         await openAdminSubmission(page, cardText, drawerTitle);
         await drawer(page)
-          .getByRole("button", { name: "Принять", exact: true })
+          .getByRole("button", { name: "Принять на выгрузку", exact: true })
           .click();
         await expectDrawerStatus(page, "Готово к выгрузке");
         await closeDrawer(page);

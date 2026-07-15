@@ -479,6 +479,14 @@ export function updateQuestionnaireField(
                 field.id === update.fieldId
                   ? {
                       ...field,
+                      adminReviewApprovedAtIso:
+                        update.value === field.value
+                          ? field.adminReviewApprovedAtIso
+                          : undefined,
+                      adminReviewApprovedBy:
+                        update.value === field.value
+                          ? field.adminReviewApprovedBy
+                          : undefined,
                       value: update.value,
                       reviewOriginSource:
                         update.reviewOriginSource ?? field.reviewOriginSource,
@@ -550,7 +558,12 @@ export function flagQuestionnaireField(
             ...section,
             fields: normalizeFields(section).map((field) =>
               questionnaireFieldMatchesTarget(field, fieldLabel)
-                ? { ...field, error: reason }
+                ? {
+                    ...field,
+                    adminReviewApprovedAtIso: undefined,
+                    adminReviewApprovedBy: undefined,
+                    error: reason,
+                  }
                 : field,
             ),
           })),
@@ -788,6 +801,8 @@ function mergeSeedField(
 
   return {
     ...seeded,
+    adminReviewApprovedAtIso: existing.adminReviewApprovedAtIso,
+    adminReviewApprovedBy: existing.adminReviewApprovedBy,
     value: existing.value,
     error: existing.error,
     reviewConfirmedAtIso: existing.reviewConfirmedAtIso,

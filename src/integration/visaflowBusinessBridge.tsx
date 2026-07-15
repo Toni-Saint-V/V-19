@@ -53,6 +53,13 @@ export interface AdminFileReviewBridgePayload {
   fileType: SubmissionFileType;
 }
 
+export interface AdminQuestionnaireFieldApprovalBridgePayload {
+  submissionId: string;
+  applicantId: string;
+  sectionId: string;
+  fieldId: string;
+}
+
 export interface AdminAiSuggestionBridgePayload {
   submissionId: string;
   suggestionId: string;
@@ -70,6 +77,7 @@ export type VisaflowUiEvent =
   | { type: 'admin.review.open'; submissionId: string }
   | { type: 'admin.issue.add'; payload: AdminIssueBridgePayload }
   | { type: 'admin.file.accept'; payload: AdminFileReviewBridgePayload }
+  | { type: 'admin.questionnaire.approve'; payload: AdminQuestionnaireFieldApprovalBridgePayload }
   | { type: 'admin.ai.run'; submissionId: string }
   | { type: 'admin.ai.accept'; payload: AdminAiSuggestionBridgePayload }
   | { type: 'admin.ai.dismiss'; payload: AdminAiSuggestionBridgePayload }
@@ -93,6 +101,9 @@ export interface VisaflowBusinessBridge {
   onAdminIssueAdd?: (payload: AdminIssueBridgePayload) => void | Promise<void>;
   onAdminFileAccept?: (
     payload: AdminFileReviewBridgePayload,
+  ) => void | Promise<void>;
+  onAdminQuestionnaireFieldApprove?: (
+    payload: AdminQuestionnaireFieldApprovalBridgePayload,
   ) => void | Promise<void>;
   onAdminAiReviewRun?: (submissionId: string) => void | Promise<void>;
   onAdminAiSuggestionAccept?: (

@@ -460,7 +460,12 @@ export function getNextAction(
   if (submission.status === "submitted_for_review") {
     const blocked = acceptanceBlockingIssues(submission).length > 0;
     const action = blocked ? "return_with_issues" : "accept";
-    return guardedAction(submission, role, action, blocked ? "Вернуть" : "Принять");
+    return guardedAction(
+      submission,
+      role,
+      action,
+      blocked ? "Отправить на исправление" : "Принять на выгрузку",
+    );
   }
   if (submission.status === "corrections_received") {
     const blocked = blockerCount(submission) > 0;
@@ -468,7 +473,7 @@ export function getNextAction(
       submission,
       role,
       blocked ? "return_again" : "close_issues_accept",
-      blocked ? "Вернуть снова" : "Закрыть и принять",
+      blocked ? "Отправить на исправление" : "Принять на выгрузку",
     );
   }
   if (submission.status === "ready_for_export") {

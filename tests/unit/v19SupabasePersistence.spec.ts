@@ -927,8 +927,10 @@ describe("V-19 Supabase cockpit persistence", () => {
                       fields: section.fields.map((field) =>
                         field.id === sourceField.id
                           ? {
-                              ...field,
-                              reviewOriginSource: "passport_ocr",
+                            ...field,
+                            adminReviewApprovedAtIso: "2026-07-15T06:30:00.000Z",
+                            adminReviewApprovedBy: "admin-reviewer",
+                            reviewOriginSource: "passport_ocr",
                               reviewSource: "passport_ocr",
                               reviewState: "needs_review",
                             }
@@ -952,6 +954,8 @@ describe("V-19 Supabase cockpit persistence", () => {
     if (!sourceAnswer) throw new Error("expected questionnaire answer");
 
     expect(sourceAnswer.value).toEqual({
+      adminReviewApprovedAtIso: "2026-07-15T06:30:00.000Z",
+      adminReviewApprovedBy: "admin-reviewer",
       kind: "v19_questionnaire_field",
       reviewOriginSource: "passport_ocr",
       reviewSource: "passport_ocr",
@@ -992,6 +996,8 @@ describe("V-19 Supabase cockpit persistence", () => {
       .find((candidate) => candidate.id === sourceField.id);
 
     expect(field).toMatchObject({
+      adminReviewApprovedAtIso: "2026-07-15T06:30:00.000Z",
+      adminReviewApprovedBy: "admin-reviewer",
       id: sourceField.id,
       reviewOriginSource: "passport_ocr",
       reviewSource: "passport_ocr",

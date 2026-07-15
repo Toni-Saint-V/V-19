@@ -23,6 +23,7 @@ import {
 import {
   fileStatusLabels,
   fileTypeLabels,
+  getAdminReviewActions,
   getPrimaryAction,
   statusLabelFor,
   statusTone as submissionStatusTone,
@@ -55,6 +56,11 @@ interface AdminReviewDrawerProps {
     fileType?: SubmissionFileType,
     applicantId?: string,
   ) => void;
+  onApproveQuestionnaireField?: (input: {
+    applicantId: string;
+    fieldId: string;
+    sectionId: string;
+  }) => boolean | Promise<boolean>;
   onPrimaryAction?: (
     submissionId: string,
     action: SubmissionAction,
@@ -72,7 +78,7 @@ type TabId =
   | "media"
   | "issues"
   | "history";
-type FieldReviewStatus = "ok" | "pending" | "error";
+type FieldReviewStatus = "approved" | "pending" | "error";
 type DrawerTabDefinition = {
   id: TabId;
   label: string;
@@ -80,15 +86,6 @@ type DrawerTabDefinition = {
   count?: number;
   isWarning?: boolean;
 };
-
-const passportFieldNeedles = [
-  "паспорт",
-  "passport",
-  "номер",
-  "выдач",
-  "expires",
-  "expiry",
-];
 
 const drawerHeadingId = "admin-review-drawer-heading";
 const primaryActionReasonId = "admin-review-primary-action-reason";
@@ -151,13 +148,10 @@ function fieldMatchesIssue(field: QuestionnaireField, issue: Issue) {
 function fieldStatus(field: QuestionnaireField, issues: Issue[]): FieldReviewStatus {
   if (field.error || issues.some((issue) => fieldMatchesIssue(field, issue)))
     return "error";
-  if (field.value.trim()) return "ok";
+  if (field.adminReviewApprovedAtIso && field.adminReviewApprovedBy) {
+    return "approved";
+  }
   return "pending";
-}
-
-function isPassportRelatedField(field: QuestionnaireField) {
-  const value = `${field.id} ${field.label}`.toLowerCase();
-  return passportFieldNeedles.some((needle) => value.includes(needle));
 }
 
 function selectedApplicantLabel(applicant: Applicant) {
@@ -191,7 +185,9 @@ function hasReviewValue(value: string) {
 function questionnaireStatusLabel(status: string) {
   if (status === "complete") return "Готово";
   if (status === "partial") return "Частично";
-  return status;
+  if (status === "needs_fix") return "Нужны исправления";
+  if (status === "empty") return "Не заполнена";
+  return "Статус не определён";
 }
 
 const FieldRow = ({
@@ -199,66 +195,70 @@ const FieldRow = ({
   label,
   value,
   status,
-  hasDocument,
-  onVerify,
+  approveDisabled,
+  approvePending,
+  onApprove,
   onRemark,
 }: {
   id?: string;
   label: string;
   value: string;
   status: FieldReviewStatus;
-  hasDocument?: boolean;
-  onVerify?: () => void;
+  approveDisabled?: boolean;
+  approvePending?: boolean;
+  onApprove?: () => void;
   onRemark?: () => void;
 }) => (
   <div
+    data-review-state={status}
     id={id}
     tabIndex={id ? -1 : undefined}
-    className={`admin-review-field-row flex flex-col justify-between gap-4 rounded-xl border bg-[#1a1a1d] p-4 transition-colors lg:flex-row lg:items-center
-    ${status === "error" ? "is-error border-white/10 bg-white/[0.035]" : status === "ok" ? "is-ok border-[#242529] hover:border-[#2e2f34]" : "border-[#242529] hover:border-[#2e2f34]"}
-  `}
+    className={`admin-review-field-row v19-admin-passport-field ${
+      status === "approved"
+        ? "is-approved"
+        : status === "error"
+          ? "is-error"
+          : "is-pending"
+    }`}
   >
     <div className="admin-review-row-main min-w-0 flex-1">
-      <div className="admin-review-row-kicker mb-1 flex items-center gap-2">
-        <span className="admin-review-row-label text-[11.5px] font-medium uppercase tracking-wider text-white/40">
-          {label}
-        </span>
-        {status === "error" && (
-          <span className="admin-review-row-status is-error rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-white/62">
-            Есть замечание
-          </span>
-        )}
-        {status === "ok" && (
-          <span className="admin-review-row-status is-ok rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-[#b8baff]">
-            Заполнено
-          </span>
-        )}
-      </div>
-      <strong className="truncate text-[14px] font-medium text-white">
-        {value || "—"}
+      <span className="admin-review-row-label">{label}</span>
+      <strong className="admin-review-row-value">
+        {value || "Не заполнено"}
       </strong>
     </div>
-    <div className="admin-review-row-actions flex shrink-0 items-center gap-2">
-      {hasDocument && onVerify && (
-        <button
-          type="button"
-          onClick={onVerify}
-          className="admin-review-row-verify flex h-8 items-center gap-1.5 rounded-lg border border-[#6f64ff]/20 bg-[#6f64ff]/10 px-3 text-[12px] font-medium text-[#b8baff] outline-none transition-colors hover:bg-[#6f64ff]/20 focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-        >
-          <ScanText className="h-3.5 w-3.5" /> Сверить с паспортом
-        </button>
-      )}
+    <div className="admin-review-row-actions">
       {onRemark && (
         <button
-          aria-label="Добавить замечание"
+          aria-label={`Добавить замечание: ${label}`}
           data-testid="admin-review-add-remark"
           type="button"
           onClick={onRemark}
-          className="admin-review-row-remark admin-review-remark-action flex h-8 items-center gap-1.5 rounded-lg border border-[#6f64ff]/20 bg-[#6f64ff]/10 px-3 text-[12px] font-medium text-[#b8baff] outline-none transition-colors hover:bg-[#6f64ff]/20 focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          className="admin-review-row-remark admin-review-remark-action"
           title="Добавить замечание"
         >
           <MessageSquarePlus className="h-4 w-4" />
-          <span>Замечание</span>
+        </button>
+      )}
+      {onApprove && (
+        <button
+          aria-label={`${status === "approved" ? "Проверено" : "Апрув"}: ${label}`}
+          aria-pressed={status === "approved"}
+          className="admin-review-row-approve"
+          data-testid="admin-review-approve-field"
+          disabled={approveDisabled || approvePending || status === "approved"}
+          onClick={onApprove}
+          title={
+            status === "approved"
+              ? "Поле проверено"
+              : approveDisabled
+                ? "Заполните поле и закройте замечания перед апрувом"
+                : "Апрув поля"
+          }
+          type="button"
+        >
+          <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+          <span>{approvePending ? "Сохраняем…" : "Апрув"}</span>
         </button>
       )}
     </div>
@@ -501,20 +501,21 @@ function ApplicantsTab({ submission }: { submission: Submission | null }) {
 
 function QuestionnaireTab({
   submission,
-  onVerifyDocument,
   onAddRemark,
+  onApproveQuestionnaireField,
 }: {
   submission: Submission | null;
-  onVerifyDocument: (applicantId?: string) => void;
   onAddRemark: (
     field?: string,
     applicant?: string,
     fileType?: SubmissionFileType,
     applicantId?: string,
   ) => void;
+  onApproveQuestionnaireField?: AdminReviewDrawerProps["onApproveQuestionnaireField"];
 }) {
   const [applicantId, setApplicantId] = useState("");
   const [isApplicantMenuOpen, setApplicantMenuOpen] = useState(false);
+  const [pendingApprovalKey, setPendingApprovalKey] = useState("");
   const applicantSelectRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -569,14 +570,15 @@ function QuestionnaireTab({
     (issue) => issue.target.applicantId === applicant.id,
   );
   const fields = applicant.sections.flatMap((section) => section.fields);
-  const reviewableFields = fields.filter((field) => hasReviewValue(field.value));
-  const reviewableCount = reviewableFields.length;
+  const approvedCount = fields.filter(
+    (field) => fieldStatus(field, applicantIssues) === "approved",
+  ).length;
   const fieldDomId = (fieldId: string) =>
     `admin-review-field-${applicant.id}-${fieldId}`;
   const focusFirstField = (
     predicate: (field: QuestionnaireField) => boolean,
   ) => {
-    const target = reviewableFields.find(predicate);
+    const target = fields.find(predicate);
     if (!target) return;
     document.getElementById(fieldDomId(target.id))?.scrollIntoView({
       behavior: "smooth",
@@ -654,11 +656,13 @@ function QuestionnaireTab({
 
         <div className="admin-review-applicant-stats" aria-label="Навигация по анкете">
           <button
-            className="admin-review-applicant-stat-button is-ok"
+            className={`admin-review-applicant-stat-button ${
+              approvedCount === fields.length && fields.length ? "is-ok" : "is-warning"
+            }`}
             onClick={() => focusFirstField(() => true)}
             type="button"
           >
-            <CheckCircle2 className="h-4 w-4" /> {reviewableCount} значений
+            <CheckCircle2 className="h-4 w-4" /> {approvedCount}/{fields.length} проверено
           </button>
           <button
             className={`admin-review-applicant-stat-button ${
@@ -681,10 +685,7 @@ function QuestionnaireTab({
 
       <div className="admin-review-field-pane">
         {applicant.sections.map((section, sectionIndex) => {
-          const visibleFields = section.fields.filter((field) =>
-            hasReviewValue(field.value),
-          );
-          if (!visibleFields.length) return null;
+          const visibleFields = section.fields;
 
           const unresolvedInSection = visibleFields.some(
             (field) =>
@@ -708,20 +709,48 @@ function QuestionnaireTab({
                 <ChevronDown aria-hidden="true" className="h-4 w-4 text-white/45" />
               </summary>
               <div className="admin-review-field-table mt-3 space-y-2">
-                {visibleFields.map((field) => (
-                  <FieldRow
-                    id={fieldDomId(field.id)}
-                    key={field.id}
-                    label={field.label}
-                    value={reviewValueFor(field)}
-                    status={fieldStatus(field, applicantIssues)}
-                    hasDocument={isPassportRelatedField(field)}
-                    onVerify={() => onVerifyDocument(applicant.id)}
-                    onRemark={() =>
-                      onAddRemark(field.label, applicant.fullName, undefined, applicant.id)
-                    }
-                  />
-                ))}
+                {visibleFields.map((field) => {
+                  const status = fieldStatus(field, applicantIssues);
+                  const approvalKey = `${applicant.id}:${section.id}:${field.id}`;
+                  const approveDisabled =
+                    !hasReviewValue(field.value) || status === "error";
+                  return (
+                    <FieldRow
+                      approveDisabled={approveDisabled}
+                      approvePending={pendingApprovalKey === approvalKey}
+                      id={fieldDomId(field.id)}
+                      key={field.id}
+                      label={field.label}
+                      value={reviewValueFor(field)}
+                      status={status}
+                      onApprove={
+                        onApproveQuestionnaireField
+                          ? async () => {
+                              if (approveDisabled || pendingApprovalKey) return;
+                              setPendingApprovalKey(approvalKey);
+                              try {
+                                await onApproveQuestionnaireField({
+                                  applicantId: applicant.id,
+                                  fieldId: field.id,
+                                  sectionId: section.id,
+                                });
+                              } finally {
+                                setPendingApprovalKey("");
+                              }
+                            }
+                          : undefined
+                      }
+                      onRemark={() =>
+                        onAddRemark(
+                          field.label,
+                          applicant.fullName,
+                          undefined,
+                          applicant.id,
+                        )
+                      }
+                    />
+                  );
+                })}
               </div>
             </details>
           );
@@ -924,24 +953,33 @@ function HistoryTab({ submission }: { submission: Submission | null }) {
       {submission.history.map((item) => {
         const detail = historyDetailForUser(item);
         const isExpanded = expandedEventId === item.id;
+        const summary = (
+          <>
+            <span>{historyTimestampForUser(item.at)}</span>
+            <div>
+              <strong>{item.text}</strong>
+              {isExpanded && detail ? <p>{detail}</p> : null}
+            </div>
+          </>
+        );
         return (
           <article
             key={item.id}
             className={`admin-review-history-item ${isExpanded ? "is-expanded" : ""}`}
           >
-            <button
-              aria-expanded={isExpanded}
-              className="w-full text-left"
-              onClick={() => setExpandedEventId(isExpanded ? null : item.id)}
-              type="button"
-            >
-              <span>{historyTimestampForUser(item.at)}</span>
-              <div>
-                <strong>{item.text}</strong>
-                {isExpanded && detail ? <p>{detail}</p> : null}
-              </div>
-              <ChevronDown aria-hidden="true" className="h-4 w-4 text-white/45" />
-            </button>
+            {detail ? (
+              <button
+                aria-expanded={isExpanded}
+                className="w-full text-left"
+                onClick={() => setExpandedEventId(isExpanded ? null : item.id)}
+                type="button"
+              >
+                {summary}
+                <ChevronDown aria-hidden="true" className="h-4 w-4 text-white/45" />
+              </button>
+            ) : (
+              <div className="admin-review-history-summary">{summary}</div>
+            )}
           </article>
         );
       })}
@@ -957,6 +995,7 @@ export function AdminReviewDrawer({
   returnFocusTarget,
   onVerifyDocument,
   onAddRemark,
+  onApproveQuestionnaireField,
   onPrimaryAction,
   onOpenExport,
   canPublishReturnedPdfHandoff = false,
@@ -973,6 +1012,19 @@ export function AdminReviewDrawer({
     () => (submission ? getPrimaryAction(submission, "admin", "review") : null),
     [submission],
   );
+  const adminReviewActions = useMemo(
+    () => (submission ? getAdminReviewActions(submission) : null),
+    [submission],
+  );
+  const hasUnresolvedReviewIssues = unresolvedIssues(submission).length > 0;
+  const footerReviewAction = adminReviewActions
+    ? hasUnresolvedReviewIssues
+      ? adminReviewActions.returnForCorrection
+      : adminReviewActions.acceptForExport
+    : null;
+  const isReturnReviewAction =
+    footerReviewAction?.action === "return_with_issues" ||
+    footerReviewAction?.action === "return_again";
   const primaryButtonLabel =
     primaryAction?.action === "generate_export"
       ? "Перейти к выгрузке"
@@ -982,12 +1034,25 @@ export function AdminReviewDrawer({
     !primaryAction ||
     primaryAction.disabled ||
     primaryAction.action === "open_history";
+  const reviewActionBlockerReason =
+    !hasUnresolvedReviewIssues &&
+    adminReviewActions?.acceptForExport.disabled &&
+    adminReviewActions.acceptForExport.reason
+      ? adminReviewActions.acceptForExport.reason
+      : undefined;
   const primaryReason =
-    primaryAction?.disabled && primaryAction.reason
+    reviewActionBlockerReason ??
+    (primaryAction?.disabled && primaryAction.reason
       ? primaryAction.reason
       : primaryAction?.action === "open_history"
         ? "Для этой заявки нет действия проверки."
-        : undefined;
+        : undefined);
+  const showPrimaryReason = Boolean(
+    primaryReason &&
+      (adminReviewActions
+        ? !hasUnresolvedReviewIssues && adminReviewActions.acceptForExport.disabled
+        : primaryDisabled),
+  );
   const currentStatusTone = submission
     ? submissionStatusTone[submission.status]
     : "muted";
@@ -1129,22 +1194,24 @@ export function AdminReviewDrawer({
     });
   };
 
-  const handlePrimaryAction = () => {
+  const handleAdminAction = (actionDecision: ActionDecision | null) => {
     if (
       !activeSubmissionId ||
-      !primaryAction ||
-      primaryAction.disabled ||
-      primaryAction.action === "open_history"
+      !actionDecision ||
+      actionDecision.disabled ||
+      actionDecision.action === "open_history"
     )
       return;
 
-    if (primaryAction.action === "generate_export") {
+    if (actionDecision.action === "generate_export") {
       onOpenExport?.();
       return;
     }
 
-    void onPrimaryAction?.(activeSubmissionId, primaryAction.action);
+    void onPrimaryAction?.(activeSubmissionId, actionDecision.action);
   };
+
+  const handlePrimaryAction = () => handleAdminAction(primaryAction);
 
   const selectTab = (tab: TabId) => {
     setActiveTab(tab);
@@ -1285,7 +1352,7 @@ export function AdminReviewDrawer({
               </div>
             </header>
 
-            <div className="admin-review-content scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 flex-1 overflow-y-auto p-5 lg:p-8">
+            <div className="admin-review-content scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 flex-1 overflow-x-hidden overflow-y-auto p-5 lg:p-8">
               <AnimatePresence mode="wait">
                 <motion.div
                   aria-labelledby={drawerTabId(activeTab)}
@@ -1311,8 +1378,8 @@ export function AdminReviewDrawer({
                   {activeTab === "questionnaire" && (
                     <QuestionnaireTab
                       submission={submission}
-                      onVerifyDocument={onVerifyDocument}
                       onAddRemark={onAddRemark}
+                      onApproveQuestionnaireField={onApproveQuestionnaireField}
                     />
                   )}
                   {activeTab === "media" && (
@@ -1331,7 +1398,7 @@ export function AdminReviewDrawer({
             </div>
 
             <footer className="admin-review-footer flex shrink-0 justify-end gap-3 border-t border-white/10 bg-[#111113]/90 p-4 pb-[max(16px,env(safe-area-inset-bottom))] backdrop-blur-md lg:px-8 lg:py-5">
-              {primaryDisabled && primaryReason ? (
+              {showPrimaryReason && primaryReason ? (
                 <div
                   className="admin-review-primary-reason"
                   id={primaryActionReasonId}
@@ -1339,26 +1406,14 @@ export function AdminReviewDrawer({
                 >
                   <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
                   <span>
-                    <strong>Нельзя принять:</strong> {primaryReason}
+                    <strong>Нельзя принять на выгрузку:</strong> {primaryReason}
                   </span>
-                  <button
-                    className="admin-review-primary-reason-action"
-                    onClick={() => selectTab("overview")}
-                    type="button"
-                  >
-                    Показать требования
-                  </button>
                 </div>
               ) : null}
-              <div className="admin-review-footer-actions">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="admin-review-secondary h-11 rounded-xl border border-white/5 bg-white/5 px-5 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
-                >
-                  Закрыть
-                </button>
-                {canPublishReturnedPdfHandoff && (
+              <div
+                className={`admin-review-footer-actions ${adminReviewActions ? "has-review-decisions" : ""}`}
+              >
+                {canPublishReturnedPdfHandoff ? (
                   <button
                     type="button"
                     onClick={handlePublishReturnedPdfHandoff}
@@ -1367,26 +1422,47 @@ export function AdminReviewDrawer({
                   >
                     Передать PDF агенту
                   </button>
+                ) : footerReviewAction ? (
+                  <button
+                    aria-describedby={
+                      showPrimaryReason ? primaryActionReasonId : undefined
+                    }
+                    className={`admin-review-primary flex h-11 items-center gap-2 rounded-xl px-6 text-[13px] font-medium transition-colors disabled:cursor-not-allowed${
+                      isReturnReviewAction ? " is-return" : ""
+                    }`}
+                    disabled={footerReviewAction.disabled}
+                    onClick={() => handleAdminAction(footerReviewAction)}
+                    title={footerReviewAction.reason}
+                    type="button"
+                  >
+                    {isReturnReviewAction ? (
+                      <AlertCircle className="h-4 w-4" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    {footerReviewAction.label}
+                  </button>
+                ) : (
+                  <button
+                    aria-describedby={
+                      primaryDisabled && primaryReason
+                        ? primaryActionReasonId
+                        : undefined
+                    }
+                    type="button"
+                    onClick={handlePrimaryAction}
+                    disabled={primaryDisabled}
+                    title={primaryReason}
+                    className="admin-review-primary flex h-11 items-center gap-2 rounded-xl bg-[#202126] px-6 text-[13px] font-medium text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/30"
+                  >
+                    {primaryAction?.action === "generate_export" ? (
+                      <DownloadCloud className="h-4 w-4" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    {primaryButtonLabel}
+                  </button>
                 )}
-                <button
-                  aria-describedby={
-                    primaryDisabled && primaryReason
-                      ? primaryActionReasonId
-                      : undefined
-                  }
-                  type="button"
-                  onClick={handlePrimaryAction}
-                  disabled={primaryDisabled}
-                  title={primaryReason}
-                  className="admin-review-primary flex h-11 items-center gap-2 rounded-xl bg-[#202126] px-6 text-[13px] font-medium text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/30"
-                >
-                  {primaryAction?.action === "generate_export" ? (
-                    <DownloadCloud className="h-4 w-4" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  {primaryButtonLabel}
-                </button>
               </div>
             </footer>
           </motion.div>

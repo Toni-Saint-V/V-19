@@ -5443,7 +5443,7 @@ export function FigmaQuestionnaireScreen({
                 >
                   <AlertCircle aria-hidden="true" className="w-4 h-4" />
                   <span>
-                    Сначала: <strong>{mobileBlockerLabel}</strong>
+                    Заполните: <strong>{mobileBlockerLabel}</strong>
                   </span>
                   <ArrowRight aria-hidden="true" className="w-4 h-4" />
                 </button>

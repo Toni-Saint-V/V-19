@@ -77,6 +77,74 @@ export type UploadedFileMetadata = {
   uploadedAtIso: string;
 };
 
+export type AdminQuestionnaireFieldApproval = {
+  applicantId: string;
+  fieldId: string;
+  sectionId: string;
+};
+
+export function approveQuestionnaireFieldForAdmin(
+  submission: Submission,
+  input: AdminQuestionnaireFieldApproval,
+  actorId: string,
+  approvedAtIso = new Date().toISOString(),
+): Submission {
+  const applicant = submission.applicants.find(
+    (candidate) => candidate.id === input.applicantId,
+  );
+  if (!applicant) return submission;
+
+  const section = applicant.sections.find(
+    (candidate) =>
+      candidate.id === input.sectionId ||
+      candidate.id.endsWith(`-${input.sectionId}`),
+  );
+  const field = section?.fields.find((candidate) => candidate.id === input.fieldId);
+  if (!section || !field || !field.value.trim() || field.error) return submission;
+
+  const hasOpenIssue = submission.issues.some(
+    (issue) =>
+      issue.status !== "closed_by_admin" &&
+      issue.target.applicantId === input.applicantId &&
+      questionnaireFieldMatchesTarget(field, issue.target.field),
+  );
+  if (hasOpenIssue) return submission;
+  if (
+    field.adminReviewApprovedAtIso === approvedAtIso &&
+    field.adminReviewApprovedBy === actorId
+  ) {
+    return submission;
+  }
+
+  return {
+    ...submission,
+    applicants: submission.applicants.map((candidate) =>
+      candidate.id !== input.applicantId
+        ? candidate
+        : {
+            ...candidate,
+            sections: candidate.sections.map((candidateSection) =>
+              candidateSection.id !== section.id
+                ? candidateSection
+                : {
+                    ...candidateSection,
+                    fields: candidateSection.fields.map((candidateField) =>
+                      candidateField.id !== input.fieldId
+                        ? candidateField
+                        : {
+                            ...candidateField,
+                            adminReviewApprovedAtIso: approvedAtIso,
+                            adminReviewApprovedBy: actorId,
+                          },
+                    ),
+                  },
+            ),
+          },
+    ),
+    updatedAt: approvedAtIso,
+  };
+}
+
 export function applyUploadedFileMetadata(
   submission: Submission,
   fileId: string,

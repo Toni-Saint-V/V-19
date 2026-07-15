@@ -60,7 +60,7 @@ async function showBlockedCorrectionGuidance(page: Page, questionnaire: ReturnTy
   await completeButton.click();
 
   await expect(questionnaire.getByTestId("questionnaire-next-blocker")).toContainText(
-    "Сначала:",
+    "Заполните:",
   );
   await expect(
     questionnaire.locator("input:focus, textarea:focus, button:focus"),

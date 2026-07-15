@@ -43,6 +43,12 @@ function draftSubmission(): Submission {
   return submission;
 }
 
+function correctionsSubmission(): Submission {
+  const submission = initialSubmissions.find((item) => item.id === "ПД-1055");
+  if (!submission) throw new Error("Missing corrections fixture ПД-1055.");
+  return submission;
+}
+
 describe("async UI callers", () => {
   test("legacy Drawer moves focus into the modal and exposes roving tabs", async () => {
     const trigger = document.createElement("button");
@@ -96,6 +102,24 @@ describe("async UI callers", () => {
     expect(await screen.findByText("Даты не указаны")).toBeInTheDocument();
     expect(screen.getByText("Обновлено 15.06")).toBeInTheDocument();
     expect(screen.queryByText("storage-token-should-not-be-visible")).not.toBeInTheDocument();
+  });
+
+  test("legacy Drawer keeps the corrections lifecycle label from the canonical submission", async () => {
+    const submission = correctionsSubmission();
+
+    render(
+      <Drawer
+        isOpen
+        onClose={vi.fn()}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(await screen.findByText("Исправления получены")).toBeInTheDocument();
+    expect(screen.queryByText("Черновик")).not.toBeInTheDocument();
+    expect(screen.getByText("Агент Тони")).toBeInTheDocument();
+    expect(screen.queryByText("local-agent-tony")).not.toBeInTheDocument();
   });
 
   test("legacy Drawer history keeps compact event types and valid fallback dates", async () => {

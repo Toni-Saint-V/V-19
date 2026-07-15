@@ -777,16 +777,19 @@ async function ensureAdminReturned(input: {
     if (state.stage === "pending_review") {
       await expect(root).toContainText("На проверке");
       await expect(
-        root.getByRole("button", { exact: true, name: "Принять" }),
+        root.getByRole("button", { exact: true, name: "Принять на выгрузку" }),
       ).toBeEnabled();
     }
 
     let returnButton = root.getByRole("button", {
       exact: true,
-      name: "Вернуть",
+      name: "Отправить на исправление",
     });
     if (!(await isVisible(returnButton))) {
-      const accept = root.getByRole("button", { exact: true, name: "Принять" });
+      const accept = root.getByRole("button", {
+        exact: true,
+        name: "Принять на выгрузку",
+      });
       invariant(
         ["pending_review", "adding_issue"].includes(state.stage) &&
           (await isVisible(accept)),
@@ -800,7 +803,7 @@ async function ensureAdminReturned(input: {
       await assertDrawerCaseMarker(root, caseMarker);
       returnButton = root.getByRole("button", {
         exact: true,
-        name: "Вернуть",
+        name: "Отправить на исправление",
       });
     }
 
@@ -1183,7 +1186,7 @@ async function ensureReturnedAccepted(input: {
     await expect(root).toContainText("Исправлено агентом");
     const accept = root.getByRole("button", {
       exact: true,
-      name: "Закрыть и принять",
+      name: "Принять на выгрузку",
     });
     await expect(accept).toBeEnabled();
     recordProductionLifecycleAcceptanceProof(state, caseMarker);
