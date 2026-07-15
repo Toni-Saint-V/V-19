@@ -434,8 +434,24 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "14.09",
     status: "corrections_received",
     applicants: [
-      applicant("з-1055-1", "Елена Смирнова", "main", "complete", "complete"),
-      applicant("з-1055-2", "Алексей Смирнов", "spouse", "complete", "complete"),
+      applicant(
+        "з-1055-1",
+        "Елена Смирнова",
+        "main",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
+      applicant(
+        "з-1055-2",
+        "Алексей Смирнов",
+        "spouse",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
     ],
     issues: [
       issue(
@@ -449,14 +465,14 @@ export const initialSubmissions: Submission[] = [
         "Данные",
       ),
     ],
-    files: [
+    files: localDemoStoredFiles("ПД-1055", [
       file("ф-1055-2", "з-1055-1", "selfie", "accepted"),
       file("ф-1055-3", "з-1055-1", "selfie_2", "accepted"),
       file("ф-1055-4", "з-1055-1", "passport_scan", "accepted"),
       file("ф-1055-6", "з-1055-2", "selfie", "accepted"),
       file("ф-1055-7", "з-1055-2", "selfie_2", "accepted"),
       file("ф-1055-8", "з-1055-2", "passport_scan", "accepted"),
-    ],
+    ]),
     completeness: { questionnaire: 100, files: 100, total: 100 },
     exportState: "not_ready",
     createdAt: "10.06",

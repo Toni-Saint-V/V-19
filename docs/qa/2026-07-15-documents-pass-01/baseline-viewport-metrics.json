@@ -1,0 +1,42 @@
+[
+  {
+    "documentWidth": {
+      "client": 320,
+      "scroll": 320
+    },
+    "matrixVisible": true,
+    "viewport": "mobile-320"
+  },
+  {
+    "documentWidth": {
+      "client": 390,
+      "scroll": 390
+    },
+    "matrixVisible": true,
+    "viewport": "mobile-390"
+  },
+  {
+    "documentWidth": {
+      "client": 430,
+      "scroll": 430
+    },
+    "matrixVisible": true,
+    "viewport": "mobile-430"
+  },
+  {
+    "documentWidth": {
+      "client": 768,
+      "scroll": 768
+    },
+    "matrixVisible": true,
+    "viewport": "tablet-768"
+  },
+  {
+    "documentWidth": {
+      "client": 1440,
+      "scroll": 1440
+    },
+    "matrixVisible": true,
+    "viewport": "desktop-1440"
+  }
+]

@@ -1500,4 +1500,25 @@ describe("Supabase security contract", () => {
       "20260710021043_harden_media_asset_review_boundary.sql",
     );
   });
+
+  test("cascades a normalized media identity into its server-owned document projection", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260715000000_document_assets_source_media_id_update_cascade.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+
+    expectSqlStatement(
+      migration,
+      "alter table public.document_assets drop constraint if exists document_assets_source_media_asset_id_fkey",
+    );
+    expectSqlStatement(
+      migration,
+      "foreign key (source_media_asset_id) references public.media_assets (id) on delete cascade on update cascade",
+    );
+    expect(migrationContract).toContain(
+      "20260715000000_document_assets_source_media_id_update_cascade.sql",
+    );
+  });
 });

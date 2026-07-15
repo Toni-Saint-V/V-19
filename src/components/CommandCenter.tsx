@@ -23,6 +23,7 @@ import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
 import { DraftsScreen } from "./DraftsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
 import { CreateSubmissionDrawer } from "../modules/submissions/components/CreateSubmissionDrawer";
+import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from "../modules/submissions/components/adminAiAssistance";
 import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import {
@@ -318,6 +319,7 @@ export function CommandCenter({
     useState<QuestionnaireInitialFocus>();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
     useState<ActionSummaryFilter>("open");
   const [actionCityFilter, setActionCityFilter] = useState("Все города");
@@ -331,6 +333,7 @@ export function CommandCenter({
   );
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
+  const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
   const [createCity, setCreateCity] = useState<City>("Москва");
   const [createFamilyCount, setCreateFamilyCount] = useState(2);
   const [createType, setCreateType] = useState<Submission["type"]>("single");
@@ -477,6 +480,21 @@ export function CommandCenter({
   }, []);
 
   useEffect(() => {
+    const handleCommandPaletteShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+
+      event.preventDefault();
+      commandPaletteFocusOriginRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setMobileNavOpen(false);
+      setCommandPaletteOpen(true);
+    };
+
+    window.addEventListener("keydown", handleCommandPaletteShortcut);
+    return () => window.removeEventListener("keydown", handleCommandPaletteShortcut);
+  }, []);
+
+  useEffect(() => {
     if (usesSupabase) return;
     saveProductIntakeDrafts(intakeDrafts);
   }, [intakeDrafts, usesSupabase]);
@@ -491,6 +509,23 @@ export function CommandCenter({
     }
     setActiveNav(normalizedNav);
     setMobileNavOpen(false);
+  };
+
+  const openCommandPalette = () => {
+    commandPaletteFocusOriginRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setMobileNavOpen(false);
+    setCommandPaletteOpen(true);
+  };
+
+  const handleCommandPaletteOpenChange = (open: boolean) => {
+    setCommandPaletteOpen(open);
+    if (open) return;
+
+    window.requestAnimationFrame(() => {
+      const origin = commandPaletteFocusOriginRef.current;
+      if (origin?.isConnected) origin.focus({ preventScroll: true });
+    });
   };
 
   const handleRowClick = (id: string) => {
@@ -864,7 +899,7 @@ export function CommandCenter({
         />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold tracking-tight">VisaFlow V-19</div>
-          <div className="text-[11px] text-white/50">Agent workspace</div>
+          <div className="text-[11px] text-white/50">Кабинет агента</div>
         </div>
         <button
           aria-label="Закрыть меню"
@@ -876,7 +911,12 @@ export function CommandCenter({
         </button>
       </div>
 
-      <button className="h-10 mb-4 bg-white/5 hover:bg-white/10 border border-[#242529] rounded-[10px] text-white/50 flex items-center gap-2 px-3 text-sm transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] mx-2">
+      <button
+        aria-label="Открыть командную палитру"
+        className="h-10 mb-4 bg-white/5 hover:bg-white/10 border border-[#242529] rounded-[10px] text-white/50 flex items-center gap-2 px-3 text-sm transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] mx-2"
+        type="button"
+        onClick={openCommandPalette}
+      >
         <Search className="w-4 h-4" />
         <span>Поиск...</span>
         <kbd className="ml-auto px-1.5 py-0.5 rounded bg-black/40 border border-[#242529] text-[10px] font-sans">
@@ -970,6 +1010,7 @@ export function CommandCenter({
     >
       <V19PriorityHero
         actionAriaLabel={`Открыть приоритетные действия: ${blockerActionCount} требуют решения`}
+        actionLabel="К блокерам"
         actionDisabled={blockerActionCount === 0}
         eyebrow="Контроль действий"
         eyebrowIcon={Clock}
@@ -1092,15 +1133,15 @@ export function CommandCenter({
                 Нет открытых действий по текущим подачам.
               </motion.div>
             ) : (
-              visibleActions.map((action, index) => (
+              visibleActions.map((action) => (
                 <V19QueueCard
                   as={motion.div}
                   layout
                   key={action.id}
-                  initial={{ opacity: 0, y: 14, scale: 0.992 }}
+                  initial={false}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.992 }}
-                  transition={{ duration: 0.2, delay: index * 0.018 }}
+                  transition={{ duration: 0.2 }}
                   onClick={() => handleActionOpen(action)}
                   tabIndex={0}
                   onKeyDown={(event) => {
@@ -1133,6 +1174,7 @@ export function CommandCenter({
                         {action.title}
                       </strong>
                     </div>
+                    <span className="v19-legacy-action-context">{action.context}</span>
                   </div>
                   <div className="v19-legacy-action-meta">
                     <span
@@ -1149,7 +1191,9 @@ export function CommandCenter({
                   <div className="v19-legacy-action-city-column">
                     <span className="v19-legacy-action-city">
                       <span aria-hidden="true" />
-                      {action.submission.city}
+                      <span className="v19-legacy-action-city-label">
+                        {action.submission.city}
+                      </span>
                     </span>
                   </div>
                   <div className="v19-legacy-action-badges">
@@ -1331,7 +1375,10 @@ export function CommandCenter({
         {renderNavContent()}
       </aside>
 
-      <main className="flex-1 min-w-0 flex flex-col bg-[#141416]">
+      <main
+        aria-label="Рабочая область подач"
+        className="flex-1 min-w-0 flex flex-col bg-[#141416]"
+      >
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
           <div className="flex items-center gap-3">
             <button
@@ -1435,6 +1482,17 @@ export function CommandCenter({
           />
         )}
       </AnimatePresence>
+      <CommandPalette
+        open={commandPaletteOpen}
+        role="agent"
+        submissions={submissionCards}
+        onOpenChange={handleCommandPaletteOpenChange}
+        onCreateSubmission={createPackage}
+        onNavigateAgentActions={() => navigateTo("actions")}
+        onNavigateAgentSubmissions={() => navigateTo("submissions")}
+        onNavigateSettings={() => navigateTo("settings")}
+        onOpenSubmission={(submission) => handleRowClick(submission.id)}
+      />
       </div>
     </div>
   );

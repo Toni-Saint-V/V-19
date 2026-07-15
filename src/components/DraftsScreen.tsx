@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import {
   AlertCircle,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   FileWarning,
   Loader2,
@@ -184,7 +186,7 @@ function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
     return {
       applicants,
       city: submission.city,
-      country: `${submission.country} (V-19)`,
+      country: submission.country,
       deadline: submissionDeadline(submission),
       id: submission.id,
       progress: statuses.length ? Math.round((ready / statuses.length) * 100) : 0,
@@ -397,23 +399,26 @@ function formatBytes(size: number) {
 }
 
 const DocCell = ({
+  label,
   onUpload,
   status,
 }: {
+  label: string;
   onUpload: () => void;
   status: DocStatus;
 }) => {
   const className = `w-8 h-8 rounded-lg flex items-center justify-center border mx-auto transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${docStatusClass(status)}`;
+  const actionLabel = `${label}: ${docStatusLabel(status)}`;
   if (status === 'missing') {
     return (
-      <button className={className} title={docStatusLabel(status)} type="button" onClick={onUpload}>
+      <button aria-label={actionLabel} className={className} title={actionLabel} type="button" onClick={onUpload}>
         <Plus className="w-4 h-4" />
       </button>
     );
   }
 
   return (
-    <button className={className} title={docStatusLabel(status)} type="button" onClick={onUpload}>
+    <button aria-label={actionLabel} className={className} title={actionLabel} type="button" onClick={onUpload}>
       {status === 'verified' ? <CheckCircle2 className="w-[18px] h-[18px]" /> : null}
       {status === 'processing' ? <ScanLine className="w-[16px] h-[16px] animate-pulse" /> : null}
       {status === 'error' ? <AlertCircle className="w-[18px] h-[18px]" /> : null}
@@ -434,18 +439,20 @@ const MobileDocSlot = ({
 
   return (
     <button
-      className={`flex min-h-[64px] items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${docStatusClass(status)}`}
+      aria-label={`${label}: ${docStatusLabel(status)}`}
+      data-testid="document-mobile-slot"
+      className={`flex min-h-[64px] items-center justify-between gap-1 rounded-xl border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] sm:gap-2 sm:px-3 ${docStatusClass(status)}`}
       type="button"
       onClick={onUpload}
-      title={docStatusLabel(status)}
+      title={`${label}: ${docStatusLabel(status)}`}
     >
-      <span className="min-w-0">
-        <span className="block truncate text-[12px] font-semibold text-white/80">{label}</span>
-        <span className="mt-1 block truncate text-[10px] font-medium text-current opacity-75">
+      <span className="v19-mobile-document-slot-copy min-w-0">
+        <span className="v19-mobile-document-slot-label block text-[12px] font-semibold text-white/80">{label}</span>
+        <span className="v19-mobile-document-slot-status mt-1 block text-[10px] font-medium text-current opacity-75">
           {isMissing ? 'Добавить' : docStatusLabel(status)}
         </span>
       </span>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#101011]/70">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#101011]/70 sm:h-8 sm:w-8">
         {status === 'verified' ? <CheckCircle2 className="h-4 w-4" /> : null}
         {status === 'processing' ? <ScanLine className="h-4 w-4 animate-pulse" /> : null}
         {status === 'error' ? <AlertCircle className="h-4 w-4" /> : null}
@@ -465,6 +472,7 @@ export function DraftsScreen({
   const [uploadError, setUploadError] = useState('');
   const [pendingCellTarget, setPendingCellTarget] = useState<PendingCellTarget | null>(null);
   const [mobileApplicantIndex, setMobileApplicantIndex] = useState<Record<string, number>>({});
+  const mobileApplicantCarouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>('missing');
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
@@ -659,6 +667,24 @@ export function DraftsScreen({
     );
   };
 
+  const selectMobileApplicant = (
+    submissionId: string,
+    applicantCount: number,
+    requestedIndex: number,
+  ) => {
+    const index = Math.min(Math.max(requestedIndex, 0), applicantCount - 1);
+    const carousel = mobileApplicantCarouselRefs.current[submissionId];
+    if (carousel) {
+      carousel.scrollTo({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : 'smooth',
+        left: carousel.clientWidth * index,
+      });
+    }
+    updateMobileApplicantIndex(submissionId, index);
+  };
+
   if (!submissions.length) {
     return (
       <motion.div
@@ -683,6 +709,7 @@ export function DraftsScreen({
       className="space-y-6 lg:space-y-8"
     >
       <input
+        data-testid="document-cell-file-input"
         ref={cellInputRef}
         type="file"
         accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
@@ -690,6 +717,7 @@ export function DraftsScreen({
         onChange={handleCellFileInput}
       />
       <input
+        data-testid="document-bulk-file-input"
         ref={bulkInputRef}
         type="file"
         multiple
@@ -728,7 +756,10 @@ export function DraftsScreen({
         />
       </V19SummaryTileGrid>
 
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
+      <div
+        className="flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]"
+        data-testid="document-collection-matrix"
+      >
         <div className="flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
           <div>
             <h2 className="text-[15px] font-semibold text-white">Матрица сбора документов</h2>
@@ -754,16 +785,23 @@ export function DraftsScreen({
           </div>
         ) : null}
 
-        <div className="space-y-4 p-3 sm:hidden">
-          {visibleDrafts.map((sub) => (
-            <section key={sub.id} className="overflow-hidden rounded-2xl border border-[#242529] bg-[#141416]">
+        <div className="space-y-4 p-3 xl:hidden">
+          {visibleDrafts.map((sub) => {
+            const activeApplicantIndex = mobileApplicantIndex[sub.id] ?? 0;
+
+            return (
+              <section
+              key={sub.id}
+              className="overflow-hidden rounded-2xl border border-[#242529] bg-[#141416]"
+              data-document-submission-id={sub.id}
+            >
               <div className="flex items-start justify-between gap-3 border-b border-[#242529] bg-[#1a1a1d] p-3">
                 <div className="flex min-w-0 items-start gap-2.5">
                   {sub.type === 'family' ? <Users className="mt-0.5 h-4 w-4 shrink-0 text-white/45" /> : <User className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />}
                   <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <h3 className="min-w-0 truncate text-[14px] font-semibold text-white">{sub.title}</h3>
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#8fa3ff]/20 bg-[#8fa3ff]/10 px-2 py-0.5 text-[10px] font-medium text-[#b8baff]">
+                    <div className="v19-mobile-document-submission-title-row flex min-w-0 flex-wrap items-center gap-2">
+                      <h3 className="v19-mobile-document-submission-title basis-full text-[14px] font-semibold text-white">{sub.title}</h3>
+                      <span className="v19-mobile-document-submission-city inline-flex shrink-0 items-center gap-1 rounded-full border border-[#8fa3ff]/20 bg-[#8fa3ff]/10 px-2 py-0.5 text-[10px] font-medium text-[#b8baff]">
                         <MapPin className="h-3 w-3" />
                         {sub.city}
                       </span>
@@ -776,6 +814,7 @@ export function DraftsScreen({
                 </div>
                 <button
                   onClick={() => onOpenDrawer(sub.id)}
+                  aria-label={`Открыть пакет ${sub.title}`}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                   type="button"
                   title="Открыть пакет"
@@ -791,6 +830,13 @@ export function DraftsScreen({
               </div>
 
               <div
+                ref={(node) => {
+                  mobileApplicantCarouselRefs.current[sub.id] = node;
+                }}
+                aria-label="Заявители пакета"
+                data-testid="document-applicant-carousel"
+                id={`document-applicant-carousel-${sub.id}`}
+                role="region"
                 className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth scrollbar-hide"
                 onScroll={(event) => {
                   const width = event.currentTarget.clientWidth;
@@ -837,16 +883,55 @@ export function DraftsScreen({
               {sub.applicants.length > 1 ? (
                 <div className="flex items-center justify-between border-t border-[#242529] px-3 py-2 text-[11px] font-medium text-white/45">
                   <span>Заявитель</span>
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/62">
-                    {(mobileApplicantIndex[sub.id] ?? 0) + 1} / {sub.applicants.length}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      aria-controls={`document-applicant-carousel-${sub.id}`}
+                      aria-label="Предыдущий заявитель"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-not-allowed disabled:opacity-35"
+                      disabled={activeApplicantIndex === 0}
+                      onClick={() =>
+                        selectMobileApplicant(
+                          sub.id,
+                          sub.applicants.length,
+                          activeApplicantIndex - 1,
+                        )
+                      }
+                      type="button"
+                    >
+                      <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+                    </button>
+                    <span
+                      aria-live="polite"
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/62"
+                      data-testid="document-applicant-position"
+                    >
+                      {activeApplicantIndex + 1} / {sub.applicants.length}
+                    </span>
+                    <button
+                      aria-controls={`document-applicant-carousel-${sub.id}`}
+                      aria-label="Следующий заявитель"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-not-allowed disabled:opacity-35"
+                      disabled={activeApplicantIndex === sub.applicants.length - 1}
+                      onClick={() =>
+                        selectMobileApplicant(
+                          sub.id,
+                          sub.applicants.length,
+                          activeApplicantIndex + 1,
+                        )
+                      }
+                      type="button"
+                    >
+                      <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </section>
-          ))}
+            );
+          })}
         </div>
 
-        <div className="hidden w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent sm:block">
+        <div className="hidden w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent xl:block">
           <div className="min-w-[700px]">
             <div className="flex items-center border-b border-[#242529] bg-[#111113]/50">
               <div className="sticky left-0 z-20 w-[280px] shrink-0 border-r border-[#242529] bg-[#111113] px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-white/40 lg:w-[320px]">
@@ -864,7 +949,11 @@ export function DraftsScreen({
 
             <div className="divide-y divide-[#202124]">
               {visibleDrafts.map((sub) => (
-                <div key={sub.id} className="group/sub">
+                <div
+                  key={sub.id}
+                  className="group/sub"
+                  data-document-submission-id={sub.id}
+                >
                   <div className="flex items-center border-b border-[#202124] bg-[#1a1a1d] transition-colors hover:bg-[#1e1e21]">
                     <div className="sticky left-0 z-20 w-[280px] shrink-0 border-r border-[#242529] bg-[#1a1a1d] px-5 py-3.5 transition-colors group-hover/sub:bg-[#1e1e21] lg:w-[320px]">
                       <div className="flex items-center justify-between">
@@ -889,8 +978,10 @@ export function DraftsScreen({
                     <div className="flex w-[60px] shrink-0 items-center justify-center">
                       <button
                         onClick={() => onOpenDrawer(sub.id)}
+                        aria-label={`Открыть пакет ${sub.title}`}
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                         type="button"
+                        title={`Открыть пакет ${sub.title}`}
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
@@ -917,6 +1008,7 @@ export function DraftsScreen({
                           {docTypes.map((doc) => (
                             <DocCell
                               key={`${app.id}-${doc.key}`}
+                              label={doc.label}
                               status={app.docs[doc.key]}
                               onUpload={() =>
                                 triggerCellUpload({
@@ -940,7 +1032,10 @@ export function DraftsScreen({
       </div>
 
       {unmatchedUploads.length ? (
-        <section className="rounded-2xl border border-[#4e2c33] bg-[#161617] p-4">
+        <section
+          className="rounded-2xl border border-[#4e2c33] bg-[#161617] p-4"
+          data-testid="document-unmatched-uploads"
+        >
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h3 className="text-[14px] font-semibold text-white">Не распределено</h3>
@@ -967,6 +1062,7 @@ export function DraftsScreen({
                   </div>
                 </div>
                 <select
+                  aria-label="Заявитель для нераспределённого файла"
                   className="h-10 rounded-[8px] border border-[#242529] bg-[#101011] px-3 text-[12px] text-white outline-none focus:border-[#6f64ff]"
                   value={upload.submissionId && upload.applicantId ? `${upload.submissionId}:${upload.applicantId}` : ''}
                   onChange={(event) => {
@@ -975,7 +1071,7 @@ export function DraftsScreen({
                   }}
                 >
                   <option value="">Выберите заявителя</option>
-                  {visibleDrafts.flatMap((submission) =>
+                  {allDrafts.flatMap((submission) =>
                     submission.applicants.map((applicant) => (
                       <option key={`${submission.id}:${applicant.id}`} value={`${submission.id}:${applicant.id}`}>
                         {submission.title} · {applicant.name}
@@ -984,6 +1080,7 @@ export function DraftsScreen({
                   )}
                 </select>
                 <select
+                  aria-label="Тип для нераспределённого файла"
                   className="h-10 rounded-[8px] border border-[#242529] bg-[#101011] px-3 text-[12px] text-white outline-none focus:border-[#6f64ff]"
                   value={upload.detectedDocType}
                   onChange={(event) =>
@@ -1000,6 +1097,7 @@ export function DraftsScreen({
                   ))}
                 </select>
                 <button
+                  data-testid="document-assign-unmatched"
                   className="h-10 rounded-[8px] bg-[#1e1e21] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#27272b] disabled:cursor-not-allowed disabled:text-white/35"
                   disabled={!upload.submissionId || !upload.applicantId || upload.detectedDocType === 'unknown'}
                   type="button"

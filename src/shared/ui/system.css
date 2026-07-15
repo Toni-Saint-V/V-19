@@ -37540,6 +37540,60 @@ select,
   color: inherit !important;
 }
 
+/* Questionnaire cards use two columns in the review drawer. Keep the field
+   identity readable by giving labels and statuses their own full-width row,
+   then place review actions below instead of squeezing text between buttons. */
+[data-admin-review-drawer-surface="workspace"] .admin-review-field-row {
+  display: grid !important;
+  grid-template-columns: minmax(
+    var(--v19b-size-0),
+    var(--v19b-grid-fr)
+  ) !important;
+  grid-template-areas:
+    "field"
+    "actions" !important;
+  align-items: stretch !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-main {
+  grid-area: field !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-kicker {
+  min-width: var(--v19b-size-0) !important;
+  flex-wrap: nowrap !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-label {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  overflow-wrap: normal !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  word-break: normal !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-status {
+  flex: 0 0 auto !important;
+  overflow-wrap: normal !important;
+  white-space: nowrap !important;
+  word-break: normal !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-actions {
+  grid-area: actions !important;
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  justify-content: flex-end !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-row-actions
+  > button {
+  white-space: nowrap !important;
+}
+
 @media (max-width: 560px) {
   [data-admin-review-drawer-surface="workspace"] .admin-review-drawer-header {
     padding: var(--v19b-size-12) var(--v19b-size-16) var(--v19b-size-0) !important;

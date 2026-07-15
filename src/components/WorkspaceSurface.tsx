@@ -7,7 +7,6 @@ import {
   type VisaflowBusinessBridge,
 } from "../integration/visaflowBusinessBridge";
 import type { WorkspaceDataStatus } from "../lib/supabase/workspaceRuntime";
-import "../shared/ui/visual-baseline.css";
 
 type Workspace = "agent" | "admin";
 

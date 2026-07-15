@@ -1,16 +1,22 @@
+declare const __V19_LOCAL_DEMO_BUILD__: boolean;
+
+const localDemoBuildEnabled =
+  typeof __V19_LOCAL_DEMO_BUILD__ !== "undefined" && __V19_LOCAL_DEMO_BUILD__;
+
 export function agentDisplayName(agentId?: string) {
   if (!agentId) return "Агент не указан";
+  if (localDemoBuildEnabled && agentId === "local-agent-tony") return "Агент Тони";
   return readableAgentFallback(agentId);
 }
 
 export function agentAgencyLabel(agentId?: string) {
   if (!agentId) return "Агентство не указано";
-  return "Агент Supabase";
+  return "Команда VisaFlow";
 }
 
 export function agentInitials(agentId?: string) {
   if (!agentId) return "АГ";
-  return readableAgentFallback(agentId)
+  return agentDisplayName(agentId)
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)

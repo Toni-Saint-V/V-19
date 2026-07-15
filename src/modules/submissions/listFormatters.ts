@@ -74,7 +74,7 @@ export function formatAgentActionRowText(
 
   if (input.kind === "add_file") {
     return {
-      subtitle: "Добавить файл",
+      subtitle: addFileActionLabel(input.fileType),
       title: applicantTitle(input.applicantName),
     };
   }
@@ -116,4 +116,11 @@ function replacementActionLabel(fileType: SubmissionFileType) {
   if (fileType === "selfie_2") return "Заменить селфи 2";
   if (fileType === "passport_scan") return "Заменить скан паспорта";
   return "Заменить файл";
+}
+
+function addFileActionLabel(fileType: SubmissionFileType) {
+  if (fileType === "selfie") return "Добавить селфи 1";
+  if (fileType === "selfie_2") return "Добавить селфи 2";
+  if (fileType === "passport_scan") return "Добавить скан паспорта";
+  return "Добавить файл";
 }

@@ -72,5 +72,16 @@ describe("submission list formatters", () => {
       subtitle: "Заменить селфи 1",
       title: "Мария Иванова",
     });
+
+    expect(
+      formatAgentActionRowText({
+        applicantName: "Мария Иванова",
+        fileType: "selfie_2",
+        kind: "add_file",
+      }),
+    ).toEqual({
+      subtitle: "Добавить селфи 2",
+      title: "Мария Иванова",
+    });
   });
 });

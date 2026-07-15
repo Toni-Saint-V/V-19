@@ -27,6 +27,14 @@ const referenceScale = visaFormPdfReferenceScale;
 const referenceOffsetX = 42.75;
 const referenceOffsetY = 771.5;
 
+// Exact Flate stream of the EU flag image from the user-approved filled
+// reference. The sanitised PDF keeps the original object geometry and byte
+// length, but its image stream was blanked together with applicant content.
+// Restoring only this stream preserves the official static artwork without
+// reintroducing any example answers or checkmarks.
+const referenceEuFlagStreamBase64 =
+  "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";
+
 const pages: readonly ReferencePage[] = [
   { contentObject: 18, pageObject: 5, resourceObject: 20 },
   { contentObject: 23, pageObject: 22, resourceObject: 25 },
@@ -47,7 +55,7 @@ export function createReferenceVisaApplicationFormPdfBlob(
   options: { exportDate?: string } = {},
 ): Blob {
   const selections = assertVisaFormDataRenderable(data);
-  const source = decodeTemplate();
+  const source = decodeVisaApplicationFormTemplate();
   const sourceText = latin1(source);
   const sourceStartXref = sourceText.lastIndexOf("startxref");
   const previousXref = Number(
@@ -131,6 +139,8 @@ function buildReferenceLayers(
   const page2 = newLayer();
   const page3 = newLayer();
   const page4 = newLayer();
+
+  euFlag(page1);
 
   // Baselines are extracted from the supplied filled reference, not guessed
   // from a generic Schengen form.
@@ -261,6 +271,22 @@ function newLayer(): PdfLayer {
   return { commands: ["q", "0 g"] };
 }
 
+function euFlag(layer: PdfLayer) {
+  // Exact source command sequence and transforms for object /Im6. The
+  // sanitisation pass removed the draw command together with filled values;
+  // replaying it in the appended layer restores the official artwork at the
+  // original reference position and size.
+  layer.commands.push(
+    "q",
+    "/GSa gs",
+    "0.502962970 0 0 0.411651240 19.4898151 50.9250007 cm",
+    "/CSp cs 0 0 0 scn",
+    "/GSa gs",
+    "250 0 0 -168 0 168 cm /Im6 Do",
+    "Q",
+  );
+}
+
 function text(
   layer: PdfLayer,
   x: number,
@@ -373,11 +399,26 @@ function appendOverlayContent(
   return withResources;
 }
 
-function decodeTemplate() {
+export function decodeVisaApplicationFormTemplate() {
   const binary = atob(VISA_APPLICATION_FORM_TEMPLATE_BASE64);
+  const objectStart = binary.indexOf("\n6 0 obj\n");
+  const streamStart = binary.indexOf("stream\n", objectStart) + "stream\n".length;
+  const streamEnd = binary.indexOf("\nendstream", streamStart);
+  const euFlagStream = atob(referenceEuFlagStreamBase64);
+  if (
+    objectStart < 0 ||
+    streamStart < "stream\n".length ||
+    streamEnd < 0 ||
+    streamEnd - streamStart !== euFlagStream.length
+  ) {
+    throw new Error("Visa form template EU flag object is malformed.");
+  }
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
+  }
+  for (let index = 0; index < euFlagStream.length; index += 1) {
+    bytes[streamStart + index] = euFlagStream.charCodeAt(index);
   }
   return bytes;
 }

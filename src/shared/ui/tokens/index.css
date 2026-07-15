@@ -997,6 +997,7 @@
   --v19b-font-mono: var(
     --vf-ref-font-family-uineg-monospace-sfmononeg-regular-menlo-consolas-monospace
   );
+  --v19b-font-family-mono: var(--v19b-font-mono);
 
   --v19b-color-clear: transparent;
   --v19b-color-black: rgb(0 0 0);
@@ -1071,6 +1072,7 @@
 
   --v19b-status-danger-bg: rgb(239 68 68 / 0.12);
   --v19b-status-danger-border: rgb(239 68 68 / 0.3);
+  --v19b-status-danger-text: var(--vf-red-soft-text);
   --v19b-status-muted-bg: rgb(255 255 255 / 0.043);
   --v19b-status-muted-text: rgb(255 255 255 / 0.52);
   --v19b-status-review-bg: rgb(143 163 255 / 0.14);
@@ -1215,6 +1217,7 @@
   --v19b-radius-control: 10px;
   --v19b-radius-segmented: 11px;
   --v19b-radius-row: 15px;
+  --v19b-radius-card: var(--v19b-radius-row);
   --v19b-radius-panel: 18px;
   --v19b-radius-sheet: var(--v19b-radius-panel);
   --v19b-radius-cockpit-hero: 24px;
