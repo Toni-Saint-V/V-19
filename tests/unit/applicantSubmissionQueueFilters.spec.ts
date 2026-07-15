@@ -93,7 +93,7 @@ describe("agent submission queue filters", () => {
     if (!source) throw new Error("Expected a ready submission fixture");
 
     const submission = withAppointmentCity(
-      { ...source, city: " Казань " },
+      { ...source, city: " Казань " as Submission["city"] },
       " ",
     );
 

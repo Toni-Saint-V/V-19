@@ -189,7 +189,9 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
 
     const mobileButton = mobileNavigation.getByRole("button", { name }).first();
     await mobileButton.waitFor({ state: "visible", timeout: 2_000 });
-    await mobileButton.click({ timeout: 10_000 });
+    await expect(mobileButton).toBeInViewport({ timeout: 2_000 });
+    await mobileButton.click({ force: true, timeout: 10_000 });
+    await mobileNavigation.waitFor({ state: "hidden", timeout: 2_000 });
     return;
   }
 

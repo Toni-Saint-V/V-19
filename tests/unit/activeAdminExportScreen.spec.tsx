@@ -50,7 +50,14 @@ describe("active admin export screen", () => {
     const applicantEmailColumn = preview.headers.indexOf("Applicant Email");
     const passportColumn = preview.headers.indexOf("Passport No");
 
-    render(<AdminExportScreen submissions={[submission]} />);
+    const { container } = render(<AdminExportScreen submissions={[submission]} />);
+
+    expect(
+      container.querySelector(".v19-admin-export-row-submission-v2"),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector(".v19-admin-export-row-agent-v2"),
+    ).toBeInTheDocument();
 
     const packageCheckbox = screen.getByRole("checkbox", {
       name: `Выбрать ${submission.listTitle ?? submission.title}`,

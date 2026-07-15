@@ -60,6 +60,7 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       await openAgentSubmissions(page);
 
       const cards = page.locator("[data-submission-id]");
+      const listHeaderCount = page.locator(".v19-admin-export-list-head-v2 small");
       const totalCards = await cards.count();
       const reviewCount = await metricValue(page, "Проверить");
       const readyCount = await metricValue(page, "К выгрузке");
@@ -72,12 +73,27 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         path: join(evidenceDir, `${viewport.label}-baseline.png`),
       });
 
+      const blockerFilter = page.getByRole("button", {
+        name: "Фильтр подач: Все",
+      });
+      await blockerFilter.click();
+      await page
+        .getByRole("listbox", { name: "Фильтр подач" })
+        .getByRole("option", { name: "Блокеры" })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Фильтр подач: Блокеры" }),
+      ).toHaveAttribute("aria-expanded", "false");
+      await expect(listHeaderCount).toContainText("Блокеры");
+      expect(await cards.count()).toBeGreaterThan(0);
+
       await page.getByRole("button", { exact: true, name: "Проверить" }).click();
       await expect(page.getByRole("button", { exact: true, name: "Проверить" })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
       await expect(cards).toHaveCount(reviewCount);
+      await expect(listHeaderCount).toContainText("Проверить");
       const reviewCardTexts = await cards.allTextContents();
       expect(
         reviewCardTexts.every(
@@ -109,9 +125,14 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         name: "Фильтр городов: Все города",
       });
       await cityFilter.click();
-      await page.getByRole("listbox", { name: "Фильтр городов" }).getByRole("option", { name: "Казань" }).click();
-      await expect(page.locator('[data-submission-id="ПД-1053"]')).toBeVisible();
-      await expect(cards).toHaveCount(1);
+      await page
+        .getByRole("listbox", { name: "Фильтр городов" })
+        .getByRole("option", { name: "Москва" })
+        .click();
+      const appointmentCitySubmission = page.locator('[data-submission-id="SUB-1103"]');
+      await expect(appointmentCitySubmission).toBeVisible();
+      await expect(appointmentCitySubmission).toContainText("Москва");
+      await expect(listHeaderCount).toContainText("Москва");
 
       await page.getByLabel("Поиск по подачам").fill("__no_matching_submission__");
       const emptyState = page.getByRole("status").filter({ hasText: "Ничего не найдено" });
@@ -119,13 +140,39 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       await emptyState.getByRole("button", { name: "Сбросить фильтры" }).click();
       await expect(cards).toHaveCount(totalCards);
 
-      await cards.first().click();
-      await expect(drawer(page)).toBeVisible();
+      const correctionsCard = page.locator('[data-submission-id="ПД-1055"]');
+      await expect(correctionsCard).toBeVisible();
+      await expect(correctionsCard).toContainText("Исправление");
+      await expect(correctionsCard).toContainText("Открыть");
+      expect(await correctionsCard.evaluate((element) => element.tagName)).toBe("BUTTON");
+      await correctionsCard.click();
+      const submissionDrawer = drawer(page);
+      await expect(submissionDrawer).toBeVisible();
+      await expect(submissionDrawer.getByText("Исправления получены", { exact: true })).toBeVisible();
+      await expect(submissionDrawer.getByText("Черновик", { exact: true })).toHaveCount(0);
+      await expect.poll(async () => {
+        const box = await submissionDrawer.boundingBox();
+        return Boolean(
+          box &&
+          box.x >= 0 &&
+          box.y >= 0 &&
+          box.x + box.width <= viewport.width &&
+          box.y + box.height <= viewport.height,
+        );
+      }, { timeout: 1_500 }).toBe(true);
+      const drawerBox = await submissionDrawer.boundingBox();
+      expect(drawerBox).not.toBeNull();
+      if (drawerBox) {
+        expect(drawerBox.x).toBeGreaterThanOrEqual(0);
+        expect(drawerBox.y).toBeGreaterThanOrEqual(0);
+        expect(drawerBox.x + drawerBox.width).toBeLessThanOrEqual(viewport.width);
+        expect(drawerBox.y + drawerBox.height).toBeLessThanOrEqual(viewport.height);
+      }
       await page.screenshot({
-        fullPage: true,
+        fullPage: false,
         path: join(evidenceDir, `${viewport.label}-drawer.png`),
       });
-      await drawer(page).getByRole("button", { name: /Закрыть (подачу|панель)/ }).click();
+      await submissionDrawer.getByRole("button", { name: /Закрыть (подачу|панель)/ }).click();
 
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,
