@@ -807,7 +807,7 @@ function MediaTab({
               )}
               <button
                 aria-label={`Добавить замечание: ${fileTypeLabels[file.type]} — ${applicant?.fullName ?? "заявитель"}`}
-                className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+                className="admin-review-file-remark flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-transparent bg-white/[0.045] px-3 text-[12px] font-medium text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
                 data-testid="admin-review-add-file-remark"
                 title="Добавить замечание к файлу"
                 type="button"
@@ -819,9 +819,10 @@ function MediaTab({
                     file.applicantId,
                   )
                 }
-              >
-                <MessageSquarePlus className="h-4 w-4" />
-              </button>
+                >
+                  <MessageSquarePlus className="h-4 w-4" />
+                  <span>Замечание</span>
+                </button>
             </div>
           </article>
         );

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
 
@@ -17,6 +17,31 @@ async function expectNoHorizontalOverflow(page: Page) {
   });
 
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+}
+
+async function isFullyWithinViewport(locator: Locator) {
+  return locator.evaluate((element) => {
+    const browserGlobal = globalThis as unknown as {
+      innerHeight: number;
+      innerWidth: number;
+    };
+    const bounds = (
+      element as {
+        getBoundingClientRect(): {
+          bottom: number;
+          left: number;
+          right: number;
+          top: number;
+        };
+      }
+    ).getBoundingClientRect();
+    return (
+      bounds.left >= 0 &&
+      bounds.right <= browserGlobal.innerWidth &&
+      bounds.top >= 0 &&
+      bounds.bottom <= browserGlobal.innerHeight
+    );
+  });
 }
 
 test.describe("V-19 P0 admin document review", () => {
@@ -48,35 +73,15 @@ test.describe("V-19 P0 admin document review", () => {
 
     const filesTab = reviewDrawer.locator("#admin-review-tab-media");
     await expect(filesTab).toHaveAttribute("aria-selected", "true");
-    await expect
-      .poll(async () =>
-        filesTab.evaluate((element) => {
-          const browserGlobal = globalThis as unknown as {
-            innerHeight: number;
-            innerWidth: number;
-          };
-          const bounds = (
-            element as {
-              getBoundingClientRect(): {
-                bottom: number;
-                left: number;
-                right: number;
-                top: number;
-              };
-            }
-          ).getBoundingClientRect();
-          return (
-            bounds.left >= 0 &&
-            bounds.right <= browserGlobal.innerWidth &&
-            bounds.top >= 0 &&
-            bounds.bottom <= browserGlobal.innerHeight
-          );
-        }),
-      )
-      .toBe(true);
+    await expect.poll(() => isFullyWithinViewport(filesTab)).toBe(true);
 
     const verifyPassport = reviewDrawer.getByTestId("admin-review-verify-passport").first();
     await expect(verifyPassport).toBeVisible();
+    const fileActions = reviewDrawer.locator(".admin-review-file-actions button");
+    expect(await fileActions.count()).toBeGreaterThan(0);
+    for (const action of await fileActions.all()) {
+      await expect.poll(() => isFullyWithinViewport(action)).toBe(true);
+    }
     await page.screenshot({
       animations: "disabled",
       fullPage: false,

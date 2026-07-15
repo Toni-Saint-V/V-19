@@ -24,6 +24,11 @@ import {
   uploadRequiredFile,
   type UploadedFileMetadata,
 } from '../modules/submissions/submissionActions';
+import { finishPassportExtraction } from '../modules/submissions/passportExtraction';
+import {
+  safeUnavailablePassportExtractionResult,
+  type PassportExtractionResult,
+} from '../modules/submissions/passportExtractionContract';
 import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
 import {
@@ -86,6 +91,7 @@ type UnmatchedUpload = {
 };
 
 const docTypes = collectionDocTypes;
+const passportCollectionExtractionTimeoutMs = 10_000;
 
 function roleLabel(role: MatrixApplicant['role']) {
   return role;
@@ -202,12 +208,21 @@ function findFreeCanonicalTarget(
         : docType === 'selfie2'
           ? ['selfie_2']
           : [];
-  return submission.files.find(
-    (file) =>
+  const applicant = submission.applicants.find((candidate) => candidate.id === applicantId);
+  return submission.files.find((file) => {
+    const canRetryPassportWithoutExtraction =
+      docType === 'passport' &&
+      file.status === 'uploaded' &&
+      !applicant?.passportExtraction;
+
+    return (
       file.applicantId === applicantId &&
       targetTypes.includes(file.type) &&
-      (file.status === 'missing' || file.status === 'needs_replacement'),
-  );
+      (file.status === 'missing' ||
+        file.status === 'needs_replacement' ||
+        canRetryPassportWithoutExtraction)
+    );
+  });
 }
 
 function mimeTypeForFile(file: File, docType: CollectionDocType) {
@@ -252,6 +267,45 @@ function applyCanonicalUpload(
   });
 
   return { applied, nextSubmissions };
+}
+
+async function attachPassportExtractionForUpload(
+  submissions: Submission[],
+  target: PendingCellTarget,
+  localFile: File,
+) {
+  const submission = submissions.find((candidate) => candidate.id === target.submissionId);
+  const applicantIndex = submission?.applicants.findIndex(
+    (applicant) => applicant.id === target.applicantId,
+  );
+  const passportFile = submission?.files.find(
+    (file) =>
+      file.applicantId === target.applicantId && file.type === 'passport_scan',
+  );
+  if (!submission || applicantIndex === undefined || applicantIndex < 0 || !passportFile) {
+    return submissions;
+  }
+
+  const { invokePassportExtraction } = await import('../modules/submissions/passportExtractionService');
+  const extraction = await Promise.race<PassportExtractionResult>([
+    invokePassportExtraction({
+      applicantIndex,
+      localFile,
+      openAiFallbackAllowed: false,
+    }),
+    new Promise((resolve) =>
+      window.setTimeout(
+        () => resolve(safeUnavailablePassportExtractionResult(applicantIndex)),
+        passportCollectionExtractionTimeoutMs,
+      ),
+    ),
+  ]);
+
+  return submissions.map((candidate) =>
+    candidate.id === submission.id
+      ? finishPassportExtraction(candidate, passportFile, extraction)
+      : candidate,
+  );
 }
 
 function applyCollectionDocumentUpload(
@@ -459,7 +513,15 @@ export function DraftsScreen({
     if (canonicalCollectionDocTypes.has(target.docType)) {
       const result = applyCanonicalUpload(submissions, target, file);
       if (result.applied) {
-        return commitSubmissions(result.nextSubmissions);
+        const nextSubmissions =
+          target.docType === 'passport'
+            ? await attachPassportExtractionForUpload(
+                result.nextSubmissions,
+                target,
+                file,
+              )
+            : result.nextSubmissions;
+        return commitSubmissions(nextSubmissions);
       }
       return false;
     }

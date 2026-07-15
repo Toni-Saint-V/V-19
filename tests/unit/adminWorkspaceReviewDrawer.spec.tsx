@@ -36,6 +36,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(screen.getByText("ПД-1053")).toBeInTheDocument();
     expect(screen.getByText("На проверке")).toHaveClass("is-blue");
     expect(screen.getByTestId("admin-review-verify-passport")).toBeInTheDocument();
+    expect(screen.getAllByTestId("admin-review-add-file-remark")[0]!).toHaveTextContent(
+      "Замечание",
+    );
     expect(screen.getByRole("tab", { name: /Файлы/ })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -434,6 +437,11 @@ describe("ReviewWorkspace safety boundary", () => {
         applicantId: applicant.id,
         fileType: "passport_scan",
       }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Паспорт уже принят" }),
+      ).toBeDisabled(),
     );
   });
 
