@@ -11,7 +11,9 @@ import {
   PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
   assertProductionNetworkRecordsHealthy,
+  buildProductionCohortPlan,
   isPermittedCohortStaticRuntimeRequest,
+  productionCohortContactEmail,
 } from "../e2e-supabase-ui/production-cohort-helpers";
 import {
   StrictProductionA1S1ExportNetworkGate,
@@ -39,6 +41,7 @@ import {
   productionDraftSubmissionStaticContentDigest,
   productionDraftStableUuid,
   productionDraftValueDigest,
+  productionLifecycleMutationPayloadMismatchCode,
   productionLifecycleMutationPayloadMatches,
   runWithFailurePreservingCleanup,
 } from "../e2e-supabase-ui/production-lifecycle-helpers";
@@ -332,6 +335,28 @@ function draftFixture(input: {
 }
 
 describe("production cohort runtime asset allowlist", () => {
+  test("uses one shared contact email for every family while keeping cases distinct", () => {
+    const cases = buildProductionCohortPlan("V19QA-20260715-CONTACT");
+    const primaryContacts = new Set<string>();
+
+    for (const cohortCase of cases) {
+      const contacts = Array.from(
+        { length: cohortCase.applicantCount },
+        (_, applicantIndex) =>
+          productionCohortContactEmail(cohortCase, applicantIndex),
+      );
+      primaryContacts.add(contacts[0] ?? "");
+      expect(contacts.every((contact) => contact.endsWith("@example.invalid"))).toBe(
+        true,
+      );
+      if (cohortCase.type === "family") {
+        expect(new Set(contacts).size).toBe(1);
+      }
+    }
+
+    expect(primaryContacts.size).toBe(cases.length);
+  });
+
   test.each([
     "/tesseract/worker.min.js",
     "/tesseract/core/tesseract-core-simd.wasm",
@@ -649,6 +674,128 @@ describe("production lifecycle mutation audit", () => {
       .applicants[0]!.sections[0]!.fields[0]!.value = "Different note";
     expect(
       productionLifecycleMutationPayloadMatches(JSON.stringify(wrongValue), contract),
+    ).toBe(false);
+  });
+
+  test("allows one exact applicant email projection replacement with the questionnaire value", () => {
+    const fixture = draftFixture({
+      correctionStatus: "open",
+      ownerId: "owner-a2-s1",
+      snapshotStatus: "returned",
+      submissionId: "submission-a2-s1",
+    });
+    const replacement = "family@example.invalid";
+    const projectedApplicant = {
+      ...fixture.payload.applicants[0]!,
+      email: replacement,
+    };
+    const expectedContentDigest =
+      productionDraftApplicantContentDigest(projectedApplicant);
+    expect(expectedContentDigest).toBeTruthy();
+    const contract = {
+      applicantProjection: {
+        applicantId: "applicant-a2-s1",
+        expectedContentDigest: expectedContentDigest!,
+        mode: "replace_email" as const,
+      },
+      correction: {
+        mode: "existing" as const,
+        reasonIncludes: "RUN A2-S1",
+        status: "open" as const,
+      },
+      draft: fixture.draft,
+      history: {
+        actorId: "owner-a2-s1",
+        actorSource: "agent" as const,
+        snapshotStatus: "returned" as const,
+      },
+      mode: "lifecycle" as const,
+      ownerId: "owner-a2-s1",
+      questionnaire: {
+        applicantId: "applicant-a2-s1",
+        expectedValueDigest: requiredDigest(replacement),
+        fieldId: "field-1",
+        mode: "replace" as const,
+        sectionId: "section-1",
+      },
+      submissionId: "submission-a2-s1",
+      submissionStatus: "returned" as const,
+    };
+    const request = { payload: structuredClone(fixture.payload) };
+    request.payload.applicants[0] = projectedApplicant;
+    request.payload.questionnaire_answers[0]!.value = replacement;
+    request.payload.submission.family_intelligence.v19CockpitSnapshot.submission
+      .applicants[0]!.sections[0]!.fields[0]!.value = replacement;
+
+    expect(
+      productionLifecycleMutationPayloadMatches(JSON.stringify(request), contract),
+    ).toBe(true);
+
+    const extraProjectionChange = structuredClone(request);
+    extraProjectionChange.payload.applicants[0]!.phone = "+7 999 999-99-99";
+    expect(
+      productionLifecycleMutationPayloadMatches(
+        JSON.stringify(extraProjectionChange),
+        contract,
+      ),
+    ).toBe(false);
+  });
+
+  test("allows an exact full applicant serializer projection and rejects any extra field", () => {
+    const fixture = draftFixture({
+      correctionStatus: "open",
+      ownerId: "owner-a2-s1",
+      snapshotStatus: "returned",
+      submissionId: "submission-a2-s1",
+    });
+    const projectedApplicant = {
+      ...fixture.payload.applicants[0]!,
+      questionnaire_percent: 83,
+    };
+    const expectedContentDigest =
+      productionDraftApplicantContentDigest(projectedApplicant);
+    expect(expectedContentDigest).toBeTruthy();
+    const contract = {
+      applicantProjection: {
+        applicants: [
+          {
+            applicantId: "applicant-a2-s1",
+            expectedContentDigest: expectedContentDigest!,
+          },
+        ],
+        mode: "replace_exact" as const,
+      },
+      correction: {
+        mode: "existing" as const,
+        reasonIncludes: "RUN A2-S1",
+        status: "open" as const,
+      },
+      draft: fixture.draft,
+      history: {
+        actorId: "owner-a2-s1",
+        actorSource: "agent" as const,
+        snapshotStatus: "returned" as const,
+      },
+      mode: "lifecycle" as const,
+      ownerId: "owner-a2-s1",
+      questionnaire: { mode: "exact" as const },
+      submissionId: "submission-a2-s1",
+      submissionStatus: "returned" as const,
+    };
+    const request = { payload: structuredClone(fixture.payload) };
+    request.payload.applicants[0] = projectedApplicant;
+
+    expect(
+      productionLifecycleMutationPayloadMatches(JSON.stringify(request), contract),
+    ).toBe(true);
+
+    const extraChange = structuredClone(request);
+    extraChange.payload.applicants[0]!.phone = "+7 999 999-99-99";
+    expect(
+      productionLifecycleMutationPayloadMatches(
+        JSON.stringify(extraChange),
+        contract,
+      ),
     ).toBe(false);
   });
 
@@ -1085,6 +1232,115 @@ describe("production lifecycle mutation audit", () => {
     changedSnapshotHistoryTimestamp.payload.submission.family_intelligence.v19CockpitSnapshot.submission.history[0]!.at =
       "2025-01-01T00:00:00.000Z";
     expect(matches(changedSnapshotHistoryTimestamp)).toBe(false);
+  });
+
+  test("uses the exact source-derived history projection for a null-note return", () => {
+    const submissionId = "submission-a2-f6";
+    const adminId = "admin-a2-f6";
+    const actionTimestamp = "2026-07-14T12:00:00.000Z";
+    const fixture = draftFixture({
+      correctionStatus: "open",
+      ownerId: "owner-a2-f6",
+      snapshotStatus: "returned",
+      submissionId,
+    });
+    const transition = {
+      comment: "Статус изменен: Возвращено",
+      fromStatus: "submitted_for_review",
+      note: null,
+      toStatus: "returned",
+    };
+    const transitionId = `и-${submissionId}-${transition.fromStatus}-${transition.toStatus}-1`;
+    const durableId = productionDraftStableUuid(
+      `history:${submissionId}:${transitionId}`,
+    );
+    const contract = {
+      correction: {
+        mode: "existing" as const,
+        reasonIncludes: "RUN A2-S1",
+        status: "open" as const,
+      },
+      draft: fixture.draft,
+      history: {
+        actorId: adminId,
+        actorSource: "admin" as const,
+        snapshotStatus: "returned" as const,
+        transition,
+      },
+      historyProjection: {
+        mode: "replace_exact" as const,
+        rows: [
+          {
+            changedAt: "action" as const,
+            changedBy: adminId,
+            commentDigest: requiredDigest(transition.comment),
+            entityId: submissionId,
+            entityType: "submission" as const,
+            fromStatus: transition.fromStatus,
+            id: durableId,
+            noteDigest: null,
+            source: "admin" as const,
+            toStatus: transition.toStatus,
+          },
+        ],
+      },
+      mode: "lifecycle" as const,
+      ownerId: "owner-a2-f6",
+      questionnaire: { mode: "exact" as const },
+      submissionId,
+      submissionStatus: "returned" as const,
+      timestampWindow: {
+        notAfter: "2026-07-14T12:01:00.000Z",
+        notBefore: "2026-07-14T11:59:00.000Z",
+      },
+    };
+    const request = { payload: structuredClone(fixture.payload) };
+    request.payload.questionnaire_answers[0]!.updated_by = adminId;
+    request.payload.corrections[0]!.created_by = adminId;
+    request.payload.status_history = [
+      {
+        changed_at: actionTimestamp,
+        changed_by: adminId,
+        comment: transition.comment,
+        entity_id: submissionId,
+        entity_type: "submission",
+        from_status: transition.fromStatus,
+        id: durableId,
+        note: null,
+        source: "admin",
+        to_status: transition.toStatus,
+      },
+    ];
+    const snapshot =
+      request.payload.submission.family_intelligence.v19CockpitSnapshot.submission;
+    snapshot.updatedAt = "сейчас";
+    snapshot.history = [
+      {
+        actorId: adminId,
+        at: "сейчас",
+        createdAt: "сейчас",
+        fromStatus: transition.fromStatus,
+        id: transitionId,
+        note: null,
+        source: "admin",
+        text: transition.comment,
+        toStatus: transition.toStatus,
+      },
+    ];
+
+    expect(
+      productionLifecycleMutationPayloadMatches(JSON.stringify(request), contract),
+    ).toBe(true);
+
+    const wrongComment = structuredClone(request);
+    wrongComment.payload.status_history[0]!.comment =
+      "Статус изменен: Возвращено: лишний комментарий";
+    expect(
+      productionLifecycleMutationPayloadMismatchCode(
+        JSON.stringify(wrongComment),
+        contract,
+      ),
+    ).toBe("history_commentDigest");
   });
 
   test("preserves duplicate durable semantics by UUID and rejects UUID rehash", () => {

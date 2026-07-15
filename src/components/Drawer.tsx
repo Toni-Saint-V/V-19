@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
 import type { Submission as CanonicalSubmission, SubmissionAction } from '../modules/submissions/types';
-import { fileTypeLabels, statusLabelFor } from '../modules/submissions/status';
+import {
+  agentQuestionnaireStatusPresentation,
+  fileTypeLabels,
+  statusLabelFor,
+} from '../modules/submissions/status';
 import { agentDisplayName } from '../modules/submissions/agentDirectory';
 import { questionnaireCityForSubmission } from '../modules/submissions/selectors';
 import { actionGate } from './v19BusinessScreenAdapter';
@@ -221,37 +225,44 @@ const ApplicantsTab = ({ data }: { data: SubmissionDetail }) => (
   </section>
 );
 
-const QuestionnaireTab = ({ data, onOpenQuestionnaire }: { data: SubmissionDetail; onOpenQuestionnaire?: () => void }) => (
-  <div className="v19-submission-drawer-stack">
-    <div className="v19-submission-drawer-section-head">
-      <div>
-        <h3>Анкета</h3>
-        <p>Проверьте готовность заявителей и продолжите заполнение в рабочей анкете.</p>
+const QuestionnaireTab = ({ data, onOpenQuestionnaire }: { data: SubmissionDetail; onOpenQuestionnaire?: () => void }) => {
+  const presentation = agentQuestionnaireStatusPresentation(data.status);
+  const ActionIcon = presentation.canEdit ? Edit3 : FileText;
+
+  return (
+    <div className="v19-submission-drawer-stack">
+      <div className="v19-submission-drawer-section-head">
+        <div>
+          <h3>Анкета</h3>
+          <p>{presentation.drawerDescription}</p>
+        </div>
+        {onOpenQuestionnaire ? (
+          <button className="v19-submission-drawer-secondary" onClick={onOpenQuestionnaire} type="button">
+            <ActionIcon className="w-4 h-4" /> {presentation.drawerActionLabel}
+          </button>
+        ) : null}
       </div>
-      <button className="v19-submission-drawer-secondary" onClick={onOpenQuestionnaire} type="button">
-        <Edit3 className="w-4 h-4" /> Открыть анкету
-      </button>
+      <div className="v19-submission-drawer-questionnaires">
+        {data.applicants.map((applicant) => (
+          <article
+            className="v19-submission-drawer-questionnaire"
+            key={applicant.name}
+          >
+            <span className="v19-submission-drawer-avatar" aria-hidden="true"><User /></span>
+            <span>
+              <strong>{applicant.name}</strong>
+              <small>{applicant.completeness === 100 ? 'Анкета заполнена' : 'Требуется продолжить заполнение'}</small>
+            </span>
+            <span className="v19-submission-drawer-progress is-inline">
+              <span>{applicant.completeness}%</span>
+              <i><b style={{ width: `${applicant.completeness}%` }} /></i>
+            </span>
+          </article>
+        ))}
+      </div>
     </div>
-    <div className="v19-submission-drawer-questionnaires">
-      {data.applicants.map((applicant) => (
-        <article
-          className="v19-submission-drawer-questionnaire"
-          key={applicant.name}
-        >
-          <span className="v19-submission-drawer-avatar" aria-hidden="true"><User /></span>
-          <span>
-            <strong>{applicant.name}</strong>
-            <small>{applicant.completeness === 100 ? 'Анкета заполнена' : 'Требуется продолжить заполнение'}</small>
-          </span>
-          <span className="v19-submission-drawer-progress is-inline">
-            <span>{applicant.completeness}%</span>
-            <i><b style={{ width: `${applicant.completeness}%` }} /></i>
-          </span>
-        </article>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 const FilesTab = ({ data, onOpenDocuments }: { data: SubmissionDetail; onOpenDocuments?: () => void }) => {
   const readyCount = data.documents.filter((document) => document.status === 'done').length;
@@ -320,20 +331,33 @@ const IssuesTab = ({
   onOpenDocuments?: () => void;
   onOpenQuestionnaire?: () => void;
 }) => {
+  const presentation = agentQuestionnaireStatusPresentation(data.status);
   const emptyCopy = getIssuesEmptyCopy(data.status);
+  const openIssues = data.issues.filter((issue) => issue.status === 'open').length;
+  const fixedIssues = data.issues.filter((issue) => issue.status === 'fixed_by_agent').length;
+  const issuesSummary = presentation.canEdit
+    ? `Требуют исправления: ${openIssues}`
+    : data.status === 'corrections_received'
+      ? `Исправления на проверке: ${fixedIssues}`
+      : 'Проверяет администратор';
+  const lockedIssueLabel = data.status === 'corrections_received'
+    ? 'Исправления отправлены'
+    : 'Проверяет администратор';
   return (
   <div className="v19-submission-drawer-issues">
     <div className="v19-submission-drawer-issues-heading">
       <div>
         <h3>Список задач по замечаниям</h3>
         <p>
-          {data.status === 'draft' || data.status === 'in_progress'
-            ? 'Задачи появятся после первой проверки администратором'
-            : 'Замечания, выявленные администратором при проверке'}
+          {presentation.canEdit
+            ? data.status === 'draft' || data.status === 'in_progress'
+              ? 'Задачи появятся после первой проверки администратором'
+              : 'Замечания, выявленные администратором при проверке'
+            : presentation.drawerDescription}
         </p>
       </div>
       <div className="v19-submission-drawer-issues-count">
-        Требуют исправления: {data.issuesCount}
+        {issuesSummary}
       </div>
     </div>
 
@@ -355,7 +379,7 @@ const IssuesTab = ({
               <div className="text-[11px] font-medium text-white/55 uppercase tracking-wider mb-2">{[issue.target.applicantName, issue.target.section, issue.target.field].filter(Boolean).join(' • ')}</div>
               <p className="text-[13px] text-white/60 leading-relaxed max-w-xl">{issue.comment}</p>
             </div>
-            {(issue.type === 'field' || issue.type === 'section') && onOpenQuestionnaire ? <div className="sm:w-[180px] shrink-0 flex items-center">
+            {presentation.canEdit && issue.status === 'open' && (issue.type === 'field' || issue.type === 'section') && onOpenQuestionnaire ? <div className="sm:w-[180px] shrink-0 flex items-center">
               <button 
                 onClick={onOpenQuestionnaire}
                 className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[13px] font-medium text-white transition-colors"
@@ -364,7 +388,7 @@ const IssuesTab = ({
                 Исправить в анкете
               </button>
             </div> : null}
-            {(issue.type === 'file' || issue.type === 'media') && onOpenDocuments ? <div className="sm:w-[180px] shrink-0 flex items-center">
+            {presentation.canEdit && issue.status === 'open' && (issue.type === 'file' || issue.type === 'media') && onOpenDocuments ? <div className="sm:w-[180px] shrink-0 flex items-center">
               <button
                 onClick={onOpenDocuments}
                 className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[13px] font-medium text-white transition-colors"
@@ -373,6 +397,13 @@ const IssuesTab = ({
                 Исправить файл
               </button>
             </div> : null}
+            {!presentation.canEdit ? (
+              <div className="sm:w-[180px] shrink-0 flex items-center">
+                <span className="v19-submission-drawer-file-state is-ready" role="status">
+                  {lockedIssueLabel}
+                </span>
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -696,8 +727,13 @@ export function Drawer({
 
     if (data.status === 'ready_for_export') {
       return (
-        <button className="v19-submission-drawer-primary" disabled type="button">
-          Готово к выгрузке
+        <button
+          className="v19-submission-drawer-primary"
+          onClick={() => setActiveTab('history')}
+          title="Открыть историю принятой подачи"
+          type="button"
+        >
+          <History className="w-4 h-4" /> Готово к выгрузке
         </button>
       );
     }

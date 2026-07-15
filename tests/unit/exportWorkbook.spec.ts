@@ -422,8 +422,8 @@ describe("V-19 export workbook contract", () => {
       "Inviting Company Email": "hotel@example.com",
       "Inviting Company Address": "1 HOTEL ROAD",
       "Inviting Company Contact No": "34900000777",
-      "Contact Person First Name": "MARIA LOPEZ",
-      "Contact Person Last Name": "",
+      "Contact Person First Name": "MARIA",
+      "Contact Person Last Name": "LOPEZ",
       "Contact Person Country": "Spain",
       "Contact Person City": "MADRID",
       "Contact Person Zip Code": "28001",
@@ -459,6 +459,19 @@ describe("V-19 export workbook contract", () => {
     expect(row?.contactPersonFirstName).toBe("HOTEL MADRID");
     expect(row?.contactPersonMobile).toBe("34900000111");
     expect(row?.invitingCompanyContactNo).toBe("34900000111");
+  });
+
+  test("splits a private host name into the Excel contact person columns", () => {
+    const [row] = buildExportContractRows([
+      withQuestionnaireFieldValues(readySubmission(), {
+        "hotel-name": "JUAN PEREZ",
+        "inviting-party-type": "Приглашающее лицо",
+        purpose: "TOURISM",
+      }),
+    ]);
+
+    expect(row?.contactPersonFirstName).toBe("JUAN");
+    expect(row?.contactPersonLastName).toBe("PEREZ");
   });
 
   test("fails closed when questionnaire means cannot be represented by the Excel contract", () => {
@@ -538,6 +551,22 @@ describe("V-19 export workbook contract", () => {
     expect(mobilePlan.ready).toBe(false);
     expect(mobilePlan.blockers.map((blocker) => blocker.reason)).toContain(
       "В строках выгрузки есть телефон заявителя не в формате 10 цифр",
+    );
+  });
+
+  test("revalidates conditional questionnaire requirements before export", () => {
+    const plan = exportSummary([
+      withQuestionnaireFieldValues(readySubmission(), {
+        "company-phone": "",
+        "inviting-party-type": "Приглашающая компания/организация",
+        purpose: "BUSINESS",
+      }),
+    ]);
+
+    expect(plan.ready).toBe(false);
+    expect(plan.canGenerate).toBe(false);
+    expect(plan.blockers.map((blocker) => blocker.reason)).toContain(
+      "В выборке есть анкеты, которые не прошли актуальную BLS-проверку",
     );
   });
 

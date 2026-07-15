@@ -8,6 +8,26 @@ import type { BrowserContext, Download, Page, Request } from "@playwright/test";
 
 import type { Database } from "../../src/lib/supabase/database.types";
 import {
+  addPreciseAdminIssue,
+  updateQuestionnaireField,
+} from "../../src/modules/submissions/submissionActions";
+import {
+  applySubmissionActionResult,
+  markSubmissionIssueFixedResult,
+} from "../../src/modules/submissions/status";
+import type {
+  Role,
+  Submission,
+  SubmissionAction,
+} from "../../src/modules/submissions/types";
+import {
+  attachDurableMediaAssetRows,
+  attachDurableStatusHistoryRows,
+  readCockpitSnapshot,
+  toCockpitDraftPersistencePayload,
+  toCockpitQuestionnaireAnswerInserts,
+} from "../../src/modules/submissions/supabasePersistence";
+import {
   PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
   PRODUCTION_SUPABASE_ORIGIN,
@@ -29,6 +49,7 @@ import {
   productionDraftQuestionnaireValueIdentity,
   productionDraftSnapshotFieldErrorIdentities,
   productionDraftSnapshotContentDigest,
+  productionDraftSnapshotProjectionDigests,
   productionDraftSnapshotIssueIdentities,
   productionDraftSnapshotMutationFromBaseline,
   productionDraftSubmissionStaticContentDigest,
@@ -37,6 +58,8 @@ import {
   requiredProductionLifecycleCaseKey,
   type ProductionDraftPayloadIdentityContract,
   type ProductionDraftPayloadMutationContract,
+  type ProductionDraftHistoryExpectation,
+  type ProductionDraftProjectedStatusHistoryIdentity,
   type ProductionDraftSnapshotMutation,
   type ProductionDraftSnapshotMutationIntent,
   type ProductionMutationTimestampWindow,
@@ -1616,29 +1639,33 @@ function requiredSnapshotFacts(
 
 function draftPayloadIdentityFromRows(input: {
   correctionMarker?: string;
+  expectedApplicantCount?: number;
   ownerId: string;
   rows: Awaited<ReturnType<typeof readA1S1ProductionRows>>;
   submissionId: string;
 }): ProductionDraftPayloadIdentityContract {
   const { rows, submissionId } = input;
+  const expectedApplicantCount = input.expectedApplicantCount ?? 1;
   invariant(
     rows.submission.id === submissionId && rows.submission.agent_id === input.ownerId,
     "A2-S1 draft identity owner or submission no longer matches the declared cohort target.",
   );
   invariant(
-    rows.applicants.length === 1 &&
+    Number.isInteger(expectedApplicantCount) &&
+      expectedApplicantCount > 0 &&
+      rows.applicants.length === expectedApplicantCount &&
       rows.applicants.every((row) => row.submission_id === submissionId),
-    "A2-S1 draft identity requires exactly one target applicant.",
+    "Production draft identity applicant count does not match the exact target.",
   );
   invariant(
-    rows.media.length === 3 &&
+    rows.media.length === expectedApplicantCount * 3 &&
       rows.media.every((row) => row.submission_id === submissionId),
-    "A2-S1 draft identity requires exactly three target media assets.",
+    "Production draft identity media count does not match the exact target.",
   );
   invariant(
-    rows.questionnaireAnswers.length === 77 &&
+    rows.questionnaireAnswers.length === expectedApplicantCount * 77 &&
       rows.questionnaireAnswers.every((row) => row.submission_id === submissionId),
-    "A2-S1 draft identity requires exactly seventy-seven questionnaire answers.",
+    "Production draft identity questionnaire count does not match the exact target.",
   );
   const snapshotFacts = requiredSnapshotFacts(
     rows.submission.family_intelligence,
@@ -1666,10 +1693,10 @@ function draftPayloadIdentityFromRows(input: {
   );
   const applicantIds = new Set(rows.applicants.map((row) => row.id));
   invariant(
-    applicantIds.size === 1 &&
+    applicantIds.size === expectedApplicantCount &&
       rows.media.every((row) => applicantIds.has(row.applicant_id)) &&
       rows.questionnaireAnswers.every((row) => applicantIds.has(row.applicant_id)),
-    "A2-S1 draft identity has a child outside its exact applicant set.",
+    "Production draft identity has a child outside its exact applicant set.",
   );
 
   const questionnaireAnswers = rows.questionnaireAnswers.map((row) => {
@@ -1816,31 +1843,714 @@ function draftPayloadIdentityFromRows(input: {
 }
 
 export type ResolvedProductionCohortDraftPayloadIdentity = {
+  applicantIdsInSnapshotOrder: string[];
+  applicantProjection?: NonNullable<
+    ProductionDraftPayloadMutationContract["applicantProjection"]
+  >;
   draft: ProductionDraftPayloadIdentityContract;
+  historyProjection?: {
+    mode: "replace_exact";
+    rows: readonly ProductionDraftProjectedStatusHistoryIdentity[];
+  };
+  historyTransition?: NonNullable<
+    ProductionDraftHistoryExpectation["transition"]
+  >;
+  questionnaireProjection?: NonNullable<
+    ProductionDraftPayloadMutationContract["questionnaireProjection"]
+  >;
   snapshotMutation?: ProductionDraftSnapshotMutation;
+  snapshotProjection?: NonNullable<
+    ProductionDraftPayloadMutationContract["snapshotProjection"]
+  >;
+  submissionProjection?: NonNullable<
+    ProductionDraftPayloadMutationContract["submissionProjection"]
+  >;
 };
 
 /** Read-only, runtime-only nested identity for lifecycle and export network gates. */
 export async function resolveProductionCohortDraftPayloadIdentity(input: {
   admin: ProductionCohortAccount;
+  applicantEmailReplacement?: { applicantId: string; email: string };
+  applicantSerializerProjection?: {
+    actorId: string;
+    allowedDriftFields: readonly "questionnaire_percent"[];
+  };
+  questionnaireSerializerProjection?: {
+    allowedLabelDriftFieldIds: readonly "hotel-name"[];
+  };
+  submissionProjectionIntent?:
+    | {
+        actorId: string;
+        intent: ProductionDraftSnapshotMutationIntent;
+        mode: "snapshot_mutation";
+      }
+    | {
+        actorId: string;
+        applicantId: string;
+        fieldId: "email";
+        mode: "questionnaire_replace";
+        value: string;
+      }
+    | {
+        action: SubmissionAction;
+        actorId: string;
+        mode: "submission_action";
+        role: Role;
+      };
   correctionMarker?: string;
+  expectedApplicantCount?: number;
   ownerId: string;
   snapshotMutationIntent?: ProductionDraftSnapshotMutationIntent;
   submissionId: string;
 }): Promise<ResolvedProductionCohortDraftPayloadIdentity> {
   const rows = await readA1S1ProductionRows(input);
-  const draft = draftPayloadIdentityFromRows({ ...input, rows });
+  const draft = draftPayloadIdentityFromRows({
+    ...input,
+    expectedApplicantCount: input.expectedApplicantCount ?? 1,
+    rows,
+  });
+  const hydratedSnapshot = (() => {
+    const snapshot = readCockpitSnapshot(
+      rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+    );
+    invariant(snapshot, "Production cockpit snapshot is unreadable for projection.");
+    const withMedia = attachDurableMediaAssetRows(
+      snapshot,
+      rows.media as Database["public"]["Tables"]["media_assets"]["Row"][],
+    );
+    return attachDurableStatusHistoryRows(
+      withMedia,
+      rows.history as Database["public"]["Tables"]["status_history"]["Row"][],
+    );
+  })();
+  const projectedSubmission = (() => {
+    const intent = input.submissionProjectionIntent;
+    if (!intent) return undefined;
+    let projected: Submission;
+    if (intent.mode === "submission_action") {
+      const result = applySubmissionActionResult(
+        hydratedSnapshot,
+        intent.action,
+        intent.role,
+        intent.actorId,
+      );
+      invariant(result.ok, "Production submission action projection was rejected.");
+      projected = result.data;
+    } else if (intent.mode === "questionnaire_replace") {
+      const applicant = hydratedSnapshot.applicants.find(
+        (item) => item.id === intent.applicantId,
+      );
+      const section = applicant?.sections.find((candidate) =>
+        candidate.fields.some((field) => field.id === intent.fieldId),
+      );
+      invariant(section, "Production questionnaire projection target is absent.");
+      projected = updateQuestionnaireField(hydratedSnapshot, {
+        applicantId: intent.applicantId,
+        fieldId: intent.fieldId,
+        sectionId: section.id,
+        value: intent.value,
+      });
+    } else if (intent.intent.mode === "add_issue") {
+      const applicant = hydratedSnapshot.applicants.find(
+        (item) =>
+          !intent.intent.applicantId || item.id === intent.intent.applicantId,
+      );
+      const section = applicant?.sections.find((candidate) =>
+        candidate.fields.some(
+          (field) =>
+            (!intent.intent.fieldId || field.id === intent.intent.fieldId) &&
+            field.label === intent.intent.fieldLabel,
+        ),
+      );
+      const field = section?.fields.find(
+        (candidate) =>
+          (!intent.intent.fieldId || candidate.id === intent.intent.fieldId) &&
+          candidate.label === intent.intent.fieldLabel,
+      );
+      invariant(applicant && field, "Production issue projection target is absent.");
+      projected = addPreciseAdminIssue(
+        hydratedSnapshot,
+        {
+          applicantId: applicant.id,
+          comment: intent.intent.comment,
+          field: field.label,
+          reason: intent.intent.reason,
+          section: intent.intent.section,
+          severity: "blocker",
+          type: "field",
+        },
+        intent.actorId,
+      );
+      invariant(
+        projected !== hydratedSnapshot,
+        "Production issue projection did not mutate the snapshot.",
+      );
+    } else {
+      const issue = hydratedSnapshot.issues.find(
+        (candidate) =>
+          candidate.status === "open" &&
+          candidate.reason === intent.intent.reason &&
+          candidate.comment === intent.intent.comment,
+      );
+      invariant(issue, "Production fixed-issue projection target is absent.");
+      const result = markSubmissionIssueFixedResult(
+        hydratedSnapshot,
+        issue.id,
+        "agent",
+      );
+      invariant(result.ok, "Production fixed-issue projection was rejected.");
+      projected = result.data;
+    }
+    return projected;
+  })();
+  const submissionProjection = (() => {
+    const intent = input.submissionProjectionIntent;
+    if (!intent || !projectedSubmission) return undefined;
+    const projectedPayload = toCockpitDraftPersistencePayload(
+      projectedSubmission,
+      intent.actorId,
+      input.ownerId,
+      intent.actorId === input.ownerId ? "agent" : "admin",
+    ).submission;
+    const staticFields = [
+      "agent_id",
+      "city",
+      "country",
+      "id",
+      "readiness_percent",
+      "title",
+      "travel_date",
+      "trip_date_from",
+      "trip_date_to",
+      "type",
+    ] as const;
+    const driftFields = staticFields.filter(
+      (field) =>
+        productionDraftValueDigest(rows.submission[field]) !==
+        productionDraftValueDigest(projectedPayload[field]),
+    );
+    invariant(
+      driftFields.every((field) => field === "readiness_percent"),
+      "Production root serializer drift exceeded readiness_percent.",
+    );
+    const expectedStaticContentDigest =
+      productionDraftSubmissionStaticContentDigest(projectedPayload);
+    invariant(
+      expectedStaticContentDigest,
+      "Production root projection cannot be digested.",
+    );
+    return {
+      expectedStaticContentDigest,
+      mode: "replace_readiness_percent" as const,
+    };
+  })();
+  const projectedHistoryPayload = (() => {
+    const intent = input.submissionProjectionIntent;
+    if (!intent || !projectedSubmission) return undefined;
+    return toCockpitDraftPersistencePayload(
+      projectedSubmission,
+      intent.actorId,
+      input.ownerId,
+      intent.actorId === input.ownerId ? "agent" : "admin",
+    ).status_history;
+  })();
+  const historyProjection = (() => {
+    if (!projectedHistoryPayload) return undefined;
+    const baselineIds = new Set(draft.statusHistory.map((row) => row.id));
+    const rows = projectedHistoryPayload.map((row) => {
+      const commentDigest = productionDraftValueDigest(row.comment);
+      const noteDigest =
+        row.note === null ? null : productionDraftValueDigest(row.note);
+      invariant(
+        typeof row.id === "string" &&
+          row.entity_type === "submission" &&
+          typeof row.entity_id === "string" &&
+          (row.from_status === null || typeof row.from_status === "string") &&
+          typeof row.to_status === "string" &&
+          (row.source === "admin" || row.source === "agent") &&
+          Boolean(commentDigest) &&
+          (row.note === null || Boolean(noteDigest)) &&
+          typeof row.changed_by === "string" &&
+          typeof row.changed_at === "string",
+        "Production history projection cannot be derived exactly.",
+      );
+      return {
+        changedAt: baselineIds.has(row.id) ? row.changed_at : "action",
+        changedBy: row.changed_by,
+        commentDigest: commentDigest!,
+        entityId: row.entity_id,
+        entityType: "submission" as const,
+        fromStatus: row.from_status,
+        id: row.id,
+        noteDigest,
+        source: row.source,
+        toStatus: row.to_status,
+      } satisfies ProductionDraftProjectedStatusHistoryIdentity;
+    });
+    return { mode: "replace_exact" as const, rows };
+  })();
+  const historyTransition = (() => {
+    if (
+      input.submissionProjectionIntent?.mode !== "submission_action" ||
+      !projectedSubmission
+    ) {
+      return undefined;
+    }
+    const actionHistory = projectedSubmission.history[0];
+    invariant(
+      actionHistory &&
+        typeof actionHistory.fromStatus === "string" &&
+        typeof actionHistory.toStatus === "string" &&
+        typeof actionHistory.text === "string",
+      "Production action history transition is absent.",
+    );
+    return {
+      comment: actionHistory.text,
+      fromStatus: actionHistory.fromStatus,
+      note: actionHistory.note ?? null,
+      toStatus: actionHistory.toStatus,
+    };
+  })();
+  const snapshotProjection = (() => {
+    const intent = input.submissionProjectionIntent;
+    if (!intent || !projectedSubmission) return undefined;
+    const projectedIntelligence = toCockpitDraftPersistencePayload(
+      projectedSubmission,
+      intent.actorId,
+      input.ownerId,
+      intent.actorId === input.ownerId ? "agent" : "admin",
+    ).submission.family_intelligence;
+    const persistedProjectedIntelligence = JSON.parse(
+      JSON.stringify(projectedIntelligence),
+    ) as unknown;
+    const expectedLifecycleContentDigest = productionDraftSnapshotContentDigest(
+      persistedProjectedIntelligence,
+      "lifecycle",
+    );
+    const projectionDigests =
+      productionDraftSnapshotProjectionDigests(persistedProjectedIntelligence);
+    invariant(
+      expectedLifecycleContentDigest,
+      "Production lifecycle snapshot content projection cannot be digested.",
+    );
+    invariant(
+      projectionDigests,
+      "Production lifecycle snapshot structural projections cannot be digested.",
+    );
+    return { expectedLifecycleContentDigest, projectionDigests };
+  })();
+  const applicantProjection = (() => {
+    if (input.applicantSerializerProjection) {
+      const snapshot = projectedSubmission ?? hydratedSnapshot;
+      const emailReplacement = input.applicantEmailReplacement;
+      const projected = toCockpitDraftPersistencePayload(
+        snapshot,
+        input.applicantSerializerProjection.actorId,
+        input.ownerId,
+        input.applicantSerializerProjection.actorId === input.ownerId
+          ? "agent"
+          : "admin",
+      ).applicants.map((row) =>
+        emailReplacement && emailReplacement.applicantId === row.id
+          ? { ...row, email: emailReplacement.email }
+          : row,
+      );
+      const projectedById = new Map(projected.map((row) => [row.id, row]));
+      const allowedDriftFields = new Set<string>(
+        input.applicantSerializerProjection.allowedDriftFields,
+      );
+      for (const row of rows.applicants) {
+        const target = projectedById.get(row.id);
+        invariant(target, "Production applicant projection changed row identity.");
+        const driftFields = Object.keys(row).filter(
+          (field) =>
+            productionDraftValueDigest(row[field as keyof ProductionApplicantRow]) !==
+            productionDraftValueDigest(target[field as keyof typeof target]),
+        );
+        invariant(
+          driftFields.every(
+            (field) =>
+              allowedDriftFields.has(field) ||
+              (field === "email" &&
+                row.id === input.applicantEmailReplacement?.applicantId),
+          ),
+          "Production applicant serializer drift exceeded the explicit allowlist.",
+        );
+      }
+      return {
+        applicants: projected.map((row) => {
+          const applicantId = typeof row.id === "string" ? row.id : "";
+          invariant(applicantId, "Production applicant projection ID is absent.");
+          const expectedContentDigest = productionDraftApplicantContentDigest(row);
+          invariant(
+            expectedContentDigest,
+            "Production applicant projection cannot be digested.",
+          );
+          return { applicantId, expectedContentDigest };
+        }),
+        mode: "replace_exact" as const,
+      };
+    }
+    if (!input.applicantEmailReplacement) return undefined;
+    const target = rows.applicants.find(
+      (applicant) => applicant.id === input.applicantEmailReplacement?.applicantId,
+    );
+    const expectedContentDigest = target
+      ? productionDraftApplicantContentDigest({
+          ...target,
+          email: input.applicantEmailReplacement.email,
+        })
+      : null;
+    invariant(
+      target && expectedContentDigest,
+      "Production applicant email projection replacement cannot be resolved.",
+    );
+    return {
+      applicantId: target.id,
+      expectedContentDigest,
+      mode: "replace_email" as const,
+    };
+  })();
+  const questionnaireProjection = (() => {
+    if (!input.questionnaireSerializerProjection) return undefined;
+    const snapshot = projectedSubmission ?? hydratedSnapshot;
+    const projectedRows = toCockpitQuestionnaireAnswerInserts(
+      snapshot,
+      input.applicantSerializerProjection?.actorId ?? input.ownerId,
+    ) as unknown as Array<{
+      applicant_id: string;
+      field_id: string;
+      label: string;
+      section_id: string;
+      submission_id: string;
+      value: unknown;
+    }>;
+    const projectedAnswers = projectedRows.map((row) => {
+      const baseline = draft.questionnaireAnswers.find(
+        (answer) =>
+          answer.submissionId === row.submission_id &&
+          answer.applicantId === row.applicant_id &&
+          answer.sectionId === row.section_id &&
+          answer.fieldId === row.field_id,
+      );
+      invariant(baseline, "Production questionnaire projection changed answer identity.");
+      const value = (() => {
+        if (
+          input.applicantEmailReplacement?.applicantId !== row.applicant_id ||
+          row.field_id !== "email"
+        ) {
+          return row.value;
+        }
+        if (
+          row.value &&
+          typeof row.value === "object" &&
+          !Array.isArray(row.value) &&
+          (row.value as { kind?: unknown }).kind === "v19_questionnaire_field"
+        ) {
+          return {
+            ...(row.value as Record<string, unknown>),
+            value: input.applicantEmailReplacement.email,
+          };
+        }
+        return input.applicantEmailReplacement.email;
+      })();
+      const identity = productionDraftQuestionnaireValueIdentity(value);
+      const labelDigest = productionDraftValueDigest(row.label);
+      invariant(
+        identity && labelDigest,
+        "Production questionnaire projection cannot be digested.",
+      );
+      return {
+        ...baseline,
+        labelDigest,
+        logicalValueDigest: identity.logicalValueDigest,
+        valueDigest: identity.valueDigest,
+        valueStructureDigest: identity.valueStructureDigest,
+      };
+    });
+    const allowedLabelDriftFieldIds = new Set<string>(
+      input.questionnaireSerializerProjection.allowedLabelDriftFieldIds,
+    );
+    for (const projected of projectedAnswers) {
+      const baseline = draft.questionnaireAnswers.find(
+        (answer) =>
+          answer.submissionId === projected.submissionId &&
+          answer.applicantId === projected.applicantId &&
+          answer.sectionId === projected.sectionId &&
+          answer.fieldId === projected.fieldId,
+      );
+      invariant(baseline, "Production questionnaire baseline identity is absent.");
+      const labelChanged = projected.labelDigest !== baseline.labelDigest;
+      const valueChanged =
+        projected.logicalValueDigest !== baseline.logicalValueDigest ||
+        projected.valueDigest !== baseline.valueDigest ||
+        projected.valueStructureDigest !== baseline.valueStructureDigest;
+      invariant(
+        (!labelChanged || allowedLabelDriftFieldIds.has(projected.fieldId)) &&
+          (!valueChanged ||
+            (projected.fieldId === "email" &&
+              projected.applicantId ===
+                input.applicantEmailReplacement?.applicantId)),
+        "Production questionnaire serializer drift exceeded the explicit allowlist.",
+      );
+    }
+    return { answers: projectedAnswers, mode: "replace_exact" as const };
+  })();
   const snapshotMutation = input.snapshotMutationIntent
     ? productionDraftSnapshotMutationFromBaseline(
         rows.submission.family_intelligence,
         input.snapshotMutationIntent,
+        {
+          projectPersistedSnapshot: (submission) =>
+            (() => {
+              const [actionHistory, ...baselineHistory] = submission.history;
+              invariant(
+                actionHistory,
+                "Production lifecycle action history is absent.",
+              );
+              const withMedia = attachDurableMediaAssetRows(
+                { ...submission, history: baselineHistory },
+                rows.media as Database["public"]["Tables"]["media_assets"]["Row"][],
+              );
+              const withDurableHistory = attachDurableStatusHistoryRows(
+                withMedia,
+                rows.history as Database["public"]["Tables"]["status_history"]["Row"][],
+              );
+              return {
+                ...withDurableHistory,
+                history: [actionHistory, ...withDurableHistory.history],
+              };
+            })(),
+        },
       )
     : undefined;
   invariant(
     !input.snapshotMutationIntent || snapshotMutation,
     "A2-S1 lifecycle snapshot mutation cannot be derived from the current read-only state.",
   );
-  return { draft, snapshotMutation: snapshotMutation ?? undefined };
+  const intelligence = jsonRecord(rows.submission.family_intelligence);
+  const envelope = jsonRecord(intelligence?.v19CockpitSnapshot);
+  const snapshot = jsonRecord(envelope?.submission);
+  const snapshotApplicants = Array.isArray(snapshot?.applicants)
+    ? snapshot.applicants
+    : [];
+  const applicantIdsInSnapshotOrder = snapshotApplicants.map((applicant) => {
+    const record = jsonRecord(applicant);
+    return typeof record?.id === "string" ? record.id : null;
+  });
+  invariant(
+    applicantIdsInSnapshotOrder.every(
+      (applicantId): applicantId is string => Boolean(applicantId),
+    ) &&
+      applicantIdsInSnapshotOrder.length === (input.expectedApplicantCount ?? 1) &&
+      new Set(applicantIdsInSnapshotOrder).size ===
+        applicantIdsInSnapshotOrder.length &&
+      applicantIdsInSnapshotOrder.every((applicantId) =>
+        rows.applicants.some((applicant) => applicant.id === applicantId),
+      ),
+    "Production snapshot applicant order cannot be resolved exactly.",
+  );
+  return {
+    applicantIdsInSnapshotOrder: applicantIdsInSnapshotOrder as string[],
+    applicantProjection,
+    draft,
+    historyProjection,
+    historyTransition,
+    questionnaireProjection,
+    snapshotMutation: snapshotMutation ?? undefined,
+    snapshotProjection,
+    submissionProjection,
+  };
+}
+
+/** Read-only, PII-free lifecycle checkpoint for resumable production runners. */
+export async function resolveProductionLifecycleMarkerReadback(input: {
+  admin: ProductionCohortAccount;
+  marker: string;
+  submissionId: string;
+}) {
+  const rows = await readA1S1ProductionRows(input);
+  const targetCorrections = rows.corrections.filter((row) =>
+    row.reason.includes(input.marker),
+  );
+  const snapshotIssues = productionDraftSnapshotIssueIdentities(
+    rows.submission.family_intelligence,
+  );
+  invariant(snapshotIssues, "Production lifecycle snapshot issues are unreadable.");
+  return {
+    applicantCount: rows.applicants.length,
+    answerCount: rows.questionnaireAnswers.length,
+    mediaCount: rows.media.length,
+    snapshotIssueStatuses: snapshotIssues.map((issue) => issue.status),
+    submissionStatus: rows.submission.status,
+    targetCorrectionCount: targetCorrections.length,
+    targetCorrectionStatuses: targetCorrections.map((row) => row.status),
+  };
+}
+
+/**
+ * Read-only and value-free diagnostic for differences between durable
+ * applicant rows and the active cockpit serializer projection.
+ */
+export async function resolveProductionApplicantSerializerDrift(input: {
+  actorId: string;
+  admin: ProductionCohortAccount;
+  ownerId: string;
+  submissionId: string;
+}) {
+  const rows = await readA1S1ProductionRows(input);
+  const snapshot = readCockpitSnapshot(
+    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+  );
+  invariant(snapshot, "Production cockpit snapshot is unreadable for applicant drift.");
+  const projected = toCockpitDraftPersistencePayload(
+    snapshot,
+    input.actorId,
+    input.ownerId,
+    "admin",
+  ).applicants;
+  invariant(
+    projected.length === rows.applicants.length,
+    "Production applicant serializer changed row count.",
+  );
+  const projectedById = new Map(projected.map((row) => [row.id, row]));
+  const fieldCounts = new Map<string, number>();
+  let affectedApplicantCount = 0;
+  for (const row of rows.applicants) {
+    const target = projectedById.get(row.id);
+    invariant(target, "Production applicant serializer changed row identity.");
+    let affected = false;
+    for (const field of Object.keys(row)) {
+      if (
+        productionDraftValueDigest(row[field as keyof ProductionApplicantRow]) !==
+        productionDraftValueDigest(target[field as keyof typeof target])
+      ) {
+        fieldCounts.set(field, (fieldCounts.get(field) ?? 0) + 1);
+        affected = true;
+      }
+    }
+    if (affected) affectedApplicantCount += 1;
+  }
+  return {
+    affectedApplicantCount,
+    fieldCounts: Object.fromEntries([...fieldCounts.entries()].sort()),
+    rowCount: rows.applicants.length,
+  };
+}
+
+/** Read-only, value-free drift summary for root submission serialization. */
+export async function resolveProductionSubmissionSerializerDrift(input: {
+  actorId: string;
+  admin: ProductionCohortAccount;
+  ownerId: string;
+  submissionId: string;
+}) {
+  const rows = await readA1S1ProductionRows(input);
+  const snapshot = readCockpitSnapshot(
+    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+  );
+  invariant(snapshot, "Production cockpit snapshot is unreadable for root drift.");
+  const projected = toCockpitDraftPersistencePayload(
+    snapshot,
+    input.actorId,
+    input.ownerId,
+    input.actorId === input.ownerId ? "agent" : "admin",
+  ).submission;
+  const staticFields = [
+    "agent_id",
+    "city",
+    "country",
+    "id",
+    "readiness_percent",
+    "title",
+    "travel_date",
+    "trip_date_from",
+    "trip_date_to",
+    "type",
+  ] as const;
+  const driftFields = staticFields.filter(
+    (field) =>
+      productionDraftValueDigest(rows.submission[field]) !==
+      productionDraftValueDigest(projected[field]),
+  );
+  return { driftFields };
+}
+
+/** Read-only, value-free drift summary for questionnaire serialization. */
+export async function resolveProductionQuestionnaireSerializerDrift(input: {
+  actorId: string;
+  admin: ProductionCohortAccount;
+  ownerId: string;
+  submissionId: string;
+}) {
+  const rows = await readA1S1ProductionRows(input);
+  const snapshot = readCockpitSnapshot(
+    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+  );
+  invariant(snapshot, "Production cockpit snapshot is unreadable for questionnaire drift.");
+  const projected = toCockpitQuestionnaireAnswerInserts(
+    snapshot,
+    input.actorId,
+  ) as unknown as Array<{
+    applicant_id: string;
+    field_id: string;
+    label: string;
+    section_id: string;
+    submission_id: string;
+    value: unknown;
+  }>;
+  const key = (row: {
+    applicant_id: string;
+    field_id: string;
+    section_id: string;
+    submission_id: string;
+  }) =>
+    [row.submission_id, row.applicant_id, row.section_id, row.field_id].join(":");
+  const projectedByKey = new Map(projected.map((row) => [key(row), row]));
+  const fieldCounts = new Map<string, number>();
+  const affectedFieldIdCounts = new Map<string, number>();
+  let affectedAnswerCount = 0;
+  for (const row of rows.questionnaireAnswers) {
+    const target = projectedByKey.get(key(row));
+    invariant(target, "Production questionnaire serializer changed answer identity.");
+    const baselineValue = productionDraftQuestionnaireValueIdentity(row.value);
+    const projectedValue = productionDraftQuestionnaireValueIdentity(target.value);
+    invariant(
+      baselineValue && projectedValue,
+      "Production questionnaire value identity is unreadable.",
+    );
+    const driftFields = [
+      productionDraftValueDigest(row.label) !==
+      productionDraftValueDigest(target.label)
+        ? "label"
+        : null,
+      baselineValue.logicalValueDigest !== projectedValue.logicalValueDigest
+        ? "logical_value"
+        : null,
+      baselineValue.valueDigest !== projectedValue.valueDigest ? "value" : null,
+      baselineValue.valueStructureDigest !== projectedValue.valueStructureDigest
+        ? "value_structure"
+        : null,
+    ].filter((field): field is string => Boolean(field));
+    for (const field of driftFields) {
+      fieldCounts.set(field, (fieldCounts.get(field) ?? 0) + 1);
+    }
+    if (driftFields.length) {
+      affectedAnswerCount += 1;
+      affectedFieldIdCounts.set(
+        row.field_id,
+        (affectedFieldIdCounts.get(row.field_id) ?? 0) + 1,
+      );
+    }
+  }
+  return {
+    affectedAnswerCount,
+    affectedFieldIdCounts: Object.fromEntries(
+      [...affectedFieldIdCounts.entries()].sort(),
+    ),
+    fieldCounts: Object.fromEntries([...fieldCounts.entries()].sort()),
+    rowCount: rows.questionnaireAnswers.length,
+  };
 }
 
 function assertA1S1ApplicantProjection(input: {

@@ -47,7 +47,7 @@ import {
 } from "../mediaStorage";
 import {
   agentQuestionnaireCompletionDecision,
-  canAgentEditSubmissionContent,
+  agentQuestionnaireStatusPresentation,
   canReplaceDocument,
 } from "../status";
 import {
@@ -2542,7 +2542,13 @@ export function FigmaQuestionnaireScreen({
     () => applyQuestionnaireUpdates(submission, pendingUpdates),
     [pendingUpdates, submission],
   );
-  const isEditable = canAgentEditSubmissionContent(draftSubmission);
+  const questionnaireStatus = agentQuestionnaireStatusPresentation(
+    draftSubmission.status,
+  );
+  const isEditable = questionnaireStatus.canEdit;
+  const isCorrectionResubmission = draftSubmission.status === "returned";
+  const completeActionLabel = questionnaireStatus.completionLabel;
+  const completeActionMobileLabel = completeActionLabel;
   const applicants = useMemo(() => applicantTabs(draftSubmission), [draftSubmission]);
   const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
   const initialFocusApplicant =
@@ -2552,11 +2558,6 @@ export function FigmaQuestionnaireScreen({
     initialFocus?.field,
     initialFocusApplicant,
   );
-  const isCorrectionResubmission = draftSubmission.status === "returned";
-  const completeActionLabel = isCorrectionResubmission
-    ? "Отправить исправления"
-    : "Отправить на проверку";
-  const completeActionMobileLabel = completeActionLabel;
   const [activeApplicant, setActiveApplicant] = useState(initialApplicantId);
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
@@ -4002,8 +4003,14 @@ export function FigmaQuestionnaireScreen({
     await enqueueDraftSave(completionPayload("manual"), revision);
   }
 
+  async function saveAndExitFromButton() {
+    if (!isEditable || completionInFlightRef.current) return;
+    await saveDraftFromButton();
+    onBack();
+  }
+
   async function confirmPassportReviewFromButton(applicantId: string) {
-    if (!onConfirmPassportReview || passportReviewPending) return;
+    if (!isEditable || !onConfirmPassportReview || passportReviewPending) return;
 
     setPassportReviewPending(true);
     setSaveStatus("saving");
@@ -4027,6 +4034,7 @@ export function FigmaQuestionnaireScreen({
 
   async function resolveCurrentIssue() {
     if (
+      !isEditable ||
       !currentSectionIssue ||
       currentSectionIssue.status !== "open" ||
       !onMarkIssueFixed ||
@@ -4061,6 +4069,7 @@ export function FigmaQuestionnaireScreen({
       focusFirstBlocker();
       return;
     }
+
     completionInFlightRef.current = true;
     clearAutosaveTimer();
     const revision = autosaveRevisionRef.current;
@@ -4721,7 +4730,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Cell: G2"
-            label="ФИО приглашающего лица или название отеля"
+            label="ФИО приглашающего лица или название отеля/компании"
             modelFieldId="hotel-name"
             number="2"
             value={formData.hotelName}
@@ -5074,7 +5083,9 @@ export function FigmaQuestionnaireScreen({
   return (
     <motion.div
       animate={{ opacity: 1 }}
-      className="vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell"
+      className={`vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell questionnaire-screen${
+        isEditable ? "" : " is-read-only"
+      }`}
       data-submission-id={draftSubmission.id}
       exit={{ opacity: 0 }}
       initial={prefersReducedMotion ? false : { opacity: 0 }}
@@ -5103,37 +5114,58 @@ export function FigmaQuestionnaireScreen({
           </h1>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-[var(--v19b-size-11)] text-white/40 hidden md:inline-flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-            {readinessStats.percent}% · {readinessStats.completed}/
-            {readinessStats.total}
-            <span aria-live="polite" role="status">
-              · {saveMessage}
-            </span>
+        <div className="v19-questionnaire-header-actions">
+          <span aria-live="polite" className="sr-only" role="status">
+            {saveMessage}
           </span>
-          <button
-            className="v19-questionnaire-draft-button"
-            disabled={!isEditable || saveStatus === "saving"}
-            type="button"
-            onClick={() => void saveDraftFromButton().catch(() => undefined)}
-          >
-            {saveStatus === "saving" ? "Сохраняем" : "Черновик"}
-          </button>
-          <button
-            aria-label={completeActionLabel}
-            className={`v19-questionnaire-complete-button ${readinessStats.canSubmit ? "is-ready" : "is-blocked"}${isCorrectionResubmission ? " is-correction-submit" : ""}`}
-            disabled={!isEditable || saveStatus === "saving"}
-            type="button"
-            onClick={() => void completeFromButton().catch(() => undefined)}
-          >
-            <span className="hidden sm:inline">{completeActionLabel}</span>
-            <span className="sm:hidden">{completeActionMobileLabel}</span>
-          </button>
+          {isEditable ? (
+            <>
+              {!readinessStats.canSubmit ? (
+                <button
+                  aria-label={`Перейти к блокеру: ${mobileBlockerLabel}`}
+                  className="v19-questionnaire-blocker-button"
+                  type="button"
+                  onClick={focusFirstBlocker}
+                >
+                  К блокеру
+                </button>
+              ) : null}
+              <button
+                className="v19-questionnaire-complete-button is-ready"
+                disabled={saveStatus === "saving"}
+                type="button"
+                onClick={() => void saveAndExitFromButton().catch(() => undefined)}
+              >
+                {saveStatus === "saving" ? "Сохраняем" : "Сохранить и выйти"}
+              </button>
+              <button
+                aria-label={completeActionLabel}
+                className={`v19-questionnaire-complete-button ${
+                  readinessStats.canSubmit ? "is-ready" : "is-blocked"
+                }${isCorrectionResubmission ? " is-correction-submit" : ""}`}
+                disabled={saveStatus === "saving"}
+                type="button"
+                onClick={() => void completeFromButton().catch(() => undefined)}
+              >
+                <span className="hidden sm:inline">{completeActionLabel}</span>
+                <span className="sm:hidden">{completeActionMobileLabel}</span>
+              </button>
+            </>
+          ) : questionnaireStatus.readOnly ? (
+            <span
+              aria-label={questionnaireStatus.readOnly.label}
+              className="v19-questionnaire-draft-button v19-questionnaire-read-only-status"
+              data-testid="questionnaire-read-only-status"
+              role="status"
+            >
+              <span className="hidden sm:inline">{questionnaireStatus.readOnly.label}</span>
+              <span className="sm:hidden">{questionnaireStatus.readOnly.mobileLabel}</span>
+            </span>
+          ) : null}
         </div>
       </header>
 
-      <div className="v19-questionnaire-progress-track">
+      <div aria-hidden="true" className="v19-questionnaire-progress-track">
         <motion.div
           animate={{ width: `${readinessStats.percent}%` }}
           className="v19-questionnaire-progress-fill"
@@ -5154,24 +5186,6 @@ export function FigmaQuestionnaireScreen({
         </motion.div>
       </div>
 
-      <div className="v19-questionnaire-mobile-status">
-        <span className="v19-questionnaire-mobile-progress">
-          {readinessStats.percent}% · {readinessStats.completed}/{readinessStats.total}
-        </span>
-        <span aria-live="polite" className="v19-questionnaire-mobile-save" role="status">
-          {saveMessage}
-        </span>
-        {!readinessStats.canSubmit ? (
-          <button
-            aria-label={`Перейти к блокеру: ${mobileBlockerLabel}`}
-            type="button"
-            onClick={focusFirstBlocker}
-          >
-            К блокеру
-          </button>
-        ) : null}
-      </div>
-
       <p aria-atomic="true" aria-live="polite" className="sr-only" role="status">
         Контекст анкеты: заявитель {activeApplicantContext?.name ?? "не выбран"}; раздел{" "}
         {activeSectionContext?.title ?? "не выбран"}.
@@ -5179,6 +5193,21 @@ export function FigmaQuestionnaireScreen({
 
       <div className="v19-questionnaire-scroll">
         <div className="v19-questionnaire-scroll-frame max-w-[var(--v19b-size-1240)] mx-auto flex flex-col h-full min-h-0 gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
+          {questionnaireStatus.readOnly ? (
+            <section
+              className="v19-questionnaire-next-blocker"
+              data-testid="questionnaire-read-only-banner"
+              role="status"
+            >
+              <AlertCircle aria-hidden="true" className="w-4 h-4" />
+              <div className="min-w-0">
+                <strong>{questionnaireStatus.readOnly.label}</strong>
+                <p className="text-[var(--v19b-size-12)] text-white/60 leading-relaxed">
+                  {questionnaireStatus.readOnly.message}
+                </p>
+              </div>
+            </section>
+          ) : null}
           <div className="v19-questionnaire-applicant-bar">
             <div
               aria-label="Заявители"
@@ -5229,7 +5258,7 @@ export function FigmaQuestionnaireScreen({
                         )}
                       </QuestionnaireProgressBadge>
                     </button>
-                    {applicant.status !== "complete" ? (
+                    {isEditable && applicant.status !== "complete" ? (
                       <button
                         aria-label={`Следующее незаполненное: ${applicant.name}`}
                         className="v19-questionnaire-draft-button min-w-[var(--v19b-size-40)] min-h-[var(--v19b-size-40)] shrink-0 px-0"
@@ -5294,7 +5323,7 @@ export function FigmaQuestionnaireScreen({
                 </QuestionnaireProgressBadge>
               </button>
             ))}
-            {!showEuRelativeSection ? (
+            {isEditable && !showEuRelativeSection ? (
               <button
                 className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
                 disabled={!isEditable}
@@ -5338,23 +5367,25 @@ export function FigmaQuestionnaireScreen({
                       ? saveMessage
                       : "Поиск по полям и значениям"}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
-                    type="button"
-                    onClick={focusNextIncomplete}
-                  >
-                    Следующее поле
-                  </button>
-                  <button
-                    className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
-                    disabled={readinessStats.canSubmit}
-                    type="button"
-                    onClick={focusFirstBlocker}
-                  >
-                    Блокер
-                  </button>
-                </div>
+                {isEditable ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
+                      type="button"
+                      onClick={focusNextIncomplete}
+                    >
+                      Следующее поле
+                    </button>
+                    <button
+                      className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
+                      disabled={readinessStats.canSubmit}
+                      type="button"
+                      onClick={focusFirstBlocker}
+                    >
+                      Блокер
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <div
@@ -5399,7 +5430,7 @@ export function FigmaQuestionnaireScreen({
                     </QuestionnaireProgressBadge>
                   </button>
                 ))}
-                {!showEuRelativeSection ? (
+                {isEditable && !showEuRelativeSection ? (
                   <button
                     className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
                     disabled={!isEditable}
@@ -5413,7 +5444,7 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel">
-              {activePassportReviewIssue && onConfirmPassportReview ? (
+              {isEditable && activePassportReviewIssue && onConfirmPassportReview ? (
                 <button
                   className="v19-questionnaire-passport-review-button"
                   data-testid="questionnaire-confirm-passport-review"
@@ -5431,7 +5462,7 @@ export function FigmaQuestionnaireScreen({
                   </span>
                 </button>
               ) : null}
-              {!readinessStats.canSubmit && !currentSectionIssue ? (
+              {isEditable && !readinessStats.canSubmit && !currentSectionIssue ? (
                 <button
                   aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
                     mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
@@ -5493,7 +5524,7 @@ export function FigmaQuestionnaireScreen({
                         : currentSectionIssue.comment}
                     </p>
                   </div>
-                  {currentSectionIssue.status === "open" && onMarkIssueFixed ? (
+                  {isEditable && currentSectionIssue.status === "open" && onMarkIssueFixed ? (
                     <div className="flex shrink-0 flex-col items-end gap-2">
                       <button
                         aria-busy={
@@ -5522,7 +5553,7 @@ export function FigmaQuestionnaireScreen({
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {canCopyFamilyWide ? (
+                {isEditable && canCopyFamilyWide ? (
                   <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
                     <button
                       aria-describedby={familyCopyMessage ? familyCopyStatusId : undefined}
@@ -5585,13 +5616,15 @@ export function FigmaQuestionnaireScreen({
                 </QuestionnaireFieldUiContext.Provider>
               </div>
 
-              <button
-                className="v19-questionnaire-next-button v19-questionnaire-next-button--simple"
-                type="button"
-                onClick={focusNextIncomplete}
-              >
-                Продолжить
-              </button>
+              {isEditable ? (
+                <button
+                  className="v19-questionnaire-next-button v19-questionnaire-next-button--simple"
+                  type="button"
+                  onClick={focusNextIncomplete}
+                >
+                  Продолжить
+                </button>
+              ) : null}
             </div>
           </QuestionnaireWorkspaceShell>
         </div>

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import {
   collectBrowserProblems,
@@ -44,6 +44,88 @@ async function openAgentSubmissions(page: Page) {
     await page.getByRole("button", { name: "Мои подачи" }).click();
   }
 
+  await expect(page.getByLabel("Поиск по подачам")).toBeVisible();
+}
+
+async function revealLastDrawerFile(
+  page: Page,
+  submissionDrawer: Locator,
+  viewport: (typeof viewports)[number],
+) {
+  const drawerBody = submissionDrawer.locator(".v19-submission-drawer-body");
+  const fileRows = drawerBody.locator(".v19-submission-drawer-file");
+  const lastFile = fileRows.last();
+  const footer = submissionDrawer.locator(".v19-submission-drawer-footer");
+
+  expect(await fileRows.count()).toBeGreaterThan(1);
+  await drawerBody.hover();
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const [fileBox, footerBox] = await Promise.all([
+      lastFile.boundingBox(),
+      footer.boundingBox(),
+    ]);
+    if (
+      fileBox &&
+      footerBox &&
+      fileBox.y >= 0 &&
+      fileBox.y + fileBox.height <= footerBox.y
+    ) {
+      await expect(lastFile).toBeVisible();
+      await page.screenshot({
+        fullPage: false,
+        path: join(evidenceDir, `${viewport.label}-drawer-files-bottom.png`),
+      });
+      return;
+    }
+    await page.mouse.wheel(0, 520);
+    await page.waitForTimeout(120);
+  }
+
+  const [fileBox, footerBox] = await Promise.all([
+    lastFile.boundingBox(),
+    footer.boundingBox(),
+  ]);
+  expect(fileBox, "the last file must stay above the drawer footer after user scroll").not.toBeNull();
+  expect(footerBox, "the drawer footer must remain visible").not.toBeNull();
+  if (fileBox && footerBox) {
+    expect(fileBox.y).toBeGreaterThanOrEqual(0);
+    expect(fileBox.y + fileBox.height).toBeLessThanOrEqual(footerBox.y);
+  }
+
+  await page.screenshot({
+    fullPage: false,
+    path: join(evidenceDir, `${viewport.label}-drawer-files-bottom.png`),
+  });
+}
+
+async function expectQuestionnaireAndReturn(
+  page: Page,
+  viewport: (typeof viewports)[number],
+  screenshot: string,
+  options?: { readOnly?: boolean },
+) {
+  await expect(page.getByRole("button", { name: "Назад" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Анкета:/ })).toBeVisible();
+  if (options?.readOnly) {
+    await expect(page.getByTestId("questionnaire-read-only-status")).toBeVisible();
+    await expect(page.getByTestId("questionnaire-read-only-banner")).toContainText(
+      "Исправления отправлены администратору",
+    );
+    await expect(page.getByRole("button", { name: "Черновик" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Отправить/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "К блокеру" })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Заполнить общие поля семьи" }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Следующее поле" })).toHaveCount(0);
+    await expect(page.getByTestId("questionnaire-next-blocker")).toHaveCount(0);
+  }
+  await page.screenshot({
+    fullPage: false,
+    path: join(evidenceDir, `${viewport.label}-${screenshot}.png`),
+  });
+  await page.getByRole("button", { name: "Назад" }).click();
   await expect(page.getByLabel("Поиск по подачам")).toBeVisible();
 }
 
@@ -177,7 +259,7 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       await emptyState.getByRole("button", { name: "Сбросить фильтры" }).click();
       await expect(cards).toHaveCount(totalCards);
 
-      const correctionsCard = page.locator('[data-submission-id="ПД-1055"]');
+      const correctionsCard = page.locator('button.v19-queue-card[data-submission-id="ПД-1055"]');
       await expect(correctionsCard).toBeVisible();
       await expect(correctionsCard).toContainText("Исправление");
       await expect(correctionsCard).toContainText("Открыть");
@@ -210,15 +292,15 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         path: join(evidenceDir, `${viewport.label}-drawer.png`),
       });
 
-      const drawerTabs = [
+        const drawerTabs = [
         { label: "Заявители", panelText: "Состав подачи и готовность анкеты каждого участника.", screenshot: "applicants" },
-        { label: "Анкета", panelText: "Открыть анкету", screenshot: "questionnaire" },
+        { label: "Анкета", panelText: "Смотреть анкету", screenshot: "questionnaire" },
         { label: "Файлы", panelText: "Файлы подачи", screenshot: "files" },
         { label: "Замечания", panelText: "Список задач по замечаниям", screenshot: "issues" },
         { label: "История", panelText: undefined, screenshot: "history" },
       ] as const;
 
-      for (const tabProof of drawerTabs) {
+        for (const tabProof of drawerTabs) {
         const tab = submissionDrawer.getByRole("tab", {
           name: new RegExp(`^${tabProof.label}`),
         });
@@ -227,12 +309,40 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         const panel = submissionDrawer.getByRole("tabpanel", { name: tabProof.label });
         await expect(panel).toBeVisible();
         if (tabProof.panelText) await expect(panel).toContainText(tabProof.panelText);
-        await page.screenshot({
-          fullPage: false,
-          path: join(evidenceDir, `${viewport.label}-drawer-${tabProof.screenshot}.png`),
-        });
-      }
+          await page.screenshot({
+            fullPage: false,
+            path: join(evidenceDir, `${viewport.label}-drawer-${tabProof.screenshot}.png`),
+          });
 
+          if (tabProof.screenshot === "files") {
+            await revealLastDrawerFile(page, submissionDrawer, viewport);
+          }
+        }
+
+      const questionnaireTab = submissionDrawer.getByRole("tab", { name: /^Анкета/ });
+      await questionnaireTab.click();
+      await expect(submissionDrawer.getByRole("tabpanel", { name: "Анкета" })).toContainText(
+        "Исправления отправлены",
+      );
+      await submissionDrawer.getByRole("button", { name: "Смотреть анкету" }).click();
+      await expect(submissionDrawer).toBeHidden();
+      await expectQuestionnaireAndReturn(
+        page,
+        viewport,
+        "drawer-questionnaire-read-only",
+        { readOnly: true },
+      );
+
+      await correctionsCard.click();
+      await expect(submissionDrawer).toBeVisible();
+      const issuesTab = submissionDrawer.getByRole("tab", { name: /^Замечания/ });
+      await issuesTab.click();
+      await expect(submissionDrawer.getByRole("tabpanel", { name: "Замечания" })).toContainText(
+        "Исправления на проверке",
+      );
+      await expect(
+        submissionDrawer.getByRole("button", { name: "Исправить в анкете" }),
+      ).toHaveCount(0);
       await submissionDrawer.getByRole("button", { name: /Закрыть (подачу|панель)/ }).click();
 
       const dimensions = await page.evaluate(() => ({

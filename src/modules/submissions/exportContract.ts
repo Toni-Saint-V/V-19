@@ -79,13 +79,17 @@ function buildExportContractRow(
   const hotelEmail = field("hotel-email");
   const hotelAddress = field("hotel-address");
   const hotelContact = digitsOnly(field("hotel-contact"));
+  const invitingPartyType = field("inviting-party-type");
+  const privateHostName = applicantNameParts(hotelName);
   const companyContactPerson = field("company-contact-person");
+  const companyContactName = applicantNameParts(companyContactPerson);
   const companyPhone = digitsOnly(field("company-phone"));
   const costCoveredBySource = field("cost-covered-by");
   const useCompanyContact = isCompanyInvitation(
-    field("inviting-party-type"),
+    invitingPartyType,
     field("purpose"),
   );
+  const usePrivateHostContact = isPrivateInvitation(invitingPartyType);
   const groupLabel = submission.type === "family" ? "Семья" : "Один заявитель";
   const intendedDateOfArrival = normalizeExportContractDate(
     field("arrival-date", submission.tripDateFrom),
@@ -119,8 +123,16 @@ function buildExportContractRow(
     contactPersonCountry: hotelCountry,
     contactPersonEmail: hotelEmail,
     contactPersonFirstName:
-      (useCompanyContact ? companyContactPerson : "") || hotelName,
-    contactPersonLastName: "",
+      (useCompanyContact
+        ? companyContactName.first
+        : usePrivateHostContact
+          ? privateHostName.first
+          : "") || hotelName,
+    contactPersonLastName: useCompanyContact
+      ? companyContactName.surname
+      : usePrivateHostContact
+        ? privateHostName.surname
+        : "",
     contactPersonMobile: (useCompanyContact ? companyPhone : "") || hotelContact,
     contactPersonZipCode: hotelPostalCode,
     costCoveredBy: normalizeCost(costCoveredBySource),
@@ -308,6 +320,10 @@ function isCompanyInvitation(invitingPartyType: string, purpose: string): boolea
     /company|organization|компан|организа/i.test(invitingPartyType) ||
     /business|cultural|medical treatment|official visit|sports|study/i.test(purpose)
   );
+}
+
+function isPrivateInvitation(invitingPartyType: string): boolean {
+  return /inviting person|private host|приглашающее лицо/i.test(invitingPartyType);
 }
 
 function normalizeMeans(value: string): string {

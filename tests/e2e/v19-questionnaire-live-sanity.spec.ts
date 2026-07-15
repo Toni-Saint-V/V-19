@@ -60,6 +60,11 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
     await expect(page.getByRole("button", { exact: true, name: "Следующее поле" })).toBeVisible();
 
+    await page.getByRole("button", { name: /Отель \/ приглашение/ }).first().click();
+    await expect(
+      page.getByText(/ФИО приглашающего лица или название отеля\/компании/),
+    ).toBeVisible();
+
     const editableField = page.locator(".v19-questionnaire-work-panel textarea").first();
     await expect(editableField).toBeVisible();
     await editableField.fill("QA local draft");
@@ -87,7 +92,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(headerBox).not.toBeNull();
     expect(headerBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(844 * 0.15);
 
-    await expect(page.locator(".v19-questionnaire-mobile-status")).toBeVisible();
+    await expect(page.locator(".v19-questionnaire-header-actions")).toBeVisible();
     const blocker = page.getByRole("button", { name: /^Перейти к блокеру:/ });
     await expect(blocker).toBeVisible();
     await blocker.click();
@@ -97,7 +102,12 @@ test.describe("V-19 questionnaire live sanity", () => {
         .locator(".vf-figma-questionnaire-screen")
         .getByText("Санкт-Петербург", { exact: true }),
     ).toBeVisible();
-    await expect(page.locator(".v19-questionnaire-complete-button")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Сохранить и выйти" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Отправить на проверку" }),
+    ).toBeVisible();
 
     await expectNoDocumentOverflow(page);
     await page.screenshot({

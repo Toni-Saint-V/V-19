@@ -1,26 +1,35 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  clearExportSelection,
   clickWorkspaceButton,
   collectBrowserProblems,
-  drawer,
   expectNoHorizontalOverflow,
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
 
-async function clearCurrentExportSelection(page: Page) {
-  const removeButtons = page.getByRole("button", { name: /^Убрать .+ из выгрузки$/ });
-
-  for (let safety = 0; safety < 12 && (await removeButtons.count()) > 0; safety += 1) {
-    await removeButtons.first().click();
-  }
+function exportRowById(page: Page, submissionId: string) {
+  return page.locator(".export-row").filter({ hasText: submissionId }).first();
 }
 
-async function selectExportPackage(page: Page, name: string) {
-  await page.getByRole("button", { name: `Выбрать ${name}` }).click();
+function exportRail(page: Page) {
+  return page.getByRole("complementary", { name: "Контроль пакета" });
+}
+
+async function selectExportPackage(page: Page, submissionId: string) {
+  const row = exportRowById(page, submissionId);
+  await expect(row).toBeVisible();
+  await row.getByRole("checkbox").check();
+}
+
+async function openMobileExportControl(page: Page) {
+  const controlToggle = page.getByRole("button", { name: /^Контроль пакета/ });
+  await expect(controlToggle).toBeVisible();
+  await controlToggle.click();
+  await expect(page.locator(".v19-admin-export-rail-v2.is-mobile-open")).toBeVisible();
 }
 
 test.describe("V-19 export click and section matrix", () => {
-  test("admin export actions move through package, download, history, and PDF context", async ({
+  test("admin export keeps the current Excel and ZIP contract actionable", async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "desktop export proof");
@@ -29,124 +38,121 @@ test.describe("V-19 export click and section matrix", () => {
     await openFreshWorkspace(page, { workspaceEmail: "admin@visaflow.local" });
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
-      page.getByRole("heading", { level: 1, name: /^(Выгрузка|Центр выгрузки)$/ }),
+      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, "desktop export initial");
 
-    await expect(page.getByRole("button", { name: /^(Скачать Excel|Скачать)$/ })).toBeDisabled();
-    await expect(page.getByRole("button", { name: /^(Отметить выгружено|Отметить)$/ })).toBeDisabled();
-    await expect(page.getByText("Сначала сформируйте Excel").first()).toBeVisible();
-    await expect(page.getByLabel("Контекст выгрузки")).toBeVisible();
+    const rail = exportRail(page);
+    await expect(rail).toBeVisible();
+    await expect(rail.getByRole("button", { name: "Сформировать Excel" })).toBeDisabled();
+    await expect(rail.getByRole("button", { name: "Скачать ZIP с Excel" })).toBeDisabled();
+    await expect(rail).toContainText("Выберите хотя бы одну подачу");
 
-    await page
-      .getByRole("button", { name: /Семья ВолковыхSUB-1102/ })
-      .first()
-      .click();
-    await expect(drawer(page)).toBeVisible();
-    await expect(drawer(page).getByText("Семья Волковых")).toBeVisible();
-    await drawer(page).getByRole("button", { name: /Закрыть (проверку|подачу)/ }).click();
-    await expect(drawer(page)).toHaveCount(0);
+    const activeRow = exportRowById(page, "ПД-1054");
+    await expect(activeRow).toBeVisible();
+    await activeRow.click();
+    await expect(rail).toContainText("Активный пакет");
+    await expect(rail).toContainText("Петровы");
 
-    await clearCurrentExportSelection(page);
-    await selectExportPackage(page, "Ольга Фролова");
-    await expect(page.getByText("Сначала сформируйте Excel").first()).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toBeEnabled();
+    await clearExportSelection(page);
+    await selectExportPackage(page, "ПД-1054");
+    await expect(rail).toContainText("Пакет выбран");
+    await expect(rail.getByRole("button", { name: "Сформировать Excel" })).toBeEnabled();
 
-    await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    await expect(
-      page.getByText("Файл сформирован. Теперь скачайте его.").first(),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: /^(Скачать Excel|Скачать)$/ })).toBeEnabled();
+    await rail.getByRole("button", { name: "Сформировать Excel" }).click();
+    await expect(rail).toContainText(/Excel сформирован:/);
 
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: /^(Скачать Excel|Скачать)$/ }).click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
-    await expect(download.failure()).resolves.toBeNull();
-    await expect(
-      page.getByText("Файл скачан. Можно отметить подачу выгруженной.").first(),
-    ).toBeVisible();
+    const excelDownloadPromise = page.waitForEvent("download");
+    await rail.getByRole("button", { name: "Скачать Excel" }).click();
+    const excelDownload = await excelDownloadPromise;
+    expect(excelDownload.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
+    await expect(excelDownload.failure()).resolves.toBeNull();
+    await expect(rail).toContainText(/Excel скачан:/);
 
-    await page.getByRole("button", { name: /^(Отметить выгружено|Отметить)$/ }).click();
-    await expect(page.getByRole("tab", { name: /История/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    const zipDownloadPromise = page.waitForEvent("download");
+    await rail.getByRole("button", { name: "Скачать ZIP с Excel" }).click();
+    const zipDownload = await zipDownloadPromise;
+    expect(zipDownload.suggestedFilename()).toMatch(
+      /^visaflow-export-.+_documents\.zip$/,
     );
-    await expect(
-      page.locator(".export-history-table").getByText("Ольга Фролова"),
-    ).toBeVisible();
-
-    const exportedHistoryRow = page
-      .locator(".export-row")
-      .filter({ hasText: "Ольга Фролова" });
-    await expect(
-      exportedHistoryRow.getByRole("button", { name: /^(Открыть|Проверить) PDF$/ }),
-    ).toHaveCount(0);
-    await expect(exportedHistoryRow.getByText("Нужна проверка PDF")).toBeVisible();
-    await expect(
-      exportedHistoryRow.getByText("PDF записи отсутствует."),
-    ).toBeVisible();
-    await exportedHistoryRow.getByRole("button", { name: /Ольга Фролова/ }).click();
-    await expect(drawer(page)).toBeVisible();
+    await expect(zipDownload.failure()).resolves.toBeNull();
+    await expect(page.getByText(/ZIP скачан:/)).toBeVisible();
+    await expectNoHorizontalOverflow(page, "desktop export after ZIP");
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
 
-  test("admin export blockers explain why disabled actions are blocked", async ({
+  test("admin export queue tabs and filters keep empty states truthful", async ({
     page,
   }, testInfo) => {
-    test.skip(testInfo.project.name !== "chromium", "desktop blocker proof");
+    test.skip(testInfo.project.name !== "chromium", "desktop queue-state proof");
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, { workspaceEmail: "admin@visaflow.local" });
     await clickWorkspaceButton(page, /Выгрузка/);
-    await clearCurrentExportSelection(page);
-    await selectExportPackage(page, "Семья Волковых");
-    await selectExportPackage(page, "Никита Морозов");
+    await clearExportSelection(page);
 
-    await expect(page.getByText("Нельзя смешивать разные города").first()).toBeVisible();
-    const generateButton = page.getByRole("button", { name: "Сформировать Excel" });
-    await expect(generateButton).toBeDisabled();
-    const disabledReasonId = await generateButton.getAttribute("aria-describedby");
+    await page.getByRole("button", { name: "Выбрано" }).click();
+    await expect(page.getByText("Пакеты не выбраны")).toBeVisible();
 
-    expect(disabledReasonId, "generate disabled reason id").toBeTruthy();
-    await expect(page.locator(`[id="${disabledReasonId}"]`)).toContainText(
-      "Нельзя смешивать разные города",
-    );
+    await page.getByRole("button", { name: "Стоп" }).click();
+    await expect(page.getByText("Пакетов с ограничениями нет")).toBeVisible();
+    await expect(
+      exportRail(page).getByRole("button", { name: "Скачать ZIP с Excel" }),
+    ).toBeDisabled();
+
+    await page.getByRole("button", { name: "Доступно" }).click();
+    const typeFilter = page.getByRole("button", { name: /^Тип:/ });
+    await typeFilter.click();
+    await page.getByRole("option", { name: "Семьи" }).click();
+    await expect(page.locator(".export-row").first()).toBeVisible();
+
+    await page.getByLabel("ID, семья или агент").fill("SUB-1102");
+    await expect(exportRowById(page, "SUB-1102")).toBeVisible();
+    await expect(page.locator(".export-row")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "Сбросить фильтры выгрузки" }).click();
+    await expect(typeFilter).toHaveAccessibleName("Тип: Все типы");
+    await expectNoHorizontalOverflow(page, "desktop export queue tabs and filters");
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
 
-  test("mobile export controls remain visible and hittable", async ({
-    page,
-  }, testInfo) => {
+  test("mobile export control sheet stays reachable and closable", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "mobile-chromium", "mobile export proof");
     const browserProblems = collectBrowserProblems(page);
 
     await page.setViewportSize({ height: 844, width: 390 });
     await openFreshWorkspace(page, { workspaceEmail: "admin@visaflow.local" });
-    await clickWorkspaceButton(page, /Выгрузка\. готово к Excel|Выгрузка/);
+    await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Выгрузка" }),
     ).toBeVisible();
-    await expectNoHorizontalOverflow(page, "mobile export");
+    await expectNoHorizontalOverflow(page, "mobile export initial");
 
-    await expect(page.getByText(/1 \/ 4\s+Выбрать пакет/)).toBeVisible();
-    const olgaPackage = page
-      .locator(".v19-export-mobile-package")
-      .filter({ hasText: "Ольга Фролова" });
+    await clearExportSelection(page);
+    await selectExportPackage(page, "ПД-1054");
+    await expect(page.getByRole("button", { name: /^Контроль пакета/ })).toContainText(
+      /1 пакет/,
+    );
 
-    await expect(olgaPackage).toBeVisible();
-    await olgaPackage.getByRole("button", { name: "Выбрать пакет" }).click();
-    await expect(page.getByText(/2 \/ 4\s+Проверить условия/)).toBeVisible();
-    await expect(page.getByText("Пакет экспортируем")).toBeVisible();
+    await openMobileExportControl(page);
+    const rail = exportRail(page);
+    await expect(rail).toContainText("Pre-flight checks");
+    await expect(rail.getByRole("button", { name: "Сформировать Excel" })).toBeEnabled();
+    await expect(rail.getByRole("button", { name: "Скачать ZIP с Excel" })).toBeEnabled();
+    await expectNoHorizontalOverflow(page, "mobile export control sheet");
 
-    const continueButton = page.getByRole("button", { name: "Продолжить" });
-    await expect(continueButton).toBeEnabled();
-    await continueButton.click();
-    await expect(page.getByText(/3 \/ 4\s+Предпросмотр строк/)).toBeVisible();
+    const screenshotPath = testInfo.outputPath("admin-export-mobile-control.png");
+    await page.screenshot({ path: screenshotPath });
+    await testInfo.attach("admin-export-mobile-control", {
+      contentType: "image/png",
+      path: screenshotPath,
+    });
+
+    await rail.getByRole("button", { name: "Закрыть контроль пакета" }).click();
+    await expect(rail).not.toBeVisible();
+    await expectNoHorizontalOverflow(page, "mobile export control closed");
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });

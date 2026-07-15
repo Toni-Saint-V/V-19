@@ -408,6 +408,14 @@ export class LocalDevAuthRegistrationAdapter
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async listAccessRequests(): Promise<AccessRequest[]> {
+    return [...readLocalDevState().accessRequests].sort((a, b) => {
+      const aTimestamp = a.reviewedAt ?? a.createdAt;
+      const bTimestamp = b.reviewedAt ?? b.createdAt;
+      return bTimestamp.localeCompare(aTimestamp);
+    });
+  }
+
   async approveAccessRequest(id: string, adminId: string): Promise<User> {
     const state = readLocalDevState();
     assertAdmin(state, adminId);

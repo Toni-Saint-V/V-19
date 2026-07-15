@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { AdminReviewDrawer } from "../../src/components/AdminReviewDrawer";
 import { ReviewScreen } from "../../src/components/AdminScreens";
@@ -31,30 +31,33 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       />,
     );
 
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(6);
+    const topTabs = within(
+      screen.getByRole("tablist", { name: "Разделы проверки" }),
+    );
+    const tabs = topTabs.getAllByRole("tab");
+    expect(tabs).toHaveLength(2);
     expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
 
-    const mediaTab = screen.getByRole("tab", { name: /Файлы/ });
-    fireEvent.keyDown(mediaTab, { key: "ArrowRight" });
+    const applicantsTab = topTabs.getByRole("tab", { name: /Заявители/ });
+    fireEvent.keyDown(applicantsTab, { key: "ArrowRight" });
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /Замечания/ })).toHaveAttribute(
+      expect(topTabs.getByRole("tab", { name: /Анкета/ })).toHaveAttribute(
         "aria-selected",
         "true",
       ),
     );
 
-    fireEvent.keyDown(screen.getByRole("tab", { name: /Замечания/ }), { key: "Home" });
+    fireEvent.keyDown(topTabs.getByRole("tab", { name: /Анкета/ }), { key: "Home" });
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: "Обзор" })).toHaveAttribute(
+      expect(topTabs.getByRole("tab", { name: /Заявители/ })).toHaveAttribute(
         "aria-selected",
         "true",
       ),
     );
 
-    fireEvent.keyDown(screen.getByRole("tab", { name: "Обзор" }), { key: "End" });
+    fireEvent.keyDown(topTabs.getByRole("tab", { name: /Заявители/ }), { key: "End" });
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /История/ })).toHaveAttribute(
+      expect(topTabs.getByRole("tab", { name: /Анкета/ })).toHaveAttribute(
         "aria-selected",
         "true",
       ),
@@ -139,7 +142,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(dialog).toHaveAttribute("aria-labelledby", "admin-review-drawer-heading");
     expect(screen.getByText("ПД-1053")).toBeInTheDocument();
     expect(screen.getByText("На проверке")).toHaveClass("is-blue");
-    expect(screen.getByTestId("admin-review-verify-passport")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /Файлы/ }));
+    expect(await screen.findByTestId("admin-review-verify-passport")).toBeInTheDocument();
     expect(screen.getAllByTestId("admin-review-add-file-remark")[0]!).toHaveTextContent(
       "Замечание",
     );
@@ -268,6 +272,65 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  test("approves every eligible field in a questionnaire section sequentially", async () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
+    const applicant = submission?.applicants[0];
+    const section = applicant?.sections[0];
+    if (!submission || !applicant || !section) {
+      throw new Error("Expected questionnaire section fixture.");
+    }
+    const onApproveQuestionnaireField = vi.fn().mockResolvedValue(true);
+
+    render(
+      <AdminReviewDrawer
+        isOpen
+        submission={submission}
+        submissionId={submission.id}
+        onAddRemark={() => undefined}
+        onApproveQuestionnaireField={onApproveQuestionnaireField}
+        onClose={() => undefined}
+        onVerifyDocument={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Анкета/ }));
+    const sectionApprove = await screen.findByRole("button", {
+      name: `Апрув всей секции: ${section.title}`,
+    });
+    const sectionElement = sectionApprove.closest("details");
+    if (!sectionElement) throw new Error("Expected questionnaire section element.");
+    const eligibleFieldIds = Array.from(
+      sectionElement.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="admin-review-approve-field"]',
+      ),
+    )
+      .filter((button) => !button.disabled)
+      .map((button) =>
+        button
+          .closest(".admin-review-field-row")
+          ?.id.replace(`admin-review-field-${applicant.id}-`, ""),
+      )
+      .filter((fieldId): fieldId is string => Boolean(fieldId));
+    expect(eligibleFieldIds.length).toBeGreaterThan(0);
+
+    fireEvent.click(sectionApprove);
+
+    await waitFor(() => {
+      expect(onApproveQuestionnaireField).toHaveBeenCalledTimes(
+        eligibleFieldIds.length,
+      );
+    });
+    expect(onApproveQuestionnaireField.mock.calls).toEqual(
+      eligibleFieldIds.map((fieldId) => [
+        {
+          applicantId: applicant.id,
+          fieldId,
+          sectionId: section.id,
+        },
+      ]),
+    );
+  });
+
   test("keeps cells red until persisted admin approval and shows blank fields", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
@@ -333,6 +396,16 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(
       screen.getByRole("button", { name: `Апрув: ${blankField.label}` }),
     ).toBeDisabled();
+    expect(
+      container.querySelector(
+        `#admin-review-field-${applicant.id}-${field.id} .admin-review-row-review-status`,
+      ),
+    ).toHaveTextContent("Подтверждено документом");
+    expect(
+      container.querySelector(
+        `#admin-review-field-${applicant.id}-${blankField.id} .admin-review-row-review-status`,
+      ),
+    ).toHaveTextContent("Поле не заполнено");
   });
 
   test("keeps document comparison and remarks on distinct controls", async () => {
@@ -354,7 +427,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("admin-review-verify-passport"));
+    fireEvent.click(screen.getByRole("tab", { name: /Файлы/ }));
+    fireEvent.click(await screen.findByTestId("admin-review-verify-passport"));
     expect(onVerifyDocument).toHaveBeenCalledTimes(1);
     expect(onAddRemark).not.toHaveBeenCalled();
 
@@ -376,6 +450,10 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     );
     expect(onAddRemark).toHaveBeenCalledTimes(1);
 
+    fireEvent.click(screen.getByRole("tab", { name: /Заявители/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /Файлы/ })).toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByRole("tab", { name: /Файлы/ }));
     await waitFor(() => {
       expect(
@@ -386,7 +464,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(onVerifyDocument).toHaveBeenCalledTimes(2);
   });
 
-  test("opens a review section from the overview decision checklist", async () => {
+  test("switches one applicant subview at a time", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
 
@@ -401,18 +479,22 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Обзор" }));
-    const checklistAction = await screen.findByRole("button", {
-      name: "Открыть раздел: Анкета",
+    const applicantTabs = screen.getByRole("tablist", {
+      name: /Разделы заявителя/,
     });
-    fireEvent.click(checklistAction);
+    expect(within(applicantTabs).getByRole("tab", { name: "Обзор" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.click(within(applicantTabs).getByRole("tab", { name: /Файлы/ }));
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: /Анкета/ })).toHaveAttribute(
+      expect(within(applicantTabs).getByRole("tab", { name: /Файлы/ })).toHaveAttribute(
         "aria-selected",
         "true",
       );
     });
+    expect(await screen.findByTestId("admin-review-verify-passport")).toBeInTheDocument();
   });
 
   test("does not present a blocked package as a successful empty issues state", async () => {
@@ -442,7 +524,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       .not.toHaveClass("is-success");
   });
 
-  test("keeps every review section as a direct tab without a mobile overflow menu", async () => {
+  test("keeps applicant history inside the selected traveler workspace", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
     const onClose = vi.fn();
@@ -458,7 +540,6 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Ещё" })).not.toBeInTheDocument();
     const historyTab = screen.getByRole("tab", { name: /История/ });
     expect(historyTab).toBeInTheDocument();
     fireEvent.click(historyTab);
@@ -477,7 +558,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test("shows an explicit empty state for empty applicants, files, and history", async () => {
+  test("shows explicit empty states for applicants and nested applicant content", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
     const emptySubmission = {
@@ -504,6 +585,23 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         screen.getByRole("heading", { name: "Заявителей пока нет" }),
       ).toBeInTheDocument();
     });
+
+    cleanup();
+    const applicantWithoutAssets = {
+      ...submission,
+      files: [],
+      history: [],
+    };
+    render(
+      <AdminReviewDrawer
+        isOpen
+        submission={applicantWithoutAssets}
+        submissionId={applicantWithoutAssets.id}
+        onAddRemark={() => undefined}
+        onClose={() => undefined}
+        onVerifyDocument={() => undefined}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: /Файлы/ }));
     await waitFor(() => {

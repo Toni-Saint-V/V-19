@@ -279,7 +279,7 @@ const questionnaireBlueprint: Array<{
     stepLabel: "8 из 10",
     fields: [
       { id: "inviting-party-type", label: "Тип принимающей стороны", placeholder: "Выберите тип", control: "select", options: ["Приглашающая компания/организация", "Гостиница/временное жилье", "Приглашающее лицо"] },
-      { id: "hotel-name", label: "ФИО приглашающего лица или название отеля", placeholder: "Введите ФИО или название" },
+      { id: "hotel-name", label: "ФИО приглашающего лица или название отеля/компании", placeholder: "Введите ФИО или название отеля/компании" },
       { id: "hotel-address", label: "Адрес", placeholder: "Введите адрес", span: "full" },
       { id: "hotel-country", label: "Страна", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Spain" },
       { id: "hotel-city", label: "Город", placeholder: "Введите город" },

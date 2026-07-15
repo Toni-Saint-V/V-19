@@ -212,6 +212,27 @@ async function verifyEveryAdminDrawerSubview(
   }
   await openAdminSubmission(page, /Нина Волкова|ПД-1053/);
 
+  // The drawer uses manual activation: arrow keys must select the next tab
+  // and keep keyboard focus on it on both the desktop and mobile tab strip.
+  await openDrawerTab(page, ["Обзор"]);
+  const overviewTab = drawer(page).getByRole("tab", { name: /Обзор/ });
+  const applicantsTab = drawer(page).getByRole("tab", { name: /Заявители/ });
+  const historyTab = drawer(page).getByRole("tab", { name: /История/ });
+  await overviewTab.focus();
+  await expect(overviewTab).toBeFocused();
+
+  await overviewTab.press("ArrowRight");
+  await expect(applicantsTab).toHaveAttribute("aria-selected", "true");
+  await expect(applicantsTab).toBeFocused();
+
+  await applicantsTab.press("End");
+  await expect(historyTab).toHaveAttribute("aria-selected", "true");
+  await expect(historyTab).toBeFocused();
+
+  await historyTab.press("Home");
+  await expect(overviewTab).toHaveAttribute("aria-selected", "true");
+  await expect(overviewTab).toBeFocused();
+
   for (const [id, label] of tabs) {
     await openDrawerTab(page, [label]);
 
@@ -342,6 +363,62 @@ test.describe("V-19 pilot admin review click flow", () => {
     },
   );
 
+  test("admin settings subviews remain reachable on desktop and mobile", async ({ page }, testInfo) => {
+    const browserProblems = collectBrowserProblems(page);
+    const sections = [
+      ["Профиль", "Профиль"],
+      ["Входящие заявки на регистрацию", "Заявки на доступ"],
+      ["Команда и роли", "Команда и роли"],
+      ["Уведомления", "Уведомления"],
+      ["Выгрузка", "Выгрузка"],
+      ["Интерфейс", "Интерфейс"],
+    ] as const;
+
+    for (const viewport of [
+      { height: 900, width: 1440 },
+      { height: 844, width: 390 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await openFreshWorkspace(page, {
+        heading: "Проверка",
+        workspaceEmail: "admin@visaflow.local",
+      });
+      await clickWorkspaceButton(page, /^Настройки$/);
+
+      const navigation = page.getByRole("navigation", {
+        name: "Разделы настроек",
+      });
+      await expect(navigation).toBeVisible();
+
+      for (const [buttonLabel, heading] of sections) {
+        const button = navigation.getByRole("button", { name: buttonLabel });
+        await button.click();
+        await expect(
+          page.getByRole("heading", { level: 2, name: heading, exact: true }),
+        ).toBeVisible();
+        if (viewport.width < 768) {
+          await expectWithinViewport(page, button);
+        }
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        ).toBe(true);
+      }
+
+      const screenshotPath = testInfo.outputPath(
+        `admin-settings-${viewport.width}-interface.png`,
+      );
+      await page.screenshot({ path: screenshotPath });
+      await testInfo.attach(`admin-settings-${viewport.width}-interface`, {
+        contentType: "image/png",
+        path: screenshotPath,
+      });
+    }
+
+    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
+      [],
+    );
+  });
+
   test("admin passport reconciliation stays blocked without protected evidence", async ({
     page,
   }) => {
@@ -446,6 +523,17 @@ test.describe("V-19 pilot admin review click flow", () => {
 
     await expect(exportRow).toBeVisible();
     await exportRow.getByRole("checkbox").check();
+
+    if ((page.viewportSize()?.width ?? 0) < 768) {
+      const controlToggle = page.getByRole("button", {
+        name: /^Контроль пакета/,
+      });
+      await expect(controlToggle).toBeVisible();
+      await controlToggle.click();
+      await expect(
+        page.locator(".v19-admin-export-rail-v2.is-mobile-open"),
+      ).toBeVisible();
+    }
 
     await expectBodyMatches(page, [/Пакет выбран|Excel preview|Excel rows/i]);
 

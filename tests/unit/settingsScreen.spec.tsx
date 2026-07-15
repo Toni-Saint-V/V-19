@@ -124,6 +124,29 @@ describe("SettingsScreen", () => {
     expect(props.onRejectAccessRequest).toHaveBeenCalledWith("access-request-1");
   });
 
+  test("keeps reviewed access requests out of the pending settings queue", () => {
+    renderSettings({
+      accessRequests: [
+        ...sampleAccessRequests,
+        {
+          ...sampleAccessRequests[0],
+          email: "approved.agent@example.com",
+          id: "access-request-approved",
+          status: "approved",
+        },
+      ],
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Входящие заявки на регистрацию/ }),
+    );
+
+    expect(screen.getByLabelText("Новых заявок: 1")).toBeVisible();
+    expect(screen.getByText(/new\.agent@example\.com/)).toBeVisible();
+    expect(screen.queryByText(/approved\.agent@example\.com/)).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Одобрить" })).toHaveLength(1);
+  });
+
   test("updates notification and interface settings through prototype controls", () => {
     const props = renderSettings({ role: "agent" });
 

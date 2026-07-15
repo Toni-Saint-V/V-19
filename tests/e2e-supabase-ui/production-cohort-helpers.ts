@@ -391,6 +391,14 @@ export function buildProductionCohortPlan(runMarker: string) {
   return cases;
 }
 
+export function productionCohortContactEmail(
+  cohortCase: ProductionCohortCase,
+  applicantIndex: number,
+) {
+  const contactSlot = cohortCase.type === "family" ? "family" : applicantIndex + 1;
+  return `v19qa.${cohortCase.caseKey.toLowerCase()}.${contactSlot}@example.invalid`;
+}
+
 function sha256(value: string | Uint8Array) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -806,7 +814,7 @@ async function fillApplicantQuestionnaire(
   cohortCase: ProductionCohortCase,
   applicantIndex: number,
 ) {
-  const contactEmail = `v19qa.${cohortCase.caseKey.toLowerCase()}.${applicantIndex + 1}@example.invalid`;
+  const contactEmail = productionCohortContactEmail(cohortCase, applicantIndex);
   const applicantTabs = questionnaire.locator(".v19-questionnaire-applicant-tab");
   const isChild = cohortCase.type === "family" && applicantIndex >= 2;
   await expect(applicantTabs).toHaveCount(cohortCase.applicantCount);
@@ -941,7 +949,7 @@ async function fillApplicantQuestionnaire(
   );
   await fillQuestionnaireField(
     questionnaire,
-    "ФИО приглашающего лица или название отеля",
+    "ФИО приглашающего лица или название отеля/компании",
     "HOTEL V19 QA MADRID",
   );
   await fillQuestionnaireField(questionnaire, "Адрес", "CALLE QA 10, MADRID");

@@ -336,7 +336,7 @@ function submissionFileFromMediaAssetRow(
   };
 }
 
-function attachDurableMediaAssetRows(
+export function attachDurableMediaAssetRows(
   submission: Submission,
   mediaRows: CockpitMediaAssetRow[],
 ): Submission {
@@ -406,7 +406,7 @@ function statusHistoryMatchKey(item: Submission["history"][number]) {
   return `${item.fromStatus ?? ""}:${item.toStatus ?? ""}:${item.source ?? ""}:${item.note ?? ""}`;
 }
 
-function attachDurableStatusHistoryRows(
+export function attachDurableStatusHistoryRows(
   submission: Submission,
   historyRows: CockpitStatusHistoryRow[],
 ): Submission {

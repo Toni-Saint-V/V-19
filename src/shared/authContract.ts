@@ -71,6 +71,7 @@ export interface AuthRepository {
 
 export interface AccessRequestRepository {
   submitAccessRequest(input: AccessRequestRegistrationInput): Promise<AccessRequest>;
+  listAccessRequests(): Promise<AccessRequest[]>;
   listPendingAccessRequests(): Promise<AccessRequest[]>;
   approveAccessRequest(id: string, adminId: string): Promise<User>;
   rejectAccessRequest(

@@ -5,7 +5,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import {
   X,
   CheckCircle2,
@@ -77,14 +77,9 @@ interface AdminReviewDrawerProps {
   onPublishReturnedPdfHandoff?: (submissionId: string) => void | Promise<void>;
 }
 
-type TabId =
-  | "overview"
-  | "applicants"
-  | "questionnaire"
-  | "media"
-  | "issues"
-  | "history";
+type TabId = "applicants" | "questionnaire";
 type FieldReviewStatus = "approved" | "pending" | "error";
+type ApplicantPanelId = "overview" | "media" | "issues" | "history";
 type DrawerTabDefinition = {
   id: TabId;
   label: string;
@@ -196,6 +191,13 @@ function questionnaireStatusLabel(status: string) {
   return "Статус не определён";
 }
 
+function fieldReviewStatusLabel(status: FieldReviewStatus, value: string) {
+  if (!hasReviewValue(value)) return "Поле не заполнено";
+  if (status === "approved") return "Подтверждено документом";
+  if (status === "error") return "Требуется исправление";
+  return "Не подтверждено документом";
+}
+
 const FieldRow = ({
   id,
   label,
@@ -216,6 +218,7 @@ const FieldRow = ({
   onRemark?: () => void;
 }) => (
   <div
+    data-review-empty={!hasReviewValue(value) || undefined}
     data-review-state={status}
     id={id}
     tabIndex={id ? -1 : undefined}
@@ -232,20 +235,11 @@ const FieldRow = ({
       <strong className="admin-review-row-value">
         {value || "Не заполнено"}
       </strong>
+      <span className="admin-review-row-review-status">
+        {fieldReviewStatusLabel(status, value)}
+      </span>
     </div>
     <div className="admin-review-row-actions">
-      {onRemark && (
-        <button
-          aria-label={`Добавить замечание: ${label}`}
-          data-testid="admin-review-add-remark"
-          type="button"
-          onClick={onRemark}
-          className="admin-review-row-remark admin-review-remark-action"
-          title="Добавить замечание"
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-        </button>
-      )}
       {onApprove && (
         <button
           aria-label={`${status === "approved" ? "Проверено" : "Апрув"}: ${label}`}
@@ -264,7 +258,26 @@ const FieldRow = ({
           type="button"
         >
           <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
-          <span>{approvePending ? "Сохраняем…" : "Апрув"}</span>
+          <span>
+            {approvePending
+              ? "Сохраняем…"
+              : status === "approved"
+                ? "Подтверждено"
+                : "Подтвердить"}
+          </span>
+        </button>
+      )}
+      {onRemark && (
+        <button
+          aria-label={`Добавить замечание: ${label}`}
+          data-testid="admin-review-add-remark"
+          type="button"
+          onClick={onRemark}
+          className="admin-review-row-remark admin-review-remark-action"
+          title="Добавить замечание"
+        >
+          <MessageSquarePlus className="h-4 w-4" />
+          <span>Замечание</span>
         </button>
       )}
     </div>
@@ -295,156 +308,64 @@ function EmptyTabState({
   );
 }
 
-function OverviewTab({
+function applicantRoleLabel(role: Applicant["role"]) {
+  if (role === "spouse") return "Супруг / супруга";
+  if (role === "child") return "Ребёнок";
+  return "Основной турист";
+}
+
+function russianCountLabel(
+  count: number,
+  one: string,
+  few: string,
+  many: string,
+) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  if (lastTwo >= 11 && lastTwo <= 14) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+function applicantInitials(fullName: string) {
+  return fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase("ru-RU"))
+    .join("");
+}
+
+function ApplicantsTab({
   submission,
   primaryAction,
-  onOpenTab,
+  onAddRemark,
+  onVerifyDocument,
 }: {
   submission: Submission | null;
   primaryAction: ActionDecision | null;
-  onOpenTab: (tab: TabId) => void;
+  onAddRemark: AdminReviewDrawerProps["onAddRemark"];
+  onVerifyDocument: AdminReviewDrawerProps["onVerifyDocument"];
 }) {
-  if (!submission) {
-    return (
-      <EmptyTabState
-        title="Заявка не найдена"
-        copy="Откройте реальную карточку из очереди проверки."
-      />
+  const [selectedApplicantId, setSelectedApplicantId] = useState("");
+  const [activePanel, setActivePanel] =
+    useState<ApplicantPanelId>("overview");
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!submission?.applicants.length) {
+      setSelectedApplicantId("");
+      return;
+    }
+
+    setSelectedApplicantId((current) =>
+      submission.applicants.some((applicant) => applicant.id === current)
+        ? current
+        : submission.applicants[0].id,
     );
-  }
+  }, [submission]);
 
-  const openIssues = unresolvedIssues(submission);
-  const acceptedFiles = submission.files.filter(
-    (file) => file.status === "accepted",
-  ).length;
-  const nextAction =
-    primaryAction?.disabled && primaryAction.reason
-      ? primaryAction.reason
-      : (primaryAction?.label ?? "Нет действия");
-  const decisionChecks = [
-    {
-      label: "Анкета",
-      value: `${submission.completeness.questionnaire}% заполнено`,
-      tab: "questionnaire" as const,
-      state: submission.completeness.questionnaire === 100 ? "is-ready" : "is-pending",
-    },
-    {
-      label: "Документы",
-      value: `${acceptedFiles} из ${submission.files.length} приняты`,
-      tab: "media" as const,
-      state: acceptedFiles === submission.files.length ? "is-ready" : "is-pending",
-    },
-    {
-      label: "Замечания",
-      value: openIssues.length
-        ? `${openIssues.length} требуют решения`
-        : "Нет открытых",
-      tab: "issues" as const,
-      state: openIssues.length ? "is-warning" : "is-ready",
-    },
-  ];
-
-  return (
-    <div className="admin-review-overview-tab">
-      <section className="admin-review-overview-hero">
-        <div>
-          <span>Пакет на проверке</span>
-          <h3>{displaySubmissionTitle(submission)}</h3>
-          <p>
-            {submission.city} · {submission.tripDateFrom} – {submission.tripDateTo}
-          </p>
-        </div>
-        <strong>{statusLabelFor(submission.status)}</strong>
-      </section>
-
-      <section className="admin-review-overview-metrics" aria-label="Состояние пакета">
-        {[
-          {
-            label: "Анкета",
-            value: `${submission.completeness.questionnaire}%`,
-            tab: "questionnaire" as const,
-            className:
-              submission.completeness.questionnaire === 100
-                ? "admin-review-metric--checked"
-                : "admin-review-metric--pending",
-          },
-          {
-            label: "Файлы",
-            value: `${acceptedFiles}/${submission.files.length}`,
-            tab: "media" as const,
-            className:
-              submission.files.length > 0 && acceptedFiles === submission.files.length
-                ? "admin-review-metric--checked"
-                : "admin-review-metric--pending",
-          },
-          {
-            label: "Заявители",
-            value: String(submission.applicants.length),
-            tab: "applicants" as const,
-            className: "admin-review-metric--applicants",
-          },
-          {
-            label: "Замечания",
-            value: String(openIssues.length),
-            tab: "issues" as const,
-            className: `admin-review-metric--issues ${openIssues.length ? "is-open is-warning" : "is-clear"}`,
-          },
-        ].map((metric) => (
-          <button
-            aria-label={`Открыть: ${metric.label}`}
-            key={metric.label}
-            className={`admin-review-metric ${metric.className}`}
-            onClick={() => onOpenTab(metric.tab)}
-            type="button"
-          >
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-          </button>
-        ))}
-      </section>
-
-      <section className="admin-review-overview-detail-grid">
-        <div>
-          <span>Маршрут</span>
-          <strong>{submission.city}</strong>
-        </div>
-        <div>
-          <span>Следующее действие</span>
-          <strong>{nextAction}</strong>
-        </div>
-      </section>
-
-      <section
-        className="admin-review-decision-checklist"
-        aria-label="Контроль перед решением"
-      >
-        <header>
-          <div>
-            <span>Контроль перед решением</span>
-            <p>Откройте блок, который требует действия.</p>
-          </div>
-        </header>
-        <ul>
-          {decisionChecks.map((check) => (
-            <li key={check.label} className={check.state}>
-              <button
-                aria-label={`Открыть раздел: ${check.label}`}
-                type="button"
-                onClick={() => onOpenTab(check.tab)}
-              >
-                <span>{check.label}</span>
-                <strong>{check.value}</strong>
-                <ChevronRight aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
-}
-
-function ApplicantsTab({ submission }: { submission: Submission | null }) {
   if (!submission) {
     return (
       <EmptyTabState
@@ -463,44 +384,243 @@ function ApplicantsTab({ submission }: { submission: Submission | null }) {
     );
   }
 
+  const applicant =
+    submission.applicants.find((item) => item.id === selectedApplicantId) ??
+    submission.applicants[0];
+  if (!applicant) return null;
+
+  const applicantFiles = submission.files.filter(
+    (file) => file.applicantId === applicant.id,
+  );
+  const applicantIssues = unresolvedIssues(submission).filter(
+    (issue) => issue.target.applicantId === applicant.id,
+  );
+  const acceptedFiles = applicantFiles.filter(
+    (file) => file.status === "accepted",
+  ).length;
+  const questionnaireFields = applicant.sections.flatMap(
+    (section) => section.fields,
+  );
+  const filledQuestionnaireFields = questionnaireFields.filter((field) =>
+    hasReviewValue(field.value),
+  );
+  const approvedQuestionnaireFields = filledQuestionnaireFields.filter(
+    (field) => fieldStatus(field, applicantIssues) === "approved",
+  ).length;
+  const attentionPanel: ApplicantPanelId | null = applicantIssues.length
+    ? "issues"
+    : applicantFiles.some((file) => file.status !== "accepted")
+      ? "media"
+      : null;
+  const applicantSubmission: Submission = {
+    ...submission,
+    applicants: [applicant],
+    files: applicantFiles,
+    issues: submission.issues.filter(
+      (issue) => issue.target.applicantId === applicant.id,
+    ),
+  };
+  const panels: Array<{
+    id: ApplicantPanelId;
+    label: string;
+    icon: typeof Info;
+    count?: number;
+  }> = [
+    { id: "overview", label: "Обзор", icon: Info },
+    { id: "media", label: "Файлы", icon: ImageIcon, count: applicantFiles.length },
+    {
+      id: "issues",
+      label: "Замечания",
+      icon: FileWarning,
+      count: applicantIssues.length,
+    },
+    {
+      id: "history",
+      label: "История",
+      icon: History,
+      count: submission.history.length,
+    },
+  ];
+
+  const handlePanelTabKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentPanel: ApplicantPanelId,
+  ) => {
+    const currentIndex = panels.findIndex((panel) => panel.id === currentPanel);
+    if (currentIndex < 0) return;
+
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % panels.length;
+    else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + panels.length) % panels.length;
+    } else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = panels.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextPanel = panels[nextIndex]?.id;
+    if (!nextPanel) return;
+    setActivePanel(nextPanel);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`admin-review-traveler-tab-${nextPanel}`)
+        ?.focus({ preventScroll: true });
+    });
+  };
+
   return (
-    <div className="admin-review-applicants-tab">
-      {submission.applicants.map((applicant, index) => {
-        const files = submission.files.filter(
-          (file) => file.applicantId === applicant.id,
-        );
-        const open = unresolvedIssues(submission).filter(
-          (issue) => issue.target.applicantId === applicant.id,
-        );
-        return (
-          <article
-            key={applicant.id}
-            className={index === 0 ? "is-selected" : undefined}
+    <div className="admin-review-travelers" data-testid="admin-review-travelers">
+      <nav aria-label="Заявители пакета" className="admin-review-traveler-switcher">
+        <header>
+          <span>Заявители</span>
+          <em>{submission.applicants.length}</em>
+        </header>
+        <div>
+          {submission.applicants.map((item, index) => {
+            const isSelected = item.id === applicant.id;
+            const itemIssues = unresolvedIssues(submission).filter(
+              (issue) => issue.target.applicantId === item.id,
+            ).length;
+            return (
+              <button
+                aria-controls="admin-review-traveler-workspace"
+                aria-expanded={isSelected}
+                className={isSelected ? "is-selected" : undefined}
+                key={item.id}
+                onClick={() => {
+                  setSelectedApplicantId(item.id);
+                  setActivePanel("overview");
+                }}
+                type="button"
+              >
+                <span>{index + 1}</span>
+                <div>
+                  <strong>{item.fullName}</strong>
+                  <small>{applicantRoleLabel(item.role)}</small>
+                </div>
+                {itemIssues ? <em>{itemIssues}</em> : null}
+                <ChevronRight aria-hidden="true" />
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <section
+        aria-label={`Профиль туриста: ${applicant.fullName}`}
+        className="admin-review-traveler-workspace"
+        id="admin-review-traveler-workspace"
+      >
+        <motion.header
+          animate={{ opacity: 1, scale: 1 }}
+          className="admin-review-traveler-hero"
+          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.985 }}
+          key={applicant.id}
+          transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
+        >
+          <div aria-hidden="true" className="admin-review-traveler-orbit">
+            <i><FileText /></i>
+            <span>{applicantInitials(applicant.fullName) || <Users />}</span>
+            <i><ImageIcon /></i>
+          </div>
+          <div className="admin-review-traveler-identity">
+            <span>{applicantRoleLabel(applicant.role)}</span>
+            <h3>{applicant.fullName}</h3>
+            <p>{submission.city} · {submission.tripDateFrom} – {submission.tripDateTo}</p>
+          </div>
+          <p className="admin-review-traveler-state">
+            {applicantIssues.length
+              ? `${applicantIssues.length} ${russianCountLabel(applicantIssues.length, "замечание", "замечания", "замечаний")} ${applicantIssues.length === 1 ? "требует" : "требуют"} внимания`
+              : `${acceptedFiles}/${applicantFiles.length} файлов принято`}
+          </p>
+        </motion.header>
+
+        <div
+          aria-label={`Разделы заявителя: ${applicant.fullName}`}
+          className="admin-review-traveler-tabs"
+          role="tablist"
+        >
+          {panels.map((panel) => {
+            const isActive = activePanel === panel.id;
+            const isAttention = attentionPanel === panel.id;
+            return (
+              <button
+                aria-controls={`admin-review-traveler-panel-${panel.id}`}
+                aria-selected={isActive}
+                className={`${isActive ? "is-active" : ""} ${
+                  isAttention ? "is-attention" : ""
+                }`}
+                id={`admin-review-traveler-tab-${panel.id}`}
+                key={panel.id}
+                onClick={() => setActivePanel(panel.id)}
+                onKeyDown={(event) => handlePanelTabKeyDown(event, panel.id)}
+                role="tab"
+                tabIndex={isActive ? 0 : -1}
+                type="button"
+              >
+                <panel.icon aria-hidden="true" />
+                <span>{panel.label}</span>
+                {panel.count ? <em>{panel.count}</em> : null}
+                {isAttention ? <i aria-label="Требует внимания" /> : null}
+              </button>
+            );
+          })}
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            animate={{ opacity: 1, x: 0 }}
+            aria-labelledby={`admin-review-traveler-tab-${activePanel}`}
+            className="admin-review-traveler-content"
+            exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, x: -8 }}
+            id={`admin-review-traveler-panel-${activePanel}`}
+            initial={prefersReducedMotion ? false : { opacity: 0, x: 8 }}
+            key={`${applicant.id}:${activePanel}`}
+            role="tabpanel"
+            transition={{ duration: prefersReducedMotion ? 0 : 0.18 }}
           >
-            <header>
-              <span>{index + 1}</span>
-              <strong>{applicant.fullName}</strong>
-              <em className={open.length ? "is-warning" : "is-clear"}>
-                {open.length ? `${open.length} замеч.` : "Без замечаний"}
-              </em>
-            </header>
-            <dl>
-              <div className="admin-review-applicant-metric">
-                <dt>Анкета</dt>
-                <dd>{questionnaireStatusLabel(applicant.questionnaireStatus)}</dd>
+            {activePanel === "overview" ? (
+              <dl className="admin-review-traveler-overview">
+                <div>
+                  <dt>Анкета</dt>
+                  <dd>{questionnaireStatusLabel(applicant.questionnaireStatus)}</dd>
+                </div>
+                <div>
+                  <dt>Проверено полей</dt>
+                  <dd>{approvedQuestionnaireFields}/{filledQuestionnaireFields.length}</dd>
+                </div>
+                <div>
+                  <dt>Файлы</dt>
+                  <dd>{acceptedFiles}/{applicantFiles.length} принято</dd>
+                </div>
+                <div>
+                  <dt>Маршрут</dt>
+                  <dd>{submission.city} · Испания</dd>
+                </div>
+              </dl>
+            ) : null}
+            {activePanel === "media" ? (
+              <MediaTab
+                onAddRemark={onAddRemark}
+                onVerifyDocument={onVerifyDocument}
+                submission={applicantSubmission}
+              />
+            ) : null}
+            {activePanel === "issues" ? (
+              <IssuesTab
+                primaryAction={primaryAction}
+                submission={applicantSubmission}
+              />
+            ) : null}
+            {activePanel === "history" ? (
+              <div className="admin-review-traveler-history">
+                <p>История пакета · {applicant.fullName}</p>
+                <HistoryTab submission={submission} />
               </div>
-              <div className="admin-review-applicant-metric">
-                <dt>Файлы</dt>
-                <dd>{files.length}</dd>
-              </div>
-              <div className="admin-review-applicant-metric">
-                <dt>Разделы</dt>
-                <dd>{applicant.sections.length}</dd>
-              </div>
-            </dl>
-          </article>
-        );
-      })}
+            ) : null}
+          </motion.div>
+        </AnimatePresence>
+      </section>
     </div>
   );
 }
@@ -522,10 +642,12 @@ function QuestionnaireTab({
   const [applicantId, setApplicantId] = useState("");
   const [isApplicantMenuOpen, setApplicantMenuOpen] = useState(false);
   const [pendingApprovalKey, setPendingApprovalKey] = useState("");
+  const [pendingSectionId, setPendingSectionId] = useState("");
   const applicantSelectRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setApplicantMenuOpen(false);
+    setPendingSectionId("");
     if (!submission?.applicants.length) {
       setApplicantId("");
       return;
@@ -617,7 +739,9 @@ function QuestionnaireTab({
               aria-haspopup="listbox"
               aria-label={`Выбранный заявитель: ${selectedApplicantLabel(applicant)}`}
               className="admin-review-applicant-select-trigger"
-              disabled={submission.applicants.length < 2}
+              disabled={
+                submission.applicants.length < 2 || Boolean(pendingSectionId)
+              }
               onClick={() => setApplicantMenuOpen((current) => !current)}
               type="button"
             >
@@ -683,7 +807,7 @@ function QuestionnaireTab({
             type="button"
           >
             <AlertCircle className="h-4 w-4" /> {applicantIssues.length
-              ? `${applicantIssues.length} замечаний`
+              ? `${applicantIssues.length} ${russianCountLabel(applicantIssues.length, "замечание", "замечания", "замечаний")}`
               : "Без замечаний"}
           </button>
         </div>
@@ -692,6 +816,20 @@ function QuestionnaireTab({
       <div className="admin-review-field-pane">
         {applicant.sections.map((section, sectionIndex) => {
           const visibleFields = section.fields;
+          const reviewableFields = visibleFields.filter((field) =>
+            hasReviewValue(field.value),
+          );
+
+          const approvedInSection = reviewableFields.filter(
+            (field) => fieldStatus(field, applicantIssues) === "approved",
+          ).length;
+          const fieldsToApprove = reviewableFields.filter((field) => {
+            const status = fieldStatus(field, applicantIssues);
+            return status !== "approved" && status !== "error";
+          });
+          const isSectionComplete =
+            Boolean(reviewableFields.length) &&
+            approvedInSection === reviewableFields.length;
 
           const unresolvedInSection = visibleFields.some(
             (field) =>
@@ -714,6 +852,56 @@ function QuestionnaireTab({
                 </span>
                 <ChevronDown aria-hidden="true" className="h-4 w-4 text-white/45" />
               </summary>
+              <div className="admin-review-section-review">
+                <span>{approvedInSection}/{reviewableFields.length} заполненных</span>
+                <button
+                  aria-label={`Апрув всей секции: ${section.title}`}
+                  className={`admin-review-section-approve ${
+                    isSectionComplete ? "is-complete" : ""
+                  }`}
+                  data-testid="admin-review-approve-section"
+                  disabled={
+                    !onApproveQuestionnaireField ||
+                    !fieldsToApprove.length ||
+                    Boolean(pendingApprovalKey) ||
+                    Boolean(pendingSectionId)
+                  }
+                  onClick={async () => {
+                    if (
+                      !onApproveQuestionnaireField ||
+                      !fieldsToApprove.length ||
+                      pendingApprovalKey ||
+                      pendingSectionId
+                    ) {
+                      return;
+                    }
+
+                    setPendingSectionId(section.id);
+                    try {
+                      for (const field of fieldsToApprove) {
+                        const approved = await onApproveQuestionnaireField({
+                          applicantId: applicant.id,
+                          fieldId: field.id,
+                          sectionId: section.id,
+                        });
+                        if (approved === false) break;
+                      }
+                    } finally {
+                      setPendingSectionId("");
+                    }
+                  }}
+                  type="button"
+                >
+                  <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                  <span>
+                    {pendingSectionId === section.id
+                      ? "Сохраняем…"
+                      : isSectionComplete
+                        ? "Вся секция подтверждена"
+                        : "Апрув всей секции"}
+                  </span>
+                </button>
+              </div>
               <div className="admin-review-field-table mt-3 space-y-2">
                 {visibleFields.map((field) => {
                   const status = fieldStatus(field, applicantIssues);
@@ -723,7 +911,10 @@ function QuestionnaireTab({
                   return (
                     <FieldRow
                       approveDisabled={approveDisabled}
-                      approvePending={pendingApprovalKey === approvalKey}
+                      approvePending={
+                        pendingApprovalKey === approvalKey ||
+                        pendingSectionId === section.id
+                      }
                       id={fieldDomId(field.id)}
                       key={field.id}
                       label={field.label}
@@ -732,7 +923,13 @@ function QuestionnaireTab({
                       onApprove={
                         onApproveQuestionnaireField
                           ? async () => {
-                              if (approveDisabled || pendingApprovalKey) return;
+                              if (
+                                approveDisabled ||
+                                pendingApprovalKey ||
+                                pendingSectionId
+                              ) {
+                                return;
+                              }
                               setPendingApprovalKey(approvalKey);
                               try {
                                 await onApproveQuestionnaireField({
@@ -1012,7 +1209,7 @@ export function AdminReviewDrawer({
   const drawerRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>("media");
+  const [activeTab, setActiveTab] = useState<TabId>("applicants");
   const activeSubmissionId = submission?.id ?? submissionId;
   const primaryAction = useMemo(
     () => (submission ? getPrimaryAction(submission, "admin", "review") : null),
@@ -1139,7 +1336,7 @@ export function AdminReviewDrawer({
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab("media");
+      setActiveTab("applicants");
       const animationFrame = window.requestAnimationFrame(() => {
         tabListRef.current
           ?.querySelector<HTMLElement>("[role='tab'][aria-selected='true']")
@@ -1152,7 +1349,6 @@ export function AdminReviewDrawer({
 
   const tabs = useMemo<DrawerTabDefinition[]>(
     () => [
-      { id: "overview" as const, label: "Обзор", icon: Info },
       {
         id: "applicants" as const,
         label: "Заявители",
@@ -1166,25 +1362,6 @@ export function AdminReviewDrawer({
         count: submission?.applicants.flatMap((applicant) =>
           applicant.sections.flatMap((section) => section.fields),
         ).length,
-      },
-      {
-        id: "media" as const,
-        label: "Файлы",
-        icon: ImageIcon,
-        count: submission?.files.length,
-      },
-      {
-        id: "issues" as const,
-        label: "Замечания",
-        icon: FileWarning,
-        count: unresolvedIssues(submission).length,
-        isWarning: unresolvedIssues(submission).length > 0,
-      },
-      {
-        id: "history" as const,
-        label: "История",
-        icon: History,
-        count: submission?.history.length,
       },
     ],
     [submission],
@@ -1397,15 +1574,13 @@ export function AdminReviewDrawer({
                   tabIndex={0}
                   transition={{ duration: 0.2 }}
                 >
-                  {activeTab === "overview" && (
-                    <OverviewTab
-                      submission={submission}
-                      primaryAction={primaryAction}
-                      onOpenTab={selectTab}
-                    />
-                  )}
                   {activeTab === "applicants" && (
-                    <ApplicantsTab submission={submission} />
+                    <ApplicantsTab
+                      onAddRemark={onAddRemark}
+                      onVerifyDocument={onVerifyDocument}
+                      primaryAction={primaryAction}
+                      submission={submission}
+                    />
                   )}
                   {activeTab === "questionnaire" && (
                     <QuestionnaireTab
@@ -1414,17 +1589,6 @@ export function AdminReviewDrawer({
                       onApproveQuestionnaireField={onApproveQuestionnaireField}
                     />
                   )}
-                  {activeTab === "media" && (
-                    <MediaTab
-                      onAddRemark={onAddRemark}
-                      onVerifyDocument={onVerifyDocument}
-                      submission={submission}
-                    />
-                  )}
-                  {activeTab === "issues" && (
-                    <IssuesTab primaryAction={primaryAction} submission={submission} />
-                  )}
-                  {activeTab === "history" && <HistoryTab submission={submission} />}
                 </motion.div>
               </AnimatePresence>
             </div>

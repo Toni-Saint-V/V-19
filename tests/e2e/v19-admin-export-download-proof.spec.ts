@@ -53,7 +53,18 @@ test.describe("V-19 admin export download proof", () => {
     await expect(targetRow).toBeVisible();
     await targetRow.getByRole("checkbox").check();
 
-    await expectBodyMatches(page, [/Пакет выбран|Excel preview|Excel rows/i]);
+    const controlToggle = page.getByRole("button", { name: /^Контроль пакета/ });
+    if (await controlToggle.isVisible()) {
+      await controlToggle.click();
+      await expect(
+        page.locator(".v19-admin-export-rail-v2.is-mobile-open"),
+      ).toBeVisible();
+    }
+
+    const controlRail = page.getByRole("complementary", {
+      name: "Контроль пакета",
+    });
+    await expect(controlRail).toContainText(/Пакет выбран|Excel preview|Excel rows/i);
 
     const prepareButton = page
       .getByRole("button", { name: /Сформировать Excel|Excel готов/i })
