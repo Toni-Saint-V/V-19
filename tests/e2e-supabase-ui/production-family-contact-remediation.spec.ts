@@ -23,10 +23,15 @@ import {
   type ProductionCohortAccount,
   type ProductionNetworkLedger,
 } from "./production-cohort-helpers";
-import { resolveProductionCohortDraftPayloadIdentity } from "./production-export-a1-s1-helpers";
+import {
+  resolveProductionCohortDraftPayloadIdentity,
+  resolveProductionFamilyContactReadback,
+  resolveProductionLifecycleMarkerReadback,
+} from "./production-export-a1-s1-helpers";
 import {
   assertProductionFamilyContactWriteUnlock,
   loadOrCreateProductionFamilyContactState,
+  productionFamilyContactRecoveryState,
   productionFamilyContactIssueMarker,
   requiredProductionFamilyContactCaseKey,
   saveProductionFamilyContactState,
@@ -811,7 +816,11 @@ async function openFamilyIssueQuestionnaire(
   let open: Locator;
   if (issueIsFixed) {
     await openDrawerTab(root, /Анкета/);
-    open = root.getByRole("button", { name: "Открыть анкету" }).first();
+    open = root
+      .getByRole("button", {
+        name: /^(?:Открыть|Смотреть|Исправить) анкету$/,
+      })
+      .first();
   } else {
     open = issueCard
       .getByRole("button", { name: /Открыть|Исправить в анкете|Исправить/ })
@@ -838,6 +847,31 @@ async function selectQuestionnaireSection(
   await section.click();
 }
 
+async function resolveFamilyContactRecoveryState(
+  state: ProductionFamilyContactState,
+) {
+  const accounts = loadProductionCohortAccounts();
+  const cohortCase = buildProductionCohortPlan(state.runMarker).find(
+    (candidate) => candidate.caseKey === state.case.caseKey,
+  );
+  invariant(cohortCase, "Family-contact cohort case is absent from the plan.");
+  const contact = await resolveProductionFamilyContactReadback({
+    admin: accounts.admin,
+    expectedEmail: productionCohortContactEmail(cohortCase, 0),
+    expectedIssueReason: familyEmailIssueReason,
+    submissionId: state.case.submissionId,
+  });
+  const lifecycle = await resolveProductionLifecycleMarkerReadback({
+    admin: accounts.admin,
+    marker: productionFamilyContactIssueMarker(state),
+    submissionId: state.case.submissionId,
+  });
+  return productionFamilyContactRecoveryState({
+    contact,
+    lifecycle,
+  });
+}
+
 async function ensureAgentCorrectedAndResubmitted(input: {
   applicantIds: string[];
   browser: Browser;
@@ -847,7 +881,23 @@ async function ensureAgentCorrectedAndResubmitted(input: {
   testInfo: TestInfo;
 }) {
   const { applicantIds, browser, evidence, owner, state, testInfo } = input;
-  if (["resubmitted", "verified"].includes(state.stage)) return;
+  if (state.stage === "verified") return;
+  if (["resubmitting", "resubmitted"].includes(state.stage)) {
+    const recoveryState = await resolveFamilyContactRecoveryState(state);
+    if (recoveryState === "returned") {
+      state.stage = "agent_fixed";
+      await saveProductionFamilyContactState(state);
+    } else {
+      invariant(
+        recoveryState === "resubmitted",
+        "Family-contact resumable checkpoint is not proven by exact durable readback.",
+      );
+      state.nextApplicantIndex = 6;
+      state.stage = "resubmitted";
+      await saveProductionFamilyContactState(state);
+      return;
+    }
+  }
   const session = await openSession(browser, testInfo, owner);
   await runWithFailurePreservingCleanup(async () => {
     const { questionnaire } = await openFamilyIssueQuestionnaire(session, state);
@@ -988,13 +1038,15 @@ async function ensureAgentCorrectedAndResubmitted(input: {
       mutation.contract,
       () => resubmit.click(),
     );
-    await expect(
-      reopened.questionnaire.locator(
-        '.v19-questionnaire-screen-header [role="status"]',
-      ),
-    ).toContainText("Отправлено на проверку", { timeout: 60_000 });
+    invariant(
+      (await resolveFamilyContactRecoveryState(state)) === "resubmitted",
+      "Family-contact resubmission was not proven by exact durable readback.",
+    );
     state.stage = "resubmitted";
     await saveProductionFamilyContactState(state);
+    await expect(
+      reopened.questionnaire.getByTestId("questionnaire-read-only-status"),
+    ).toContainText("Исправления на проверке", { timeout: 60_000 });
   }, () => closeSession(session, evidence));
 }
 
@@ -1006,6 +1058,10 @@ async function verifyFamilyContactReadBack(input: {
   testInfo: TestInfo;
 }) {
   const { browser, evidence, owner, state, testInfo } = input;
+  invariant(
+    (await resolveFamilyContactRecoveryState(state)) === "resubmitted",
+    "Family-contact verification requires exact durable readback.",
+  );
   const session = await openSession(browser, testInfo, owner);
   await runWithFailurePreservingCleanup(async () => {
     const canonicalEmail = `v19qa.${state.case.caseKey.toLowerCase()}.family@example.invalid`;
@@ -1014,7 +1070,12 @@ async function verifyFamilyContactReadBack(input: {
       state.case.submissionId,
     );
     await openDrawerTab(root, /Анкета/);
-    await root.getByRole("button", { name: "Открыть анкету" }).first().click();
+    await root
+      .getByRole("button", {
+        name: /^(?:Открыть|Смотреть|Исправить) анкету$/,
+      })
+      .first()
+      .click();
     const questionnaire = session.page
       .locator(".vf-figma-questionnaire-screen")
       .first();

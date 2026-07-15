@@ -52,6 +52,26 @@ const expectedLifecycleByPhase = new Map([
       ),
     ),
   ],
+  [
+    "all_submitted",
+    new Map(
+      lifecycleByCase.map(([caseKey]) => [
+        caseKey,
+        { stage: "submitted", status: "waiting_review" },
+      ]),
+    ),
+  ],
+  [
+    "family_export_proof",
+    new Map(
+      lifecycleByCase.map(([caseKey]) => [
+        caseKey,
+        caseKey === "A1-F6"
+          ? { stage: "exported", status: "exported" }
+          : { stage: "submitted", status: "waiting_review" },
+      ]),
+    ),
+  ],
 ]);
 
 export function productionCohortFinalGate({

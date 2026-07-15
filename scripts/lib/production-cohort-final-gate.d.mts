@@ -15,7 +15,9 @@ export function productionCohortFinalGate(input: {
     | "pre_export"
     | "post_export"
     | "pre_export_a2_s1"
-    | "post_export_a2_s1";
+    | "post_export_a2_s1"
+    | "all_submitted"
+    | "family_export_proof";
   reports: Array<{ caseKey: string; stage: string; status: string }>;
   totals: ProductionCohortFinalTotals & { storageReadable: number };
 }): boolean;

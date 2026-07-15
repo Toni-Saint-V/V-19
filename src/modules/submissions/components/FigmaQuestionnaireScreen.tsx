@@ -266,6 +266,7 @@ type FigmaQuestionnaireScreenProps = {
   onConfirmPassportReview?: (applicantId: string) => void | Promise<void>;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
   onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
+  onOpenDocuments?: (filter?: QuestionnaireDocumentsFilter) => void;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onSaveDraft?: (values: QuestionnaireCommitPayload) => void | Promise<void>;
   submission: Submission;
@@ -315,6 +316,8 @@ export type QuestionnaireInitialFocus = {
   field?: string;
   section?: string;
 };
+
+export type QuestionnaireDocumentsFilter = "error" | "missing";
 
 type QuestionnaireFormData = {
   appointmentCity: string;
@@ -2525,6 +2528,7 @@ export function FigmaQuestionnaireScreen({
   onConfirmPassportReview,
   onFieldChange,
   onMarkIssueFixed,
+  onOpenDocuments,
   onUploadFile,
   onSaveDraft,
   submission,
@@ -3986,6 +3990,20 @@ export function FigmaQuestionnaireScreen({
     if (!target) return;
     setRevealRequiredErrors(true);
     setSaveStatus("idle");
+    if (target.sectionId === "files" && onOpenDocuments) {
+      const targetFile = target.fileId
+        ? draftSubmission.files.find((file) => file.id === target.fileId)
+        : undefined;
+      const filter: QuestionnaireDocumentsFilter =
+        targetFile?.status === "needs_replacement" ||
+        targetFile?.reviewStatus === "replace_required" ||
+        targetFile?.reviewStatus === "poor_quality"
+          ? "error"
+          : "missing";
+      setSaveMessage("Открываем сборку документов...");
+      onOpenDocuments(filter);
+      return;
+    }
     setSaveMessage(
       target.label
         ? `Сначала: ${target.label}`

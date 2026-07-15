@@ -1924,6 +1924,39 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
+  test("routes file blockers to document collection when that workspace is available", () => {
+    const submission = withQuestionnaireFileIssue(
+      withReadyQuestionnaireFiles(
+        fillEveryQuestionnaireField(
+          createDraftSubmission({
+            applicantNames: ["VOLKOV ANTON"],
+            city: "Москва",
+            familyCount: 1,
+            idScheme: "local",
+            submissions: [],
+            type: "single",
+          }),
+        ),
+      ),
+      "selfie",
+    );
+    const onOpenDocuments = vi.fn();
+
+    render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onOpenDocuments={onOpenDocuments}
+        onUploadFile={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+
+    expect(onOpenDocuments).toHaveBeenCalledWith("error");
+  });
+
   test("resolves an open issue through the full field binding catalog", async () => {
     const submission = withQuestionnaireIssue(
       withReadyQuestionnaireFiles(

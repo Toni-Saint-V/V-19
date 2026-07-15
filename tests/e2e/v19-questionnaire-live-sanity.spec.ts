@@ -26,10 +26,12 @@ async function openQuestionnaire(page: Page) {
   await expect(continueAction.first()).toBeVisible();
   await continueAction.first().click();
 
-  await expect(
-    page.getByRole("heading", { level: 1, name: /^Анкета:/ }),
-  ).toBeVisible();
   await expect(page.locator(".vf-figma-questionnaire-screen")).toBeVisible();
+  await expect(
+    page.locator(
+      ".v19-questionnaire-title-mobile:visible, .v19-questionnaire-title-desktop:visible",
+    ),
+  ).toBeVisible();
 }
 
 async function expectNoDocumentOverflow(page: Page) {
