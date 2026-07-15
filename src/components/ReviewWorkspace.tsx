@@ -127,10 +127,14 @@ export function ReviewWorkspace({
     "loading" | "ready" | "unavailable"
   >("unavailable");
   const [pendingFileType, setPendingFileType] = useState<SubmissionFileType>();
+  const [acceptedFileTypes, setAcceptedFileTypes] = useState<Set<SubmissionFileType>>(
+    () => new Set(),
+  );
   const [acceptanceError, setAcceptanceError] = useState("");
 
   useEffect(() => {
     setVerifiedFieldLabels(new Set());
+    setAcceptedFileTypes(new Set());
     setAcceptanceError("");
   }, [selectedApplicantId, submissionId]);
 
@@ -168,7 +172,8 @@ export function ReviewWorkspace({
   }, [protectedPassportPath, selectedApplicantId, submissionId]);
 
   const canReviewPassport = passportPreviewStatus === "ready";
-  const passportAlreadyAccepted = passportFile?.status === "accepted";
+  const passportAlreadyAccepted =
+    passportFile?.status === "accepted" || acceptedFileTypes.has("passport_scan");
   const allPassportFieldsVerified =
     reviewFields.length > 0 && reviewFields.every((field) => verifiedFieldLabels.has(field.label));
   const canCompletePassport =
@@ -198,6 +203,8 @@ export function ReviewWorkspace({
       });
       if (accepted === false) {
         setAcceptanceError("Не удалось сохранить результат сверки. Повторите попытку.");
+      } else {
+        setAcceptedFileTypes((current) => new Set(current).add(fileType));
       }
     } catch {
       setAcceptanceError("Не удалось сохранить результат сверки. Повторите попытку.");

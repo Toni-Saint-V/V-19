@@ -168,6 +168,34 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
             type="button"
             onClick={() =>
               capture(
+                bridge.onAdminFileAccept?.({
+                  applicantId: "applicant-1",
+                  fileType: "passport_scan",
+                  submissionId: "submission-1",
+                }),
+              )
+            }
+          >
+            Accept passport file
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              capture(
+                bridge.onAdminFileAccept?.({
+                  applicantId: "missing-applicant",
+                  fileType: "passport_scan",
+                  submissionId: "submission-1",
+                }),
+              )
+            }
+          >
+            Accept invalid passport file
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              capture(
                 bridge.onExportPackages?.({
                   documentExport: {
                     applicantCount: 1,
@@ -337,7 +365,22 @@ function resetDeferredRuntime() {
 
 const loadedSubmission = {
   agentId: "agent-owner-uuid",
+  applicants: [{ id: "applicant-1" }],
   exportIdentityVersion: "prepared",
+  files: [
+    {
+      applicantId: "applicant-1",
+      generatedFileName: "demo1_passport_scan.jpg",
+      id: "file-passport-1",
+      status: "pending_review",
+      storageAdapter: "supabase-private",
+      storageBucket: "submission-media",
+      storagePath:
+        "submissions/submission-1/applicants/applicant-1/passport_scan/demo1_passport_scan.jpg",
+      type: "passport_scan",
+      uploadStatus: "uploaded",
+    },
+  ],
   id: "submission-1",
 };
 
@@ -412,6 +455,63 @@ describe("App production workspace runtime", () => {
       expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
       expect(externalIssue).toHaveBeenCalledTimes(1);
     });
+  });
+
+  test("persists an exact protected passport before notifying the external bridge", async () => {
+    const externalFileAccept = vi.fn(async () => undefined);
+    render(<App bridge={{ onAdminFileAccept: externalFileAccept }} />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept passport file" }));
+    await waitFor(() =>
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+    );
+    expect(externalFileAccept).not.toHaveBeenCalled();
+
+    await act(async () => {
+      runtime.resolveSave(new Map([["submission-1", "agent-owner-uuid"]]));
+      await runtime.lastMutationPromise;
+    });
+
+    expect(externalFileAccept).toHaveBeenCalledWith({
+      applicantId: "applicant-1",
+      fileType: "passport_scan",
+      submissionId: "submission-1",
+    });
+  });
+
+  test("does not persist or notify for a passport outside the selected applicant", async () => {
+    const externalFileAccept = vi.fn(async () => undefined);
+    runtime.savePromise = Promise.resolve(new Map([["submission-1", "agent-owner-uuid"]]));
+    render(<App bridge={{ onAdminFileAccept: externalFileAccept }} />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Accept invalid passport file" }),
+    );
+    await act(async () => {
+      await runtime.lastMutationPromise;
+    });
+
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
+    expect(externalFileAccept).not.toHaveBeenCalled();
+    expect(runtime.lastMutationError?.message).toBe(
+      "Нельзя подтвердить файл без защищённого оригинала выбранного заявителя.",
+    );
   });
 
   test("keeps the canonical workspace and surfaces a rejected Supabase mutation", async () => {

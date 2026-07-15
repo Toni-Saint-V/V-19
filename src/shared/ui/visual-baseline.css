@@ -27288,11 +27288,27 @@ body,
   }
 
   [data-admin-review-drawer-surface="workspace"] .admin-review-file-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    width: var(--v19b-size-full);
     justify-content: flex-start !important;
   }
 
-  [data-admin-review-drawer-surface="workspace"] .admin-review-file-verify {
-    flex: 1 1 auto;
+  [data-admin-review-drawer-surface="workspace"] .admin-review-file-status {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  [data-admin-review-drawer-surface="workspace"] :is(
+    .admin-review-file-verify,
+    .admin-review-file-remark
+  ) {
+    min-width: var(--v19b-size-0);
+    width: var(--v19b-size-full);
+  }
+
+  [data-admin-review-drawer-surface="workspace"] .admin-review-file-remark:nth-child(2):last-child {
+    grid-column: 1 / -1;
   }
 
   [data-admin-review-drawer-surface="workspace"] .admin-review-footer {
