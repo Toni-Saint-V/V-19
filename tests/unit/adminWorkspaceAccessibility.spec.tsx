@@ -15,6 +15,7 @@ import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionAc
 import { saveCockpitSubmissionsForProfile } from "../../src/modules/submissions/supabasePersistence";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { AppProfile } from "../../src/types/session";
+import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const persistenceRuntime = vi.hoisted(() => ({
   rpc: vi.fn(async () => ({ error: null })),
@@ -63,7 +64,7 @@ function acceptableReviewSubmission(): Submission {
   const source = initialSubmissions.find((submission) => submission.id === "ПД-1056");
   if (!source) throw new Error("Missing acceptance-ready admin review fixture.");
 
-  return {
+  return adminApproveQuestionnaireForTest({
     ...source,
     id: "review-async-failure",
     issues: [],
@@ -71,7 +72,7 @@ function acceptableReviewSubmission(): Submission {
     status: "submitted_for_review",
     exportState: "not_ready",
     title: "Асинхронная проверка",
-  };
+  });
 }
 
 function productionLikePartialFamily(): Submission {

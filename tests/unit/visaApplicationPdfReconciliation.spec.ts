@@ -24,7 +24,10 @@ import {
   canPerformAction,
 } from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 const pdfTextFrom669308614 = `
 1. Apellido(s)/Фамилия(-и):
@@ -411,7 +414,7 @@ destino, si procede)/
   });
 
   test("does not block acceptance because returned PDF review is post-export", () => {
-    const submitted = submittedFixture();
+    const submitted = adminApproveQuestionnaireForTest(submittedFixture());
     const withPdfReview = applyVisaApplicationPdfReview(
       submitted,
       pdfTextFrom669308614,

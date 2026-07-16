@@ -35,7 +35,10 @@ import type {
   Submission,
   SubmissionAction,
 } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 const allContracts = V19_BUSINESS_CLICK_CONTRACT_LIST;
 const actionContracts = V19_SUBMISSION_ACTION_CLICK_CONTRACTS;
@@ -289,9 +292,11 @@ function successFixtureFor(action: SubmissionAction): Submission {
     case "return_with_issues":
       return submittedWithOpenIssueFixture();
     case "accept":
-      return submittedFixture();
+      return approvedSubmittedFixture();
     case "close_issues_accept":
-      return correctionsReceivedWithFixedIssueFixture();
+      return adminApproveQuestionnaireForTest(
+        correctionsReceivedWithFixedIssueFixture(),
+      );
     case "return_again":
       return correctionsReceivedWithOpenIssueFixture();
     case "generate_export":
@@ -344,6 +349,10 @@ function submittedFixture(): Submission {
   );
   if (!result.ok) throw new Error(result.error.message);
   return result.data;
+}
+
+function approvedSubmittedFixture(): Submission {
+  return adminApproveQuestionnaireForTest(submittedFixture());
 }
 
 function submittedWithOpenIssueFixture(): Submission {
@@ -413,7 +422,11 @@ function correctionsReceivedWithOpenIssueFixture(): Submission {
 }
 
 function readyForExportFixture(): Submission {
-  const result = applySubmissionActionResult(submittedFixture(), "accept", "admin");
+  const result = applySubmissionActionResult(
+    approvedSubmittedFixture(),
+    "accept",
+    "admin",
+  );
   if (!result.ok) throw new Error(result.error.message);
   return result.data;
 }
