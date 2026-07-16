@@ -411,12 +411,12 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
               className="v19-agent-shared-card group"
               type="button"
             >
-              <div className="flex justify-between items-start gap-3 mb-5">
-                <div className="flex gap-3.5 items-center">
+              <div className="v19-applicant-family-header flex justify-between items-start gap-3 mb-5">
+                <div className="v19-applicant-family-main flex gap-3.5 items-center">
                   <div className="v19-agent-submission-family-icon w-11 h-11 bg-white/5 border border-white/5 flex items-center justify-center shadow-inner group-hover:bg-[#6f64ff]/10 group-hover:border-[#6f64ff]/20 transition-colors">
                     <Users className="w-5 h-5 text-white/70 group-hover:text-[#3a45b4] transition-colors" />
                   </div>
-                  <div>
+                  <div className="v19-applicant-family-copy">
                     <h3 className="text-[15px] font-semibold text-white group-hover:text-white transition-colors">{family.title}</h3>
                     <p className="mt-0.5 text-[12px] text-[var(--v19b-color-text-70)]">{peopleCountLabel(family.members.length)}</p>
                   </div>

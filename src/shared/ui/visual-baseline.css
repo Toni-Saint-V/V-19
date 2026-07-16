@@ -5236,9 +5236,38 @@
   flex-direction: column;
 }
 
+.v19-agent-submissions-board .v19-two-row-toolbar {
+  grid-template-rows: var(--v19b-size-44) var(--v19b-size-40);
+}
+
+.v19-agent-submissions-board .v19-admin-toolbar-select {
+  height: var(--v19b-size-44);
+}
+
+.v19-agent-submissions-board .v19-admin-list-header > button {
+  min-height: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+}
+
 /* On tablet the city menu has enough room below its trigger. Opening upward
    hides early options behind the sticky topbar, including the selected city. */
 @media (min-width: 768px) and (max-width: 1023px) {
+  .v19-agent-submissions-board .v19-two-row-toolbar-filters {
+    grid-template-columns: repeat(3, var(--v19b-size-44));
+  }
+
+  .v19-agent-submissions-board .v19-admin-toolbar-select {
+    width: var(--v19b-size-44);
+    min-width: var(--v19b-size-44);
+  }
+
+  .v19-agent-submissions-board
+    .v19-admin-toolbar-controls
+    > .v19-admin-toolbar-select {
+    width: var(--v19b-size-44);
+    min-width: var(--v19b-size-44);
+  }
+
   .v19-agent-submissions-board .v19-admin-city-filter .v19-admin-toolbar-select-menu {
     top: calc(100% + var(--v19b-size-6));
     bottom: auto;
@@ -5284,6 +5313,7 @@
 
 .v19-agent-submissions-list {
   display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
   gap: var(--v19b-size-8);
   min-width: var(--v19b-size-0);
   padding: var(--v19b-size-12);
@@ -5291,6 +5321,7 @@
 
 .v19-agent-submissions-group {
   display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
   gap: var(--v19b-size-8);
   min-width: var(--v19b-size-0);
   padding: var(--v19b-size-12);
@@ -5586,6 +5617,27 @@
   .v19-agent-submissions-cards {
     gap: var(--v19b-size-12);
     padding: var(--v19b-size-12);
+  }
+
+  .v19-agent-submissions-board .v19-applicant-family-header,
+  .v19-agent-submissions-board .v19-applicant-card-footer {
+    flex-wrap: wrap;
+  }
+
+  .v19-agent-submissions-board .v19-applicant-family-main,
+  .v19-agent-submissions-board .v19-applicant-family-copy {
+    min-width: var(--v19b-size-0);
+  }
+
+  .v19-agent-submissions-board .v19-applicant-family-copy h3 {
+    overflow-wrap: anywhere;
+  }
+
+  .v19-agent-submissions-board .v19-applicant-card-city,
+  .v19-agent-submissions-board .v19-applicant-card-footer-actions {
+    max-width: var(--v19b-size-full);
+    flex-wrap: wrap;
+    margin-left: auto;
   }
 }
 
@@ -29145,10 +29197,10 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   .v19-admin-queue-toolbar.v19-two-row-toolbar {
     display: grid !important;
     grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) max-content !important;
-    grid-template-rows: var(--v19b-size-40) !important;
+    grid-template-rows: var(--v19b-size-44) !important;
     align-items: center !important;
     gap: var(--v19b-size-8) !important;
-    min-height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-44) !important;
     padding: var(--v19b-size-12) !important;
     overflow: visible !important;
   }
@@ -29189,9 +29241,10 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
       .v19-admin-toolbar-controls > .v19-admin-toolbar-select,
       .v19-admin-city-filter
     ) {
-    width: var(--v19b-size-40) !important;
-    min-width: var(--v19b-size-40) !important;
-    flex: 0 0 var(--v19b-size-40) !important;
+    width: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    flex: 0 0 var(--v19b-size-44) !important;
   }
 
   .v19-admin-queue-toolbar .v19-admin-toolbar-select-trigger {
@@ -29222,7 +29275,12 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   section[data-testid="agent-actions-screen"]
     .v19-admin-queue-toolbar.v19-two-row-toolbar {
     grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
-    grid-template-rows: var(--v19b-size-40) var(--v19b-size-40) !important;
+    grid-template-rows: var(--v19b-size-44) var(--v19b-size-44) !important;
+  }
+
+  .v19-admin-list-header > button {
+    min-height: var(--v19b-size-40);
+    height: var(--v19b-size-40);
   }
 
   section[data-testid="agent-actions-screen"]
@@ -31246,7 +31304,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 @media (max-width: 360px) {
   section[data-testid="agent-actions-screen"]
     .v19-admin-queue-toolbar.v19-two-row-toolbar {
-    grid-template-rows: var(--v19b-size-40) auto !important;
+    grid-template-rows: var(--v19b-size-44) auto !important;
   }
 
   section[data-testid="agent-actions-screen"]
