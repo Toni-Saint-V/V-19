@@ -70,6 +70,19 @@ function pendingInviteIdentity(
   return { email, userId };
 }
 
+function verifiedInviteIdentity(
+  session: SupabaseInviteSession | null,
+): { email: string; userId: string } | null {
+  const email = session?.user.email?.trim().toLowerCase();
+  const userId = session?.user.id.trim();
+
+  if (!email || !userId) {
+    return null;
+  }
+
+  return { email, userId };
+}
+
 export function parseSupabaseInviteCallbackUrl(
   currentUrl: string,
 ): SupabaseInviteCallback | null {
@@ -130,7 +143,11 @@ export async function beginSupabaseInvitePasswordSetup(
     );
   }
 
-  const identity = pendingInviteIdentity(result.data.session);
+  // The callback itself is verified as an invite above. Older deployed
+  // access-request functions did not attach password_setup_required metadata,
+  // so requiring that flag here would strand already invited agents without a
+  // password. Reload recovery remains metadata-gated below.
+  const identity = verifiedInviteIdentity(result.data.session);
   if (!identity) {
     throw new Error("Supabase не подтвердил сессию установки пароля.");
   }

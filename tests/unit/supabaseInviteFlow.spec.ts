@@ -100,6 +100,32 @@ describe("Supabase invite completion", () => {
     expect(auth.verifyOtp).not.toHaveBeenCalled();
   });
 
+  test("accepts a verified legacy invite callback without the setup metadata flag", async () => {
+    const auth = inviteAuthClient();
+    vi.mocked(auth.verifyOtp).mockResolvedValueOnce({
+      data: {
+        session: {
+          user: {
+            email: "legacy.invite@example.test",
+            id: "legacy-invite-user-id",
+            user_metadata: {},
+          },
+        },
+      },
+      error: null,
+    });
+
+    await expect(
+      beginSupabaseInvitePasswordSetup(
+        auth,
+        "http://127.0.0.1:5191/?token_hash=legacy-token&type=invite",
+      ),
+    ).resolves.toEqual({
+      email: "legacy.invite@example.test",
+      userId: "legacy-invite-user-id",
+    });
+  });
+
   test("updates the password, signs out, and removes callback secrets from the URL", async () => {
     const auth = inviteAuthClient();
 
