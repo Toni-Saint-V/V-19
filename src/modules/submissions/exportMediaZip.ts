@@ -7,6 +7,7 @@ import {
   type DocumentZipDownloader,
 } from "../documents/documentExport";
 import {
+  DOCUMENT_TYPES,
   documentTypeToFrontendMediaType,
   tryNormalizeDocumentType,
   type DocumentAsset,
@@ -80,6 +81,14 @@ export type ExportMediaZipArtifactResult =
   | {
       ok: false;
       reason: ExportMediaZipBlockedReason;
+      safeMessage: string;
+    };
+
+export type ExportMediaZipAuditResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "audit_failed";
       safeMessage: string;
     };
 
@@ -188,6 +197,7 @@ export async function createExportMediaZipArtifact(
       JSON.stringify(
         buildArchiveManifest(orderedSubmissions, identityResult.identity, {
           applicantCount: documents.applicantCount,
+          documentAssetIds: documents.documentAssetIds,
           documentEntries: documents.entries,
           fileCount: documents.fileCount,
           rootFolder: documents.rootFolder,
@@ -227,12 +237,154 @@ export async function createExportMediaZipArtifact(
       workbookFileName: workbookArtifact.fileName,
     };
 
+    const audit = await auditExportMediaZipArtifact(artifact);
+    if (!audit.ok) return audit;
+
     return { ok: true, artifact };
   } catch (error) {
     if (error instanceof DocumentZipBuilderError) {
       return blocked(error.reason, safeMessageForDocumentZipError(error));
     }
     return blocked("zip_failed", "Не удалось сформировать ZIP-файл.");
+  }
+}
+
+export async function auditExportMediaZipArtifact(
+  artifact: ExportMediaZipArtifact,
+): Promise<ExportMediaZipAuditResult> {
+  try {
+    if (artifact.blob.size <= 0) return failedArchiveAudit();
+
+    const archive = await JSZip.loadAsync(await artifact.blob.arrayBuffer());
+    const fileNames = Object.keys(archive.files).filter(
+      (name) => !archive.files[name]?.dir,
+    );
+    const manifestNames = fileNames.filter((name) =>
+      name.endsWith("/manifest.json"),
+    );
+    if (manifestNames.length !== 1) return failedArchiveAudit();
+
+    const manifestName = manifestNames[0];
+    if (!manifestName) return failedArchiveAudit();
+    const manifestEntry = archive.file(manifestName);
+    if (!manifestEntry) return failedArchiveAudit();
+    const manifest = JSON.parse(await manifestEntry.async("string")) as unknown;
+    if (!isArchiveManifest(manifest)) return failedArchiveAudit();
+
+    if (
+      artifact.applicantCount < 1 ||
+      artifact.submissionCount < 1 ||
+      manifest.applicantCount !== artifact.applicantCount ||
+      manifest.fileCount !== artifact.fileCount ||
+      manifest.workbookFileName !== artifact.workbookFileName ||
+      artifact.workbookFileName !== artifact.packageIdentity.fileName ||
+      artifact.fileName !==
+        `visaflow-export-${artifact.packageIdentity.idempotencyKey}_documents.zip` ||
+      artifact.submissionCount !== artifact.packageIdentity.submissionIds.length ||
+      artifact.applicantCount !== artifact.packageIdentity.rowCount ||
+      artifact.fileCount !== artifact.applicantCount * EXPORT_DOCUMENT_TYPES.length ||
+      artifact.documentAssetIds.length !==
+        artifact.applicantCount * DOCUMENT_TYPES.length ||
+      new Set(artifact.documentAssetIds).size !== artifact.documentAssetIds.length ||
+      !exportPackageIdentityMatches(artifact.packageIdentity, manifest.package) ||
+      !sameStringArray(manifest.requiredDocumentTypes, EXPORT_DOCUMENT_TYPES)
+    ) {
+      return failedArchiveAudit();
+    }
+
+    const documentEntries = manifest.documentEntries;
+    if (
+      documentEntries.length !== artifact.fileCount ||
+      new Set(documentEntries).size !== documentEntries.length ||
+      documentEntries.some(
+        (name) => !name.startsWith(`${manifest.rootFolder}/`),
+      )
+    ) {
+      return failedArchiveAudit();
+    }
+
+    if (
+      manifest.submissions.length !== artifact.submissionCount ||
+      !sameStringSet(
+        manifest.submissions.map((submission) => submission.id),
+        artifact.packageIdentity.submissionIds,
+      )
+    ) {
+      return failedArchiveAudit();
+    }
+
+    const manifestApplicants = manifest.submissions.flatMap(
+      (submission) => submission.applicants,
+    );
+    if (manifestApplicants.length !== artifact.applicantCount) {
+      return failedArchiveAudit();
+    }
+
+    const applicantEntries = manifestApplicants.flatMap(
+      (applicant) => applicant.documentEntries,
+    );
+    const applicantAssetIds = manifestApplicants.flatMap(
+      (applicant) => applicant.documentAssetIds,
+    );
+    if (
+      !sameStringArray(applicantEntries, documentEntries) ||
+      !sameStringArray(applicantAssetIds, artifact.documentAssetIds)
+    ) {
+      return failedArchiveAudit();
+    }
+
+    for (const applicant of manifestApplicants) {
+      if (
+        !sameStringArray(applicant.documentTypes, EXPORT_DOCUMENT_TYPES) ||
+        applicant.documentEntries.length !== EXPORT_DOCUMENT_TYPES.length ||
+        new Set(applicant.documentEntries).size !==
+          applicant.documentEntries.length ||
+        applicant.documentAssetIds.length !== DOCUMENT_TYPES.length ||
+        new Set(applicant.documentAssetIds).size !==
+          applicant.documentAssetIds.length
+      ) {
+        return failedArchiveAudit();
+      }
+
+      const observedTypes = applicant.documentEntries.map(
+        archiveDocumentTypeForEntry,
+      );
+      if (
+        observedTypes.some((type) => type === null) ||
+        !sameStringArray(
+          observedTypes as (typeof EXPORT_DOCUMENT_TYPES)[number][],
+          EXPORT_DOCUMENT_TYPES,
+        )
+      ) {
+        return failedArchiveAudit();
+      }
+    }
+
+    const workbookName = `${manifest.rootFolder}/${artifact.workbookFileName}`;
+    const readmeName = `${manifest.rootFolder}/README_ПАКЕТ.txt`;
+    const expectedNames = new Set([
+      ...documentEntries,
+      manifestName,
+      readmeName,
+      workbookName,
+    ]);
+    if (
+      expectedNames.size !== fileNames.length ||
+      fileNames.some((name) => !expectedNames.has(name))
+    ) {
+      return failedArchiveAudit();
+    }
+
+    for (const name of expectedNames) {
+      const entry = archive.file(name);
+      if (!entry || (await entry.async("uint8array")).byteLength <= 0) {
+        return failedArchiveAudit();
+      }
+    }
+
+    return { ok: true };
+  } catch {
+    return failedArchiveAudit();
   }
 }
 
@@ -263,7 +415,7 @@ export function downloadPreparedExportMediaZip(
     runtime.document.body.append(link);
     link.click();
     link.remove();
-    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 0);
+    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 60_000);
     return {
       ok: true,
       applicantCount: artifact.applicantCount,
@@ -510,12 +662,16 @@ function buildArchiveManifest(
   identity: ExportPackageIdentity,
   counts: {
     applicantCount: number;
+    documentAssetIds: string[];
     documentEntries: string[];
     fileCount: number;
     rootFolder: string;
     workbookFileName: string;
   },
 ) {
+  let documentEntryIndex = 0;
+  let documentAssetIndex = 0;
+
   return {
     applicantCount: counts.applicantCount,
     documentEntries: counts.documentEntries,
@@ -526,6 +682,14 @@ function buildArchiveManifest(
     workbookFileName: counts.workbookFileName,
     submissions: submissions.map((submission) => ({
       applicants: submission.applicants.map((applicant) => ({
+        documentAssetIds: counts.documentAssetIds.slice(
+          documentAssetIndex,
+          (documentAssetIndex += DOCUMENT_TYPES.length),
+        ),
+        documentEntries: counts.documentEntries.slice(
+          documentEntryIndex,
+          (documentEntryIndex += EXPORT_DOCUMENT_TYPES.length),
+        ),
         id: applicant.id,
         documentTypes: EXPORT_DOCUMENT_TYPES,
         name: applicant.fullName,
@@ -535,6 +699,130 @@ function buildArchiveManifest(
       title: submission.title,
       type: submission.type,
     })),
+  };
+}
+
+function isArchiveManifest(value: unknown): value is {
+  applicantCount: number;
+  documentEntries: string[];
+  fileCount: number;
+  package: ExportPackageIdentity;
+  requiredDocumentTypes: string[];
+  rootFolder: string;
+  submissions: Array<{
+    applicants: Array<{
+      documentAssetIds: string[];
+      documentEntries: string[];
+      documentTypes: string[];
+      id: string;
+      name: string;
+    }>;
+    id: string;
+  }>;
+  workbookFileName: string;
+} {
+  if (!isRecord(value)) return false;
+  return (
+    Number.isInteger(value.applicantCount) &&
+    Number.isInteger(value.fileCount) &&
+    isStringArray(value.documentEntries) &&
+    isExportPackageIdentity(value.package) &&
+    isStringArray(value.requiredDocumentTypes) &&
+    typeof value.rootFolder === "string" &&
+    value.rootFolder.length > 0 &&
+    isArchiveManifestSubmissions(value.submissions) &&
+    typeof value.workbookFileName === "string" &&
+    value.workbookFileName.length > 0
+  );
+}
+
+function isArchiveManifestSubmissions(
+  value: unknown,
+): value is Array<{
+  applicants: Array<{
+    documentAssetIds: string[];
+    documentEntries: string[];
+    documentTypes: string[];
+    id: string;
+    name: string;
+  }>;
+  id: string;
+}> {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (submission) =>
+        isRecord(submission) &&
+        typeof submission.id === "string" &&
+        Array.isArray(submission.applicants) &&
+        submission.applicants.every(
+          (applicant) =>
+            isRecord(applicant) &&
+            typeof applicant.id === "string" &&
+            typeof applicant.name === "string" &&
+            isStringArray(applicant.documentTypes) &&
+            isStringArray(applicant.documentEntries) &&
+            isStringArray(applicant.documentAssetIds),
+        ),
+    )
+  );
+}
+
+function archiveDocumentTypeForEntry(
+  entryName: string,
+): (typeof EXPORT_DOCUMENT_TYPES)[number] | null {
+  const fileName = entryName.split("/").at(-1) ?? "";
+  return (
+    EXPORT_DOCUMENT_TYPES.find((type) => fileName.includes(`_${type}.`)) ?? null
+  );
+}
+
+function isExportPackageIdentity(value: unknown): value is ExportPackageIdentity {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.contentFingerprint === "string" &&
+    typeof value.fileName === "string" &&
+    (value.format === "csv" || value.format === "xlsx") &&
+    typeof value.idempotencyKey === "string" &&
+    Number.isInteger(value.rowCount) &&
+    isStringArray(value.submissionIds)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function sameStringArray(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((item, index) => item === right[index])
+  );
+}
+
+function sameStringSet(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    new Set(left).size === left.length &&
+    left.every((item) => right.includes(item))
+  );
+}
+
+function failedArchiveAudit(): ExportMediaZipAuditResult {
+  return {
+    ok: false,
+    reason: "audit_failed",
+    safeMessage: "ZIP не прошёл проверку состава. Скачивание и фиксация отменены.",
   };
 }
 

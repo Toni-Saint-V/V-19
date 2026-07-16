@@ -972,6 +972,7 @@ export function applyExportStateToSelection(
         ...submission,
         exportPackage: exportPackage ?? undefined,
         exportState,
+        updatedAt: "сейчас",
       };
     }
     if (exportState === "ready" || exportState === "not_ready") {

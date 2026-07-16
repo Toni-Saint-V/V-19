@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { AdminExportScreen } from "../../src/components/AdminExportScreen";
 import { exportSummary } from "../../src/modules/submissions/exportRules";
@@ -8,6 +8,7 @@ import type { Submission } from "../../src/modules/submissions/types";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 function readySubmission(): Submission {
@@ -78,5 +79,35 @@ describe("active admin export screen", () => {
       within(table).getByText(preview.rows[0]?.[passportColumn] ?? "missing-passport"),
     ).toBeInTheDocument();
     expect(screen.getByText("A:BD · 56 колонок · 1 строка")).toBeInTheDocument();
+  });
+
+  test("prepares Excel before exposing a real browser download link", async () => {
+    const submission = readySubmission();
+    const createObjectURL = vi.fn(() => "blob:verified-export-workbook");
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(globalThis.URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(globalThis.URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+
+    render(<AdminExportScreen submissions={[submission]} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `Выбрать ${submission.listTitle ?? submission.title}`,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Сформировать Excel" }));
+
+    const download = await screen.findByRole("link", { name: "Скачать Excel" });
+    expect(download).toHaveAttribute("href", "blob:verified-export-workbook");
+    expect(download).toHaveAttribute(
+      "download",
+      expect.stringMatching(/^visaflow-export-.+\.xlsx$/),
+    );
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
   });
 });

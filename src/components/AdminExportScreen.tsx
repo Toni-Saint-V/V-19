@@ -34,6 +34,7 @@ import { getSupabaseClient } from "../lib/supabase/client";
 import { applyExportStateToSelection } from "../modules/submissions/submissionActions";
 import {
   buildExportPackageIdentity,
+  exportPackageIdentityMatches,
   exportSummary,
 } from "../modules/submissions/exportRules";
 import { buildSubmissionAiHelperSurface } from "../modules/submissions/aiHelperSurface";
@@ -42,6 +43,7 @@ import type {
   Submission,
 } from "../modules/submissions/types";
 import type { ExportWorkbookArtifact } from "../modules/submissions/exportWorkbook";
+import type { ExportMediaZipArtifact } from "../modules/submissions/exportMediaZip";
 import {
   AdminContextToggle,
   AdminListHeader,
@@ -83,6 +85,11 @@ interface PreparedExportPackage {
   submissionIds: string[];
   submissions: Submission[];
   workbookArtifact: ExportWorkbookArtifact;
+}
+
+interface PreparedExportArchive {
+  artifact: ExportMediaZipArtifact;
+  prepared: PreparedExportPackage;
 }
 
 type ExportQueueTab = "ready" | "selected" | "blocked";
@@ -233,12 +240,53 @@ export function AdminExportScreen({
   const [exportNotice, setExportNotice] = useState("");
   const [preparedExport, setPreparedExport] =
     useState<PreparedExportPackage | null>(null);
+  const [preparedArchive, setPreparedArchive] =
+    useState<PreparedExportArchive | null>(null);
+  const [workbookDownloadUrl, setWorkbookDownloadUrl] = useState("");
+  const [archiveDownloadUrl, setArchiveDownloadUrl] = useState("");
+  const [archiveDownloadStarted, setArchiveDownloadStarted] = useState(false);
   const [mobileControlOpen, setMobileControlOpen] = useState(false);
 
   const clearPreparedExport = () => {
     setPreparedExport(null);
+    setPreparedArchive(null);
+    setArchiveDownloadStarted(false);
     setExportNotice("");
   };
+
+  useEffect(() => {
+    if (!preparedExport) {
+      setWorkbookDownloadUrl("");
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(preparedExport.workbookArtifact.blob);
+      setWorkbookDownloadUrl(url);
+      return () => {
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      };
+    } catch {
+      setWorkbookDownloadUrl("");
+      setExportError("Не удалось подготовить ссылку Excel. Сформируйте файл заново.");
+    }
+  }, [preparedExport]);
+
+  useEffect(() => {
+    if (!preparedArchive) {
+      setArchiveDownloadUrl("");
+      return;
+    }
+    try {
+      const url = URL.createObjectURL(preparedArchive.artifact.blob);
+      setArchiveDownloadUrl(url);
+      return () => {
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      };
+    } catch {
+      setArchiveDownloadUrl("");
+      setExportError("Не удалось подготовить ссылку ZIP. Сформируйте пакет заново.");
+    }
+  }, [preparedArchive]);
 
   useEffect(() => {
     setSelectedRealIds((current) => {
@@ -330,6 +378,8 @@ export function AdminExportScreen({
 
   useEffect(() => {
     setPreparedExport(null);
+    setPreparedArchive(null);
+    setArchiveDownloadStarted(false);
     setExportError("");
   }, [selectedSignature, submissions]);
 
@@ -537,6 +587,8 @@ export function AdminExportScreen({
     try {
       const prepared = await prepareWorkbookForCurrentSelection();
       if (!prepared) return;
+      setPreparedArchive(null);
+      setArchiveDownloadStarted(false);
       setPreparedExport(prepared);
       setExportNotice(`Excel сформирован: ${prepared.identity.fileName}`);
     } catch (error) {
@@ -550,35 +602,27 @@ export function AdminExportScreen({
     }
   };
 
-  const handleDownloadExcel = async () => {
-    setExportError("");
-    setExportNotice("");
-    setIsExporting(true);
-    try {
-      const prepared =
-        preparedExport ?? (await prepareWorkbookForCurrentSelection());
-      if (!prepared) return;
-      const { downloadPreparedExportWorkbookArtifact } =
-        await import("../modules/submissions/exportWorkbook");
-      const downloadResult = downloadPreparedExportWorkbookArtifact(
-        prepared.workbookArtifact,
-      );
-      if (!downloadResult.ok) {
-        setExportError(downloadResult.safeMessage);
-        return;
-      }
-      setPreparedExport(prepared);
-      setExportNotice(`Excel скачан: ${downloadResult.fileName}`);
-    } catch (error) {
-      setExportError(
-        error instanceof Error ? error.message : "Не удалось скачать Excel.",
-      );
-    } finally {
-      setIsExporting(false);
+  const handleWorkbookDownloadClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
+    if (
+      !preparedExport ||
+      !currentIdentity ||
+      !exportPackageIdentityMatches(preparedExport.identity, currentIdentity)
+    ) {
+      event.preventDefault();
+      setExportNotice("");
+      setExportError("Выбор изменился. Сформируйте Excel заново.");
+      return;
     }
+    setExportError("");
+    setExportNotice(
+      `Скачивание Excel начато: ${preparedExport.workbookArtifact.fileName}`,
+    );
   };
 
-  const handleExport = async () => {
+  const handlePrepareArchive = async () => {
     if (selectedCount === 0 || hasExportBlockers) return;
     setExportError("");
     setExportNotice("");
@@ -587,11 +631,9 @@ export function AdminExportScreen({
       const prepared =
         preparedExport ?? (await prepareWorkbookForCurrentSelection());
       if (!prepared) return;
-      const {
-        downloadPreparedExportMediaZip,
-        prepareExportMediaZip,
-        toExportPackageDocumentCommit,
-      } = await import("../modules/submissions/exportMediaZip");
+      const { prepareExportMediaZip } = await import(
+        "../modules/submissions/exportMediaZip"
+      );
       const supabaseClient = getSupabaseClient();
       let zipOptions = {};
       if (!supabaseClient) {
@@ -615,40 +657,15 @@ export function AdminExportScreen({
         setExportError(zipArtifactResult.safeMessage);
         return;
       }
-      const zipResult = downloadPreparedExportMediaZip(
-        zipArtifactResult.artifact,
-      );
-      if (!zipResult.ok) {
-        setExportError(zipResult.safeMessage);
-        return;
-      }
-
-      try {
-        if (!bridge.onExportPackages) {
-          throw new Error("Обработчик фиксации выгрузки недоступен.");
-        }
-        await bridge.onExportPackages({
-          documentExport: toExportPackageDocumentCommit(
-            zipArtifactResult.artifact,
-          ),
-          packageIdentity: zipArtifactResult.artifact.packageIdentity,
-          submissionIds: prepared.submissionIds,
-        });
-      } catch (error) {
-        setExportError(
-          error instanceof Error
-            ? `ZIP скачан, но терминальная фиксация не подтверждена: ${error.message}`
-            : "ZIP скачан, но терминальная фиксация не подтверждена.",
-        );
-        return;
-      }
-
       setPreparedExport(prepared);
-      setExportNotice(`ZIP скачан: ${zipResult.fileName}`);
-      emitVisaflowUiEvent(bridge, {
-        type: "export.start",
-        submissionIds: prepared.submissionIds,
+      setArchiveDownloadStarted(false);
+      setPreparedArchive({
+        artifact: zipArtifactResult.artifact,
+        prepared,
       });
+      setExportNotice(
+        `ZIP проверен: ${zipArtifactResult.artifact.fileName}. Нажмите «Скачать ZIP».`,
+      );
     } catch (error) {
       setExportError(
         error instanceof Error
@@ -658,6 +675,88 @@ export function AdminExportScreen({
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const commitPreparedArchive = async (archive: PreparedExportArchive) => {
+    setExportError("");
+    setExportNotice("Подтверждаем скачивание и фиксируем пакет…");
+    setIsExporting(true);
+    try {
+      const { toExportPackageDocumentCommit } = await import(
+        "../modules/submissions/exportMediaZip"
+      );
+      if (!bridge.onExportPackages) {
+        throw new Error("Обработчик фиксации выгрузки недоступен.");
+      }
+      await bridge.onExportPackages({
+        documentExport: toExportPackageDocumentCommit(archive.artifact),
+        packageIdentity: archive.artifact.packageIdentity,
+        submissionIds: archive.prepared.submissionIds,
+      });
+      setExportError("");
+      setArchiveDownloadStarted(false);
+      setExportNotice(
+        `Скачивание подтверждено, пакет зафиксирован: ${archive.artifact.fileName}`,
+      );
+      emitVisaflowUiEvent(bridge, {
+        type: "export.start",
+        submissionIds: archive.prepared.submissionIds,
+      });
+    } catch (error) {
+      setExportError(
+        error instanceof Error
+          ? `Скачивание ZIP начато, но терминальная фиксация не подтверждена: ${error.message}`
+          : "Скачивание ZIP начато, но терминальная фиксация не подтверждена.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleArchiveDownloadClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    if (isExporting) {
+      event.preventDefault();
+      return;
+    }
+    const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
+    if (
+      !preparedArchive ||
+      !currentIdentity ||
+      !exportPackageIdentityMatches(
+        preparedArchive.artifact.packageIdentity,
+        currentIdentity,
+      )
+    ) {
+      event.preventDefault();
+      setExportNotice("");
+      setExportError("Выбор изменился. Сформируйте ZIP заново.");
+      return;
+    }
+    setExportError("");
+    setExportNotice(
+      `ZIP передан браузеру: ${preparedArchive.artifact.fileName}. После сохранения подтвердите скачивание.`,
+    );
+    setArchiveDownloadStarted(true);
+  };
+
+  const handleConfirmArchiveDownload = () => {
+    if (isExporting || !archiveDownloadStarted) return;
+    const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
+    if (
+      !preparedArchive ||
+      !currentIdentity ||
+      !exportPackageIdentityMatches(
+        preparedArchive.artifact.packageIdentity,
+        currentIdentity,
+      )
+    ) {
+      setExportNotice("");
+      setExportError("Выбор изменился. Сформируйте ZIP заново.");
+      return;
+    }
+    void commitPreparedArchive(preparedArchive);
   };
 
   return (
@@ -1047,16 +1146,25 @@ export function AdminExportScreen({
               >
                 {preparedExport ? "Excel готов" : "Сформировать Excel"}
               </button>
-              <button
-                className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-white/45"
-                disabled={
-                  selectedCount === 0 || hasExportBlockers || isExporting
-                }
-                type="button"
-                onClick={handleDownloadExcel}
-              >
-                Скачать Excel
-              </button>
+              {preparedExport && workbookDownloadUrl ? (
+                <a
+                  className="flex h-9 items-center justify-center rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  download={preparedExport.workbookArtifact.fileName}
+                  href={workbookDownloadUrl}
+                  onClick={handleWorkbookDownloadClick}
+                >
+                  Скачать Excel
+                </a>
+              ) : (
+                <button
+                  className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white/45 disabled:cursor-not-allowed"
+                  disabled
+                  type="button"
+                  title="Сначала сформируйте Excel"
+                >
+                  Скачать Excel
+                </button>
+              )}
             </div>
             <div className="space-y-2">
               <ManifestRow
@@ -1196,19 +1304,57 @@ export function AdminExportScreen({
         </div>
 
         <div className="shrink-0 border-t border-[#242529] bg-[#1a1a1d] p-4">
-          <button
-            onClick={handleExport}
-            disabled={selectedCount === 0 || isExporting || hasExportBlockers}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
-          >
-            {isExporting ? (
-              <UploadCloud className="h-4 w-4 animate-pulse" />
-            ) : (
+          {preparedArchive && archiveDownloadUrl && archiveDownloadStarted ? (
+            <div className="space-y-2">
+              <button
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-wait disabled:opacity-60"
+                data-testid="confirm-export-download"
+                disabled={isExporting}
+                onClick={handleConfirmArchiveDownload}
+                type="button"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {isExporting ? "Фиксируем выгрузку…" : "Подтвердить скачивание"}
+              </button>
+              <a
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#242529] bg-[#1e1e21] text-[12px] font-semibold text-white/75 transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                data-testid="repeat-export-download"
+                download={preparedArchive.artifact.fileName}
+                href={archiveDownloadUrl}
+                onClick={handleArchiveDownloadClick}
+              >
+                <Download className="h-4 w-4" />
+                Скачать ZIP повторно
+              </a>
+            </div>
+          ) : preparedArchive && archiveDownloadUrl ? (
+            <a
+              aria-disabled={isExporting}
+              className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${isExporting ? "cursor-wait opacity-60" : ""}`}
+              data-testid="export-download"
+              download={preparedArchive.artifact.fileName}
+              href={archiveDownloadUrl}
+              onClick={handleArchiveDownloadClick}
+            >
               <Download className="h-4 w-4" />
-            )}
-            {isExporting ? "Формируем пакет…" : "Скачать ZIP с Excel"}
-            {!isExporting && <ArrowRight className="h-4 w-4" />}
-          </button>
+              Скачать ZIP
+              <ArrowRight className="h-4 w-4" />
+            </a>
+          ) : (
+            <button
+              onClick={handlePrepareArchive}
+              disabled={selectedCount === 0 || isExporting || hasExportBlockers}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
+            >
+              {isExporting ? (
+                <UploadCloud className="h-4 w-4 animate-pulse" />
+              ) : (
+                <FileArchive className="h-4 w-4" />
+              )}
+              {isExporting ? "Формируем пакет…" : "Сформировать ZIP с Excel"}
+              {!isExporting && <ArrowRight className="h-4 w-4" />}
+            </button>
+          )}
           <div
             className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? "text-[#d59aa3]" : exportNotice ? "text-[#b8baff]" : "text-white/35"}`}
             id="export-action-hint"
@@ -1220,8 +1366,10 @@ export function AdminExportScreen({
                 ? hasExportBlockers
                   ? selectedPlan.blockers[0]?.reason ??
                     "Уберите ограничения перед выгрузкой"
-                  : preparedExport
-                    ? "Excel готов, можно скачать ZIP"
+                  : preparedArchive
+                    ? "ZIP проверен, можно скачивать"
+                    : preparedExport
+                      ? "Excel готов, сформируйте ZIP"
                     : "Можно сформировать Excel и ZIP"
                 : "Выберите хотя бы одну подачу")}
           </div>

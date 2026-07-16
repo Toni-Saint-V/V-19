@@ -801,7 +801,12 @@ describe("V-19 export rules", () => {
 
   it("keeps download state locked until the selected package is generated", () => {
     const submissions = [
-      fillRequiredQuestionnaireForTest(readyClone({ id: "ПД-1056" })),
+      fillRequiredQuestionnaireForTest(
+        readyClone({
+          id: "ПД-1056",
+          updatedAt: "2026-07-16T12:36:18.000Z",
+        }),
+      ),
     ];
 
     expect(

@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { describe, expect, test, vi } from "vitest";
 import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import {
+  auditExportMediaZipArtifact,
   createExportMediaZipArtifact,
   default as downloadExportMediaZip,
   toExportPackageDocumentCommit,
@@ -257,6 +258,42 @@ describe("export media mega ZIP", () => {
         `${rootFolder}/Москва/Семья Волковых/660011023_selfie_2.jpg`,
       ]),
     );
+  });
+
+  test("audits exactly four mapped files and three unique source assets per applicant", async () => {
+    const selection = generatedSelection(withCanonicalStorage(byId("SUB-1102")));
+    const result = await createExportMediaZipArtifact(selection, {
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument: documentDownloader(),
+      expectedIdentity: identityFor(selection),
+      exportDate,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+    await expect(auditExportMediaZipArtifact(result.artifact)).resolves.toEqual({
+      ok: true,
+    });
+
+    const archive = await JSZip.loadAsync(await result.artifact.blob.arrayBuffer());
+    const missingForm = Object.keys(archive.files).find((name) =>
+      name.endsWith("660011022_visa_form.pdf"),
+    );
+    if (!missingForm) throw new Error("Missing family visa form fixture.");
+    archive.remove(missingForm);
+    const tamperedBlob = await archive.generateAsync({ type: "blob" });
+
+    await expect(
+      auditExportMediaZipArtifact({ ...result.artifact, blob: tamperedBlob }),
+    ).resolves.toMatchObject({ ok: false, reason: "audit_failed" });
+    await expect(
+      auditExportMediaZipArtifact({
+        ...result.artifact,
+        documentAssetIds: result.artifact.documentAssetIds.map((id, index) =>
+          index === 1 ? result.artifact.documentAssetIds[0]! : id,
+        ),
+      }),
+    ).resolves.toMatchObject({ ok: false, reason: "audit_failed" });
   });
 
   test("groups mixed packages by city and submission folder", async () => {

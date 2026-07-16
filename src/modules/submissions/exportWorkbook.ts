@@ -119,7 +119,7 @@ export function downloadPreparedExportWorkbookArtifact(
     runtime.document.body.append(link);
     link.click();
     link.remove();
-    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 0);
+    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 60_000);
     return { ok: true, fileName: artifact.fileName };
   } catch {
     if (url) runtime.URL.revokeObjectURL(url);
