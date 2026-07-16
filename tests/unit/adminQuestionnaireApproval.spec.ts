@@ -5,6 +5,8 @@ import {
   approveQuestionnaireFieldForAdmin,
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
+import { adminQuestionnaireReviewReadiness } from "../../src/modules/submissions/status";
+import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function reviewFixture() {
   const submission = initialSubmissions.find((candidate) => candidate.id === "ПД-1053");
@@ -111,6 +113,80 @@ describe("admin questionnaire field approval", () => {
         "admin-reviewer",
       ),
     ).toBe(withIssue);
+  });
+
+  test("allows admin to confirm a correction marked fixed by the agent", () => {
+    const { applicant, field, section, submission } = reviewFixture();
+    const corrected = {
+      ...submission,
+      issues: [
+        {
+          id: "issue-fixed-field-approval",
+          type: "field" as const,
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: field.label,
+          },
+          reason: "Проверить исправление",
+          comment: "Агент обновил значение",
+          severity: "warning" as const,
+          status: "fixed_by_agent" as const,
+          createdBy: "admin" as const,
+          createdAt: "сейчас",
+        },
+      ],
+    };
+
+    const approved = approveQuestionnaireFieldForAdmin(
+      corrected,
+      {
+        applicantId: applicant.id,
+        fieldId: field.id,
+        sectionId: section.id,
+      },
+      "admin-reviewer",
+      "2026-07-16T07:00:00.000Z",
+    );
+
+    expect(approved).not.toBe(corrected);
+    expect(
+      approved.applicants[0]?.sections
+        .flatMap((candidate) => candidate.fields)
+        .find((candidate) => candidate.id === field.id),
+    ).toMatchObject({
+      adminReviewApprovedAtIso: "2026-07-16T07:00:00.000Z",
+      adminReviewApprovedBy: "admin-reviewer",
+    });
+  });
+
+  test("fails closed until every populated questionnaire field is approved", () => {
+    const { field, submission } = reviewFixture();
+    const approved = adminApproveQuestionnaireForTest(submission);
+    const pending = {
+      ...approved,
+      applicants: approved.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((candidate) =>
+            candidate.id === field.id
+              ? {
+                  ...candidate,
+                  adminReviewApprovedAtIso: undefined,
+                  adminReviewApprovedBy: undefined,
+                }
+              : candidate,
+          ),
+        })),
+      })),
+    };
+
+    expect(adminQuestionnaireReviewReadiness(pending)).toEqual({
+      ok: false,
+      reason: "Подтвердите заполненные поля анкеты перед принятием",
+    });
+    expect(adminQuestionnaireReviewReadiness(approved)).toEqual({ ok: true });
   });
 
   test("revokes an existing approval when admin adds a field remark", () => {

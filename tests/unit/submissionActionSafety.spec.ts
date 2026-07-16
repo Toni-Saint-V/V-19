@@ -18,7 +18,10 @@ import {
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 function reviewReadySubmission(): Submission {
   const draft = createDraftSubmission({
@@ -30,12 +33,12 @@ function reviewReadySubmission(): Submission {
     type: "single",
   });
 
-  return {
+  return adminApproveQuestionnaireForTest({
     ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
     status: "in_progress",
     tripDateFrom: "2026-07-10",
     tripDateTo: "2026-07-18",
-  };
+  });
 }
 
 describe("submission action safety", () => {

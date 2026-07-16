@@ -6,6 +6,7 @@ import {
 } from "./exportRules";
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
 import {
+  adminQuestionnaireReviewReadiness,
   canPerformAction,
   blockerCount,
   calculateSubmissionProgress,
@@ -303,6 +304,13 @@ export function acceptSubmission(
   }
   if (hasMissingRequiredWork(submission)) {
     return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
+  }
+  const questionnaireReview = adminQuestionnaireReviewReadiness(submission);
+  if (!questionnaireReview.ok) {
+    return failure(
+      "VALIDATION_ERROR",
+      questionnaireReview.reason ?? "Questionnaire review must be complete.",
+    );
   }
   if (!hasUsableTripDateRange(submission)) {
     return failure("VALIDATION_ERROR", "Trip dates must be complete.");

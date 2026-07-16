@@ -104,7 +104,7 @@ export function approveQuestionnaireFieldForAdmin(
 
   const hasOpenIssue = submission.issues.some(
     (issue) =>
-      issue.status !== "closed_by_admin" &&
+      issue.status === "open" &&
       issue.target.applicantId === input.applicantId &&
       questionnaireFieldMatchesTarget(field, issue.target.field),
   );

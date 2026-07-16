@@ -33,7 +33,10 @@ import type {
   IssueInput,
   Submission,
 } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -74,12 +77,12 @@ function firstIssueInput(submission: Submission): IssueInput {
 }
 
 function completeInProgressSubmission(): Submission {
-  return {
+  return adminApproveQuestionnaireForTest({
     ...fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
     id: "ПД-DOMAIN-READY",
     status: "in_progress",
     exportState: "not_ready",
-  };
+  });
 }
 
 describe("V-19 domain engine", () => {
@@ -323,6 +326,38 @@ describe("V-19 domain engine", () => {
       ok: false,
       reason: "Есть незакрытые замечания",
     });
+  });
+
+  it("keeps every acceptance API fail-closed until questionnaire review is complete", () => {
+    const reviewed = completeInProgressSubmission();
+    const submitted: Submission = {
+      ...reviewed,
+      applicants: reviewed.applicants.map((applicant, applicantIndex) => ({
+        ...applicant,
+        sections: applicant.sections.map((section, sectionIndex) => ({
+          ...section,
+          fields: section.fields.map((field, fieldIndex) =>
+            applicantIndex === 0 && sectionIndex === 0 && fieldIndex === 0
+              ? {
+                  ...field,
+                  adminReviewApprovedAtIso: undefined,
+                  adminReviewApprovedBy: undefined,
+                }
+              : field,
+          ),
+        })),
+      })),
+      status: "submitted_for_review",
+    };
+
+    expect(acceptSubmission(submitted, "admin")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Подтвердите заполненные поля анкеты перед принятием",
+      },
+    });
+    expect(canAdminApproveForExport(submitted)).toBe(false);
   });
 
   it("treats exported as terminal for mutation commands", () => {

@@ -516,6 +516,7 @@ export function canAdminApproveForExport(submission: Submission) {
       submission.status === "corrections_received") &&
     !hasBlockingIssues(submission) &&
     !hasMissingRequiredWork(submission) &&
+    adminQuestionnaireReviewReadiness(submission).ok &&
     hasRequiredDocuments(submission) &&
     hasUsableTripDateRange(submission)
   );
@@ -562,6 +563,40 @@ export function hasMissingRequiredWork(submission: Submission) {
       (file) => file.status === "missing" || file.status === "needs_replacement",
     )
   );
+}
+
+function hasAdminReviewValue(value: string) {
+  const normalized = value.trim().toLocaleLowerCase("ru-RU");
+  return Boolean(normalized) && normalized !== "—" && normalized !== "не заполнено";
+}
+
+export function adminQuestionnaireReviewReadiness(submission: Submission): {
+  ok: boolean;
+  reason?: string;
+} {
+  const fields = submission.applicants.flatMap((applicant) =>
+    applicant.sections.flatMap((section) => section.fields),
+  );
+
+  if (fields.some((field) => Boolean(field.error))) {
+    return {
+      ok: false,
+      reason: "В анкете есть поля, требующие исправления",
+    };
+  }
+
+  const hasUnapprovedValue = fields.some(
+    (field) =>
+      hasAdminReviewValue(field.value) &&
+      (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
+  );
+
+  return hasUnapprovedValue
+    ? {
+        ok: false,
+        reason: "Подтвердите заполненные поля анкеты перед принятием",
+      }
+    : { ok: true };
 }
 
 export function defaultDrawerTab(submission: Submission): DrawerTab {
@@ -726,6 +761,11 @@ function validateSubmissionActionPolicy(
     hasMissingRequiredWork(submission)
   ) {
     return { ok: false, reason: "Не все обязательные анкеты и файлы готовы" };
+  }
+
+  if (action === "accept" || action === "close_issues_accept") {
+    const questionnaireReview = adminQuestionnaireReviewReadiness(submission);
+    if (!questionnaireReview.ok) return questionnaireReview;
   }
 
   if (

@@ -100,6 +100,29 @@ export function fillRequiredQuestionnaireForTest(submission: Submission): Submis
   return next;
 }
 
+export function adminApproveQuestionnaireForTest(
+  submission: Submission,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.value.trim() && !field.error
+            ? {
+                ...field,
+                adminReviewApprovedAtIso: "2026-07-16T00:00:00.000Z",
+                adminReviewApprovedBy: "admin-reviewer-test",
+              }
+            : field,
+        ),
+      })),
+    })),
+  };
+}
+
 function questionnaireFieldValue(applicant: Submission["applicants"][number] | undefined, fieldId: string) {
   return applicant?.sections
     .flatMap((section) => section.fields)

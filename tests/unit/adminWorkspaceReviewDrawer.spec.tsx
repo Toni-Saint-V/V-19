@@ -16,6 +16,7 @@ import * as mediaStorage from "../../src/modules/submissions/mediaStorage";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionActions";
+import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 afterEach(() => {
   cleanup();
@@ -26,8 +27,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("routes the four review outcomes through the canonical admin actions", () => {
     const corrections = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!corrections) throw new Error("Expected corrections-received fixture.");
+    const reviewedCorrections = adminApproveQuestionnaireForTest(corrections);
     const cleanReview = {
-      ...corrections,
+      ...reviewedCorrections,
       status: "submitted_for_review" as const,
       issues: [],
     };
@@ -39,8 +41,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       severity: "blocker",
       type: "field",
     });
-    const correctionsWithIssue = addPreciseAdminIssue(corrections, {
-      applicantId: corrections.applicants[0]?.id ?? "",
+    const correctionsWithIssue = addPreciseAdminIssue(reviewedCorrections, {
+      applicantId: reviewedCorrections.applicants[0]?.id ?? "",
       comment: "Исправление не прошло повторную проверку.",
       field: "Адрес отеля",
       reason: "Адрес отеля всё ещё требует исправления",
@@ -55,7 +57,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         action: "return_with_issues",
       },
       {
-        submission: corrections,
+        submission: reviewedCorrections,
         button: "Принять на выгрузку",
         action: "close_issues_accept",
       },
@@ -94,8 +96,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("moves a clean accepted submission directly to the export workspace", async () => {
     const corrections = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!corrections) throw new Error("Expected corrections-received fixture.");
+    const reviewedCorrections = adminApproveQuestionnaireForTest(corrections);
     const cleanReview = {
-      ...corrections,
+      ...reviewedCorrections,
       status: "submitted_for_review" as const,
       issues: [],
     };
@@ -216,13 +219,14 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("offers close-and-accept when all remaining issues are fixed by the agent", () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!submission) throw new Error("Expected corrections-received fixture.");
+    const reviewedSubmission = adminApproveQuestionnaireForTest(submission);
     const onPrimaryAction = vi.fn();
 
     render(
       <AdminReviewDrawer
         isOpen
-        submission={submission}
-        submissionId={submission.id}
+        submission={reviewedSubmission}
+        submissionId={reviewedSubmission.id}
         onAddRemark={vi.fn()}
         onClose={vi.fn()}
         onPrimaryAction={onPrimaryAction}
@@ -236,7 +240,10 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       screen.queryByRole("button", { name: "Отправить на исправление" }),
     ).not.toBeInTheDocument();
     fireEvent.click(accept);
-    expect(onPrimaryAction).toHaveBeenCalledWith(submission.id, "close_issues_accept");
+    expect(onPrimaryAction).toHaveBeenCalledWith(
+      reviewedSubmission.id,
+      "close_issues_accept",
+    );
   });
 
   test("uses roving tab focus and arrow, Home, and End navigation", async () => {

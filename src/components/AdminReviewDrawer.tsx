@@ -169,7 +169,12 @@ function issueTargetsFile(issue: Issue) {
 }
 
 function fieldStatus(field: QuestionnaireField, issues: Issue[]): FieldReviewStatus {
-  if (field.error || issues.some((issue) => fieldMatchesIssue(field, issue)))
+  if (
+    field.error ||
+    issues.some(
+      (issue) => issue.status === "open" && fieldMatchesIssue(field, issue),
+    )
+  )
     return "error";
   if (field.adminReviewApprovedAtIso && field.adminReviewApprovedBy) {
     return "approved";

@@ -88,7 +88,10 @@ import type {
   SubmissionStatus,
 } from "../../src/modules/submissions/types";
 import { matchesReviewTab } from "../../src/modules/submissions/uiTypes";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 const canonicalMediaTypes = ["passport_scan", "selfie", "selfie_2"] as const;
 
@@ -139,14 +142,14 @@ function testStorage() {
 }
 
 function readyClone(patch: Partial<Submission>): Submission {
-  return {
+  return adminApproveQuestionnaireForTest({
     ...fillRequiredQuestionnaireForTest(
       canonicalMediaSubmission(byId("ПД-1056")),
     ),
     id: patch.id ?? "ПД-ТЕСТ",
     title: patch.title ?? "Тестовая подача",
     ...patch,
-  };
+  });
 }
 
 function datedPreliminaryIntake() {
@@ -284,8 +287,10 @@ describe("V-19 submission status rules", () => {
   });
 
   it("blocks role-incompatible actions", () => {
-    const submitted = canonicalMediaSubmission(
-      fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+    const submitted = adminApproveQuestionnaireForTest(
+      canonicalMediaSubmission(
+        fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+      ),
     );
 
     expect(canPerformAction(submitted, "accept", "agent")).toEqual({
@@ -333,7 +338,7 @@ describe("V-19 submission status rules", () => {
   });
 
   it("keeps the corrected demo family ready for explicit admin closeout", () => {
-    const corrected = byId("ПД-1055");
+    const corrected = adminApproveQuestionnaireForTest(byId("ПД-1055"));
 
     expect(hasMissingRequiredWork(corrected)).toBe(false);
     expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
@@ -1968,8 +1973,10 @@ describe("V-19 submission actions", () => {
 
   it("records the admin reviewer when accepting uploaded media", () => {
     const adminProfileId = "00000000-0000-4000-8000-000000000002";
-    const submission = canonicalMediaSubmission(
-      fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+    const submission = adminApproveQuestionnaireForTest(
+      canonicalMediaSubmission(
+        fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+      ),
     );
     const reviewableFiles = submission.files.filter((file) =>
       ["uploaded", "pending_review", "accepted"].includes(file.status),
