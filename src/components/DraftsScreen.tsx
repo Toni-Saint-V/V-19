@@ -15,6 +15,7 @@ import {
   UploadCloud,
   User,
   Users,
+  X,
 } from 'lucide-react';
 import type {
   CollectionDocumentUpload,
@@ -31,8 +32,13 @@ import {
   safeUnavailablePassportExtractionResult,
   type PassportExtractionResult,
 } from '../modules/submissions/passportExtractionContract';
-import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
+import {
+  V19SearchField,
+  V19SummaryTile,
+  V19SummaryTileGrid,
+} from '../shared/ui/v19-design-system';
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
+import { searchSubmissions } from '../modules/submissions/selectors';
 import {
   canonicalCollectionDocTypes,
   collectionDocumentDocTypes,
@@ -95,6 +101,7 @@ type UnmatchedUpload = {
 
 const docTypes = collectionDocTypes;
 const passportCollectionExtractionTimeoutMs = 10_000;
+const documentsBatchSize = 6;
 
 function roleLabel(role: MatrixApplicant['role']) {
   return role;
@@ -476,8 +483,11 @@ export function DraftsScreen({
   const [mobileApplicantIndex, setMobileApplicantIndex] = useState<Record<string, number>>({});
   const mobileApplicantCarouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>(initialFilter);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibleDraftCount, setVisibleDraftCount] = useState(documentsBatchSize);
   useEffect(() => {
     setDraftSummaryFilter(initialFilter);
+    setSearchQuery('');
   }, [initialFilter]);
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
@@ -491,6 +501,24 @@ export function DraftsScreen({
       ),
     [allDrafts, draftSummaryFilter],
   );
+  const searchedSubmissionIds = useMemo(
+    () =>
+      new Set(
+        searchSubmissions(submissions, searchQuery, 'Все города').map(
+          (submission) => submission.id,
+        ),
+      ),
+    [searchQuery, submissions],
+  );
+  const searchedDrafts = useMemo(
+    () => visibleDrafts.filter((submission) => searchedSubmissionIds.has(submission.id)),
+    [searchedSubmissionIds, visibleDrafts],
+  );
+  const pagedDrafts = searchedDrafts.slice(0, visibleDraftCount);
+  const remainingDrafts = Math.max(0, searchedDrafts.length - pagedDrafts.length);
+  useEffect(() => {
+    setVisibleDraftCount(documentsBatchSize);
+  }, [draftSummaryFilter, searchQuery]);
   const summary = useMemo(() => {
     const statuses = allDrafts.flatMap((submission) =>
       submission.applicants.flatMap((applicant) => docTypes.map((doc) => applicant.docs[doc.key])),
@@ -773,7 +801,7 @@ export function DraftsScreen({
             </p>
           </div>
           <button
-            className="flex h-9 shrink-0 items-center gap-2 rounded-[8px] border border-white/5 bg-[#301e39] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#3a2645] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
+            className="v19-documents-bulk-upload flex shrink-0 items-center gap-2 rounded-[8px] border border-white/5 bg-[#301e39] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#3a2645] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
             type="button"
             onClick={() => bulkInputRef.current?.click()}
             disabled={bulkBusy}
@@ -790,8 +818,44 @@ export function DraftsScreen({
           </div>
         ) : null}
 
-        <div className="space-y-4 p-3 xl:hidden">
-          {visibleDrafts.map((sub) => {
+        <div className="v19-documents-search-toolbar">
+          <div className="v19-documents-search-control">
+            <V19SearchField
+              className="v19-documents-search-field"
+              label="Поиск по пакетам документов"
+              placeholder="ID, пакет, заявитель или город"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.currentTarget.value)}
+            />
+            {searchQuery ? (
+              <button
+                aria-label="Очистить поиск по пакетам"
+                className="v19-documents-search-clear"
+                type="button"
+                onClick={() => setSearchQuery('')}
+              >
+                <X aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+          <span aria-live="polite" className="v19-documents-search-count">
+            Найдено: {searchedDrafts.length}
+          </span>
+        </div>
+
+        {!searchedDrafts.length ? (
+          <div className="v19-documents-search-empty" role="status">
+            <strong>{searchQuery ? 'Пакеты не найдены' : 'В этом статусе нет пакетов'}</strong>
+            <span>
+              {searchQuery
+                ? 'Измените запрос или очистите поиск.'
+                : 'Выберите другой статус в сводке выше.'}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="space-y-4 p-3 xl:hidden" id="document-mobile-packages">
+          {pagedDrafts.map((sub) => {
             const activeApplicantIndex = mobileApplicantIndex[sub.id] ?? 0;
 
             return (
@@ -820,7 +884,7 @@ export function DraftsScreen({
                 <button
                   onClick={() => onOpenDrawer(sub.id)}
                   aria-label={`Открыть пакет ${sub.title}`}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  className="v19-documents-package-open flex shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                   type="button"
                   title="Открыть пакет"
                 >
@@ -952,8 +1016,8 @@ export function DraftsScreen({
               <div className="w-[60px] shrink-0" />
             </div>
 
-            <div className="divide-y divide-[#202124]">
-              {visibleDrafts.map((sub) => (
+            <div className="divide-y divide-[#202124]" id="document-desktop-packages">
+              {pagedDrafts.map((sub) => (
                 <div
                   key={sub.id}
                   className="group/sub"
@@ -984,7 +1048,7 @@ export function DraftsScreen({
                       <button
                         onClick={() => onOpenDrawer(sub.id)}
                         aria-label={`Открыть пакет ${sub.title}`}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                        className="v19-documents-package-open flex items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                         type="button"
                         title={`Открыть пакет ${sub.title}`}
                       >
@@ -1034,6 +1098,23 @@ export function DraftsScreen({
             </div>
           </div>
         </div>
+
+        {remainingDrafts ? (
+          <div className="v19-documents-pagination">
+            <span aria-live="polite">
+              Показано {pagedDrafts.length} из {searchedDrafts.length}
+            </span>
+            <button
+              aria-controls="document-mobile-packages document-desktop-packages"
+              type="button"
+              onClick={() =>
+                setVisibleDraftCount((current) => current + documentsBatchSize)
+              }
+            >
+              Показать ещё {Math.min(documentsBatchSize, remainingDrafts)}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {unmatchedUploads.length ? (

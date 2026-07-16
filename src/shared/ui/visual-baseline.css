@@ -28504,6 +28504,159 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   }
 }
 
+.v19-documents-bulk-upload {
+  min-height: var(--v19b-size-40);
+}
+
+.v19-documents-package-open {
+  width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+}
+
+.v19-documents-search-toolbar {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  align-items: center;
+  gap: var(--v19b-size-12);
+  padding: var(--v19b-size-12) var(--v19b-size-16);
+  border-bottom: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  background: var(--v19b-color-panel);
+}
+
+.v19-documents-search-control {
+  position: relative;
+  min-width: var(--v19b-size-0);
+}
+
+.v19-documents-search-field input {
+  width: var(--v19b-size-full);
+  height: var(--v19b-size-40);
+  padding: var(--v19b-size-0) var(--v19b-size-44) var(--v19b-size-0)
+    var(--v19b-size-36);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  outline: none;
+  color: var(--v19b-color-text);
+  background: var(--v19b-color-app);
+  font-size: var(--v19b-size-12);
+  transition:
+    border-color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast);
+}
+
+.v19-documents-search-field input::placeholder {
+  color: var(--v19b-color-text-faint);
+}
+
+.v19-documents-search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.v19-documents-search-field input:focus-visible {
+  border-color: var(--v19b-color-focus);
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
+.v19-documents-search-clear {
+  position: absolute;
+  top: var(--v19b-size-0);
+  right: var(--v19b-size-0);
+  display: grid;
+  width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+  place-items: center;
+  border: var(--v19b-size-0);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-muted);
+  background: transparent;
+}
+
+.v19-documents-search-clear:is(:hover, :focus-visible) {
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-control-hover);
+}
+
+.v19-documents-search-clear svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+}
+
+.v19-documents-search-count {
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-control);
+  white-space: nowrap;
+}
+
+.v19-documents-search-empty {
+  display: grid;
+  min-height: var(--v19b-size-132);
+  place-content: center;
+  gap: var(--v19b-size-6);
+  padding: var(--v19b-size-20);
+  color: var(--v19b-color-text-muted);
+  text-align: center;
+}
+
+.v19-documents-search-empty strong {
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-14);
+}
+
+.v19-documents-search-empty span {
+  font-size: var(--v19b-size-12);
+}
+
+.v19-documents-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v19b-size-12);
+  padding: var(--v19b-size-12);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  color: var(--v19b-color-text-muted);
+  background: var(--v19b-color-panel);
+  font-size: var(--v19b-size-11);
+}
+
+.v19-documents-pagination button {
+  min-height: var(--v19b-size-44);
+  padding: var(--v19b-size-0) var(--v19b-size-14);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-control);
+  font-family: var(--v19b-font-family);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-documents-pagination button:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+}
+
+@media (max-width: 767px) {
+  .v19-documents-bulk-upload,
+  .v19-documents-search-field,
+  .v19-documents-search-field input,
+  .v19-documents-search-clear {
+    min-height: var(--v19b-size-44);
+  }
+
+  .v19-documents-search-clear {
+    width: var(--v19b-size-44);
+    height: var(--v19b-size-44);
+  }
+
+  .v19-documents-search-toolbar {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    gap: var(--v19b-size-8);
+    padding: var(--v19b-size-12);
+  }
+}
+
 @media (max-width: 360px) {
   .v19-documents-summary-grid .v19-summary-tile-icon {
     display: none;
