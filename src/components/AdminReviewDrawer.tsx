@@ -38,6 +38,7 @@ import {
   historyDetailForUser,
   historyTimestampForUser,
 } from "../modules/submissions/historyPresentation";
+import { questionnaireFieldMatchesTarget } from "../modules/submissions/questionnaire";
 import type {
   ActionDecision,
   Applicant,
@@ -80,6 +81,10 @@ interface AdminReviewDrawerProps {
 type TabId = "applicants" | "questionnaire";
 type FieldReviewStatus = "approved" | "pending" | "error";
 type ApplicantPanelId = "overview" | "media" | "issues" | "history";
+type ReviewTargetRequest = {
+  issue: Issue;
+  requestId: number;
+};
 type DrawerTabDefinition = {
   id: TabId;
   label: string;
@@ -107,10 +112,6 @@ function drawerPanelId(tab: TabId) {
   return `admin-review-panel-${tab}`;
 }
 
-function displaySubmissionTitle(submission: Submission | null | undefined) {
-  return submission?.listTitle ?? submission?.title ?? "Заявка не выбрана";
-}
-
 function unresolvedIssues(submission: Submission | null | undefined): Issue[] {
   return submission?.issues.filter((issue) => issue.status !== "closed_by_admin") ?? [];
 }
@@ -135,14 +136,35 @@ function fileStatusTone(file: SubmissionFile) {
 }
 
 function fieldMatchesIssue(field: QuestionnaireField, issue: Issue) {
-  const targetField = issue.target.field?.trim().toLowerCase();
-  if (!targetField) return false;
-  const fieldLabel = field.label.trim().toLowerCase();
-  const fieldId = field.id.trim().toLowerCase();
+  return questionnaireFieldMatchesTarget(field, issue.target.field);
+}
+
+function questionnaireFieldDomId(applicantId: string, fieldId: string) {
+  return `admin-review-field-${applicantId}-${fieldId}`;
+}
+
+function questionnaireSectionDomId(applicantId: string, sectionId: string) {
+  return `admin-review-section-${applicantId}-${sectionId}`;
+}
+
+function fileDomId(fileId: string) {
+  return `admin-review-file-${fileId}`;
+}
+
+function focusReviewTarget(target: HTMLElement | null) {
+  if (!target) {
+    return;
+  }
+
+  if (typeof target.scrollIntoView === "function") {
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  target.focus({ preventScroll: true });
+}
+
+function issueTargetsFile(issue: Issue) {
   return (
-    fieldLabel === targetField ||
-    fieldId === targetField ||
-    fieldLabel.includes(targetField)
+    issue.type === "file" || issue.type === "media" || Boolean(issue.target.fileType)
   );
 }
 
@@ -232,9 +254,7 @@ const FieldRow = ({
   >
     <div className="admin-review-row-main min-w-0 flex-1">
       <span className="admin-review-row-label">{label}</span>
-      <strong className="admin-review-row-value">
-        {value || "Не заполнено"}
-      </strong>
+      <strong className="admin-review-row-value">{value || "Не заполнено"}</strong>
       <span className="admin-review-row-review-status">
         {fieldReviewStatusLabel(status, value)}
       </span>
@@ -314,12 +334,7 @@ function applicantRoleLabel(role: Applicant["role"]) {
   return "Основной турист";
 }
 
-function russianCountLabel(
-  count: number,
-  one: string,
-  few: string,
-  many: string,
-) {
+function russianCountLabel(count: number, one: string, few: string, many: string) {
   const lastTwo = count % 100;
   const last = count % 10;
   if (lastTwo >= 11 && lastTwo <= 14) return many;
@@ -340,17 +355,20 @@ function applicantInitials(fullName: string) {
 function ApplicantsTab({
   submission,
   primaryAction,
+  reviewTarget,
   onAddRemark,
+  onOpenIssue,
   onVerifyDocument,
 }: {
   submission: Submission | null;
   primaryAction: ActionDecision | null;
+  reviewTarget: ReviewTargetRequest | null;
   onAddRemark: AdminReviewDrawerProps["onAddRemark"];
+  onOpenIssue: (issue: Issue) => void;
   onVerifyDocument: AdminReviewDrawerProps["onVerifyDocument"];
 }) {
   const [selectedApplicantId, setSelectedApplicantId] = useState("");
-  const [activePanel, setActivePanel] =
-    useState<ApplicantPanelId>("overview");
+  const [activePanel, setActivePanel] = useState<ApplicantPanelId>("overview");
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -365,6 +383,17 @@ function ApplicantsTab({
         : submission.applicants[0].id,
     );
   }, [submission]);
+
+  useEffect(() => {
+    const issue = reviewTarget?.issue;
+    if (!issue || !issueTargetsFile(issue)) return;
+    if (!submission?.applicants.some((item) => item.id === issue.target.applicantId)) {
+      return;
+    }
+
+    setSelectedApplicantId(issue.target.applicantId);
+    setActivePanel("media");
+  }, [reviewTarget, submission]);
 
   if (!submission) {
     return (
@@ -398,9 +427,7 @@ function ApplicantsTab({
   const acceptedFiles = applicantFiles.filter(
     (file) => file.status === "accepted",
   ).length;
-  const questionnaireFields = applicant.sections.flatMap(
-    (section) => section.fields,
-  );
+  const questionnaireFields = applicant.sections.flatMap((section) => section.fields);
   const filledQuestionnaireFields = questionnaireFields.filter((field) =>
     hasReviewValue(field.value),
   );
@@ -519,14 +546,20 @@ function ApplicantsTab({
           transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
         >
           <div aria-hidden="true" className="admin-review-traveler-orbit">
-            <i><FileText /></i>
+            <i>
+              <FileText />
+            </i>
             <span>{applicantInitials(applicant.fullName) || <Users />}</span>
-            <i><ImageIcon /></i>
+            <i>
+              <ImageIcon />
+            </i>
           </div>
           <div className="admin-review-traveler-identity">
             <span>{applicantRoleLabel(applicant.role)}</span>
             <h3>{applicant.fullName}</h3>
-            <p>{submission.city} · {submission.tripDateFrom} – {submission.tripDateTo}</p>
+            <p>
+              {submission.city} · {submission.tripDateFrom} – {submission.tripDateTo}
+            </p>
           </div>
           <p className="admin-review-traveler-state">
             {applicantIssues.length
@@ -587,11 +620,15 @@ function ApplicantsTab({
                 </div>
                 <div>
                   <dt>Проверено полей</dt>
-                  <dd>{approvedQuestionnaireFields}/{filledQuestionnaireFields.length}</dd>
+                  <dd>
+                    {approvedQuestionnaireFields}/{filledQuestionnaireFields.length}
+                  </dd>
                 </div>
                 <div>
                   <dt>Файлы</dt>
-                  <dd>{acceptedFiles}/{applicantFiles.length} принято</dd>
+                  <dd>
+                    {acceptedFiles}/{applicantFiles.length} принято
+                  </dd>
                 </div>
                 <div>
                   <dt>Маршрут</dt>
@@ -603,11 +640,13 @@ function ApplicantsTab({
               <MediaTab
                 onAddRemark={onAddRemark}
                 onVerifyDocument={onVerifyDocument}
+                reviewTarget={reviewTarget}
                 submission={applicantSubmission}
               />
             ) : null}
             {activePanel === "issues" ? (
               <IssuesTab
+                onOpenIssue={onOpenIssue}
                 primaryAction={primaryAction}
                 submission={applicantSubmission}
               />
@@ -627,10 +666,12 @@ function ApplicantsTab({
 
 function QuestionnaireTab({
   submission,
+  reviewTarget,
   onAddRemark,
   onApproveQuestionnaireField,
 }: {
   submission: Submission | null;
+  reviewTarget: ReviewTargetRequest | null;
   onAddRemark: (
     field?: string,
     applicant?: string,
@@ -673,6 +714,57 @@ function QuestionnaireTab({
     return () => document.removeEventListener("mousedown", closeOutsideMenu);
   }, [isApplicantMenuOpen]);
 
+  useEffect(() => {
+    const issue = reviewTarget?.issue;
+    if (!issue || issueTargetsFile(issue)) return;
+    if (!submission?.applicants.some((item) => item.id === issue.target.applicantId)) {
+      return;
+    }
+
+    setApplicantId(issue.target.applicantId);
+  }, [reviewTarget, submission]);
+
+  useEffect(() => {
+    const issue = reviewTarget?.issue;
+    if (!issue || issueTargetsFile(issue) || applicantId !== issue.target.applicantId) {
+      return;
+    }
+
+    const targetApplicant = submission?.applicants.find(
+      (item) => item.id === issue.target.applicantId,
+    );
+    if (!targetApplicant) {
+      return;
+    }
+
+    const targetField = targetApplicant.sections
+      .flatMap((section) => section.fields)
+      .find((field) => questionnaireFieldMatchesTarget(field, issue.target.field));
+    const targetSection = targetApplicant.sections.find(
+      (section) =>
+        section.id === issue.target.section || section.title === issue.target.section,
+    );
+    const targetId = targetField
+      ? questionnaireFieldDomId(targetApplicant.id, targetField.id)
+      : targetSection
+        ? questionnaireSectionDomId(targetApplicant.id, targetSection.id)
+        : undefined;
+    if (!targetId) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      const section = target?.closest("details");
+      if (section instanceof HTMLDetailsElement) {
+        section.open = true;
+      }
+      focusReviewTarget(target);
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [applicantId, reviewTarget, submission]);
+
   if (!submission) {
     return (
       <EmptyTabState
@@ -701,17 +793,15 @@ function QuestionnaireTab({
   const approvedCount = fields.filter(
     (field) => fieldStatus(field, applicantIssues) === "approved",
   ).length;
-  const fieldDomId = (fieldId: string) =>
-    `admin-review-field-${applicant.id}-${fieldId}`;
-  const focusFirstField = (
-    predicate: (field: QuestionnaireField) => boolean,
-  ) => {
+  const focusFirstField = (predicate: (field: QuestionnaireField) => boolean) => {
     const target = fields.find(predicate);
     if (!target) return;
-    document.getElementById(fieldDomId(target.id))?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
+    document
+      .getElementById(questionnaireFieldDomId(applicant.id, target.id))
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
   };
 
   return (
@@ -739,9 +829,7 @@ function QuestionnaireTab({
               aria-haspopup="listbox"
               aria-label={`Выбранный заявитель: ${selectedApplicantLabel(applicant)}`}
               className="admin-review-applicant-select-trigger"
-              disabled={
-                submission.applicants.length < 2 || Boolean(pendingSectionId)
-              }
+              disabled={submission.applicants.length < 2 || Boolean(pendingSectionId)}
               onClick={() => setApplicantMenuOpen((current) => !current)}
               type="button"
             >
@@ -749,7 +837,10 @@ function QuestionnaireTab({
                 {selectedApplicantLabel(applicant)}
               </span>
               {submission.applicants.length > 1 ? (
-                <ChevronDown aria-hidden="true" className={isApplicantMenuOpen ? "is-open" : undefined} />
+                <ChevronDown
+                  aria-hidden="true"
+                  className={isApplicantMenuOpen ? "is-open" : undefined}
+                />
               ) : null}
             </button>
 
@@ -792,7 +883,8 @@ function QuestionnaireTab({
             onClick={() => focusFirstField(() => true)}
             type="button"
           >
-            <CheckCircle2 className="h-4 w-4" /> {approvedCount}/{fields.length} проверено
+            <CheckCircle2 className="h-4 w-4" /> {approvedCount}/{fields.length}{" "}
+            проверено
           </button>
           <button
             className={`admin-review-applicant-stat-button ${
@@ -806,7 +898,8 @@ function QuestionnaireTab({
             }
             type="button"
           >
-            <AlertCircle className="h-4 w-4" /> {applicantIssues.length
+            <AlertCircle className="h-4 w-4" />{" "}
+            {applicantIssues.length
               ? `${applicantIssues.length} ${russianCountLabel(applicantIssues.length, "замечание", "замечания", "замечаний")}`
               : "Без замечаний"}
           </button>
@@ -832,15 +925,16 @@ function QuestionnaireTab({
             approvedInSection === reviewableFields.length;
 
           const unresolvedInSection = visibleFields.some(
-            (field) =>
-              fieldStatus(field, applicantIssues) === "error",
+            (field) => fieldStatus(field, applicantIssues) === "error",
           );
 
           return (
             <details
               className="admin-review-field-section"
+              id={questionnaireSectionDomId(applicant.id, section.id)}
               key={section.id}
               open={sectionIndex === 0 || unresolvedInSection}
+              tabIndex={-1}
             >
               <summary className="admin-review-questionnaire-section-title flex cursor-pointer items-center gap-2 text-[15px] font-semibold text-white">
                 <span className="admin-review-section-number flex h-6 w-6 items-center justify-center rounded-md bg-white/5 font-mono text-[12px] text-white/60">
@@ -853,7 +947,9 @@ function QuestionnaireTab({
                 <ChevronDown aria-hidden="true" className="h-4 w-4 text-white/45" />
               </summary>
               <div className="admin-review-section-review">
-                <span>{approvedInSection}/{reviewableFields.length} заполненных</span>
+                <span>
+                  {approvedInSection}/{reviewableFields.length} заполненных
+                </span>
                 <button
                   aria-label={`Апрув всей секции: ${section.title}`}
                   className={`admin-review-section-approve ${
@@ -915,7 +1011,7 @@ function QuestionnaireTab({
                         pendingApprovalKey === approvalKey ||
                         pendingSectionId === section.id
                       }
-                      id={fieldDomId(field.id)}
+                      id={questionnaireFieldDomId(applicant.id, field.id)}
                       key={field.id}
                       label={field.label}
                       value={reviewValueFor(field)}
@@ -966,12 +1062,36 @@ function QuestionnaireTab({
 function MediaTab({
   onAddRemark,
   onVerifyDocument,
+  reviewTarget,
   submission,
 }: {
   onAddRemark: AdminReviewDrawerProps["onAddRemark"];
   onVerifyDocument: AdminReviewDrawerProps["onVerifyDocument"];
+  reviewTarget: ReviewTargetRequest | null;
   submission: Submission | null;
 }) {
+  useEffect(() => {
+    const issue = reviewTarget?.issue;
+    if (!issue || !issueTargetsFile(issue)) {
+      return;
+    }
+
+    const targetFile = submission?.files.find(
+      (file) =>
+        file.applicantId === issue.target.applicantId &&
+        (!issue.target.fileType || file.type === issue.target.fileType),
+    );
+    if (!targetFile) {
+      return;
+    }
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      focusReviewTarget(document.getElementById(fileDomId(targetFile.id)));
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [reviewTarget, submission]);
+
   if (!submission) {
     return (
       <EmptyTabState
@@ -1001,6 +1121,8 @@ function MediaTab({
             key={file.id}
             className="admin-review-file-row"
             data-file-status={file.status}
+            id={fileDomId(file.id)}
+            tabIndex={-1}
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1051,10 +1173,10 @@ function MediaTab({
                     file.applicantId,
                   )
                 }
-                >
-                  <MessageSquarePlus className="h-4 w-4" />
-                  <span>Замечание</span>
-                </button>
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                <span>Замечание</span>
+              </button>
             </div>
           </article>
         );
@@ -1066,9 +1188,11 @@ function MediaTab({
 function IssuesTab({
   submission,
   primaryAction,
+  onOpenIssue,
 }: {
   submission: Submission | null;
   primaryAction: ActionDecision | null;
+  onOpenIssue: (issue: Issue) => void;
 }) {
   if (!submission) {
     return (
@@ -1086,9 +1210,7 @@ function IssuesTab({
     return (
       <EmptyTabState
         title={
-          packageBlocked
-            ? "Замечаний нет, но пакет ещё не готов"
-            : "Замечаний нет"
+          packageBlocked ? "Замечаний нет, но пакет ещё не готов" : "Замечаний нет"
         }
         copy={
           primaryAction?.disabled && primaryAction.reason
@@ -1104,31 +1226,37 @@ function IssuesTab({
     <div className="admin-review-issues-list">
       {issues.map((issue) => (
         <article key={issue.id} className="admin-review-issue-card">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`admin-review-issue-severity is-${issue.severity} rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/62`}
-            >
-              {issueSeverityLabel(issue)}
+          <button
+            aria-label={`Открыть замечание: ${issue.reason}`}
+            className="admin-review-issue-open"
+            onClick={() => onOpenIssue(issue)}
+            type="button"
+          >
+            <span className="admin-review-issue-badges">
+              <span
+                className={`admin-review-issue-severity is-${issue.severity} rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/62`}
+              >
+                {issueSeverityLabel(issue)}
+              </span>
+              <span
+                className={`admin-review-issue-status is-${issue.status} rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] font-medium text-white/50`}
+              >
+                {issueStatusLabel(issue)}
+              </span>
             </span>
-            <span
-              className={`admin-review-issue-status is-${issue.status} rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] font-medium text-white/50`}
-            >
-              {issueStatusLabel(issue)}
+            <strong>{issue.reason}</strong>
+            <span>{issue.comment}</span>
+            <small>
+              {issue.target.applicantName} ·{" "}
+              {issue.target.field ??
+                issue.target.section ??
+                issue.target.fileType ??
+                issue.type}
+            </small>
+            <span className="admin-review-issue-open-hint">
+              Открыть место проверки <ChevronRight aria-hidden="true" />
             </span>
-          </div>
-          <h3 className="m-0 mt-3 text-[14px] font-semibold text-white">
-            {issue.reason}
-          </h3>
-          <p className="m-0 mt-2 text-[13px] leading-5 text-white/55">
-            {issue.comment}
-          </p>
-          <p className="m-0 mt-3 text-[11px] text-white/35">
-            {issue.target.applicantName} ·{" "}
-            {issue.target.field ??
-              issue.target.section ??
-              issue.target.fileType ??
-              issue.type}
-          </p>
+          </button>
         </article>
       ))}
     </div>
@@ -1210,6 +1338,7 @@ export function AdminReviewDrawer({
   const tabListRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("applicants");
+  const [reviewTarget, setReviewTarget] = useState<ReviewTargetRequest | null>(null);
   const activeSubmissionId = submission?.id ?? submissionId;
   const primaryAction = useMemo(
     () => (submission ? getPrimaryAction(submission, "admin", "review") : null),
@@ -1219,8 +1348,9 @@ export function AdminReviewDrawer({
     () => (submission ? getAdminReviewActions(submission) : null),
     [submission],
   );
-  const hasOpenReviewIssues =
-    unresolvedIssues(submission).some((issue) => issue.status === "open");
+  const hasOpenReviewIssues = unresolvedIssues(submission).some(
+    (issue) => issue.status === "open",
+  );
   const footerReviewAction = adminReviewActions
     ? hasOpenReviewIssues
       ? adminReviewActions.returnForCorrection
@@ -1251,12 +1381,6 @@ export function AdminReviewDrawer({
       : primaryAction?.action === "open_history"
         ? "Для этой заявки нет действия проверки."
         : undefined);
-  const showPrimaryReason = Boolean(
-    primaryReason &&
-      (adminReviewActions
-        ? !hasOpenReviewIssues && adminReviewActions.acceptForExport.disabled
-        : primaryDisabled),
-  );
   const currentStatusTone = submission
     ? submissionStatusTone[submission.status]
     : "muted";
@@ -1338,6 +1462,7 @@ export function AdminReviewDrawer({
   useEffect(() => {
     if (isOpen) {
       setActiveTab("applicants");
+      setReviewTarget(null);
       const animationFrame = window.requestAnimationFrame(() => {
         tabListRef.current
           ?.querySelector<HTMLElement>("[role='tab'][aria-selected='true']")
@@ -1396,6 +1521,14 @@ export function AdminReviewDrawer({
   };
 
   const handlePrimaryAction = () => handleAdminAction(primaryAction);
+
+  const handleOpenIssue = (issue: Issue) => {
+    setReviewTarget((current) => ({
+      issue,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+    setActiveTab(issueTargetsFile(issue) ? "applicants" : "questionnaire");
+  };
 
   const selectTab = (tab: TabId) => {
     setActiveTab(tab);
@@ -1472,15 +1605,6 @@ export function AdminReviewDrawer({
             <header className="admin-review-drawer-header z-20 shrink-0 border-b border-white/5 bg-[#111113]/90 px-5 pb-0 pt-5 backdrop-blur-md lg:px-8">
               <div className="admin-review-titlebar mb-5 flex items-start justify-between gap-4">
                 <div className="admin-review-titlecopy min-w-0">
-                  <p className="mb-2 flex items-center gap-2 text-[11px] text-white/50 lg:text-xs">
-                    <span className="admin-review-submission-tag font-mono font-medium tracking-wider text-white/70">
-                      {activeSubmissionId ?? "—"}
-                    </span>
-                    <span className="admin-review-title-separator h-1 w-1 rounded-full bg-white/20" />
-                    <span className="truncate">
-                      {displaySubmissionTitle(submission)}
-                    </span>
-                  </p>
                   <h2 className="flex items-center gap-3 text-[20px] font-semibold leading-tight tracking-tight text-white lg:text-[24px]">
                     <span id={drawerHeadingId} className="admin-review-drawer-heading">
                       Проверка пакета
@@ -1500,15 +1624,68 @@ export function AdminReviewDrawer({
                   </h2>
                 </div>
 
-                <button
-                  aria-label="Закрыть проверку"
-                  data-admin-review-initial-focus
-                  type="button"
-                  onClick={onClose}
-                  className="admin-review-close flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-white/70 outline-none transition-colors hover:border-white/10 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                <div className="admin-review-header-actions">
+                  {canPublishReturnedPdfHandoff ? (
+                    <button
+                      className="admin-review-secondary"
+                      onClick={handlePublishReturnedPdfHandoff}
+                      title={returnedPdfHandoffReason}
+                      type="button"
+                    >
+                      Передать PDF агенту
+                    </button>
+                  ) : footerReviewAction ? (
+                    <button
+                      aria-describedby={
+                        primaryReason ? primaryActionReasonId : undefined
+                      }
+                      className={`admin-review-primary${isReturnReviewAction ? " is-return" : ""}`}
+                      disabled={footerReviewAction.disabled}
+                      onClick={() => handleAdminAction(footerReviewAction)}
+                      title={footerReviewAction.reason}
+                      type="button"
+                    >
+                      {isReturnReviewAction ? (
+                        <AlertCircle aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 aria-hidden="true" />
+                      )}
+                      <span>{footerReviewAction.label}</span>
+                    </button>
+                  ) : (
+                    <button
+                      aria-describedby={
+                        primaryReason ? primaryActionReasonId : undefined
+                      }
+                      className="admin-review-primary"
+                      disabled={primaryDisabled}
+                      onClick={handlePrimaryAction}
+                      title={primaryReason}
+                      type="button"
+                    >
+                      {primaryAction?.action === "generate_export" ? (
+                        <DownloadCloud aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 aria-hidden="true" />
+                      )}
+                      <span>{primaryButtonLabel}</span>
+                    </button>
+                  )}
+                  <button
+                    aria-label="Закрыть проверку"
+                    className="admin-review-close"
+                    data-admin-review-initial-focus
+                    onClick={onClose}
+                    type="button"
+                  >
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+                {primaryReason ? (
+                  <span className="sr-only" id={primaryActionReasonId} role="status">
+                    {primaryReason}
+                  </span>
+                ) : null}
               </div>
 
               <div
@@ -1578,13 +1755,16 @@ export function AdminReviewDrawer({
                   {activeTab === "applicants" && (
                     <ApplicantsTab
                       onAddRemark={onAddRemark}
+                      onOpenIssue={handleOpenIssue}
                       onVerifyDocument={onVerifyDocument}
                       primaryAction={primaryAction}
+                      reviewTarget={reviewTarget}
                       submission={submission}
                     />
                   )}
                   {activeTab === "questionnaire" && (
                     <QuestionnaireTab
+                      reviewTarget={reviewTarget}
                       submission={submission}
                       onAddRemark={onAddRemark}
                       onApproveQuestionnaireField={onApproveQuestionnaireField}
@@ -1593,75 +1773,6 @@ export function AdminReviewDrawer({
                 </motion.div>
               </AnimatePresence>
             </div>
-
-            <footer className="admin-review-footer flex shrink-0 justify-end gap-3 border-t border-white/10 bg-[#111113]/90 p-4 pb-[max(16px,env(safe-area-inset-bottom))] backdrop-blur-md lg:px-8 lg:py-5">
-              {showPrimaryReason && primaryReason ? (
-                <div
-                  className="admin-review-primary-reason"
-                  id={primaryActionReasonId}
-                  role="status"
-                >
-                  <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-                  <span>
-                    <strong>Нельзя принять на выгрузку:</strong> {primaryReason}
-                  </span>
-                </div>
-              ) : null}
-              <div
-                className={`admin-review-footer-actions ${adminReviewActions ? "has-review-decisions" : ""}`}
-              >
-                {canPublishReturnedPdfHandoff ? (
-                  <button
-                    type="button"
-                    onClick={handlePublishReturnedPdfHandoff}
-                    title={returnedPdfHandoffReason}
-                    className="admin-review-secondary h-11 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.08]"
-                  >
-                    Передать PDF агенту
-                  </button>
-                ) : footerReviewAction ? (
-                  <button
-                    aria-describedby={
-                      showPrimaryReason ? primaryActionReasonId : undefined
-                    }
-                    className={`admin-review-primary flex h-11 items-center gap-2 rounded-xl px-6 text-[13px] font-medium transition-colors disabled:cursor-not-allowed${
-                      isReturnReviewAction ? " is-return" : ""
-                    }`}
-                    disabled={footerReviewAction.disabled}
-                    onClick={() => handleAdminAction(footerReviewAction)}
-                    title={footerReviewAction.reason}
-                    type="button"
-                  >
-                    {isReturnReviewAction ? (
-                      <AlertCircle className="h-4 w-4" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4" />
-                    )}
-                    {footerReviewAction.label}
-                  </button>
-                ) : (
-                  <button
-                    aria-describedby={
-                      primaryDisabled && primaryReason
-                        ? primaryActionReasonId
-                        : undefined
-                    }
-                    type="button"
-                    onClick={handlePrimaryAction}
-                    disabled={primaryDisabled}
-                    title={primaryReason}
-                    className="admin-review-primary flex h-11 items-center gap-2 rounded-xl bg-[#202126] px-6 text-[13px] font-medium text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/30"
-                  >
-                    {primaryAction?.action === "generate_export" ? (
-                      <DownloadCloud className="h-4 w-4" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4" />
-                    )}
-                    {primaryButtonLabel}
-                  </button>
-                )}
-              </div>
-            </footer>
           </motion.div>
         </>
       )}
