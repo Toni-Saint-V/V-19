@@ -9,7 +9,11 @@ footer actions, and responsive overflow.
 ## Evidence
 
 - `desktop-1440x1024-overview.png`
+- `desktop-1440x1024-family-overview.png`
+- `desktop-1487x1058-family-overview.png`
 - `mobile-390x844-overview.png`
+- `mobile-390x844-family-overview.png`
+- `reference-vs-implementation.png`
 - `tests/e2e/v19-pilot-admin-review-flow.spec.ts`: 7/7 passed
 - full unit/integration suite: 970/970 passed
 - production build and production-bundle guard: passed
@@ -26,3 +30,5 @@ footer actions, and responsive overflow.
 ## Verdict
 
 The reviewed desktop and mobile surfaces are ready for the verified scope.
+The family applicant switcher remains horizontal and the selected applicant
+owns the review workspace without duplicating the blocker callout.
