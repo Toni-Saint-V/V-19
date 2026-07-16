@@ -3231,6 +3231,44 @@
   }
 }
 
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-traveler-summary
+  > div
+  > button {
+  display: inline-flex;
+  grid-column: 2;
+  min-height: var(--v19b-size-36);
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  gap: var(--v19b-size-6);
+  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-orange-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+  color: var(--v19b-admin-drawer-orange-text);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  padding-inline: var(--v19b-size-12);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-traveler-summary
+  > div
+  > button:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+  outline: var(--v19b-size-0);
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-traveler-summary
+  > div
+  > button
+  svg {
+  width: var(--v19b-size-14);
+  height: var(--v19b-size-14);
+}
+
 .v19-admin-review-board {
   border-radius: var(--v19b-radius-panel);
   overflow: hidden;
@@ -19486,88 +19524,6 @@ body,
   text-align: right;
 }
 
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step {
-  display: grid;
-  grid-template-columns:
-    var(--v19b-size-40) minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-    auto;
-  align-items: center;
-  gap: var(--v19b-size-12);
-  margin: var(--v19b-size-16);
-  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
-  border-radius: var(--v19b-radius-control);
-  background: var(--v19b-color-control);
-  padding: var(--v19b-size-12);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step.is-warning {
-  border-color: var(--v19b-admin-drawer-orange-border);
-  background: var(--v19b-admin-drawer-orange-bg);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step-icon {
-  display: inline-flex;
-  width: var(--v19b-size-40);
-  height: var(--v19b-size-40);
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--v19b-radius-pill);
-  background: var(--v19b-color-panel);
-  color: var(--v19b-color-text-muted);
-}
-
-[data-admin-review-drawer-surface="workspace"]
-  .admin-review-next-step.is-warning
-  .admin-review-next-step-icon {
-  color: var(--v19b-admin-drawer-orange-text);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step > div {
-  display: grid;
-  min-width: var(--v19b-size-0);
-  gap: var(--v19b-size-3);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step strong {
-  color: var(--v19b-color-text-strong);
-  font-size: var(--v19b-size-13);
-  font-weight: var(--v19b-weight-title);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step span {
-  color: var(--v19b-color-text-muted);
-  font-size: var(--v19b-size-12);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step > button {
-  display: inline-flex;
-  min-height: var(--v19b-size-40);
-  align-items: center;
-  justify-content: center;
-  gap: var(--v19b-size-6);
-  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
-  border-radius: var(--v19b-radius-control);
-  background: var(--v19b-color-control);
-  color: var(--v19b-color-text-strong);
-  font-size: var(--v19b-size-12);
-  font-weight: var(--v19b-weight-control);
-  padding-inline: var(--v19b-size-12);
-}
-
-[data-admin-review-drawer-surface="workspace"]
-  .admin-review-next-step
-  > button:is(:hover, :focus-visible) {
-  border-color: var(--v19b-color-border-selected);
-  background: var(--v19b-color-control-hover);
-  outline: var(--v19b-size-0);
-  box-shadow: 0 0 0 var(--v19b-size-2) var(--vf-accent-soft);
-}
-
-[data-admin-review-drawer-surface="workspace"] .admin-review-next-step > button svg {
-  width: var(--v19b-size-16);
-  height: var(--v19b-size-16);
-}
-
 [data-admin-review-drawer-surface="workspace"] .admin-review-traveler-tabs {
   display: flex;
   justify-content: flex-start;
@@ -19791,24 +19747,6 @@ body,
     grid-column: 1 / -1;
     max-width: none;
     text-align: left;
-  }
-
-  [data-admin-review-drawer-surface="workspace"] .admin-review-next-step {
-    grid-template-columns: var(--v19b-size-32) minmax(
-        var(--v19b-size-0),
-        var(--v19b-grid-fr)
-      );
-    margin: var(--v19b-size-12);
-  }
-
-  [data-admin-review-drawer-surface="workspace"] .admin-review-next-step-icon {
-    width: var(--v19b-size-32);
-    height: var(--v19b-size-32);
-  }
-
-  [data-admin-review-drawer-surface="workspace"] .admin-review-next-step > button {
-    grid-column: 1 / -1;
-    width: var(--v19b-size-full);
   }
 
   [data-admin-review-drawer-surface="workspace"] .admin-review-traveler-tabs {
@@ -30990,5 +30928,69 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 @media (max-width: 560px) {
   [data-admin-review-drawer-surface="workspace"] .admin-review-titlemeta {
     display: none;
+  }
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-travelers {
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  gap: var(--v19b-size-12) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-traveler-switcher {
+  display: grid !important;
+  grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-traveler-switcher
+  > header {
+  min-width: var(--v19b-size-120) !important;
+  border-right: var(--v19b-size-1) solid var(--v19b-color-border) !important;
+  border-bottom: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-traveler-switcher > div {
+  display: flex !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow-x: auto !important;
+}
+
+[data-admin-review-drawer-surface="workspace"]
+  .admin-review-traveler-switcher
+  > div
+  > button {
+  flex: 1 0 var(--v19b-size-148) !important;
+  width: auto !important;
+  min-width: var(--v19b-size-148) !important;
+  min-height: var(--v19b-size-64) !important;
+  border-right: var(--v19b-size-1) solid var(--v19b-color-border) !important;
+  border-bottom: var(--v19b-size-0) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-traveler-workspace {
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+@media (max-width: 560px) {
+  [data-admin-review-drawer-surface="workspace"] .admin-review-traveler-switcher {
+    display: block !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"]
+    .admin-review-traveler-switcher
+    > header {
+    border-right: var(--v19b-size-0) !important;
+    border-bottom: var(--v19b-size-1) solid var(--v19b-color-border) !important;
+  }
+
+  [data-admin-review-drawer-surface="workspace"]
+    .admin-review-traveler-switcher
+    > div
+    > button {
+    flex-basis: var(--v19b-size-160) !important;
+    min-width: var(--v19b-size-160) !important;
   }
 }

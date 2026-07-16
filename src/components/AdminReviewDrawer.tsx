@@ -564,37 +564,6 @@ function ApplicantsTab({
           </p>
         </motion.header>
 
-        <section
-          aria-label="Следующий шаг проверки"
-          className={`admin-review-next-step ${attentionPanel ? "is-warning" : "is-ready"}`}
-        >
-          <span aria-hidden="true" className="admin-review-next-step-icon">
-            {attentionPanel ? <AlertCircle /> : <CheckCircle2 />}
-          </span>
-          <div>
-            <strong>
-              {applicantIssues.length
-                ? `${applicantIssues.length} ${russianCountLabel(applicantIssues.length, "замечание требует", "замечания требуют", "замечаний требуют")} проверки`
-                : applicantFiles.some((file) => file.status !== "accepted")
-                  ? "Завершите проверку файлов"
-                  : "Заявитель готов к итоговой проверке"}
-            </strong>
-            <span>
-              {attentionPanel === "issues"
-                ? "Проверьте исправления агента и закройте замечания."
-                : attentionPanel === "media"
-                  ? "Сверьте загруженные документы перед принятием пакета."
-                  : "Все доступные данные заявителя проверены."}
-            </span>
-          </div>
-          {attentionPanel ? (
-            <button onClick={() => setActivePanel(attentionPanel)} type="button">
-              {attentionPanel === "issues" ? "К замечаниям" : "Проверить файлы"}
-              <ChevronRight aria-hidden="true" />
-            </button>
-          ) : null}
-        </section>
-
         <div
           aria-label={`Разделы заявителя: ${applicant.fullName}`}
           className="admin-review-traveler-tabs"
@@ -683,18 +652,27 @@ function ApplicantsTab({
                     )}
                     <span>
                       <strong>
-                        {attentionPanel
-                          ? "Есть блокирующие действия"
-                          : "Проверка завершена"}
+                        {attentionPanel ? "Требует внимания" : "Проверка завершена"}
                       </strong>
                       <small>
                         {attentionPanel === "issues"
-                          ? "Открытые замечания нужно перепроверить."
+                          ? "Замечания агента нужно перепроверить."
                           : attentionPanel === "media"
                             ? "Не все файлы приняты администратором."
                             : "Данные готовы к решению по пакету."}
                       </small>
                     </span>
+                    {attentionPanel ? (
+                      <button
+                        onClick={() => setActivePanel(attentionPanel)}
+                        type="button"
+                      >
+                        {attentionPanel === "issues"
+                          ? "Перейти к замечаниям"
+                          : "Проверить файлы"}
+                        <ChevronRight aria-hidden="true" />
+                      </button>
+                    ) : null}
                   </div>
                 </aside>
               </div>
