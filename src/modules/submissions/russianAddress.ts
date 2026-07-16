@@ -65,9 +65,15 @@ export function normalizedRussianAddress(value: string) {
 
   const streetName = tokens.slice(0, firstAddressPartIndex).join(" ");
   const parts: Partial<Record<AddressPartLabel, string[]>> = {};
+  const unsupportedSuffix: string[] = [];
   let currentLabel: AddressPartLabel | undefined;
 
   for (const token of tokens.slice(firstAddressPartIndex)) {
+    if (unsupportedSuffix.length) {
+      unsupportedSuffix.push(token);
+      continue;
+    }
+
     const normalizedToken = token.toLocaleLowerCase("ru-RU");
     if (addressPartLabelSet.has(normalizedToken)) {
       currentLabel = normalizedToken as AddressPartLabel;
@@ -76,9 +82,26 @@ export function normalizedRussianAddress(value: string) {
     }
 
     if (/\d/u.test(token) && (!currentLabel || parts[currentLabel]?.length)) {
-      currentLabel = nextInferredLabel(parts);
+      const nextLabel = nextInferredLabel(parts);
+      if (!nextLabel) {
+        unsupportedSuffix.push(token);
+        currentLabel = undefined;
+        continue;
+      }
+      currentLabel = nextLabel;
     }
-    if (!currentLabel) continue;
+
+    if (!currentLabel) {
+      unsupportedSuffix.push(token);
+      continue;
+    }
+
+    if (!/\d/u.test(token) && parts[currentLabel]?.length) {
+      unsupportedSuffix.push(token);
+      currentLabel = undefined;
+      continue;
+    }
+
     parts[currentLabel] ??= [];
     parts[currentLabel]?.push(token);
   }
@@ -88,10 +111,14 @@ export function normalizedRussianAddress(value: string) {
     .map((label) => `${label} ${parts[label]?.join(" ")}`);
   if (!formattedParts.length) return expanded;
 
-  return `${streetType} ${capitalized(streetName)} ${formattedParts[0]}${formattedParts
+  const normalized = `${streetType} ${capitalized(streetName)} ${formattedParts[0]}${formattedParts
     .slice(1)
     .map((part) => `, ${part}`)
     .join("")}`;
+
+  return unsupportedSuffix.length
+    ? `${normalized}, ${unsupportedSuffix.join(" ")}`
+    : normalized;
 }
 
 export function suggestedRussianAddress(value: string) {
