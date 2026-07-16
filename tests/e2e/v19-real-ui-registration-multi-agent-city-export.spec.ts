@@ -438,17 +438,28 @@ async function exportFamilyExcel(page: Page, family: FamilyDraft) {
   await row.getByRole("checkbox").check();
   await expect(page.getByRole("heading", { name: /1 подача · \d+ заявител/ })).toBeVisible();
   await page.getByRole("button", { name: "Сформировать Excel" }).click();
-  await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
+  const excelLink = page.getByRole("link", { name: "Скачать Excel" });
+  await expect(excelLink).toBeVisible();
 
   mkdirSync(evidenceDir, { recursive: true });
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Скачать Excel" }).click();
+  await excelLink.click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
   await expect(download.failure()).resolves.toBeNull();
   const savedPath = `${evidenceDir}/${family.fileSlug}.xlsx`;
   await download.saveAs(savedPath);
-  await page.getByRole("button", { name: "Отметить выгружено" }).click();
+  await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
+  const zipLink = page.getByRole("link", { name: "Скачать ZIP" });
+  await expect(zipLink).toBeVisible();
+  const zipDownloadPromise = page.waitForEvent("download");
+  await zipLink.click();
+  const zipDownload = await zipDownloadPromise;
+  await expect(zipDownload.failure()).resolves.toBeNull();
+  await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+  await expect(page.locator("#export-action-hint")).toContainText(
+    "Скачивание подтверждено, пакет зафиксирован",
+  );
   await page.getByRole("tab", { name: "История" }).click();
   await expect(page.locator(".submission-panel").getByText(family.title)).toBeVisible();
   return savedPath;

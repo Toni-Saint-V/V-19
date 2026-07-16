@@ -1473,10 +1473,13 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
       testInfo,
     });
     await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    const downloadButton = page.getByRole("button", {
-      name: /Скачать ZIP файлов|Скачать ZIP с Excel/,
+    const prepareZipButton = page.getByRole("button", {
+      name: "Сформировать ZIP с Excel",
     });
-    await expect(downloadButton).toBeEnabled();
+    await expect(prepareZipButton).toBeEnabled();
+    await prepareZipButton.click();
+    const downloadLink = page.getByRole("link", { name: "Скачать ZIP" });
+    await expect(downloadLink).toBeVisible({ timeout: 120_000 });
     await captureUiEvidence({
       description: "Excel сформирован через UI; ZIP download CTA доступен.",
       page,
@@ -1486,10 +1489,14 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
       testInfo,
     });
     const downloadPromise = page.waitForEvent("download");
-    await downloadButton.click();
+    await downloadLink.click();
     const download = await downloadPromise;
     await expect(download.failure()).resolves.toBeNull();
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+/);
+    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+    await expect(page.locator("#export-action-hint")).toContainText(
+      "Скачивание подтверждено, пакет зафиксирован",
+    );
     await captureUiEvidence({
       description:
         "ZIP download инициирован реальным кликом и завершился без browser download failure.",

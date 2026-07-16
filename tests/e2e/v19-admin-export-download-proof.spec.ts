@@ -75,16 +75,17 @@ test.describe("V-19 admin export download proof", () => {
       await prepareButton.click();
     }
 
-    const downloadButton = page
-      .getByRole("button", {
-        name: /Скачать ZIP с Excel|Скачать ZIP \+ Excel|Скачать ZIP файлов/i,
-      })
-      .first();
+    const prepareArchiveButton = page.getByRole("button", {
+      name: "Сформировать ZIP с Excel",
+    });
 
-    await expect(downloadButton).toBeEnabled();
+    await expect(prepareArchiveButton).toBeEnabled();
+    await prepareArchiveButton.click();
+    const downloadLink = page.getByRole("link", { name: "Скачать ZIP" });
+    await expect(downloadLink).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
-    await downloadButton.click();
+    await downloadLink.click();
     const download = await downloadPromise;
 
     expect(download.suggestedFilename()).toMatch(
@@ -92,7 +93,8 @@ test.describe("V-19 admin export download proof", () => {
     );
     await expect(download.failure()).resolves.toBeNull();
 
-    await expectBodyMatches(page, [/ZIP скачан|Excel готов|Скачать ZIP с Excel/i]);
+    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+    await expectBodyMatches(page, [/пакет зафиксирован|Выгрузка завершена/i]);
 
     expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
       [],

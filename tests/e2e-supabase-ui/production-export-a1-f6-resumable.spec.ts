@@ -543,7 +543,7 @@ async function downloadAndInspectExcel(page: Page, cohortCase: ProductionCohortC
   await expect(prepare).toBeEnabled();
   await prepare.click();
   await expect(page.getByRole("button", { name: "Excel готов" })).toBeVisible();
-  const downloadButton = page.getByRole("button", { name: "Скачать Excel" });
+  const downloadButton = page.getByRole("link", { name: "Скачать Excel" });
   const downloadPromise = page.waitForEvent("download");
   await downloadButton.click();
   const download = await downloadPromise;
@@ -566,18 +566,23 @@ async function downloadAndInspectZip(
   session.gate.beginExport();
   let proof: SanitizedZipProof;
   try {
-    const button = session.page.getByRole("button", {
-      name: "Скачать ZIP с Excel",
+    const prepareButton = session.page.getByRole("button", {
+      name: "Сформировать ZIP с Excel",
     });
-    await expect(button).toBeEnabled();
+    await expect(prepareButton).toBeEnabled();
     const exportStartedAt = Date.now();
+    await prepareButton.click();
+    const downloadLink = session.page.getByRole("link", {
+      name: "Скачать ZIP",
+    });
+    await expect(downloadLink).toBeVisible({ timeout: zipDownloadTimeoutMs });
     const downloadPromise = session.page.waitForEvent("download", {
       timeout: zipDownloadTimeoutMs,
     });
-    await button.click();
+    await downloadLink.click();
     const download = await downloadPromise.catch(async () => {
       const [buttonText, hint] = await Promise.all([
-        button.textContent().catch(() => ""),
+        prepareButton.textContent().catch(() => ""),
         session.page
           .locator("#export-action-hint")
           .textContent()
@@ -609,8 +614,13 @@ async function downloadAndInspectZip(
     state.stage = "artifact_verified";
     await saveProductionExportState(state);
     session.gate.releaseExportMutations();
+    const confirmDownload = session.page.getByRole("button", {
+      name: "Подтвердить скачивание",
+    });
+    await expect(confirmDownload).toBeEnabled();
+    await confirmDownload.click();
     await expect(session.page.locator("#export-action-hint")).toContainText(
-      /ZIP скачан/,
+      /Скачивание подтверждено, пакет зафиксирован/,
       { timeout: 90_000 },
     );
     state.postCommitUiNoticeVerified = true;

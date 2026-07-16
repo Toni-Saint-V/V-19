@@ -59,6 +59,7 @@ import {
   productionDraftSubmissionStaticContentDigest,
   productionDraftValueDigest,
   productionLifecycleStatePath,
+  productionLifecycleMutationPayloadMismatchCode,
   requiredProductionLifecycleCaseKey,
   type ProductionDraftPayloadIdentityContract,
   type ProductionDraftPayloadMutationContract,
@@ -539,6 +540,23 @@ function baseExportPayloadMatches(
   return false;
 }
 
+function baseExportPayloadMismatchCode(
+  body: string | null,
+  key: string,
+  networkContract: ProductionA1S1ExportNetworkContract,
+  timestampWindow: ProductionMutationTimestampWindow | null,
+) {
+  if (key !== "POST /rest/v1/rpc/save_submission_draft") {
+    return "terminal_payload";
+  }
+  const draftContract = exportDraftPayloadContract(networkContract, timestampWindow);
+  if (!draftContract) return "timestamp_window";
+  return productionLifecycleMutationPayloadMismatchCode(body, {
+    ...draftContract,
+    submissionStatus: networkContract.preCommitStatus,
+  });
+}
+
 /**
  * Compares a browser-owned terminal payload with the verified ZIP/XLSX
  * identity in memory. It deliberately returns only a boolean so raw export
@@ -946,6 +964,7 @@ export class StrictProductionA1S1ExportNetworkGate {
   #businessReleasePromise: Promise<"cancel" | "release"> | null = null;
   #businessReleaseResolve: ((decision: "cancel" | "release") => void) | null = null;
   #exportMutationTimestampWindow: ProductionMutationTimestampWindow | null = null;
+  #lastBasePayloadMismatchCode: string | null = null;
   readonly #networkContract: ProductionA1S1ExportNetworkContract | null;
   #verifiedArtifactContract: ProductionA1S1VerifiedArtifactContract | null = null;
   #passwordLoginAttempts = 0;
@@ -1022,6 +1041,14 @@ export class StrictProductionA1S1ExportNetworkGate {
       networkContract,
       timestampWindow,
     );
+    this.#lastBasePayloadMismatchCode = matches
+      ? null
+      : baseExportPayloadMismatchCode(
+          request.postData(),
+          key,
+          networkContract,
+          timestampWindow,
+        );
     if (matches && timestampWindow && !this.#exportMutationTimestampWindow) {
       this.#exportMutationTimestampWindow = timestampWindow;
     }
@@ -1211,6 +1238,7 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
     this.#businessPhase = true;
     this.#businessReleaseDecision = null;
+    this.#lastBasePayloadMismatchCode = null;
     this.#acceptedExportDraft = null;
     this.#acceptedExportDraftPromise = new Promise((resolve) => {
       this.#acceptedExportDraftResolve = resolve;
@@ -1249,7 +1277,12 @@ export class StrictProductionA1S1ExportNetworkGate {
         acceptedExportDraftPromise,
         new Promise<never>((_, reject) => {
           timeout = setTimeout(
-            () => reject(new Error("Timed out waiting for the accepted export draft.")),
+            () =>
+              reject(
+                new Error(
+                  `Timed out waiting for the accepted export draft (${this.#lastBasePayloadMismatchCode ?? "request_absent"}).`,
+                ),
+              ),
             timeoutMs,
           );
         }),
@@ -1611,6 +1644,7 @@ async function readA1S1ProductionRows(input: {
 function requiredSnapshotFacts(
   value: unknown,
   historyRows: readonly ProductionStatusHistoryRow[],
+  mediaRows: readonly ProductionMediaAssetRow[],
 ) {
   const intelligence = jsonRecord(value);
   const envelope = jsonRecord(intelligence?.v19CockpitSnapshot);
@@ -1623,8 +1657,31 @@ function requiredSnapshotFacts(
     Array.isArray(snapshot.history) && Array.isArray(snapshot.issues),
     "A2-S1 cockpit snapshot is missing history or issues identity arrays.",
   );
-  const exportContentDigest = productionDraftSnapshotContentDigest(value, "export");
-  const lifecycleContentDigest = productionDraftSnapshotContentDigest(value, "lifecycle");
+  const sourceSnapshot = readCockpitSnapshot(
+    value as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+  );
+  invariant(sourceSnapshot, "A2-S1 cockpit snapshot cannot be hydrated.");
+  const hydratedSnapshot = attachDurableMediaAssetRows(
+    sourceSnapshot,
+    mediaRows as Database["public"]["Tables"]["media_assets"]["Row"][],
+  );
+  const hydratedIntelligence = JSON.parse(
+    JSON.stringify({
+      ...intelligence,
+      v19CockpitSnapshot: {
+        ...envelope,
+        submission: hydratedSnapshot,
+      },
+    }),
+  ) as unknown;
+  const exportContentDigest = productionDraftSnapshotContentDigest(
+    hydratedIntelligence,
+    "export",
+  );
+  const lifecycleContentDigest = productionDraftSnapshotContentDigest(
+    hydratedIntelligence,
+    "lifecycle",
+  );
   const effectiveHistory = productionDraftEffectiveSnapshotHistory({
     familyIntelligence: value,
     statusHistory: historyRows,
@@ -1674,6 +1731,7 @@ function draftPayloadIdentityFromRows(input: {
   const snapshotFacts = requiredSnapshotFacts(
     rows.submission.family_intelligence,
     rows.history,
+    rows.media,
   );
   const snapshotFieldErrors = productionDraftSnapshotFieldErrorIdentities(
     rows.submission.family_intelligence,
@@ -2374,10 +2432,18 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
         input.submissionProjectionIntent?.mode === "questionnaire_replace" &&
         input.submissionProjectionIntent.applicantId === projected.applicantId &&
         input.submissionProjectionIntent.fieldId === projected.fieldId;
+      const issueApprovalResetMatches =
+        input.submissionProjectionIntent?.mode === "snapshot_mutation" &&
+        input.submissionProjectionIntent.intent.mode === "add_issue" &&
+        input.submissionProjectionIntent.intent.applicantId ===
+          projected.applicantId &&
+        input.submissionProjectionIntent.intent.fieldId === projected.fieldId &&
+        projected.logicalValueDigest === baseline.logicalValueDigest;
       invariant(
         (!labelChanged || allowedLabelDriftFieldIds.has(projected.fieldId)) &&
           (!valueChanged ||
             questionnaireReplacementMatches ||
+            issueApprovalResetMatches ||
             (projected.fieldId === "email" &&
               projected.applicantId ===
                 input.applicantEmailReplacement?.applicantId)),

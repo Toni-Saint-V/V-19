@@ -19,6 +19,7 @@ import {
 } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
+import { decodeVisaApplicationFormTemplate } from "../../src/modules/submissions/visaApplicationFormReferencePdf";
 import {
   PRODUCTION_PROJECT_REF,
   buildProductionCohortPlan,
@@ -367,6 +368,7 @@ async function inspectZip(
       manifest.documentEntries?.every((entry) => documentEntries.includes(entry)),
     "ZIP document entries do not match the manifest.",
   );
+  const canonicalTemplate = decodeVisaApplicationFormTemplate();
   const typesByPassport = new Map<string, Set<string>>();
   for (const entry of documentEntries) {
     const fileName = entry.split("/").at(-1) ?? "";
@@ -390,13 +392,25 @@ async function inspectZip(
         { type: "application/pdf" },
       ) as unknown as globalThis.File;
       const extraction = await extractPdfTextFromFile(file);
+      const pdfChecks = {
+        marker: extraction.text.includes(input.cohortCase.caseMarker),
+        pageCount: extraction.pageCount === 4,
+        passport: extraction.text.includes(identity.passportNumber),
+        referenceTemplate:
+          entryBytes.byteLength > canonicalTemplate.byteLength &&
+          productionA1S1ExportDigest(
+            entryBytes.slice(0, canonicalTemplate.byteLength),
+          ) === productionA1S1ExportDigest(canonicalTemplate),
+        textLayer: extraction.source === "text_layer",
+      };
       invariant(
-        extraction.pageCount === 4 &&
-          extraction.source === "text_layer" &&
-          extraction.text.includes("APPLICATION FOR SCHENGEN VISA") &&
-          extraction.text.includes(input.cohortCase.caseMarker) &&
-          extraction.text.includes(identity.passportNumber),
-        "Generated questionnaire PDF does not contain the expected applicant data.",
+        Object.values(pdfChecks).every(Boolean),
+        `Generated questionnaire PDF failed sanitized checks (` +
+          `entry=${productionA1S1ExportDigest(entry).slice(0, 16)};` +
+          `checks=${Object.entries(pdfChecks)
+            .filter(([, passed]) => !passed)
+            .map(([name]) => name)
+            .join(",")}).`,
       );
     } else {
       invariant(
@@ -629,7 +643,7 @@ async function downloadAndInspectExcel(page: Page, cohortCase: ProductionCohortC
   await expect(prepare).toBeEnabled();
   await prepare.click();
   await expect(page.getByRole("button", { name: "Excel готов" })).toBeVisible();
-  const downloadButton = page.getByRole("button", { name: "Скачать Excel" });
+  const downloadButton = page.getByRole("link", { name: "Скачать Excel" });
   const downloadPromise = page.waitForEvent("download");
   await downloadButton.click();
   const download = await downloadPromise;
@@ -653,11 +667,16 @@ async function downloadAndInspectZip(
   session.gate.beginExport();
   let proof: SanitizedA1S1ZipProof;
   try {
-    const button = session.page.getByRole("button", {
-      name: "Скачать ZIP с Excel",
+    const prepareButton = session.page.getByRole("button", {
+      name: "Сформировать ZIP с Excel",
     });
-    await expect(button).toBeEnabled();
+    await expect(prepareButton).toBeEnabled();
     const exportStartedAt = Date.now();
+    await prepareButton.click();
+    const downloadLink = session.page.getByRole("link", {
+      name: "Скачать ZIP",
+    });
+    await expect(downloadLink).toBeVisible({ timeout: zipDownloadTimeoutMs });
     const downloadOutcome = session.page
       .waitForEvent("download", { timeout: zipDownloadTimeoutMs })
       .then(
@@ -687,7 +706,7 @@ async function downloadAndInspectZip(
         () => ({ kind: "ui-error" as const }),
         () => ({ kind: "no-ui-error" as const }),
       );
-    await button.click();
+    await downloadLink.click();
     const outcome = await Promise.race([downloadOutcome, uiErrorOutcome]);
     let download: Download | undefined;
     if (outcome.kind === "download") {
@@ -703,7 +722,7 @@ async function downloadAndInspectZip(
       );
     } else {
       const [buttonText, hint] = await Promise.all([
-        button.textContent().catch(() => ""),
+        prepareButton.textContent().catch(() => ""),
         session.page
           .locator("#export-action-hint")
           .textContent()
@@ -739,8 +758,13 @@ async function downloadAndInspectZip(
     await saveProductionA1S1ExportState(state);
     session.gate.bindVerifiedArtifact(inspected.artifactContract);
     session.gate.releaseExportMutations();
+    const confirmDownload = session.page.getByRole("button", {
+      name: "Подтвердить скачивание",
+    });
+    await expect(confirmDownload).toBeEnabled();
+    await confirmDownload.click();
     await expect(session.page.locator("#export-action-hint")).toHaveText(
-      /^\s*ZIP скачан: visaflow-export-[a-z0-9]{7}_documents\.zip\s*$/,
+      /^\s*Скачивание подтверждено, пакет зафиксирован: visaflow-export-[a-z0-9]{7}_documents\.zip\s*$/,
       { timeout: 90_000 },
     );
     state.postCommitUiNoticeVerified = true;
@@ -1256,21 +1280,22 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} abort-only draft gate`, 
         admin.gate.beginExport();
         let exportPhaseFinished = false;
         try {
-          const button = admin.page.getByRole("button", {
-            name: "Скачать ZIP с Excel",
+          const prepareButton = admin.page.getByRole("button", {
+            name: "Сформировать ZIP с Excel",
           });
-          await expect(button).toBeEnabled();
-          const acceptedDraftPromise = admin.gate.waitForAcceptedExportDraft(
-            zipDownloadTimeoutMs,
-          );
+          await expect(prepareButton).toBeEnabled();
+          await prepareButton.click();
+          const downloadLink = admin.page.getByRole("link", {
+            name: "Скачать ZIP",
+          });
+          await expect(downloadLink).toBeVisible({
+            timeout: zipDownloadTimeoutMs,
+          });
           const downloadPromise = admin.page.waitForEvent("download", {
             timeout: zipDownloadTimeoutMs,
           });
-          await button.click();
-          const [download, acceptedDraft] = await Promise.all([
-            downloadPromise,
-            acceptedDraftPromise,
-          ]);
+          await downloadLink.click();
+          const download = await downloadPromise;
           invariant(
             /^visaflow-export-.+_documents\.zip$/.test(
               download.suggestedFilename(),
@@ -1286,12 +1311,17 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} abort-only draft gate`, 
               zipFileName: download.suggestedFilename(),
             },
           );
-          evidence.acceptedDraftPayloadDigest = acceptedDraft.payloadDigest;
           evidence.zip = inspected.proof;
           admin.gate.bindVerifiedArtifact(inspected.artifactContract);
+          const acceptedDraftPromise = admin.gate.waitForAcceptedExportDraft(30_000);
+          await admin.page
+            .getByRole("button", { name: "Подтвердить скачивание" })
+            .click();
+          const acceptedDraft = await acceptedDraftPromise;
+          evidence.acceptedDraftPayloadDigest = acceptedDraft.payloadDigest;
           admin.gate.cancelExportMutations();
           await expect(admin.page.locator("#export-action-hint")).toContainText(
-            /ZIP скачан, но терминальная фиксация не подтверждена/,
+            /Скачивание ZIP начато, но терминальная фиксация не подтверждена/,
             { timeout: 90_000 },
           );
           admin.gate.finishExport();

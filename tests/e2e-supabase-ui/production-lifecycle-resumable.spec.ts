@@ -620,6 +620,7 @@ function lifecycleSnapshotMutationIntent(
 ): {
   applicantId?: string;
   comment: string;
+  fieldId: string;
   fieldLabel: string;
   mode: "add_issue" | "mark_issue_fixed";
   reason: string;
@@ -627,6 +628,7 @@ function lifecycleSnapshotMutationIntent(
   if (!requested) return undefined;
   return {
     comment: productionLifecycleIssueMarker(state),
+    fieldId: "appointment-note",
     fieldLabel: "Примечание",
     mode: requested,
     reason: "Требуется исправить поле «Примечание»",

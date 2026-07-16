@@ -16,6 +16,7 @@ import {
 } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
+import { decodeVisaApplicationFormTemplate } from "../../src/modules/submissions/visaApplicationFormReferencePdf";
 import {
   assertNoOverflow,
   clickAndWaitForSupabaseWrite,
@@ -800,9 +801,14 @@ async function inspectGeneratedZip(
     workbookValue(headers, dataRows[1]!, "Applicant Email"),
   );
 
+  const canonicalTemplate = decodeVisaApplicationFormTemplate();
   for (const pdfName of entries.filter((name) => name.endsWith("_visa_form.pdf"))) {
     const pdfBytes = await zip.file(pdfName)!.async("uint8array");
     expect(new TextDecoder().decode(pdfBytes.slice(0, 8))).toBe("%PDF-1.4");
+    expect(pdfBytes.byteLength).toBeGreaterThan(canonicalTemplate.byteLength);
+    expect(await sha256(pdfBytes.slice(0, canonicalTemplate.byteLength))).toBe(
+      await sha256(canonicalTemplate),
+    );
     const pdfFile = new File([
       pdfBytes.buffer.slice(
         pdfBytes.byteOffset,
@@ -814,9 +820,15 @@ async function inspectGeneratedZip(
     const extraction = await extractPdfTextFromFile(pdfFile);
     expect(extraction.pageCount).toBe(4);
     expect(extraction.source).toBe("text_layer");
-    expect(extraction.text).toContain("APPLICATION FOR SCHENGEN VISA");
     expect(extraction.text).toContain("HOTEL E2E MADRID");
-    expect(applicants.some((applicant) => extraction.text.includes(applicant.passportNumber))).toBe(true);
+    const passportNumber = basename(pdfName).replace(/_visa_form\.pdf$/, "");
+    const applicant = applicants.find(
+      (candidate) => candidate.passportNumber === passportNumber,
+    );
+    if (!applicant) throw new Error(`Applicant identity missing for ${basename(pdfName)}.`);
+    expect(extraction.text).toContain(applicant.passportNumber);
+    expect(extraction.text).toContain(applicant.surname);
+    expect(extraction.text).toContain(applicant.firstName);
   }
 
   const fileStat = await stat(zipPath);
@@ -1038,18 +1050,27 @@ test.describe("real new-user Supabase family application ZIP", () => {
         path: resolve(outputDir, "desktop-1440-excel-preview.png"),
       });
 
-      const zipButton = admin.page.getByRole("button", { name: "Скачать ZIP с Excel" });
+      const zipButton = admin.page.getByRole("button", {
+        name: "Сформировать ZIP с Excel",
+      });
       await expect(zipButton).toBeEnabled();
-      const downloadPromise = admin.page.waitForEvent("download");
       await zipButton.click();
+      const zipLink = admin.page.getByRole("link", { name: "Скачать ZIP" });
+      await expect(zipLink).toBeVisible({ timeout: 120_000 });
+      const downloadPromise = admin.page.waitForEvent("download");
+      await zipLink.click();
       const download = await downloadPromise;
       await expect(download.failure()).resolves.toBeNull();
       expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+_documents\.zip$/);
       const zipPath = resolve(outputDir, download.suggestedFilename());
       await download.saveAs(zipPath);
-      await expect(admin.page.locator("#export-action-hint")).toContainText(/ZIP скачан|пакет/i, {
+      await admin.page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+      await expect(admin.page.locator("#export-action-hint")).toContainText(
+        "Скачивание подтверждено, пакет зафиксирован",
+        {
         timeout: 45_000,
-      });
+        },
+      );
 
       await signOut(owner.page);
       await ensureLoginMode(owner.page);

@@ -667,12 +667,31 @@ async function generateAndDownloadExcel(page: Page) {
   }
 
   await generateButton.click();
-  const downloadButton = page.getByRole("button", { name: "Скачать Excel" });
-  await expect(downloadButton).toBeEnabled();
+  const downloadButton = page.getByRole("link", { name: "Скачать Excel" });
+  await expect(downloadButton).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await downloadButton.click();
   const download = await downloadPromise;
   await expect(download.failure()).resolves.toBeNull();
+  return download;
+}
+
+async function generateDownloadAndConfirmZip(page: Page) {
+  const prepareZip = page.getByRole("button", {
+    name: "Сформировать ZIP с Excel",
+  });
+  await expect(prepareZip).toBeEnabled();
+  await prepareZip.click();
+  const downloadZip = page.getByRole("link", { name: "Скачать ZIP" });
+  await expect(downloadZip).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await downloadZip.click();
+  const download = await downloadPromise;
+  await expect(download.failure()).resolves.toBeNull();
+  await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+  await expect(page.locator("#export-action-hint")).toContainText(
+    "Скачивание подтверждено, пакет зафиксирован",
+  );
   return download;
 }
 
@@ -1417,17 +1436,26 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Excel" }).click();
     await expect(page.locator("#export-action-hint")).toContainText(
-      "Файл сформирован. Теперь скачайте его.",
+      "Excel сформирован:",
     );
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
-    await page.getByRole("button", { name: "Скачать Excel" }).click();
+    const excelLink = page.getByRole("link", { name: "Скачать Excel" });
+    await expect(excelLink).toBeVisible();
+    const excelDownloadPromise = page.waitForEvent("download");
+    await excelLink.click();
+    await excelDownloadPromise;
     await expect(page.locator("#export-action-hint")).toContainText(
-      "Файл скачан. Можно отметить подачу выгруженной.",
+      "Скачивание Excel начато:",
     );
-    await expect(
-      page.getByRole("button", { name: "Отметить выгружено" }),
-    ).toBeEnabled();
-    await page.getByRole("button", { name: "Отметить выгружено" }).click();
+    await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
+    const zipLink = page.getByRole("link", { name: "Скачать ZIP" });
+    await expect(zipLink).toBeVisible();
+    const zipDownloadPromise = page.waitForEvent("download");
+    await zipLink.click();
+    await zipDownloadPromise;
+    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+    await expect(page.locator("#export-action-hint")).toContainText(
+      "Скачивание подтверждено, пакет зафиксирован",
+    );
 
     await clickExportTab(page, "История");
     await expect(
@@ -1660,9 +1688,23 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: "Новая подача" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
-    await page.getByRole("button", { name: "Скачать Excel" }).click();
-    await page.getByRole("button", { name: "Отметить выгружено" }).click();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
+    await page.getByRole("button", { name: "Сформировать Excel" }).click();
+    const refreshedExcelLink = page.getByRole("link", { name: "Скачать Excel" });
+    await expect(refreshedExcelLink).toBeVisible();
+    const refreshedExcelDownload = page.waitForEvent("download");
+    await refreshedExcelLink.click();
+    await refreshedExcelDownload;
+    await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
+    const refreshedZipLink = page.getByRole("link", { name: "Скачать ZIP" });
+    await expect(refreshedZipLink).toBeVisible();
+    const refreshedZipDownload = page.waitForEvent("download");
+    await refreshedZipLink.click();
+    await refreshedZipDownload;
+    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+    await expect(page.locator("#export-action-hint")).toContainText(
+      "Скачивание подтверждено, пакет зафиксирован",
+    );
 
     await clickExportTab(page, "История");
     const exportedHistoryRow = page.getByLabel(/Выгруженный пакет Новая подача/);
@@ -1845,7 +1887,7 @@ test.describe("V-19 operations workspace", () => {
         ),
       ).toBeVisible();
       await generateAndDownloadExcel(page);
-      await page.getByRole("button", { name: "Отметить выгружено" }).click();
+      await generateDownloadAndConfirmZip(page);
     });
 
     await test.step("export two single applicants together", async () => {
@@ -1865,7 +1907,7 @@ test.describe("V-19 operations workspace", () => {
         page.getByRole("heading", { name: "2 подачи · 2 заявителя" }),
       ).toBeVisible();
       await generateAndDownloadExcel(page);
-      await page.getByRole("button", { name: "Отметить выгружено" }).click();
+      await generateDownloadAndConfirmZip(page);
     });
 
     await test.step("export history contains all generated packages", async () => {

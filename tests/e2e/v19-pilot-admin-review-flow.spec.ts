@@ -563,7 +563,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       await prepareButton.click();
     }
 
-    await expectBodyMatches(page, [/Excel готов|Скачать ZIP с Excel|Можно сформировать/i]);
+    await expectBodyMatches(page, [/Excel готов|Сформировать ZIP с Excel|Можно сформировать/i]);
 
     expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
       [],

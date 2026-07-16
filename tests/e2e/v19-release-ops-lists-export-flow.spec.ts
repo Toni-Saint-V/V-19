@@ -91,7 +91,7 @@ test.describe("V-19 release ops lists export flow", () => {
       page.getByRole("button", { name: "Сформировать Excel" }),
     ).toBeEnabled();
     await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
+    await expect(page.getByRole("link", { name: "Скачать Excel" })).toBeVisible();
 
     await clearExportSelection(page);
     await page.getByRole("button", { name: "Стоп" }).click();
