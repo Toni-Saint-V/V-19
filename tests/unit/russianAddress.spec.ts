@@ -26,4 +26,12 @@ describe("Russian questionnaire address suggestions", () => {
       ),
     ).toBeUndefined();
   });
+
+  test("preserves unsupported address suffixes instead of dropping their values", () => {
+    const source = "ул Ленина 5 корп 1 кв 12 этаж 3";
+    const expected = "улица Ленина дом 5, корпус 1, квартира 12, этаж 3";
+
+    expect(normalizedRussianAddress(source)).toBe(expected);
+    expect(suggestedRussianAddress(source)).toBe(expected);
+  });
 });

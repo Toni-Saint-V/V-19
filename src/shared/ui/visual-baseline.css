@@ -25113,7 +25113,7 @@ body,
 
 .vf-figma-questionnaire-screen .v19-questionnaire-address-suggestion button {
   flex: 0 0 auto;
-  min-height: var(--v19b-size-32);
+  min-height: var(--v19b-size-40);
   padding-inline: var(--v19b-size-10);
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19-control-radius);

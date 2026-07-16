@@ -158,9 +158,13 @@ test.describe("V-19 questionnaire live sanity", () => {
     const suggestion = page.locator(".v19-questionnaire-address-suggestion");
     await expect(suggestion).toBeVisible();
     await expect(suggestion).toBeInViewport();
-    await expect(
-      page.getByRole("button", { name: "Подставить адрес: Домашний адрес" }),
-    ).toBeVisible();
+    const applyAddressButton = page.getByRole("button", {
+      name: "Подставить адрес: Домашний адрес",
+    });
+    await expect(applyAddressButton).toBeVisible();
+    await expect(applyAddressButton).toBeInViewport();
+    const applyAddressBox = await applyAddressButton.boundingBox();
+    expect(applyAddressBox?.height ?? 0).toBeGreaterThanOrEqual(40);
 
     await expectNoDocumentOverflow(page);
     await page.screenshot({
