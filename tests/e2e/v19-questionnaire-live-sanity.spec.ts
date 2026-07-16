@@ -9,6 +9,21 @@ async function openQuestionnaire(page: Page) {
   const ownedByCurrentLocalAgent = initialSubmissions.map((submission) => ({
     ...submission,
     agentId: "local-agent-tony",
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === "birth-date"
+            ? {
+                ...field,
+                reviewSource: "passport_ocr" as const,
+                reviewState: "needs_review" as const,
+              }
+            : field,
+        ),
+      })),
+    })),
   }));
   await page.evaluate((submissions) => {
     const browserGlobal = globalThis as unknown as {
@@ -62,14 +77,45 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
     await expect(page.getByRole("button", { exact: true, name: "Следующее поле" })).toBeVisible();
 
-    await page.getByRole("button", { name: /Отель \/ приглашение/ }).first().click();
+    await page.getByRole("button", { name: /Личные данные/ }).first().click();
+    const reviewField = page.locator(".v19-questionnaire-field-control.is-review:visible").first();
+    const normalField = page.locator(".v19-questionnaire-field-control.is-normal:visible").first();
+    await expect(reviewField).toBeVisible();
+    await expect(normalField).toBeVisible();
+    const [reviewBackground, normalBackground] = await Promise.all([
+      reviewField.evaluate((element) => getComputedStyle(element).backgroundColor),
+      normalField.evaluate((element) => getComputedStyle(element).backgroundColor),
+    ]);
+    expect(reviewBackground).toBe(normalBackground);
+    const confirmReview = page.getByRole("button", {
+      name: "Подтвердить поле: Дата рождения",
+    });
+    await expect(confirmReview).toBeVisible();
     await expect(
-      page.getByText(/ФИО приглашающего лица или название отеля\/компании/),
-    ).toBeVisible();
+      reviewField.locator("xpath=ancestor::*[@data-field-label='Дата рождения']"),
+    ).toContainText("Подтвердить");
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("questionnaire-review-desktop.png"),
+    });
 
-    const editableField = page.locator(".v19-questionnaire-work-panel textarea").first();
-    await expect(editableField).toBeVisible();
-    await editableField.fill("QA local draft");
+    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
+    const address = page.getByRole("textbox", { name: "Домашний адрес" });
+    await address.fill("прНовочеркаский56 2 34");
+    await expect(address).toHaveValue("прНовочеркаский56 2 34");
+    await expect(
+      page.getByText("проспект Новочеркаский дом 56, корпус 2, квартира 34"),
+    ).toBeVisible();
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("questionnaire-address-desktop.png"),
+    });
+    await page
+      .getByRole("button", { name: "Подставить адрес: Домашний адрес" })
+      .click();
+    await expect(address).toHaveValue(
+      "проспект Новочеркаский дом 56, корпус 2, квартира 34",
+    );
     await expect(page.locator("[role='status']:visible").filter({ hasText: "Сохранено" })).toBeVisible({
       timeout: 5_000,
     });
@@ -100,15 +146,20 @@ test.describe("V-19 questionnaire live sanity", () => {
     await blocker.click();
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
     await expect(
-      page
-        .locator(".vf-figma-questionnaire-screen")
-        .getByText("Санкт-Петербург", { exact: true }),
-    ).toBeVisible();
-    await expect(
       page.getByRole("button", { name: "Сохранить и выйти" }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Отправить на проверку" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
+    const address = page.getByRole("textbox", { name: "Домашний адрес" });
+    await address.fill("улЛенина5 2 12");
+    const suggestion = page.locator(".v19-questionnaire-address-suggestion");
+    await expect(suggestion).toBeVisible();
+    await expect(suggestion).toBeInViewport();
+    await expect(
+      page.getByRole("button", { name: "Подставить адрес: Домашний адрес" }),
     ).toBeVisible();
 
     await expectNoDocumentOverflow(page);

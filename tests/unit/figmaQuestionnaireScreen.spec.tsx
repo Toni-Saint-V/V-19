@@ -1280,9 +1280,17 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(address.tagName).toBe("INPUT");
     expect(address).toHaveAttribute("placeholder", "ул ленина д 5 кв 12");
 
-    fireEvent.change(address, { target: { value: "ул ленина д 5 кв 12" } });
-    fireEvent.blur(address);
-    expect(address).toHaveValue("улица ленина дом 5 квартира 12");
+    fireEvent.change(address, { target: { value: "прНовочеркаский56 2 34" } });
+    expect(address).toHaveValue("прНовочеркаский56 2 34");
+    expect(
+      screen.getByText("проспект Новочеркаский дом 56, корпус 2, квартира 34"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подставить адрес: Домашний адрес" }),
+    );
+    expect(address).toHaveValue(
+      "проспект Новочеркаский дом 56, корпус 2, квартира 34",
+    );
 
     const city = screen.getByLabelText("Город проживания");
     fireEvent.focus(city);

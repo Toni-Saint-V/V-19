@@ -54,6 +54,7 @@ import {
   passportGateIssues,
   type PassportGateIssue,
 } from "../passportExtractionGuards";
+import { suggestedRussianAddress } from "../russianAddress";
 import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
@@ -223,6 +224,7 @@ const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
 };
 
 type FormFieldProps = {
+  addressAssist?: boolean;
   compact?: boolean;
   excelMap?: string;
   errorMessage?: string;
@@ -575,20 +577,6 @@ function formatPhoneInput(value: string, prefix: "+7" | "+34") {
   );
 }
 
-function normalizeRussianAddress(value: string) {
-  return value
-    .trim()
-    .replace(/(^|[\s,])ул\.?(?=\s|,|$)\s*/giu, "$1улица ")
-    .replace(/(^|[\s,])пр(?:-?т)?\.?(?=\s|,|$)\s*/giu, "$1проспект ")
-    .replace(/(^|[\s,])д\.?(?=\s|\d|,|$)\s*/giu, "$1дом ")
-    .replace(/(^|[\s,])кв\.?(?=\s|\d|,|$)\s*/giu, "$1квартира ")
-    .replace(/(^|[\s,])корп\.?(?=\s|\d|,|$)\s*/giu, "$1корпус ")
-    .replace(/(^|[\s,])стр\.?(?=\s|\d|,|$)\s*/giu, "$1строение ")
-    .replace(/(^|[\s,])оф\.?(?=\s|\d|,|$)\s*/giu, "$1офис ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
 function emailSuggestions(value: string) {
   const [localPart = "", domainPart = ""] = value.trim().split("@", 2);
   if (!localPart) return [];
@@ -618,6 +606,7 @@ function inputAutocomplete(label: string, type: FormFieldProps["type"]) {
 }
 
 function FormField({
+  addressAssist,
   compact,
   errorMessage,
   focused,
@@ -698,6 +687,10 @@ function FormField({
       .filter((option) => !query || optionMatchesSearch(option, query))
       .slice(0, 10);
   }, [inputSuggestions, value]);
+  const addressSuggestion = useMemo(
+    () => (addressAssist ? suggestedRussianAddress(value) : undefined),
+    [addressAssist, value],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1164,6 +1157,22 @@ function FormField({
             onClick={() => fieldContract?.confirmReview(modelFieldId)}
           >
             Подтвердить
+          </button>
+        </div>
+      ) : null}
+
+      {addressSuggestion && onChange ? (
+        <div className="v19-questionnaire-address-suggestion" role="status">
+          <span>
+            <small>Предлагаем записать</small>
+            <strong>{addressSuggestion}</strong>
+          </span>
+          <button
+            aria-label={`Подставить адрес: ${label}`}
+            type="button"
+            onClick={() => onChange(addressSuggestion)}
+          >
+            Подставить
           </button>
         </div>
       ) : null}
@@ -3246,11 +3255,6 @@ export function FigmaQuestionnaireScreen({
     );
   }
 
-  function normalizeAddressField(key: "contactAddress" | "employerAddress") {
-    const normalized = normalizeRussianAddress(formData[key]);
-    if (normalized !== formData[key]) updateField(key, normalized);
-  }
-
   function copySharedDataToFamily() {
     if (
       !isEditable ||
@@ -4424,16 +4428,16 @@ export function FigmaQuestionnaireScreen({
       return (
         <>
           <FormField
+            addressAssist
             excelMap="Cell: D2"
             fullWidth
-            hint="Можно без заглавных и знаков: ул ленина д 5 кв 12 — расшифруем после ввода."
+            hint="Пишите коротко: ул, пр, пер, наб, д, корп, кв, под, оф. Предложим полный адрес после номера дома."
             label="Домашний адрес"
             modelFieldId="home-address"
             number="1"
             placeholder="ул ленина д 5 кв 12"
             compact
             value={formData.contactAddress}
-            onBlur={() => normalizeAddressField("contactAddress")}
             onChange={(value) => updateField("contactAddress", value)}
           />
           <FormField
@@ -4565,16 +4569,16 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("employerContact", value)}
           />
           <FormField
+            addressAssist
             excelMap="Cell: E4"
             fullWidth
-            hint="Можно без заглавных и знаков: пр мира д 10 оф 4 — расшифруем после ввода."
+            hint="Пишите коротко — полный вариант появится как предложение после номера дома."
             label="Адрес работодателя / учебного заведения"
             modelFieldId="employer-address"
             number="5"
             placeholder="пр мира д 10 оф 4"
             compact
             value={formData.employerAddress}
-            onBlur={() => normalizeAddressField("employerAddress")}
             onChange={(value) => updateField("employerAddress", value)}
           />
         </>
@@ -4755,6 +4759,7 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("hotelName", value)}
           />
           <FormField
+            addressAssist
             excelMap="Cell: G3"
             fullWidth
             label="Адрес"
