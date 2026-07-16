@@ -30,7 +30,10 @@ import {
   isKnownContractRole,
   isStatusTransitionAllowed,
 } from "./domainContract";
-import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
+import {
+  blsApplicableQuestionnaireFields,
+  blsQuestionnaireReadiness,
+} from "./questionnaireBlsRules";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -575,7 +578,7 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
   reason?: string;
 } {
   const fields = submission.applicants.flatMap((applicant) =>
-    applicant.sections.flatMap((section) => section.fields),
+    blsApplicableQuestionnaireFields(applicant),
   );
 
   if (fields.some((field) => Boolean(field.error))) {

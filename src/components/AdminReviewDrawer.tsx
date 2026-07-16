@@ -38,6 +38,7 @@ import {
   historyDetailForUser,
   historyTimestampForUser,
 } from "../modules/submissions/historyPresentation";
+import { blsApplicantQuestionnaireStatus } from "../modules/submissions/questionnaireBlsRules";
 import { questionnaireFieldMatchesTarget } from "../modules/submissions/questionnaire";
 import type {
   ActionDecision,
@@ -361,33 +362,23 @@ function ApplicantsTab({
   submission,
   primaryAction,
   reviewTarget,
+  selectedApplicantId,
   onAddRemark,
   onOpenIssue,
+  onSelectedApplicantIdChange,
   onVerifyDocument,
 }: {
   submission: Submission | null;
   primaryAction: ActionDecision | null;
   reviewTarget: ReviewTargetRequest | null;
+  selectedApplicantId: string;
   onAddRemark: AdminReviewDrawerProps["onAddRemark"];
   onOpenIssue: (issue: Issue) => void;
+  onSelectedApplicantIdChange: (applicantId: string) => void;
   onVerifyDocument: AdminReviewDrawerProps["onVerifyDocument"];
 }) {
-  const [selectedApplicantId, setSelectedApplicantId] = useState("");
   const [activePanel, setActivePanel] = useState<ApplicantPanelId>("overview");
   const prefersReducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (!submission?.applicants.length) {
-      setSelectedApplicantId("");
-      return;
-    }
-
-    setSelectedApplicantId((current) =>
-      submission.applicants.some((applicant) => applicant.id === current)
-        ? current
-        : submission.applicants[0].id,
-    );
-  }, [submission]);
 
   useEffect(() => {
     const issue = reviewTarget?.issue;
@@ -396,9 +387,9 @@ function ApplicantsTab({
       return;
     }
 
-    setSelectedApplicantId(issue.target.applicantId);
+    onSelectedApplicantIdChange(issue.target.applicantId);
     setActivePanel("media");
-  }, [reviewTarget, submission]);
+  }, [onSelectedApplicantIdChange, reviewTarget, submission]);
 
   if (!submission) {
     return (
@@ -439,6 +430,11 @@ function ApplicantsTab({
   const approvedQuestionnaireFields = filledQuestionnaireFields.filter(
     (field) => fieldStatus(field, applicantIssues) === "approved",
   ).length;
+  const applicantQuestionnaireStatus = applicantIssues.some(
+    (issue) => issue.status === "open" && !issueTargetsFile(issue),
+  )
+    ? "needs_fix"
+    : blsApplicantQuestionnaireStatus(applicant);
   const totalReviewItems = filledQuestionnaireFields.length + applicantFiles.length;
   const completedReviewItems = approvedQuestionnaireFields + acceptedFiles;
   const attentionPanel: ApplicantPanelId | null = applicantIssues.length
@@ -522,7 +518,7 @@ function ApplicantsTab({
                 className={isSelected ? "is-selected" : undefined}
                 key={item.id}
                 onClick={() => {
-                  setSelectedApplicantId(item.id);
+                  onSelectedApplicantIdChange(item.id);
                   setActivePanel("overview");
                 }}
                 type="button"
@@ -618,7 +614,7 @@ function ApplicantsTab({
                 <dl className="admin-review-traveler-overview">
                   <div>
                     <dt>Анкета</dt>
-                    <dd>{questionnaireStatusLabel(applicant.questionnaireStatus)}</dd>
+                    <dd>{questionnaireStatusLabel(applicantQuestionnaireStatus)}</dd>
                   </div>
                   <div>
                     <dt>Проверено полей</dt>
@@ -713,11 +709,14 @@ function ApplicantsTab({
 function QuestionnaireTab({
   submission,
   reviewTarget,
+  selectedApplicantId,
   onAddRemark,
   onApproveQuestionnaireField,
+  onSelectedApplicantIdChange,
 }: {
   submission: Submission | null;
   reviewTarget: ReviewTargetRequest | null;
+  selectedApplicantId: string;
   onAddRemark: (
     field?: string,
     applicant?: string,
@@ -725,8 +724,8 @@ function QuestionnaireTab({
     applicantId?: string,
   ) => void;
   onApproveQuestionnaireField?: AdminReviewDrawerProps["onApproveQuestionnaireField"];
+  onSelectedApplicantIdChange: (applicantId: string) => void;
 }) {
-  const [applicantId, setApplicantId] = useState("");
   const [isApplicantMenuOpen, setApplicantMenuOpen] = useState(false);
   const [pendingApprovalKey, setPendingApprovalKey] = useState("");
   const [pendingSectionId, setPendingSectionId] = useState("");
@@ -735,16 +734,6 @@ function QuestionnaireTab({
   useEffect(() => {
     setApplicantMenuOpen(false);
     setPendingSectionId("");
-    if (!submission?.applicants.length) {
-      setApplicantId("");
-      return;
-    }
-
-    setApplicantId((current) =>
-      submission.applicants.some((applicant) => applicant.id === current)
-        ? current
-        : submission.applicants[0].id,
-    );
   }, [submission]);
 
   useEffect(() => {
@@ -767,12 +756,16 @@ function QuestionnaireTab({
       return;
     }
 
-    setApplicantId(issue.target.applicantId);
-  }, [reviewTarget, submission]);
+    onSelectedApplicantIdChange(issue.target.applicantId);
+  }, [onSelectedApplicantIdChange, reviewTarget, submission]);
 
   useEffect(() => {
     const issue = reviewTarget?.issue;
-    if (!issue || issueTargetsFile(issue) || applicantId !== issue.target.applicantId) {
+    if (
+      !issue ||
+      issueTargetsFile(issue) ||
+      selectedApplicantId !== issue.target.applicantId
+    ) {
       return;
     }
 
@@ -809,7 +802,7 @@ function QuestionnaireTab({
     });
 
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [applicantId, reviewTarget, submission]);
+  }, [reviewTarget, selectedApplicantId, submission]);
 
   if (!submission) {
     return (
@@ -821,7 +814,7 @@ function QuestionnaireTab({
   }
 
   const applicant =
-    submission.applicants.find((item) => item.id === applicantId) ??
+    submission.applicants.find((item) => item.id === selectedApplicantId) ??
     submission.applicants[0];
   if (!applicant) {
     return (
@@ -836,7 +829,8 @@ function QuestionnaireTab({
     (issue) => issue.target.applicantId === applicant.id,
   );
   const fields = applicant.sections.flatMap((section) => section.fields);
-  const approvedCount = fields.filter(
+  const reviewableFields = fields.filter((field) => hasReviewValue(field.value));
+  const approvedCount = reviewableFields.filter(
     (field) => fieldStatus(field, applicantIssues) === "approved",
   ).length;
   const focusFirstField = (predicate: (field: QuestionnaireField) => boolean) => {
@@ -905,7 +899,7 @@ function QuestionnaireTab({
                       className={isSelected ? "is-selected" : undefined}
                       key={item.id}
                       onClick={() => {
-                        setApplicantId(item.id);
+                        onSelectedApplicantIdChange(item.id);
                         setApplicantMenuOpen(false);
                       }}
                       role="option"
@@ -924,13 +918,15 @@ function QuestionnaireTab({
         <div className="admin-review-applicant-stats" aria-label="Навигация по анкете">
           <button
             className={`admin-review-applicant-stat-button ${
-              approvedCount === fields.length && fields.length ? "is-ok" : "is-warning"
+              approvedCount === reviewableFields.length && reviewableFields.length
+                ? "is-ok"
+                : "is-warning"
             }`}
-            onClick={() => focusFirstField(() => true)}
+            onClick={() => focusFirstField((field) => hasReviewValue(field.value))}
             type="button"
           >
-            <CheckCircle2 className="h-4 w-4" /> {approvedCount}/{fields.length}{" "}
-            проверено
+            <CheckCircle2 className="h-4 w-4" /> Проверено {approvedCount} из{" "}
+            {reviewableFields.length} заполненных
           </button>
           <button
             className={`admin-review-applicant-stat-button ${
@@ -994,7 +990,7 @@ function QuestionnaireTab({
               </summary>
               <div className="admin-review-section-review">
                 <span>
-                  {approvedInSection}/{reviewableFields.length} заполненных
+                  Проверено {approvedInSection} из {reviewableFields.length} заполненных
                 </span>
                 <button
                   aria-label={`Апрув всей секции: ${section.title}`}
@@ -1384,6 +1380,7 @@ export function AdminReviewDrawer({
   const tabListRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("applicants");
+  const [selectedApplicantId, setSelectedApplicantId] = useState("");
   const [reviewTarget, setReviewTarget] = useState<ReviewTargetRequest | null>(null);
   const activeSubmissionId = submission?.id ?? submissionId;
   const primaryAction = useMemo(
@@ -1430,6 +1427,19 @@ export function AdminReviewDrawer({
   const currentStatusTone = submission
     ? submissionStatusTone[submission.status]
     : "muted";
+
+  useEffect(() => {
+    if (!submission?.applicants.length) {
+      setSelectedApplicantId("");
+      return;
+    }
+
+    setSelectedApplicantId((current) =>
+      submission.applicants.some((applicant) => applicant.id === current)
+        ? current
+        : submission.applicants[0].id,
+    );
+  }, [submission]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1533,7 +1543,7 @@ export function AdminReviewDrawer({
         icon: FileText,
         count: submission?.applicants.flatMap((applicant) =>
           applicant.sections.flatMap((section) => section.fields),
-        ).length,
+        ).filter((field) => hasReviewValue(field.value)).length,
       },
     ],
     [submission],
@@ -1612,6 +1622,7 @@ export function AdminReviewDrawer({
   );
 
   const handleOpenIssue = (issue: Issue) => {
+    setSelectedApplicantId(issue.target.applicantId);
     setReviewTarget((current) => ({
       issue,
       requestId: (current?.requestId ?? 0) + 1,
@@ -1808,15 +1819,19 @@ export function AdminReviewDrawer({
                     <ApplicantsTab
                       onAddRemark={onAddRemark}
                       onOpenIssue={handleOpenIssue}
+                      onSelectedApplicantIdChange={setSelectedApplicantId}
                       onVerifyDocument={onVerifyDocument}
                       primaryAction={primaryAction}
                       reviewTarget={reviewTarget}
+                      selectedApplicantId={selectedApplicantId}
                       submission={submission}
                     />
                   )}
                   {activeTab === "questionnaire" && (
                     <QuestionnaireTab
+                      onSelectedApplicantIdChange={setSelectedApplicantId}
                       reviewTarget={reviewTarget}
+                      selectedApplicantId={selectedApplicantId}
                       submission={submission}
                       onAddRemark={onAddRemark}
                       onApproveQuestionnaireField={onApproveQuestionnaireField}

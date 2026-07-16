@@ -321,9 +321,26 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     const source = initialSubmissions.find((item) => item.id === "ПД-1053");
     const applicant = source?.applicants[0];
     if (!source || !applicant) throw new Error("Expected admin review fixture.");
+    const errorField = applicant.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "appointment-city");
+    if (!errorField) throw new Error("Expected questionnaire field fixture.");
     const submission = {
       ...source,
-      applicants: [{ ...applicant, questionnaireStatus: "needs_fix" as const }],
+      applicants: [
+        {
+          ...applicant,
+          questionnaireStatus: "needs_fix" as const,
+          sections: applicant.sections.map((section) => ({
+            ...section,
+            fields: section.fields.map((field) =>
+              field.id === errorField.id
+                ? { ...field, error: "Нужно исправить значение" }
+                : field,
+            ),
+          })),
+        },
+      ],
     };
 
     render(
@@ -342,6 +359,71 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       expect(screen.getByText("Нужны исправления")).toBeVisible();
     });
     expect(screen.queryByText("needs_fix")).not.toBeInTheDocument();
+  });
+
+  test("keeps the selected tourist when moving from applicants to questionnaire", async () => {
+    const submission = initialSubmissions.find((item) => item.applicants.length > 1);
+    const secondApplicant = submission?.applicants[1];
+    if (!submission || !secondApplicant) {
+      throw new Error("Expected a family submission fixture.");
+    }
+    const isReviewable = (value: string) => {
+      const normalized = value.trim().toLocaleLowerCase("ru-RU");
+      return Boolean(normalized) && normalized !== "—" && normalized !== "не заполнено";
+    };
+    const applicantReviewableFields = secondApplicant.sections
+      .flatMap((section) => section.fields)
+      .filter((field) => isReviewable(field.value));
+    const applicantApprovedFields = applicantReviewableFields.filter(
+      (field) => field.adminReviewApprovedAtIso && field.adminReviewApprovedBy,
+    );
+    const packageReviewableFieldCount = submission.applicants
+      .flatMap((applicant) =>
+        applicant.sections.flatMap((section) => section.fields),
+      )
+      .filter((field) => isReviewable(field.value)).length;
+
+    render(
+      <AdminReviewDrawer
+        isOpen
+        submission={submission}
+        submissionId={submission.id}
+        onAddRemark={() => undefined}
+        onClose={() => undefined}
+        onVerifyDocument={() => undefined}
+      />,
+    );
+
+    const applicantName = screen.getByText(secondApplicant.fullName, {
+      selector: "nav[aria-label='Заявители пакета'] strong",
+    });
+    fireEvent.click(applicantName.closest("button") as HTMLButtonElement);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: secondApplicant.fullName }),
+      ).toBeVisible(),
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Анкета/ }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: `Выбранный заявитель: ${secondApplicant.fullName}`,
+        }),
+      ).toBeVisible(),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: new RegExp(
+          `Проверено\\s+${applicantApprovedFields.length}\\s+из\\s+${applicantReviewableFields.length}\\s+заполненных`,
+        ),
+      }),
+    ).toBeVisible();
+    const questionnaireTab = screen.getByRole("tab", { name: /Анкета/ });
+    expect(questionnaireTab).toHaveTextContent(String(packageReviewableFieldCount));
+    expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByText(/Проверено \d+ из \d+ заполненных/)).not.toHaveLength(0);
   });
 
   test("uses truthful field labels and an accessible review dialog", async () => {

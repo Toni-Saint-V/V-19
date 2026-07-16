@@ -3,10 +3,14 @@ import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
   addPreciseAdminIssue,
   approveQuestionnaireFieldForAdmin,
+  createDraftSubmission,
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
 import { adminQuestionnaireReviewReadiness } from "../../src/modules/submissions/status";
-import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 function reviewFixture() {
   const submission = initialSubmissions.find((candidate) => candidate.id === "ПД-1053");
@@ -187,6 +191,84 @@ describe("admin questionnaire field approval", () => {
       reason: "Подтвердите заполненные поля анкеты перед принятием",
     });
     expect(adminQuestionnaireReviewReadiness(approved)).toEqual({ ok: true });
+  });
+
+  test("ignores stale errors on blank child employer fields but reviews populated values", () => {
+    let submission = fillRequiredQuestionnaireForTest(
+      createDraftSubmission({
+        city: "Москва",
+        familyCount: 3,
+        submissions: [],
+        type: "family",
+      }),
+    );
+    const child = submission.applicants.find((applicant) => applicant.role === "child");
+    if (!child) throw new Error("Expected a child applicant fixture.");
+    const workSection = child.sections.find((section) =>
+      section.fields.some((field) => field.id === "occupation"),
+    );
+    if (!workSection) throw new Error("Expected a child work section fixture.");
+
+    submission = updateQuestionnaireField(submission, {
+      applicantId: child.id,
+      fieldId: "occupation",
+      sectionId: workSection.id,
+      value: "MINOR",
+    });
+    const employerFieldIds = new Set([
+      "employer-name",
+      "employer-contact",
+      "employer-address",
+    ]);
+    const withBlankEmployerErrors = {
+      ...submission,
+      applicants: submission.applicants.map((applicant) =>
+        applicant.id !== child.id
+          ? applicant
+          : {
+              ...applicant,
+              sections: applicant.sections.map((section) => ({
+                ...section,
+                fields: section.fields.map((field) =>
+                  employerFieldIds.has(field.id)
+                    ? {
+                        ...field,
+                        adminReviewApprovedAtIso: undefined,
+                        adminReviewApprovedBy: undefined,
+                        error: "Обязательное поле",
+                        value: "",
+                      }
+                    : field,
+                ),
+              })),
+            },
+      ),
+    };
+    const approved = adminApproveQuestionnaireForTest(withBlankEmployerErrors);
+
+    expect(adminQuestionnaireReviewReadiness(approved)).toEqual({ ok: true });
+
+    const populatedEmployer = updateQuestionnaireField(approved, {
+      applicantId: child.id,
+      fieldId: "employer-name",
+      sectionId: workSection.id,
+      value: "SCHOOL",
+    });
+    expect(adminQuestionnaireReviewReadiness(populatedEmployer)).toEqual({
+      ok: false,
+      reason: "Подтвердите заполненные поля анкеты перед принятием",
+    });
+
+    const employerApproved = approveQuestionnaireFieldForAdmin(
+      populatedEmployer,
+      {
+        applicantId: child.id,
+        fieldId: "employer-name",
+        sectionId: workSection.id,
+      },
+      "admin-reviewer",
+    );
+    expect(adminQuestionnaireReviewReadiness(employerApproved)).toEqual({ ok: true });
   });
 
   test("revokes an existing approval when admin adds a field remark", () => {

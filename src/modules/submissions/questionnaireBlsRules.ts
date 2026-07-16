@@ -219,7 +219,7 @@ export function isBlsQuestionnaireFieldApplicable({
     case 'employer-name':
     case 'employer-contact':
     case 'employer-address':
-      return occupationRequiresEmployer(formData) || hasOwnValue;
+      return occupationRequiresEmployer(formData, applicantRole) || hasOwnValue;
 
     case 'stay-purpose-details':
       return isOtherLike(read(formData, 'stayPurpose')) || hasOwnValue;
@@ -334,9 +334,12 @@ export function blsStayDurationFromDates(
   return String(daysInclusive(travelStart, travelEnd));
 }
 
-function occupationRequiresEmployer(formData: BlsFormData) {
+function occupationRequiresEmployer(
+  formData: BlsFormData,
+  applicantRole?: Applicant['role'],
+) {
   const occupation = read(formData, 'occupation').toUpperCase();
-  if (!occupation) return true;
+  if (!occupation) return applicantRole !== 'child';
   return !nonWorkingOccupations.has(occupation);
 }
 
@@ -382,7 +385,7 @@ export function isBlsQuestionnaireFieldRequired({
     case 'employer-name':
     case 'employer-contact':
     case 'employer-address':
-      return occupationRequiresEmployer(formData);
+      return occupationRequiresEmployer(formData, applicantRole);
 
     case 'stay-purpose-details':
       return isOtherLike(read(formData, 'stayPurpose'));
@@ -544,6 +547,44 @@ function blsFormDataForApplicant(applicant: Applicant): BlsFormData {
   }
 
   return formData;
+}
+
+export function blsApplicableQuestionnaireFields(applicant: Applicant) {
+  const formData = blsFormDataForApplicant(applicant);
+  return applicant.sections
+    .flatMap((section) => section.fields)
+    .filter((field) =>
+      isBlsQuestionnaireFieldApplicable({
+        applicantRole: applicant.role,
+        field,
+        formData,
+      }),
+    );
+}
+
+export function blsApplicantQuestionnaireStatus(
+  applicant: Applicant,
+): Applicant['questionnaireStatus'] {
+  const formData = blsFormDataForApplicant(applicant);
+  const fields = applicant.sections.flatMap((section) => section.fields);
+  const hasBlockingValue = fields.some((field) => {
+    const context = {
+      applicantRole: applicant.role,
+      field,
+      formData,
+    } satisfies BlsFieldValidationContext;
+
+    return (
+      isBlsQuestionnaireFieldApplicable(context) &&
+      (Boolean(field.error) || isBlsQuestionnaireFieldBlockingIssue(context))
+    );
+  });
+
+  if (hasBlockingValue) return 'needs_fix';
+  if (blsQuestionnaireReadiness({ applicants: [applicant] }).ready) {
+    return 'complete';
+  }
+  return fields.some((field) => field.value.trim()) ? 'partial' : 'empty';
 }
 
 export function blsQuestionnaireReadiness(

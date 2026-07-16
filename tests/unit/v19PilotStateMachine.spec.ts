@@ -23,7 +23,10 @@ import type {
   IssueInput,
   Submission,
 } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -189,7 +192,17 @@ describe("V-19 pilot click logic state machine", () => {
 
     const closed = unwrap(closeIssue(resubmitted, "admin", issueId));
     expect(closed.issues[0]?.status).toBe("closed_by_admin");
-    expect(unwrap(acceptSubmission(closed, "admin")).status).toBe("ready_for_export");
+    expect(acceptSubmission(closed, "admin")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Подтвердите заполненные поля анкеты перед принятием",
+      },
+    });
+    const questionnaireApproved = adminApproveQuestionnaireForTest(closed);
+    expect(unwrap(acceptSubmission(questionnaireApproved, "admin")).status).toBe(
+      "ready_for_export",
+    );
   });
 
   it("keeps export package-level, Excel-only, and download-gated", () => {

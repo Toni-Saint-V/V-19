@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  blsApplicantQuestionnaireStatus,
   blsStayDurationFromDates,
   blsQuestionnaireReadiness,
   isBlsQuestionnaireFieldRequired,
@@ -113,6 +114,72 @@ describe("canonical BLS questionnaire readiness", () => {
         formData,
       }),
     ).toBe(true);
+  });
+
+  test("does not require employer data from a child until a working or study occupation is selected", () => {
+    const field = {
+      error: undefined,
+      id: "employer-name",
+      label: "Работодатель / учебное заведение",
+      required: true,
+      value: "",
+    };
+
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "child",
+        field,
+        formData: { occupation: "" },
+      }),
+    ).toBe(false);
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "child",
+        field,
+        formData: { occupation: "MINOR" },
+      }),
+    ).toBe(false);
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "child",
+        field,
+        formData: { occupation: "STUDENT" },
+      }),
+    ).toBe(true);
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "main",
+        field,
+        formData: { occupation: "" },
+      }),
+    ).toBe(true);
+  });
+
+  test("keeps a family package ready when a minor child has no employer", () => {
+    let submission = uploadRequiredFiles(
+      fillRequiredQuestionnaireForTest(
+        createDraftSubmission({
+          city: "Москва",
+          familyCount: 3,
+          submissions: [],
+          type: "family",
+        }),
+      ),
+    );
+    const childIndex = submission.applicants.findIndex(
+      (applicant) => applicant.role === "child",
+    );
+    if (childIndex < 0) throw new Error("Expected a child applicant fixture.");
+
+    submission = setApplicantField(submission, childIndex, "occupation", "MINOR");
+    submission = setApplicantField(submission, childIndex, "employer-name", "");
+    submission = setApplicantField(submission, childIndex, "employer-contact", "");
+    submission = setApplicantField(submission, childIndex, "employer-address", "");
+
+    expectReadyParity(submission);
+    expect(
+      blsApplicantQuestionnaireStatus(submission.applicants[childIndex]),
+    ).toBe("complete");
   });
 
   test("switches from applicant means to sponsor requirements", () => {
