@@ -866,19 +866,30 @@ export function CommandCenter({
     }));
   };
 
-  const executeAgentSubmissionAction = async (action: SubmissionAction) => {
-    if (!selectedCanonicalSubmission) return;
+  const executeAgentSubmissionActionFor = async (
+    submissionId: string,
+    action: SubmissionAction,
+  ) => {
+    const submission = (canonicalSubmissions ?? []).find(
+      (candidate) => candidate.id === submissionId,
+    );
+    if (!submission) throw new Error("Подача не найдена. Обновите страницу.");
 
     const result = applySubmissionActionResult(
-      selectedCanonicalSubmission,
+      submission,
       action,
       "agent",
-      agentId ?? selectedCanonicalSubmission.agentId,
+      agentId ?? submission.agentId,
     );
     if (!result.ok) throw new Error(result.error.message);
 
     await onSubmissionsChange?.([result.data]);
     setCanonicalOverrides((current) => ({ ...current, [result.data.id]: result.data }));
+  };
+
+  const executeAgentSubmissionAction = async (action: SubmissionAction) => {
+    if (!selectedCanonicalSubmission) return;
+    await executeAgentSubmissionActionFor(selectedCanonicalSubmission.id, action);
   };
 
   const markAgentIssueFixed = async (issueId: string) => {
@@ -1517,6 +1528,9 @@ export function CommandCenter({
                 <DraftsScreen
                   initialFilter={documentsFilter}
                   onOpenDrawer={handleRowClick}
+                  onSubmitForReview={(submissionId) =>
+                    executeAgentSubmissionActionFor(submissionId, "submit_for_review")
+                  }
                   onSubmissionsChange={onSubmissionsChange}
                   submissions={canonicalSubmissions}
                 />

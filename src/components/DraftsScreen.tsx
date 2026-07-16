@@ -52,16 +52,18 @@ import {
   type CollectionDocType,
 } from '../modules/submissions/documentCollectionIntake';
 import { fileToDocumentStatus } from './v19BusinessScreenAdapter';
+import { canPerformAction } from '../modules/submissions/status';
 
 interface DraftsScreenProps {
   initialFilter?: DraftSummaryFilter;
   onOpenDrawer: (id: string) => void;
+  onSubmitForReview?: (id: string) => void | Promise<void>;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   submissions?: Submission[];
 }
 
 type DocStatus = 'verified' | 'processing' | 'error' | 'missing';
-export type DraftSummaryFilter = 'missing' | 'processing' | 'error';
+export type DraftSummaryFilter = 'missing' | 'processing' | 'error' | 'ready';
 
 type MatrixApplicant = {
   docs: Record<CollectionDocType, DocStatus>;
@@ -73,6 +75,7 @@ type MatrixApplicant = {
 
 type MatrixSubmission = {
   applicants: MatrixApplicant[];
+  canSubmitForReview: boolean;
   city: string;
   country: string;
   deadline: string;
@@ -99,7 +102,7 @@ type UnmatchedUpload = {
   submissionId?: string;
 };
 
-const docTypes = collectionDocTypes;
+const docTypes = collectionDocTypes.filter((doc) => canonicalCollectionDocTypes.has(doc.key));
 const passportCollectionExtractionTimeoutMs = 10_000;
 const documentsBatchSize = 6;
 
@@ -193,6 +196,7 @@ function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
 
     return {
       applicants,
+      canSubmitForReview: canPerformAction(submission, 'submit_for_review', 'agent').ok,
       city: submission.city,
       country: submission.country,
       deadline: submissionDeadline(submission),
@@ -473,6 +477,7 @@ const MobileDocSlot = ({
 export function DraftsScreen({
   initialFilter = 'missing',
   onOpenDrawer,
+  onSubmitForReview,
   onSubmissionsChange,
   submissions = [],
 }: DraftsScreenProps) {
@@ -485,6 +490,7 @@ export function DraftsScreen({
   const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleDraftCount, setVisibleDraftCount] = useState(documentsBatchSize);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
   useEffect(() => {
     setDraftSummaryFilter(initialFilter);
     setSearchQuery('');
@@ -495,9 +501,11 @@ export function DraftsScreen({
   const visibleDrafts = useMemo(
     () =>
       allDrafts.filter((submission) =>
-        submission.applicants.some((applicant) =>
-          docTypes.some((doc) => applicant.docs[doc.key] === draftSummaryFilter),
-        ),
+        draftSummaryFilter === 'ready'
+          ? submission.canSubmitForReview
+          : submission.applicants.some((applicant) =>
+              docTypes.some((doc) => applicant.docs[doc.key] === draftSummaryFilter),
+            ),
       ),
     [allDrafts, draftSummaryFilter],
   );
@@ -527,9 +535,27 @@ export function DraftsScreen({
       error: statuses.filter((status) => status === 'error').length,
       missing: statuses.filter((status) => status === 'missing').length,
       processing: statuses.filter((status) => status === 'processing').length,
+      ready: allDrafts.filter((submission) => submission.canSubmitForReview).length,
       submissions: allDrafts.length,
     };
   }, [allDrafts]);
+
+  const submitForReview = async (submissionId: string) => {
+    if (!onSubmitForReview || submittingId) return;
+    setUploadError('');
+    setSubmittingId(submissionId);
+    try {
+      await onSubmitForReview(submissionId);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Не удалось отправить подачу на проверку.',
+      );
+    } finally {
+      setSubmittingId(null);
+    }
+  };
 
   const commitSubmissions = async (nextSubmissions: Submission[]) => {
     setUploadError('');
@@ -594,12 +620,17 @@ export function DraftsScreen({
     setBulkBusy(true);
     const unmatched: UnmatchedUpload[] = [];
     const autoAssigned: UnmatchedUpload[] = [];
+    let questionnaireRejected = false;
     let workingSubmissions = submissions;
     let submissionsChanged = false;
 
     try {
       for (const file of uploadFiles) {
         const detectedDocType = detectCollectionDocType(file.name);
+        if (detectedDocType === 'questionnaire') {
+          questionnaireRejected = true;
+          continue;
+        }
         const passportNumber = await detectedPassportNumber(file, detectedDocType);
         const resolution = resolveCollectionUploadTarget({
           applicants: applicantIndex(submissions),
@@ -655,6 +686,11 @@ export function DraftsScreen({
         if (!saved) unmatched.push(...autoAssigned);
       }
       setUnmatchedUploads((current) => [...unmatched, ...current]);
+      if (questionnaireRejected) {
+        setUploadError(
+          'Анкета не загружается в сборе документов — заполните её в разделе «Анкета».',
+        );
+      }
     } catch (error) {
       setUploadError(
         error instanceof Error
@@ -759,7 +795,7 @@ export function DraftsScreen({
         onChange={handleBulkFileInput}
       />
 
-      <V19SummaryTileGrid className="v19-documents-summary-grid grid-cols-3">
+      <V19SummaryTileGrid className="v19-documents-summary-grid grid-cols-2 sm:grid-cols-4">
         <V19SummaryTile
           active={draftSummaryFilter === 'missing'}
           detail={`ожидают · ${summary.submissions}`}
@@ -786,6 +822,15 @@ export function DraftsScreen({
           tone="danger"
           value={summary.error}
           onClick={() => setDraftSummaryFilter('error')}
+        />
+        <V19SummaryTile
+          active={draftSummaryFilter === 'ready'}
+          detail="анкета и файлы"
+          icon={CheckCircle2}
+          label="Готовы"
+          tone="green"
+          value={summary.ready}
+          onClick={() => setDraftSummaryFilter('ready')}
         />
       </V19SummaryTileGrid>
 
@@ -995,6 +1040,23 @@ export function DraftsScreen({
                   </div>
                 </div>
               ) : null}
+              {sub.canSubmitForReview && onSubmitForReview ? (
+                <div className="v19-documents-submit-review-row">
+                  <button
+                    className="v19-documents-submit-review"
+                    disabled={submittingId === sub.id}
+                    onClick={() => void submitForReview(sub.id)}
+                    type="button"
+                  >
+                    {submittingId === sub.id ? (
+                      <Loader2 aria-hidden="true" className="animate-spin" />
+                    ) : (
+                      <CheckCircle2 aria-hidden="true" />
+                    )}
+                    Отправить на проверку
+                  </button>
+                </div>
+              ) : null}
             </section>
             );
           })}
@@ -1039,10 +1101,26 @@ export function DraftsScreen({
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-1 justify-center px-6 py-3">
-                      <div className="relative h-[2px] w-full overflow-hidden rounded-full bg-white/5">
-                        <div className="absolute inset-y-0 left-0 bg-[#6f64ff]/40" style={{ width: `${sub.progress}%` }} />
-                      </div>
+                    <div className="flex flex-1 items-center justify-center px-6 py-3">
+                      {sub.canSubmitForReview && onSubmitForReview ? (
+                        <button
+                          className="v19-documents-submit-review"
+                          disabled={submittingId === sub.id}
+                          onClick={() => void submitForReview(sub.id)}
+                          type="button"
+                        >
+                          {submittingId === sub.id ? (
+                            <Loader2 aria-hidden="true" className="animate-spin" />
+                          ) : (
+                            <CheckCircle2 aria-hidden="true" />
+                          )}
+                          Отправить на проверку
+                        </button>
+                      ) : (
+                        <div className="relative h-[2px] w-full overflow-hidden rounded-full bg-white/5">
+                          <div className="absolute inset-y-0 left-0 bg-[#6f64ff]/40" style={{ width: `${sub.progress}%` }} />
+                        </div>
+                      )}
                     </div>
                     <div className="flex w-[60px] shrink-0 items-center justify-center">
                       <button

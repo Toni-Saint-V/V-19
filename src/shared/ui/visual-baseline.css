@@ -28637,6 +28637,43 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
   background: var(--v19b-color-control-hover);
 }
 
+.v19-documents-submit-review-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--v19b-size-12);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+}
+
+.v19-documents-submit-review {
+  display: inline-flex;
+  min-height: var(--v19b-size-40);
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19b-size-8);
+  padding: var(--v19b-size-0) var(--v19b-size-14);
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-hover);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-primary);
+  font-family: var(--v19b-font-family);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-documents-submit-review:is(:hover, :focus-visible) {
+  background: var(--v19b-color-primary-hover);
+}
+
+.v19-documents-submit-review:disabled {
+  cursor: wait;
+  opacity: var(--v19b-opacity-disabled);
+}
+
+.v19-documents-submit-review svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+}
+
 @media (max-width: 767px) {
   .v19-documents-bulk-upload,
   .v19-documents-search-field,
