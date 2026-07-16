@@ -1,8 +1,52 @@
-# Design QA — «Мои действия»
+# Design QA — AdminDrawer, Product Design option 2
 
 ## Final result
 
-final result: blocked
+final result: passed
+
+## Current comparison target
+
+- Source visual: the left pane of `docs/qa/admin-drawer-option-2-20260716/reference-vs-implementation.png` — selected Product Design option 2.
+- Implementation: `docs/qa/admin-drawer-option-2-20260716/desktop-1487x1058-family-overview.png` — family review overview at the source image viewport.
+- Combined comparison: `docs/qa/admin-drawer-option-2-20260716/reference-vs-implementation.png`.
+- Responsive evidence: `docs/qa/admin-drawer-option-2-20260716/mobile-390x844-family-overview.png`.
+- State: Admin review drawer, `Заявители`, family submission, first applicant, `Обзор`.
+
+## Current QA result
+
+- Layout and hierarchy: passed. The drawer is a 1040px verification workspace on desktop; applicants are a horizontal switchboard, the selected applicant owns the full content width, and the decision bar is sticky.
+- Signal-to-noise: passed. Decorative orbit/hero treatment and the duplicate next-step alert were removed. The remaining attention message is contextual and links to the exact tab.
+- Typography and tokens: passed. Existing V-19 font roles and shared visual tokens are used; no new raw component-level colors, radii, spacing, or motion values were introduced.
+- Responsive behavior: passed. `document.documentElement.scrollWidth <= innerWidth` at 1440x900, 1487x1058, and 390x844. Mobile header ratio is 0.1294, below the 0.15 contract.
+- Interaction and accessibility: passed. Parent and applicant tablists retain keyboard activation; the contextual action opens the correct `Замечания` panel; close and decision controls retain accessible names and focus behavior.
+- Runtime stability: passed. No console errors or page errors in the final desktop/mobile captures.
+- Dynamic product truth: passed. The implementation preserves real submission/applicant data and existing review actions instead of copying mock values from the visual concept.
+
+## Current findings
+
+- Critical: none.
+- High: none.
+- Medium: none.
+- Minor: none inside the declared AdminDrawer redesign scope.
+
+## Current comparison history
+
+1. Initial implementation comparison exposed a late CSS cascade that retained the 860px drawer and legacy left applicant rail; fixed with a final scoped cascade guard.
+2. Mobile measurement exposed a 0.1584 header ratio; hiding secondary ID metadata on mobile reduced it to 0.1294.
+3. Final combined comparison exposed three repeated blocker messages; removed the duplicate banner and moved the actionable link into the applicant summary.
+4. Final runtime pass confirmed horizontal family switching, full-width applicant workspace, contextual tab navigation, no overflow, and no browser errors.
+
+## Current verdict
+
+- Verdict gate: PASS for the declared AdminDrawer redesign scope.
+
+---
+
+## Previous run — «Мои действия»
+
+### Historical result
+
+historical result: blocked
 
 ## Comparison target
 
