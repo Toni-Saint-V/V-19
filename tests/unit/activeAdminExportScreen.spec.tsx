@@ -1,8 +1,18 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { AdminExportScreen } from "../../src/components/AdminExportScreen";
-import { exportSummary } from "../../src/modules/submissions/exportRules";
+import {
+  buildExportPackageIdentity,
+  exportSummary,
+} from "../../src/modules/submissions/exportRules";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import type { Submission } from "../../src/modules/submissions/types";
 
@@ -41,6 +51,25 @@ function readySubmission(): Submission {
         file.type === "selfie" ||
         file.type === "selfie_2",
     ),
+  };
+}
+
+function changeQuestionnaireField(
+  submission: Submission,
+  fieldId: string,
+  value: string,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === fieldId ? { ...field, value } : field,
+        ),
+      })),
+    })),
   };
 }
 
@@ -110,10 +139,64 @@ describe("active admin export screen", () => {
     );
     expect(createObjectURL).toHaveBeenCalledTimes(1);
 
-    view.rerender(<AdminExportScreen submissions={[readySubmission()]} />);
+    const refreshBase = readySubmission();
+    const reviewOnlyRefresh: Submission = {
+      ...refreshBase,
+      applicants: refreshBase.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field, index) =>
+            index === 0
+              ? {
+                  ...field,
+                  reviewConfirmedAtIso: "2026-07-16T12:00:00.000Z",
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+    view.rerender(<AdminExportScreen submissions={[reviewOnlyRefresh]} />);
     expect(
       await screen.findByRole("link", { name: "Скачать Excel" }),
     ).toHaveAttribute("href", "blob:verified-export-workbook");
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  test("invalidates prepared downloads when a PDF-only questionnaire field changes", async () => {
+    const submission = readySubmission();
+    const changed = changeQuestionnaireField(
+      submission,
+      "main-destination",
+      "Portugal",
+    );
+    expect(buildExportPackageIdentity([changed])).toEqual(
+      buildExportPackageIdentity([submission]),
+    );
+    Object.defineProperty(globalThis.URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:prepared-before-questionnaire-refresh"),
+    });
+    Object.defineProperty(globalThis.URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+
+    const view = render(<AdminExportScreen submissions={[submission]} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `Выбрать ${submission.listTitle ?? submission.title}`,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Сформировать Excel" }));
+    await screen.findByRole("link", { name: "Скачать Excel" });
+
+    view.rerender(<AdminExportScreen submissions={[changed]} />);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("link", { name: "Скачать Excel" }),
+      ).not.toBeInTheDocument(),
+    );
   });
 });

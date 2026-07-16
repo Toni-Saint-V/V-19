@@ -14,6 +14,7 @@ export interface ExportPackageDocumentCommit {
 }
 
 export interface ExportPackageCompletionRequest {
+  archiveInputSignature: string;
   documentExport: ExportPackageDocumentCommit;
   packageIdentity: ExportPackageIdentity;
   submissionIds: string[];

@@ -11,6 +11,7 @@ import { agentOwnerDisplayName } from "./ownership";
 import {
   type CanonicalSubmissionStatus,
   canonicalRequiredMediaReadiness,
+  isCanonicalFrontendMediaType,
   normalizeLegacySubmissionStatus,
 } from "./domainContract";
 import { passportGateIssues } from "./passportExtractionGuards";
@@ -436,6 +437,71 @@ export function buildExportPackageIdentity(
     rowCount: rows.length,
     submissionIds: sortedSubmissionIds(submissions),
   };
+}
+
+export function buildExportArchiveInputSignature(
+  submissions: Submission[],
+  format: ExportPackageFormat = "xlsx",
+): string | null {
+  const packageIdentity = buildExportPackageIdentity(submissions, format);
+  if (!packageIdentity) return null;
+
+  const questionnaireFields = submissions
+    .flatMap((submission) =>
+      submission.applicants.flatMap((applicant) =>
+        applicant.sections.flatMap((section) =>
+          section.fields.map(
+            (field) =>
+              [
+                submission.id,
+                applicant.id,
+                section.id,
+                field.id,
+                field.value,
+              ] as const,
+          ),
+        ),
+      ),
+    )
+    .sort((left, right) =>
+      JSON.stringify(left).localeCompare(JSON.stringify(right)),
+    );
+  const mediaFiles = submissions
+    .flatMap((submission) =>
+      submission.files
+        .filter((file) => isCanonicalFrontendMediaType(file.type))
+        .map(
+          (file) =>
+            [
+              submission.id,
+              file.id,
+              file.applicantId,
+              file.type,
+              file.status,
+              file.uploadStatus ?? null,
+              file.storageAdapter ?? null,
+              file.storageBucket ?? null,
+              file.storagePath ?? null,
+              file.generatedFileName ?? null,
+              file.mimeType ?? null,
+              file.sizeBytes ?? null,
+            ] as const,
+        ),
+    )
+    .sort((left, right) =>
+      JSON.stringify(left).localeCompare(JSON.stringify(right)),
+    );
+
+  return JSON.stringify({
+    mediaFiles,
+    packageIdentity: {
+      contentFingerprint: packageIdentity.contentFingerprint,
+      format: packageIdentity.format,
+      rowCount: packageIdentity.rowCount,
+      submissionIds: packageIdentity.submissionIds,
+    },
+    questionnaireFields,
+  });
 }
 
 export function exportPackageIdentityMatches(

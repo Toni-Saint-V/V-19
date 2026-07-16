@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   AlertTriangle,
@@ -33,6 +33,7 @@ import {
 import { getSupabaseClient } from "../lib/supabase/client";
 import { applyExportStateToSelection } from "../modules/submissions/submissionActions";
 import {
+  buildExportArchiveInputSignature,
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
   exportSummary,
@@ -81,6 +82,7 @@ interface ExportItem {
 }
 
 interface PreparedExportPackage {
+  archiveInputSignature: string;
   identity: ExportPackageIdentity;
   submissionIds: string[];
   submissions: Submission[];
@@ -375,24 +377,20 @@ export function AdminExportScreen({
     () => selectedRealIds.slice().sort().join("|"),
     [selectedRealIds],
   );
-  const selectedContentSignature = useMemo(() => {
-    const identity = buildExportPackageIdentity(selectedSubmissions);
-    return identity
-      ? [
-          identity.contentFingerprint,
-          identity.format,
-          identity.rowCount,
-          ...identity.submissionIds,
-        ].join("|")
-      : "";
-  }, [selectedSubmissions]);
+  const selectedArchiveInputSignature = useMemo(
+    () => buildExportArchiveInputSignature(selectedSubmissions),
+    [selectedSubmissions],
+  );
+  const selectedArchiveInputSignatureRef = useRef(selectedArchiveInputSignature);
+  selectedArchiveInputSignatureRef.current = selectedArchiveInputSignature;
 
   useEffect(() => {
     setPreparedExport(null);
     setPreparedArchive(null);
     setArchiveDownloadStarted(false);
     setExportError("");
-  }, [selectedContentSignature, selectedSignature]);
+    setExportNotice("");
+  }, [selectedArchiveInputSignature, selectedSignature]);
 
   const activeItem =
     displayItems.find((item) => item.id === activeId) ??
@@ -562,12 +560,19 @@ export function AdminExportScreen({
       }
 
       const identity = buildExportPackageIdentity(selectedGenerated);
+      const archiveInputSignature =
+        buildExportArchiveInputSignature(selectedGenerated);
       const plan = exportSummary(selectedGenerated);
       const hasDownloadableState =
         plan.exportState === "file_generated" ||
         plan.exportState === "file_downloaded";
 
-      if (!identity || !plan.ready || !hasDownloadableState) {
+      if (
+        !identity ||
+        !archiveInputSignature ||
+        !plan.ready ||
+        !hasDownloadableState
+      ) {
         setExportError(
           "Пакет выгрузки не готов: есть ограничения или устаревший preview.",
         );
@@ -584,6 +589,7 @@ export function AdminExportScreen({
       }
 
       return {
+        archiveInputSignature,
         identity,
         submissionIds,
         submissions: selectedGenerated,
@@ -598,6 +604,14 @@ export function AdminExportScreen({
     try {
       const prepared = await prepareWorkbookForCurrentSelection();
       if (!prepared) return;
+      if (
+        selectedArchiveInputSignatureRef.current !==
+        prepared.archiveInputSignature
+      ) {
+        clearPreparedExport();
+        setExportError("Данные изменились. Сформируйте Excel заново.");
+        return;
+      }
       setPreparedArchive(null);
       setArchiveDownloadStarted(false);
       setPreparedExport(prepared);
@@ -620,6 +634,7 @@ export function AdminExportScreen({
     if (
       !preparedExport ||
       !currentIdentity ||
+      preparedExport.archiveInputSignature !== selectedArchiveInputSignature ||
       !exportPackageIdentityMatches(preparedExport.identity, currentIdentity)
     ) {
       event.preventDefault();
@@ -640,7 +655,9 @@ export function AdminExportScreen({
     setIsExporting(true);
     try {
       const prepared =
-        preparedExport ?? (await prepareWorkbookForCurrentSelection());
+        preparedExport?.archiveInputSignature === selectedArchiveInputSignature
+          ? preparedExport
+          : await prepareWorkbookForCurrentSelection();
       if (!prepared) return;
       const { prepareExportMediaZip } = await import(
         "../modules/submissions/exportMediaZip"
@@ -666,6 +683,14 @@ export function AdminExportScreen({
       );
       if (!zipArtifactResult.ok) {
         setExportError(zipArtifactResult.safeMessage);
+        return;
+      }
+      if (
+        selectedArchiveInputSignatureRef.current !==
+        prepared.archiveInputSignature
+      ) {
+        clearPreparedExport();
+        setExportError("Данные изменились. Сформируйте ZIP заново.");
         return;
       }
       setPreparedExport(prepared);
@@ -700,12 +725,13 @@ export function AdminExportScreen({
         throw new Error("Обработчик фиксации выгрузки недоступен.");
       }
       await bridge.onExportPackages({
+        archiveInputSignature: archive.prepared.archiveInputSignature,
         documentExport: toExportPackageDocumentCommit(archive.artifact),
         packageIdentity: archive.artifact.packageIdentity,
         submissionIds: archive.prepared.submissionIds,
       });
       setExportError("");
-      setArchiveDownloadStarted(false);
+      clearPreparedExport();
       setExportNotice(
         `Скачивание подтверждено, пакет зафиксирован: ${archive.artifact.fileName}`,
       );
@@ -735,6 +761,8 @@ export function AdminExportScreen({
     if (
       !preparedArchive ||
       !currentIdentity ||
+      preparedArchive.prepared.archiveInputSignature !==
+        selectedArchiveInputSignature ||
       !exportPackageIdentityMatches(
         preparedArchive.artifact.packageIdentity,
         currentIdentity,
@@ -758,6 +786,8 @@ export function AdminExportScreen({
     if (
       !preparedArchive ||
       !currentIdentity ||
+      preparedArchive.prepared.archiveInputSignature !==
+        selectedArchiveInputSignature ||
       !exportPackageIdentityMatches(
         preparedArchive.artifact.packageIdentity,
         currentIdentity,

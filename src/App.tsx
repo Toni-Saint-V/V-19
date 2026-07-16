@@ -23,6 +23,7 @@ import {
   reconcileExportPackageCompletion,
 } from "./modules/submissions/exportWorkflow";
 import {
+  buildExportArchiveInputSignature,
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
 } from "./modules/submissions/exportRules";
@@ -1035,6 +1036,7 @@ export default function App({
         await bridge.onAdminAiSuggestionDismiss?.({ submissionId, suggestionId });
       },
       onExportPackages: async ({
+        archiveInputSignature,
         documentExport,
         packageIdentity,
         submissionIds,
@@ -1056,9 +1058,12 @@ export default function App({
           requestedSubmissionIds.has(submission.id),
         );
         const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
+        const currentArchiveInputSignature =
+          buildExportArchiveInputSignature(selectedCurrent);
         const artifactStillMatchesCurrentSelection =
           requestedSubmissionIds.size === submissionIds.length &&
           selectedCurrent.length === submissionIds.length &&
+          archiveInputSignature === currentArchiveInputSignature &&
           exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
           exportPackageDocumentCommitMatchesIdentity(
             documentExport,
@@ -1088,8 +1093,11 @@ export default function App({
           requestedSubmissionIds.has(submission.id),
         );
         const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
+        const downloadedArchiveInputSignature =
+          buildExportArchiveInputSignature(selectedDownloaded);
         const downloadedSelectionMatchesArtifact =
           selectedDownloaded.length === submissionIds.length &&
+          archiveInputSignature === downloadedArchiveInputSignature &&
           exportPackageIdentityMatches(packageIdentity, downloadedIdentity) &&
           selectedDownloaded.every(
             (submission) =>
@@ -1164,6 +1172,7 @@ export default function App({
             }
             try {
               await bridge.onExportPackages?.({
+                archiveInputSignature,
                 documentExport,
                 packageIdentity,
                 submissionIds,
@@ -1207,6 +1216,7 @@ export default function App({
         }
         try {
           await bridge.onExportPackages?.({
+            archiveInputSignature,
             documentExport,
             packageIdentity,
             submissionIds,

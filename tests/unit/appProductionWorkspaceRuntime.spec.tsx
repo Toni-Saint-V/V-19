@@ -68,6 +68,16 @@ const exportRuleMocks = vi.hoisted(() => {
           };
     },
   );
+  const buildExportArchiveInputSignature = vi.fn(
+    (submissions: Array<Record<string, unknown>>) => {
+      if (submissions.length === 0) return null;
+      return submissions.some(
+        (submission) => submission.archiveInputVersion === "refreshed",
+      )
+        ? "archive-input-b"
+        : "archive-input-a";
+    },
+  );
   const exportPackageIdentityMatches = vi.fn(
     (
       left: typeof preparedIdentity,
@@ -88,6 +98,7 @@ const exportRuleMocks = vi.hoisted(() => {
   );
 
   return {
+    buildExportArchiveInputSignature,
     buildExportPackageIdentity,
     exportPackageIdentityMatches,
     preparedIdentity,
@@ -197,6 +208,7 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
             onClick={() =>
               capture(
                 bridge.onExportPackages?.({
+                  archiveInputSignature: "archive-input-a",
                   documentExport: {
                     applicantCount: 1,
                     assetIds: ["00000000-0000-4000-8000-000000000801"],
@@ -271,6 +283,8 @@ vi.mock("../../src/modules/submissions/aiSuggestions", () => ({
 vi.mock("../../src/modules/submissions/exportWorkflow", () => exportMocks);
 
 vi.mock("../../src/modules/submissions/exportRules", () => ({
+  buildExportArchiveInputSignature:
+    exportRuleMocks.buildExportArchiveInputSignature,
   buildExportPackageIdentity: exportRuleMocks.buildExportPackageIdentity,
   exportPackageIdentityMatches: exportRuleMocks.exportPackageIdentityMatches,
 }));
@@ -359,6 +373,7 @@ function resetDeferredRuntime() {
   persistenceMocks.saveCockpitSubmissionsForProfile.mockClear();
   exportMocks.completeExportPackage.mockClear();
   exportMocks.reconcileExportPackageCompletion.mockClear();
+  exportRuleMocks.buildExportArchiveInputSignature.mockClear();
   exportRuleMocks.buildExportPackageIdentity.mockClear();
   exportRuleMocks.exportPackageIdentityMatches.mockClear();
 }
@@ -609,6 +624,54 @@ describe("App production workspace runtime", () => {
         {
           ...loadedSubmission,
           exportIdentityVersion: "refreshed",
+        },
+      ],
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await waitFor(() =>
+      expect(
+        persistenceMocks.loadCockpitSubmissionsForProfile,
+      ).toHaveBeenCalledTimes(1),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await act(async () => {
+      await runtime.lastMutationPromise;
+    });
+
+    expect(runtime.exportStateCalls).toEqual([]);
+    expect(
+      persistenceMocks.saveCockpitSubmissionsForProfile,
+    ).not.toHaveBeenCalled();
+    expect(exportMocks.completeExportPackage).not.toHaveBeenCalled();
+    expect(runtime.lastMutationError?.message).toBe(
+      "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+    );
+  });
+
+  test("fails closed when canonical questionnaire data changes outside the Excel identity", async () => {
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    render(<App />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockClear();
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValueOnce({
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [
+        {
+          ...loadedSubmission,
+          archiveInputVersion: "refreshed",
         },
       ],
     });

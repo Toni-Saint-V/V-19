@@ -16,6 +16,7 @@ import {
 } from "../../src/modules/submissions/agentActions";
 import {
   buildExportMappingAudit,
+  buildExportArchiveInputSignature,
   buildExportPackageIdentity,
   buildExportRows,
   exportPackageIdentityMatches,
@@ -454,6 +455,62 @@ describe("V-19 submission status rules", () => {
 });
 
 describe("V-19 export rules", () => {
+  it("binds archive preparation to PDF questionnaire values and media storage identity", () => {
+    const baseline = readyClone({ id: "ПД-ARCHIVE-SIGNATURE" });
+    const pdfChanged: Submission = {
+      ...baseline,
+      applicants: baseline.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "main-destination"
+              ? { ...field, value: "Portugal" }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const mediaChanged: Submission = {
+      ...baseline,
+      files: baseline.files.map((file, index) =>
+        index === 0
+          ? { ...file, storagePath: `${file.storagePath ?? "media"}-replacement` }
+          : file,
+      ),
+    };
+    const reviewMetadataChanged: Submission = {
+      ...baseline,
+      applicants: baseline.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field, index) =>
+            index === 0
+              ? {
+                  ...field,
+                  reviewConfirmedAtIso: "2026-07-16T12:00:00.000Z",
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    expect(buildExportPackageIdentity([pdfChanged])).toEqual(
+      buildExportPackageIdentity([baseline]),
+    );
+    expect(buildExportArchiveInputSignature([pdfChanged])).not.toBe(
+      buildExportArchiveInputSignature([baseline]),
+    );
+    expect(buildExportArchiveInputSignature([mediaChanged])).not.toBe(
+      buildExportArchiveInputSignature([baseline]),
+    );
+    expect(buildExportArchiveInputSignature([reviewMetadataChanged])).toBe(
+      buildExportArchiveInputSignature([baseline]),
+    );
+  });
+
   it("exports one row per applicant and keeps family rows together", () => {
     const rows = buildExportRows([byId("ПД-1048")]);
     expect(rows).toHaveLength(4);
