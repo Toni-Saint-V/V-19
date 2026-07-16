@@ -463,10 +463,7 @@
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-history-tab article {
   display: grid;
-  grid-template-columns: var(--v19b-size-76) minmax(
-      var(--v19b-size-0),
-      var(--v19b-grid-fr)
-    );
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
   align-items: start;
   gap: var(--v19b-size-14);
   padding: var(--v19b-size-14);
