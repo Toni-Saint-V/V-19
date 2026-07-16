@@ -362,9 +362,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     const dialog = screen.getByRole("dialog", { name: "Проверка пакета" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(dialog).toHaveAttribute("aria-labelledby", "admin-review-drawer-heading");
-    expect(screen.queryByText("ПД-1053")).not.toBeInTheDocument();
+    expect(screen.getByText("ПД-1053")).toBeInTheDocument();
     expect(screen.getByText("На проверке")).toHaveClass("is-blue");
-    expect(container.querySelector(".admin-review-footer")).not.toBeInTheDocument();
+    expect(container.querySelector(".admin-review-footer")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: /Файлы/ }));
     expect(
       await screen.findByTestId("admin-review-verify-passport"),
