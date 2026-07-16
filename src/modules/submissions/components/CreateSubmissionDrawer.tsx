@@ -29,8 +29,8 @@ const maxFamilyApplicants = 6;
 type PassportLiveTone = "red" | "yellow" | "green";
 
 const submissionTypeOptions: Array<{ label: string; value: Submission["type"] }> = [
-  { label: "Заявитель", value: "single" },
   { label: "Семья", value: "family" },
+  { label: "Один", value: "single" },
 ];
 
 const firstStepFamilyQuestions: Array<{
@@ -253,7 +253,7 @@ export function CreateSubmissionDrawer({
   const applicantCount = type === "family" ? familyCount : 1;
   const passportFileInputRef = useRef<HTMLInputElement | null>(null);
   const headerCloseButtonRef = useRef<HTMLButtonElement | null>(null);
-  const uploadBatchRef = useRef(0);
+  const uploadSequenceRef = useRef(0);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [passportFileError, setPassportFileError] = useState("");
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
@@ -309,6 +309,7 @@ export function CreateSubmissionDrawer({
   });
 
   function selectType(nextType: Submission["type"]) {
+    if (createBusy) return;
     const nextApplicantCount = nextType === "family" ? Math.max(2, familyCount) : 1;
     onType(nextType);
     if (nextType === "family") {
@@ -326,6 +327,7 @@ export function CreateSubmissionDrawer({
   }
 
   function addFamilyMember() {
+    if (createBusy) return;
     if (type !== "family") {
       onType("family");
       onFamilyCount(Math.max(2, familyCount));
@@ -340,7 +342,7 @@ export function CreateSubmissionDrawer({
   }
 
   async function addPassportFiles(files: FileList | null) {
-    if (!files?.length) return;
+    if (createBusy || !files?.length) return;
 
     const allSelectedFiles = Array.from(files);
     const rejectedCount = allSelectedFiles.filter(
@@ -355,26 +357,26 @@ export function CreateSubmissionDrawer({
         : "",
     );
     if (!selectedFiles.length) return;
-    const nextBatch = uploadBatchRef.current + 1;
-    uploadBatchRef.current = nextBatch;
-
     if (selectedFiles.length > 1) {
       onType("family");
       onFamilyCount(Math.max(2, Math.min(maxFamilyApplicants, selectedFiles.length)));
     }
 
     const targetStartIndex = selectedFiles.length > 1 ? 0 : safeActiveApplicantIndex;
-    const nextUploads = selectedFiles.map((file, index) => ({
-      applicantIndex: boundedApplicantIndex(
-        targetStartIndex + index,
-        maxFamilyApplicants,
-      ),
-      extractedFields: [],
-      file,
-      fileName: file.name,
-      id: `passport-${Date.now()}-${index}`,
-      status: "extracting" as const,
-    }));
+    const nextUploads = selectedFiles.map((file, index) => {
+      uploadSequenceRef.current += 1;
+      return {
+        applicantIndex: boundedApplicantIndex(
+          targetStartIndex + index,
+          maxFamilyApplicants,
+        ),
+        extractedFields: [],
+        file,
+        fileName: file.name,
+        id: `passport-${Date.now()}-${uploadSequenceRef.current}`,
+        status: "extracting" as const,
+      };
+    });
     setPassportUploads((current) =>
       mergePassportUploads(current, nextUploads, applicantCount),
     );
@@ -396,7 +398,6 @@ export function CreateSubmissionDrawer({
             }),
           );
 
-          if (uploadBatchRef.current !== nextBatch) return;
           setPassportFileError("");
 
           setPassportUploads((current) =>
@@ -411,8 +412,6 @@ export function CreateSubmissionDrawer({
             ),
           );
         } catch {
-          if (uploadBatchRef.current !== nextBatch) return;
-
           setPassportUploads((current) =>
             current.map((candidate) =>
               candidate.id === upload.id
@@ -454,6 +453,7 @@ export function CreateSubmissionDrawer({
 
   function handleDragOver(event: DragEvent) {
     event.preventDefault();
+    if (createBusy) return;
     setIsDragging(true);
   }
 
@@ -464,6 +464,7 @@ export function CreateSubmissionDrawer({
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     setIsDragging(false);
+    if (createBusy) return;
     void addPassportFiles(event.dataTransfer.files);
   }
 
@@ -503,9 +504,11 @@ export function CreateSubmissionDrawer({
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-title"
+      aria-busy={createBusy}
+      data-create-submission-surface="preupload-blue"
       transition={{ duration: prefersReducedMotion ? 0.01 : 0.22 }}
       onKeyDown={(event) => {
-        if (event.key !== "Escape") return;
+        if (event.key !== "Escape" || createBusy) return;
         event.stopPropagation();
         onClose();
       }}
@@ -515,22 +518,24 @@ export function CreateSubmissionDrawer({
           ref={headerCloseButtonRef}
           className="v19-create-drawer-close"
           type="button"
-          aria-label="Закрыть создание"
+          aria-label="Назад"
+          disabled={createBusy}
           onClick={onClose}
         >
           <ArrowLeft className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
         </button>
 
         <div className="flex-1 min-w-0">
-          <div className="text-[var(--v19b-size-11)] text-white/40 uppercase tracking-[var(--v19b-tracking-wider)] font-medium">
-            Новый пакет
-          </div>
           <h1
             id="create-title"
-            className="text-[var(--v19b-size-19)] lg:text-[var(--v19b-size-21)] font-semibold tracking-tight text-white m-0 mt-1 leading-none truncate"
+            className="text-[var(--v19b-size-19)] lg:text-[var(--v19b-size-21)] font-semibold tracking-tight text-white m-0 leading-none truncate"
           >
-            Загрузка и первичная сборка
+            <span className="sr-only">Загрузка и первичная сборка — </span>
+            Новая подача
           </h1>
+          <div className="v19-preupload-header-copy text-[var(--v19b-size-11)] text-white/40 mt-1 font-medium">
+            Паспорта → реальный OCR → анкета
+          </div>
         </div>
 
         <span className="px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-white/5 border border-white/5 text-[var(--v19b-size-10)] uppercase tracking-wider text-white/60 font-mono">
@@ -541,6 +546,7 @@ export function CreateSubmissionDrawer({
           className="v19-create-drawer-close"
           type="button"
           aria-label="Закрыть создание"
+          disabled={createBusy}
           onClick={onClose}
         >
           <X className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
@@ -552,12 +558,12 @@ export function CreateSubmissionDrawer({
       <div className="sr-only" role="group" aria-label="Заявители в подаче" />
       <h2 className="sr-only">Загрузите паспорт</h2>
 
-      <div className="flex-1 overflow-y-auto p-6 lg:p-10">
-        <div className="create-submission-passport-shell mx-auto h-full">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
-              <div className="flex flex-col gap-6">
+      <div className="v19-preupload-production-body flex-1 overflow-y-auto p-6 lg:p-10">
+        <div className="v19-preupload-production-shell create-submission-passport-shell mx-auto h-full">
+          <div className="v19-preupload-production-grid grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
+              <div className="v19-preupload-production-primary flex flex-col gap-6">
                 <section
-                  className="rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
+                  className="v19-preupload-setup-panel rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                   aria-label="Тип подачи"
                 >
                   <div className="flex items-center justify-between gap-3 mb-3">
@@ -584,6 +590,7 @@ export function CreateSubmissionDrawer({
                         }`}
                         type="button"
                         aria-pressed={type === option.value}
+                        disabled={createBusy}
                         onClick={() => selectType(option.value)}
                       >
                         {option.label}
@@ -598,6 +605,7 @@ export function CreateSubmissionDrawer({
                     <select
                       id="create-submission-city"
                       className="h-10 rounded-[var(--v19b-size-8)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] px-3 text-[var(--v19b-size-13)] font-medium text-white/78 outline-none transition-colors hover:border-white/12 focus:border-white/24"
+                      disabled={createBusy}
                       value={city}
                       onChange={(event) => onCity(event.currentTarget.value as City)}
                     >
@@ -612,7 +620,7 @@ export function CreateSubmissionDrawer({
 
                 {type === "family" ? (
                   <section
-                    className="lg:hidden rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
+                    className="v19-preupload-family-panel lg:hidden rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                     aria-label="Заявители семьи и общие ответы"
                   >
                     <div className="flex items-center justify-between gap-3 mb-3">
@@ -625,10 +633,10 @@ export function CreateSubmissionDrawer({
                         </h3>
                       </div>
                       <button
-                        className="h-8 px-3 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-[var(--v19b-size-12)] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="v19-preupload-add-applicant h-8 px-3 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-[var(--v19b-size-12)] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         aria-label="Добавить заявителя в семью"
                         type="button"
-                        disabled={applicantCount >= maxFamilyApplicants}
+                        disabled={createBusy || applicantCount >= maxFamilyApplicants}
                         onClick={addFamilyMember}
                       >
                         + заявитель
@@ -646,13 +654,14 @@ export function CreateSubmissionDrawer({
                         return (
                           <button
                             key={index}
-                            className={`flex items-start justify-between gap-3 rounded-[var(--v19b-radius-control)] border px-3 py-2 text-left transition-colors ${
+                            className={`v19-preupload-applicant-slot flex items-start justify-between gap-3 rounded-[var(--v19b-radius-control)] border px-3 py-2 text-left transition-colors ${
                               safeActiveApplicantIndex === index
                                 ? "border-white/16 bg-white/8"
                                 : "border-[var(--v19b-color-border)] bg-[var(--v19b-color-panel)] hover:border-white/10"
                             }`}
                             type="button"
                             aria-pressed={safeActiveApplicantIndex === index}
+                            disabled={createBusy}
                             onClick={() => setActiveApplicantIndex(index)}
                           >
                             <span className="min-w-0">
@@ -688,13 +697,15 @@ export function CreateSubmissionDrawer({
                             {[true, false].map((value) => (
                               <button
                                 key={String(value)}
-                                className={`h-8 rounded-[var(--v19b-size-6)] px-2 text-[var(--v19b-size-12)] font-medium transition-colors ${
+                                className={`v19-preupload-choice h-8 rounded-[var(--v19b-size-6)] px-2 text-[var(--v19b-size-12)] font-medium transition-colors ${
                                   preliminaryIntake[question.key] === value
                                     ? "bg-white/12 text-white"
                                     : "text-white/38 hover:text-white/75"
                                 }`}
                                 type="button"
                                 aria-pressed={preliminaryIntake[question.key] === value}
+                                aria-label={`${question.label}: ${value ? "Да" : "Нет"}`}
+                                disabled={createBusy}
                                 onClick={() =>
                                   updatePreliminaryIntake(question.key, value)
                                 }
@@ -706,6 +717,7 @@ export function CreateSubmissionDrawer({
                         </div>
                       ))}
                       <FamilySharedAddressFields
+                        disabled={createBusy}
                         preliminaryIntake={preliminaryIntake}
                         onUpdate={updatePreliminaryIntake}
                       />
@@ -722,6 +734,7 @@ export function CreateSubmissionDrawer({
                   name="preintakePassportScans"
                   tabIndex={-1}
                   type="file"
+                  disabled={createBusy}
                   onChange={(event) => {
                     void addPassportFiles(event.currentTarget.files);
                     event.currentTarget.value = "";
@@ -746,12 +759,12 @@ export function CreateSubmissionDrawer({
                     id="passport-intake-title"
                     className="text-[var(--v19b-size-15)] font-medium text-white/80 mb-1.5 relative z-10"
                   >
-                    Перетащите файлы
+                    Перетащите паспорта сюда
                   </h3>
-                  <p className="text-[var(--v19b-size-12)] text-white/60 max-w-[var(--v19b-size-240)] mb-8 font-light relative z-10 leading-relaxed">
+                  <p className="v19-preupload-upload-copy text-[var(--v19b-size-12)] text-white/60 max-w-[var(--v19b-size-240)] mb-8 font-light relative z-10 leading-relaxed">
                     {passportScanUploadFormatLabel}.
                     <br />
-                    Разворот загранпаспорта с MRZ.
+                    Сначала реальный OCR. В защищённое хранилище файлы попадут только после сохранения подачи.
                   </p>
                   {passportFileError ? (
                     <p className="mb-4 text-[var(--v19b-size-12)] text-red-400 relative z-10" role="alert">
@@ -761,6 +774,7 @@ export function CreateSubmissionDrawer({
                   <button
                     className="v19-create-upload-button"
                     type="button"
+                    disabled={createBusy}
                     onClick={() => passportFileInputRef.current?.click()}
                   >
                     Выбрать файлы
@@ -795,9 +809,9 @@ export function CreateSubmissionDrawer({
                 </div>
               </div>
 
-              <div className="hidden lg:flex flex-col h-full max-h-[var(--v19b-size-800)] border-l border-[var(--v19b-color-border)] pl-10">
+              <div className="v19-preupload-production-rail hidden lg:flex flex-col h-full max-h-[var(--v19b-size-800)] border-l border-[var(--v19b-color-border)] pl-10">
                 <section
-                  className="mb-5 rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
+                  className="v19-preupload-applicants-panel mb-5 rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                   aria-label="Заявители и общие семейные ответы"
                 >
                   <div className="flex items-center justify-between gap-3 mb-3">
@@ -810,10 +824,10 @@ export function CreateSubmissionDrawer({
                       </h3>
                     </div>
                     <button
-                      className="h-8 px-3 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-[var(--v19b-size-12)] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="v19-preupload-add-applicant h-8 px-3 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-[var(--v19b-size-12)] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       type="button"
                       aria-label="Добавить заявителя в семью"
-                      disabled={applicantCount >= maxFamilyApplicants}
+                      disabled={createBusy || applicantCount >= maxFamilyApplicants}
                       onClick={addFamilyMember}
                     >
                       + заявитель
@@ -831,13 +845,14 @@ export function CreateSubmissionDrawer({
                       return (
                         <button
                           key={index}
-                          className={`flex items-center justify-between gap-3 rounded-[var(--v19b-radius-control)] border px-3 py-2 text-left transition-colors ${
+                          className={`v19-preupload-applicant-slot flex items-center justify-between gap-3 rounded-[var(--v19b-radius-control)] border px-3 py-2 text-left transition-colors ${
                             safeActiveApplicantIndex === index
                               ? "border-white/16 bg-white/8"
                               : "border-[var(--v19b-color-border)] bg-[var(--v19b-color-panel)] hover:border-white/10"
                           }`}
                           type="button"
                           aria-pressed={safeActiveApplicantIndex === index}
+                          disabled={createBusy}
                           onClick={() => setActiveApplicantIndex(index)}
                         >
                           <span className="min-w-0">
@@ -874,13 +889,15 @@ export function CreateSubmissionDrawer({
                             {[true, false].map((value) => (
                               <button
                                 key={String(value)}
-                                className={`h-7 min-w-10 rounded-[var(--v19b-size-6)] px-2 text-[var(--v19b-size-12)] font-medium transition-colors ${
+                                className={`v19-preupload-choice h-7 min-w-10 rounded-[var(--v19b-size-6)] px-2 text-[var(--v19b-size-12)] font-medium transition-colors ${
                                   preliminaryIntake[question.key] === value
                                     ? "bg-white/12 text-white"
                                     : "text-white/38 hover:text-white/75"
                                 }`}
                                 type="button"
                                 aria-pressed={preliminaryIntake[question.key] === value}
+                                aria-label={`${question.label}: ${value ? "Да" : "Нет"}`}
+                                disabled={createBusy}
                                 onClick={() =>
                                   updatePreliminaryIntake(question.key, value)
                                 }
@@ -891,6 +908,11 @@ export function CreateSubmissionDrawer({
                           </span>
                         </div>
                       ))}
+                      <FamilySharedAddressFields
+                        disabled={createBusy}
+                        preliminaryIntake={preliminaryIntake}
+                        onUpdate={updatePreliminaryIntake}
+                      />
                     </div>
                   ) : null}
                 </section>
@@ -908,7 +930,7 @@ export function CreateSubmissionDrawer({
                   {extractedPassportFields.length ? (
                     <motion.section
                       aria-label="Распознанные поля OCR"
-                      className="mb-5 rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
+                      className="v19-preupload-prefill-panel mb-5 rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                       initial={prefersReducedMotion ? false : { opacity: 0, x: 12 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 12 }}
@@ -1063,14 +1085,7 @@ export function CreateSubmissionDrawer({
       </div>
 
       <footer className="v19-create-drawer-footer">
-        <div className="min-w-0">
-          <span className="text-[var(--v19b-size-12)] text-white/60">
-            {type === "family" ? `${applicantCount} заявителя. ` : ""}
-            {passportReadinessSummary}
-          </span>
-          {createError ? <p className="mt-1 text-[var(--v19b-size-12)] text-red-300" role="alert">{createError}</p> : null}
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="v19-preupload-footer-actions flex flex-col sm:flex-row gap-2">
           <button
             disabled={!canCreateDraft || createBusy}
             className={`v19-create-footer-action v19-create-footer-action--secondary ${
@@ -1092,15 +1107,24 @@ export function CreateSubmissionDrawer({
             {createBusy ? "Создаём..." : "Создать и открыть анкету"}
           </button>
         </div>
+        <div className="v19-preupload-footer-summary min-w-0" role="status" aria-live="polite">
+          <span className="text-[var(--v19b-size-12)] text-white/60">
+            {type === "family" ? `${applicantCountLabel(applicantCount)}. ` : ""}
+            {passportReadinessSummary}
+          </span>
+          {createError ? <p className="mt-1 text-[var(--v19b-size-12)] text-red-300" role="alert">{createError}</p> : null}
+        </div>
       </footer>
     </motion.div>
   );
 }
 
 function FamilySharedAddressFields({
+  disabled,
   onUpdate,
   preliminaryIntake,
 }: {
+  disabled?: boolean;
   onUpdate: <Key extends keyof PreliminaryIntakeDraft>(
     key: Key,
     value: PreliminaryIntakeDraft[Key],
@@ -1113,6 +1137,7 @@ function FamilySharedAddressFields({
         <label>
           <span>Адрес проживания в России</span>
           <input
+            disabled={disabled}
             value={preliminaryIntake.homeAddress}
             placeholder="Улица, дом, квартира, город"
             onChange={(event) => onUpdate("homeAddress", event.currentTarget.value)}
@@ -1125,6 +1150,7 @@ function FamilySharedAddressFields({
           <label>
             <span>Место проживания в Испании</span>
             <input
+              disabled={disabled}
               value={preliminaryIntake.spainStayName}
               placeholder="Отель или адрес принимающей стороны"
               onChange={(event) => onUpdate("spainStayName", event.currentTarget.value)}
@@ -1133,6 +1159,7 @@ function FamilySharedAddressFields({
           <label className="v19-family-shared-fields-full">
             <span>Адрес в Испании</span>
             <input
+              disabled={disabled}
               value={preliminaryIntake.spainStayAddress}
               placeholder="Calle, дом, индекс"
               onChange={(event) =>
@@ -1216,6 +1243,15 @@ function applicantLabel(index: number, type: Submission["type"]) {
   if (type === "single") return "Заявитель";
   if (index === 0) return "Основной заявитель";
   return `Заявитель ${index + 1}`;
+}
+
+function applicantCountLabel(count: number) {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return `${count} заявителей`;
+  if (lastDigit === 1) return `${count} заявитель`;
+  if (lastDigit >= 2 && lastDigit <= 4) return `${count} заявителя`;
+  return `${count} заявителей`;
 }
 
 function formatFileSize(size = 0) {

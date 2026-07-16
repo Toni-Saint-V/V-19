@@ -636,15 +636,18 @@ export function CommandCenter({
     preliminaryIntake?: PreliminaryIntakeDraft,
     options?: { openQuestionnaire?: boolean },
   ) => {
-    const applicantNames = passportUploads.map((upload) => {
+    const applicantNames: string[] = [];
+    for (const upload of passportUploads) {
       const firstName = upload.extractedFields
         .find((field) => field.key === "firstName")
         ?.value.trim();
       const surname = upload.extractedFields
         .find((field) => field.key === "surname")
         ?.value.trim();
-      return [firstName, surname].filter(Boolean).join(" ");
-    });
+      applicantNames[upload.applicantIndex] = [firstName, surname]
+        .filter(Boolean)
+        .join(" ");
+    }
     let pendingSubmission = pendingCreatedSubmissionRef.current;
     if (!pendingSubmission) {
       const result = createDraft({

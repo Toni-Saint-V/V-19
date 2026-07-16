@@ -32,10 +32,12 @@ function renderCreateDrawer() {
   const onCreate = vi.fn();
   const result = render(
     <CreateSubmissionDrawer
+      city="Москва"
       familyCount={2}
       type="family"
       onClose={() => undefined}
       onCreate={onCreate}
+      onCity={() => undefined}
       onFamilyCount={() => undefined}
       onPassportFilesSelected={() => undefined}
       onType={() => undefined}
@@ -52,6 +54,18 @@ function renderCreateDrawer() {
 }
 
 describe("CreateSubmissionDrawer passport readiness", () => {
+  test("renders the blue PreUpload production surface with real flow controls", () => {
+    renderCreateDrawer();
+
+    expect(screen.getByRole("dialog", { name: /Новая подача/ })).toHaveAttribute(
+      "data-create-submission-surface",
+      "preupload-blue",
+    );
+    expect(screen.getByRole("button", { name: "Назад" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Сохранить черновик" })).toBeDisabled();
+    expect(screen.getByText(/В защищённое хранилище файлы попадут/)).toBeInTheDocument();
+  });
+
   test("shows extracted passport fields in the animated right column", async () => {
     vi.mocked(invokePassportExtraction).mockResolvedValueOnce({
       fields: [
@@ -188,5 +202,96 @@ describe("CreateSubmissionDrawer passport readiness", () => {
       expect(nextButton).toBeEnabled();
     });
     expect(invokePassportExtraction).toHaveBeenCalledTimes(2);
+  });
+
+  test("keeps overlapping OCR results bound to both family applicants", async () => {
+    const dateNow = vi.spyOn(Date, "now").mockReturnValue(1_721_100_000_000);
+    let resolveFirst!: (value: Awaited<ReturnType<typeof invokePassportExtraction>>) => void;
+    let resolveSecond!: (value: Awaited<ReturnType<typeof invokePassportExtraction>>) => void;
+    vi.mocked(invokePassportExtraction)
+      .mockImplementationOnce(
+        () => new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => {
+          resolveSecond = resolve;
+        }),
+      );
+    try {
+      const { input } = renderCreateDrawer();
+
+      fireEvent.change(input, {
+        target: { files: [passportFile("first.jpg")] },
+      });
+      fireEvent.click(screen.getAllByRole("button", { name: /Заявитель 2/ })[0]!);
+      fireEvent.change(input, {
+        target: { files: [passportFile("second.jpg")] },
+      });
+
+      resolveSecond({
+        fields: [
+          {
+            confidence: "high",
+            key: "surname",
+            needsManualReview: false,
+            value: "SECOND",
+          },
+          {
+            confidence: "high",
+            key: "firstName",
+            needsManualReview: false,
+            value: "APPLICANT",
+          },
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: false,
+            value: "SECOND-PASSPORT",
+          },
+        ],
+        guardrails: [],
+        source: "local-ocr",
+        status: "extracted",
+        summary: "Second passport extracted.",
+      });
+      resolveFirst({
+        fields: [
+          {
+            confidence: "high",
+            key: "surname",
+            needsManualReview: false,
+            value: "FIRST",
+          },
+          {
+            confidence: "high",
+            key: "firstName",
+            needsManualReview: false,
+            value: "APPLICANT",
+          },
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: false,
+            value: "FIRST-PASSPORT",
+          },
+        ],
+        guardrails: [],
+        source: "local-ocr",
+        status: "extracted",
+        summary: "First passport extracted.",
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("FIRST-PASSPORT")).toBeVisible();
+        expect(screen.getByText("SECOND-PASSPORT")).toBeVisible();
+        expect(screen.getAllByText("Паспорт принят").length).toBeGreaterThanOrEqual(2);
+        expect(screen.getAllByText("first.jpg").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("second.jpg").length).toBeGreaterThan(0);
+      });
+    } finally {
+      dateNow.mockRestore();
+    }
   });
 });
