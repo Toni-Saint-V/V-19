@@ -375,13 +375,24 @@ export function AdminExportScreen({
     () => selectedRealIds.slice().sort().join("|"),
     [selectedRealIds],
   );
+  const selectedContentSignature = useMemo(() => {
+    const identity = buildExportPackageIdentity(selectedSubmissions);
+    return identity
+      ? [
+          identity.contentFingerprint,
+          identity.format,
+          identity.rowCount,
+          ...identity.submissionIds,
+        ].join("|")
+      : "";
+  }, [selectedSubmissions]);
 
   useEffect(() => {
     setPreparedExport(null);
     setPreparedArchive(null);
     setArchiveDownloadStarted(false);
     setExportError("");
-  }, [selectedSignature, submissions]);
+  }, [selectedContentSignature, selectedSignature]);
 
   const activeItem =
     displayItems.find((item) => item.id === activeId) ??

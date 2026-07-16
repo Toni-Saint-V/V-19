@@ -94,7 +94,7 @@ describe("active admin export screen", () => {
       value: revokeObjectURL,
     });
 
-    render(<AdminExportScreen submissions={[submission]} />);
+    const view = render(<AdminExportScreen submissions={[submission]} />);
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: `Выбрать ${submission.listTitle ?? submission.title}`,
@@ -108,6 +108,12 @@ describe("active admin export screen", () => {
       "download",
       expect.stringMatching(/^visaflow-export-.+\.xlsx$/),
     );
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+    view.rerender(<AdminExportScreen submissions={[readySubmission()]} />);
+    expect(
+      await screen.findByRole("link", { name: "Скачать Excel" }),
+    ).toHaveAttribute("href", "blob:verified-export-workbook");
     expect(createObjectURL).toHaveBeenCalledTimes(1);
   });
 });
