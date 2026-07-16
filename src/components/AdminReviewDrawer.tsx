@@ -434,6 +434,8 @@ function ApplicantsTab({
   const approvedQuestionnaireFields = filledQuestionnaireFields.filter(
     (field) => fieldStatus(field, applicantIssues) === "approved",
   ).length;
+  const totalReviewItems = filledQuestionnaireFields.length + applicantFiles.length;
+  const completedReviewItems = approvedQuestionnaireFields + acceptedFiles;
   const attentionPanel: ApplicantPanelId | null = applicantIssues.length
     ? "issues"
     : applicantFiles.some((file) => file.status !== "accepted")
@@ -545,15 +547,9 @@ function ApplicantsTab({
           key={applicant.id}
           transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
         >
-          <div aria-hidden="true" className="admin-review-traveler-orbit">
-            <i>
-              <FileText />
-            </i>
-            <span>{applicantInitials(applicant.fullName) || <Users />}</span>
-            <i>
-              <ImageIcon />
-            </i>
-          </div>
+          <span aria-hidden="true" className="admin-review-traveler-avatar">
+            {applicantInitials(applicant.fullName) || <Users />}
+          </span>
           <div className="admin-review-traveler-identity">
             <span>{applicantRoleLabel(applicant.role)}</span>
             <h3>{applicant.fullName}</h3>
@@ -567,6 +563,37 @@ function ApplicantsTab({
               : `${acceptedFiles}/${applicantFiles.length} файлов принято`}
           </p>
         </motion.header>
+
+        <section
+          aria-label="Следующий шаг проверки"
+          className={`admin-review-next-step ${attentionPanel ? "is-warning" : "is-ready"}`}
+        >
+          <span aria-hidden="true" className="admin-review-next-step-icon">
+            {attentionPanel ? <AlertCircle /> : <CheckCircle2 />}
+          </span>
+          <div>
+            <strong>
+              {applicantIssues.length
+                ? `${applicantIssues.length} ${russianCountLabel(applicantIssues.length, "замечание требует", "замечания требуют", "замечаний требуют")} проверки`
+                : applicantFiles.some((file) => file.status !== "accepted")
+                  ? "Завершите проверку файлов"
+                  : "Заявитель готов к итоговой проверке"}
+            </strong>
+            <span>
+              {attentionPanel === "issues"
+                ? "Проверьте исправления агента и закройте замечания."
+                : attentionPanel === "media"
+                  ? "Сверьте загруженные документы перед принятием пакета."
+                  : "Все доступные данные заявителя проверены."}
+            </span>
+          </div>
+          {attentionPanel ? (
+            <button onClick={() => setActivePanel(attentionPanel)} type="button">
+              {attentionPanel === "issues" ? "К замечаниям" : "Проверить файлы"}
+              <ChevronRight aria-hidden="true" />
+            </button>
+          ) : null}
+        </section>
 
         <div
           aria-label={`Разделы заявителя: ${applicant.fullName}`}
@@ -613,28 +640,64 @@ function ApplicantsTab({
             transition={{ duration: prefersReducedMotion ? 0 : 0.18 }}
           >
             {activePanel === "overview" ? (
-              <dl className="admin-review-traveler-overview">
-                <div>
-                  <dt>Анкета</dt>
-                  <dd>{questionnaireStatusLabel(applicant.questionnaireStatus)}</dd>
-                </div>
-                <div>
-                  <dt>Проверено полей</dt>
-                  <dd>
-                    {approvedQuestionnaireFields}/{filledQuestionnaireFields.length}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Файлы</dt>
-                  <dd>
-                    {acceptedFiles}/{applicantFiles.length} принято
-                  </dd>
-                </div>
-                <div>
-                  <dt>Маршрут</dt>
-                  <dd>{submission.city} · Испания</dd>
-                </div>
-              </dl>
+              <div className="admin-review-traveler-overview-layout">
+                <dl className="admin-review-traveler-overview">
+                  <div>
+                    <dt>Анкета</dt>
+                    <dd>{questionnaireStatusLabel(applicant.questionnaireStatus)}</dd>
+                  </div>
+                  <div>
+                    <dt>Проверено полей</dt>
+                    <dd>
+                      {approvedQuestionnaireFields}/{filledQuestionnaireFields.length}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Файлы</dt>
+                    <dd>
+                      {acceptedFiles}/{applicantFiles.length} принято
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Маршрут</dt>
+                    <dd>{submission.city} · Испания</dd>
+                  </div>
+                </dl>
+                <aside className="admin-review-traveler-summary">
+                  <header>
+                    <span>Итог по заявителю</span>
+                    <strong>
+                      {completedReviewItems}/{totalReviewItems || 0}
+                    </strong>
+                  </header>
+                  <progress
+                    aria-label="Прогресс проверки заявителя"
+                    max={Math.max(totalReviewItems, 1)}
+                    value={completedReviewItems}
+                  />
+                  <div className={attentionPanel ? "is-warning" : "is-ready"}>
+                    {attentionPanel ? (
+                      <AlertCircle aria-hidden="true" />
+                    ) : (
+                      <CheckCircle2 aria-hidden="true" />
+                    )}
+                    <span>
+                      <strong>
+                        {attentionPanel
+                          ? "Есть блокирующие действия"
+                          : "Проверка завершена"}
+                      </strong>
+                      <small>
+                        {attentionPanel === "issues"
+                          ? "Открытые замечания нужно перепроверить."
+                          : attentionPanel === "media"
+                            ? "Не все файлы приняты администратором."
+                            : "Данные готовы к решению по пакету."}
+                      </small>
+                    </span>
+                  </div>
+                </aside>
+              </div>
             ) : null}
             {activePanel === "media" ? (
               <MediaTab
@@ -1522,6 +1585,49 @@ export function AdminReviewDrawer({
 
   const handlePrimaryAction = () => handleAdminAction(primaryAction);
 
+  const reviewActionControl = canPublishReturnedPdfHandoff ? (
+    <button
+      className="admin-review-secondary"
+      onClick={handlePublishReturnedPdfHandoff}
+      title={returnedPdfHandoffReason}
+      type="button"
+    >
+      Передать PDF агенту
+    </button>
+  ) : footerReviewAction ? (
+    <button
+      aria-describedby={primaryReason ? primaryActionReasonId : undefined}
+      className={`admin-review-primary${isReturnReviewAction ? " is-return" : ""}`}
+      disabled={footerReviewAction.disabled}
+      onClick={() => handleAdminAction(footerReviewAction)}
+      title={footerReviewAction.reason}
+      type="button"
+    >
+      {isReturnReviewAction ? (
+        <AlertCircle aria-hidden="true" />
+      ) : (
+        <CheckCircle2 aria-hidden="true" />
+      )}
+      <span>{footerReviewAction.label}</span>
+    </button>
+  ) : (
+    <button
+      aria-describedby={primaryReason ? primaryActionReasonId : undefined}
+      className="admin-review-primary"
+      disabled={primaryDisabled}
+      onClick={handlePrimaryAction}
+      title={primaryReason}
+      type="button"
+    >
+      {primaryAction?.action === "generate_export" ? (
+        <DownloadCloud aria-hidden="true" />
+      ) : (
+        <CheckCircle2 aria-hidden="true" />
+      )}
+      <span>{primaryButtonLabel}</span>
+    </button>
+  );
+
   const handleOpenIssue = (issue: Issue) => {
     setReviewTarget((current) => ({
       issue,
@@ -1605,6 +1711,15 @@ export function AdminReviewDrawer({
             <header className="admin-review-drawer-header z-20 shrink-0 border-b border-white/5 bg-[#111113]/90 px-5 pb-0 pt-5 backdrop-blur-md lg:px-8">
               <div className="admin-review-titlebar mb-5 flex items-start justify-between gap-4">
                 <div className="admin-review-titlecopy min-w-0">
+                  <div className="admin-review-titlemeta">
+                    <code>{activeSubmissionId ?? "Заявка не выбрана"}</code>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {submission?.type === "family"
+                        ? "Семейная подача"
+                        : "Одиночная подача"}
+                    </span>
+                  </div>
                   <h2 className="flex items-center gap-3 text-[20px] font-semibold leading-tight tracking-tight text-white lg:text-[24px]">
                     <span id={drawerHeadingId} className="admin-review-drawer-heading">
                       Проверка пакета
@@ -1625,52 +1740,6 @@ export function AdminReviewDrawer({
                 </div>
 
                 <div className="admin-review-header-actions">
-                  {canPublishReturnedPdfHandoff ? (
-                    <button
-                      className="admin-review-secondary"
-                      onClick={handlePublishReturnedPdfHandoff}
-                      title={returnedPdfHandoffReason}
-                      type="button"
-                    >
-                      Передать PDF агенту
-                    </button>
-                  ) : footerReviewAction ? (
-                    <button
-                      aria-describedby={
-                        primaryReason ? primaryActionReasonId : undefined
-                      }
-                      className={`admin-review-primary${isReturnReviewAction ? " is-return" : ""}`}
-                      disabled={footerReviewAction.disabled}
-                      onClick={() => handleAdminAction(footerReviewAction)}
-                      title={footerReviewAction.reason}
-                      type="button"
-                    >
-                      {isReturnReviewAction ? (
-                        <AlertCircle aria-hidden="true" />
-                      ) : (
-                        <CheckCircle2 aria-hidden="true" />
-                      )}
-                      <span>{footerReviewAction.label}</span>
-                    </button>
-                  ) : (
-                    <button
-                      aria-describedby={
-                        primaryReason ? primaryActionReasonId : undefined
-                      }
-                      className="admin-review-primary"
-                      disabled={primaryDisabled}
-                      onClick={handlePrimaryAction}
-                      title={primaryReason}
-                      type="button"
-                    >
-                      {primaryAction?.action === "generate_export" ? (
-                        <DownloadCloud aria-hidden="true" />
-                      ) : (
-                        <CheckCircle2 aria-hidden="true" />
-                      )}
-                      <span>{primaryButtonLabel}</span>
-                    </button>
-                  )}
                   <button
                     aria-label="Закрыть проверку"
                     className="admin-review-close"
@@ -1773,6 +1842,25 @@ export function AdminReviewDrawer({
                 </motion.div>
               </AnimatePresence>
             </div>
+
+            <footer className="admin-review-footer">
+              <p className="admin-review-primary-reason">
+                {primaryReason ? (
+                  <>
+                    <AlertCircle aria-hidden="true" />
+                    <span>
+                      <strong>Что блокирует решение:</strong> {primaryReason}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 aria-hidden="true" />
+                    <span>Пакет готов к следующему действию.</span>
+                  </>
+                )}
+              </p>
+              <div className="admin-review-footer-actions">{reviewActionControl}</div>
+            </footer>
           </motion.div>
         </>
       )}
