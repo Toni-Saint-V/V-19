@@ -25061,11 +25061,66 @@ body,
   gap: var(--v19b-size-8);
   min-height: var(--v19b-size-40);
   padding: var(--v19b-size-6) var(--v19b-size-8);
-  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border: var(--v19b-size-1) solid transparent;
   border-radius: var(--v19-control-radius);
   color: var(--v19b-color-text-muted);
-  background: var(--v19b-dot-halo-warning);
+  background: transparent;
   font-size: var(--v19b-size-11);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-field-control:is(.is-review, .is-invalid) {
+  background: var(--v19b-color-control) !important;
+  box-shadow: none !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control.is-review {
+  border-color: var(--v19b-color-border-selected) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control.is-invalid {
+  border-color: var(--v19b-color-border-strong) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-address-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v19b-size-10);
+  padding: var(--v19b-size-8) var(--v19b-size-10);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-selected);
+  border-radius: var(--v19-control-radius);
+  background: var(--v19b-color-control);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-address-suggestion span {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  gap: var(--v19b-size-2);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-address-suggestion small {
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-10-5);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-address-suggestion strong {
+  overflow-wrap: anywhere;
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-address-suggestion button {
+  flex: 0 0 auto;
+  min-height: var(--v19b-size-32);
+  padding-inline: var(--v19b-size-10);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19-control-radius);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-control-hover);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-control);
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-review-confirmation button {
