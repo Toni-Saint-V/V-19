@@ -962,8 +962,9 @@ export function toCockpitDraftPersistencePayload(
   };
 }
 
-function requiresCorrectionHandoff(submission: Submission): boolean {
+function requiresCorrectionHandoff(submission: Submission, role: Role): boolean {
   return (
+    role === "agent" &&
     submission.status === "corrections_received" &&
     submission.issues.some((issue) => issue.status === "fixed_by_agent")
   );
@@ -1053,7 +1054,7 @@ function assertReviewHandoffPersistenceConsistency(
 
   const issues = reviewHandoffPersistenceIssues(submission, role);
   if (issues.length === 0) return;
-  const operation = requiresCorrectionHandoff(submission)
+  const operation = requiresCorrectionHandoff(submission, role)
     ? "rpc.submit_corrections_handoff"
     : "rpc.save_submission_draft";
 
@@ -1540,7 +1541,7 @@ export async function saveCockpitSubmissionsForProfile(
       ownerId,
       profile.role,
     );
-    const correctionHandoff = requiresCorrectionHandoff(submission);
+    const correctionHandoff = requiresCorrectionHandoff(submission, profile.role);
     const operation = correctionHandoff
       ? "rpc.submit_corrections_handoff"
       : "rpc.save_submission_draft";

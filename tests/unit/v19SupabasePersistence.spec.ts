@@ -386,6 +386,58 @@ describe("V-19 Supabase cockpit persistence", () => {
     ).toBe("waiting_review");
   });
 
+  it("uses the draft RPC when an admin reviews an existing correction handoff", async () => {
+    const returnedSubmission = initialSubmissions.find(
+      (submission) => submission.status === "returned",
+    ) as Submission;
+    const handedOffSubmission: Submission = {
+      ...returnedSubmission,
+      updatedAt: "2026-07-16T12:30:00.000Z",
+      status: "corrections_received",
+      issues: returnedSubmission.issues.map((issue) =>
+        issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
+      ),
+      files: returnedSubmission.files.map((file) =>
+        file.linkedIssueId
+          ? {
+              ...file,
+              reviewStatus: "accepted",
+              status: "accepted",
+              storageBucket: "visa-documents",
+              storagePath: `submissions/${returnedSubmission.id}/${file.id}`,
+              uploadedAtIso: "2026-06-27T10:00:00.000Z",
+            }
+          : file,
+      ),
+      history: [
+        {
+          id: "и-existing-corrections-handoff",
+          text: "Агент отправил исправления",
+          at: "2026-07-16T12:25:00.000Z",
+          fromStatus: "returned",
+          source: "agent",
+          toStatus: "corrections_received",
+        },
+        ...returnedSubmission.history,
+      ],
+    };
+
+    await saveCockpitSubmissionsForProfile(
+      adminProfile,
+      [handedOffSubmission],
+      new Map([[handedOffSubmission.id, agentProfile.id]]),
+    );
+
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(
+      (
+        mockState.rpcCalls[0]?.args.payload as {
+          submission: { status: string };
+        }
+      ).submission.status,
+    ).toBe("waiting_review");
+  });
+
   it("fails closed before RPC when fixed issues do not resolve their targets", async () => {
     const returnedSubmission = initialSubmissions.find(
       (submission) => submission.status === "returned",
