@@ -39,6 +39,14 @@ const SettingsScreen = lazy(
   () => import("../modules/submissions/pages/SettingsScreen"),
 );
 const adminMobileNavigationId = "admin-mobile-navigation";
+const mobileNavFocusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
 
 const accessRequestStatusCopy: Record<AccessRequest["status"], string> = {
   approved: "Одобрена",
@@ -300,20 +308,46 @@ export function AdminWorkspace({
     if (!mobileNavOpen) return;
 
     const trigger = mobileNavTriggerRef.current;
-    const closeButton = mobileNavPanelRef.current?.querySelector<HTMLButtonElement>(
-      "[data-admin-mobile-nav-close]",
-    );
-    closeButton?.focus({ preventScroll: true });
+    const panel = mobileNavPanelRef.current;
+    const animationFrame = window.requestAnimationFrame(() => {
+      const closeButton = panel?.querySelector<HTMLButtonElement>(
+        "[data-admin-mobile-nav-close]",
+      );
+      (closeButton ?? panel)?.focus({ preventScroll: true });
+    });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setMobileNavOpen(false);
+      const controls = Array.from(
+        panel?.querySelectorAll<HTMLElement>(mobileNavFocusableSelector) ?? [],
+      ).filter((control) => control.getClientRects().length > 0);
+      if (!controls.length) {
+        event.preventDefault();
+        panel?.focus({ preventScroll: true });
+        return;
+      }
+
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !panel?.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !panel?.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener("keydown", handleEscape);
+      window.cancelAnimationFrame(animationFrame);
+      document.removeEventListener("keydown", handleKeyDown);
       if (window.innerWidth < 768) {
         trigger?.focus({ preventScroll: true });
       }
@@ -583,7 +617,7 @@ export function AdminWorkspace({
           data-admin-mobile-nav-close=""
           type="button"
           onClick={() => setMobileNavOpen(false)}
-          className="md:hidden p-2 text-white/50 hover:text-white"
+          className="md:hidden min-h-[var(--v19-control-row-height)] min-w-[var(--v19-control-row-height)] rounded-lg text-white/50 hover:text-white flex items-center justify-center"
         >
           <X aria-hidden="true" className="w-5 h-5" />
         </button>
@@ -597,7 +631,7 @@ export function AdminWorkspace({
           <button
             aria-label="Проверка"
             onClick={() => navigateTo("review")}
-            className={`v19-admin-sidebar-nav-item w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "review" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "review" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
           >
             <ShieldCheck className="w-4 h-4 text-white/55" />{" "}
             <span className="flex-1 text-left">Проверка</span>
@@ -608,7 +642,7 @@ export function AdminWorkspace({
           <button
             aria-label="Выгрузка"
             onClick={() => navigateTo("export")}
-            className={`v19-admin-sidebar-nav-item w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "export" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "export" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
           >
             <DownloadCloud className="w-4 h-4 text-[#b8baff]/75" />{" "}
             <span className="flex-1 text-left">Выгрузка</span>
@@ -620,7 +654,7 @@ export function AdminWorkspace({
             <button
               aria-label="Возврат"
               onClick={() => navigateTo("returns")}
-              className={`v19-admin-sidebar-nav-item w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "returns" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+              className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "returns" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             >
               <Inbox className="w-4 h-4 text-[#8fe7c1]" />{" "}
               <span className="flex-1 text-left">Возврат</span>
@@ -635,7 +669,7 @@ export function AdminWorkspace({
           <button
             aria-label="Пользователи"
             onClick={() => navigateTo("users")}
-            className={`v19-admin-sidebar-nav-item w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "users" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "users" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
           >
             <Users className="w-4 h-4" />{" "}
             <span className="flex-1 text-left">Пользователи</span>
@@ -649,7 +683,7 @@ export function AdminWorkspace({
             <button
               aria-label="Настройки"
               onClick={() => navigateTo("settings")}
-              className={`v19-admin-sidebar-nav-item w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "settings" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+              className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "settings" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             >
               <Settings className="w-4 h-4" />{" "}
               <span className="flex-1 text-left">Настройки</span>
@@ -659,6 +693,28 @@ export function AdminWorkspace({
       </div>
 
       <div className="relative mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
+        <button
+          onClick={() => setBottomProfileMenuOpen((open) => !open)}
+          aria-label="Профиль администратора"
+          aria-expanded={bottomProfileMenuOpen}
+          className="v19-admin-sidebar-profile w-full min-h-[64px] px-3 py-2 border rounded-xl text-left transition-colors flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+        >
+          <span className="v19-admin-sidebar-avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold text-white">
+            {adminInitials}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block whitespace-normal text-[12.5px] font-medium leading-4 text-white">
+              {adminIdentityName}
+            </span>
+            <span className="block text-[10.5px] font-medium leading-4 text-white/42">
+              Администратор
+            </span>
+            <span className="block truncate text-[9.5px] font-medium leading-3 text-white/30">
+              {adminIdentityLabel}
+            </span>
+          </span>
+          <ArrowLeftRight className="w-4 h-4 shrink-0 text-white/42" />
+        </button>
         <AnimatePresence>
           {bottomProfileMenuOpen ? (
             <motion.div
@@ -704,28 +760,6 @@ export function AdminWorkspace({
             </motion.div>
           ) : null}
         </AnimatePresence>
-        <button
-          onClick={() => setBottomProfileMenuOpen((open) => !open)}
-          aria-label="Профиль администратора"
-          aria-expanded={bottomProfileMenuOpen}
-          className="v19-admin-sidebar-profile w-full min-h-[64px] px-3 py-2 border rounded-xl text-left transition-colors flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-        >
-          <span className="v19-admin-sidebar-avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold text-white">
-            {adminInitials}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block whitespace-normal text-[12.5px] font-medium leading-4 text-white">
-              {adminIdentityName}
-            </span>
-            <span className="block text-[10.5px] font-medium leading-4 text-white/42">
-              Администратор
-            </span>
-            <span className="block truncate text-[9.5px] font-medium leading-3 text-white/30">
-              {adminIdentityLabel}
-            </span>
-          </span>
-          <ArrowLeftRight className="w-4 h-4 shrink-0 text-white/42" />
-        </button>
       </div>
     </>
   );
@@ -810,7 +844,8 @@ export function AdminWorkspace({
         {mobileNavOpen && (
           <div className="md:hidden">
             <motion.button
-              aria-label="Закрыть меню администратора"
+              aria-hidden="true"
+              tabIndex={-1}
               type="button"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -824,6 +859,7 @@ export function AdminWorkspace({
               id={adminMobileNavigationId}
               ref={mobileNavPanelRef}
               role="dialog"
+              tabIndex={-1}
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
@@ -837,13 +873,19 @@ export function AdminWorkspace({
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <aside className="v19-admin-sidebar hidden md:flex w-[260px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20">
+      <aside
+        aria-hidden={mobileNavOpen ? "true" : undefined}
+        inert={mobileNavOpen}
+        className="v19-admin-sidebar hidden md:flex w-[260px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20"
+      >
         {renderNavContent()}
       </aside>
 
       {/* Main Content */}
       <main
         aria-label="Рабочая область подач"
+        aria-hidden={mobileNavOpen ? "true" : undefined}
+        inert={mobileNavOpen}
         className="v19-admin-main flex-1 min-w-0 flex flex-col bg-[#141416]"
       >
         {/* Topbar */}
