@@ -7,6 +7,8 @@ import {
   Image as ImageIcon,
   ScanLine,
   UploadCloud,
+  UserRound,
+  Users,
   X,
 } from "lucide-react";
 import { invokePassportExtraction } from "../passportExtractionService";
@@ -28,17 +30,21 @@ const maxFamilyApplicants = 6;
 
 type PassportLiveTone = "red" | "yellow" | "green";
 
-const submissionTypeOptions: Array<{ label: string; value: Submission["type"] }> = [
-  { label: "Семья", value: "family" },
-  { label: "Один", value: "single" },
+const submissionTypeOptions: Array<{
+  icon: typeof Users;
+  label: string;
+  value: Submission["type"];
+}> = [
+  { icon: Users, label: "Семья", value: "family" },
+  { icon: UserRound, label: "Один", value: "single" },
 ];
 
 const firstStepFamilyQuestions: Array<{
   key: Extract<keyof PreliminaryIntakeDraft, "sameHomeAddress" | "sameSpainStay">;
   label: string;
 }> = [
-  { key: "sameHomeAddress", label: "Один адрес проживания в России у всех?" },
-  { key: "sameSpainStay", label: "Одно проживание в Испании у всех?" },
+  { key: "sameHomeAddress", label: "Одинаковый адрес проживания в России?" },
+  { key: "sameSpainStay", label: "Одинаковое место проживания в Испании?" },
 ];
 
 const passportFieldLabels: Record<PassportExtractedField["key"], string> = {
@@ -155,8 +161,8 @@ function passportUploadStatusCopy(upload: PassportUploadDraft | undefined) {
   }
   if (visualStatus === "extracting") {
     return {
-      description: "Файл выбран. OCR читает MRZ, номер паспорта и ФИО.",
-      title: "OCR читает паспорт",
+      description: "Распознаём имя, номер и срок действия паспорта.",
+      title: "Распознаём паспорт",
     };
   }
   if (visualStatus === "unavailable") {
@@ -283,6 +289,9 @@ export function CreateSubmissionDrawer({
       : [],
   );
   const passportReady = allApplicantPassportsReady(passportUploads, applicantCount);
+  const passportProgress = Math.round(
+    (passportUploads.filter(isPassportUploadReady).length / applicantCount) * 100,
+  );
   const hasProcessedPassport = passportUploads.some(isPassportUploadReady);
   const passportProcessingFinished = passportUploads.every(
     (upload) => upload.status !== "extracting",
@@ -533,14 +542,7 @@ export function CreateSubmissionDrawer({
             <span className="sr-only">Загрузка и первичная сборка — </span>
             Новая подача
           </h1>
-          <div className="v19-preupload-header-copy text-[var(--v19b-size-11)] text-white/40 mt-1 font-medium">
-            Паспорта → реальный OCR → анкета
-          </div>
         </div>
-
-        <span className="px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-white/5 border border-white/5 text-[var(--v19b-size-10)] uppercase tracking-wider text-white/60 font-mono">
-          OCR
-        </span>
 
         <button
           className="v19-create-drawer-close"
@@ -562,40 +564,40 @@ export function CreateSubmissionDrawer({
         <div className="v19-preupload-production-shell create-submission-passport-shell mx-auto h-full">
           <div className="v19-preupload-production-grid grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
               <div className="v19-preupload-production-primary flex flex-col gap-6">
+                <div className="v19-preupload-progress-indicator" role="status">
+                  <span aria-hidden="true" />
+                  Подготовка подачи · {passportProgress}%
+                </div>
                 <section
                   className="v19-preupload-setup-panel rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                   aria-label="Тип подачи"
                 >
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div>
-                      <p className="text-[var(--v19b-size-10)] uppercase tracking-[var(--v19b-tracking-wider)] text-white/60 font-medium">
-                        Заявитель / Семья
-                      </p>
-                      <h3 className="text-[var(--v19b-size-13)] text-white/80 font-medium mt-1">
-                        Структура подачи
-                      </h3>
+                  <div className="v19-preupload-setup-top flex items-center justify-between gap-3 mb-3">
+                    <div className="v19-preupload-type-switch grid grid-cols-2 gap-2">
+                      {submissionTypeOptions.map((option) => {
+                        const Icon = option.icon;
+                        return (
+                          <button
+                            key={option.value}
+                            className={`v19-preupload-type-option h-10 rounded-[var(--v19b-size-8)] border text-[var(--v19b-size-13)] font-medium transition-colors ${
+                              type === option.value
+                                ? "border-white/18 bg-white/10 text-white"
+                                : "border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-white/45 hover:text-white/75 hover:border-white/12"
+                            }`}
+                            type="button"
+                            aria-pressed={type === option.value}
+                            disabled={createBusy}
+                            onClick={() => selectType(option.value)}
+                          >
+                            <Icon aria-hidden="true" />
+                            {option.label}
+                          </button>
+                        );
+                      })}
                     </div>
                     <span className="text-[var(--v19b-size-11)] font-mono px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-strong)] text-white/50">
                       {applicantCount} чел.
                     </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {submissionTypeOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        className={`h-10 rounded-[var(--v19b-size-8)] border text-[var(--v19b-size-13)] font-medium transition-colors ${
-                          type === option.value
-                            ? "border-white/18 bg-white/10 text-white"
-                            : "border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-white/45 hover:text-white/75 hover:border-white/12"
-                        }`}
-                        type="button"
-                        aria-pressed={type === option.value}
-                        disabled={createBusy}
-                        onClick={() => selectType(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
                   </div>
                   <label
                     className="mt-3 grid gap-1.5 text-left text-[var(--v19b-size-12)] text-white/58"
@@ -759,12 +761,12 @@ export function CreateSubmissionDrawer({
                     id="passport-intake-title"
                     className="text-[var(--v19b-size-15)] font-medium text-white/80 mb-1.5 relative z-10"
                   >
-                    Перетащите паспорта сюда
+                    {type === "family"
+                      ? "Перетащите паспорта сюда"
+                      : "Перетащите паспорт сюда"}
                   </h3>
                   <p className="v19-preupload-upload-copy text-[var(--v19b-size-12)] text-white/60 max-w-[var(--v19b-size-240)] mb-8 font-light relative z-10 leading-relaxed">
-                    {passportScanUploadFormatLabel}.
-                    <br />
-                    Сначала реальный OCR. В защищённое хранилище файлы попадут только после сохранения подачи.
+                    {passportScanUploadFormatLabel}. После загрузки распознаем данные и подготовим анкету.
                   </p>
                   {passportFileError ? (
                     <p className="mb-4 text-[var(--v19b-size-12)] text-red-400 relative z-10" role="alert">
@@ -919,10 +921,10 @@ export function CreateSubmissionDrawer({
 
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-[var(--v19b-size-13)] uppercase tracking-widest font-medium text-white/60">
-                    Очередь обработки
+                    {type === "family" ? "Данные из паспортов" : "Данные из паспорта"}
                   </h3>
                   <span className="text-[var(--v19b-size-11)] font-mono px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-strong)] text-white/50">
-                    {passportUploads.length} ITEMS
+                    {extractedPassportFields.length} полей
                   </span>
                 </div>
 
@@ -938,10 +940,10 @@ export function CreateSubmissionDrawer({
                     >
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <h4 className="text-[var(--v19b-size-12)] font-medium text-white/75">
-                          Распознано OCR
+                          Распознанные данные
                         </h4>
                         <span className="text-[var(--v19b-size-10)] font-mono text-[var(--vf-green-soft-text)]">
-                          {extractedPassportFields.length} ПОЛЕЙ
+                          {extractedPassportFields.length} полей
                         </span>
                       </div>
                       <div className="max-h-[var(--v19b-size-180)] space-y-2 overflow-y-auto pr-1">
@@ -1073,7 +1075,7 @@ export function CreateSubmissionDrawer({
                         <ScanLine className="w-4 h-4 text-white/20" />
                       </div>
                       <p className="text-[var(--v19b-size-12)] text-white/60 font-light">
-                        Выберите паспорт, чтобы начать реальное извлечение.
+                        Здесь появятся данные после распознавания паспорта.
                       </p>
                     </div>
                   )}

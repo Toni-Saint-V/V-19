@@ -63,7 +63,9 @@ describe("CreateSubmissionDrawer passport readiness", () => {
     );
     expect(screen.getByRole("button", { name: "Назад" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Сохранить черновик" })).toBeDisabled();
-    expect(screen.getByText(/В защищённое хранилище файлы попадут/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/После загрузки распознаем данные и подготовим анкету/),
+    ).toBeInTheDocument();
   });
 
   test("shows extracted passport fields in the animated right column", async () => {
