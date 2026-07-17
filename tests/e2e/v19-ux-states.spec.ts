@@ -76,9 +76,12 @@ test.describe("V-19 UX state proof", () => {
     });
     await clickOperationalNav(page, /^Выгрузка/);
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
-    const selectedExport = page.locator(".export-row").getByRole("checkbox", {
-      checked: true,
-    }).first();
+    const selectedExport = page
+      .locator(".export-row")
+      .getByRole("checkbox", {
+        checked: true,
+      })
+      .first();
     if (await selectedExport.count()) {
       await selectedExport.uncheck();
     }

@@ -455,8 +455,7 @@ export function productionA1S1ExportDigest(value: string | Uint8Array) {
 
 function digestMatches(value: unknown, expectedDigest: string) {
   return (
-    typeof value === "string" &&
-    productionA1S1ExportDigest(value) === expectedDigest
+    typeof value === "string" && productionA1S1ExportDigest(value) === expectedDigest
   );
 }
 
@@ -552,7 +551,8 @@ export function productionA1S1ExportPayloadMatches(
   artifactContract: ProductionA1S1VerifiedArtifactContract,
   timestampWindow: ProductionMutationTimestampWindow | null,
 ) {
-  if (!baseExportPayloadMatches(body, key, networkContract, timestampWindow)) return false;
+  if (!baseExportPayloadMatches(body, key, networkContract, timestampWindow))
+    return false;
   const payload = exportPayloadRecord(body);
   if (!payload) return false;
 
@@ -572,7 +572,10 @@ export function productionA1S1ExportPayloadMatches(
         exportPackage.contentFingerprint,
         artifactContract.contentFingerprintDigest,
       ) &&
-      digestMatches(exportPackage.idempotencyKey, artifactContract.idempotencyKeyDigest) &&
+      digestMatches(
+        exportPackage.idempotencyKey,
+        artifactContract.idempotencyKeyDigest,
+      ) &&
       digestMatches(exportPackage.fileName, artifactContract.workbookFileNameDigest)
     );
   }
@@ -580,10 +583,16 @@ export function productionA1S1ExportPayloadMatches(
   const batch = jsonRecord(payload.batch);
   const documentExport = jsonRecord(payload.document_export);
   return (
-    digestMatches(batch?.content_fingerprint, artifactContract.contentFingerprintDigest) &&
+    digestMatches(
+      batch?.content_fingerprint,
+      artifactContract.contentFingerprintDigest,
+    ) &&
     digestMatches(batch?.idempotency_key, artifactContract.idempotencyKeyDigest) &&
     digestMatches(batch?.file_name, artifactContract.workbookFileNameDigest) &&
-    digestMatches(documentExport?.workbook_file_name, artifactContract.workbookFileNameDigest) &&
+    digestMatches(
+      documentExport?.workbook_file_name,
+      artifactContract.workbookFileNameDigest,
+    ) &&
     digestMatches(documentExport?.zip_file_name, artifactContract.zipFileNameDigest)
   );
 }
@@ -795,10 +804,7 @@ export async function loadAcceptedA1S1ProductionExportCase(): Promise<ResolvedAc
   );
 
   const lifecycleState = await readJson<ProductionLifecycleState>(
-    productionLifecycleStatePath(
-      runMarker,
-      PRODUCTION_EXPORT_CASE_KEY,
-    ),
+    productionLifecycleStatePath(runMarker, PRODUCTION_EXPORT_CASE_KEY),
   );
   invariant(
     lifecycleState.stage === "accepted",
@@ -960,7 +966,10 @@ export class StrictProductionA1S1ExportNetworkGate {
         networkContract.ownerId.length > 0 &&
         typeof networkContract.submissionId === "string" &&
         networkContract.submissionId.length > 0 &&
-        exactStringSet(networkContract.documentAssetIds, networkContract.documentAssetIds) &&
+        exactStringSet(
+          networkContract.documentAssetIds,
+          networkContract.documentAssetIds,
+        ) &&
         networkContract.documentAssetIds.length === 3 &&
         networkContract.documentAssetIds.every((id) => id.length > 0),
       "A1-S1 export network gate requires an exact runtime-only preflight contract.",
@@ -972,13 +981,19 @@ export class StrictProductionA1S1ExportNetworkGate {
         corrections: networkContract.draft.corrections.map((item) => ({ ...item })),
         effectiveHistoryCount: networkContract.draft.effectiveHistoryCount,
         mediaAssets: networkContract.draft.mediaAssets.map((item) => ({ ...item })),
-        questionnaireAnswers: networkContract.draft.questionnaireAnswers.map((item) => ({
+        questionnaireAnswers: networkContract.draft.questionnaireAnswers.map(
+          (item) => ({
+            ...item,
+          }),
+        ),
+        snapshot: { ...networkContract.draft.snapshot },
+        snapshotHistory: networkContract.draft.snapshotHistory.map((item) => ({
           ...item,
         })),
-        snapshot: { ...networkContract.draft.snapshot },
-        snapshotHistory: networkContract.draft.snapshotHistory.map((item) => ({ ...item })),
         snapshotIssueCount: networkContract.draft.snapshotIssueCount,
-        snapshotIssues: networkContract.draft.snapshotIssues.map((item) => ({ ...item })),
+        snapshotIssues: networkContract.draft.snapshotIssues.map((item) => ({
+          ...item,
+        })),
         snapshotUntypedHistoryDigests: [
           ...networkContract.draft.snapshotUntypedHistoryDigests,
         ],
@@ -1026,14 +1041,14 @@ export class StrictProductionA1S1ExportNetworkGate {
     const artifactContract = this.#verifiedArtifactContract;
     return Boolean(
       networkContract &&
-        artifactContract &&
-        productionA1S1ExportPayloadMatches(
-          request.postData(),
-          key,
-          networkContract,
-          artifactContract,
-          this.#exportMutationTimestampWindow,
-        ),
+      artifactContract &&
+      productionA1S1ExportPayloadMatches(
+        request.postData(),
+        key,
+        networkContract,
+        artifactContract,
+        this.#exportMutationTimestampWindow,
+      ),
     );
   }
 
@@ -1319,13 +1334,11 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
     invariant(this.#violations.length === 0, "Unapproved network request was blocked.");
     invariant(
-      (this.#requestCounts.get("POST /rest/v1/rpc/save_submission_draft") ?? 0) ===
-        2,
+      (this.#requestCounts.get("POST /rest/v1/rpc/save_submission_draft") ?? 0) === 2,
       "Abort-only export must capture the initial save and its one bounded retry.",
     );
     invariant(
-      (this.#requestCounts.get("POST /rest/v1/rpc/complete_export_package") ??
-        0) === 0,
+      (this.#requestCounts.get("POST /rest/v1/rpc/complete_export_package") ?? 0) === 0,
       "Abort-only export must not start complete_export_package.",
     );
     invariant(
@@ -1527,56 +1540,61 @@ async function readA1S1ProductionRowsWithClient(input: {
     correctionsResult,
     questionnaireAnswersResult,
     historyResult,
-  ] =
-    await Promise.all([
-      input.client
-        .from("submissions")
-        .select(
-          "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,submitted_at,review_started_at,accepted_at,exported_at,updated_at",
-        )
-        .eq("id", input.submissionId)
-        .maybeSingle(),
-      input.client
-        .from("applicants")
-        .select(
-          "id,submission_id,full_name,role,suggested_role,role_confirmed,birth_date,patronymic,citizenship,address,phone,email,passport_number,passport_issued_at,passport_expires_at,country,city,trip_dates,hotel_name,hotel_address,questionnaire_percent,media_percent",
-        )
-        .eq("submission_id", input.submissionId),
-      input.client
-        .from("document_assets")
-        .select(
-          "id,source_media_asset_id,submission_id,applicant_id,type,upload_status,validation_status,export_status",
-        )
-        .eq("submission_id", input.submissionId),
-      input.client
-        .from("media_assets")
-        .select(
-          "id,applicant_id,submission_id,type,original_file_name,generated_file_name,storage_bucket,storage_path,mime_type,size_bytes,upload_status,review_status,uploaded_at,reviewed_at,reviewed_by",
-        )
-        .eq("submission_id", input.submissionId),
-      input.client
-        .from("corrections")
-        .select(
-          "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at",
-        )
-        .eq("submission_id", input.submissionId),
-      input.client
-        .from("questionnaire_answers")
-        .select("submission_id,applicant_id,section_id,field_id,label,value")
-        .eq("submission_id", input.submissionId),
-      input.client
-        .from("status_history")
-        .select(
-          "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at,note,source",
-        )
-        .eq("entity_type", "submission")
-        .eq("entity_id", input.submissionId),
-    ]);
-  invariant(!submissionResult.error && submissionResult.data, "A1-S1 submission is unreadable.");
+  ] = await Promise.all([
+    input.client
+      .from("submissions")
+      .select(
+        "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,submitted_at,review_started_at,accepted_at,exported_at,updated_at",
+      )
+      .eq("id", input.submissionId)
+      .maybeSingle(),
+    input.client
+      .from("applicants")
+      .select(
+        "id,submission_id,full_name,role,suggested_role,role_confirmed,birth_date,patronymic,citizenship,address,phone,email,passport_number,passport_issued_at,passport_expires_at,country,city,trip_dates,hotel_name,hotel_address,questionnaire_percent,media_percent",
+      )
+      .eq("submission_id", input.submissionId),
+    input.client
+      .from("document_assets")
+      .select(
+        "id,source_media_asset_id,submission_id,applicant_id,type,upload_status,validation_status,export_status",
+      )
+      .eq("submission_id", input.submissionId),
+    input.client
+      .from("media_assets")
+      .select(
+        "id,applicant_id,submission_id,type,original_file_name,generated_file_name,storage_bucket,storage_path,mime_type,size_bytes,upload_status,review_status,uploaded_at,reviewed_at,reviewed_by",
+      )
+      .eq("submission_id", input.submissionId),
+    input.client
+      .from("corrections")
+      .select(
+        "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at",
+      )
+      .eq("submission_id", input.submissionId),
+    input.client
+      .from("questionnaire_answers")
+      .select("submission_id,applicant_id,section_id,field_id,label,value")
+      .eq("submission_id", input.submissionId),
+    input.client
+      .from("status_history")
+      .select(
+        "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at,note,source",
+      )
+      .eq("entity_type", "submission")
+      .eq("entity_id", input.submissionId),
+  ]);
+  invariant(
+    !submissionResult.error && submissionResult.data,
+    "A1-S1 submission is unreadable.",
+  );
   invariant(!applicantsResult.error, "A1-S1 applicants are unreadable.");
   invariant(!documentsResult.error, "A1-S1 document assets are unreadable.");
   invariant(!mediaResult.error, "A1-S1 media assets are unreadable.");
-  invariant(!questionnaireAnswersResult.error, "A1-S1 questionnaire answers are unreadable.");
+  invariant(
+    !questionnaireAnswersResult.error,
+    "A1-S1 questionnaire answers are unreadable.",
+  );
   invariant(!correctionsResult.error, "A1-S1 corrections are unreadable.");
   invariant(!historyResult.error, "A1-S1 status history is unreadable.");
   return {
@@ -1585,7 +1603,8 @@ async function readA1S1ProductionRowsWithClient(input: {
     documents: (documentsResult.data ?? []) as unknown as ProductionDocumentAssetRow[],
     history: (historyResult.data ?? []) as unknown as ProductionStatusHistoryRow[],
     media: (mediaResult.data ?? []) as unknown as ProductionMediaAssetRow[],
-    questionnaireAnswers: (questionnaireAnswersResult.data ?? []) as unknown as ProductionQuestionnaireAnswerRow[],
+    questionnaireAnswers: (questionnaireAnswersResult.data ??
+      []) as unknown as ProductionQuestionnaireAnswerRow[],
     submission: submissionResult.data as unknown as ProductionSubmissionRow,
   };
 }
@@ -1617,7 +1636,10 @@ function requiredSnapshotFacts(
     "A2-S1 cockpit snapshot is missing history or issues identity arrays.",
   );
   const exportContentDigest = productionDraftSnapshotContentDigest(value, "export");
-  const lifecycleContentDigest = productionDraftSnapshotContentDigest(value, "lifecycle");
+  const lifecycleContentDigest = productionDraftSnapshotContentDigest(
+    value,
+    "lifecycle",
+  );
   const effectiveHistory = productionDraftEffectiveSnapshotHistory({
     familyIntelligence: value,
     statusHistory: historyRows,
@@ -1699,7 +1721,10 @@ function draftPayloadIdentityFromRows(input: {
   const questionnaireAnswers = rows.questionnaireAnswers.map((row) => {
     const labelDigest = productionDraftValueDigest(row.label);
     const valueIdentity = productionDraftQuestionnaireValueIdentity(row.value);
-    invariant(labelDigest && valueIdentity, "A2-S1 questionnaire identity cannot be digested.");
+    invariant(
+      labelDigest && valueIdentity,
+      "A2-S1 questionnaire identity cannot be digested.",
+    );
     const snapshotErrorDigest = snapshotErrorByQuestionnaireKey.get(
       `${row.applicant_id}\u0000${row.section_id}\u0000${row.field_id}`,
     );
@@ -1724,7 +1749,9 @@ function draftPayloadIdentityFromRows(input: {
   });
   invariant(
     new Set(
-      questionnaireAnswers.map((row) => `${row.applicantId}\u0000${row.sectionId}\u0000${row.fieldId}`),
+      questionnaireAnswers.map(
+        (row) => `${row.applicantId}\u0000${row.sectionId}\u0000${row.fieldId}`,
+      ),
     ).size === questionnaireAnswers.length &&
       snapshotErrorByQuestionnaireKey.size === questionnaireAnswers.length,
     "A2-S1 questionnaire identity contains duplicate answer keys.",
@@ -1849,9 +1876,7 @@ export type ResolvedProductionCohortDraftPayloadIdentity = {
     mode: "replace_exact";
     rows: readonly ProductionDraftProjectedStatusHistoryIdentity[];
   };
-  historyTransition?: NonNullable<
-    ProductionDraftHistoryExpectation["transition"]
-  >;
+  historyTransition?: NonNullable<ProductionDraftHistoryExpectation["transition"]>;
   mediaProjection?: NonNullable<
     ProductionDraftPayloadMutationContract["mediaProjection"]
   >;
@@ -1914,7 +1939,8 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
   });
   const hydratedSnapshot = (() => {
     const snapshot = readCockpitSnapshot(
-      rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+      rows.submission
+        .family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
     );
     invariant(snapshot, "Production cockpit snapshot is unreadable for projection.");
     const withMedia = attachDurableMediaAssetRows(
@@ -1960,8 +1986,7 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
       );
     } else if (intent.intent.mode === "add_issue") {
       const applicant = hydratedSnapshot.applicants.find(
-        (item) =>
-          !intent.intent.applicantId || item.id === intent.intent.applicantId,
+        (item) => !intent.intent.applicantId || item.id === intent.intent.applicantId,
       );
       const section = applicant?.sections.find((candidate) =>
         candidate.fields.some(
@@ -2307,7 +2332,10 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
           answer.sectionId === row.section_id &&
           answer.fieldId === row.field_id,
       );
-      invariant(baseline, "Production questionnaire projection changed answer identity.");
+      invariant(
+        baseline,
+        "Production questionnaire projection changed answer identity.",
+      );
       const questionnaireReplacement =
         input.submissionProjectionIntent?.mode === "questionnaire_replace" &&
         input.submissionProjectionIntent.applicantId === row.applicant_id &&
@@ -2372,8 +2400,7 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
           (!valueChanged ||
             questionnaireReplacementMatches ||
             (projected.fieldId === "email" &&
-              projected.applicantId ===
-                input.applicantEmailReplacement?.applicantId)),
+              projected.applicantId === input.applicantEmailReplacement?.applicantId)),
         "Production questionnaire serializer drift exceeded the explicit allowlist.",
       );
     }
@@ -2422,8 +2449,8 @@ export async function resolveProductionCohortDraftPayloadIdentity(input: {
     return typeof record?.id === "string" ? record.id : null;
   });
   invariant(
-    applicantIdsInSnapshotOrder.every(
-      (applicantId): applicantId is string => Boolean(applicantId),
+    applicantIdsInSnapshotOrder.every((applicantId): applicantId is string =>
+      Boolean(applicantId),
     ) &&
       applicantIdsInSnapshotOrder.length === (input.expectedApplicantCount ?? 1) &&
       new Set(applicantIdsInSnapshotOrder).size ===
@@ -2482,12 +2509,14 @@ export async function resolveProductionFamilyContactReadback(input: {
 }) {
   const rows = await readA1S1ProductionRows(input);
   const snapshot = readCockpitSnapshot(
-    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+    rows.submission
+      .family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
   );
-  invariant(snapshot, "Production cockpit snapshot is unreadable for contact readback.");
-  const durableByApplicant = new Map(
-    rows.applicants.map((row) => [row.id, row.email]),
+  invariant(
+    snapshot,
+    "Production cockpit snapshot is unreadable for contact readback.",
   );
+  const durableByApplicant = new Map(rows.applicants.map((row) => [row.id, row.email]));
   const questionnaireByApplicant = new Map(
     rows.questionnaireAnswers
       .filter((row) => row.field_id === "email")
@@ -2495,9 +2524,7 @@ export async function resolveProductionFamilyContactReadback(input: {
         const envelope = jsonRecord(row.value);
         return [
           row.applicant_id,
-          envelope?.kind === "v19_questionnaire_field"
-            ? envelope.value
-            : row.value,
+          envelope?.kind === "v19_questionnaire_field" ? envelope.value : row.value,
         ];
       }),
   );
@@ -2580,7 +2607,8 @@ export async function resolveProductionApplicantSerializerDrift(input: {
 }) {
   const rows = await readA1S1ProductionRows(input);
   const snapshot = readCockpitSnapshot(
-    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+    rows.submission
+      .family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
   );
   invariant(snapshot, "Production cockpit snapshot is unreadable for applicant drift.");
   const projected = toCockpitDraftPersistencePayload(
@@ -2627,7 +2655,8 @@ export async function resolveProductionSubmissionSerializerDrift(input: {
 }) {
   const rows = await readA1S1ProductionRows(input);
   const snapshot = readCockpitSnapshot(
-    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+    rows.submission
+      .family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
   );
   invariant(snapshot, "Production cockpit snapshot is unreadable for root drift.");
   const projected = toCockpitDraftPersistencePayload(
@@ -2665,9 +2694,13 @@ export async function resolveProductionQuestionnaireSerializerDrift(input: {
 }) {
   const rows = await readA1S1ProductionRows(input);
   const snapshot = readCockpitSnapshot(
-    rows.submission.family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
+    rows.submission
+      .family_intelligence as Database["public"]["Tables"]["submissions"]["Row"]["family_intelligence"],
   );
-  invariant(snapshot, "Production cockpit snapshot is unreadable for questionnaire drift.");
+  invariant(
+    snapshot,
+    "Production cockpit snapshot is unreadable for questionnaire drift.",
+  );
   const projected = toCockpitQuestionnaireAnswerInserts(
     snapshot,
     input.actorId,
@@ -2684,8 +2717,7 @@ export async function resolveProductionQuestionnaireSerializerDrift(input: {
     field_id: string;
     section_id: string;
     submission_id: string;
-  }) =>
-    [row.submission_id, row.applicant_id, row.section_id, row.field_id].join(":");
+  }) => [row.submission_id, row.applicant_id, row.section_id, row.field_id].join(":");
   const projectedByKey = new Map(projected.map((row) => [key(row), row]));
   const fieldCounts = new Map<string, number>();
   const affectedFieldIdCounts = new Map<string, number>();
@@ -2700,8 +2732,7 @@ export async function resolveProductionQuestionnaireSerializerDrift(input: {
       "Production questionnaire value identity is unreadable.",
     );
     const driftFields = [
-      productionDraftValueDigest(row.label) !==
-      productionDraftValueDigest(target.label)
+      productionDraftValueDigest(row.label) !== productionDraftValueDigest(target.label)
         ? "label"
         : null,
       baselineValue.logicalValueDigest !== projectedValue.logicalValueDigest
@@ -2759,7 +2790,8 @@ function assertA1S1ApplicantProjection(input: {
       ) &&
       input.documents.every((document) => {
         const source = mediaById.get(document.source_media_asset_id);
-        const expectedDocumentType = source?.type === "selfie" ? "selfie_1" : source?.type;
+        const expectedDocumentType =
+          source?.type === "selfie" ? "selfie_1" : source?.type;
         return (
           source?.applicant_id === document.applicant_id &&
           source?.submission_id === document.submission_id &&
@@ -2942,7 +2974,8 @@ export async function repairIncompleteA1S1ProductionExport(input: {
     "A1-S1 repair refuses an artifact whose names do not match the durable batch.",
   );
 
-  const events = (eventsResult.data ?? []) as unknown as ProductionDocumentExportEventRow[];
+  const events = (eventsResult.data ??
+    []) as unknown as ProductionDocumentExportEventRow[];
   const matchingEvents = events.filter(
     (event) =>
       event.package_identity_key === idempotencyKey &&
@@ -2988,7 +3021,10 @@ export async function verifyA1S1ProductionExportFinalState(input: {
   state: ProductionA1S1ExportState;
   submissionId: string;
 }): Promise<ProductionA1S1ExportFinalStateProof> {
-  invariant(input.state.zipProof, "A1-S1 terminal read-back requires verified ZIP proof.");
+  invariant(
+    input.state.zipProof,
+    "A1-S1 terminal read-back requires verified ZIP proof.",
+  );
   const client = await createReadOnlyProductionAdminClient(input.admin);
   const [rows, batchesResult, eventsResult, historyResult] = await Promise.all([
     readA1S1ProductionRowsWithClient({ client, submissionId: input.submissionId }),
@@ -3063,7 +3099,8 @@ export async function verifyA1S1ProductionExportFinalState(input: {
     "A1-S1 export batch workbook name does not match the downloaded ZIP.",
   );
 
-  const events = (eventsResult.data ?? []) as unknown as ProductionDocumentExportEventRow[];
+  const events = (eventsResult.data ??
+    []) as unknown as ProductionDocumentExportEventRow[];
   const matchingEvents = events.filter(
     (event) =>
       event.package_identity_key === batch.idempotency_key &&

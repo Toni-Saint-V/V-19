@@ -26,6 +26,7 @@ const completeDemoQuestionnaireValues: Record<string, string> = {
   "contact-number": "+7 900 000-00-00",
   "departure-date": "18.07.2026",
   "desired-date-1": "05.08.2026",
+  "desired-date-2": "12.08.2026",
   email: "demo@example.com",
   "employer-address": "MOSCOW",
   "employer-contact": "+7 900 000-00-01",

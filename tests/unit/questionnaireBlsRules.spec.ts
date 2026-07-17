@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  blsApplicantQuestionnaireStatus,
   blsStayDurationFromDates,
   blsQuestionnaireReadiness,
   isBlsQuestionnaireFieldRequired,
@@ -84,19 +85,15 @@ describe("canonical BLS questionnaire readiness", () => {
     expectReadyParity(submission);
   });
 
-  test("requires guardian data for every minor, including a single applicant", () => {
+  test("keeps guardian data optional for a minor", () => {
     let submission = readySingleSubmission();
     submission = setApplicantField(submission, 0, "birth-date", "20.08.2012");
     submission = setApplicantField(submission, 0, "guardian-info", "");
 
-    expect(blsQuestionnaireReadiness(submission).ready).toBe(false);
-    expect(hasMissingRequiredWork(submission)).toBe(true);
-
-    submission = setApplicantField(submission, 0, "guardian-info", "TEST GUARDIAN");
     expectReadyParity(submission);
   });
 
-  test("requires guardian data for the canonical child role", () => {
+  test("keeps guardian data optional for the canonical child role", () => {
     const field = {
       error: undefined,
       id: "guardian-info",
@@ -112,20 +109,81 @@ describe("canonical BLS questionnaire readiness", () => {
         field,
         formData,
       }),
+    ).toBe(false);
+  });
+
+  test("does not require employer data from a child until a working or study occupation is selected", () => {
+    const field = {
+      error: undefined,
+      id: "employer-name",
+      label: "Работодатель / учебное заведение",
+      required: true,
+      value: "",
+    };
+
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "child",
+        field,
+        formData: { occupation: "" },
+      }),
+    ).toBe(false);
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "child",
+        field,
+        formData: { occupation: "MINOR" },
+      }),
+    ).toBe(false);
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "child",
+        field,
+        formData: { occupation: "STUDENT" },
+      }),
+    ).toBe(true);
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "main",
+        field,
+        formData: { occupation: "" },
+      }),
     ).toBe(true);
   });
 
-  test("switches from applicant means to sponsor requirements", () => {
-    let submission = readySingleSubmission();
-    submission = setApplicantField(submission, 0, "cost-covered-by", "Спонсор");
-    submission = setApplicantField(submission, 0, "means-of-support", "");
-    submission = setApplicantField(submission, 0, "sponsor-in-host-fields", "Да");
-    submission = setApplicantField(submission, 0, "sponsor-means", "Наличные");
+  test("keeps a family package ready when a minor child has no employer", () => {
+    let submission = uploadRequiredFiles(
+      fillRequiredQuestionnaireForTest(
+        createDraftSubmission({
+          city: "Москва",
+          familyCount: 3,
+          submissions: [],
+          type: "family",
+        }),
+      ),
+    );
+    const childIndex = submission.applicants.findIndex(
+      (applicant) => applicant.role === "child",
+    );
+    if (childIndex < 0) throw new Error("Expected a child applicant fixture.");
+
+    submission = setApplicantField(submission, childIndex, "occupation", "MINOR");
+    submission = setApplicantField(submission, childIndex, "employer-name", "");
+    submission = setApplicantField(submission, childIndex, "employer-contact", "");
+    submission = setApplicantField(submission, childIndex, "employer-address", "");
 
     expectReadyParity(submission);
+    expect(
+      blsApplicantQuestionnaireStatus(submission.applicants[childIndex]),
+    ).toBe("complete");
+  });
 
-    submission = setApplicantField(submission, 0, "sponsor-means", "");
-    expect(blsQuestionnaireReadiness(submission).ready).toBe(false);
+  test("keeps payment compatibility defaults outside the visible questionnaire", () => {
+    let submission = readySingleSubmission();
+    submission = setApplicantField(submission, 0, "cost-covered-by", "Сам заявитель");
+    submission = setApplicantField(submission, 0, "means-of-support", "Наличные");
+
+    expectReadyParity(submission);
   });
 
   test("requires company fields only for company or business submissions", () => {

@@ -69,15 +69,14 @@ test.describe("V-19 real passport OCR proof", () => {
       .toBe(true);
     mkdirSync(qaDir, { recursive: true });
     await page.screenshot({
-      path: path.join(
-        qaDir,
-        `create-passport-ai-intake-${testInfo.project.name}.png`,
-      ),
+      path: path.join(qaDir, `create-passport-ai-intake-${testInfo.project.name}.png`),
       fullPage: true,
     });
 
     await page.getByRole("button", { exact: true, name: "Далее" }).click();
-    await expect(page.getByRole("heading", { name: /Анкета|VOLKOV|Schengen/ })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Анкета|VOLKOV|Schengen/ }),
+    ).toBeVisible();
 
     await expect
       .poll(

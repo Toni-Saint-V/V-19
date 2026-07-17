@@ -15,12 +15,13 @@ import {
 import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
 import { ReviewWorkspace } from "./ReviewWorkspace";
-import { AdminReviewDrawer } from "./AdminReviewDrawer";
+import { AdminReviewDrawer } from "../modules/submissions/components/AdminReviewDrawer";
 import { AdminReturnPackagesScreen } from "./AdminReturnPackagesScreen";
 import { RemarkForm } from "./RemarkForm";
 import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import type { AccessRequest } from "../shared/authContract";
 import type {
+  DrawerTab,
   IssueInput,
   Submission,
   SubmissionAction,
@@ -256,7 +257,6 @@ export function AdminWorkspace({
   const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
   const adminFileAcceptPendingRef = useRef(false);
-  const adminQuestionnaireApprovalPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
   const pendingAccessRequestCount = accessRequests.filter(
     (request) => request.status === "pending",
@@ -277,6 +277,7 @@ export function AdminWorkspace({
   const adminInitials = adminIdentityToken || "АД";
 
   const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
+  const [adminDrawerTab, setAdminDrawerTab] = useState<DrawerTab>("questionnaire");
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
   const [reviewApplicantId, setReviewApplicantId] = useState<string>();
   const [remarkContext, setRemarkContext] = useState<{
@@ -329,6 +330,7 @@ export function AdminWorkspace({
       submissionId: id,
     });
     setSelectedRow(id);
+    setAdminDrawerTab("questionnaire");
     setAdminDrawerOpen(true);
   };
 
@@ -438,6 +440,43 @@ export function AdminWorkspace({
     }
   };
 
+  const handleAdminAiReview = async () => {
+    if (!selectedRow || !bridge.onAdminAiReviewRun) return;
+    setAdminAsyncError("");
+    try {
+      await bridge.onAdminAiReviewRun(selectedRow);
+      emitVisaflowUiEvent(bridge, {
+        type: "admin.ai.run",
+        submissionId: selectedRow,
+      });
+    } catch {
+      setAdminAsyncError("Не удалось выполнить AI-сверку.");
+    }
+  };
+
+  const handleAdminAiSuggestion = async (
+    action: "accept" | "dismiss",
+    suggestionId: string,
+  ) => {
+    if (!selectedRow) return;
+    const payload = { submissionId: selectedRow, suggestionId };
+    const handler =
+      action === "accept"
+        ? bridge.onAdminAiSuggestionAccept
+        : bridge.onAdminAiSuggestionDismiss;
+    if (!handler) return;
+    setAdminAsyncError("");
+    try {
+      await handler(payload);
+      emitVisaflowUiEvent(bridge, {
+        type: action === "accept" ? "admin.ai.accept" : "admin.ai.dismiss",
+        payload,
+      });
+    } catch {
+      setAdminAsyncError("Не удалось применить действие AI-помощника.");
+    }
+  };
+
   const handleReviewFileAccept = async (input: {
     applicantId: string;
     fileType: SubmissionFileType;
@@ -465,40 +504,6 @@ export function AdminWorkspace({
       return false;
     } finally {
       adminFileAcceptPendingRef.current = false;
-    }
-  };
-
-  const handleQuestionnaireFieldApprove = async (input: {
-    applicantId: string;
-    fieldId: string;
-    sectionId: string;
-  }): Promise<boolean> => {
-    if (!selectedRow || adminQuestionnaireApprovalPendingRef.current) return false;
-    const payload = { submissionId: selectedRow, ...input };
-    setAdminAsyncError("");
-
-    if (!bridge.onAdminQuestionnaireFieldApprove) {
-      setAdminAsyncError(
-        "Апрув поля недоступен: обработчик сохранения не подключён. Состояние подачи не изменено.",
-      );
-      return false;
-    }
-
-    adminQuestionnaireApprovalPendingRef.current = true;
-    try {
-      await bridge.onAdminQuestionnaireFieldApprove(payload);
-      emitVisaflowUiEvent(bridge, {
-        type: "admin.questionnaire.approve",
-        payload,
-      });
-      return true;
-    } catch {
-      setAdminAsyncError(
-        "Не удалось подтвердить поле анкеты. Состояние подачи не изменено. Повторите попытку.",
-      );
-      return false;
-    } finally {
-      adminQuestionnaireApprovalPendingRef.current = false;
     }
   };
 
@@ -778,21 +783,33 @@ export function AdminWorkspace({
         />
       )}
 
-      <AdminReviewDrawer
-        isOpen={adminDrawerOpen}
-        onClose={() => setAdminDrawerOpen(false)}
-        submissionId={selectedRow}
-        submission={selectedSubmission}
-        returnFocusTarget={reviewDrawerReturnFocusRef.current}
-        onVerifyDocument={handleVerifyDocument}
-        onAddRemark={handleOpenRemark}
-        onApproveQuestionnaireField={handleQuestionnaireFieldApprove}
-        onPrimaryAction={handleAdminPrimaryAction}
-        onOpenExport={() => {
-          setAdminDrawerOpen(false);
-          navigateTo("export");
-        }}
-      />
+      {adminDrawerOpen && selectedSubmission ? (
+        <AdminReviewDrawer
+          actionError=""
+          activeTab={adminDrawerTab}
+          submission={selectedSubmission}
+          onAcceptAiSuggestion={(suggestionId) =>
+            void handleAdminAiSuggestion("accept", suggestionId)
+          }
+          onAction={(action) =>
+            void handleAdminPrimaryAction(selectedSubmission.id, action)
+          }
+          onAddIssue={(input) => void handleAddIssue(input)}
+          onClose={() => {
+            setAdminDrawerOpen(false);
+            window.requestAnimationFrame(() =>
+              reviewDrawerReturnFocusRef.current?.focus(),
+            );
+          }}
+          onDismissAiSuggestion={(suggestionId) =>
+            void handleAdminAiSuggestion("dismiss", suggestionId)
+          }
+          onReviewFileAccept={(input) => void handleReviewFileAccept(input)}
+          onRunAiReview={() => void handleAdminAiReview()}
+          onTab={setAdminDrawerTab}
+          onVerifyDocument={(applicantId) => handleVerifyDocument(applicantId)}
+        />
+      ) : null}
 
       <RemarkForm
         isOpen={remarkFormOpen}

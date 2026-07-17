@@ -11,10 +11,10 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
-  ArrowLeft,
   Briefcase,
   Calendar,
   CheckCircle2,
+  Clock,
   CreditCard,
   Edit3,
   FileDigit,
@@ -49,6 +49,8 @@ import {
   operationalDrawerSourceStatus,
   type OperationalDrawerSourceStatus,
 } from "../operationalDrawerStatus";
+import { ProgressMeter } from "./CollectionPrimitives";
+import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
 
 type SourceStatus = OperationalDrawerSourceStatus;
 
@@ -2352,6 +2354,1367 @@ const figmaSubmissionDrawerStyles = `
       height: var(--v19b-size-4);
     }
   }
+
+  /* Selected Product Design direction: a single, exact correction at a time. */
+  .v20-submission-drawer {
+    width: min(
+      var(--v19b-size-full),
+      calc(var(--v19b-size-840) + var(--v19b-size-120))
+    );
+    border-block: var(--v19b-size-0);
+    border-right: var(--v19b-size-0);
+    border-radius: var(--v19b-size-0);
+    background: var(--v19b-color-page);
+  }
+
+  .v20-drawer-topbar > .v20-icon-button:first-child {
+    display: inline-flex;
+  }
+
+  .v20-drawer-topbar {
+    position: relative;
+    z-index: 3;
+    grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    min-height: var(--v19b-size-72);
+    padding: var(--v19b-size-12) var(--v19b-size-24);
+    background: var(--v19b-color-page);
+  }
+
+  .v20-header-actions,
+  .v20-sections-trigger,
+  .v20-sections-popover button {
+    display: flex;
+    align-items: center;
+  }
+
+  .v20-header-actions {
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-sections-menu {
+    position: relative;
+  }
+
+  .v20-sections-trigger {
+    min-height: var(--v19b-size-40);
+    gap: var(--v19b-size-8);
+    padding-inline: var(--v19b-size-12);
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-color-control);
+    font: inherit;
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+    cursor: pointer;
+  }
+
+  .v20-sections-trigger svg,
+  .v20-sections-popover svg {
+    width: var(--v19b-size-18);
+    height: var(--v19b-size-18);
+  }
+
+  .v20-sections-trigger:focus-visible,
+  .v20-sections-popover button:focus-visible,
+  .v20-focus-stepper button:focus-visible,
+  .v20-focus-primary:focus-visible {
+    outline: var(--v19b-size-2) solid var(--v19b-color-primary-text);
+    outline-offset: var(--v19b-size-2);
+  }
+
+  .v20-sections-popover {
+    position: absolute;
+    z-index: 4;
+    top: calc(var(--v19b-size-full) + var(--v19b-size-8));
+    right: var(--v19b-size-0);
+    display: grid;
+    width: var(--v19b-size-220);
+    gap: var(--v19b-size-2);
+    padding: var(--v19b-size-6);
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-color-control);
+    box-shadow: var(--v19b-shadow-panel);
+  }
+
+  .v20-sections-popover button {
+    min-height: var(--v19b-size-40);
+    gap: var(--v19b-size-10);
+    padding-inline: var(--v19b-size-12);
+    border: var(--v19b-size-0);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-color-text-muted);
+    background: transparent;
+    font: inherit;
+    font-size: var(--v19b-size-13);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .v20-sections-popover button[aria-current="page"] {
+    color: var(--v19b-color-primary-text);
+    background: var(--v19b-color-primary-soft-10);
+  }
+
+  .v20-sections-popover .v20-tab-count {
+    margin-left: auto;
+  }
+
+  .v20-drawer-body {
+    padding: var(--v19b-size-0);
+  }
+
+  .v20-drawer-body > [role="region"] {
+    display: flex;
+    min-height: var(--v19b-size-full);
+    flex-direction: column;
+    outline: none;
+  }
+
+  .v20-focus-flow {
+    display: flex;
+    min-height: var(--v19b-size-full);
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .v20-focus-progress {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--v19b-size-28) var(--v19b-size-32) var(--v19b-size-12);
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-16);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-focus-progressbar {
+    width: calc(var(--v19b-size-full) - var(--v19b-size-64));
+    height: var(--v19b-size-3);
+    margin-inline: var(--v19b-size-32);
+    overflow: hidden;
+    border: var(--v19b-size-0);
+    border-radius: var(--v19b-radius-pill);
+    background: var(--v19b-color-control);
+    accent-color: var(--v19b-dot-warning);
+  }
+
+  .v20-focus-progressbar::-webkit-progress-bar {
+    background: var(--v19b-color-control);
+  }
+
+  .v20-focus-progressbar::-moz-progress-bar {
+    background: var(--v19b-dot-warning);
+  }
+
+  .v20-focus-progressbar::-webkit-progress-value {
+    background: var(--v19b-dot-warning);
+  }
+
+  .v20-focus-workspace {
+    display: grid;
+    max-width: var(--v19b-size-760);
+    gap: var(--v19b-size-28);
+    padding: var(--v19b-size-40) var(--v19b-size-32) var(--v19b-size-48);
+  }
+
+  .v20-focus-heading-row {
+    display: flex;
+    min-width: var(--v19b-size-0);
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--v19b-size-20);
+  }
+
+  .v20-focus-eyebrow {
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+    text-transform: uppercase;
+  }
+
+  .v20-focus-title {
+    margin: var(--v19b-size-8) var(--v19b-size-0) var(--v19b-size-0);
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-40);
+    font-weight: var(--v19b-weight-title);
+    letter-spacing: var(--v19b-letter-spacing-title);
+    line-height: var(--v19b-line-height-title);
+  }
+
+  .v20-focus-stepper {
+    display: flex;
+    gap: var(--v19b-size-6);
+  }
+
+  .v20-focus-stepper button {
+    display: inline-flex;
+    width: var(--v19b-size-40);
+    height: var(--v19b-size-40);
+    align-items: center;
+    justify-content: center;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-color-control);
+    cursor: pointer;
+  }
+
+  .v20-focus-stepper button:disabled {
+    color: var(--v19b-color-text-faint);
+    cursor: default;
+  }
+
+  .v20-focus-stepper svg {
+    width: var(--v19b-size-18);
+    height: var(--v19b-size-18);
+  }
+
+  .v20-focus-remark {
+    display: grid;
+    grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    align-items: start;
+    gap: var(--v19b-size-12);
+    padding-block: var(--v19b-size-16);
+    border-block: var(--v19b-size-1) solid var(--v19b-color-border);
+    color: var(--v19b-dot-warning);
+  }
+
+  .v20-focus-remark svg {
+    width: var(--v19b-size-20);
+    height: var(--v19b-size-20);
+  }
+
+  .v20-focus-remark p,
+  .v20-focus-target p {
+    margin: var(--v19b-size-0);
+    font-size: var(--v19b-size-16);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .v20-focus-remark p {
+    color: var(--v19b-dot-warning);
+  }
+
+  .v20-focus-target {
+    display: grid;
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-focus-target > span {
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-focus-target strong {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-18);
+  }
+
+  .v20-focus-target p {
+    color: var(--v19b-color-text-muted);
+  }
+
+  .v20-focus-target-control {
+    display: flex;
+    min-height: var(--v19b-size-64);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--v19b-size-16);
+    padding-inline: var(--v19b-size-16);
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-color-control);
+  }
+
+  .v20-focus-target-control span {
+    display: flex;
+    align-items: center;
+    gap: var(--v19b-size-10);
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-16);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-focus-target-control svg {
+    width: var(--v19b-size-20);
+    height: var(--v19b-size-20);
+    color: var(--v19b-dot-warning);
+  }
+
+  .v20-focus-target-control em {
+    color: var(--v19b-dot-warning);
+    font-size: var(--v19b-size-13);
+    font-style: normal;
+  }
+
+  .v20-focus-primary {
+    width: fit-content;
+    min-height: var(--v19b-size-64);
+    padding-inline: var(--v19b-size-24);
+    border: var(--v19b-size-1) solid var(--v19b-color-primary-deep-border);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-color-primary-text);
+    background: var(--v19b-color-primary);
+    font: inherit;
+    font-size: var(--v19b-size-16);
+    font-weight: var(--v19b-weight-control);
+    cursor: pointer;
+  }
+
+  .v20-focus-primary:disabled {
+    opacity: var(--v19b-opacity-disabled);
+    cursor: default;
+  }
+
+  .v20-focus-error {
+    margin: calc(var(--v19b-size-16) * -1) var(--v19b-size-0) var(--v19b-size-0);
+    color: var(--v19b-dot-danger);
+    font-size: var(--v19b-size-13);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .v20-focus-context {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    gap: var(--v19b-size-16);
+    margin-top: auto;
+    min-height: calc(var(--v19b-size-64) + var(--v19b-size-24));
+    align-items: center;
+    padding: var(--v19b-size-24) var(--v19b-size-32);
+    border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-14);
+  }
+
+  .v20-focus-context span {
+    display: flex;
+    min-width: var(--v19b-size-0);
+    align-items: center;
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-focus-context svg {
+    width: var(--v19b-size-18);
+    height: var(--v19b-size-18);
+    flex: none;
+  }
+
+  .v20-footer {
+    min-height: calc(var(--v19b-size-76) + var(--v19b-size-24));
+    padding: var(--v19b-size-20) var(--v19b-size-24);
+    background: var(--v19b-color-page);
+  }
+
+  @media (max-width: 760px) {
+    .v20-drawer-topbar {
+      grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+      min-height: var(--v19b-size-64);
+      gap: var(--v19b-size-8);
+      padding-inline: var(--v19b-size-12);
+    }
+
+    .v20-header-actions {
+      gap: var(--v19b-size-4);
+    }
+
+    .v20-sections-trigger {
+      width: var(--v19b-size-40);
+      justify-content: center;
+      padding-inline: var(--v19b-size-0);
+    }
+
+    .v20-sections-trigger span,
+    .v20-header-actions .v20-status-pill {
+      display: none;
+    }
+
+    .v20-sections-popover {
+      right: var(--v19b-size-0);
+    }
+
+    .v20-focus-progress {
+      padding: var(--v19b-size-20) var(--v19b-size-20) var(--v19b-size-10);
+    }
+
+    .v20-focus-progressbar {
+      width: calc(var(--v19b-size-full) - var(--v19b-size-40));
+      margin-inline: var(--v19b-size-20);
+    }
+
+    .v20-focus-workspace {
+      gap: var(--v19b-size-20);
+      padding: var(--v19b-size-28) var(--v19b-size-20) var(--v19b-size-32);
+    }
+
+    .v20-focus-title {
+      font-size: var(--v19b-size-28);
+    }
+
+    .v20-focus-context {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+      gap: var(--v19b-size-10);
+      padding: var(--v19b-size-16) var(--v19b-size-20);
+    }
+
+    .v20-footer {
+      min-height: auto;
+    }
+  }
+
+  @media (max-width: 460px) {
+    .v20-focus-heading-row {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .v20-focus-stepper {
+      align-self: flex-end;
+    }
+
+    .v20-focus-primary {
+      width: var(--v19b-size-full);
+    }
+  }
+
+  /* Premium Dark-First Drawer convergence. The questionnaire component below
+     keeps its existing internal layout; these rules own the shared shell and
+     the overview/files/issues/history presentation only. */
+  .v20-drawer-overlay {
+    background: var(--v19b-admin-drawer-backdrop);
+    backdrop-filter: blur(var(--v19b-size-4));
+  }
+
+  .v20-submission-drawer {
+    inset: var(--v19b-size-8) var(--v19b-size-8) var(--v19b-size-8) auto;
+    width: min(calc(var(--v19b-size-full) - var(--v19b-size-16)), var(--v19b-size-840));
+    height: auto;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-panel);
+    color: var(--v19b-color-text);
+    background: var(--v19b-color-app);
+    box-shadow: var(--v19b-shadow-panel);
+    outline: none !important;
+  }
+
+  .v20-drawer-topbar {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    min-height: var(--v19b-size-120);
+    gap: var(--v19b-size-24);
+    padding: var(--v19b-size-24) var(--v19b-size-32) var(--v19b-size-18);
+    border-bottom: var(--v19b-size-0);
+    background: var(--v19b-color-panel);
+  }
+
+  .v20-title-wrap {
+    gap: var(--v19b-size-10);
+  }
+
+  .v20-subtitle {
+    gap: var(--v19b-size-8);
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-11);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-meta);
+    text-transform: uppercase;
+  }
+
+  .v20-title {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-28);
+    font-weight: var(--v19b-weight-title);
+    line-height: var(--v19b-line-height-title);
+    letter-spacing: var(--v19b-letter-spacing-title);
+  }
+
+  .v20-drawer-title-line {
+    align-items: center;
+    gap: var(--v19b-size-12);
+  }
+
+  .v20-status-pill {
+    min-height: var(--v19b-size-28);
+    border-color: var(--v19b-color-border-strong);
+    color: var(--v19b-color-text-muted);
+    background: var(--v19b-color-control);
+    font-size: var(--v19b-size-10);
+    letter-spacing: var(--v19b-letter-spacing-meta);
+  }
+
+  .v20-status-pill.is-warning {
+    border-color: var(--vf-warning-border);
+    color: var(--vf-warning);
+    background: var(--vf-warning-soft);
+  }
+
+  .v20-icon-button.is-close {
+    width: var(--v19b-size-44);
+    height: var(--v19b-size-44);
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-color-text-muted);
+    background: var(--v19b-color-control);
+  }
+
+  .v20-icon-button.is-close:hover {
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-color-control-hover);
+  }
+
+  .v20-tabbar-wrap {
+    min-height: var(--v19b-size-48);
+    padding: var(--v19b-size-0) var(--v19b-size-32);
+    border-bottom: var(--v19b-size-1) solid var(--v19b-color-border);
+    background: var(--v19b-color-panel);
+  }
+
+  .v20-tabbar {
+    gap: var(--v19b-size-4);
+    padding: var(--v19b-size-0);
+  }
+
+  .v20-tab-button {
+    position: relative;
+    min-height: var(--v19b-size-48);
+    gap: var(--v19b-size-8);
+    padding: var(--v19b-size-0) var(--v19b-size-14);
+    border: var(--v19b-size-0);
+    border-radius: var(--v19b-radius-control) var(--v19b-radius-control)
+      var(--v19b-size-0) var(--v19b-size-0);
+    color: var(--v19b-color-text-muted);
+    background: transparent;
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-tab-button::after {
+    position: absolute;
+    right: var(--v19b-size-12);
+    bottom: calc(var(--v19b-size-1) * -1);
+    left: var(--v19b-size-12);
+    height: var(--v19b-size-2);
+    border-radius: var(--v19b-radius-pill);
+    background: transparent;
+    content: "";
+  }
+
+  .v20-tab-button:hover:not(.is-active) {
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-color-control);
+  }
+
+  .v20-tab-button.is-active {
+    color: var(--vf-warning);
+    background: var(--vf-warning-soft);
+  }
+
+  .v20-tab-button.is-active::after {
+    background: var(--vf-warning) !important;
+  }
+
+  .v20-tab-button:focus-visible {
+    outline: var(--v19b-size-2) solid var(--vf-warning-border) !important;
+    outline-offset: calc(var(--v19b-size-2) * -1) !important;
+  }
+
+  .v20-tab-icon {
+    display: none;
+  }
+
+  .v20-tab-count {
+    min-width: var(--v19b-size-20);
+    min-height: var(--v19b-size-20);
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-pill);
+    color: var(--v19b-color-text-muted);
+    background: var(--v19b-color-control);
+    font-size: var(--v19b-size-10);
+  }
+
+  .v20-tab-button.is-warning .v20-tab-count {
+    border-color: var(--vf-warning-border);
+    color: var(--vf-warning);
+    background: var(--vf-warning-soft);
+  }
+
+  .v20-tabbar-more {
+    display: none;
+  }
+
+  .v20-drawer-body {
+    padding: var(--v19b-size-28) var(--v19b-size-32) var(--v19b-size-32);
+    background: var(--v19b-color-app);
+  }
+
+  .v20-drawer-body > [role="tabpanel"]:not([aria-labelledby$="questionnaire"]) {
+    min-height: var(--v19b-size-full);
+  }
+
+  .v20-drawer-body > [aria-labelledby="v20-submission-drawer-tab-overview"]
+    > .v20-section-stack
+    > .v20-stat-grid {
+    display: none;
+  }
+
+  .v20-drawer-body > [aria-labelledby="v20-submission-drawer-tab-issues"]
+    .v20-stat-grid {
+    display: none;
+  }
+
+  .v20-drawer-body > [role="tabpanel"]:not([aria-labelledby$="questionnaire"])
+    :is(.v20-card, .v20-stat-card, .v20-file-section, .v20-issue-card, .v20-history-item) {
+    border-color: var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-color-panel);
+    box-shadow: var(--v19b-shadow-row-inner);
+  }
+
+  .v20-drawer-body > [role="tabpanel"]:not([aria-labelledby$="questionnaire"])
+    :is(.v20-section-label, .v20-info-title, .v20-family-title, .v20-file-section-title, .v20-issue-title, .v20-history-title) {
+    color: var(--v19b-color-text-strong);
+  }
+
+  .v20-drawer-body > [role="tabpanel"]:not([aria-labelledby$="questionnaire"])
+    :is(.v20-file-action, .v20-issue-button:not(.is-ghost)) {
+    border-color: var(--vf-warning-border);
+    color: var(--vf-warning);
+    background: var(--v19b-color-control);
+    box-shadow: none;
+  }
+
+  .v20-drawer-body > [role="tabpanel"]:not([aria-labelledby$="questionnaire"])
+    :is(.v20-file-action, .v20-issue-button:not(.is-ghost)):hover:not(:disabled) {
+    border-color: var(--vf-warning);
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-color-control-hover);
+  }
+
+  .v20-stat-grid {
+    gap: var(--v19b-size-10);
+  }
+
+  .v20-stat-card {
+    min-height: var(--v19b-size-88);
+    padding: var(--v19b-size-16);
+  }
+
+  .v20-stat-card::before {
+    background: var(--v19b-color-border-strong);
+  }
+
+  .v20-stat-card:has(.v20-stat-icon.is-warning)::before {
+    background: var(--vf-warning);
+  }
+
+  .v20-two-col {
+    gap: var(--v19b-size-12);
+  }
+
+  .v20-footer {
+    min-height: var(--v19b-size-88);
+    padding: var(--v19b-size-16) var(--v19b-size-32);
+    border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+    background: var(--v19b-color-panel);
+  }
+
+  .v20-action-button {
+    min-height: var(--v19b-size-44);
+    border-radius: var(--v19b-radius-control);
+  }
+
+  .v20-action-button.is-warning {
+    border-color: var(--vf-warning-border);
+    color: var(--v19b-color-app);
+    background: var(--vf-warning);
+  }
+
+  .v20-action-button:disabled {
+    border-color: var(--v19b-color-border-strong);
+    color: var(--v19b-color-text-faint);
+    background: var(--v19b-color-control);
+  }
+
+  @media (max-width: 1023px) {
+    .v20-submission-drawer {
+      inset: var(--v19b-size-0);
+      width: var(--v19b-size-full);
+      height: 100dvh;
+      border: var(--v19b-size-0);
+      border-radius: var(--v19b-size-0);
+    }
+
+    .v20-drawer-topbar {
+      position: relative;
+      min-height: var(--v19b-size-88);
+      padding: var(--v19b-size-16) var(--v19b-size-64) var(--v19b-size-12)
+        var(--v19b-size-20);
+    }
+
+    .v20-icon-button.is-close {
+      position: absolute;
+      top: var(--v19b-size-16);
+      right: var(--v19b-size-16);
+      display: grid !important;
+    }
+
+    .v20-title {
+      font-size: var(--v19b-size-20);
+    }
+
+    .v20-drawer-title-line {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: var(--v19b-size-6);
+    }
+
+    .v20-tabbar-wrap {
+      min-height: var(--v19b-size-48);
+      padding-inline: var(--v19b-size-16);
+      overflow: hidden;
+    }
+
+    .v20-tabbar {
+      display: flex;
+      gap: var(--v19b-size-2);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .v20-tabbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .v20-tabbar .v20-tab-button.is-mobile-secondary {
+      display: inline-flex;
+    }
+
+    .v20-tab-button {
+      flex: var(--v19b-size-0) var(--v19b-size-0) auto;
+      min-height: var(--v19b-size-48);
+      gap: var(--v19b-size-4);
+      padding-inline: var(--v19b-size-8);
+      font-size: var(--v19b-size-11);
+    }
+
+    .v20-drawer-body {
+      padding: var(--v19b-size-20) var(--v19b-size-16) var(--v19b-size-24);
+    }
+
+    .v20-footer {
+      min-height: auto;
+      padding: var(--v19b-size-12) var(--v19b-size-16)
+        max(var(--v19b-size-12), env(safe-area-inset-bottom));
+    }
+
+    .v20-footer-note:not(.is-error) {
+      display: none;
+    }
+
+    .v20-footer-actions {
+      display: grid;
+      width: var(--v19b-size-full);
+      grid-template-columns: var(--v19b-size-96) minmax(
+          var(--v19b-size-0),
+          var(--v19b-grid-fr)
+        );
+      gap: var(--v19b-size-8);
+    }
+  }
+
+  /* Screenshot-locked central Drawer shell. Overview and Issues follow the
+     selected reference; Questionnaire keeps the existing demo component. */
+  @media (min-width: 1024px) {
+    .v20-submission-drawer {
+      inset: var(--v19b-size-24);
+      width: min(calc(var(--v19b-size-full) - var(--v19b-size-48)), var(--v19b-size-1140));
+      height: calc(100dvh - var(--v19b-size-48));
+      margin: auto;
+      border-radius: var(--v19b-radius-panel);
+      background: var(--v19b-admin-drawer-bg);
+      box-shadow: var(--v19b-admin-drawer-shadow);
+    }
+
+    .v20-drawer-topbar {
+      min-height: var(--v19b-size-160);
+      padding: var(--v19b-size-28) var(--v19b-size-44) var(--v19b-size-20);
+      background: var(--v19b-admin-drawer-bg);
+    }
+
+    .v20-tabbar-wrap {
+      min-height: var(--v19b-size-56);
+      padding-inline: var(--v19b-size-44);
+      background: var(--v19b-admin-drawer-bg);
+    }
+
+    .v20-tab-button {
+      min-height: var(--v19b-size-56);
+      padding-inline: var(--v19b-size-20);
+    }
+
+    .v20-drawer-body {
+      padding: var(--v19b-size-40) var(--v19b-size-44) var(--v19b-size-32);
+    }
+
+    .v20-footer {
+      padding-inline: var(--v19b-size-44);
+    }
+  }
+
+  .v20-title-wrap {
+    justify-content: center;
+  }
+
+  .v20-subtitle {
+    font-family: var(--v19-font-family);
+  }
+
+  .v20-status-row,
+  .v20-updated-at {
+    display: flex;
+    align-items: center;
+  }
+
+  .v20-status-row {
+    flex-wrap: wrap;
+    gap: var(--v19b-size-12);
+  }
+
+  .v20-status-pill {
+    gap: var(--v19b-size-6);
+  }
+
+  .v20-status-pill svg,
+  .v20-updated-at svg {
+    width: var(--v19b-size-14);
+    height: var(--v19b-size-14);
+  }
+
+  .v20-status-pill.is-warning::before {
+    display: none;
+  }
+
+  .v20-updated-at {
+    gap: var(--v19b-size-6);
+    color: var(--v19b-color-text-faint);
+    font-size: var(--v19b-size-12);
+  }
+
+  .v20-tab-button.is-active {
+    color: var(--v19b-color-text-strong);
+    background: transparent;
+  }
+
+  .v20-tab-button.is-active::after {
+    background: var(--v19b-admin-drawer-text-70) !important;
+  }
+
+  .v20-drawer-body {
+    background: var(--v19b-admin-drawer-bg);
+  }
+
+  .v20-section-stack {
+    gap: var(--v19b-size-28);
+  }
+
+  .v20-two-col {
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    gap: var(--v19b-size-20);
+  }
+
+  .v20-info-card {
+    min-height: var(--v19b-size-200);
+    padding: var(--v19b-size-28);
+    border-color: var(--v19b-admin-drawer-border-faint) !important;
+    background: var(--v19b-admin-drawer-surface) !important;
+  }
+
+  .v20-info-title,
+  .v20-section-label {
+    color: var(--v19b-color-text-40) !important;
+    font-size: var(--v19b-size-11);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-meta);
+    text-transform: uppercase;
+  }
+
+  .v20-info-list,
+  .v20-package-list {
+    gap: var(--v19b-size-16);
+  }
+
+  .v20-info-main {
+    font-size: var(--v19b-size-16);
+  }
+
+  .v20-applicant-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    gap: var(--v19b-size-12);
+  }
+
+  .v20-applicant-card {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-88);
+    grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    align-items: center;
+    gap: var(--v19b-size-14);
+    padding: var(--v19b-size-14) var(--v19b-size-16);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-admin-drawer-surface);
+  }
+
+  .v20-applicant-copy {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    gap: var(--v19b-size-4);
+  }
+
+  .v20-applicant-copy strong,
+  .v20-applicant-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-applicant-copy strong {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-14);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-applicant-copy small {
+    color: var(--v19b-color-text-faint);
+    font-size: var(--v19b-size-11);
+  }
+
+  .v20-applicant-progress {
+    color: var(--v19b-admin-drawer-green-text);
+    font-family: var(--v19-font-family);
+    font-size: var(--v19b-size-12);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-summary-head {
+    display: grid;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    align-items: center;
+    gap: var(--v19b-size-12);
+    padding: var(--v19b-size-20);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-admin-drawer-surface);
+  }
+
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-summary-copy {
+    min-width: var(--v19b-size-0);
+  }
+
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-summary-title,
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-summary-helper {
+    margin: var(--v19b-size-0);
+  }
+
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-summary-title {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-16);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-summary-helper {
+    margin-top: var(--v19b-size-4);
+    color: var(--v19b-color-text-faint);
+    font-size: var(--v19b-size-12);
+  }
+
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-open-button {
+    display: inline-flex;
+    min-height: var(--v19b-size-44);
+    align-items: center;
+    justify-content: center;
+    gap: var(--v19b-size-8);
+    padding-inline: var(--v19b-size-14);
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-color-control);
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+    cursor: pointer;
+  }
+
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-open-icon {
+    width: var(--v19b-size-16);
+    height: var(--v19b-size-16);
+  }
+
+  .v20-issues-screen {
+    gap: var(--v19b-size-32);
+  }
+
+  .v20-issues-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--v19b-size-24);
+    padding-bottom: var(--v19b-size-24);
+    border-bottom: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+  }
+
+  .v20-issues-heading h3,
+  .v20-issues-heading p {
+    margin: var(--v19b-size-0);
+  }
+
+  .v20-issues-heading h3 {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-18);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  .v20-issues-heading p {
+    margin-top: var(--v19b-size-6);
+    color: var(--v19b-color-text-faint);
+    font-size: var(--v19b-size-12);
+  }
+
+  .v20-issues-heading strong {
+    flex: none;
+    padding: var(--v19b-size-8) var(--v19b-size-14);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-orange-border);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-admin-drawer-orange-text);
+    background: var(--v19b-admin-drawer-orange-bg);
+    font-size: var(--v19b-size-12);
+    font-weight: var(--v19b-weight-control);
+  }
+
+  .v20-issue-list {
+    gap: var(--v19b-size-20);
+  }
+
+  .v20-issue-card {
+    min-height: var(--v19b-size-136);
+    grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--v19b-size-240);
+    gap: var(--v19b-size-20);
+    padding: var(--v19b-size-20);
+    border-color: var(--v19b-admin-drawer-orange-border) !important;
+    border-left: var(--v19b-size-4) solid var(--v19b-admin-drawer-orange-text) !important;
+    background: var(--v19b-admin-drawer-surface) !important;
+  }
+
+  .v20-issue-title-row {
+    justify-content: flex-start;
+  }
+
+  .v20-issue-target {
+    color: var(--v19b-admin-drawer-orange-text);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-meta);
+    text-transform: uppercase;
+  }
+
+  .v20-issue-badge {
+    min-height: var(--v19b-size-24);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-admin-drawer-orange-text);
+    background: var(--v19b-admin-drawer-orange-bg);
+  }
+
+  .v20-issue-actions {
+    align-self: center;
+  }
+
+  .v20-issue-button {
+    width: var(--v19b-size-full);
+    min-height: var(--v19b-size-52);
+  }
+
+  .v20-footer {
+    background: var(--v19b-admin-drawer-bg);
+  }
+
+  .v20-footer-note {
+    color: var(--v19b-color-text-faint);
+  }
+
+  .v20-action-button.is-ghost {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .v20-action-button.is-warning {
+    min-width: var(--v19b-size-320);
+    gap: var(--v19b-size-8);
+    border-color: var(--v19b-admin-drawer-orange-text);
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-admin-drawer-orange-text);
+    box-shadow: var(--v19b-admin-drawer-primary-shadow);
+  }
+
+  .v20-action-button.is-warning svg {
+    width: var(--v19b-size-16);
+    height: var(--v19b-size-16);
+  }
+
+  .v20-action-button.is-warning:disabled {
+    border-color: var(--v19b-admin-drawer-orange-border);
+    color: var(--v19b-color-text-strong);
+    background: var(--v19b-admin-drawer-orange-text);
+    opacity: var(--v19b-opacity-disabled);
+  }
+
+  .v20-icon-button.is-close {
+    width: var(--v19b-size-52);
+    height: var(--v19b-size-52);
+  }
+
+  @media (min-width: 1024px) {
+    .v20-title {
+      font-size: var(--v19b-size-32);
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .v20-drawer-topbar {
+      min-height: var(--v19b-size-104);
+      padding: var(--v19b-size-10) var(--v19b-size-56) var(--v19b-size-10)
+        var(--v19b-size-16);
+    }
+
+    .v20-title-wrap {
+      display: grid;
+      gap: var(--v19b-size-4);
+    }
+
+    .v20-subtitle {
+      margin-top: var(--v19b-size-0);
+      font-size: var(--v19b-size-10);
+    }
+
+    .v20-title {
+      font-size: var(--v19b-size-18);
+    }
+
+    .v20-status-row {
+      gap: var(--v19b-size-6);
+    }
+
+    .v20-status-pill {
+      min-height: var(--v19b-size-24);
+      font-size: var(--v19b-size-10);
+    }
+
+    .v20-updated-at {
+      display: none;
+    }
+
+    .v20-icon-button.is-close {
+      top: var(--v19b-size-10);
+      right: var(--v19b-size-16);
+      width: var(--v19b-size-44);
+      height: var(--v19b-size-44);
+    }
+
+    .v20-two-col,
+    .v20-applicant-grid {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    }
+
+    .v20-info-card {
+      min-height: auto;
+      padding: var(--v19b-size-20);
+    }
+
+    .v20-drawer-body [aria-labelledby$="questionnaire"]
+      .v19-drawer-questionnaire-summary-head {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+      align-items: stretch;
+      gap: var(--v19b-size-10);
+    }
+
+    .v20-drawer-body [aria-labelledby$="questionnaire"]
+      .v19-drawer-questionnaire-open-button {
+      width: var(--v19b-size-full);
+    }
+
+    .v20-issues-heading {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: var(--v19b-size-14);
+    }
+
+    .v20-issue-card {
+      grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    }
+
+    .v20-issue-actions {
+      grid-column: 1 / -1;
+    }
+
+    .v20-action-button.is-warning {
+      min-width: var(--v19b-size-0);
+    }
+  }
+
+  /* Stable semantic ownership for the demo questionnaire preview. The source
+     utility classes remain for parity, while these rules guarantee the same
+     composition in every V-19 build and viewport. */
+  .v20-questionnaire-tab {
+    display: grid;
+    gap: var(--v19b-size-24);
+  }
+
+  .v20-questionnaire-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    gap: var(--v19b-size-12);
+  }
+
+  .v20-questionnaire-section-card {
+    display: flex;
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-76);
+    align-items: center;
+    gap: var(--v19b-size-16);
+    padding: var(--v19b-size-16);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-admin-drawer-surface);
+    cursor: pointer;
+    transition:
+      border-color var(--v19b-motion-fast),
+      background var(--v19b-motion-fast);
+  }
+
+  .v20-questionnaire-section-card:hover {
+    border-color: var(--v19b-color-border-strong);
+    background: var(--v19b-color-control-hover);
+  }
+
+  .v20-questionnaire-section-card:focus-visible {
+    outline: none;
+    box-shadow: var(--v19b-focus-ring);
+  }
+
+  .v20-questionnaire-section-copy {
+    min-width: var(--v19b-size-0);
+  }
+
+  .v20-questionnaire-section-card .v19-drawer-questionnaire-section-head {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    align-items: baseline;
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-questionnaire-section-card .v19-drawer-questionnaire-section-title {
+    min-width: var(--v19b-size-0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-questionnaire-section-card .v19-drawer-questionnaire-section-percent {
+    white-space: nowrap;
+  }
+
+  @media (min-width: 640px) and (max-width: 1023px) {
+    .v20-drawer-topbar {
+      padding-inline: var(--v19b-size-24) var(--v19b-size-64);
+    }
+
+    .v20-title-wrap {
+      justify-content: start;
+    }
+
+    .v20-tabbar-wrap,
+    .v20-drawer-body,
+    .v20-footer {
+      padding-inline: var(--v19b-size-24);
+    }
+
+    .v20-two-col,
+    .v20-applicant-grid {
+      grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    }
+
+    .v20-drawer-body [aria-labelledby$="questionnaire"]
+      .v19-drawer-questionnaire-summary-head {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+      align-items: center;
+    }
+
+    .v20-drawer-body [aria-labelledby$="questionnaire"]
+      .v19-drawer-questionnaire-open-button {
+      width: auto;
+    }
+
+    .v20-footer-actions {
+      grid-template-columns: auto var(--v19b-size-320);
+      justify-content: end;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .v20-issue-card {
+      grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+        var(--v19b-size-240);
+    }
+
+    .v20-issue-actions {
+      grid-column: auto;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .v20-questionnaire-preview-grid {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    }
+
+    .v20-questionnaire-section-card {
+      gap: var(--v19b-size-12);
+      padding: var(--v19b-size-14);
+    }
+  }
+
+  @media (max-width: 360px) {
+    .v20-footer-actions {
+      grid-template-columns: var(--v19b-size-80) minmax(
+          var(--v19b-size-0),
+          var(--v19b-grid-fr)
+        );
+    }
+
+    .v20-action-button {
+      padding-inline: var(--v19b-size-8);
+    }
+
+    .v20-action-button.is-warning {
+      gap: var(--v19b-size-6);
+      padding-inline: var(--v19b-size-12);
+      white-space: nowrap;
+    }
+
+    .v20-questionnaire-section-card .v19-drawer-questionnaire-section-title {
+      overflow: visible;
+      line-height: var(--v19b-line-height-row);
+      text-overflow: clip;
+      white-space: normal;
+    }
+  }
 `;
 
 function getDrawerFocusableElements(container: HTMLElement | null) {
@@ -2588,17 +3951,6 @@ function documentPackageItems(submission: Submission) {
   }));
 }
 
-function personCountLabel(count: number) {
-  const lastDigit = count % 10;
-  const lastTwoDigits = count % 100;
-
-  if (lastDigit === 1 && lastTwoDigits !== 11) return `${count} человек`;
-  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) {
-    return `${count} человека`;
-  }
-  return `${count} человек`;
-}
-
 function initials(name: string) {
   const value = name
     .split(" ")
@@ -2610,33 +3962,6 @@ function initials(name: string) {
   return value || "—";
 }
 
-function applicantStatusMark(status: string) {
-  if (status === "complete") return <CheckCircle2 className="v20-mini-status" aria-hidden="true" />;
-  if (status === "needs_fix") {
-    return <AlertCircle className="v20-mini-status is-danger" aria-hidden="true" />;
-  }
-  if (status === "empty") return <span className="v20-mini-dot is-muted" aria-hidden="true" />;
-  return <span className="v20-mini-dot" aria-hidden="true" />;
-}
-
-const MetricCard = ({
-  Icon,
-  label,
-  tone,
-  value,
-}: {
-  Icon: IconComponent;
-  label: string;
-  tone?: "accent" | "warning";
-  value: number | string;
-}) => (
-  <div className="v20-stat-card">
-    <Icon className={`v20-stat-icon ${tone ? `is-${tone}` : ""}`} aria-hidden="true" />
-    <div className="v20-stat-value">{value}</div>
-    <div className="v20-stat-label">{label}</div>
-  </div>
-);
-
 const OverviewTab = ({
   data,
   submission,
@@ -2646,22 +3971,10 @@ const OverviewTab = ({
 }) => {
   const documentItems = documentPackageItems(submission);
   const readyFilesCount = submission.files.filter(isFileReady).length;
-  const closedIssuesCount = submission.issues.filter(
-    (issue) => issue.status === "closed_by_admin",
-  ).length;
-  const packageCount = Math.max(1, Math.ceil(submission.files.length / Math.max(data.applicantsCount, 1)));
 
   return (
     <div className="v20-section-stack">
-      <div className="v20-stat-grid">
-        <MetricCard Icon={FileText} label="документы" value={submission.files.length} />
-        <MetricCard Icon={AlertCircle} label="замечания" tone="warning" value={data.issuesCount} />
-        <MetricCard Icon={CheckCircle2} label="готово" tone="accent" value={readyFilesCount} />
-        <MetricCard Icon={History} label="закрыто" value={closedIssuesCount} />
-      </div>
-
       <section>
-        <h3 className="v20-section-label">Подача</h3>
         <div className="v20-two-col">
           <div className="v20-card v20-info-card">
             <h4 className="v20-info-title">Маршрут и подача</h4>
@@ -2710,126 +4023,23 @@ const OverviewTab = ({
       </section>
 
       <section>
-        <h3 className="v20-section-label">Участники</h3>
-        <div className="v20-card v20-family-card">
-          <div className="v20-family-head">
-            <div className="v20-family-icon">
-              <User aria-hidden="true" />
-            </div>
-            <div>
-              <h3 className="v20-family-title">{data.title}</h3>
-              <div className="v20-family-meta">{personCountLabel(data.applicantsCount)}</div>
-            </div>
-          </div>
-
-          <div className="v20-person-list">
-            {data.applicants.map((applicant, index) => (
-              <div key={`${applicant.name}-${index}`} className="v20-person-row">
-                <span className="v20-avatar">{initials(applicant.name)}</span>
-                <span className="v20-person-name">{applicant.name}</span>
-                <span className="v20-person-role">{applicant.role}</span>
-                {applicantStatusMark(applicant.status)}
-              </div>
-            ))}
-          </div>
-
-          <div className="v20-card-divider" />
-
-          <div className="v20-family-foot">
-            <span>Обновлено: {data.updated}</span>
-            <span className="v20-package-pill">
-              <FileText aria-hidden="true" />
-              {packageCount} {packageCount === 1 ? "пакет" : "пакета"}
-            </span>
-          </div>
+        <h3 className="v20-section-label">Участники ({data.applicantsCount})</h3>
+        <div className="v20-applicant-grid">
+          {data.applicants.map((applicant, index) => (
+            <article key={`${applicant.name}-${index}`} className="v20-applicant-card">
+              <span className="v20-avatar">{initials(applicant.name)}</span>
+              <span className="v20-applicant-copy">
+                <strong>{applicant.name}</strong>
+                <small>{applicant.role}</small>
+              </span>
+              <span className="v20-applicant-progress">{applicant.completeness}%</span>
+            </article>
+          ))}
         </div>
       </section>
     </div>
   );
 };
-
-type QuestionnaireDrawerSection = {
-  Icon: IconComponent;
-  progress: number;
-  remaining?: string;
-  status: "done" | "in_progress" | "pending";
-  title: string;
-};
-
-const questionnaireSectionIcons: IconComponent[] = [
-  User,
-  FileDigit,
-  Briefcase,
-  CreditCard,
-  Plane,
-  History,
-];
-
-function questionnaireSectionProgress(
-  section: Submission["applicants"][number]["sections"][number],
-) {
-  if (section.status === "complete") return 100;
-  if (section.status === "empty") return 0;
-
-  const requiredFields = section.fields.filter((field) => field.required);
-  if (!requiredFields.length) return section.status === "needs_fix" ? 0 : 50;
-
-  return Math.round(
-    (requiredFields.filter((field) => field.value.trim().length > 0).length /
-      requiredFields.length) *
-      100,
-  );
-}
-
-function questionnaireDrawerSections(submission: Submission): QuestionnaireDrawerSection[] {
-  const sectionsByTitle = new Map<
-    string,
-    Submission["applicants"][number]["sections"]
-  >();
-
-  for (const applicant of submission.applicants) {
-    for (const section of applicant.sections) {
-      const current = sectionsByTitle.get(section.title) ?? [];
-      current.push(section);
-      sectionsByTitle.set(section.title, current);
-    }
-  }
-
-  return Array.from(sectionsByTitle.entries()).map(([title, sections], index) => {
-    const statuses = sections.map((section) => section.status);
-    const progress = Math.round(
-      sections.reduce((total, section) => total + questionnaireSectionProgress(section), 0) /
-        sections.length,
-    );
-    const hasNeedsFix = statuses.includes("needs_fix");
-    const hasPartial = statuses.includes("partial");
-    const allComplete = statuses.every((status) => status === "complete");
-    const missingFields = sections.reduce(
-      (total, section) =>
-        total +
-        section.fields.filter((field) => field.required && !field.value.trim()).length,
-      0,
-    );
-    const status: QuestionnaireDrawerSection["status"] = allComplete
-      ? "done"
-      : hasNeedsFix || hasPartial
-        ? "in_progress"
-        : "pending";
-    const remaining = hasNeedsFix
-      ? "нужно исправить"
-      : missingFields > 0
-        ? `${missingFields} ${missingFields === 1 ? "поле" : "поля"}`
-        : undefined;
-
-    return {
-      Icon: questionnaireSectionIcons[index % questionnaireSectionIcons.length],
-      progress,
-      remaining,
-      status,
-      title,
-    };
-  });
-}
 
 const QuestionnaireTab = ({
   onOpenQuestionnaire,
@@ -2838,75 +4048,196 @@ const QuestionnaireTab = ({
   onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
   submission: Submission;
 }) => {
-  const sections = questionnaireDrawerSections(submission);
-  const incompleteSections = sections.filter((section) => section.progress < 100).length;
+  const sectionBlueprint: ReadonlyArray<{
+    Icon: IconComponent;
+    fieldIds?: readonly string[];
+    sectionIds: readonly string[];
+    title: string;
+  }> = [
+    {
+      title: "Личные данные",
+      Icon: User,
+      sectionIds: ["personal", "contacts"],
+    },
+    {
+      title: "Паспортные данные",
+      Icon: FileDigit,
+      sectionIds: ["passport"],
+    },
+    {
+      title: "Место работы / Учебы",
+      Icon: Briefcase,
+      sectionIds: ["employment"],
+    },
+    {
+      title: "Спонсоры и финансы",
+      Icon: CreditCard,
+      sectionIds: ["payment"],
+    },
+    {
+      title: "Детали поездки",
+      Icon: Plane,
+      sectionIds: ["appointment", "trip", "hotel"],
+    },
+    {
+      title: "Визовая история",
+      Icon: History,
+      fieldIds: ["previous-biometrics", "previous-biometrics-date", "previous-visa-number"],
+      sectionIds: ["trip"],
+    },
+  ];
+  const sections = sectionBlueprint.map((section) => {
+    const relevantSections = submission.applicants.flatMap((applicant) =>
+      applicant.sections.filter((candidate) => section.sectionIds.includes(candidate.id)),
+    );
+    const allApplicantsComplete = submission.applicants.every(
+      (applicant) => applicant.questionnaireStatus === "complete",
+    );
+    const progress = allApplicantsComplete
+      ? 100
+      : relevantSections.length > 0
+        ? Math.round(
+            relevantSections.reduce((sum, candidate) => {
+              if (candidate.status === "complete") return sum + 100;
+              if (candidate.status === "empty") return sum;
+
+              const fields = section.fieldIds
+                ? candidate.fields.filter((field) => section.fieldIds?.includes(field.id))
+                : candidate.fields;
+              const requiredFields = fields.filter((field) => field.required);
+              if (requiredFields.length === 0) {
+                return sum + (candidate.status === "needs_fix" ? 65 : 40);
+              }
+
+              const filledFields = requiredFields.filter(
+                (field) => field.value.trim().length > 0 && !field.error,
+              );
+              const calculated = Math.round(
+                (filledFields.length / requiredFields.length) * 100,
+              );
+              return sum + (candidate.status === "needs_fix" ? Math.min(calculated, 90) : calculated);
+            }, 0) / relevantSections.length,
+          )
+        : Math.round(
+            submission.applicants.reduce(
+              (sum, applicant) => sum + applicantQuestionnairePercent(applicant),
+              0,
+            ) / Math.max(submission.applicants.length, 1),
+          );
+    const remainingFieldCount = allApplicantsComplete
+      ? 0
+      : relevantSections.reduce((sum, candidate) => {
+          const fields = section.fieldIds
+            ? candidate.fields.filter((field) => section.fieldIds?.includes(field.id))
+            : candidate.fields;
+          return (
+            sum +
+            fields.filter(
+              (field) => field.required && (!field.value.trim() || Boolean(field.error)),
+            ).length
+          );
+        }, 0);
+
+    return {
+      ...section,
+      progress,
+      remaining: remainingFieldCount > 0 ? `${remainingFieldCount} поля` : undefined,
+      status:
+        progress >= 100
+          ? ("done" as const)
+          : progress > 0
+            ? ("in_progress" as const)
+            : ("pending" as const),
+    };
+  });
+  const remainingBlockCount = sections.filter((section) => section.progress < 100).length;
+  const remainingBlockLabel =
+    remainingBlockCount === 0
+      ? "Все блоки данных заполнены"
+      : `Осталось заполнить ${remainingBlockCount} ${
+          remainingBlockCount % 10 === 1 && remainingBlockCount % 100 !== 11
+            ? "блок данных"
+            : remainingBlockCount % 10 >= 2 &&
+                remainingBlockCount % 10 <= 4 &&
+                (remainingBlockCount % 100 < 12 || remainingBlockCount % 100 > 14)
+              ? "блока данных"
+              : "блоков данных"
+        }`;
 
   return (
-    <div className="v20-section-stack">
-      <div className="v20-card v20-questionnaire-head">
-        <div>
-          <h3 className="v20-questionnaire-title">Прогресс заполнения</h3>
-          <p className="v20-questionnaire-helper">
-            {sections.length
-              ? incompleteSections > 0
-                ? `Незаполненных разделов: ${incompleteSections}.`
-                : "Все разделы заполнены."
-              : `Готовность анкеты: ${submission.completeness.questionnaire}%`}
+    <div className="v20-questionnaire-tab space-y-6">
+      <div className="v19-drawer-questionnaire-summary-head">
+        <div className="v19-drawer-questionnaire-summary-copy">
+          <h3 className="v19-drawer-questionnaire-summary-title">Прогресс заполнения</h3>
+          <p className="v19-questionnaire-progress-helper v19-drawer-questionnaire-summary-helper">
+            {remainingBlockLabel}
           </p>
         </div>
         <button
-          className="v20-questionnaire-open"
+          className="v19-drawer-questionnaire-open-button"
           onClick={() => onOpenQuestionnaire()}
           type="button"
         >
-          <Edit3 aria-hidden="true" />
-          Открыть анкету
+          <Edit3 className="v19-drawer-questionnaire-open-icon" aria-hidden="true" />
+          <span className="v19-drawer-questionnaire-open-text">Открыть анкету</span>
         </button>
       </div>
 
-      {sections.length ? <div className="v20-questionnaire-grid">
-        {sections.map((section) => (
-          <button
-            className="v20-questionnaire-card"
-            key={section.title}
-            type="button"
+      <div className="v20-questionnaire-preview-grid grid grid-cols-1 md:grid-cols-2 gap-3">
+        {sections.map((section, index) => (
+          <QuestionnaireSectionPreviewCard
+            key={`questionnaire-preview-${submission.id}-${section.title}-${index}`}
+            className="v20-questionnaire-section-card p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
+            role="button"
+            tabIndex={0}
             onClick={() => onOpenQuestionnaire()}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              onOpenQuestionnaire();
+            }}
           >
             <span
-              className={`v20-questionnaire-icon ${
+              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
                 section.status === "done"
-                  ? "is-done"
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                   : section.status === "in_progress"
-                    ? "is-progress"
-                    : ""
+                    ? "bg-[var(--v19b-color-primary-soft-10)] border-[var(--v19b-color-primary-soft-20)] text-[var(--v19b-color-primary-text)]"
+                    : "bg-white/5 border-white/10 text-white/40"
               }`}
             >
               <section.Icon aria-hidden="true" />
             </span>
-            <span>
-              <span className="v20-questionnaire-card-title">{section.title}</span>
-              <span className="v20-progress-line">
-                <span className="v20-progress-track">
-                  <progress
-                    aria-label={`${section.title}: ${section.progress}%`}
-                    className={`v20-progress-fill ${section.status === "done" ? "is-done" : ""}`}
-                    max={100}
-                    value={section.progress}
-                  />
+            <span className="v20-questionnaire-section-copy flex-1 min-w-0">
+              <span className="v19-drawer-questionnaire-section-head flex items-center justify-between mb-1">
+                <span className="v19-drawer-questionnaire-section-title text-[var(--v19b-size-13)] font-medium text-white truncate">
+                  {section.title}
                 </span>
-                <span className="v20-progress-percent">{section.progress}%</span>
+                <span className="v19-drawer-questionnaire-section-percent text-[var(--v19b-size-11)] font-mono text-white/50">
+                  {section.progress}%
+                </span>
               </span>
+              <ProgressMeter
+                ariaHidden
+                className="v19-questionnaire-section-progress"
+                tone={
+                  section.status === "done"
+                    ? "success"
+                    : section.status === "in_progress"
+                      ? "accent"
+                      : "muted"
+                }
+                value={section.progress}
+              />
               {section.remaining ? (
-                <span className="v20-questionnaire-card-remaining">{section.remaining}</span>
+                <span className="v19-drawer-questionnaire-section-remaining text-[var(--v19b-size-10)] text-white/40 mt-1.5">
+                  Осталось: {section.remaining}
+                </span>
               ) : null}
             </span>
-          </button>
+          </QuestionnaireSectionPreviewCard>
         ))}
-      </div> : (
-        <div className="v20-empty-state">
-          Детализация разделов появится после сохранения анкеты.
-        </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -3195,9 +4526,9 @@ const IssuesTab = ({
   const [issueFixError, setIssueFixError] = useState("");
   const [pendingIssueId, setPendingIssueId] = useState<string | null>(null);
   const issueFixPendingRef = useRef(false);
-  const openIssues = submission.issues.filter((issue) => issue.status !== "closed_by_admin");
-  const fixedIssues = submission.issues.filter((issue) => issue.status === "fixed_by_agent");
-  const closedIssues = submission.issues.filter((issue) => issue.status === "closed_by_admin");
+  const unresolvedIssues = submission.issues.filter(
+    (issue) => issue.status !== "closed_by_admin",
+  );
   const issueStateKey = submission.issues
     .map((issue) => `${issue.id}:${issue.status}`)
     .join("|");
@@ -3229,24 +4560,13 @@ const IssuesTab = ({
 
   return (
     <div className="v20-issues-screen">
-      <div className="v20-stat-grid">
-        <MetricCard Icon={AlertCircle} label="открыто" tone="warning" value={openIssues.length} />
-        <MetricCard Icon={History} label="сегодня" value={fixedIssues.length} />
-        <MetricCard Icon={FileText} label="на неделе" value={data.issuesCount} />
-        <MetricCard Icon={CheckCircle2} label="закрыто" tone="accent" value={closedIssues.length} />
-      </div>
-
-      <section className="v20-subview-intro" aria-label="Порядок работы с замечаниями">
-        <span className="v20-subview-eyebrow">Порядок работы</span>
-        <h3 className="v20-subview-title">
-          {openIssues.length > 0 ? "Сначала устраните открытые замечания" : "Открытых замечаний нет"}
-        </h3>
-        <p className="v20-subview-copy">
-          {openIssues.length > 0
-            ? "Откройте точное место, сохраните исправление и только затем отметьте замечание исправленным."
-            : "Новые действия появятся здесь, если администратор вернёт подачу на исправление."}
-        </p>
-      </section>
+      <header className="v20-issues-heading">
+        <span>
+          <h3>Список задач по замечаниям</h3>
+          <p>Ошибки, выявленные администратором при проверке</p>
+        </span>
+        <strong>Требуют исправления: {data.issuesCount}</strong>
+      </header>
 
       {issueFixError ? (
         <div className="v20-upload-error" role="alert">
@@ -3254,9 +4574,9 @@ const IssuesTab = ({
         </div>
       ) : null}
 
-      {openIssues.length > 0 ? (
+      {unresolvedIssues.length > 0 ? (
         <div className="v20-issue-list">
-          {openIssues.map((issue) => {
+          {unresolvedIssues.map((issue) => {
             const Icon = issue.type === "file" ? ImageIcon : FileText;
             const canMarkFixed =
               role === "agent" && issue.status === "open" && Boolean(onMarkIssueFixed);
@@ -3298,10 +4618,10 @@ const IssuesTab = ({
                       type="button"
                       onClick={() => onOpenWorkspaceTarget(targetForIssue(issue))}
                     >
-                      Заменить файл
+                      Перезагрузить файл
                     </button>
                   ) : null}
-                  {canMarkFixed ? (
+                  {canMarkFixed && !issue.target.fileType && issue.type !== "field" ? (
                     <button
                       aria-busy={pendingIssueId === issue.id}
                       className="v20-issue-button is-ghost"
@@ -3558,10 +4878,11 @@ export function FigmaSubmissionDrawer({
       onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
     };
   }, [mobileTabsOpen, onClose]);
 
@@ -3577,6 +4898,20 @@ export function FigmaSubmissionDrawer({
     document.addEventListener("pointerdown", closeOnPointerOutside, true);
     return () => document.removeEventListener("pointerdown", closeOnPointerOutside, true);
   }, [mobileTabsOpen]);
+
+  useEffect(() => {
+    if (!mobileTabsOpen) return;
+    const focusFrame = window.requestAnimationFrame(() => {
+      const activeItem = mobileTabsRef.current?.querySelector<HTMLButtonElement>(
+        `[data-section-menu-tab="${tab}"]`,
+      );
+      const firstItem = mobileTabsRef.current?.querySelector<HTMLButtonElement>(
+        '[role="menuitem"]',
+      );
+      (activeItem ?? firstItem)?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [mobileTabsOpen, tab]);
 
   useEffect(() => {
     if (status !== "success") return;
@@ -3645,7 +4980,6 @@ export function FigmaSubmissionDrawer({
   const tabs: DrawerTabConfig[] = [
     { icon: Info, id: "overview", label: "Обзор" },
     { icon: FileText, id: "questionnaire", label: "Анкета" },
-    { icon: ImageIcon, id: "files", label: "Файлы" },
     {
       getCount: (detail) => detail.issuesCount,
       icon: AlertCircle,
@@ -3660,6 +4994,48 @@ export function FigmaSubmissionDrawer({
   function selectDrawerTab(nextTab: TabId) {
     setTab(nextTab);
     setMobileTabsOpen(false);
+  }
+
+  function selectSectionMenuTab(nextTab: TabId) {
+    selectDrawerTab(nextTab);
+    window.requestAnimationFrame(() => {
+      mobileTabsTriggerRef.current?.focus({ preventScroll: true });
+    });
+  }
+
+  function handleSectionMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setMobileTabsOpen(false);
+      window.requestAnimationFrame(() => {
+        mobileTabsTriggerRef.current?.focus({ preventScroll: true });
+      });
+      return;
+    }
+
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+    );
+    const currentIndex = items.findIndex((item) => item === document.activeElement);
+    let nextIndex = currentIndex < 0 ? 0 : currentIndex;
+
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      nextIndex = (nextIndex + 1) % items.length;
+    } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+      nextIndex = (nextIndex - 1 + items.length) % items.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = items.length - 1;
+    } else {
+      return;
+    }
+
+    const nextItem = items[nextIndex];
+    if (!nextItem) return;
+    event.preventDefault();
+    nextItem.focus({ preventScroll: true });
   }
 
   function focusDrawerTab(nextTab: TabId) {
@@ -3687,16 +5063,20 @@ export function FigmaSubmissionDrawer({
   }
 
   const visibleActionError = localActionError || actionError;
+  const correctionIssueCount = submission.issues.filter(
+    (issue) => issue.status !== "closed_by_admin",
+  ).length;
   const footerStatusText =
     visibleActionError ||
+    (tab === "overview" && correctionIssueCount > 0
+      ? `Незакрытых замечаний: ${correctionIssueCount}`
+      : "") ||
     primaryAction.reason ||
     (data.status === "returned"
       ? "Исправьте замечания перед повторной отправкой."
       : statusLabels[submission.status]);
   const primaryFooterLabel =
     data.status === "returned" ? "Отправить исправления" : (primaryAction.label || "Далее");
-  const currentTabLabel = tabs.find((item) => item.id === tab)?.label ?? "Обзор";
-
   async function handlePrimaryAction() {
     if (primaryAction.disabled || actionPendingRef.current) return;
 
@@ -3748,19 +5128,23 @@ export function FigmaSubmissionDrawer({
           onKeyDown={handleDrawerKeyDown}
         >
           <header className="v20-drawer-topbar">
-            <button className="v20-icon-button" aria-label="Назад" type="button" onClick={onClose}>
-              <ArrowLeft aria-hidden="true" />
-            </button>
             <div className="v20-title-wrap">
               <div className="v20-subtitle">
                 <span>{screenMeta(data)}</span>
-                <span className="v20-subtitle-separator" aria-hidden="true">·</span>
-                <span>{currentTabLabel}</span>
               </div>
               <div className="v20-drawer-title-line">
                 <h2 className="v20-title" id={drawerHeadingId}>{data.title}</h2>
+              </div>
+              <div className="v20-status-row">
                 <span className={`v20-status-pill ${data.status === "returned" ? "is-warning" : ""}`}>
-                  {operationalDrawerCompactStatusLabel(data.status)}
+                  {data.status === "returned" ? <AlertCircle aria-hidden="true" /> : null}
+                  {data.status === "returned"
+                    ? "Возвращено (ошибки)"
+                    : operationalDrawerCompactStatusLabel(data.status)}
+                </span>
+                <span className="v20-updated-at">
+                  <Clock aria-hidden="true" />
+                  Обновлено {data.updated}
                 </span>
               </div>
             </div>
@@ -3814,7 +5198,13 @@ export function FigmaSubmissionDrawer({
                 <span>Ещё</span>
               </button>
               {mobileTabsOpen ? (
-                <div className="v20-tabbar-more-menu" id={mobileSecondaryDrawerTabsMenuId} role="menu">
+                <div
+                  aria-label="Дополнительные разделы подачи"
+                  className="v20-tabbar-more-menu"
+                  id={mobileSecondaryDrawerTabsMenuId}
+                  role="menu"
+                  onKeyDown={handleSectionMenuKeyDown}
+                >
                   {tabs
                     .filter((item) => mobileSecondaryDrawerTabs.has(item.id))
                     .map((item) => {
@@ -3823,10 +5213,17 @@ export function FigmaSubmissionDrawer({
                       return (
                         <button
                           aria-current={tab === item.id ? "page" : undefined}
+                          data-section-menu-tab={item.id}
                           key={item.id}
                           role="menuitem"
+                          tabIndex={
+                            tab === item.id ||
+                            (!activeSecondaryTab && item.id === "files")
+                              ? 0
+                              : -1
+                          }
                           type="button"
-                          onClick={() => selectDrawerTab(item.id)}
+                          onClick={() => selectSectionMenuTab(item.id)}
                         >
                           <Icon className="v20-tab-icon" aria-hidden="true" />
                           <span>{item.label}</span>
@@ -3857,7 +5254,7 @@ export function FigmaSubmissionDrawer({
               <main className="v20-drawer-body">
                 <AnimatePresence mode="wait">
                   <motion.div
-                    aria-labelledby={drawerTabId(tab)}
+                    aria-labelledby={tabs.some((item) => item.id === tab) ? drawerTabId(tab) : drawerHeadingId}
                     animate={{ opacity: 1, y: 0 }}
                     exit={tabContentExit}
                     id={drawerPanelId(tab)}
@@ -3911,14 +5308,18 @@ export function FigmaSubmissionDrawer({
                     type="button"
                     onClick={onClose}
                   >
-                    Закрыть
+                    Отмена
                   </button>
                   <button
+                    aria-busy={actionPending}
                     className={`v20-action-button ${data.status === "returned" ? "is-warning" : "is-primary"}`}
                     disabled={primaryAction.disabled || actionPending}
                     type="button"
                     onClick={() => void handlePrimaryAction()}
                   >
+                    {data.status === "returned" && !actionPending ? (
+                      <UploadCloud aria-hidden="true" />
+                    ) : null}
                     {actionPending ? "Сохраняем…" : primaryFooterLabel}
                   </button>
                 </div>

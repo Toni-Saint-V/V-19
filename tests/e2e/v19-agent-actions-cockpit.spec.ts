@@ -65,7 +65,9 @@ async function openFreshAgentActions(page: Page) {
     await page.getByRole("button", { name: "Войти" }).click();
   }
 
-  await expect(page.getByRole("heading", { level: 1, name: "Мои действия" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Мои действия" }),
+  ).toBeVisible();
   await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 }
 
@@ -112,9 +114,10 @@ async function documentMetrics(page: Page) {
 async function expectNoHorizontalOverflow(page: Page, label: string) {
   const metrics = await documentMetrics(page);
 
-  expect(metrics.scrollWidth, `${label}: horizontal document overflow`).toBeLessThanOrEqual(
-    metrics.clientWidth + 1,
-  );
+  expect(
+    metrics.scrollWidth,
+    `${label}: horizontal document overflow`,
+  ).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
 async function resetProofScroll(page: Page) {
@@ -131,12 +134,15 @@ async function resetProofScroll(page: Page) {
       };
     };
 
-    const scrollingElement = root.document.scrollingElement ?? root.document.documentElement;
+    const scrollingElement =
+      root.document.scrollingElement ?? root.document.documentElement;
     for (const target of [
       scrollingElement,
       root.document.querySelector<ScrollTarget>(".workspace"),
       root.document.querySelector<ScrollTarget>('[data-testid="agent-action-queue"]'),
-      root.document.querySelector<ScrollTarget>('[data-testid="agent-action-active-panel"]'),
+      root.document.querySelector<ScrollTarget>(
+        '[data-testid="agent-action-active-panel"]',
+      ),
     ]) {
       if (!target) continue;
       target.scrollTop = 0;
@@ -229,16 +235,17 @@ async function assertDesktopCockpit(page: Page) {
   if (viewport && viewport.width >= 1280) {
     const visibleCards = await surface
       .getByTestId("agent-action-queue-item")
-      .evaluateAll((cards) =>
-        cards.filter((card) => {
-          const element = card as unknown as {
-            getBoundingClientRect(): { bottom: number; top: number };
-          };
-          const rect = element.getBoundingClientRect();
-          const viewportHeight = (globalThis as unknown as { innerHeight: number })
-            .innerHeight;
-          return rect.top >= 0 && rect.bottom <= viewportHeight;
-        }).length,
+      .evaluateAll(
+        (cards) =>
+          cards.filter((card) => {
+            const element = card as unknown as {
+              getBoundingClientRect(): { bottom: number; top: number };
+            };
+            const rect = element.getBoundingClientRect();
+            const viewportHeight = (globalThis as unknown as { innerHeight: number })
+              .innerHeight;
+            return rect.top >= 0 && rect.bottom <= viewportHeight;
+          }).length,
       );
     expect(visibleCards).toBeGreaterThanOrEqual(3);
   }
@@ -249,7 +256,9 @@ async function assertDesktopCockpit(page: Page) {
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toHaveCount(0);
 
-  await expect(page.getByRole("heading", { level: 1, name: "Мои действия" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Мои действия" }),
+  ).toBeVisible();
 }
 
 async function assertActionFilters(page: Page) {
@@ -330,7 +339,9 @@ test.describe("V-19 My Actions submission command cockpit", () => {
 
     await page.setViewportSize({ height: 900, width: 1440 });
     await openFreshAdminReview(page);
-    await expect(page.locator(".v17-admin-work-row, .v17-admin-empty-state").first()).toBeVisible();
+    await expect(
+      page.locator(".v17-admin-work-row, .v17-admin-empty-state").first(),
+    ).toBeVisible();
     await expect(page.locator(".vf-figma-action-row")).toHaveCount(0);
     await expect(page.getByTestId("agent-actions-cockpit")).toHaveCount(0);
     await page.screenshot({

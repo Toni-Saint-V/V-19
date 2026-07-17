@@ -79,7 +79,9 @@ async function openWorkspace(
   const emailField = page.locator("#workspace-email");
   if (await isVisible(emailField)) {
     await emailField.fill(options.email);
-    await page.locator("#workspace-password").fill(options.password ?? "local-dev-password");
+    await page
+      .locator("#workspace-password")
+      .fill(options.password ?? "local-dev-password");
     await page.getByRole("button", { name: "Войти" }).click();
   }
 
@@ -217,7 +219,7 @@ async function closeOpenDialog(page: Page) {
 async function exerciseAgentActions(page: Page) {
   const mobileEvent = page
     .getByTestId("agent-action-timeline")
-    .locator('[data-submission-id]')
+    .locator("[data-submission-id]")
     .first();
 
   if (await isVisible(mobileEvent)) {
@@ -242,7 +244,9 @@ async function exerciseAgentActions(page: Page) {
 
 async function exerciseMySubmissions(page: Page) {
   await clickWorkspaceButton(page, /^Мои подачи/);
-  await expect(page.getByRole("heading", { level: 1, name: "Мои подачи" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Мои подачи" }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: /^Все/ }).click();
   const submissionRow = page.locator(".v19-submission-row").first();
   await expect(submissionRow).toBeVisible();
@@ -280,7 +284,9 @@ async function exerciseExport(page: Page) {
       )
       .first(),
   ).toBeVisible();
-  const preview = page.locator(".magic-export-preview, .v17-export-checks-card").first();
+  const preview = page
+    .locator(".magic-export-preview, .v17-export-checks-card")
+    .first();
   const panelToggle = page
     .getByRole("button", {
       name: /Контракт выгрузки открыт|Открыть контракт выгрузки/,
@@ -361,23 +367,28 @@ async function captureProof(
     notes: options.notes,
   });
 
-  expect(horizontalOverflow, `${options.screen} ${options.viewport.label}: overflow`).toBe(
-    false,
-  );
+  expect(
+    horizontalOverflow,
+    `${options.screen} ${options.viewport.label}: overflow`,
+  ).toBe(false);
   expect(
     clippedCriticalLabels,
     `${options.screen} ${options.viewport.label}: clipped labels`,
   ).toBe(false);
-  expect(consoleErrors, `${options.screen} ${options.viewport.label}: console errors`).toBe(
-    false,
-  );
-  expect(options.interactionChecked, `${options.screen} ${options.viewport.label}: interaction`).toBe(
-    true,
-  );
+  expect(
+    consoleErrors,
+    `${options.screen} ${options.viewport.label}: console errors`,
+  ).toBe(false);
+  expect(
+    options.interactionChecked,
+    `${options.screen} ${options.viewport.label}: interaction`,
+  ).toBe(true);
 }
 
 test.describe("V-19 Codex B full UI copy proof", () => {
-  test("captures required screenshots and proof metadata", async ({ page }, testInfo) => {
+  test("captures required screenshots and proof metadata", async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(120_000);
     test.skip(testInfo.project.name !== "chromium", "single-project screenshot proof");
 
@@ -394,7 +405,8 @@ test.describe("V-19 Codex B full UI copy proof", () => {
         browserProblems,
         fileName: `agent-actions-${viewport.label}.png`,
         interactionChecked: true,
-        notes: "Выбор задачи и CTA открыли drawer подачи; экран возвращен в чистое состояние.",
+        notes:
+          "Выбор задачи и CTA открыли drawer подачи; экран возвращен в чистое состояние.",
         screen: "Мои действия",
         viewport,
       });
@@ -423,7 +435,8 @@ test.describe("V-19 Codex B full UI copy proof", () => {
         browserProblems,
         fileName: `review-${viewport.label}.png`,
         interactionChecked: true,
-        notes: "Вкладки проверки и исправлений работают; карточка открывает контекст подачи.",
+        notes:
+          "Вкладки проверки и исправлений работают; карточка открывает контекст подачи.",
         screen: "Проверка",
         viewport,
       });

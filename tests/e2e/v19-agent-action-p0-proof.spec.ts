@@ -39,10 +39,14 @@ async function openReturnedFileCollection(page: Page) {
   await expect(documents).toBeVisible();
   await expect(page.getByTestId("document-collection-matrix")).toBeVisible();
   await expect(
-    page.locator(`[data-document-submission-id="${returnedSubmissionId}"]:visible`).first(),
+    page
+      .locator(`[data-document-submission-id="${returnedSubmissionId}"]:visible`)
+      .first(),
   ).toBeVisible();
   await expect(
-    page.locator(`.vf-figma-questionnaire-screen[data-submission-id="${returnedSubmissionId}"]`),
+    page.locator(
+      `.vf-figma-questionnaire-screen[data-submission-id="${returnedSubmissionId}"]`,
+    ),
   ).toHaveCount(0);
   await expect(page.locator('[role="dialog"]:visible')).toHaveCount(0);
 

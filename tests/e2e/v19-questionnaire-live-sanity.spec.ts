@@ -153,18 +153,13 @@ test.describe("V-19 questionnaire live sanity", () => {
     ).toBeVisible();
 
     await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
-    const address = page.getByRole("textbox", { name: "Домашний адрес" });
-    await address.fill("улЛенина5 2 12");
-    const suggestion = page.locator(".v19-questionnaire-address-suggestion");
-    await expect(suggestion).toBeVisible();
-    await expect(suggestion).toBeInViewport();
-    const applyAddressButton = page.getByRole("button", {
-      name: "Подставить адрес: Домашний адрес",
+    const street = page.getByRole("combobox", {
+      name: "Улица / проспект / переулок",
     });
-    await expect(applyAddressButton).toBeVisible();
-    await expect(applyAddressButton).toBeInViewport();
-    const applyAddressBox = await applyAddressButton.boundingBox();
-    expect(applyAddressBox?.height ?? 0).toBeGreaterThanOrEqual(40);
+    await street.fill("ул");
+    await expect(page.getByRole("option", { name: "улица" })).toBeVisible();
+    await page.getByRole("option", { name: "улица" }).click();
+    await expect(street).toHaveValue("улица ");
 
     await expectNoDocumentOverflow(page);
     await page.screenshot({

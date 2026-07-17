@@ -20,6 +20,7 @@ const testValuesByFieldId: Record<string, string> = {
   "contact-number": "+7 900 000-00-00",
   "departure-date": "18.07.2026",
   "desired-date-1": "05.08.2026",
+  "desired-date-2": "12.08.2026",
   "email": "test@example.com",
   "employer-address": "MOSCOW",
   "employer-contact": "+7 900 000-00-01",
@@ -27,8 +28,12 @@ const testValuesByFieldId: Record<string, string> = {
   "first-entry-country": "Spain",
   "first-name": "MARIA",
   "home-address": "TEST ADDRESS",
+  "home-building": "2",
   "home-city": "MOSCOW",
   "home-country": "Russian Federation",
+  "home-house": "15",
+  "home-street": "улица Ленина",
+  "home-unit": "кв 12",
   "hotel-address": "TEST HOTEL ADDRESS",
   "hotel-city": "MADRID",
   "hotel-contact": "+34 900 000 000",
@@ -52,6 +57,7 @@ const testValuesByFieldId: Record<string, string> = {
 export function fillRequiredQuestionnaireForTest(submission: Submission): Submission {
   let next = completeQuestionnaire(submission);
   const conditionallyRequiredBlsFields = new Set([
+    "desired-date-2",
     "employer-address",
     "employer-contact",
     "employer-name",
@@ -64,9 +70,11 @@ export function fillRequiredQuestionnaireForTest(submission: Submission): Submis
   for (const applicant of next.applicants) {
     for (const section of applicant.sections) {
       for (const field of section.fields) {
+        const hasGeneratedPlaceholder =
+          field.value.startsWith("DEMO ") && Boolean(testValuesByFieldId[field.id]);
         if (
           (!field.required && !conditionallyRequiredBlsFields.has(field.id)) ||
-          field.value.trim()
+          (field.value.trim() && !hasGeneratedPlaceholder)
         ) {
           continue;
         }
@@ -98,6 +106,29 @@ export function fillRequiredQuestionnaireForTest(submission: Submission): Submis
   }
 
   return next;
+}
+
+export function adminApproveQuestionnaireForTest(
+  submission: Submission,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.value.trim() && !field.error
+            ? {
+                ...field,
+                adminReviewApprovedAtIso: "2026-07-16T00:00:00.000Z",
+                adminReviewApprovedBy: "admin-reviewer-test",
+              }
+            : field,
+        ),
+      })),
+    })),
+  };
 }
 
 function questionnaireFieldValue(applicant: Submission["applicants"][number] | undefined, fieldId: string) {

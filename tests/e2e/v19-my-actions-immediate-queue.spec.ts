@@ -67,7 +67,7 @@ async function prepareAnimationMetrics(page: Page) {
       };
       const row = element.closest?.('[data-testid="agent-action-row"]');
       if (row) {
-        const timing = typeof options === "number" ? { delay: 0 } : options ?? {};
+        const timing = typeof options === "number" ? { delay: 0 } : (options ?? {});
         records.push({
           delay: Number(timing.delay ?? 0),
           submissionId: row.dataset?.agentActionId ?? null,
@@ -100,7 +100,9 @@ test.describe("V-19 My Actions immediate queue", () => {
       await openFreshWorkspace(page, { heading: "Мои действия" });
 
       const action = page
-        .locator('[data-testid="agent-action-row"][data-agent-action-id^="replace-ПД-1048-"]')
+        .locator(
+          '[data-testid="agent-action-row"][data-agent-action-id^="replace-ПД-1048-"]',
+        )
         .first();
       await expect(action).toBeVisible();
       await expect(action.locator(".v19-legacy-action-city-label")).toHaveText(/\S+/);
@@ -139,7 +141,9 @@ test.describe("V-19 My Actions immediate queue", () => {
         const statusFilter = page.getByRole("button", {
           name: /Фильтр действий: Открыто/,
         });
-        await expect(statusFilter.locator(".v19-admin-toolbar-select-value")).toBeVisible();
+        await expect(
+          statusFilter.locator(".v19-admin-toolbar-select-value"),
+        ).toBeVisible();
         await expect(
           page
             .getByRole("button", { name: /Сортировка действий: По дате вылета/ })
@@ -176,12 +180,17 @@ test.describe("V-19 My Actions immediate queue", () => {
         await page.screenshot({
           animations: "disabled",
           fullPage: false,
-          path: join(evidenceDirectory, `${viewport.label}-document-collection-after.png`),
+          path: join(
+            evidenceDirectory,
+            `${viewport.label}-document-collection-after.png`,
+          ),
         });
       }
 
       expect(metrics.rowCount).toBeGreaterThan(0);
-      expect(metrics.documentWidth.scroll).toBeLessThanOrEqual(metrics.documentWidth.client + 1);
+      expect(metrics.documentWidth.scroll).toBeLessThanOrEqual(
+        metrics.documentWidth.client + 1,
+      );
       expect(metrics.rowOpacity).toEqual(Array(metrics.rowCount).fill("1"));
       expect(metrics.animationRecords.filter((record) => record.delay > 0)).toEqual([]);
 
@@ -190,7 +199,10 @@ test.describe("V-19 My Actions immediate queue", () => {
           .locator(".v19-legacy-action-city-label")
           .evaluate((node) => {
             const element = node as HTMLElement;
-            return { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+            return {
+              clientWidth: element.clientWidth,
+              scrollWidth: element.scrollWidth,
+            };
           });
         expect(cityLayout.scrollWidth).toBeLessThanOrEqual(cityLayout.clientWidth + 1);
 
@@ -221,13 +233,14 @@ test.describe("V-19 My Actions immediate queue", () => {
           expect(layout.whiteSpace).toBe("normal");
         }
 
-        const compactFilterValues = page.locator(
-          ".v19-admin-toolbar-select-value",
-        );
+        const compactFilterValues = page.locator(".v19-admin-toolbar-select-value");
         const filterLayouts = await compactFilterValues.evaluateAll((nodes) =>
           nodes.map((node) => {
             const element = node as HTMLElement;
-            return { clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+            return {
+              clientWidth: element.clientWidth,
+              scrollWidth: element.scrollWidth,
+            };
           }),
         );
         for (const filter of filterLayouts) {
@@ -251,11 +264,15 @@ test.describe("V-19 My Actions immediate queue", () => {
     await page.setViewportSize({ height: 900, width: 1440 });
     await openFreshWorkspace(page, { heading: "Мои действия" });
 
-    const trigger = page.getByRole("button", { name: "Открыть командную палитру" }).last();
+    const trigger = page
+      .getByRole("button", { name: "Открыть командную палитру" })
+      .last();
     await trigger.click();
     const palette = page.getByRole("dialog", { name: "Командная палитра" });
     await expect(palette).toBeVisible();
-    await expect(palette.locator('input[aria-label="Найти команду или подачу"]')).toBeFocused();
+    await expect(
+      palette.locator('input[aria-label="Найти команду или подачу"]'),
+    ).toBeFocused();
     await page.screenshot({
       animations: "disabled",
       fullPage: false,
@@ -269,7 +286,9 @@ test.describe("V-19 My Actions immediate queue", () => {
     await page.keyboard.press("Control+k");
     await expect(palette).toBeVisible();
     await palette.getByText("Мои подачи", { exact: true }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Мои подачи" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Мои подачи" }),
+    ).toBeVisible();
     expect(browserProblems).toEqual([]);
   });
 });

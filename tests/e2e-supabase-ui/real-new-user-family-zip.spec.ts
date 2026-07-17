@@ -167,13 +167,16 @@ async function mailTmRequest<T>(
         signal: AbortSignal.timeout(25_000),
       });
       if (!response.ok) {
-        throw new Error(`mail.tm ${input.method ?? "GET"} ${path} failed with ${response.status}`);
+        throw new Error(
+          `mail.tm ${input.method ?? "GET"} ${path} failed with ${response.status}`,
+        );
       }
       if (response.status === 204) return undefined as T;
       return (await response.json()) as T;
     } catch (error) {
       lastError = error;
-      if (attempt < 4) await new Promise((resolveDelay) => setTimeout(resolveDelay, 1_000));
+      if (attempt < 4)
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 1_000));
     }
   }
   throw lastError instanceof Error ? lastError : new Error(`mail.tm ${path} failed.`);
@@ -224,7 +227,9 @@ function htmlDecode(value: string) {
 }
 
 function inviteTokenFromMessage(message: { html?: string[] | string; text?: string }) {
-  const html = Array.isArray(message.html) ? message.html.join("\n") : message.html ?? "";
+  const html = Array.isArray(message.html)
+    ? message.html.join("\n")
+    : (message.html ?? "");
   const body = htmlDecode(`${html}\n${message.text ?? ""}`);
   const urls = body.match(/https?:\/\/[^\s"'<>]+/g) ?? [];
 
@@ -232,7 +237,8 @@ function inviteTokenFromMessage(message: { html?: string[] | string; text?: stri
     try {
       const url = new URL(candidate.replace(/[),.;]+$/, ""));
       const type = url.searchParams.get("type");
-      const tokenHash = url.searchParams.get("token_hash") ?? url.searchParams.get("token");
+      const tokenHash =
+        url.searchParams.get("token_hash") ?? url.searchParams.get("token");
       if (type === "invite" && tokenHash) return tokenHash;
 
       const redirect = url.searchParams.get("redirect_to");
@@ -240,7 +246,8 @@ function inviteTokenFromMessage(message: { html?: string[] | string; text?: stri
         const redirectUrl = new URL(redirect);
         const nestedType = redirectUrl.searchParams.get("type");
         const nestedToken =
-          redirectUrl.searchParams.get("token_hash") ?? redirectUrl.searchParams.get("token");
+          redirectUrl.searchParams.get("token_hash") ??
+          redirectUrl.searchParams.get("token");
         if (nestedType === "invite" && nestedToken) return nestedToken;
       }
     } catch {
@@ -256,7 +263,9 @@ async function waitForInviteToken(account: MailTmAccount): Promise<string> {
   const seen = new Set<string>();
 
   while (Date.now() < deadline) {
-    const list = await mailTmRequest<unknown>("/messages?page=1", { token: account.token });
+    const list = await mailTmRequest<unknown>("/messages?page=1", {
+      token: account.token,
+    });
 
     for (const item of collectionMembers<{ id: string; subject?: string }>(list)) {
       if (seen.has(item.id)) continue;
@@ -298,7 +307,9 @@ async function submitAccessRequest(page: Page, email: string, label: string) {
   await clearBrowserState(page);
   await ensureLoginMode(page);
   await page.getByRole("button", { name: "Запросить доступ" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Заявка на доступ" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Заявка на доступ" }),
+  ).toBeVisible();
   await page.getByLabel("Имя и фамилия").fill(`TEST AGENT ${label}`);
   await page.getByLabel("Агентство / компания").fill("V19 REAL E2E LAB");
   await page.getByLabel("Город").fill("Москва");
@@ -335,7 +346,9 @@ async function submitAccessRequest(page: Page, email: string, label: string) {
     response.status(),
     `public access-request submit must succeed: ${responseBody}`,
   ).toBe(200);
-  await expect(page.getByRole("heading", { level: 1, name: "Ожидает подтверждения" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Ожидает подтверждения" }),
+  ).toBeVisible();
   await expect(page.getByText("Статус: pending · роль agent")).toBeVisible();
 }
 
@@ -347,7 +360,9 @@ async function approveAccessRequest(page: Page, email: string) {
   await expect(queueButton.first()).toBeVisible({ timeout: 30_000 });
   await queueButton.first().click();
   await expect(
-    page.getByTestId("admin-access-queue").or(page.getByTestId("admin-users-access-requests")),
+    page
+      .getByTestId("admin-access-queue")
+      .or(page.getByTestId("admin-users-access-requests")),
   ).toBeVisible();
 
   const settingsRow = page.locator(".settings-access-row").filter({ hasText: email });
@@ -355,7 +370,9 @@ async function approveAccessRequest(page: Page, email: string) {
     .getByTestId("admin-users-access-requests")
     .locator("article")
     .filter({ hasText: email });
-  const row = (await isVisible(settingsRow.first())) ? settingsRow.first() : workspaceRow.first();
+  const row = (await isVisible(settingsRow.first()))
+    ? settingsRow.first()
+    : workspaceRow.first();
   await expect(row).toBeVisible({ timeout: 30_000 });
 
   const responsePromise = page.waitForResponse(
@@ -388,22 +405,33 @@ async function approveAccessRequest(page: Page, email: string) {
       .filter({ hasText: "Входящие заявки на регистрацию" });
     await expect(refreshedQueueButton.first()).toBeVisible({ timeout: 30_000 });
     await refreshedQueueButton.first().click();
-    await expect(page.locator(".settings-access-row").filter({ hasText: email })).toHaveCount(0);
+    await expect(
+      page.locator(".settings-access-row").filter({ hasText: email }),
+    ).toHaveCount(0);
   }
 }
 
-async function activateInviteAndLogin(page: Page, email: string, tokenHash: string, password: string) {
+async function activateInviteAndLogin(
+  page: Page,
+  email: string,
+  tokenHash: string,
+  password: string,
+) {
   const pendingLogout = page.getByRole("button", { name: /^Выйти$/ });
   if (await isVisible(pendingLogout.first())) await clickFirstVisible(pendingLogout);
   await page.goto(`/?token_hash=${encodeURIComponent(tokenHash)}&type=invite`);
-  await expect(page.getByRole("heading", { level: 1, name: "Создайте пароль" })).toBeVisible({
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Создайте пароль" }),
+  ).toBeVisible({
     timeout: 45_000,
   });
   await expect(page.getByText(email, { exact: false })).toBeVisible();
   await page.getByLabel("Новый пароль").fill(password);
   await page.getByLabel("Повторите пароль").fill(password);
   await page.getByRole("button", { name: "Сохранить пароль" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible({
+    timeout: 45_000,
+  });
   await expect(page.getByRole("status")).toContainText("Пароль сохранён");
 
   await page.getByLabel("Email").fill(email);
@@ -424,29 +452,48 @@ async function activateInviteAndLogin(page: Page, email: string, tokenHash: stri
   ).toBeVisible({ timeout: 45_000 });
 }
 
-async function clickQuestionnaireSection(questionnaire: Locator, name: RegExp | string) {
-  const sections = questionnaire.locator(".v19-questionnaire-section-tab").filter({ hasText: name });
+async function clickQuestionnaireSection(
+  questionnaire: Locator,
+  name: RegExp | string,
+) {
+  const sections = questionnaire
+    .locator(".v19-questionnaire-section-tab")
+    .filter({ hasText: name });
   await clickFirstVisible(sections);
   await expect(questionnaire.locator(".v19-questionnaire-work-panel")).toBeVisible();
 }
 
 async function questionnaireField(questionnaire: Locator, label: string) {
   const panel = questionnaire.locator(".v19-questionnaire-work-panel");
-  const field = panel.locator("[data-field-label]").filter({ has: panel.getByText(label, { exact: true }) });
-  const exact = panel.locator(`[data-field-label="${label.replaceAll('"', '\\"')}"]`).first();
+  const field = panel
+    .locator("[data-field-label]")
+    .filter({ has: panel.getByText(label, { exact: true }) });
+  const exact = panel
+    .locator(`[data-field-label="${label.replaceAll('"', '\\"')}"]`)
+    .first();
   return (await exact.count()) > 0 ? exact : field.first();
 }
 
-async function fillQuestionnaireField(questionnaire: Locator, label: string, value: string) {
+async function fillQuestionnaireField(
+  questionnaire: Locator,
+  label: string,
+  value: string,
+) {
   const field = await questionnaireField(questionnaire, label);
   await expect(field).toBeVisible();
-  const control = field.locator("input:not([readonly]), textarea:not([readonly])").first();
+  const control = field
+    .locator("input:not([readonly]), textarea:not([readonly])")
+    .first();
   await expect(control).toBeVisible();
   await control.fill(value);
   await control.press("Tab");
 }
 
-async function chooseQuestionnaireField(questionnaire: Locator, label: string, value: string) {
+async function chooseQuestionnaireField(
+  questionnaire: Locator,
+  label: string,
+  value: string,
+) {
   const field = await questionnaireField(questionnaire, label);
   await expect(field).toBeVisible();
   const quick = field.getByRole("button", { exact: true, name: value });
@@ -460,7 +507,9 @@ async function chooseQuestionnaireField(questionnaire: Locator, label: string, v
   await dropdown.click();
   const search = field.getByRole("textbox", { name: `Поиск: ${label}` });
   if (await isVisible(search)) await search.fill(value);
-  const option = field.locator(".v19-questionnaire-dropdown-option").filter({ hasText: value });
+  const option = field
+    .locator(".v19-questionnaire-dropdown-option")
+    .filter({ hasText: value });
   await expect(option.first()).toBeVisible();
   await option.first().click();
 }
@@ -480,17 +529,33 @@ async function fillApplicantQuestionnaire(
   await chooseQuestionnaireField(questionnaire, "Тип визы", "Шенгенская");
   await chooseQuestionnaireField(questionnaire, "Категория обслуживания", "Normal");
   await fillQuestionnaireField(questionnaire, "Желаемая дата 1", "10.12.2026");
-  await fillQuestionnaireField(questionnaire, "Примечание", "REAL E2E FAMILY APPLICATION");
+  await fillQuestionnaireField(
+    questionnaire,
+    "Примечание",
+    "REAL E2E FAMILY APPLICATION",
+  );
 
   await clickQuestionnaireSection(questionnaire, /Личные данные/);
   await fillQuestionnaireField(questionnaire, "Фамилия", input.surname);
   await fillQuestionnaireField(questionnaire, "Имя", input.firstName);
   await fillQuestionnaireField(questionnaire, "Дата рождения", input.birthDate);
   await fillQuestionnaireField(questionnaire, "Место рождения", input.birthPlace);
-  await chooseQuestionnaireField(questionnaire, "Страна рождения", "Russian Federation");
-  await chooseQuestionnaireField(questionnaire, "Текущее гражданство", "Russian Federation");
+  await chooseQuestionnaireField(
+    questionnaire,
+    "Страна рождения",
+    "Russian Federation",
+  );
+  await chooseQuestionnaireField(
+    questionnaire,
+    "Текущее гражданство",
+    "Russian Federation",
+  );
   await chooseQuestionnaireField(questionnaire, "Пол", input.gender);
-  await chooseQuestionnaireField(questionnaire, "Семейное положение", "Холост/не замужем");
+  await chooseQuestionnaireField(
+    questionnaire,
+    "Семейное положение",
+    "Холост/не замужем",
+  );
 
   await clickQuestionnaireSection(questionnaire, /^Паспорт$/);
   await chooseQuestionnaireField(questionnaire, "Тип документа", "Ordinary Passport");
@@ -504,10 +569,18 @@ async function fillApplicantQuestionnaire(
   await fillQuestionnaireField(questionnaire, "Домашний адрес", "TEST STREET 1");
   await fillQuestionnaireField(questionnaire, "Email", email);
   await fillQuestionnaireField(questionnaire, "Телефон", phone);
-  await chooseQuestionnaireField(questionnaire, "Страна проживания", "Russian Federation");
+  await chooseQuestionnaireField(
+    questionnaire,
+    "Страна проживания",
+    "Russian Federation",
+  );
   await fillQuestionnaireField(questionnaire, "Город проживания", "MOSCOW");
   await fillQuestionnaireField(questionnaire, "Почтовый индекс", "101000");
-  await chooseQuestionnaireField(questionnaire, "Проживание не в стране гражданства", "Нет");
+  await chooseQuestionnaireField(
+    questionnaire,
+    "Проживание не в стране гражданства",
+    "Нет",
+  );
 
   await clickQuestionnaireSection(questionnaire, /Работа \/ учеба/);
   await chooseQuestionnaireField(questionnaire, "Профессия", "IT PROFESSIONAL");
@@ -529,7 +602,11 @@ async function fillApplicantQuestionnaire(
 
   await clickQuestionnaireSection(questionnaire, /^Поездка$/);
   await chooseQuestionnaireField(questionnaire, "Цель поездки", "TOURISM");
-  await fillQuestionnaireField(questionnaire, "Дополнительные сведения о цели", "REAL E2E TOURISM");
+  await fillQuestionnaireField(
+    questionnaire,
+    "Дополнительные сведения о цели",
+    "REAL E2E TOURISM",
+  );
   await chooseQuestionnaireField(questionnaire, "Основная страна назначения", "Spain");
   await chooseQuestionnaireField(questionnaire, "Страна первого въезда", "Spain");
   await chooseQuestionnaireField(questionnaire, "Количество въездов", "Однократная");
@@ -539,7 +616,11 @@ async function fillApplicantQuestionnaire(
   await chooseQuestionnaireField(questionnaire, "Отпечатки ранее сдавались", "Нет");
 
   await clickQuestionnaireSection(questionnaire, /Отель \/ приглашение/);
-  await chooseQuestionnaireField(questionnaire, "Тип принимающей стороны", "Гостиница/временное жилье");
+  await chooseQuestionnaireField(
+    questionnaire,
+    "Тип принимающей стороны",
+    "Гостиница/временное жилье",
+  );
   await fillQuestionnaireField(
     questionnaire,
     "ФИО приглашающего лица или название отеля",
@@ -553,7 +634,11 @@ async function fillApplicantQuestionnaire(
   await fillQuestionnaireField(questionnaire, "Телефон", "+34 600 123 456");
 
   await clickQuestionnaireSection(questionnaire, /Оплата поездки/);
-  await chooseQuestionnaireField(questionnaire, "Кто оплачивает поездку", "Сам заявитель");
+  await chooseQuestionnaireField(
+    questionnaire,
+    "Кто оплачивает поездку",
+    "Сам заявитель",
+  );
   await chooseQuestionnaireField(questionnaire, "Средства заявителя", "Наличные");
 }
 
@@ -568,7 +653,9 @@ async function uploadApplicantSelfies(
   await clickQuestionnaireSection(questionnaire, /^Файлы$/);
 
   for (const [index, label] of ["Селфи 1", "Селфи 2"].entries()) {
-    const slot = questionnaire.locator(".v19-questionnaire-file-slot").filter({ hasText: label });
+    const slot = questionnaire
+      .locator(".v19-questionnaire-file-slot")
+      .filter({ hasText: label });
     const input = slot.locator('input[type="file"]');
     await expect(input).toBeVisible();
     const response = page.waitForResponse(
@@ -590,7 +677,8 @@ async function uploadApplicantSelfies(
 async function visibleStatus(root: Locator, expected: RegExp) {
   const text = await root.innerText();
   const match = text.match(expected);
-  if (!match) throw new Error(`Expected status ${expected} was absent from visible UI.`);
+  if (!match)
+    throw new Error(`Expected status ${expected} was absent from visible UI.`);
   return match[0];
 }
 
@@ -618,11 +706,16 @@ async function createFamilyDraft(page: Page, passportPaths: [string, string]) {
   const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
   await expect(questionnaire).toBeVisible({ timeout: 45_000 });
   const applicationId = await questionnaire.getAttribute("data-submission-id");
-  if (!applicationId) throw new Error("New application id is absent from questionnaire UI.");
+  if (!applicationId)
+    throw new Error("New application id is absent from questionnaire UI.");
   return { applicationId, questionnaire };
 }
 
-async function unauthorizedAdminAttempt(page: Page, functionUrl: string, publishableKey: string) {
+async function unauthorizedAdminAttempt(
+  page: Page,
+  functionUrl: string,
+  publishableKey: string,
+) {
   return page.evaluate(
     async ({ edgeUrl, key }) => {
       const authStorageKey = Object.keys(localStorage).find((candidate) =>
@@ -633,7 +726,10 @@ async function unauthorizedAdminAttempt(page: Page, functionUrl: string, publish
       const parsed = raw ? (JSON.parse(raw) as { access_token?: string }) : null;
       if (!parsed?.access_token) return { body: "ACCESS_TOKEN_MISSING", status: 0 };
       const response = await fetch(edgeUrl, {
-        body: JSON.stringify({ action: "approve", id: "00000000-0000-0000-0000-000000000000" }),
+        body: JSON.stringify({
+          action: "approve",
+          id: "00000000-0000-0000-0000-000000000000",
+        }),
         headers: {
           apikey: key,
           authorization: `Bearer ${parsed.access_token}`,
@@ -648,7 +744,9 @@ async function unauthorizedAdminAttempt(page: Page, functionUrl: string, publish
 }
 
 async function clearExportSelection(page: Page) {
-  const checked = page.locator('.v19-admin-export-row input[type="checkbox"]:checked, .export-row input[type="checkbox"]:checked');
+  const checked = page.locator(
+    '.v19-admin-export-row input[type="checkbox"]:checked, .export-row input[type="checkbox"]:checked',
+  );
   while ((await checked.count()) > 0) {
     await checked.first().uncheck();
   }
@@ -677,9 +775,13 @@ async function inspectGeneratedZip(
 ): Promise<Pick<Evidence, "documents" | "workbook" | "zip">> {
   const bytes = await readFile(zipPath);
   const zip = await JSZip.loadAsync(bytes, { checkCRC32: true });
-  const entries = Object.keys(zip.files).filter((name) => !zip.files[name]?.dir).sort();
+  const entries = Object.keys(zip.files)
+    .filter((name) => !zip.files[name]?.dir)
+    .sort();
   expect(entries).toHaveLength(11);
-  expect(entries.every((name) => !name.startsWith("/") && !name.split("/").includes(".."))).toBe(true);
+  expect(
+    entries.every((name) => !name.startsWith("/") && !name.split("/").includes("..")),
+  ).toBe(true);
 
   const manifestName = entries.find((name) => name.endsWith("/manifest.json"));
   const workbookName = entries.find((name) => name.endsWith(".xlsx"));
@@ -701,28 +803,29 @@ async function inspectGeneratedZip(
     }>;
   };
   expect(manifest.applicantCount).toBe(2);
-  expect(manifest.fileCount).toBe(8);
-  expect(manifest.documentEntries).toHaveLength(8);
+  expect(manifest.fileCount).toBe(4);
+  expect(manifest.documentEntries).toHaveLength(4);
   expect(manifest.package.submissionIds).toEqual([applicationId]);
   expect(manifest.submissions).toHaveLength(1);
   expect(manifest.submissions[0]?.id).toBe(applicationId);
   expect(manifest.submissions[0]?.type).toBe("family");
-  expect(manifest.submissions[0]?.applicants.map((applicant) => applicant.name)).toEqual([
-    "TEST PERSON ONE",
-    "TEST PERSON TWO",
-  ]);
+  expect(
+    manifest.submissions[0]?.applicants.map((applicant) => applicant.name),
+  ).toEqual(["TEST PERSON ONE", "TEST PERSON TWO"]);
   expect(manifest.requiredDocumentTypes).toEqual([
     "passport_scan",
     "selfie_1",
     "selfie_2",
-    "visa_form",
   ]);
-  expect(entries.filter((name) => name.endsWith("_visa_form.pdf"))).toHaveLength(2);
-  expect(entries.filter((name) => name.endsWith(".png"))).toHaveLength(6);
+  expect(entries.filter((name) => name.endsWith("_visa_form.pdf"))).toHaveLength(0);
+  expect(entries.filter((name) => name.endsWith(".png"))).toHaveLength(4);
 
   const sourceHashByName = new Map<string, string>();
   for (const sourcePath of sourcePaths) {
-    sourceHashByName.set(basename(sourcePath), await sha256(await readFile(sourcePath)));
+    sourceHashByName.set(
+      basename(sourcePath),
+      await sha256(await readFile(sourcePath)),
+    );
   }
   const foundHashes = new Set<string>();
   let signaturesValid = true;
@@ -740,14 +843,17 @@ async function inspectGeneratedZip(
   expect(workbookBytes.byteLength).toBeGreaterThan(1_000);
   expect(String.fromCharCode(workbookBytes[0]!, workbookBytes[1]!)).toBe("PK");
   const parsed = await parseExportWorkbookBlob(
-    new Blob([
-      workbookBytes.buffer.slice(
-        workbookBytes.byteOffset,
-        workbookBytes.byteOffset + workbookBytes.byteLength,
-      ) as ArrayBuffer,
-    ], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }),
+    new Blob(
+      [
+        workbookBytes.buffer.slice(
+          workbookBytes.byteOffset,
+          workbookBytes.byteOffset + workbookBytes.byteLength,
+        ) as ArrayBuffer,
+      ],
+      {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    ),
   );
   expect(parsed.sheetName).toBe("Sheet1");
   expect(parsed.dimension).toBe("A1:BD3");
@@ -755,12 +861,16 @@ async function inspectGeneratedZip(
   expect(headers).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
   const dataRows = parsed.rows
     .slice(1)
-    .filter((row) => applicants.some((applicant) => row.includes(applicant.passportNumber)));
+    .filter((row) =>
+      applicants.some((applicant) => row.includes(applicant.passportNumber)),
+    );
   expect(dataRows).toHaveLength(2);
 
   const workbookFields: Evidence["workbook"]["fields"] = [];
   for (const [index, applicant] of applicants.entries()) {
-    const row = dataRows.find((candidate) => candidate.includes(applicant.passportNumber));
+    const row = dataRows.find((candidate) =>
+      candidate.includes(applicant.passportNumber),
+    );
     if (!row) throw new Error(`Workbook row missing for ${applicant.passportNumber}.`);
     const expectedFields: Array<[string, string]> = [
       ["Applicant Email", ownerEmail],
@@ -781,8 +891,14 @@ async function inspectGeneratedZip(
       ["Gender(Male/Female)", index === 0 ? "Male" : "Female"],
       ["Marital Status(Single/Married)", "Single"],
       ["Cost Covered By(Sponsor/Applicant)", "Applicant"],
-      ["Means Of Support(Accommodation Provided/All expenses covered/Cash/CreditCard)", "Cash"],
-      ["Appointment Type(For Family, applicant email and contact number should be same for all family members)", "FAMILY"],
+      [
+        "Means Of Support(Accommodation Provided/All expenses covered/Cash/CreditCard)",
+        "Cash",
+      ],
+      [
+        "Appointment Type(For Family, applicant email and contact number should be same for all family members)",
+        "FAMILY",
+      ],
     ];
     for (const [field, expected] of expectedFields) {
       const actual = workbookValue(headers, row, field);
@@ -797,20 +913,28 @@ async function inspectGeneratedZip(
   for (const pdfName of entries.filter((name) => name.endsWith("_visa_form.pdf"))) {
     const pdfBytes = await zip.file(pdfName)!.async("uint8array");
     expect(new TextDecoder().decode(pdfBytes.slice(0, 8))).toBe("%PDF-1.4");
-    const pdfFile = new File([
-      pdfBytes.buffer.slice(
-        pdfBytes.byteOffset,
-        pdfBytes.byteOffset + pdfBytes.byteLength,
-      ) as ArrayBuffer,
-    ], basename(pdfName), {
-      type: "application/pdf",
-    }) as unknown as globalThis.File;
+    const pdfFile = new File(
+      [
+        pdfBytes.buffer.slice(
+          pdfBytes.byteOffset,
+          pdfBytes.byteOffset + pdfBytes.byteLength,
+        ) as ArrayBuffer,
+      ],
+      basename(pdfName),
+      {
+        type: "application/pdf",
+      },
+    ) as unknown as globalThis.File;
     const extraction = await extractPdfTextFromFile(pdfFile);
     expect(extraction.pageCount).toBe(4);
     expect(extraction.source).toBe("text_layer");
     expect(extraction.text).toContain("APPLICATION FOR SCHENGEN VISA");
     expect(extraction.text).toContain("HOTEL E2E MADRID");
-    expect(applicants.some((applicant) => extraction.text.includes(applicant.passportNumber))).toBe(true);
+    expect(
+      applicants.some((applicant) =>
+        extraction.text.includes(applicant.passportNumber),
+      ),
+    ).toBe(true);
   }
 
   const fileStat = await stat(zipPath);
@@ -899,7 +1023,9 @@ test.describe("real new-user Supabase family application ZIP", () => {
         ownerPassword,
       );
 
-      await expect(owner.page.getByRole("button", { name: /Проверка|Выгрузка/ })).toHaveCount(0);
+      await expect(
+        owner.page.getByRole("button", { name: /Проверка|Выгрузка/ }),
+      ).toHaveCount(0);
       await clickWorkspaceButton(owner.page, /Мои подачи/);
       await expect(owner.page.locator("[data-submission-id]")).toHaveCount(0);
       const agentEdgeAttempt = await unauthorizedAdminAttempt(
@@ -911,20 +1037,42 @@ test.describe("real new-user Supabase family application ZIP", () => {
       expect(agentEdgeAttempt.body).toContain("ADMIN_REQUIRED");
 
       await owner.page.setViewportSize({ height: 844, width: 390 });
-      const created = await createFamilyDraft(owner.page, [sourcePaths[0]!, sourcePaths[3]!]);
+      const created = await createFamilyDraft(owner.page, [
+        sourcePaths[0]!,
+        sourcePaths[3]!,
+      ]);
       applicationId = created.applicationId;
       const questionnaire = created.questionnaire;
-      await fillApplicantQuestionnaire(questionnaire, 0, applicants[0]!, ownerMailbox.address);
-      await uploadApplicantSelfies(owner.page, questionnaire, 0, [sourcePaths[1]!, sourcePaths[2]!]);
-      await fillApplicantQuestionnaire(questionnaire, 1, applicants[1]!, ownerMailbox.address);
-      await uploadApplicantSelfies(owner.page, questionnaire, 1, [sourcePaths[4]!, sourcePaths[5]!]);
+      await fillApplicantQuestionnaire(
+        questionnaire,
+        0,
+        applicants[0]!,
+        ownerMailbox.address,
+      );
+      await uploadApplicantSelfies(owner.page, questionnaire, 0, [
+        sourcePaths[1]!,
+        sourcePaths[2]!,
+      ]);
+      await fillApplicantQuestionnaire(
+        questionnaire,
+        1,
+        applicants[1]!,
+        ownerMailbox.address,
+      );
+      await uploadApplicantSelfies(owner.page, questionnaire, 1, [
+        sourcePaths[4]!,
+        sourcePaths[5]!,
+      ]);
       await assertNoOverflow(owner.page);
       await owner.page.screenshot({
         fullPage: true,
         path: resolve(outputDir, "mobile-390-questionnaire-files.png"),
       });
 
-      const saveDraft = questionnaire.getByRole("button", { name: "Черновик", exact: true });
+      const saveDraft = questionnaire.getByRole("button", {
+        name: "Черновик",
+        exact: true,
+      });
       await clickAndWaitForSupabaseWrite(
         owner.page,
         () => saveDraft.click(),
@@ -978,7 +1126,8 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await expect(drawer(admin.page)).toContainText("910000001");
       await expect(drawer(admin.page)).toContainText("910000002");
       await openDrawerTab(admin.page, /Файлы/);
-      for (const name of sourceDocuments) await expect(drawer(admin.page)).toContainText(name);
+      for (const name of sourceDocuments)
+        await expect(drawer(admin.page)).toContainText(name);
       await admin.page.screenshot({
         fullPage: true,
         path: resolve(outputDir, "desktop-1440-admin-review.png"),
@@ -1003,7 +1152,9 @@ test.describe("real new-user Supabase family application ZIP", () => {
       );
 
       await clickWorkspaceButton(admin.page, /Выгрузка/);
-      await expect(admin.page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
+      await expect(
+        admin.page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+      ).toBeVisible();
       await clearExportSelection(admin.page);
       const exportRow = admin.page
         .locator(".v19-admin-export-row, .export-row")
@@ -1026,7 +1177,9 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await expect(preview).toContainText("910000002");
       await expect(preview).toContainText("HOTEL E2E MADRID");
       await admin.page.getByRole("button", { name: "Сформировать Excel" }).click();
-      await expect(admin.page.getByRole("button", { name: "Excel готов" })).toBeVisible();
+      await expect(
+        admin.page.getByRole("button", { name: "Excel готов" }),
+      ).toBeVisible();
       await admin.page.screenshot({
         fullPage: true,
         path: resolve(outputDir, "desktop-1440-excel-preview.png"),
@@ -1038,12 +1191,17 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await zipButton.click();
       const download = await downloadPromise;
       await expect(download.failure()).resolves.toBeNull();
-      expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+_documents\.zip$/);
+      expect(download.suggestedFilename()).toMatch(
+        /^visaflow-export-.+_documents\.zip$/,
+      );
       const zipPath = resolve(outputDir, download.suggestedFilename());
       await download.saveAs(zipPath);
-      await expect(admin.page.locator("#export-action-hint")).toContainText(/ZIP скачан|пакет/i, {
-        timeout: 45_000,
-      });
+      await expect(admin.page.locator("#export-action-hint")).toContainText(
+        /ZIP скачан|пакет/i,
+        {
+          timeout: 45_000,
+        },
+      );
 
       await signOut(owner.page);
       await ensureLoginMode(owner.page);
@@ -1051,11 +1209,17 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await owner.page.getByLabel("Пароль", { exact: true }).fill(ownerPassword);
       await owner.page.getByRole("button", { name: /Войти/ }).click();
       await expect(
-        owner.page.getByRole("heading", { level: 1, name: /^(Мои действия|Мои подачи)$/ }),
+        owner.page.getByRole("heading", {
+          level: 1,
+          name: /^(Мои действия|Мои подачи)$/,
+        }),
       ).toBeVisible({ timeout: 45_000 });
       await clickWorkspaceButton(owner.page, /Мои подачи/);
       await openSubmissionById(owner.page, applicationId);
-      const afterExport = await visibleStatus(drawer(owner.page), /Выгружено|Экспортировано/);
+      const afterExport = await visibleStatus(
+        drawer(owner.page),
+        /Выгружено|Экспортировано/,
+      );
 
       const inspected = await inspectGeneratedZip(
         zipPath,

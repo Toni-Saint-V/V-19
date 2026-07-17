@@ -37,8 +37,7 @@ const allowedProductionLifecycleCaseKeys = [
 
 export type ProductionSingleCaseKey = `A${1 | 2 | 3}-S${1 | 2 | 3}`;
 
-export function requiredProductionLifecycleCaseKey():
-  (typeof allowedProductionLifecycleCaseKeys)[number] {
+export function requiredProductionLifecycleCaseKey(): (typeof allowedProductionLifecycleCaseKeys)[number] {
   const caseKey = process.env.V19_PRODUCTION_COHORT_CASE_KEY?.trim();
   invariant(
     allowedProductionLifecycleCaseKeys.includes(
@@ -50,8 +49,7 @@ export function requiredProductionLifecycleCaseKey():
 }
 
 export const RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY =
-  process.env.V19_PRODUCTION_COHORT_CASE_KEY ===
-  FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
+  process.env.V19_PRODUCTION_COHORT_CASE_KEY === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
     ? FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
     : PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY;
 
@@ -254,7 +252,7 @@ export type ProductionDraftSnapshotMutationIntent =
 
 export type ProductionLifecycleMutationContract =
   ProductionDraftPayloadMutationContract & {
-  submissionStatus: "ready_for_excel" | "returned" | "waiting_review";
+    submissionStatus: "ready_for_excel" | "returned" | "waiting_review";
   };
 
 /**
@@ -416,8 +414,10 @@ function jsonRecord(value: unknown): JsonRecord | null {
 
 function canonicalJson(value: unknown): string | null {
   if (value === null) return "null";
-  if (typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
-  if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : null;
+  if (typeof value === "boolean" || typeof value === "string")
+    return JSON.stringify(value);
+  if (typeof value === "number")
+    return Number.isFinite(value) ? JSON.stringify(value) : null;
   if (Array.isArray(value)) {
     const items = value.map((item) => canonicalJson(item));
     return items.every((item): item is string => item !== null)
@@ -440,7 +440,9 @@ function canonicalJson(value: unknown): string | null {
 /** Hashes a value in memory without retaining its potentially sensitive text. */
 export function productionDraftValueDigest(value: unknown) {
   const serialized = canonicalJson(value);
-  return serialized === null ? null : createHash("sha256").update(serialized).digest("hex");
+  return serialized === null
+    ? null
+    : createHash("sha256").update(serialized).digest("hex");
 }
 
 /** Mirrors the deterministic persistence identity used by cockpit draft writes. */
@@ -463,13 +465,14 @@ export function productionDraftStableUuid(seed: string) {
 }
 
 function productionDraftDurableUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 /** Mirrors the serializer: durable audit rows keep their database UUID. */
-export function productionDraftHistoryPayloadId(submissionId: string, historyId: string) {
+export function productionDraftHistoryPayloadId(
+  submissionId: string,
+  historyId: string,
+) {
   return productionDraftDurableUuid(historyId)
     ? historyId
     : productionDraftStableUuid(`history:${submissionId}:${historyId}`);
@@ -482,7 +485,9 @@ function identityKey(...values: unknown[]) {
 function recordArray(value: unknown): JsonRecord[] | null {
   if (!Array.isArray(value)) return null;
   const records = value.map(jsonRecord);
-  return records.every((record): record is JsonRecord => record !== null) ? records : null;
+  return records.every((record): record is JsonRecord => record !== null)
+    ? records
+    : null;
 }
 
 function text(value: unknown) {
@@ -493,10 +498,7 @@ function nullableText(value: unknown) {
   return value === null || typeof value === "string" ? value : undefined;
 }
 
-function exactIdentitySet(
-  actual: readonly string[],
-  expected: readonly string[],
-) {
+function exactIdentitySet(actual: readonly string[], expected: readonly string[]) {
   const actualSet = new Set(actual);
   const expectedSet = new Set(expected);
   return (
@@ -508,10 +510,7 @@ function exactIdentitySet(
   );
 }
 
-function exactIdentityMultiset(
-  actual: readonly string[],
-  expected: readonly string[],
-) {
+function exactIdentityMultiset(actual: readonly string[], expected: readonly string[]) {
   if (actual.length !== expected.length) return false;
   const counts = new Map<string, number>();
   for (const value of expected) counts.set(value, (counts.get(value) ?? 0) + 1);
@@ -700,9 +699,7 @@ export function productionDraftMediaStaticContentDigest(value: unknown) {
   const staticRecord = Object.fromEntries(
     Object.entries(record).filter(
       ([key]) =>
-        key !== "review_status" &&
-        key !== "reviewed_at" &&
-        key !== "reviewed_by",
+        key !== "review_status" && key !== "reviewed_at" && key !== "reviewed_by",
     ),
   );
   return productionDraftValueDigest({
@@ -818,9 +815,7 @@ export function productionDraftSnapshotProjectionDigests(
   }
   const projectionDigest = (key: "applicants" | "files" | "history" | "issues") =>
     productionDraftValueDigest(
-      Object.hasOwn(snapshot, key)
-        ? snapshot[key]
-        : { absentSnapshotProjection: key },
+      Object.hasOwn(snapshot, key) ? snapshot[key] : { absentSnapshotProjection: key },
     );
   const applicants = projectionDigest("applicants");
   const files = projectionDigest("files");
@@ -1145,8 +1140,7 @@ function applicantPayloadMismatchCode(
     const expected = expectedById.get(applicantId);
     if (!expected) return "identity";
     if (
-      productionDraftApplicantContentDigest(actual) ===
-      expected.expectedContentDigest
+      productionDraftApplicantContentDigest(actual) === expected.expectedContentDigest
     ) {
       continue;
     }
@@ -1184,7 +1178,13 @@ function mediaPayloadKey(value: JsonRecord) {
   const storageBucket = text(value.storage_bucket);
   const storagePathDigest = productionDraftValueDigest(value.storage_path);
   const contentDigest = productionDraftMediaContentDigest(value);
-  return id && applicantId && submissionId && type && storageBucket && storagePathDigest && contentDigest
+  return id &&
+    applicantId &&
+    submissionId &&
+    type &&
+    storageBucket &&
+    storagePathDigest &&
+    contentDigest
     ? identityKey(
         id,
         applicantId,
@@ -1206,10 +1206,7 @@ function mediaRowsMatch(
     const mediaKeys = actualRows.map(mediaPayloadKey);
     return (
       mediaKeys.every((key): key is string => key !== null) &&
-      exactIdentitySet(
-        mediaKeys,
-        contract.draft.mediaAssets.map(mediaKey),
-      )
+      exactIdentitySet(mediaKeys, contract.draft.mediaAssets.map(mediaKey))
     );
   }
   if (
@@ -1237,11 +1234,11 @@ function mediaRowsMatch(
     const expected = mediaId ? projectedById.get(mediaId) : undefined;
     return Boolean(
       expected &&
-        row.review_status === "accepted" &&
-        row.reviewed_by === projection.actorId &&
-        timestampFallsWithinWindow(row.reviewed_at, contract.timestampWindow) &&
-        productionDraftMediaStaticContentDigest(row) ===
-          expected.expectedStaticContentDigest,
+      row.review_status === "accepted" &&
+      row.reviewed_by === projection.actorId &&
+      timestampFallsWithinWindow(row.reviewed_at, contract.timestampWindow) &&
+      productionDraftMediaStaticContentDigest(row) ===
+        expected.expectedStaticContentDigest,
     );
   });
 }
@@ -1313,10 +1310,7 @@ function submissionPayloadMismatchCode(
         ? "ready_for_excel"
         : "waiting_review";
   if (submission.status !== expectedStatus) return "status";
-  if (
-    submission.priority !==
-    (expectedStatus === "returned" ? "Высокий" : "Средний")
-  ) {
+  if (submission.priority !== (expectedStatus === "returned" ? "Высокий" : "Средний")) {
     return "priority";
   }
   if (submission.appointment_status !== "not_started") return "appointment";
@@ -1353,7 +1347,9 @@ function questionnaireValueStructureDigest(value: unknown) {
 }
 
 export function productionDraftQuestionnaireValueIdentity(value: unknown) {
-  const logicalValueDigest = productionDraftValueDigest(questionnaireLogicalValue(value));
+  const logicalValueDigest = productionDraftValueDigest(
+    questionnaireLogicalValue(value),
+  );
   const valueDigest = productionDraftValueDigest(value);
   const valueStructureDigest = questionnaireValueStructureDigest(value);
   return logicalValueDigest && valueDigest && valueStructureDigest
@@ -1370,7 +1366,13 @@ function answerPayloadIdentity(value: JsonRecord) {
   const labelDigest = productionDraftValueDigest(value.label);
   const valueIdentity = productionDraftQuestionnaireValueIdentity(value.value);
   const updatedBy = text(value.updated_by);
-  return submissionId && applicantId && sectionId && fieldId && labelDigest && valueIdentity && updatedBy
+  return submissionId &&
+    applicantId &&
+    sectionId &&
+    fieldId &&
+    labelDigest &&
+    valueIdentity &&
+    updatedBy
     ? {
         applicantId,
         fieldId,
@@ -1586,7 +1588,8 @@ function historyPayloadRecord(value: JsonRecord): StatusHistoryPayloadRecord | n
   const toStatus = text(value.to_status);
   const source = text(value.source);
   const commentDigest = productionDraftValueDigest(value.comment);
-  const noteDigest = value.note === null ? null : productionDraftValueDigest(value.note);
+  const noteDigest =
+    value.note === null ? null : productionDraftValueDigest(value.note);
   const changedBy = text(value.changed_by);
   const changedAt = text(value.changed_at);
   if (
@@ -1597,7 +1600,7 @@ function historyPayloadRecord(value: JsonRecord): StatusHistoryPayloadRecord | n
     !toStatus ||
     (source !== "admin" && source !== "agent") ||
     !commentDigest ||
-    noteDigest === null && value.note !== null ||
+    (noteDigest === null && value.note !== null) ||
     !changedBy ||
     !isIsoTimestamp(changedAt)
   ) {
@@ -1641,9 +1644,7 @@ function expectedHistoryPayload(
   if (!transition) return expected;
   const commentDigest = productionDraftValueDigest(transition.comment);
   const noteDigest =
-    transition.note === null
-      ? null
-      : productionDraftValueDigest(transition.note);
+    transition.note === null ? null : productionDraftValueDigest(transition.note);
   if (!commentDigest || (transition.note !== null && !noteDigest)) return [];
   return [
     ...expected,
@@ -1676,9 +1677,7 @@ function expectedCorrections(
         ? {
             ...item,
             fixedAt:
-              item.status === contract.correction.status
-                ? item.fixedAt
-                : "action",
+              item.status === contract.correction.status ? item.fixedAt : "action",
             status: contract.correction.status,
           }
         : item,
@@ -1687,9 +1686,7 @@ function expectedCorrections(
   if (markerRows.length !== 0) return null;
   const applicantId =
     contract.correction.applicantId ??
-    (contract.draft.applicants.length === 1
-      ? contract.draft.applicants[0]!.id
-      : null);
+    (contract.draft.applicants.length === 1 ? contract.draft.applicants[0]!.id : null);
   const fieldKey = contract.correction.fieldKey ?? "Примечание";
   const baseReason =
     contract.correction.baseReason ?? "Требуется исправить поле «Примечание»";
@@ -1812,9 +1809,9 @@ function statusHistoryPayloadTimestampsMatch(
     const item = actualByKey.get(historyPayloadKey(expectedItem));
     return Boolean(
       item &&
-        (expectedItem.changedAt === "action"
-          ? timestampFallsWithinWindow(item.changedAt, contract.timestampWindow)
-          : timestampMatches(item.changedAt, expectedItem.changedAt)),
+      (expectedItem.changedAt === "action"
+        ? timestampFallsWithinWindow(item.changedAt, contract.timestampWindow)
+        : timestampMatches(item.changedAt, expectedItem.changedAt)),
     );
   });
 }
@@ -1845,7 +1842,9 @@ export function productionDraftSnapshotIssueIdentities(value: unknown) {
     if (
       !id ||
       ids.has(id) ||
-      (status !== "open" && status !== "fixed_by_agent" && status !== "closed_by_admin") ||
+      (status !== "open" &&
+        status !== "fixed_by_agent" &&
+        status !== "closed_by_admin") ||
       !contentDigest ||
       !withoutStatus
     ) {
@@ -1902,16 +1901,17 @@ function snapshotHistoryIdentity(
     textValue === null ? undefined : detail ? `${textValue} — ${detail}` : textValue,
   );
   const contentDigest = normalizedSnapshotHistoryContentDigest(value);
-  return (
-    id &&
+  return id &&
     fromStatus !== undefined &&
     toStatus &&
-    (source === "admin" || source === "agent" || source === "bb" || source === "system") &&
+    (source === "admin" ||
+      source === "agent" ||
+      source === "bb" ||
+      source === "system") &&
     commentDigest &&
     contentDigest
-      ? { commentDigest, contentDigest, fromStatus, id, noteDigest, source, toStatus }
-      : null
-  );
+    ? { commentDigest, contentDigest, fromStatus, id, noteDigest, source, toStatus }
+    : null;
 }
 
 function snapshotHistoryIdentityKey(value: ProductionDraftSnapshotHistoryIdentity) {
@@ -1970,7 +1970,8 @@ export function productionDraftEffectiveSnapshotHistory(input: {
       const comment = text(row.comment);
       const toStatus = canonicalHistoryStatus(row.to_status);
       const fromStatus = canonicalHistoryStatus(row.from_status);
-      if (!id || !entityId || !changedBy || !changedAt || !comment || !toStatus) return null;
+      if (!id || !entityId || !changedBy || !changedAt || !comment || !toStatus)
+        return null;
       const item: JsonRecord = {
         actorId: changedBy,
         at: changedAt,
@@ -1985,9 +1986,7 @@ export function productionDraftEffectiveSnapshotHistory(input: {
       if (note) item.note = note;
       return { changedAt, item };
     })
-    .filter(
-      (entry): entry is { changedAt: string; item: JsonRecord } => Boolean(entry),
-    )
+    .filter((entry): entry is { changedAt: string; item: JsonRecord } => Boolean(entry))
     .sort((left, right) => right.changedAt.localeCompare(left.changedAt));
 
   const durableKeys = new Set(
@@ -2024,9 +2023,7 @@ export function productionDraftEffectiveSnapshotHistory(input: {
   };
 }
 
-function expectedSnapshotHistoryKeys(
-  contract: ProductionDraftPayloadMutationContract,
-) {
+function expectedSnapshotHistoryKeys(contract: ProductionDraftPayloadMutationContract) {
   if (contract.snapshotHistoryProjection) {
     return contract.snapshotHistoryProjection.typed.map(snapshotHistoryIdentityKey);
   }
@@ -2094,10 +2091,7 @@ function snapshotDraftPayloadMismatchCode(
   const snapshotTimestampValid = input.contract.timestampWindow
     ? input.contract.snapshotProjection?.updatedAtMode === "action_iso"
       ? typeof snapshot.updatedAt === "string" &&
-        timestampFallsWithinWindow(
-          snapshot.updatedAt,
-          input.contract.timestampWindow,
-        )
+        timestampFallsWithinWindow(snapshot.updatedAt, input.contract.timestampWindow)
       : snapshot.updatedAt === "сейчас"
     : isSnapshotTimestamp(snapshot.updatedAt);
   if (!snapshotTimestampValid) {
@@ -2136,9 +2130,9 @@ function snapshotDraftPayloadMismatchCode(
 
   const snapshotApplicants = recordArray(snapshot.applicants);
   if (!snapshotApplicants) return "applicant_shape";
-  const expectedApplicantIds = input.applicants.map((item) => text(item.id)).filter(
-    (item): item is string => Boolean(item),
-  );
+  const expectedApplicantIds = input.applicants
+    .map((item) => text(item.id))
+    .filter((item): item is string => Boolean(item));
   const actualApplicantIds = snapshotApplicants
     .map((item) => text(item.id))
     .filter((item): item is string => Boolean(item));
@@ -2252,19 +2246,17 @@ function snapshotDraftPayloadMismatchCode(
         input.payloadSubmission.family_intelligence,
       ) === input.contract.snapshotMutation.expectedContentDigest
     : productionDraftSnapshotContentDigest(
-          input.payloadSubmission.family_intelligence,
-          input.contract.mode,
-          {
-            normalizeFileReviewTimestamps: Boolean(
-              input.contract.mediaProjection,
-            ),
-          },
-        ) ===
-        (input.contract.snapshotProjection && input.contract.mode === "lifecycle"
-          ? input.contract.snapshotProjection.expectedLifecycleContentDigest
-          : input.contract.mode === "export"
-            ? input.contract.draft.snapshot.exportContentDigest
-            : input.contract.draft.snapshot.lifecycleContentDigest);
+        input.payloadSubmission.family_intelligence,
+        input.contract.mode,
+        {
+          normalizeFileReviewTimestamps: Boolean(input.contract.mediaProjection),
+        },
+      ) ===
+      (input.contract.snapshotProjection && input.contract.mode === "lifecycle"
+        ? input.contract.snapshotProjection.expectedLifecycleContentDigest
+        : input.contract.mode === "export"
+          ? input.contract.draft.snapshot.exportContentDigest
+          : input.contract.draft.snapshot.lifecycleContentDigest);
   return contentMatches ? null : "content";
 }
 
@@ -2421,13 +2413,7 @@ export function productionLifecycleMutationPayloadMismatchCode(
     if (!submissionPayloadMatchesContract(submission, contract)) {
       return `submission_${submissionPayloadMismatchCode(submission, contract)}`;
     }
-    if (
-      !applicants ||
-      !media ||
-      !questionnaireAnswers ||
-      !corrections ||
-      !history
-    ) {
+    if (!applicants || !media || !questionnaireAnswers || !corrections || !history) {
       return "nested_shape";
     }
     if (!expectedCorrectionRows) return "expected_corrections";
@@ -2597,8 +2583,7 @@ export function assertProductionLifecycleMutationAudit(
   );
   invariant(
     authRecords.every(
-      (record) =>
-        record.status === 0 || (record.status >= 200 && record.status < 300),
+      (record) => record.status === 0 || (record.status >= 200 && record.status < 300),
     ),
     "Production lifecycle auth emitted a non-retryable HTTP failure.",
   );
@@ -2726,9 +2711,11 @@ export function productionLifecycleStatePath(
   runMarker: string,
   caseKey = FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY,
 ) {
-  const suffix =
-    caseKey === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY ? "" : `-${caseKey}`;
-  return resolve(process.cwd(), `.production-lifecycle-${runMarker}${suffix}.state.local.json`);
+  const suffix = caseKey === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY ? "" : `-${caseKey}`;
+  return resolve(
+    process.cwd(),
+    `.production-lifecycle-${runMarker}${suffix}.state.local.json`,
+  );
 }
 
 function productionCohortMutationLockPath(runMarker: string) {
@@ -2802,8 +2789,7 @@ function focusedSubmittedCase(runMarker: string) {
     `Focused ${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} case is absent from the production plan.`,
   );
   const expectedApplicantCount =
-    RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY ===
-    FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
+    RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
       ? 6
       : 1;
   invariant(

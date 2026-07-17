@@ -4,6 +4,7 @@ import {
   validateVisaFormDataForRendering,
 } from "./visaApplicationFormRenderContract";
 import type { Applicant, Submission } from "./types";
+import { composeQuestionnaireHomeAddress } from "./questionnaireAddressFields";
 
 export function createVisaApplicationFormPdfBlob(
   submission: Submission,
@@ -161,9 +162,18 @@ function buildVisaFormData(submission: Submission, applicant: Applicant): VisaFo
   const passportNo = normalizeVisaFormInput(
     firstNonEmpty(field("passport-no"), field("passport-number"), field("passportNo")),
   );
+  const homeAddress = firstNonEmpty(
+    field("home-address"),
+    composeQuestionnaireHomeAddress({
+      homeBuilding: field("home-building"),
+      homeHouse: field("home-house"),
+      homeStreet: field("home-street"),
+      homeUnit: field("home-unit"),
+    }),
+  );
 
   return {
-    address: field("home-address"),
+    address: homeAddress,
     addressCity: field("home-city"),
     birthCountry: normalizeCountry(field("birth-country")),
     birthDate: dateForVisaForm(field("birth-date")),
@@ -200,7 +210,7 @@ function buildVisaFormData(submission: Submission, applicant: Applicant): VisaFo
         field("birth-country"),
       ),
     ),
-    occupation: firstNonEmpty(field("occupation-specify"), field("occupation")),
+    occupation: firstNonEmpty(field("occupation"), field("occupation-specify")),
     otherSponsor: field("other-sponsor"),
     passportExpiry: dateForVisaForm(field("passport-expiry-date")),
     passportNo,

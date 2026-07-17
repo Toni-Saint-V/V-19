@@ -315,7 +315,7 @@ describe("V-19 export workbook contract", () => {
     });
   });
 
-  test("preserves canonical identity and sponsor fields in the parsed workbook", async () => {
+  test("preserves canonical identity and simplified production fields in the parsed workbook", async () => {
     const submission = withQuestionnaireFieldValues(readySubmission(), {
       "arrival-date": "04.09.2026",
       "birth-citizenship": "USSR",
@@ -326,7 +326,7 @@ describe("V-19 export workbook contract", () => {
       "company-contact-person": "MARIA LOPEZ",
       "company-phone": "+34 900 000 777",
       "contact-number": "+7 900 111-22-33",
-      "cost-covered-by": "Спонсор",
+      "cost-covered-by": "Сам заявитель",
       "departure-date": "14.09.2026",
       email: "olga@example.com",
       "employer-address": "10 WORK ROAD",
@@ -347,10 +347,9 @@ describe("V-19 export workbook contract", () => {
       "hotel-postal-code": "28001",
       "inviting-party-type": "Приглашающая компания/организация",
       "marital-status": "Холост/не замужем",
-      "means-of-support": "",
+      "means-of-support": "Наличные",
       nationality: "Russian Federation",
-      occupation: "OTHER",
-      "occupation-specify": "PRODUCT MANAGER",
+      occupation: "PRODUCT MANAGER",
       "passport-no": "AB 12-34 567",
       "passport-expiry-date": "20.02.2034",
       "passport-issue-country": "Russian Federation",
@@ -360,8 +359,6 @@ describe("V-19 export workbook contract", () => {
       "postal-code": "119991",
       "previous-surname": "SMITH",
       purpose: "OTHER",
-      "sponsor-in-host-fields": "Да",
-      "sponsor-means": "Все расходы оплачиваются",
       "stay-duration": "11",
       "stay-purpose-details": "CONFERENCE",
       surname: "MOROZOVA",
@@ -430,9 +427,9 @@ describe("V-19 export workbook contract", () => {
       "Contact Person address": "1 HOTEL ROAD",
       "Contact Person Email": "hotel@example.com",
       "Contact Person Mobile": "34900000777",
-      "Cost Covered By(Sponsor/Applicant)": "Sponsor",
+      "Cost Covered By(Sponsor/Applicant)": "Applicant",
       "Means Of Support(Accommodation Provided/All expenses covered/Cash/CreditCard)":
-        "All expenses covered",
+        "Cash",
       "Appointment Type(For Family, applicant email and contact number should be same for all family members)":
         "Individual",
       "Nationality At Birth": "USSR",
@@ -481,22 +478,11 @@ describe("V-19 export workbook contract", () => {
         "means-of-support": "Дорожные чеки",
       }),
     ]);
-    const sponsorMeans = exportSummary([
-      withQuestionnaireFieldValues(readySubmission(), {
-        "cost-covered-by": "Спонсор",
-        "means-of-support": "",
-        "sponsor-in-host-fields": "Да",
-        "sponsor-means": "Транспорт предоплачен",
-      }),
-    ]);
-
-    for (const plan of [applicantMeans, sponsorMeans]) {
-      expect(plan.ready).toBe(false);
-      expect(plan.canGenerate).toBe(false);
-      expect(plan.blockers.map((blocker) => blocker.reason)).toContain(
-        "В строках выгрузки есть способ оплаты, который не поддерживается Excel-контрактом",
-      );
-    }
+    expect(applicantMeans.ready).toBe(false);
+    expect(applicantMeans.canGenerate).toBe(false);
+    expect(applicantMeans.blockers.map((blocker) => blocker.reason)).toContain(
+      "В строках выгрузки есть способ оплаты, который не поддерживается Excel-контрактом",
+    );
   });
 
   test("fails closed for duplicate passports and repeated applicant identity profiles", () => {

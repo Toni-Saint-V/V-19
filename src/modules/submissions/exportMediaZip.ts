@@ -4,6 +4,7 @@ import {
   buildDocumentsZip,
   DocumentZipBuilderError,
   EXPORT_DOCUMENT_TYPES,
+  exportDocumentTypesForApplicant,
   type DocumentZipDownloader,
 } from "../documents/documentExport";
 import {
@@ -19,11 +20,6 @@ import {
 } from "./exportRules";
 import type { ExportPackageDocumentCommit } from "./exportPackageDocumentCommit";
 import { createExportWorkbookArtifact } from "./exportWorkbook";
-import {
-  createVisaApplicationFormPdfBlob,
-  validateVisaApplicationFormData,
-  visaApplicationFormValidationMessage,
-} from "./visaApplicationFormPdf";
 import {
   downloadMediaFromStorage,
   mediaStorageBucket,
@@ -43,7 +39,6 @@ export type ExportMediaZipBlockedReason =
   | "export_not_ready"
   | "media_not_ready"
   | "passport_number_missing"
-  | "questionnaire_incomplete"
   | "row_mismatch"
   | "storage_download_failed"
   | "storage_unavailable"
@@ -205,7 +200,8 @@ export async function createExportMediaZipArtifact(
         `Applicants: ${documents.applicantCount}`,
         `Document files: ${documents.fileCount}`,
         `Workbook: ${workbookArtifact.fileName}`,
-        "Required files per applicant: passport_scan, selfie_1, selfie_2",
+        "Required files: passport_scan for every applicant; selfie_1 and selfie_2 for the primary applicant only",
+        "Questionnaire PDF is not included.",
         "Archive structure: VisaFlow_Export_YYYY-MM-DD / city / family-or-applicant / documents.",
       ].join("\n"),
     );
@@ -306,19 +302,6 @@ function validateExportMediaZipIdentity(
       reason: ExportMediaZipBlockedReason;
       safeMessage: string;
     } {
-  const incompleteVisaForms = submissions.flatMap((submission) =>
-    submission.applicants.flatMap((applicant) => {
-      const validation = validateVisaApplicationFormData(submission, applicant);
-      return validation.ok ? [] : validation.missingFields;
-    }),
-  );
-  if (incompleteVisaForms.length > 0) {
-    return blocked(
-      "questionnaire_incomplete",
-      visaApplicationFormValidationMessage(incompleteVisaForms),
-    );
-  }
-
   if (!canDownloadExportMediaZip(submissions)) {
     return blocked(
       "export_not_ready",
@@ -412,12 +395,6 @@ function documentDownloaderForOptions(
   if (options.downloadMedia) {
     const legacyDownload = options.downloadMedia;
     return async (asset, context) => {
-      if (asset.type === "visa_form") {
-        return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
-          exportDate: context.exportDate,
-        });
-      }
-
       const frontendType = documentTypeToFrontendMediaType(asset.type);
       const file = submissions
         .find((submission) => submission.id === asset.submissionId)
@@ -444,13 +421,7 @@ function documentDownloaderForOptions(
     };
   }
 
-  return async (asset, context) => {
-    if (asset.type === "visa_form") {
-      return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
-        exportDate: context.exportDate,
-      });
-    }
-
+  return async (asset) => {
     return downloadMediaFromStorage({
       bucket: mediaStorageBucket,
       path: asset.storage.path,
@@ -525,9 +496,9 @@ function buildArchiveManifest(
     rootFolder: counts.rootFolder,
     workbookFileName: counts.workbookFileName,
     submissions: submissions.map((submission) => ({
-      applicants: submission.applicants.map((applicant) => ({
+      applicants: submission.applicants.map((applicant, applicantIndex) => ({
         id: applicant.id,
-        documentTypes: EXPORT_DOCUMENT_TYPES,
+        documentTypes: exportDocumentTypesForApplicant(applicantIndex),
         name: applicant.fullName,
       })),
       city: submission.city,
@@ -551,9 +522,6 @@ function safeMessageForDocumentZipError(error: DocumentZipBuilderError): string 
   }
   if (reason === "passport_number_missing") {
     return "У каждого заявителя должен быть проверенный номер паспорта. ZIP не сформирован.";
-  }
-  if (reason === "questionnaire_incomplete") {
-    return error.message;
   }
   return "В выбранном пакете не все обязательные документы прошли проверку.";
 }

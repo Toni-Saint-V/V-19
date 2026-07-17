@@ -170,13 +170,14 @@ describe("document export ZIP builder", () => {
       submissions: [submission],
     });
 
-    expect(result).toMatchObject({ applicantCount: 3, fileCount: 12 });
+    expect(result).toMatchObject({ applicantCount: 3, fileCount: 5 });
     expect(await zipFileNames(result.zip)).toEqual(
       expect.arrayContaining([
         "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011021_passport_scan.jpg",
         "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011021_selfie_1.jpg",
-        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011022_selfie_2.jpg",
-        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011023_visa_form.pdf",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011021_selfie_2.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011022_passport_scan.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011023_passport_scan.jpg",
       ]),
     );
   });
@@ -210,7 +211,7 @@ describe("document export ZIP builder", () => {
     expect(downloadAsset).not.toHaveBeenCalled();
   });
 
-  test("fails closed before download when a PDF field would be truncated", async () => {
+  test("does not validate questionnaire PDF fields", async () => {
     const source = byId("ПД-1056");
     const submission: Submission = {
       ...source,
@@ -228,21 +229,17 @@ describe("document export ZIP builder", () => {
       async () => new Blob(["bytes"], { type: "image/jpeg" }),
     );
 
-    await expect(
-      buildDocumentsZip({
-        assets: documentAssetsFor(submission),
-        downloadAsset,
-        exportDate,
-        submissions: [submission],
-      }),
-    ).rejects.toMatchObject({
-      message: expect.stringContaining("Домашний адрес"),
-      reason: "questionnaire_incomplete",
+    const result = await buildDocumentsZip({
+      assets: documentAssetsFor(submission),
+      downloadAsset,
+      exportDate,
+      submissions: [submission],
     });
-    expect(downloadAsset).not.toHaveBeenCalled();
+    expect(result.fileCount).toBe(3);
+    expect(downloadAsset).toHaveBeenCalledTimes(3);
   });
 
-  test("blocks an unsafe passport number instead of rewriting every filename prefix", async () => {
+  test("normalizes the passport number used for archive filenames", async () => {
     const source = byId("ПД-1056");
     const submission: Submission = {
       ...source,
@@ -261,18 +258,18 @@ describe("document export ZIP builder", () => {
         new Blob([asset.id], { type: asset.mime ?? "image/jpeg" }),
     );
 
-    await expect(
-      buildDocumentsZip({
-        assets: documentAssetsFor(submission),
-        downloadAsset,
-        exportDate,
-        submissions: [submission],
-      }),
-    ).rejects.toMatchObject({
-      message: expect.stringContaining("Номер паспорта"),
-      reason: "questionnaire_incomplete",
+    const result = await buildDocumentsZip({
+      assets: documentAssetsFor(submission),
+      downloadAsset,
+      exportDate,
+      submissions: [submission],
     });
-    expect(downloadAsset).not.toHaveBeenCalled();
+    expect(result.entries).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/AB123456_passport_scan\.jpg$/),
+      ]),
+    );
+    expect(downloadAsset).toHaveBeenCalledTimes(3);
   });
 
   test("blocks missing selfie_2", () => {

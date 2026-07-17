@@ -2,13 +2,9 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
   FileWarning,
   Loader2,
-  MapPin,
   MoreVertical,
   Plus,
   ScanLine,
@@ -17,7 +13,6 @@ import {
   Users,
 } from 'lucide-react';
 import type {
-  CollectionDocumentUpload,
   Submission,
   SubmissionFile,
   SubmissionFileType,
@@ -35,14 +30,11 @@ import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-syst
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
 import {
   canonicalCollectionDocTypes,
-  collectionDocumentDocTypes,
   collectionDocTypes,
   detectCollectionDocType,
-  findCollectionDocumentUpload,
   normalizeCollectionPassportNumber,
   passportNumberFromCollectionText,
   resolveCollectionUploadTarget,
-  upsertCollectionDocumentUpload,
   type CollectionDocType,
 } from '../modules/submissions/documentCollectionIntake';
 import { fileToDocumentStatus } from './v19BusinessScreenAdapter';
@@ -50,6 +42,7 @@ import { fileToDocumentStatus } from './v19BusinessScreenAdapter';
 interface DraftsScreenProps {
   initialFilter?: DraftSummaryFilter;
   onOpenDrawer: (id: string) => void;
+  onOpenIssue: (target: DocumentIssueTarget) => void;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   submissions?: Submission[];
 }
@@ -60,6 +53,7 @@ export type DraftSummaryFilter = 'missing' | 'processing' | 'error';
 type MatrixApplicant = {
   docs: Record<CollectionDocType, DocStatus>;
   id: string;
+  isPrimary: boolean;
   name: string;
   passportNumber: string;
   role: string;
@@ -83,6 +77,8 @@ type PendingCellTarget = {
   submissionId: string;
 };
 
+export type DocumentIssueTarget = PendingCellTarget;
+
 type UnmatchedUpload = {
   applicantId?: string;
   detectedDocType: CollectionDocType | 'unknown';
@@ -93,11 +89,30 @@ type UnmatchedUpload = {
   submissionId?: string;
 };
 
-const docTypes = collectionDocTypes;
+const docTypes = collectionDocTypes.filter((doc) =>
+  canonicalCollectionDocTypes.has(doc.key),
+);
 const passportCollectionExtractionTimeoutMs = 10_000;
 
-function roleLabel(role: MatrixApplicant['role']) {
-  return role;
+function requiredDocTypesForApplicant(applicant: MatrixApplicant) {
+  return applicant.isPrimary
+    ? docTypes
+    : docTypes.filter((doc) => doc.key === 'passport');
+}
+
+function groupSubmissionsByType(submissions: MatrixSubmission[]) {
+  return [
+    {
+      key: 'family' as const,
+      label: 'Семьи',
+      submissions: submissions.filter((submission) => submission.type === 'family'),
+    },
+    {
+      key: 'single' as const,
+      label: 'Одиночные заявители',
+      submissions: submissions.filter((submission) => submission.type === 'single'),
+    },
+  ].filter((group) => group.submissions.length > 0);
 }
 
 function applicantRoleLabel(applicant: Submission['applicants'][number]) {
@@ -105,16 +120,6 @@ function applicantRoleLabel(applicant: Submission['applicants'][number]) {
   if (applicant.role === 'spouse') return 'Супруг(а)';
   if (applicant.role === 'child') return 'Ребёнок';
   return 'Заявитель';
-}
-
-function mobileApplicantRoleLabel(applicant: MatrixApplicant) {
-  if (applicant.role === 'Основной') return '';
-  if (applicant.role === 'Ребёнок') return 'Ребенок';
-  if (applicant.role === 'Супруг(а)') {
-    const lastNamePart = applicant.name.trim().split(/\s+/).at(-1)?.toLowerCase() ?? '';
-    return /[ая]$/.test(lastNamePart) ? 'Супруга' : 'Супруг';
-  }
-  return applicant.role;
 }
 
 function docStatusClass(status: DocStatus) {
@@ -135,17 +140,6 @@ function fileStatusToDocStatus(file?: SubmissionFile): DocStatus {
   return fileToDocumentStatus(file);
 }
 
-function collectionStatus(
-  submission: Submission,
-  applicant: Submission['applicants'][number],
-  docType: CollectionDocType,
-): DocStatus {
-  const upload = findCollectionDocumentUpload(submission, applicant.id, docType);
-  if (upload) return upload.status === 'needs_review' ? 'processing' : 'verified';
-
-  return 'missing';
-}
-
 function applicantDocs(
   submission: Submission,
   applicant: Submission['applicants'][number],
@@ -155,7 +149,7 @@ function applicantDocs(
     passport: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'passport_scan')),
     selfie: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'selfie')),
     selfie2: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'selfie_2')),
-    questionnaire: collectionStatus(submission, applicant, 'questionnaire'),
+    questionnaire: 'missing',
   };
 }
 
@@ -177,11 +171,14 @@ function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
     const applicants = submission.applicants.map((applicant) => ({
       docs: applicantDocs(submission, applicant),
       id: applicant.id,
+      isPrimary: applicant.role === 'main',
       name: applicant.fullName,
       passportNumber: normalizeCollectionPassportNumber(passportNumberFromApplicant(applicant)),
       role: applicantRoleLabel(applicant),
     }));
-    const statuses = applicants.flatMap((applicant) => docTypes.map((doc) => applicant.docs[doc.key]));
+    const statuses = applicants.flatMap((applicant) =>
+      requiredDocTypesForApplicant(applicant).map((doc) => applicant.docs[doc.key]),
+    );
     const ready = statuses.filter((status) => status === 'verified').length;
 
     return {
@@ -311,48 +308,6 @@ async function attachPassportExtractionForUpload(
   );
 }
 
-function applyCollectionDocumentUpload(
-  submissions: Submission[],
-  target: PendingCellTarget,
-  file: File,
-  passportNumber?: string,
-) {
-  if (!collectionDocumentDocTypes.has(target.docType)) {
-    return { applied: false, nextSubmissions: submissions };
-  }
-
-  let applied = false;
-  const nextSubmissions = submissions.map((submission) => {
-    if (submission.id !== target.submissionId) return submission;
-    applied = true;
-    return upsertCollectionDocumentUpload(
-      submission,
-      assignmentRecord(target, file, passportNumber),
-    );
-  });
-
-  return { applied, nextSubmissions };
-}
-
-function assignmentRecord(
-  target: PendingCellTarget,
-  file: File,
-  passportNumber?: string,
-): CollectionDocumentUpload {
-  return {
-    applicantId: target.applicantId,
-    docType: 'questionnaire',
-    fileName: file.name,
-    id: `collection-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    mimeType: mimeTypeForFile(file, target.docType),
-    passportNumber,
-    sizeBytes: file.size,
-    status: 'uploaded',
-    submissionId: target.submissionId,
-    uploadedAtIso: new Date().toISOString(),
-  };
-}
-
 async function passportNumberFromPassportOcr(file: File) {
   try {
     const { invokePassportExtraction } = await import('../modules/submissions/passportExtractionService');
@@ -379,6 +334,19 @@ function applicantIndex(submissions: Submission[]) {
   );
 }
 
+function targetRequiresDocType(
+  submissions: Submission[],
+  target: PendingCellTarget,
+) {
+  if (!canonicalCollectionDocTypes.has(target.docType)) return false;
+  if (target.docType === 'passport') return true;
+  const submission = submissions.find((candidate) => candidate.id === target.submissionId);
+  const applicant = submission?.applicants.find(
+    (candidate) => candidate.id === target.applicantId,
+  );
+  return applicant?.role === 'main';
+}
+
 async function detectedPassportNumber(file: File, detectedDocType: CollectionDocType | 'unknown') {
   const fromName = passportNumberFromCollectionText(file.name);
   if (fromName) return fromName;
@@ -401,14 +369,16 @@ function formatBytes(size: number) {
 
 const DocCell = ({
   label,
+  onReview,
   onUpload,
   status,
 }: {
   label: string;
+  onReview: () => void;
   onUpload: () => void;
   status: DocStatus;
 }) => {
-  const className = `w-8 h-8 rounded-lg flex items-center justify-center border mx-auto transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${docStatusClass(status)}`;
+  const className = `v19-document-desktop-cell is-${status} w-8 h-8 rounded-lg flex items-center justify-center border mx-auto transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${docStatusClass(status)}`;
   const actionLabel = `${label}: ${docStatusLabel(status)}`;
   if (status === 'missing') {
     return (
@@ -419,7 +389,13 @@ const DocCell = ({
   }
 
   return (
-    <button aria-label={actionLabel} className={className} title={actionLabel} type="button" onClick={onUpload}>
+    <button
+      aria-label={actionLabel}
+      className={className}
+      title={actionLabel}
+      type="button"
+      onClick={status === 'error' ? onReview : onUpload}
+    >
       {status === 'verified' ? <CheckCircle2 className="w-[18px] h-[18px]" /> : null}
       {status === 'processing' ? <ScanLine className="w-[16px] h-[16px] animate-pulse" /> : null}
       {status === 'error' ? <AlertCircle className="w-[18px] h-[18px]" /> : null}
@@ -429,10 +405,12 @@ const DocCell = ({
 
 const MobileDocSlot = ({
   label,
+  onReview,
   onUpload,
   status,
 }: {
   label: string;
+  onReview: () => void;
   onUpload: () => void;
   status: DocStatus;
 }) => {
@@ -442,9 +420,9 @@ const MobileDocSlot = ({
     <button
       aria-label={`${label}: ${docStatusLabel(status)}`}
       data-testid="document-mobile-slot"
-      className={`flex min-h-[64px] items-center justify-between gap-1 rounded-xl border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] sm:gap-2 sm:px-3 ${docStatusClass(status)}`}
+      className={`v19-document-mobile-slot is-${status} flex min-h-[64px] items-center justify-between gap-1 rounded-xl border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] sm:gap-2 sm:px-3 ${docStatusClass(status)}`}
       type="button"
-      onClick={onUpload}
+      onClick={status === 'error' ? onReview : onUpload}
       title={`${label}: ${docStatusLabel(status)}`}
     >
       <span className="v19-mobile-document-slot-copy min-w-0">
@@ -453,7 +431,7 @@ const MobileDocSlot = ({
           {isMissing ? 'Добавить' : docStatusLabel(status)}
         </span>
       </span>
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#101011]/70 sm:h-8 sm:w-8">
+      <span className="v19-document-mobile-slot-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#101011]/70 sm:h-8 sm:w-8">
         {status === 'verified' ? <CheckCircle2 className="h-4 w-4" /> : null}
         {status === 'processing' ? <ScanLine className="h-4 w-4 animate-pulse" /> : null}
         {status === 'error' ? <AlertCircle className="h-4 w-4" /> : null}
@@ -466,6 +444,7 @@ const MobileDocSlot = ({
 export function DraftsScreen({
   initialFilter = 'missing',
   onOpenDrawer,
+  onOpenIssue,
   onSubmissionsChange,
   submissions = [],
 }: DraftsScreenProps) {
@@ -473,8 +452,6 @@ export function DraftsScreen({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [pendingCellTarget, setPendingCellTarget] = useState<PendingCellTarget | null>(null);
-  const [mobileApplicantIndex, setMobileApplicantIndex] = useState<Record<string, number>>({});
-  const mobileApplicantCarouselRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>(initialFilter);
   useEffect(() => {
     setDraftSummaryFilter(initialFilter);
@@ -486,14 +463,24 @@ export function DraftsScreen({
     () =>
       allDrafts.filter((submission) =>
         submission.applicants.some((applicant) =>
-          docTypes.some((doc) => applicant.docs[doc.key] === draftSummaryFilter),
+          requiredDocTypesForApplicant(applicant).some(
+            (doc) => applicant.docs[doc.key] === draftSummaryFilter,
+          ),
         ),
       ),
     [allDrafts, draftSummaryFilter],
   );
+  const draftGroups = useMemo(
+    () => groupSubmissionsByType(visibleDrafts),
+    [visibleDrafts],
+  );
   const summary = useMemo(() => {
     const statuses = allDrafts.flatMap((submission) =>
-      submission.applicants.flatMap((applicant) => docTypes.map((doc) => applicant.docs[doc.key])),
+      submission.applicants.flatMap((applicant) =>
+        requiredDocTypesForApplicant(applicant).map(
+          (doc) => applicant.docs[doc.key],
+        ),
+      ),
     );
     return {
       error: statuses.filter((status) => status === 'error').length,
@@ -521,9 +508,8 @@ export function DraftsScreen({
   const assignFileToTarget = async (
     target: PendingCellTarget,
     file: File,
-    passportNumber?: string,
   ) => {
-    if (canonicalCollectionDocTypes.has(target.docType)) {
+    if (targetRequiresDocType(submissions, target)) {
       const result = applyCanonicalUpload(submissions, target, file);
       if (result.applied) {
         const nextSubmissions =
@@ -539,9 +525,7 @@ export function DraftsScreen({
       return false;
     }
 
-    const result = applyCollectionDocumentUpload(submissions, target, file, passportNumber);
-    if (!result.applied) return false;
-    return commitSubmissions(result.nextSubmissions);
+    return false;
   };
 
   const triggerCellUpload = (target: PendingCellTarget) => {
@@ -553,11 +537,9 @@ export function DraftsScreen({
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file || !pendingCellTarget) return;
-    void assignFileToTarget(
-      pendingCellTarget,
-      file,
-      passportNumberFromCollectionText(file.name),
-    ).finally(() => setPendingCellTarget(null));
+    void assignFileToTarget(pendingCellTarget, file).finally(() =>
+      setPendingCellTarget(null),
+    );
   };
 
   const handleBulkFiles = async (files: FileList | File[]) => {
@@ -592,9 +574,39 @@ export function DraftsScreen({
         }
 
         const target = resolution.target;
-        const result = canonicalCollectionDocTypes.has(target.docType)
-          ? applyCanonicalUpload(workingSubmissions, target, file)
-          : applyCollectionDocumentUpload(workingSubmissions, target, file, passportNumber);
+        if (!canonicalCollectionDocTypes.has(target.docType)) {
+          unmatched.push({
+            applicantId: target.applicantId,
+            detectedDocType,
+            file,
+            id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            passportNumber,
+            reason: 'Этот тип файла не входит в пакет документов.',
+            submissionId: target.submissionId,
+          });
+          continue;
+        }
+
+        const targetSubmission = workingSubmissions.find(
+          (submission) => submission.id === target.submissionId,
+        );
+        const targetApplicant = targetSubmission?.applicants.find(
+          (applicant) => applicant.id === target.applicantId,
+        );
+        if (target.docType !== 'passport' && targetApplicant?.role !== 'main') {
+          unmatched.push({
+            applicantId: target.applicantId,
+            detectedDocType,
+            file,
+            id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            passportNumber,
+            reason: 'Для члена семьи требуется только скан загранпаспорта.',
+            submissionId: target.submissionId,
+          });
+          continue;
+        }
+
+        const result = applyCanonicalUpload(workingSubmissions, target, file);
 
         if (result.applied) {
           workingSubmissions = result.nextSubmissions;
@@ -653,7 +665,6 @@ export function DraftsScreen({
         submissionId: upload.submissionId,
       },
       upload.file,
-      upload.passportNumber,
     );
     if (applied) {
       setUnmatchedUploads((current) => current.filter((item) => item.id !== upload.id));
@@ -664,30 +675,6 @@ export function DraftsScreen({
     setUnmatchedUploads((current) =>
       current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
     );
-  };
-
-  const updateMobileApplicantIndex = (submissionId: string, index: number) => {
-    setMobileApplicantIndex((current) =>
-      current[submissionId] === index ? current : { ...current, [submissionId]: index },
-    );
-  };
-
-  const selectMobileApplicant = (
-    submissionId: string,
-    applicantCount: number,
-    requestedIndex: number,
-  ) => {
-    const index = Math.min(Math.max(requestedIndex, 0), applicantCount - 1);
-    const carousel = mobileApplicantCarouselRefs.current[submissionId];
-    if (carousel) {
-      carousel.scrollTo({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          ? 'auto'
-          : 'smooth',
-        left: carousel.clientWidth * index,
-      });
-    }
-    updateMobileApplicantIndex(submissionId, index);
   };
 
   if (!submissions.length) {
@@ -711,7 +698,7 @@ export function DraftsScreen({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="space-y-6 lg:space-y-8"
+      className="v19-documents-screen space-y-6 lg:space-y-8"
     >
       <input
         data-testid="document-cell-file-input"
@@ -731,7 +718,7 @@ export function DraftsScreen({
         onChange={handleBulkFileInput}
       />
 
-      <V19SummaryTileGrid className="v19-documents-summary-grid grid-cols-3">
+      <V19SummaryTileGrid className="v19-documents-summary-grid v19-admin-review-metrics grid-cols-3">
         <V19SummaryTile
           active={draftSummaryFilter === 'missing'}
           detail={`ожидают · ${summary.submissions}`}
@@ -762,18 +749,19 @@ export function DraftsScreen({
       </V19SummaryTileGrid>
 
       <div
-        className="flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]"
+        className="v19-documents-board flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]"
         data-testid="document-collection-matrix"
       >
-        <div className="flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
-          <div>
-            <h2 className="text-[15px] font-semibold text-white">Матрица сбора документов</h2>
+        <div className="v19-documents-board-header flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
+          <div className="v19-documents-board-heading">
+            <h2>Документы заявителей</h2>
             <p className="mt-1 text-[11px] text-white/50 sm:text-[12px]">
-              Загрузка по заявителю, массовое распределение по номеру паспорта.
+              Скан загранпаспорта — для каждого. Два селфи — только для заявителя подачи.
             </p>
           </div>
           <button
-            className="flex h-9 shrink-0 items-center gap-2 rounded-[8px] border border-white/5 bg-[#301e39] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#3a2645] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
+            aria-label="Массовая загрузка документов"
+            className="v19-documents-upload-action flex h-9 shrink-0 items-center gap-2 rounded-[8px] border border-white/5 bg-[#301e39] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#3a2645] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
             type="button"
             onClick={() => bulkInputRef.current?.click()}
             disabled={bulkBusy}
@@ -790,159 +778,109 @@ export function DraftsScreen({
           </div>
         ) : null}
 
-        <div className="space-y-4 p-3 xl:hidden">
-          {visibleDrafts.map((sub) => {
-            const activeApplicantIndex = mobileApplicantIndex[sub.id] ?? 0;
-
-            return (
-              <section
-              key={sub.id}
-              className="overflow-hidden rounded-2xl border border-[#242529] bg-[#141416]"
-              data-document-submission-id={sub.id}
-            >
-              <div className="flex items-start justify-between gap-3 border-b border-[#242529] bg-[#1a1a1d] p-3">
-                <div className="flex min-w-0 items-start gap-2.5">
-                  {sub.type === 'family' ? <Users className="mt-0.5 h-4 w-4 shrink-0 text-white/45" /> : <User className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />}
-                  <div className="min-w-0">
-                    <div className="v19-mobile-document-submission-title-row flex min-w-0 flex-wrap items-center gap-2">
-                      <h3 className="v19-mobile-document-submission-title basis-full text-[14px] font-semibold text-white">{sub.title}</h3>
-                      <span className="v19-mobile-document-submission-city inline-flex shrink-0 items-center gap-1 rounded-full border border-[#8fa3ff]/20 bg-[#8fa3ff]/10 px-2 py-0.5 text-[10px] font-medium text-[#b8baff]">
-                        <MapPin className="h-3 w-3" />
-                        {sub.city}
-                      </span>
-                    </div>
-                    <div className="mt-1 inline-flex min-w-0 items-center gap-1 text-[11px] text-white/48">
-                      <CalendarDays className="h-3 w-3 shrink-0 text-white/35" />
-                      <span className="truncate">{sub.tripDates}</span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onOpenDrawer(sub.id)}
-                  aria-label={`Открыть пакет ${sub.title}`}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-                  type="button"
-                  title="Открыть пакет"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="px-3 pt-3">
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                  <div className="h-full rounded-full bg-[#6f64ff]/55" style={{ width: `${sub.progress}%` }} />
-                </div>
-              </div>
-
+        <div className="v19-documents-mobile-list p-3 xl:hidden">
+          {draftGroups.map((group) => (
+            <div className={`v19-document-type-group is-${group.key}`} key={group.key}>
               <div
-                ref={(node) => {
-                  mobileApplicantCarouselRefs.current[sub.id] = node;
-                }}
-                aria-label="Заявители пакета"
-                data-testid="document-applicant-carousel"
-                id={`document-applicant-carousel-${sub.id}`}
-                role="region"
-                className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth scrollbar-hide"
-                onScroll={(event) => {
-                  const width = event.currentTarget.clientWidth;
-                  if (!width) return;
-                  updateMobileApplicantIndex(sub.id, Math.round(event.currentTarget.scrollLeft / width));
-                }}
+                className="v19-document-type-divider flex items-center gap-3"
+                data-testid="document-type-divider"
               >
-                {sub.applicants.map((app) => (
-                  <div key={app.id} className="w-full shrink-0 snap-start space-y-3 p-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#202024] text-white/55">
-                        <Users className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-[14px] font-medium text-white/85">{app.name}</div>
-                        {mobileApplicantRoleLabel(app) ? (
-                          <div className="mt-0.5 truncate text-[10px] font-medium text-white/60">
-                            {mobileApplicantRoleLabel(app)}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
+                {group.key === 'family' ? <Users aria-hidden="true" className="h-4 w-4" /> : <User aria-hidden="true" className="h-4 w-4" />}
+                <span>{group.label}</span>
+                <span aria-hidden="true" className="v19-document-type-divider-line" />
+              </div>
+              <div className="v19-document-package-list">
+                {group.submissions.map((sub, submissionIndex) => (
+                  <div className="v19-document-package-block" key={sub.id}>
+                    {group.key === 'family' && submissionIndex > 0 ? (
+                      <div aria-hidden="true" className="v19-document-family-divider" />
+                    ) : null}
+                    <section
+                      className="v19-document-mobile-card overflow-hidden rounded-2xl border border-[#242529] bg-[#141416]"
+                      data-document-submission-id={sub.id}
+                    >
+                      <div
+                        aria-label="Заявители пакета"
+                        data-testid="document-applicant-list"
+                        role="list"
+                      >
+                        {sub.applicants.map((app) => (
+                          <div
+                            className={`v19-document-mobile-applicant ${app.isPrimary ? 'is-primary' : 'is-family-member'}`}
+                            data-testid="document-applicant-row"
+                            key={app.id}
+                            role="listitem"
+                          >
+                            <div className="v19-document-mobile-applicant-identity flex min-w-0 items-center gap-3">
+                              <div className="v19-document-applicant-avatar flex shrink-0 items-center justify-center rounded-full">
+                                {sub.type === 'family' ? (
+                                  <Users aria-hidden="true" className="h-3.5 w-3.5" />
+                                ) : (
+                                  <User aria-hidden="true" className="h-3.5 w-3.5" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <div
+                                  className="v19-document-applicant-name truncate"
+                                  data-testid="document-applicant-name"
+                                >
+                                  {app.name}
+                                </div>
+                              </div>
+                              {app.isPrimary ? (
+                                <button
+                                  aria-label={`Открыть пакет ${sub.title}`}
+                                  className="v19-document-mobile-menu ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                                  onClick={() => onOpenDrawer(sub.id)}
+                                  title="Открыть пакет"
+                                  type="button"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              ) : null}
+                            </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      {docTypes.map((doc) => (
-                        <MobileDocSlot
-                          key={`${app.id}-${doc.key}`}
-                          label={doc.label}
-                          status={app.docs[doc.key]}
-                          onUpload={() =>
-                            triggerCellUpload({
-                              applicantId: app.id,
-                              docType: doc.key,
-                              submissionId: sub.id,
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
+                            <div className="v19-document-mobile-slots grid grid-cols-2 gap-2">
+                              {requiredDocTypesForApplicant(app).map((doc) => (
+                                <MobileDocSlot
+                                  key={`${app.id}-${doc.key}`}
+                                  label={doc.label}
+                                  status={app.docs[doc.key]}
+                                  onReview={() =>
+                                    onOpenIssue({
+                                      applicantId: app.id,
+                                      docType: doc.key,
+                                      submissionId: sub.id,
+                                    })
+                                  }
+                                  onUpload={() =>
+                                    triggerCellUpload({
+                                      applicantId: app.id,
+                                      docType: doc.key,
+                                      submissionId: sub.id,
+                                    })
+                                  }
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   </div>
                 ))}
               </div>
-
-              {sub.applicants.length > 1 ? (
-                <div className="flex items-center justify-between border-t border-[#242529] px-3 py-2 text-[11px] font-medium text-white/60">
-                  <span>Заявитель</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      aria-controls={`document-applicant-carousel-${sub.id}`}
-                      aria-label="Предыдущий заявитель"
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-not-allowed disabled:opacity-35"
-                      disabled={activeApplicantIndex === 0}
-                      onClick={() =>
-                        selectMobileApplicant(
-                          sub.id,
-                          sub.applicants.length,
-                          activeApplicantIndex - 1,
-                        )
-                      }
-                      type="button"
-                    >
-                      <ChevronLeft aria-hidden="true" className="h-4 w-4" />
-                    </button>
-                    <span
-                      aria-live="polite"
-                      className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/70"
-                      data-testid="document-applicant-position"
-                    >
-                      {activeApplicantIndex + 1} / {sub.applicants.length}
-                    </span>
-                    <button
-                      aria-controls={`document-applicant-carousel-${sub.id}`}
-                      aria-label="Следующий заявитель"
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-not-allowed disabled:opacity-35"
-                      disabled={activeApplicantIndex === sub.applicants.length - 1}
-                      onClick={() =>
-                        selectMobileApplicant(
-                          sub.id,
-                          sub.applicants.length,
-                          activeApplicantIndex + 1,
-                        )
-                      }
-                      type="button"
-                    >
-                      <ChevronRight aria-hidden="true" className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </section>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
-        <div className="hidden w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent xl:block">
-          <div className="min-w-[700px]">
-            <div className="flex items-center border-b border-[#242529] bg-[#111113]/50">
+        <div className="v19-documents-table-scroll hidden w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent xl:block">
+          <div className="v19-documents-table min-w-[700px]">
+            <div className="v19-documents-table-header flex items-center border-b border-[#242529] bg-[#111113]/50">
               <div className="sticky left-0 z-20 w-[280px] shrink-0 border-r border-[#242529] bg-[#111113] px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-white/40 lg:w-[320px]">
                 Пакет / Заявитель
               </div>
-              <div className="grid flex-1 grid-cols-4 px-2">
+              <div className="grid flex-1 grid-cols-3 px-2">
                 {docTypes.map((doc) => (
                   <div key={doc.key} className="py-3 text-center text-[11px] font-medium uppercase tracking-wider text-white/40">
                     {doc.label}
@@ -952,80 +890,96 @@ export function DraftsScreen({
               <div className="w-[60px] shrink-0" />
             </div>
 
-            <div className="divide-y divide-[#202124]">
-              {visibleDrafts.map((sub) => (
+            <div>
+              {draftGroups.map((group) => (
+                <div className={`v19-document-type-group is-${group.key}`} key={group.key}>
+                  <div
+                    className="v19-document-type-divider v19-document-type-divider-desktop flex items-center gap-3"
+                    data-testid="document-type-divider"
+                  >
+                    {group.key === 'family' ? <Users aria-hidden="true" className="h-4 w-4" /> : <User aria-hidden="true" className="h-4 w-4" />}
+                    <span>{group.label}</span>
+                    <span aria-hidden="true" className="v19-document-type-divider-line" />
+                  </div>
+                  <div>
+                    {group.submissions.map((sub, submissionIndex) => (
+                      <div className="v19-document-package-block" key={sub.id}>
+                        {group.key === 'family' && submissionIndex > 0 ? (
+                          <div aria-hidden="true" className="v19-document-family-divider" />
+                        ) : null}
                 <div
-                  key={sub.id}
-                  className="group/sub"
+                  className="v19-document-desktop-package group/sub"
                   data-document-submission-id={sub.id}
                 >
-                  <div className="flex items-center border-b border-[#202124] bg-[#1a1a1d] transition-colors hover:bg-[#1e1e21]">
-                    <div className="sticky left-0 z-20 w-[280px] shrink-0 border-r border-[#242529] bg-[#1a1a1d] px-5 py-3.5 transition-colors group-hover/sub:bg-[#1e1e21] lg:w-[320px]">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            {sub.type === 'family' ? <Users className="w-3.5 h-3.5 text-white/50" /> : <User className="w-3.5 h-3.5 text-white/50" />}
-                            <span className="text-[13px] font-medium text-white">{sub.title}</span>
-                          </div>
-                          <div className="mt-1 flex items-center gap-2 text-[11px] text-white/40">
-                            <span>{sub.country}</span>
-                            <span className="h-1 w-1 rounded-full bg-white/20" />
-                            <span className="text-white/55">{sub.deadline}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-1 justify-center px-6 py-3">
-                      <div className="relative h-[2px] w-full overflow-hidden rounded-full bg-white/5">
-                        <div className="absolute inset-y-0 left-0 bg-[#6f64ff]/40" style={{ width: `${sub.progress}%` }} />
-                      </div>
-                    </div>
-                    <div className="flex w-[60px] shrink-0 items-center justify-center">
-                      <button
-                        onClick={() => onOpenDrawer(sub.id)}
-                        aria-label={`Открыть пакет ${sub.title}`}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-                        type="button"
-                        title={`Открыть пакет ${sub.title}`}
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
                   <div className="divide-y divide-white/5">
                     {sub.applicants.map((app) => (
-                      <div key={app.id} className="flex items-center bg-[#161617] transition-colors hover:bg-[#1a1a1d]">
-                        <div className="sticky left-0 z-20 flex w-[280px] shrink-0 items-center gap-3 border-r border-[#242529] bg-[#161617] px-5 py-3 transition-colors hover:bg-[#1a1a1d] lg:w-[320px]">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/5 bg-[#202024] text-[10px] font-medium text-white/50">
+                      <div key={app.id} className="v19-document-desktop-applicant-row flex items-center bg-[#161617] transition-colors hover:bg-[#1a1a1d]">
+                        <div className="v19-document-desktop-identity sticky left-0 z-20 flex w-[280px] shrink-0 items-center gap-3 px-5 py-3 lg:w-[320px]">
+                          <div className="v19-document-applicant-avatar flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
                             {app.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}
                           </div>
                           <div className="min-w-0">
-                            <div className="truncate text-[13px] font-medium text-white/80">{app.name}</div>
-                            <div className="mt-0.5 text-[11px] text-white/40">
-                              {roleLabel(app.role)}
-                              {app.passportNumber ? ` · ${app.passportNumber}` : ''}
+                            <div
+                              className="v19-document-applicant-name truncate"
+                              data-testid="document-applicant-name"
+                            >
+                              {app.name}
                             </div>
                           </div>
                         </div>
 
-                        <div className="grid flex-1 grid-cols-4 px-2 py-2">
-                          {docTypes.map((doc) => (
-                            <DocCell
-                              key={`${app.id}-${doc.key}`}
-                              label={doc.label}
-                              status={app.docs[doc.key]}
-                              onUpload={() =>
-                                triggerCellUpload({
-                                  applicantId: app.id,
-                                  docType: doc.key,
-                                  submissionId: sub.id,
-                                })
-                              }
-                            />
-                          ))}
+                        <div className="grid flex-1 grid-cols-3 px-2 py-2">
+                          {docTypes.map((doc) =>
+                            app.isPrimary || doc.key === 'passport' ? (
+                              <DocCell
+                                key={`${app.id}-${doc.key}`}
+                                label={doc.label}
+                                status={app.docs[doc.key]}
+                                onReview={() =>
+                                  onOpenIssue({
+                                    applicantId: app.id,
+                                    docType: doc.key,
+                                    submissionId: sub.id,
+                                  })
+                                }
+                                onUpload={() =>
+                                  triggerCellUpload({
+                                    applicantId: app.id,
+                                    docType: doc.key,
+                                    submissionId: sub.id,
+                                  })
+                                }
+                              />
+                            ) : (
+                              <div
+                                aria-label={`${doc.label}: не требуется`}
+                                className="v19-document-desktop-not-required mx-auto"
+                                data-testid="document-not-required"
+                                key={`${app.id}-${doc.key}`}
+                                title={`${doc.label}: не требуется`}
+                              >
+                                Не нужно
+                              </div>
+                            ),
+                          )}
                         </div>
-                        <div className="w-[60px] shrink-0" />
+                        <div className="flex w-[60px] shrink-0 items-center justify-center">
+                          {app.isPrimary ? (
+                            <button
+                              aria-label={`Открыть пакет ${sub.title}`}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                              onClick={() => onOpenDrawer(sub.id)}
+                              title={`Открыть пакет ${sub.title}`}
+                              type="button"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                       </div>
                     ))}
                   </div>

@@ -26,7 +26,6 @@ import {
   type ExportContractRow,
   validateExportContractShape,
 } from "./exportContract";
-import { validateVisaApplicationFormData } from "./visaApplicationFormPdf";
 import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
 
 export type ExportSelectionState = ExportState | "mixed";
@@ -112,11 +111,6 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   const rows = buildExportRows(submissions);
   const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
   const rowDataIssues = new Set(exportContractDataIssues(rows));
-  const applicantsWithIncompleteVisaForm = submissions.flatMap((submission) =>
-    submission.applicants.filter(
-      (applicant) => !validateVisaApplicationFormData(submission, applicant).ok,
-    ),
-  );
   const submissionsWithIncompleteQuestionnaire = submissions.filter(
     (submission) => !blsQuestionnaireReadiness(submission).ready,
   );
@@ -194,13 +188,6 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     blockers.push({
       reason:
         "В семейной подаче email и телефон должны совпадать у всех заявителей",
-    });
-  }
-
-  if (applicantsWithIncompleteVisaForm.length > 0) {
-    blockers.push({
-      reason:
-        "В выборке есть анкеты без обязательных данных для PDF. ZIP не сформирован.",
     });
   }
 

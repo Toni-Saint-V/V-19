@@ -41,9 +41,7 @@ async function openMySubmissions(page: Page, mobile: boolean) {
     }
   }
 
-  await clickFirstVisible(
-    page.getByRole("button", { name: /Мои подачи/ }),
-  );
+  await clickFirstVisible(page.getByRole("button", { name: /Мои подачи/ }));
   await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
 }
 

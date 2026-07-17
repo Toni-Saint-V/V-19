@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -51,6 +52,7 @@ import {
 import {
   fileLabel,
   targetElementId,
+  targetForIssue,
   type WorkspaceTarget,
 } from "../workspaceModel";
 import type {
@@ -111,6 +113,7 @@ type ReviewFieldRow = {
   hasDocument?: boolean;
   label: string;
   section: string;
+  sectionId: string;
   value: string;
 };
 
@@ -180,6 +183,14 @@ const remarkTemplates = [
   "Нужно добавить актуальный скан паспорта или селфи для этого поля.",
 ];
 
+function adminReviewTabId(tab: DrawerTab) {
+  return `admin-review-tab-${tab}`;
+}
+
+function adminReviewPanelId(tab: DrawerTab) {
+  return `admin-review-panel-${tab}`;
+}
+
 export function AdminReviewDrawer({
   actionError = "",
   activeTab,
@@ -193,6 +204,7 @@ export function AdminReviewDrawer({
   onReviewFileAccept,
   onRunAiReview,
   onTab,
+  onVerifyDocument,
   submission,
 }: {
   actionError?: string;
@@ -210,6 +222,7 @@ export function AdminReviewDrawer({
   }) => void;
   onRunAiReview: () => void;
   onTab: (tab: DrawerTab) => void;
+  onVerifyDocument: (applicantId: string) => void;
   submission: Submission;
 }) {
   const [selectedApplicantId, setSelectedApplicantId] = useState(
@@ -227,7 +240,16 @@ export function AdminReviewDrawer({
   });
   const [questionnaireFocusTarget, setQuestionnaireFocusTarget] =
     useState<WorkspaceTarget | undefined>(undefined);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const reviewTabsRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const remarkContextRef = useRef(remarkContext);
+  const passportWorkspaceOpenRef = useRef(passportWorkspaceOpen);
   const prefersReducedMotion = useReducedMotion();
+
+  onCloseRef.current = onClose;
+  remarkContextRef.current = remarkContext;
+  passportWorkspaceOpenRef.current = passportWorkspaceOpen;
 
   useEffect(() => {
     if (submission.applicants.some((applicant) => applicant.id === selectedApplicantId)) {
@@ -256,19 +278,75 @@ export function AdminReviewDrawer({
   }, [activeTab]);
 
   useEffect(() => {
+    const previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = window.requestAnimationFrame(() => {
+      drawerRef.current
+        ?.querySelector<HTMLButtonElement>(".admin-review-close")
+        ?.focus({ preventScroll: true });
+    });
+
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (passportWorkspaceOpenRef.current) {
+          setPassportWorkspaceOpen(false);
+          return;
+        }
+        if (remarkContextRef.current) {
+          setRemarkContext(null);
+          return;
+        }
+        onCloseRef.current();
+        return;
+      }
+
+      if (
+        event.key !== "Tab" ||
+        passportWorkspaceOpenRef.current ||
+        remarkContextRef.current
+      ) {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        drawerRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter(
+        (element) =>
+          element.getAttribute("aria-hidden") !== "true" &&
+          !element.hasAttribute("hidden"),
+      );
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements.at(-1);
+      if (!firstElement || !lastElement) return;
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus({ preventScroll: true });
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus({ preventScroll: true });
+      } else if (!drawerRef.current?.contains(document.activeElement)) {
+        event.preventDefault();
+        firstElement.focus({ preventScroll: true });
+      }
     }
 
-    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      if (previouslyFocusedElement && document.contains(previouslyFocusedElement)) {
+        previouslyFocusedElement.focus({ preventScroll: true });
+      }
     };
-  }, [onClose]);
+  }, [submission.id]);
 
   const selectedApplicant =
     submission.applicants.find((applicant) => applicant.id === selectedApplicantId) ??
@@ -343,12 +421,50 @@ export function AdminReviewDrawer({
     selectReviewTab("questionnaire");
   }
 
+  function focusReferenceTab(tab: DrawerTab) {
+    window.requestAnimationFrame(() => {
+      reviewTabsRef.current
+        ?.querySelector<HTMLElement>(`#${adminReviewTabId(tab)}`)
+        ?.focus({ preventScroll: true });
+    });
+  }
+
+  function handleReferenceTabKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentTab: DrawerTab,
+  ) {
+    const currentIndex = adminReferenceTabs.findIndex((tab) => tab.id === currentTab);
+    if (currentIndex < 0) return;
+
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % adminReferenceTabs.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + adminReferenceTabs.length) % adminReferenceTabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = adminReferenceTabs.length - 1;
+    } else {
+      return;
+    }
+
+    const nextTab = adminReferenceTabs[nextIndex]?.id;
+    if (!nextTab) return;
+    event.preventDefault();
+    selectReferenceTab(nextTab);
+    focusReferenceTab(nextTab);
+  }
+
   function openApplicantSubscreen(
     applicantId: string,
     tab: Extract<AdminReviewTab, "passport" | "selfie" | "questionnaire" | "files">,
   ) {
     setSelectedApplicantId(applicantId);
-    if (tab === "passport") setReviewTarget("passport_scan");
+    if (tab === "passport") {
+      onVerifyDocument(applicantId);
+      return;
+    }
     if (tab === "selfie") setReviewTarget("selfie");
     selectReviewTab(tab);
   }
@@ -437,12 +553,21 @@ export function AdminReviewDrawer({
 
     if (target.tab === "files" && isAdminReviewFileTarget(target.fileType)) {
       setReviewTarget(target.fileType);
-      selectReviewTab(target.fileType === "passport_scan" ? "passport" : "selfie");
+      if (target.fileType === "passport_scan") {
+        onVerifyDocument(target.applicantId);
+        return;
+      }
+      selectReviewTab("selfie");
+      return;
+    }
+
+    if (target.tab === "files") {
+      selectReviewTab("files");
       return;
     }
 
     selectReviewTab("issues");
-  }, [selectReviewTab]);
+  }, [onVerifyDocument, selectReviewTab]);
 
   function handleIdentityFindingRemark(finding: IdentityConsistencyFinding) {
     const target = finding.target;
@@ -483,7 +608,7 @@ export function AdminReviewDrawer({
       applicantId: selectedApplicant.id,
       field: row.label,
       reason: `${row.label}: требуется уточнение`,
-      sectionId: row.field?.id,
+      sectionId: row.sectionId,
       sectionLabel: row.section,
       targetLabel: row.label,
       targetType: "questionnaire",
@@ -494,10 +619,11 @@ export function AdminReviewDrawer({
     fileType: AdminReviewFileTarget,
     reason?: string,
     context?: Partial<RemarkContext>,
+    applicantId = selectedApplicant?.id,
   ) {
-    if (!selectedApplicant) return;
+    if (!applicantId) return;
     setRemarkContext({
-      applicantId: selectedApplicant.id,
+      applicantId,
       ...context,
       fileType,
       reason: reason ?? `${fileLabel(fileType)} требует повторной проверки`,
@@ -529,24 +655,17 @@ export function AdminReviewDrawer({
   }
 
   function handleIssueJump(issue: Submission["issues"][number]) {
-    if (issue.target.applicantId) setSelectedApplicantId(issue.target.applicantId);
-    if (issue.target.fileType === "passport_scan") {
-      selectReviewTab("passport");
-    } else if (
-      issue.target.fileType === "selfie" ||
-      issue.target.fileType === "selfie_2"
-    ) {
-      setReviewTarget(issue.target.fileType);
-      selectReviewTab("selfie");
-    } else {
-      selectReviewTab("questionnaire");
-    }
+    jumpToWorkspaceTarget(targetForIssue(issue));
   }
 
   function submitRemark(input: IssueInput) {
     onAddIssue(input);
     setRemarkContext(null);
   }
+
+  const activeReferenceTab =
+    adminReferenceTabs.find((tab) => isReferenceTabSelected(tab.id))?.id ??
+    "overview";
 
   return (
     <AnimatePresence>
@@ -561,10 +680,12 @@ export function AdminReviewDrawer({
       />
 
       <motion.aside
-        aria-label="Проверка пакета"
+        aria-labelledby="admin-review-heading"
         aria-modal="true"
         className="admin-review-drawer"
+        data-admin-review-drawer-surface="workspace"
         key="admin-review-drawer"
+        ref={drawerRef}
         role="dialog"
         initial={
           prefersReducedMotion
@@ -596,7 +717,7 @@ export function AdminReviewDrawer({
                 <span aria-hidden="true"> · </span>
                 {openIssueCount(submission)} замечаний
               </p>
-              <h2>
+              <h2 id="admin-review-heading">
                 Проверка пакета
                 <span className={`admin-review-status-pill is-${submission.status}`}>
                   {statusLabels[submission.status]}
@@ -616,6 +737,7 @@ export function AdminReviewDrawer({
           <nav
             className="admin-review-tabs"
             aria-label="Рабочие вкладки проверки"
+            ref={reviewTabsRef}
             role="tablist"
           >
             {adminReferenceTabs.map((tab) => {
@@ -624,12 +746,16 @@ export function AdminReviewDrawer({
 
               return (
                 <button
+                  aria-controls={adminReviewPanelId(tab.id)}
                   aria-selected={selected}
                   className={selected ? "is-active" : ""}
+                  id={adminReviewTabId(tab.id)}
                   key={tab.id}
                   role="tab"
+                  tabIndex={selected ? 0 : -1}
                   type="button"
                   onClick={() => selectReferenceTab(tab.id)}
+                  onKeyDown={(event) => handleReferenceTabKeyDown(event, tab.id)}
                 >
                   <span>{tab.label}</span>
                   {typeof count === "number" ? (
@@ -674,6 +800,7 @@ export function AdminReviewDrawer({
 
           <AnimatePresence mode="wait">
             <motion.div
+              aria-labelledby={adminReviewTabId(activeReferenceTab)}
               animate={{ opacity: 1, y: 0 }}
               className="admin-review-tab-panel"
               exit={
@@ -686,7 +813,9 @@ export function AdminReviewDrawer({
                   ? { opacity: 0, y: 0 }
                   : { opacity: 0, y: 8 }
               }
+              id={adminReviewPanelId(activeReferenceTab)}
               key={activeReviewTab}
+              role="tabpanel"
               transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
             >
               {activeReviewTab === "overview" ? (
@@ -705,11 +834,18 @@ export function AdminReviewDrawer({
               ) : activeReviewTab === "files" ? (
                 <AdminFilesTab
                   submission={submission}
-                  onFileRemark={openFileRemark}
+                  onFileRemark={(file, reason) => {
+                    setSelectedApplicantId(file.applicantId);
+                    openFileRemark(file.type, reason, undefined, file.applicantId);
+                  }}
                   onOpenReview={(file) => {
                     setSelectedApplicantId(file.applicantId);
+                    if (file.type === "passport_scan") {
+                      onVerifyDocument(file.applicantId);
+                      return;
+                    }
                     setReviewTarget(file.type as AdminReviewFileTarget);
-                    selectReviewTab(file.type === "passport_scan" ? "passport" : "selfie");
+                    selectReviewTab("selfie");
                   }}
                 />
               ) : activeReviewTab === "passport" ? (
@@ -746,7 +882,9 @@ export function AdminReviewDrawer({
                     })
                   }
                   onFieldRemark={openQuestionnaireRemark}
-                  onOpenWorkspace={() => setPassportWorkspaceOpen(true)}
+                  onOpenWorkspace={() => {
+                    if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
+                  }}
                   onNext={() => selectReviewTab("questionnaire")}
                   onRemark={() => openFileRemark("passport_scan", "Скан паспорта требует замены")}
                 />
@@ -785,10 +923,15 @@ export function AdminReviewDrawer({
                   submission={submission}
                   onFieldRemark={openQuestionnaireRemark}
                   onSectionRemark={openSectionRemark}
-                  onVerifyPassport={() => setPassportWorkspaceOpen(true)}
+                  onVerifyPassport={() => {
+                    if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
+                  }}
                 />
               ) : activeReviewTab === "issues" ? (
                 <IssuesTab
+                  addRemarkDisabled={!selectedApplicant || Boolean(issueGuardReason)}
+                  emptyStateReady={!primaryAction.disabled}
+                  emptyStateReason={primaryAction.reason}
                   identityFindings={identityReport.findings}
                   submission={submission}
                   onAcceptAiSuggestion={onAcceptAiSuggestion}
@@ -1089,6 +1232,16 @@ function ApplicantsReviewTab({
   ) => void;
   onSelectApplicant: (applicantId: string) => void;
 }) {
+  if (!submission.applicants.length) {
+    return (
+      <div className="admin-review-empty-card" role="status">
+        <Users aria-hidden="true" size={18} />
+        <strong>Заявители не добавлены</strong>
+        <span>Проверка станет доступна после добавления хотя бы одного заявителя.</span>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-review-applicants-tab">
       {submission.applicants.map((applicant, index) => {
@@ -1204,7 +1357,10 @@ function AdminFilesTab({
   onOpenReview,
   submission,
 }: {
-  onFileRemark: (fileType: AdminReviewFileTarget, reason?: string) => void;
+  onFileRemark: (
+    file: SubmissionFile & { type: AdminReviewFileTarget },
+    reason?: string,
+  ) => void;
   onOpenReview: (file: SubmissionFile & { type: AdminReviewFileTarget }) => void;
   submission: Submission;
 }) {
@@ -1224,6 +1380,14 @@ function AdminFilesTab({
           {readyCount}/{reviewFiles.length}
         </span>
       </div>
+
+      {!reviewFiles.length ? (
+        <div className="admin-review-empty-card" role="status">
+          <FileWarning aria-hidden="true" size={18} />
+          <strong>Файлы для проверки не загружены</strong>
+          <span>Паспорт и селфи появятся здесь после загрузки агентом.</span>
+        </div>
+      ) : null}
 
       <div className="v19-drawer-file-sections">
         {submission.applicants.map((applicant) => {
@@ -1299,7 +1463,7 @@ function AdminFilesTab({
                           type="button"
                           onClick={() =>
                             onFileRemark(
-                              file.type,
+                              file,
                               `${fileLabel(file.type)} требует повторной проверки`,
                             )
                           }
@@ -1539,7 +1703,7 @@ function AdminPassportReviewWorkspace({
   );
 
   useEffect(() => {
-    workspaceMainRef.current?.scrollTo({ top: 0, left: 0 });
+    workspaceMainRef.current?.scrollTo?.({ top: 0, left: 0 });
   }, [submission.id, selectedApplicant?.id]);
 
   return (
@@ -2570,6 +2734,9 @@ function AdminRemarkForm({
 }
 
 function IssuesTab({
+  addRemarkDisabled = false,
+  emptyStateReady = false,
+  emptyStateReason,
   identityFindings = [],
   onAcceptAiSuggestion,
   onAddRemark,
@@ -2580,6 +2747,9 @@ function IssuesTab({
   submission,
   onJump,
 }: {
+  addRemarkDisabled?: boolean;
+  emptyStateReady?: boolean;
+  emptyStateReason?: string;
   identityFindings?: IdentityConsistencyFinding[];
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onAddRemark: () => void;
@@ -2590,25 +2760,54 @@ function IssuesTab({
   submission: Submission;
   onJump: (issue: Submission["issues"][number]) => void;
 }) {
+  const unresolvedIssueCount =
+    submission.issues.filter((issue) => issue.status !== "closed_by_admin").length +
+    identityFindings.length;
+  const issuesSummary = (
+    <header className="admin-review-issues-summary">
+      <div>
+        <h3>Список задач по замечаниям</h3>
+        <p>Ошибки и расхождения, которые требуют решения по этому пакету.</p>
+      </div>
+      <span className={unresolvedIssueCount ? "is-warning" : "is-clear"}>
+        {unresolvedIssueCount
+          ? `Требуют решения: ${unresolvedIssueCount}`
+          : "Требуют решения: 0"}
+      </span>
+    </header>
+  );
+
   if (!submission.issues.length && !identityFindings.length) {
     return (
       <div className="admin-review-issues-list">
-        <BbAiPanel
-          role="admin"
-          submission={submission}
-          surface="review"
-          onAccept={onAcceptAiSuggestion}
-          onDismiss={onDismissAiSuggestion}
-          onRun={onRunAiReview}
-        />
+        {issuesSummary}
         <div className="admin-review-empty-card">
-          <ShieldCheck aria-hidden="true" size={18} />
-          <strong>Замечаний пока нет</strong>
-          <span>Если паспорт, селфи и анкета корректны, можно принимать заявку.</span>
-          <button type="button" onClick={onAddRemark}>
+          {emptyStateReady ? (
+            <ShieldCheck aria-hidden="true" size={18} />
+          ) : (
+            <AlertCircle aria-hidden="true" size={18} />
+          )}
+          <strong>{emptyStateReady ? "Замечаний пока нет" : "Открытых замечаний нет"}</strong>
+          <span>
+            {emptyStateReady
+              ? "Паспорт, селфи и анкета не содержат открытых замечаний. Пакет можно принимать."
+              : emptyStateReason ||
+                "Пакет ещё не готов к принятию. Проверьте обязательные данные и файлы."}
+          </span>
+          <button disabled={addRemarkDisabled} type="button" onClick={onAddRemark}>
             <MessageSquarePlus aria-hidden="true" size={15} />
             Добавить замечание
           </button>
+        </div>
+        <div className="admin-review-issues-assist">
+          <BbAiPanel
+            role="admin"
+            submission={submission}
+            surface="review"
+            onAccept={onAcceptAiSuggestion}
+            onDismiss={onDismissAiSuggestion}
+            onRun={onRunAiReview}
+          />
         </div>
       </div>
     );
@@ -2616,16 +2815,14 @@ function IssuesTab({
 
   return (
     <div className="admin-review-issues-list">
-      <BbAiPanel
-        role="admin"
-        submission={submission}
-        surface="review"
-        onAccept={onAcceptAiSuggestion}
-        onDismiss={onDismissAiSuggestion}
-        onRun={onRunAiReview}
-      />
+      {issuesSummary}
 
-      <button type="button" onClick={onAddRemark}>
+      <button
+        className="admin-review-add-remark"
+        disabled={addRemarkDisabled}
+        type="button"
+        onClick={onAddRemark}
+      >
         <MessageSquarePlus aria-hidden="true" size={15} />
         Добавить замечание
       </button>
@@ -2680,6 +2877,17 @@ function IssuesTab({
           </button>
         </article>
       ))}
+
+      <div className="admin-review-issues-assist">
+        <BbAiPanel
+          role="admin"
+          submission={submission}
+          surface="review"
+          onAccept={onAcceptAiSuggestion}
+          onDismiss={onDismissAiSuggestion}
+          onRun={onRunAiReview}
+        />
+      </div>
     </div>
   );
 }
@@ -2705,6 +2913,7 @@ function buildReviewSections(applicant: Applicant): ReviewSection[] {
           field.label.toLowerCase().includes("паспорт"),
         label: field.label,
         section: isPassport ? "Паспорт" : section.title,
+        sectionId: section.id,
         value: field.value,
       })),
     };

@@ -51,6 +51,8 @@ const blsFormKeyByQuestionnaireFieldId: Record<string, string> = {
   'company-phone': 'companyPhone',
   'cost-covered-by': 'paymentSponsor',
   'departure-date': 'travelEnd',
+  'desired-date-1': 'desiredDate1',
+  'desired-date-2': 'desiredDate2',
   'entry-permit-final-country': 'finalEntryPermit',
   'entry-permit-issued-by': 'finalEntryPermitIssuedBy',
   'entry-permit-valid-from': 'finalEntryPermitValidFrom',
@@ -219,7 +221,7 @@ export function isBlsQuestionnaireFieldApplicable({
     case 'employer-name':
     case 'employer-contact':
     case 'employer-address':
-      return occupationRequiresEmployer(formData) || hasOwnValue;
+      return occupationRequiresEmployer(formData, applicantRole) || hasOwnValue;
 
     case 'stay-purpose-details':
       return isOtherLike(read(formData, 'stayPurpose')) || hasOwnValue;
@@ -275,11 +277,10 @@ export function isBlsQuestionnaireSectionApplicable(
 ) {
   switch (sectionId) {
     case 'files':
-      return false;
     case 'euRelative':
-      return euRelativeGroupStarted(formData);
     case 'filler':
-      return fillerGroupStarted(formData);
+    case 'payment':
+      return false;
     case 'appointment':
     case 'personal':
     case 'passport':
@@ -288,7 +289,6 @@ export function isBlsQuestionnaireSectionApplicable(
     case 'employment':
     case 'trip':
     case 'hotel':
-    case 'payment':
       return true;
     default:
       return applicantRole !== undefined || Object.values(formData).some((value) => Boolean(value?.trim()));
@@ -334,9 +334,12 @@ export function blsStayDurationFromDates(
   return String(daysInclusive(travelStart, travelEnd));
 }
 
-function occupationRequiresEmployer(formData: BlsFormData) {
+function occupationRequiresEmployer(
+  formData: BlsFormData,
+  applicantRole?: Applicant['role'],
+) {
   const occupation = read(formData, 'occupation').toUpperCase();
-  if (!occupation) return true;
+  if (!occupation) return applicantRole !== 'child';
   return !nonWorkingOccupations.has(occupation);
 }
 
@@ -360,12 +363,11 @@ export function isBlsQuestionnaireFieldRequired({
     case 'previous-visa-number':
       return false;
 
-    case 'desired-date-2':
     case 'desired-date-3':
       return false;
 
     case 'guardian-info':
-      return isBlsQuestionnaireMinorApplicant(applicantRole, formData);
+      return false;
 
     case 'eu-relative-details':
     case 'eu-relationship':
@@ -382,7 +384,7 @@ export function isBlsQuestionnaireFieldRequired({
     case 'employer-name':
     case 'employer-contact':
     case 'employer-address':
-      return occupationRequiresEmployer(formData);
+      return occupationRequiresEmployer(formData, applicantRole);
 
     case 'stay-purpose-details':
       return isOtherLike(read(formData, 'stayPurpose'));
@@ -473,6 +475,18 @@ export function validateBlsQuestionnaireField({
     }
   }
 
+  if (field.id === 'desired-date-1' || field.id === 'desired-date-2') {
+    const desiredFrom = parseBlsQuestionnaireDate(
+      field.id === 'desired-date-1' ? trimmed : read(formData, 'desiredDate1'),
+    );
+    const desiredTo = parseBlsQuestionnaireDate(
+      field.id === 'desired-date-2' ? trimmed : read(formData, 'desiredDate2'),
+    );
+    if (desiredFrom && desiredTo && desiredTo < desiredFrom) {
+      return 'Конец интервала должен быть не раньше начала';
+    }
+  }
+
   if (field.id === 'stay-duration') {
     if (!/^\d+$/.test(trimmed)) return 'Введите количество дней числом';
     const duration = Number(trimmed);
@@ -490,7 +504,7 @@ export function validateBlsQuestionnaireField({
   if (field.id === 'postal-code' || field.id === 'hotel-postal-code') {
     return /^[A-Z0-9][A-Z0-9\s-]{1,14}[A-Z0-9]$/i.test(trimmed)
       ? undefined
-      : 'Проверьте почтовый индекс';
+      : 'Введите индекс: 3–16 букв или цифр, можно пробел и дефис';
   }
 
   return undefined;
@@ -544,6 +558,44 @@ function blsFormDataForApplicant(applicant: Applicant): BlsFormData {
   }
 
   return formData;
+}
+
+export function blsApplicableQuestionnaireFields(applicant: Applicant) {
+  const formData = blsFormDataForApplicant(applicant);
+  return applicant.sections
+    .flatMap((section) => section.fields)
+    .filter((field) =>
+      isBlsQuestionnaireFieldApplicable({
+        applicantRole: applicant.role,
+        field,
+        formData,
+      }),
+    );
+}
+
+export function blsApplicantQuestionnaireStatus(
+  applicant: Applicant,
+): Applicant['questionnaireStatus'] {
+  const formData = blsFormDataForApplicant(applicant);
+  const fields = applicant.sections.flatMap((section) => section.fields);
+  const hasBlockingValue = fields.some((field) => {
+    const context = {
+      applicantRole: applicant.role,
+      field,
+      formData,
+    } satisfies BlsFieldValidationContext;
+
+    return (
+      isBlsQuestionnaireFieldApplicable(context) &&
+      (Boolean(field.error) || isBlsQuestionnaireFieldBlockingIssue(context))
+    );
+  });
+
+  if (hasBlockingValue) return 'needs_fix';
+  if (blsQuestionnaireReadiness({ applicants: [applicant] }).ready) {
+    return 'complete';
+  }
+  return fields.some((field) => field.value.trim()) ? 'partial' : 'empty';
 }
 
 export function blsQuestionnaireReadiness(

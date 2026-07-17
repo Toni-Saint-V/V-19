@@ -110,9 +110,7 @@ async function logoutThroughUi(page: Page) {
 async function approveAccessRequests(page: Page, emails: string[]) {
   await login(page, "2@2.ru", "22");
   await clickWorkspaceButton(page, /Настройки/);
-  await page
-    .getByRole("button", { name: /Входящие заявки на регистрацию/ })
-    .click();
+  await page.getByRole("button", { name: /Входящие заявки на регистрацию/ }).click();
   const queue = page.getByTestId("admin-access-queue");
   await expect(queue).toBeVisible();
 
@@ -146,7 +144,9 @@ async function createFamilyAndSubmit(page: Page, family: FamilyDraft) {
   await drawer(page).locator("#create-submission-city").selectOption(family.city);
 
   for (let index = 2; index < family.applicants.length; index += 1) {
-    await drawer(page).getByRole("button", { name: /Добавить заявителя/ }).click();
+    await drawer(page)
+      .getByRole("button", { name: /Добавить заявителя/ })
+      .click();
   }
 
   await drawer(page)
@@ -188,7 +188,9 @@ async function openMediaTab(page: Page) {
     .first();
   await expect(filesTab).toBeVisible();
   await filesTab.click();
-  await expect(drawer(page).getByRole("heading", { name: /Файлы подачи|Файлы/ })).toBeVisible();
+  await expect(
+    drawer(page).getByRole("heading", { name: /Файлы подачи|Файлы/ }),
+  ).toBeVisible();
 }
 
 async function fillQuestionnaire(page: Page) {
@@ -317,7 +319,9 @@ async function returnWithIssue(page: Page, submissionId: string, drawerTitle: st
     .fill("Нужно уточнить номер паспорта для семейной подачи.");
   await page
     .getByPlaceholder("Конкретное действие для агента")
-    .fill("Откройте поле номера паспорта, исправьте значение и подтвердите исправление.");
+    .fill(
+      "Откройте поле номера паспорта, исправьте значение и подтвердите исправление.",
+    );
   await expect(
     drawer(page).getByText(/Переход агента[\s\S]*Паспорт \/ Номер паспорта/),
   ).toBeVisible();
@@ -350,7 +354,11 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
       await contextIssue.click();
     } else {
       await openDrawerTab(page, ["Замечания"]);
-      await expect(drawer(page).getByText(/Номер паспорта/).first()).toBeVisible();
+      await expect(
+        drawer(page)
+          .getByText(/Номер паспорта/)
+          .first(),
+      ).toBeVisible();
       await drawer(page).getByRole("button", { name: "Исправить" }).click();
     }
   }
@@ -358,9 +366,13 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
   await expect(
     page.locator('[aria-selected="true"]').filter({ hasText: "Паспорт" }).first(),
   ).toBeVisible();
-  const passportNumberField = page.getByRole("textbox", { name: "Номер паспорта" }).first();
+  const passportNumberField = page
+    .getByRole("textbox", { name: "Номер паспорта" })
+    .first();
   await expect(passportNumberField).toBeVisible();
-  await expect(page.locator('[data-field-label="Номер паспорта"][data-field-focused="true"]')).toBeVisible();
+  await expect(
+    page.locator('[data-field-label="Номер паспорта"][data-field-focused="true"]'),
+  ).toBeVisible();
   await passportNumberField.fill("991234567");
   await expect(passportNumberField).toHaveValue("991234567");
   const completeQuestionnaireButton = page.getByRole("button", {
@@ -402,7 +414,9 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
     if (await isVisible(backButton)) {
       await backButton.click();
     }
-    const openSubmissionButton = page.getByRole("button", { name: "Открыть подачу" }).first();
+    const openSubmissionButton = page
+      .getByRole("button", { name: "Открыть подачу" })
+      .first();
     if (await isVisible(openSubmissionButton)) {
       await openSubmissionButton.click();
     } else {
@@ -437,7 +451,9 @@ async function exportFamilyExcel(page: Page, family: FamilyDraft) {
   await expect(row).toBeVisible();
   await expect(row).toContainText(family.city);
   await row.getByRole("checkbox").check();
-  await expect(page.getByRole("heading", { name: /1 подача · \d+ заявител/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /1 подача · \d+ заявител/ }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Сформировать Excel" }).click();
   await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
 
@@ -522,7 +538,11 @@ test.describe("V-19 real UI registration to city Excel export", () => {
     }
 
     await login(page, "2@2.ru", "22");
-    await returnWithIssue(page, submissionIds.get(families[0].title) ?? "", families[0].title);
+    await returnWithIssue(
+      page,
+      submissionIds.get(families[0].title) ?? "",
+      families[0].title,
+    );
     await logoutThroughUi(page);
 
     await login(page, families[0].ownerEmail);
@@ -545,7 +565,9 @@ test.describe("V-19 real UI registration to city Excel export", () => {
     }
 
     expect(savedFiles).toHaveLength(3);
-    expect(families.reduce((total, family) => total + family.applicants.length, 0)).toBe(10);
+    expect(
+      families.reduce((total, family) => total + family.applicants.length, 0),
+    ).toBe(10);
     expect(browserProblems).toEqual([]);
   });
 });

@@ -23,9 +23,12 @@ import type {
 } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import { ApplicantsScreen } from "./ApplicantsScreen";
 import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
-import { DraftsScreen, type DraftSummaryFilter } from "./DraftsScreen";
+import {
+  DraftsScreen,
+  type DocumentIssueTarget,
+  type DraftSummaryFilter,
+} from "./DraftsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
-import { CreateSubmissionDrawer } from "../modules/submissions/components/CreateSubmissionDrawer";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from "../modules/submissions/components/adminAiAssistance";
 import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
@@ -46,11 +49,14 @@ import {
 import { createDraft } from "../modules/submissions/domainEngine";
 import type {
   City,
+  DrawerTab,
   PassportUploadDraft,
   PreliminaryIntakeDraft,
   Submission,
   SubmissionAction,
+  SubmissionFileType,
 } from "../modules/submissions/types";
+import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
 import {
   listItemsFromSubmissions,
   type LegacyAgentNavSection,
@@ -61,7 +67,10 @@ import {
   saveProductIntakeDrafts,
   type ProductIntakeDraft,
 } from "../modules/submissions/productIntakeFlow";
-import { productIntakeDraftToSubmission } from "../modules/submissions/productIntakeSubmissionAdapter";
+import {
+  productIntakeDraftToPassportUploads,
+  productIntakeDraftToSubmission,
+} from "../modules/submissions/productIntakeSubmissionAdapter";
 import {
   agentActionQueue,
   searchAgentActions,
@@ -100,6 +109,15 @@ type AgentShellNavSection = Extract<
 >;
 type ActionSummaryFilter = "blockers" | "open" | "today" | "week" | "completed";
 type ActionSort = "tripDate" | "createdAt";
+
+function submissionFileTypeForDocumentIssue(
+  docType: DocumentIssueTarget["docType"],
+): SubmissionFileType | undefined {
+  if (docType === "passport") return "passport_scan";
+  if (docType === "selfie") return "selfie";
+  if (docType === "selfie2") return "selfie_2";
+  return undefined;
+}
 
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
@@ -321,6 +339,8 @@ export function CommandCenter({
   const [questionnaireInitialFocus, setQuestionnaireInitialFocus] =
     useState<QuestionnaireInitialFocus>();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerActiveTab, setDrawerActiveTab] = useState<DrawerTab>("overview");
+  const [drawerFocusTarget, setDrawerFocusTarget] = useState<WorkspaceTarget>();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
@@ -336,12 +356,11 @@ export function CommandCenter({
   const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() =>
     usesSupabase ? [] : loadProductIntakeDrafts(),
   );
-  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
-  const [createCity, setCreateCity] = useState<City>("Москва");
-  const [createFamilyCount, setCreateFamilyCount] = useState(2);
-  const [createType, setCreateType] = useState<Submission["type"]>("single");
+  const createCity: City = "Москва";
+  const createFamilyCount = 2;
+  const createType: Submission["type"] = "single";
   const [canonicalOverrides, setCanonicalOverrides] = useState<
     Record<string, Submission>
   >({});
@@ -548,7 +567,34 @@ export function CommandCenter({
 
     bridge.onSubmissionOpen?.(id);
     emitVisaflowUiEvent(bridge, { type: "submission.open", submissionId: id });
+    setDrawerActiveTab("overview");
+    setDrawerFocusTarget(undefined);
     setSelectedRow(id);
+    setDrawerOpen(true);
+  };
+
+  const handleOpenDocumentIssue = (target: DocumentIssueTarget) => {
+    const submission = effectiveCanonicalSubmissions.find(
+      (candidate) => candidate.id === target.submissionId,
+    );
+    const fileType = submissionFileTypeForDocumentIssue(target.docType);
+    const issue = submission?.issues.find(
+      (candidate) =>
+        candidate.status !== "closed_by_admin" &&
+        candidate.target.applicantId === target.applicantId &&
+        candidate.target.fileType === fileType,
+    );
+
+    bridge.onSubmissionOpen?.(target.submissionId);
+    emitVisaflowUiEvent(bridge, {
+      type: "submission.open",
+      submissionId: target.submissionId,
+    });
+    setDrawerActiveTab("issues");
+    setDrawerFocusTarget(
+      issue ? { issueId: issue.id, tab: "issues" } : undefined,
+    );
+    setSelectedRow(target.submissionId);
     setDrawerOpen(true);
   };
 
@@ -624,38 +670,41 @@ export function CommandCenter({
   const createPackage = () => {
     bridge.onCreatePackage?.();
     emitVisaflowUiEvent(bridge, { type: "package.create" });
-    if (usesSupabase) {
-      setCreateDrawerOpen(true);
-      return;
-    }
     setCurrentView("upload");
   };
 
   const executeCreateCanonicalDraft = async (
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
-    options?: { openQuestionnaire?: boolean },
+    options?: {
+      familyCount?: number;
+      openQuestionnaire?: boolean;
+      type?: Submission["type"];
+    },
   ) => {
-    const applicantNames = passportUploads.map((upload) => {
+    const applicantNames: string[] = [];
+    for (const upload of passportUploads) {
       const firstName = upload.extractedFields
         .find((field) => field.key === "firstName")
         ?.value.trim();
       const surname = upload.extractedFields
         .find((field) => field.key === "surname")
         ?.value.trim();
-      return [firstName, surname].filter(Boolean).join(" ");
-    });
+      applicantNames[upload.applicantIndex] = [firstName, surname]
+        .filter(Boolean)
+        .join(" ");
+    }
     let pendingSubmission = pendingCreatedSubmissionRef.current;
     if (!pendingSubmission) {
       const result = createDraft({
         agentId,
         applicantNames,
         city: createCity,
-        familyCount: createFamilyCount,
+        familyCount: options?.familyCount ?? createFamilyCount,
         idScheme: "supabase",
         preliminaryIntake,
         submissions: canonicalSubmissions ?? [],
-        type: createType,
+        type: options?.type ?? createType,
       });
       if (!result.ok) throw new Error(result.error.message);
       pendingSubmission = result.data;
@@ -686,7 +735,6 @@ export function CommandCenter({
       ...current,
       [nextSubmission.id]: nextSubmission,
     }));
-    setCreateDrawerOpen(false);
     setActiveNav("submissions");
     setSearchQuery("");
     if (options?.openQuestionnaire) {
@@ -699,7 +747,11 @@ export function CommandCenter({
   const createCanonicalDraft = (
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
-    options?: { openQuestionnaire?: boolean },
+    options?: {
+      familyCount?: number;
+      openQuestionnaire?: boolean;
+      type?: Submission["type"];
+    },
   ) => {
     if (createSubmissionPromiseRef.current) {
       return createSubmissionPromiseRef.current;
@@ -856,6 +908,23 @@ export function CommandCenter({
     setActiveNav("submissions");
     setSearchQuery("");
     setCurrentView("questionnaire");
+  };
+
+  const persistSupabasePreUploadDraft = async (
+    draft: ProductIntakeDraft,
+    preliminaryIntake: PreliminaryIntakeDraft,
+    openQuestionnaire: boolean,
+  ) => {
+    await createCanonicalDraft(
+      productIntakeDraftToPassportUploads(draft),
+      preliminaryIntake,
+      {
+        familyCount: draft.applicants.length,
+        openQuestionnaire,
+        type: draft.type,
+      },
+    );
+    if (!openQuestionnaire) setCurrentView("main");
   };
 
   const handleUploadDraftSave = (draft: ProductIntakeDraft) => {
@@ -1361,8 +1430,18 @@ export function CommandCenter({
           <PreUploadScreen
             key="upload"
             onBack={() => setCurrentView("main")}
-            onSaveDraft={handleUploadDraftSave}
-            onComplete={handleUploadComplete}
+            onSaveDraft={
+              usesSupabase
+                ? (draft, preliminaryIntake) =>
+                    persistSupabasePreUploadDraft(draft, preliminaryIntake, false)
+                : handleUploadDraftSave
+            }
+            onComplete={
+              usesSupabase
+                ? (draft, preliminaryIntake) =>
+                    persistSupabasePreUploadDraft(draft, preliminaryIntake, true)
+                : handleUploadComplete
+            }
           />
         )}
       </AnimatePresence>
@@ -1445,6 +1524,7 @@ export function CommandCenter({
                 <DraftsScreen
                   initialFilter={documentsFilter}
                   onOpenDrawer={handleRowClick}
+                  onOpenIssue={handleOpenDocumentIssue}
                   onSubmissionsChange={onSubmissionsChange}
                   submissions={canonicalSubmissions}
                 />
@@ -1465,7 +1545,9 @@ export function CommandCenter({
       {usesSupabase ? (
         drawerOpen && selectedCanonicalSubmission ? (
           <OperationalSubmissionDrawer
-            activeTab="overview"
+            activeTab={drawerActiveTab}
+            focusTarget={drawerFocusTarget}
+            onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
             onAction={executeAgentSubmissionAction}
             onClose={() => setDrawerOpen(false)}
             onMarkIssueFixed={async (issueId) => {
@@ -1483,6 +1565,7 @@ export function CommandCenter({
       ) : (
         <Drawer
           allowDemoFallback
+          initialTab={drawerActiveTab}
           isOpen={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           submissionId={selectedRow}
@@ -1498,21 +1581,6 @@ export function CommandCenter({
         />
       )}
 
-      <AnimatePresence>
-        {usesSupabase && createDrawerOpen && (
-          <CreateSubmissionDrawer
-            city={createCity}
-            familyCount={createFamilyCount}
-            onCity={setCreateCity}
-            onClose={() => setCreateDrawerOpen(false)}
-            onCreate={createCanonicalDraft}
-            onFamilyCount={setCreateFamilyCount}
-            onPassportFilesSelected={() => undefined}
-            onType={setCreateType}
-            type={createType}
-          />
-        )}
-      </AnimatePresence>
       <CommandPalette
         open={commandPaletteOpen}
         role="agent"

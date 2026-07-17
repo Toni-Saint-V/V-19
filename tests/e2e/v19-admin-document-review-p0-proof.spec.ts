@@ -46,10 +46,9 @@ async function isFullyWithinViewport(locator: Locator) {
 }
 
 test.describe("V-19 P0 admin document review", () => {
-  test("mobile review opens Files first and blocks confirmation without the protected original", async (
-    { page },
-    testInfo,
-  ) => {
+  test("mobile review opens Files first and blocks confirmation without the protected original", async ({
+    page,
+  }, testInfo) => {
     test.skip(
       testInfo.project.name !== "chromium",
       "The explicit 390px proof runs once in Chromium.",
@@ -69,14 +68,18 @@ test.describe("V-19 P0 admin document review", () => {
     await expect(submission).toBeVisible();
     await submission.click();
 
-    const reviewDrawer = page.locator('[role="dialog"][data-admin-review-drawer-surface="workspace"]');
+    const reviewDrawer = page.locator(
+      '[role="dialog"][data-admin-review-drawer-surface="workspace"]',
+    );
     await expect(reviewDrawer).toBeVisible();
 
     const filesTab = reviewDrawer.locator("#admin-review-tab-media");
     await expect(filesTab).toHaveAttribute("aria-selected", "true");
     await expect.poll(() => isFullyWithinViewport(filesTab)).toBe(true);
 
-    const verifyPassport = reviewDrawer.getByTestId("admin-review-verify-passport").first();
+    const verifyPassport = reviewDrawer
+      .getByTestId("admin-review-verify-passport")
+      .first();
     await expect(verifyPassport).toBeVisible();
     const fileActions = reviewDrawer.locator(".admin-review-file-actions button");
     expect(await fileActions.count()).toBeGreaterThan(0);

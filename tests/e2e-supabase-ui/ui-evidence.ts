@@ -17,7 +17,9 @@ type CaptureUiEvidenceInput = {
 export function uiEvidenceRunId(testInfo: TestInfo) {
   const runId = testInfo.config.metadata.uiEvidenceRunId;
   if (typeof runId !== "string" || !runId.trim()) {
-    throw new Error("Playwright metadata.uiEvidenceRunId is required for screenshot evidence.");
+    throw new Error(
+      "Playwright metadata.uiEvidenceRunId is required for screenshot evidence.",
+    );
   }
   return runId.trim().replace(/[^a-zA-Z0-9_-]/g, "-");
 }
