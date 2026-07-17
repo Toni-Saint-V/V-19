@@ -56,7 +56,7 @@ Capture reference and target before edits:
 - `768x1024`
 - `1440x900`
 
-Save screenshots under `docs/qa/` with names that identify:
+If screenshots are needed, save them under `V19_TEST_ARTIFACTS_DIR` (or the operating-system temporary directory) with names that identify:
 
 - reference or target;
 - screen;

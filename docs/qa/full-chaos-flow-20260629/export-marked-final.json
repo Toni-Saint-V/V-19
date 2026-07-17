@@ -1,8 +1,0 @@
-{
-  "markVisible": true,
-  "markEnabled": true,
-  "markedState": true,
-  "bodySnippet": "V\nVisaFlow V-19\nWorkspace\nПроверка\n2\nВыгрузка\n3\nНастройки\n0\nАД\nadmin@visaflow.local\nАдмин · local/dev auth\nВыгрузка\nПакеты для Excel\nPreview использует структуру входного Excel-шаблона, но не создаёт файл.\n56 колонок в шаблоне\nГотово\n3\nИстория\n2\nПоиск в текущем списке\nВсе города\nФИЛЬТР ПО АГЕНТУ\nВсе агенты\nАлексей Морозов\nТатьяна Николаева\n\tПодача\tГород\tДаты\tЗаявители\tСостояние\tОбновлено\n\n\t\nОльга Фролова\nSUB-1101\n\tМосква\t09-16 сен 2026\t1\tГотово\t15.06\n\n\t\nСемья Волковых\nSUB-1102\n\tМосква\t09-16 сен 2026\t3\tГотово\t15.06\n\n\t\nНикита Морозов\nSUB-1103\n\tСанкт-Петербург\t09-16 сен 2026\t1\tГотово\t15.06\n\nКОНТРАКТ ВЫГРУЗКИ\n\nExcel · Sheet1 A:BD\n\nТЕКУЩИЙ ПАКЕТ\n\nПакет не выбран\n51\nMAPPED\n2\nUNRESOLVED\n\nПакет не выбран\n\nSheet1 · masked preview\n#\nLOCATION\nVISA TYPE\nVISA SUB TYPE\nAPPOINTMENT CATEGORY(NORMAL)\nAPPLICANT EMAIL\nAPPLICANT MOBILE(10 DIGIT, NO SPACE OR -,LEADING ZERO)\nPASSPORT NO\nSURNAME (FAMILY NAME)\nSURNAME AT BIRTH\n\nПоказаны первые 9 из 56 колонок. Один заявитель = одна строка; члены семьи идут последовательным блоком.\n\nPRE-EXPORT CHECKS\n\nЕсть выбранные подачи\nТолько принятые подачи\nНет открытых блокеров\nОбязательные файлы готовы\nОдин город\nНе выбран · Не выбран\nВсе 56 колонок подтверждены\nSheet1 A:BD\nКонтракт A:BD\n51 mapped · 3 derived · 2 unresolved\n1\nLocation\nmapped\n2\nVisa Type\nmapped\n3\nVisa Sub Type\nunresolved\n4\nAppointment Category(Normal)\nmapped\n5\nApplicant Email\nmapped\n6\nApplicant Mobile(10 Digit, No space or -,leading zero)\nmapped\n7\nPassport No\nmapped\n8\nSurname (Family Name)\nmapp",
-  "problems": [],
-  "networkFailures": []
-}

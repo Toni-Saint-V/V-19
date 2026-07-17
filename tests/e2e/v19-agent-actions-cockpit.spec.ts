@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { testArtifactPath } from "../support/artifacts";
 
 import { expect, test, type Page } from "@playwright/test";
 
-const proofDir = "docs/qa/2026-07-01-agent-actions-cockpit";
+const proofDir = testArtifactPath("2026-07-01-agent-actions-cockpit");
 
 const viewports = [
   { height: 720, label: "320", width: 320 },

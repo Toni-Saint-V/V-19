@@ -5,6 +5,8 @@ import { dirname, resolve } from "node:path";
 
 import type { BrowserContext, Download, Page, Request } from "@playwright/test";
 
+import { testArtifactPath } from "../support/artifacts";
+
 import {
   PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
@@ -295,9 +297,7 @@ export async function saveProductionExportState(state: ProductionExportState) {
 }
 
 export async function writeProductionExportEvidence(runMarker: string, value: unknown) {
-  const path = resolve(
-    process.cwd(),
-    "output",
+  const path = testArtifactPath(
     "playwright",
     "production-export",
     runMarker,

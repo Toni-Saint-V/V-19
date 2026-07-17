@@ -2,7 +2,6 @@
 paths:
   - "src/modules/submissions/**"
   - "src/shared/ui/system.css"
-  - "docs/qa/**"
   - ".agents/reference-screens/**"
 ---
 
@@ -11,9 +10,10 @@ paths:
 Use this rule before implementing or approving any V-19 design-system screen. It fixes the intended frame, spacing, and layout behavior for the current screen-by-screen migration.
 
 Tracked screenshot files were removed from the repository during cleanup. Any
-`.agents/reference-screens/*.png` or `docs/qa/*.png` names below are historical
+`.agents/reference-screens/*.png` or historical QA screenshot names below are
 labels only, not required local files. Use the textual wireframes here plus
-fresh runtime screenshots captured for the current task.
+fresh runtime checks captured for the current task. Any optional screenshot is
+written outside the repository through `V19_TEST_ARTIFACTS_DIR`.
 
 ## Agent Execution Protocol
 
@@ -80,6 +80,7 @@ Mobile is not a squeezed desktop. Tables become cards, desktop sidebars become o
 ## Agent Actions / My Actions
 
 References:
+
 - `.agents/reference-screens/agent-actions-desktop-list.png`
 - `.agents/reference-screens/agent-actions-mobile-list.png`
 
@@ -141,6 +142,7 @@ Acceptance: tabs switch without layout jump; footer never covers content; issue 
 ## Questionnaire Edit
 
 References:
+
 - `.agents/reference-screens/questionnaire-mobile-personal-data.png`
 - `.agents/reference-screens/questionnaire-mobile-passport-data.png`
 
@@ -178,6 +180,7 @@ Acceptance: each issue has exact target CTA; sending corrections is disabled/blo
 ## Admin Review / Проверка
 
 References:
+
 - `.agents/reference-screens/admin-review-desktop-cards.png`
 - `.agents/reference-screens/admin-review-desktop-list.png`
 - `.agents/reference-screens/admin-review-desktop-columns.png`
@@ -213,6 +216,7 @@ Acceptance: desktop brand/nav readable; list and board modes both fit without cl
 ## Create Submission
 
 References:
+
 - `.agents/reference-screens/create-submission-desktop-single.png`
 - `.agents/reference-screens/create-submission-desktop-family.png`
 
@@ -253,6 +257,7 @@ Acceptance: family vs single profiles are visually distinct; package counts and 
 ## Export / Excel Preview
 
 References:
+
 - `.agents/reference-screens/export-desktop-context-rail.png`
 - `.agents/reference-screens/export-table-wireframe-crop.png`
 

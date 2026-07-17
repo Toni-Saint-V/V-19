@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openFreshWorkspace } from "./v19-pilot-helpers";
+import { testArtifactPath } from "../support/artifacts";
 
 function collectBrowserProblems(page: Page) {
   const problems: string[] = [];
@@ -18,7 +19,7 @@ function collectBrowserProblems(page: Page) {
 async function saveScreenshot(page: Page, name: string) {
   await page.screenshot({
     fullPage: true,
-    path: `docs/qa/2026-06-21-v19-ux-states-${name}.png`,
+    path: testArtifactPath(`2026-06-21-v19-ux-states-${name}.png`),
   });
 }
 

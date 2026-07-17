@@ -41,11 +41,11 @@ npm run v19:e2e:lanes -- --dry-run --print-commands --no-plugin-install
 - Lane config: `docs/prompts/v19-e2e-lanes/lanes.json`
 - Shared prompt template: `docs/prompts/v19-e2e-lanes/shared.md`
 - Shared state model: `docs/architecture/v19-flow-state-model.md`
-- Root manifest: `docs/qa/generated-lane-prompts/<run-id>/launch-manifest.json`
-- Lane prompt: `docs/qa/generated-lane-prompts/<run-id>/<lane>.md`
-- Lane context bundle: `docs/qa/generated-lane-prompts/<run-id>/context/...`
-- Lane visual/QA assets: `docs/qa/generated-lane-prompts/<run-id>/context/docs/qa/*.{png,jpg,jpeg,webp}`
-- Lane skill bundle: `docs/qa/generated-lane-prompts/<run-id>/context/skills/*.md`
+- Root manifest: `$V19_TEST_ARTIFACTS_DIR/generated-lane-prompts/<run-id>/launch-manifest.json`
+- Lane prompt: `$V19_TEST_ARTIFACTS_DIR/generated-lane-prompts/<run-id>/<lane>.md`
+- Lane context bundle: `$V19_TEST_ARTIFACTS_DIR/generated-lane-prompts/<run-id>/<lane>/context/...`
+- Lane visual/QA assets: not copied into the repository or worktree.
+- Lane skill bundle: `$V19_TEST_ARTIFACTS_DIR/generated-lane-prompts/<run-id>/<lane>/context/skills/*.md`
 
 ## Preflight
 

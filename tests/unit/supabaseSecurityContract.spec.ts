@@ -575,8 +575,8 @@ describe("Supabase security contract", () => {
   test("binds the complete P1 and A2 proof surface into the readiness hash", () => {
     const verifier = readProjectFile("scripts/verify-production-readiness.mjs");
     const requiredProofPaths = [
-      "playwright.supabase-production-export-a1-s1.config.ts",
-      "playwright.supabase-production-export-a2-s1-abort.config.ts",
+      "config/playwright/playwright.supabase-production-export-a1-s1.config.ts",
+      "config/playwright/playwright.supabase-production-export-a2-s1-abort.config.ts",
       "src/modules/submissions/submissionActions.ts",
       "tests/e2e-supabase-ui/production-export-a1-s1-helpers.ts",
       "tests/e2e-supabase-ui/production-export-a1-s1-resumable.spec.ts",

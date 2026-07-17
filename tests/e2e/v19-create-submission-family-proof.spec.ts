@@ -1,8 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
+import { testArtifactPath } from "../support/artifacts";
 
-const qaDir = "docs/qa/pipeline-premium-ui-mobile-20260628/fix-findings";
+const qaDir = testArtifactPath("pipeline-premium-ui-mobile-20260628/fix-findings");
 
 function e2ePassportFile(name: string) {
   return {

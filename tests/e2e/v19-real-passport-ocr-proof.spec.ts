@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { testArtifactPath } from "../support/artifacts";
 import {
   clickFirstVisible,
   collectBrowserProblems,
@@ -9,7 +10,7 @@ import {
 } from "./v19-pilot-helpers";
 
 const realPassportPath = "/Users/user/Desktop/passport.jpeg";
-const qaDir = path.join(process.cwd(), "docs/qa/passport-ai-hints-20260706");
+const qaDir = testArtifactPath("passport-ai-hints-20260706");
 const intakeDraftStorageKey = "visaflow.v19.productIntakeDrafts.v1";
 
 type StoredIntakeDraft = {

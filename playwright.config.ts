@@ -1,15 +1,20 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { testArtifactPath } from "./tests/support/artifacts";
 
 const e2eHost = process.env.PW_BASE_HOST ?? "localhost";
 const e2ePort = process.env.PW_BASE_PORT ?? "4207";
 const e2eUrl = `http://${e2eHost}:${e2ePort}`;
 export default defineConfig({
+  outputDir: testArtifactPath("playwright", "local-e2e"),
+  preserveOutput: "never",
   testDir: "./tests/e2e",
   reporter: [["list"]],
   use: {
     baseURL: e2eUrl,
-    trace: "retain-on-failure",
+    screenshot: "off",
+    trace: "off",
+    video: "off",
     launchOptions: {
       args: [
         "--no-first-run",

@@ -3,7 +3,6 @@ paths:
   - "src/shared/ui/system.css"
   - "src/modules/submissions/**"
   - "docs/VISAFLOW_VISUAL_LOCK.md"
-  - "docs/qa/**"
 ---
 
 # Visual Lock Tokens
@@ -13,4 +12,4 @@ paths:
 - Required locked `--vf-*` tokens are verified by `npm run verify:agent-screen-system`.
 - Do not introduce random colors, glow, gradients, glassmorphism, heavy shadows, or a new visual language.
 - Use neutral gray for selected navigation/views, indigo only for focus and subtle active row borders, red/yellow/green only for mapped status states.
-- UI/token changes require fresh runtime proof and screenshots under `docs/qa/` when feasible.
+- UI/token changes require fresh runtime proof. Optional screenshots must stay outside the repository through `V19_TEST_ARTIFACTS_DIR`.

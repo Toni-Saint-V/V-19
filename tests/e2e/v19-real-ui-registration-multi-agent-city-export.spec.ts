@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
+import { testArtifactPath } from "../support/artifacts";
 import {
   clearExportSelection,
   clickWorkspaceButton,
@@ -18,7 +19,7 @@ import {
 type City = "Москва" | "Санкт-Петербург" | "Казань";
 
 const accessPassword = "secure-local-password";
-const evidenceDir = "docs/qa/real-ui-goal-20260630";
+const evidenceDir = testArtifactPath("real-ui-goal-20260630");
 
 type AgentAccount = {
   city: string;

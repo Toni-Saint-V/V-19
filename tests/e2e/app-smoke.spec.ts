@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openFreshWorkspace } from "./v19-pilot-helpers";
+import { testArtifactPath } from "../support/artifacts";
 
 const forbiddenPrimaryLabels = [
   "Люди",
@@ -763,14 +764,16 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.getByRole("button", { name: "Мои подачи" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Настройки" })).toBeVisible();
     await expect(page.getByText("Входящие", { exact: true })).toHaveCount(0);
-    await expect(page.locator('input[placeholder="Поиск по действиям..."]')).toBeVisible();
+    await expect(
+      page.locator('input[placeholder="Поиск по действиям..."]'),
+    ).toBeVisible();
     await expectAtLeastOneVisible(
       page.getByRole("button", { name: /^(Исправить|Продолжить|Добавить)$/ }),
       "No visible agent action CTA matched.",
     );
     await page.screenshot({
       fullPage: true,
-      path: "docs/qa/v19-agent-actions-restored-desktop.png",
+      path: testArtifactPath("v19-agent-actions-restored-desktop.png"),
     });
 
     await clickWorkspaceButton(page, /Мои подачи/);
@@ -791,11 +794,13 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Настройки рабочего места" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Открыть canonical настройки" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Открыть canonical настройки" }),
+    ).toBeVisible();
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/2026-06-21-v19-settings-dirty-desktop.png",
+        path: testArtifactPath("2026-06-21-v19-settings-dirty-desktop.png"),
       });
     }
 
@@ -815,7 +820,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(statusOption).toBeVisible();
     await page.screenshot({
       fullPage: true,
-      path: "docs/qa/v19-mobile-filter-390-before-click.png",
+      path: testArtifactPath("v19-mobile-filter-390-before-click.png"),
     });
 
     const hitTarget = await statusOption.evaluate((element) => {
@@ -865,7 +870,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
     await page.screenshot({
       fullPage: true,
-      path: "docs/qa/v19-mobile-filter-390-after-click.png",
+      path: testArtifactPath("v19-mobile-filter-390-after-click.png"),
     });
   });
 
@@ -890,7 +895,7 @@ test.describe("V-19 operations workspace", () => {
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/2026-06-21-v19-role-safe-admin-events-desktop.png",
+        path: testArtifactPath("2026-06-21-v19-role-safe-admin-events-desktop.png"),
       });
     }
 
@@ -898,7 +903,9 @@ test.describe("V-19 operations workspace", () => {
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/2026-06-21-v19-role-safe-admin-corrections-desktop.png",
+        path: testArtifactPath(
+          "2026-06-21-v19-role-safe-admin-corrections-desktop.png",
+        ),
       });
     }
     await expectAdminWorkNavigation(page);
@@ -1004,7 +1011,7 @@ test.describe("V-19 operations workspace", () => {
       await page.waitForTimeout(250);
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/v19-linear-admin-review-desktop.png",
+        path: testArtifactPath("v19-linear-admin-review-desktop.png"),
       });
     }
 
@@ -1028,7 +1035,7 @@ test.describe("V-19 operations workspace", () => {
       await page.waitForTimeout(250);
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/v19-linear-drawer-desktop.png",
+        path: testArtifactPath("v19-linear-drawer-desktop.png"),
       });
     }
 
@@ -1040,7 +1047,7 @@ test.describe("V-19 operations workspace", () => {
       await page.waitForTimeout(250);
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/v19-linear-issue-composer-desktop.png",
+        path: testArtifactPath("v19-linear-issue-composer-desktop.png"),
       });
     }
 
@@ -1071,7 +1078,7 @@ test.describe("V-19 operations workspace", () => {
       await page.waitForTimeout(250);
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/v19-linear-export-desktop.png",
+        path: testArtifactPath("v19-linear-export-desktop.png"),
       });
     }
 
@@ -1079,7 +1086,7 @@ test.describe("V-19 operations workspace", () => {
       await page.waitForTimeout(250);
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/v19-linear-export-mobile.png",
+        path: testArtifactPath("v19-linear-export-mobile.png"),
       });
     }
 
@@ -1158,7 +1165,9 @@ test.describe("V-19 operations workspace", () => {
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/2026-06-21-v19-media-replacement-corrections-desktop.png",
+        path: testArtifactPath(
+          "2026-06-21-v19-media-replacement-corrections-desktop.png",
+        ),
       });
     }
   });
@@ -1699,7 +1708,7 @@ test.describe("V-19 operations workspace", () => {
       await fillQuestionnaire(page);
       familyId = await fillFilesAndSubmit(
         page,
-        "docs/qa/v19-flow-media-drawer-no-overlap.png",
+        testArtifactPath("v19-flow-media-drawer-no-overlap.png"),
       );
     });
 

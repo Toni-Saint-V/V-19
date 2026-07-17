@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { mkdir, rename, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 import { expect, test } from "@playwright/test";
 
+import { testArtifactPath } from "../support/artifacts";
 import {
   PRODUCTION_PROJECT_REF,
   assertProductionCohortWriteUnlock,
@@ -24,9 +25,7 @@ function errorDigest(error: unknown) {
 }
 
 async function writeEvidence(runMarker: string, value: unknown) {
-  const path = resolve(
-    process.cwd(),
-    "output",
+  const path = testArtifactPath(
     "playwright",
     "production-cohort",
     runMarker,

@@ -5,10 +5,9 @@ import { parse } from "postcss";
 const root = process.cwd();
 const visualLockPath = path.join(root, "docs", "VISAFLOW_VISUAL_LOCK.md");
 const expectedReferences = [
-  "docs/qa/2026-07-05-agent-unfinished-final/desktop-1440-actions.png",
-  "docs/qa/2026-07-05-agent-unfinished-final/desktop-1440-submissions.png",
-  "docs/qa/2026-07-05-agent-unfinished-final/mobile-390-actions.png",
-  "docs/qa/2026-07-05-agent-unfinished-final/mobile-390-submissions.png",
+  ".agents/rules/v19-screen-wireframes.md",
+  ".agents/rules/visual-lock-tokens.md",
+  "src/shared/ui/visual-baseline.css",
 ];
 const runtimeStyleFiles = [
   "src/shared/ui/tokens/index.css",
@@ -18,11 +17,7 @@ const runtimeStyleFiles = [
 const scannedRoots = ["docs", "src"].map((dir) => path.join(root, dir));
 const ignoredDirs = new Set([".git", "node_modules", "dist"]);
 const ignoredBinaryExtensions = /\.(png|jpe?g|webp|gif|ico|zip|pdf|mp4|mov|xlsx?)$/i;
-const forbiddenPathParts = [
-  "docs/prototypes",
-  "docs/qa/deep-research-idea-pack",
-  "docs/research/deep-research-idea-pack",
-];
+const forbiddenPathParts = ["docs/prototypes", "docs/research/deep-research-idea-pack"];
 const forbiddenTextPatterns = [
   /\bprototype\b/i,
   /\bprototypes\b/i,
@@ -75,15 +70,11 @@ function verifyVisualLock() {
     }
   }
 
-  const listedReferences = unique(
-    [...text.matchAll(/`(docs\/qa\/[^`]+\.png)`/g)].map((match) => match[1]),
-  );
-
-  assertSameSet(
-    listedReferences,
-    expectedReferences,
-    "docs/VISAFLOW_VISUAL_LOCK.md agent reference list",
-  );
+  for (const reference of expectedReferences) {
+    if (!text.includes(`\`${reference}\``)) {
+      failures.push(`docs/VISAFLOW_VISUAL_LOCK.md missing reference: ${reference}`);
+    }
+  }
 }
 
 function verifyMotionContract() {
@@ -100,18 +91,29 @@ function verifyMotionContract() {
     failures.push("View Transition root CSS must be scoped to html.vf-vt");
   }
 
-  if (/::view-transition-(?:old|new)\(root\)/.test(styles.replaceAll("html.vf-vt::view-transition-old(root)", "").replaceAll("html.vf-vt::view-transition-new(root)", ""))) {
+  if (
+    /::view-transition-(?:old|new)\(root\)/.test(
+      styles
+        .replaceAll("html.vf-vt::view-transition-old(root)", "")
+        .replaceAll("html.vf-vt::view-transition-new(root)", ""),
+    )
+  ) {
     failures.push("Unscoped root View Transition selectors are not allowed");
   }
 
   const screenGridBlock = styles.match(/\.v19-screen-grid\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
 
-  if (/grid-template-columns\s+var\([^;]*motion|gap\s+var\([^;]*motion/.test(screenGridBlock)) {
+  if (
+    /grid-template-columns\s+var\([^;]*motion|gap\s+var\([^;]*motion/.test(
+      screenGridBlock,
+    )
+  ) {
     failures.push(".v19-screen-grid must not animate layout properties");
   }
 
   const reducedMotionBlock =
-    styles.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+    styles.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\}/)?.[0] ??
+    "";
 
   if (
     !reducedMotionBlock.includes("animation: none !important") ||
@@ -120,10 +122,14 @@ function verifyMotionContract() {
     failures.push("Reduced motion must disable app animation and transition effects");
   }
 
-  const exportQueueBlocks = [...styles.matchAll(/\.magic-export-queue\s*\{([^{}]*)\}/g)];
+  const exportQueueBlocks = [
+    ...styles.matchAll(/\.magic-export-queue\s*\{([^{}]*)\}/g),
+  ];
 
   if (exportQueueBlocks.some((match) => /overflow:\s*hidden/.test(match[1]))) {
-    failures.push("Mobile export queue must not hide enabled row actions with overflow: hidden");
+    failures.push(
+      "Mobile export queue must not hide enabled row actions with overflow: hidden",
+    );
   }
 }
 
@@ -150,7 +156,10 @@ function verifyCssTokenContract() {
     parsedStyles.walkDecls((declaration) => {
       if (!declaration.prop.startsWith("--")) return;
       definedTokens.add(declaration.prop);
-      if (declaration.parent?.type === "rule" && declaration.parent.selector === ":root") {
+      if (
+        declaration.parent?.type === "rule" &&
+        declaration.parent.selector === ":root"
+      ) {
         rootTokenValues.set(declaration.prop, declaration.value.trim());
       }
     });
@@ -186,15 +195,20 @@ function verifyCssTokenContract() {
 
   for (const token of requiredRootTokens) {
     if (!rootTokenValues.has(token)) {
-      failures.push(`runtime style tokens missing required :root custom property ${token}`);
+      failures.push(
+        `runtime style tokens missing required :root custom property ${token}`,
+      );
     }
   }
 
   const undefinedReferences = new Set();
-  const combinedStyles = styleSources.map((styleSource) => styleSource.source).join("\n");
+  const combinedStyles = styleSources
+    .map((styleSource) => styleSource.source)
+    .join("\n");
   for (const match of combinedStyles.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)([^)]*)\)/g)) {
     const [, token, rest] = match;
-    if (!definedTokens.has(token) && !rest.includes(",")) undefinedReferences.add(token);
+    if (!definedTokens.has(token) && !rest.includes(","))
+      undefinedReferences.add(token);
   }
 
   for (const token of [...undefinedReferences].sort()) {
@@ -204,9 +218,7 @@ function verifyCssTokenContract() {
   for (const match of combinedStyles.matchAll(
     /var\(\s*(--[A-Za-z0-9_-]+)\s*,\s*var\(\s*\1\b/g,
   )) {
-    failures.push(
-      `runtime styles have self-referential fallback for ${match[1]}`,
-    );
+    failures.push(`runtime styles have self-referential fallback for ${match[1]}`);
   }
 }
 
@@ -219,7 +231,9 @@ function verifySingleStyleEntrypoint() {
 
   assertSameSet(cssFiles, expectedCssFiles, "runtime stylesheet files");
 
-  const sourceFiles = listFiles(srcRoot).filter((file) => /\.(?:ts|tsx|js|jsx)$/i.test(file));
+  const sourceFiles = listFiles(srcRoot).filter((file) =>
+    /\.(?:ts|tsx|js|jsx)$/i.test(file),
+  );
   const cssImports = [];
 
   for (const file of sourceFiles) {
@@ -272,7 +286,9 @@ function verifyUnifiedSidebarContract() {
   const styles = fs.readFileSync(stylesPath, "utf8");
 
   if (/\.surface-agent-inbox,\s*\.surface-agent-inbox/.test(styles)) {
-    failures.push("src/shared/ui/system.css duplicates .surface-agent-inbox in an :is() selector");
+    failures.push(
+      "src/shared/ui/system.css duplicates .surface-agent-inbox in an :is() selector",
+    );
   }
 
   if (/\.ops-shell\s+\.ops-sidebar/.test(styles)) {
@@ -282,7 +298,9 @@ function verifyUnifiedSidebarContract() {
   }
 
   if (
-    /\.ops-shell(?!(?:\.has-unified-side-menu|:not\(\.has-unified-side-menu\)))(?:\.[A-Za-z0-9_-]+|:is\([^)]*\))*\.is-mobile-nav-open\s+\.ops-sidebar/.test(styles)
+    /\.ops-shell(?!(?:\.has-unified-side-menu|:not\(\.has-unified-side-menu\)))(?:\.[A-Za-z0-9_-]+|:is\([^)]*\))*\.is-mobile-nav-open\s+\.ops-sidebar/.test(
+      styles,
+    )
   ) {
     failures.push(
       "src/shared/ui/system.css has mobile sidebar selectors that bypass the unified side menu contract",
@@ -359,10 +377,14 @@ function verifyV19SemanticStyleContract() {
   const combinedSource = [...sourceByPath.values()].join("\n");
   for (const className of requiredSemanticClasses) {
     if (!combinedSource.includes(className)) {
-      failures.push(`V-19 semantic class ${className} is not used by the target UI surfaces`);
+      failures.push(
+        `V-19 semantic class ${className} is not used by the target UI surfaces`,
+      );
     }
     if (!styles.includes(`.${className}`)) {
-      failures.push(`V-19 semantic class ${className} is not defined in src/shared/ui/system.css`);
+      failures.push(
+        `V-19 semantic class ${className} is not defined in src/shared/ui/system.css`,
+      );
     }
   }
 
@@ -377,11 +399,17 @@ function verifyV19SemanticStyleContract() {
     ],
     [
       "src/modules/submissions/components/FigmaQuestionnaireScreen.tsx",
-      ["bg-[#101011] flex flex-col overflow-hidden", "bg-orange-500 hover:bg-orange-600"],
+      [
+        "bg-[#101011] flex flex-col overflow-hidden",
+        "bg-orange-500 hover:bg-orange-600",
+      ],
     ],
     [
       "src/modules/submissions/components/CreateSubmissionDrawer.tsx",
-      ["bg-[#0e0e10] flex flex-col overflow-hidden", "bg-white text-black hover:bg-white/90"],
+      [
+        "bg-[#0e0e10] flex flex-col overflow-hidden",
+        "bg-white text-black hover:bg-white/90",
+      ],
     ],
   ]);
 
@@ -389,7 +417,9 @@ function verifyV19SemanticStyleContract() {
     const source = sourceByPath.get(relativePath) ?? "";
     for (const snippet of forbiddenSnippets) {
       if (source.includes(snippet)) {
-        failures.push(`${relativePath} still contains inline visual contract: ${snippet}`);
+        failures.push(
+          `${relativePath} still contains inline visual contract: ${snippet}`,
+        );
       }
     }
   }
@@ -409,23 +439,7 @@ function verifyReferenceFiles() {
       failures.push(`${reference} must be a non-empty file`);
       continue;
     }
-
-    const signature = fs.readFileSync(absolutePath).subarray(0, 8);
-    const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    if (!signature.equals(pngSignature)) {
-      failures.push(`${reference} must be a PNG file`);
-    }
   }
-
-  const allAgentLockReferences = listFiles(path.join(root, "docs", "qa"))
-    .map((file) => relative(file))
-    .filter((file) => /^docs\/qa\/v19-agent-.*reference.*\.png$/i.test(file));
-
-  assertSameSet(
-    allAgentLockReferences,
-    expectedReferences.filter((file) => /^docs\/qa\/v19-agent-/.test(file)),
-    "docs/qa agent reference PNG files",
-  );
 }
 
 function verifyNoForbiddenArtifacts() {
@@ -492,10 +506,6 @@ function assertSameOrderedList(actual, expected, label) {
       );
     }
   }
-}
-
-function unique(values) {
-  return [...new Set(values)];
 }
 
 function relative(file) {

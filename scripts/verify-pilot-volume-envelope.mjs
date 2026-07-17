@@ -1,10 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { testArtifactPath } from "./lib/artifact-paths.mjs";
 
 const repoRoot = process.cwd();
-const evidencePath = resolve(repoRoot, "docs/qa/supabase-pilot-volume-envelope-20260706.md");
-const readinessPath = resolve(repoRoot, "docs/release/supabase-production-readiness.json");
+const evidencePath = testArtifactPath("supabase-pilot-volume-envelope-20260706.md");
+const readinessPath = resolve(
+  repoRoot,
+  "docs/release/supabase-production-readiness.json",
+);
 const pilotCohortPath = resolve(repoRoot, ".supabase-pilot-cohort.local.json");
 const adminEnvPath = resolve(repoRoot, ".env.supabase-production-admin.local");
 const publicEnvPath = resolve(repoRoot, ".env.supabase-production.local");
@@ -23,9 +27,7 @@ const maxTotalApplicants = maxTotalSubmissions * envelope.maxApplicantsPerSubmis
 const maxRequiredMediaObjects =
   maxTotalApplicants * envelope.requiredMediaSlotsPerApplicant;
 const readiness = readJsonIfExists(readinessPath);
-const pilotWindowStartedAt = clean(
-  readiness.controlledPilot?.pilotWindowStartedAt,
-);
+const pilotWindowStartedAt = clean(readiness.controlledPilot?.pilotWindowStartedAt);
 const adminEnv = readEnvIfExists(adminEnvPath);
 const publicEnv = readEnvIfExists(publicEnvPath);
 const projectRef =
@@ -36,7 +38,9 @@ const projectUrl =
   clean(adminEnv.SUPABASE_PROJECT_URL) ||
   clean(publicEnv.VITE_SUPABASE_URL) ||
   clean(readiness.productionTarget?.projectUrl);
-const adminCredential = clean(adminEnv[["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_")]);
+const adminCredential = clean(
+  adminEnv[["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_")],
+);
 
 function fail(message) {
   console.error(`FAIL ${message}`);
@@ -73,7 +77,10 @@ function roleCountsFromUsers(users) {
 }
 
 function readPilotCohortAggregate() {
-  assert(existsSync(pilotCohortPath), "local pilot cohort file is available for registered-agent cap check");
+  assert(
+    existsSync(pilotCohortPath),
+    "local pilot cohort file is available for registered-agent cap check",
+  );
   const cohort = readJsonIfExists(pilotCohortPath);
   const users = Array.isArray(cohort.pilotUsers) ? cohort.pilotUsers : [];
   const roleCounts = roleCountsFromUsers(users);
@@ -124,11 +131,13 @@ async function verifyProductionSubmissionCaps() {
     projectUrl.includes(projectRef),
     "production project URL matches production project ref",
   );
-  assert(adminCredential, "local service-role key is available for read-only cap check");
   assert(
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
-      pilotWindowStartedAt,
-    ) && !Number.isNaN(Date.parse(pilotWindowStartedAt)),
+    adminCredential,
+    "local service-role key is available for read-only cap check",
+  );
+  assert(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(pilotWindowStartedAt) &&
+      !Number.isNaN(Date.parse(pilotWindowStartedAt)),
     "controlled pilot window start is a valid UTC timestamp",
   );
   assert(
@@ -148,7 +157,9 @@ async function verifyProductionSubmissionCaps() {
     .eq("role", "agent");
 
   if (agentProfileError) {
-    fail(`production registered agent profile count is unreadable: ${agentProfileError.message}`);
+    fail(
+      `production registered agent profile count is unreadable: ${agentProfileError.message}`,
+    );
   }
 
   const authUsers = await listProductionAuthUsers(admin);
@@ -172,12 +183,16 @@ async function verifyProductionSubmissionCaps() {
       .eq("role", "admin");
 
   if (adminProfileError) {
-    fail(`production registered admin profile count is unreadable: ${adminProfileError.message}`);
+    fail(
+      `production registered admin profile count is unreadable: ${adminProfileError.message}`,
+    );
   }
 
   const capViolations = [];
   if (pilotCohort.projectRef !== projectRef) {
-    capViolations.push("local pilot cohort project ref does not match production project ref");
+    capViolations.push(
+      "local pilot cohort project ref does not match production project ref",
+    );
   }
   if (!Number.isInteger(productionRegisteredAgentProfiles)) {
     capViolations.push("production registered agent profile count is not exact");
@@ -216,7 +231,9 @@ async function verifyProductionSubmissionCaps() {
     .gte("created_at", pilotWindowStartedAt);
 
   if (countError) {
-    fail(`production pilot-window submission count is unreadable: ${countError.message}`);
+    fail(
+      `production pilot-window submission count is unreadable: ${countError.message}`,
+    );
   }
 
   if (!Number.isInteger(count)) {
@@ -252,10 +269,7 @@ async function verifyProductionSubmissionCaps() {
   }
 
   const activeAgentCount = productionPerAgentCounts.size;
-  const maxSubmissionsForOneAgent = Math.max(
-    0,
-    ...productionPerAgentCounts.values(),
-  );
+  const maxSubmissionsForOneAgent = Math.max(0, ...productionPerAgentCounts.values());
   if (activeAgentCount > envelope.registeredAgents) {
     capViolations.push(
       `production pilot window has ${activeAgentCount} active agents with submissions, above pilot cap ${envelope.registeredAgents}`,
@@ -272,7 +286,9 @@ async function verifyProductionSubmissionCaps() {
     .select("agent_id")
     .range(0, Math.max(0, (lifetimeSubmissionCount ?? 0) - 1));
   if (lifetimeRowsError) {
-    fail(`production lifetime per-agent counts are unreadable: ${lifetimeRowsError.message}`);
+    fail(
+      `production lifetime per-agent counts are unreadable: ${lifetimeRowsError.message}`,
+    );
   }
   const lifetimePerAgentCounts = new Map();
   for (const row of lifetimeRows ?? []) {
@@ -297,10 +313,7 @@ async function verifyProductionSubmissionCaps() {
     pilotCohortTotalUsers: pilotCohort.totalUsers,
     lifetimeTotalSubmissions: lifetimeSubmissionCount,
     lifetimeActiveAgentsWithSubmissions: lifetimePerAgentCounts.size,
-    lifetimeMaxSubmissionsForOneAgent: Math.max(
-      0,
-      ...lifetimePerAgentCounts.values(),
-    ),
+    lifetimeMaxSubmissionsForOneAgent: Math.max(0, ...lifetimePerAgentCounts.values()),
     totalSubmissions: count,
     activeAgentsWithSubmissions: activeAgentCount,
     maxSubmissionsForOneAgent,
@@ -375,7 +388,10 @@ for (let agentIndex = 1; agentIndex <= envelope.registeredAgents; agentIndex += 
 
 assert(submissions.length === maxTotalSubmissions, "submission envelope mismatch");
 assert(applicants.length === maxTotalApplicants, "applicant envelope mismatch");
-assert(mediaRows.length === maxRequiredMediaObjects, "required media envelope mismatch");
+assert(
+  mediaRows.length === maxRequiredMediaObjects,
+  "required media envelope mismatch",
+);
 assert(storagePaths.size === mediaRows.length, "storage paths are not unique");
 
 for (const [agentId, count] of perAgentCounts) {
@@ -481,7 +497,9 @@ console.log(
 console.log(
   `Production active registered agent profiles: ${productionCaps.productionRegisteredAgentProfiles}`,
 );
-console.log(`Pilot cohort registered agents: ${productionCaps.pilotCohortRegisteredAgents}`);
+console.log(
+  `Pilot cohort registered agents: ${productionCaps.pilotCohortRegisteredAgents}`,
+);
 console.log(`Pilot window starts at: ${productionCaps.pilotWindowStartedAt}`);
 console.log(
   `Production lifetime total submissions: ${productionCaps.lifetimeTotalSubmissions}`,

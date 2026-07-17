@@ -4,7 +4,12 @@ import path from "node:path";
 const root = process.cwd();
 const suiteDir = path.join(root, "tests/e2e-supabase-ui");
 const suiteEntryPath = path.join(suiteDir, "sandbox-ui-flow.spec.ts");
-const configPath = path.join(root, "playwright.supabase-ui.config.ts");
+const configPath = path.join(
+  root,
+  "config",
+  "playwright",
+  "playwright.supabase-ui.config.ts",
+);
 const violations = [];
 
 const forbiddenPatterns = [
@@ -37,7 +42,7 @@ if (!fs.existsSync(suiteDir)) {
 }
 
 if (!fs.existsSync(configPath)) {
-  violations.push("playwright.supabase-ui.config.ts is missing");
+  violations.push("config/playwright/playwright.supabase-ui.config.ts is missing");
 } else {
   const config = fs.readFileSync(configPath, "utf8");
   for (const required of [

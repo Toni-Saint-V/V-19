@@ -1,19 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { File } from "node:buffer";
 import { readFileSync } from "node:fs";
-import {
-  mkdir,
-  readFile,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import JSZip from "jszip";
 
-import {
-  EXPECTED_EXPORT_CONTRACT_HEADERS,
-} from "../../src/lib/export/exportContractCore";
+import { testArtifactPath } from "../support/artifacts";
+import { EXPECTED_EXPORT_CONTRACT_HEADERS } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
 import {
@@ -870,9 +864,9 @@ test.describe("real new-user Supabase family application ZIP", () => {
   }) => {
     test.setTimeout(900_000);
     const runId = `real-e2e-${Date.now()}-${randomBytes(3).toString("hex")}`;
-    const outputDir = resolve(process.cwd(), "output", "real-supabase-e2e", runId);
+    const outputDir = testArtifactPath("real-supabase-e2e", runId);
     await mkdir(outputDir, { recursive: true });
-    const docsDir = resolve(process.cwd(), "docs", "Для теста");
+    const docsDir = resolve(process.cwd(), "tests", "fixtures", "production-media");
     const sourcePaths = sourceDocuments.map((name) => resolve(docsDir, name));
     for (const path of sourcePaths) expect((await stat(path)).size).toBeGreaterThan(0);
 

@@ -19,7 +19,7 @@ type PdfTextItem = {
   transform: number[];
 };
 
-const filledReferencePath = "docs/пиздец/Выгрузка_Анкета.pdf";
+const filledReferencePath = "tests/fixtures/reference-exports/Выгрузка_Анкета.pdf";
 
 const formData: VisaFormData = {
   address: "12 TEST STREET",

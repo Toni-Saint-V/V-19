@@ -3,6 +3,7 @@
 This repository is the local VisaFlow V-19 product checkout. Move the product with the smallest safe change, current source truth, and fresh evidence. Never fake completion, OCR, uploads, AI decisions, official verification, production proof, Excel proof, or verification results.
 
 ## 0. Operating Contract
+
 - Use the smallest valid stack for the current task.
 - Plugin-first means conditional routing, not plugin sprawl.
 - Use at most one task-specific helper and one verifier unless risk or the user explicitly requires more.
@@ -10,6 +11,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Do not expand scope silently.
 
 ## Codex Skill Context Budget
+
 - Default preset for ordinary repo work:
   - `$codex-logic`
   - `$codex-scope-lock`
@@ -29,6 +31,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
   - Export/report tasks only: `$data-reports-exports`.
 
 ## Source Truth
+
 - Stack: React 19, Vite 8, strict TypeScript, custom CSS/UI, Supabase JS, Vitest, Playwright.
 - Routing: local application state only. Do not add React Router or another routing framework without an explicit product need.
 - Durable submission logic lives mainly in `src/modules/submissions`, `src/services/`, `src/lib/supabase`, and `supabase/`. Legacy `src/lib/workflow.ts` and `src/types/domain.ts` are compatibility surfaces unless the canonical contract explicitly says otherwise.
@@ -37,6 +40,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Preserve unrelated dirty work. Do not use destructive git unless explicitly requested.
 
 ## V-19 Scope Lock
+
 - Main entity: `Submission`.
 - Allowed submission types: `single`, `family`.
 - Allowed roles: `agent`, `admin`.
@@ -47,6 +51,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Applicants, questionnaire, files, issues, and history belong inside `Submission`.
 
 ## Architecture
+
 - No business logic in UI components.
 - Submission statuses, transitions, permissions, readiness, export eligibility, and issue lifecycle are domain/use-case owned.
 - `requiresAction` is derived, not a persisted lifecycle status.
@@ -55,6 +60,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Export is fail-closed. Excel preview and workbook generation must share the same row model.
 
 ## Visual Baseline: My Actions
+
 - First step for UI work: replace colors, font roles, sizes, spacing, radius, and motion with tokens before styling screens; new raw values belong only in the token section of `src/shared/ui/visual-baseline.css`.
 - Do not duplicate colors, font sizes, spacing, radius, or motion values in component CSS; after tokens exist, screen rules must use `var(...)`.
 - Canonical visual screen: `Мои действия`. Apply its dark operational density screen by screen, starting with `Мои действия`; do not copy archive logic, mock data, routes, `motion/react`, product entities, or statuses.
@@ -72,6 +78,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - For UI/component replacement or polish, use the UI task preset as the selected preset only when the current task is UI-scoped, keep changes screen-scoped, capture fresh desktop/mobile runtime proof, write `premium-design-ux-review`, and fix all Critical/High/Medium findings before the next screen.
 
 ## Strict ZIP/HTML 1:1 UI Transfer
+
 - Use this section whenever the user provides or references a ZIP/HTML UI artifact, `START_HERE.html`, source truth, `1:1`, visual parity, перенос UI, or asks to make the project match a reference. The ZIP/HTML is the visual source truth, not the deliverable. The deliverable is this target project changed to match the reference.
 - Before doing that work, read `.agents/workflows/v19-ui-reference-transfer/README.md`, then follow its numbered files in order. The reusable copy-ready prompt is `.agents/prompts/v19-ui-reference-transfer.md`.
 - If the request is not a UI/reference-transfer task, route out through `.agents/workflows/v19-ui-reference-transfer/00-route.md` and use the normal non-UI route. Do not load browser/UI workflows for backend, business logic, Supabase, OCR, export data, release, security, tests-only, or docs-only work unless the task actually requires UI runtime evidence.
@@ -124,7 +131,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
   - `prefers-reduced-motion` safety is required when motion is changed.
 - Required browser proof after the latest code change:
   - viewports: `320x740`, `390x844`, `430x932`, `768x1024`, and desktop `1440x900` or the exact desktop viewport requested by the user;
-  - collect reference-vs-target screenshots for migrated screens under `docs/qa/`;
+  - keep optional reference-vs-target screenshots outside the repository under `V19_TEST_ARTIFACTS_DIR`;
   - assert `document.documentElement.scrollWidth <= window.innerWidth`;
   - assert header height ratio `<= 0.15` on mobile/tablet;
   - assert visible mobile insets are at least `16px`;
@@ -138,12 +145,14 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Never claim full 1:1 completion if only a slice was migrated, if screenshots are stale, if runtime was served from an unverified cwd, if console/build/typecheck is red, or if Critical/High/Medium visual findings remain in the declared scope.
 
 ## Verification
-- Use targeted proof first: file inspection, focused scripts/tests, typecheck/build when relevant, browser/runtime proof for UI, screenshots under `docs/qa/`.
-- For UI/browser acceptance, exercise the full claimed flow through real browser clicks, taps, typing, uploads, and downloads. Capture fresh screenshots after the latest code change in a new per-run folder under `docs/qa/`, with a step description and a strict UI assessment. Unit tests are regression support, not a substitute for UI evidence.
+
+- Use targeted proof first: file inspection, focused scripts/tests, typecheck/build when relevant, and browser/runtime proof for UI. Optional screenshots are ephemeral and must stay outside the repository.
+- For UI/browser acceptance, exercise the full claimed flow through real browser clicks, taps, typing, uploads, and downloads. If screenshots are useful, write them to `V19_TEST_ARTIFACTS_DIR` or the operating-system temporary directory. Unit tests are regression support, not a substitute for UI evidence.
 - Release/security gates: `npm run verify:security` or `npm run verify:full` only when risk requires it.
 - Do not claim done while relevant tests fail or product-ready proof is incomplete.
 
 ## Rule Index
+
 - Agents folder entry point: `.agents/README.md`
 - V-19 domain and scope: `.agents/rules/v19-domain.md`
 - Design-system components: `.agents/rules/v19-design-system-components.md`
