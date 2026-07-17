@@ -2858,6 +2858,10 @@ export function FigmaQuestionnaireScreen({
     (section) => section.id === activeSection,
   );
   const nextSection = sections[activeSectionIndex + 1];
+  const activeApplicantIndex = applicants.findIndex(
+    (applicant) => applicant.id === activeApplicant,
+  );
+  const nextApplicant = applicants[activeApplicantIndex + 1];
   const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
   const showPurposeDetails = formData.stayPurpose === "OTHER";
   const showPreviousBiometricsDetails = formData.previousBiometrics === "Да";
@@ -3747,6 +3751,26 @@ export function FigmaQuestionnaireScreen({
     if (nextSection) {
       setRevealRequiredErrors(false);
       setActiveSection(nextSection.id);
+      window.setTimeout(() => {
+        const firstField = workPanelRef.current?.querySelector<HTMLElement>(
+          "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
+        );
+        firstField?.focus({ preventScroll: true });
+        workPanelRef.current?.scrollIntoView?.({
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "start",
+        });
+      }, 0);
+      return;
+    }
+
+    if (nextApplicant) {
+      const firstSection = sections[0];
+      if (!firstSection) return;
+
+      setRevealRequiredErrors(false);
+      setActiveApplicant(nextApplicant.id);
+      setActiveSection(firstSection.id);
       window.setTimeout(() => {
         const firstField = workPanelRef.current?.querySelector<HTMLElement>(
           "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
