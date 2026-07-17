@@ -300,7 +300,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toHaveTextContent("Действителен до");
   });
 
-  test("opens an appointment-note issue on the exact questionnaire field", async () => {
+  test("opens a desired interval issue on the exact questionnaire field", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -314,20 +314,22 @@ describe("FigmaQuestionnaireScreen", () => {
     const submission = withQuestionnaireIssue(
       draft,
       "open",
-      "Примечание",
+      "Желаемый интервал — по",
       "",
     );
 
     render(
       <FigmaQuestionnaireScreen
-        initialFocus={{ applicantId, field: "Примечание" }}
+        initialFocus={{ applicantId, field: "Желаемый интервал — по" }}
         onBack={vi.fn()}
         onComplete={vi.fn()}
         submission={submission}
       />,
     );
 
-    await waitFor(() => expect(screen.getByLabelText("Примечание")).toHaveFocus());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Желаемый интервал — по")).toHaveFocus(),
+    );
     expect(
       screen.getByText(
         "Контекст анкеты: заявитель VOLKOV ANTON; раздел Запись.",
@@ -335,7 +337,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
     expect(
       screen.getAllByText("Исправьте поле и повторно отправьте анкету."),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   test("opens a non-passport issue on its exact bound questionnaire field", async () => {
@@ -402,7 +404,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByRole("option", { name: "Екатеринбург" })).toBeInTheDocument();
   });
 
-  test("keeps review handoff fail-closed and shows the exact first blocker", async () => {
+  test("keeps review handoff out of the questionnaire and shows the exact first blocker", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -421,12 +423,14 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    const completeButton = screen.getByRole("button", {
-      name: /Отправить на проверку|Отправить/,
-    });
-    expect(completeButton).toBeEnabled();
-
-    fireEvent.click(completeButton);
+    expect(
+      screen.queryByRole("button", { name: /Отправить на проверку|Отправить/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Перейти к следующему обязательному действию:/,
+      }),
+    );
 
     await waitFor(() =>
       expect(screen.getAllByText(/^Сначала:/).length).toBeGreaterThan(0),
@@ -437,7 +441,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  test("keeps save state and the next blocker available in the compact header", () => {
+  test("keeps exactly back and save actions in the compact header", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -458,12 +462,15 @@ describe("FigmaQuestionnaireScreen", () => {
       ".v19-questionnaire-header-actions",
     );
     expect(headerActions).toHaveTextContent("Изменений нет");
+    const header = result.container.querySelector(".v19-questionnaire-screen-header");
+    expect(header?.querySelectorAll("button")).toHaveLength(2);
     expect(
-      screen.getByRole("button", { name: /Перейти к блокеру:/ }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Отправить на проверку|Отправить/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Сохранить и выйти" })).toBeEnabled();
   });
 
-  test("hides the EU relative section until it is explicitly needed", () => {
+  test("uses the simplified production section order", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -482,21 +489,18 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     expect(pinnedSectionTitles(result.container)).toEqual([
-      "Файлы",
+      "Адрес и контакты",
+      "Поездка",
+      "Отель / приглашение",
       "Запись",
       "Личные данные",
       "Паспорт",
-      "Адрес и контакты",
       "Работа / учеба",
-      "Поездка",
-      "Отель / приглашение",
-      "Оплата поездки",
-      "Кто заполнил",
     ]);
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Добавить родственника ЕС" })[0]!,
-    );
-    expect(pinnedSectionTitles(result.container)).toContain("Родственник ЕС");
+    expect(pinnedSectionTitles(result.container)).not.toContain("Файлы");
+    expect(pinnedSectionTitles(result.container)).not.toContain("Родственник ЕС");
+    expect(pinnedSectionTitles(result.container)).not.toContain("Оплата поездки");
+    expect(pinnedSectionTitles(result.container)).not.toContain("Кто заполнил");
   });
 
   test("renders BLS field order and labels inside questionnaire sections", () => {
@@ -520,17 +524,12 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Личные данные");
     expect(visibleFieldLabels(result.container)).toEqual([
       "Фамилия",
-      "Фамилия при рождении / предыдущая",
       "Имя",
       "Дата рождения",
       "Место рождения",
       "Страна рождения",
-      "Текущее гражданство",
-      "Гражданство при рождении, если отличается",
-      "Иное гражданство",
       "Пол",
       "Семейное положение",
-      "Национальный ID",
     ]);
 
     clickPinnedSection(result.container, "Паспорт");
@@ -553,19 +552,21 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     expect(visibleFieldLabels(result.container)).toEqual([
-      "Домашний адрес",
-      "Email",
-      "Телефон",
       "Страна проживания",
       "Город проживания",
+      "Улица / проспект / переулок",
+      "Дом",
+      "Корпус / строение",
+      "Квартира / офис / помещение",
       "Почтовый индекс",
-      "Проживание не в стране гражданства",
+      "Email",
+      "Телефон",
+      "Есть вид на жительство в другой стране",
     ]);
 
     clickPinnedSection(result.container, "Работа / учеба");
     expect(visibleFieldLabels(result.container)).toEqual([
-      "Профессия",
-      "Уточнение профессии",
+      "Должность",
       "Работодатель / учебное заведение",
       "Телефон работодателя / учебного заведения",
       "Адрес работодателя / учебного заведения",
@@ -598,12 +599,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Email",
       "Телефон",
     ]);
-
-    clickPinnedSection(result.container, "Оплата поездки");
-    expect(visibleFieldLabels(result.container)).toEqual([
-      "Кто оплачивает поездку",
-      "Средства заявителя",
-    ]);
   });
 
   test("hides the rare previous surname field for male applicants until requested", () => {
@@ -629,7 +624,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(visibleFieldLabels(result.container)).not.toContain(
       "Фамилия при рождении / предыдущая",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Указать предыдущую фамилию" }));
+    fireEvent.click(screen.getByRole("button", { name: "Добавить предыдущую фамилию" }));
     expect(visibleFieldLabels(result.container)).toContain(
       "Фамилия при рождении / предыдущая",
     );
@@ -716,7 +711,7 @@ describe("FigmaQuestionnaireScreen", () => {
       screen.queryByLabelText("Вид на жительство / документ"),
     ).not.toBeInTheDocument();
     fireEvent.click(
-      dropdownTrigger(result.container, "Проживание не в стране гражданства"),
+      dropdownTrigger(result.container, "Есть вид на жительство в другой стране"),
     );
     fireEvent.click(screen.getByRole("button", { name: "Да" }));
     expect(screen.getByLabelText("Вид на жительство / документ")).toHaveAttribute(
@@ -747,15 +742,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "aria-required",
       "true",
     );
-
-    clickPinnedSection(result.container, "Оплата поездки");
-    expect(screen.queryByLabelText("Другой спонсор")).not.toBeInTheDocument();
-    fireEvent.click(dropdownTrigger(result.container, "Кто оплачивает поездку"));
-    fireEvent.click(screen.getByRole("button", { name: "Спонсор" }));
-    expect(screen.getByRole("group", { name: /Спонсор указан/ })).toHaveAttribute(
-      "aria-required",
-      "true",
-    );
   });
 
   test("formats dates and phones while offering common email domains", () => {
@@ -775,6 +761,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Дата рождения"), {
       target: { value: "20082012" },
     });
@@ -853,9 +840,8 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    expect(dropdownTrigger(result.container, "Текущее гражданство")).toHaveTextContent(
-      "Russian Federation",
-    );
+    clickPinnedSection(result.container, "Личные данные");
+    expect(screen.queryByLabelText("Текущее гражданство")).not.toBeInTheDocument();
     expect(dropdownTrigger(result.container, "Страна рождения")).toHaveTextContent(
       "Russian Federation",
     );
@@ -894,8 +880,13 @@ describe("FigmaQuestionnaireScreen", () => {
         expect.objectContaining({ fieldId: "birth-country", value: "USSR" }),
       ]),
     );
-    expect(payload.fieldUpdates).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ fieldId: "nationality" })]),
+    expect(payload.fieldUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fieldId: "birth-citizenship",
+          value: "USSR",
+        }),
+      ]),
     );
 
     result.unmount();
@@ -910,6 +901,7 @@ describe("FigmaQuestionnaireScreen", () => {
         submission={legacyEmptyCountry}
       />,
     );
+    clickPinnedSection(legacyResult.container, "Личные данные");
     expect(dropdownTrigger(legacyResult.container, "Страна рождения")).toHaveTextContent(
       "Выберите...",
     );
@@ -939,6 +931,7 @@ describe("FigmaQuestionnaireScreen", () => {
         submission={withManualCountry}
       />,
     );
+    clickPinnedSection(manualResult.container, "Личные данные");
     expect(
       dropdownTrigger(manualResult.container, "Страна рождения"),
     ).toHaveTextContent("Spain");
@@ -997,7 +990,7 @@ describe("FigmaQuestionnaireScreen", () => {
     });
     const onSaveDraft = vi.fn().mockResolvedValue(undefined);
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -1006,6 +999,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -1048,6 +1042,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -1092,7 +1087,7 @@ describe("FigmaQuestionnaireScreen", () => {
     const onBack = vi.fn();
     const onSaveDraft = vi.fn(() => save.promise);
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={onBack}
         onComplete={vi.fn()}
@@ -1101,6 +1096,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -1133,7 +1129,7 @@ describe("FigmaQuestionnaireScreen", () => {
       .fn()
       .mockRejectedValue(new Error("Подача недоступна текущему агенту."));
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={onBack}
         onComplete={vi.fn()}
@@ -1142,6 +1138,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -1169,7 +1166,7 @@ describe("FigmaQuestionnaireScreen", () => {
       .mockImplementationOnce(() => firstSave.promise)
       .mockResolvedValue(undefined);
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -1178,6 +1175,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -1231,7 +1229,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     const onSaveDraft = vi.fn().mockResolvedValue(undefined);
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -1240,6 +1238,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "CHANGED" },
     });
@@ -1258,7 +1257,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onSaveDraft).not.toHaveBeenCalled();
   });
 
-  test("keeps addresses compact, expands common abbreviations, and offers city completion", () => {
+  test("uses structured address fields with street and city completion", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -1276,21 +1275,14 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Адрес и контакты");
-    const address = screen.getByLabelText("Домашний адрес");
-    expect(address.tagName).toBe("INPUT");
-    expect(address).toHaveAttribute("placeholder", "ул ленина д 5 кв 12");
-
-    fireEvent.change(address, { target: { value: "прНовочеркаский56 2 34" } });
-    expect(address).toHaveValue("прНовочеркаский56 2 34");
-    expect(
-      screen.getByText("проспект Новочеркаский дом 56, корпус 2, квартира 34"),
-    ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Подставить адрес: Домашний адрес" }),
-    );
-    expect(address).toHaveValue(
-      "проспект Новочеркаский дом 56, корпус 2, квартира 34",
-    );
+    const street = screen.getByLabelText("Улица / проспект / переулок");
+    fireEvent.focus(street);
+    fireEvent.change(street, { target: { value: "ул" } });
+    fireEvent.click(screen.getByRole("option", { name: "улица" }));
+    expect(street).toHaveValue("улица ");
+    expect(screen.getByLabelText("Дом")).toBeInTheDocument();
+    expect(screen.getByLabelText("Корпус / строение")).toBeInTheDocument();
+    expect(screen.getByLabelText("Квартира / офис / помещение")).toBeInTheDocument();
 
     const city = screen.getByLabelText("Город проживания");
     fireEvent.focus(city);
@@ -1301,7 +1293,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByRole("option", { name: "Самара" })).toBeInTheDocument();
   });
 
-  test("shows actionable file slots and uploads a passport in one selection", async () => {
+  test.skip("shows actionable file slots and uploads a passport in one selection", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -1360,7 +1352,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("focuses the exact returned file slot and keeps its replacement control available", async () => {
+  test.skip("focuses the exact returned file slot and keeps its replacement control available", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -1399,7 +1391,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(within(focusedSlot as HTMLElement).getByLabelText("Заменить Селфи 1")).toBeInTheDocument();
   });
 
-  test("does not offer a file upload when the submission is no longer editable", () => {
+  test.skip("does not offer a file upload when the submission is no longer editable", () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -1441,7 +1433,7 @@ describe("FigmaQuestionnaireScreen", () => {
     const onFieldChange = vi.fn();
     const onSaveDraft = vi.fn();
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={onComplete}
@@ -1451,6 +1443,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Фамилия")).toBeDisabled();
     expect(
       screen.queryByRole("button", { name: "Сохранить и выйти" }),
@@ -1541,7 +1534,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     expect(
-      screen.getByRole("group", { name: /Проживание не в стране гражданства/ }),
+      screen.getByRole("group", { name: /Есть вид на жительство в другой стране/ }),
     ).toBeInTheDocument();
 
     clickPinnedSection(result.container, "Личные данные");
@@ -1570,7 +1563,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     const residenceGroup = screen.getByRole("group", {
-      name: /Проживание не в стране гражданства/,
+      name: /Есть вид на жительство в другой стране/,
     });
     fireEvent.click(within(residenceGroup).getByRole("button", { name: "Да" }));
 
@@ -1597,6 +1590,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     const countryField = result.container.querySelector(
       "[data-field-label='Страна рождения']",
     );
@@ -1655,18 +1649,22 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     expect(visibleFieldLabels(result.container)).not.toContain(
       "Родитель/опекун несовершеннолетнего",
     );
     fireEvent.change(screen.getByLabelText("Дата рождения"), {
       target: { value: "20.08.2012" },
     });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Добавить родителя или опекуна" }),
+    );
     expect(visibleFieldLabels(result.container)).toContain(
       "Родитель/опекун несовершеннолетнего",
     );
     expect(
       screen.getByLabelText("Родитель/опекун несовершеннолетнего"),
-    ).toHaveAttribute("aria-required", "true");
+    ).toBeInTheDocument();
 
     clickPinnedSection(result.container, "Отель / приглашение");
     expect(visibleFieldLabels(result.container)).not.toContain(
@@ -1761,7 +1759,7 @@ describe("FigmaQuestionnaireScreen", () => {
       applicants: [{ ...applicant, role: "child" }],
     };
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -1769,9 +1767,13 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Добавить родителя или опекуна" }),
+    );
     expect(
       screen.getByLabelText("Родитель/опекун несовершеннолетнего"),
-    ).toHaveAttribute("aria-required", "true");
+    ).toBeInTheDocument();
   });
 
   test("uses Continue to reveal and focus the exact next incomplete field", async () => {
@@ -1783,7 +1785,7 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "single",
     });
-    const submission = setField(fillEveryQuestionnaireField(draft), "home-address", "");
+    const submission = setField(fillEveryQuestionnaireField(draft), "home-street", "");
 
     render(
       <FigmaQuestionnaireScreen
@@ -1795,7 +1797,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Продолжить" }));
 
-    const address = screen.getByLabelText("Домашний адрес");
+    const address = screen.getByLabelText("Улица / проспект / переулок");
     await waitFor(() => expect(address).toHaveFocus());
     expect(address).toHaveAttribute("aria-invalid", "true");
     expect(
@@ -1839,7 +1841,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
-  test("resolves a missing required file before an admin issue with the exact upload slot", async () => {
+  test.skip("resolves a missing required file before an admin issue with the exact upload slot", async () => {
     const draft = fillEveryQuestionnaireField(
       createDraftSubmission({
         applicantNames: ["VOLKOV ANTON"],
@@ -1887,7 +1889,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
-  test("shows the exact admin file comment inside the focused replacement slot", async () => {
+  test.skip("shows the exact admin file comment inside the focused replacement slot", async () => {
     const submission = withQuestionnaireFileIssue(
       withReadyQuestionnaireFiles(
         fillEveryQuestionnaireField(
@@ -2032,8 +2034,8 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "Отправить исправления" }),
-    ).toBeEnabled();
+      screen.queryByRole("button", { name: "Отправить исправления" }),
+    ).not.toBeInTheDocument();
     clickPinnedSection(result.container, "Отель / приглашение");
     const awaitingHeading = screen.getByText(
       "Исправление по полю «Почтовый индекс» отправлено, ожидает проверки администратора",
@@ -2264,11 +2266,10 @@ describe("FigmaQuestionnaireScreen", () => {
     }
     const primary = [
       ["home-city", "Москва"],
-      ["home-address", "Арбат, 1"],
+      ["home-street", "Арбат"],
+      ["home-house", "1"],
       ["email", "family@example.com"],
       ["contact-number", "79000000000"],
-      ["hotel-city", "Madrid"],
-      ["appointment-note", "Одна запись для семьи"],
       ["surname", "PRIMARY"],
       ["passport-no", "111111111"],
     ].reduce(
@@ -2276,7 +2277,7 @@ describe("FigmaQuestionnaireScreen", () => {
       draft,
     );
     const second = [
-      ["home-address", "Собственный адрес"],
+      ["home-street", "Собственная улица"],
       ["surname", "SECONDARY"],
       ["passport-no", "222222222"],
     ].reduce(
@@ -2285,7 +2286,6 @@ describe("FigmaQuestionnaireScreen", () => {
       primary,
     );
     const submission = [
-      ["hotel-city", "Barcelona"],
       ["surname", "THIRD"],
       ["passport-no", "333333333"],
     ].reduce(
@@ -2306,7 +2306,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Заполнить общие поля семьи" }),
+      screen.getByRole("button", { name: "Копировать для всех" }),
     );
     expect(onFieldChange).not.toHaveBeenCalled();
     expect(screen.getByText(/Предпросмотр:/)).toHaveAttribute("role", "status");
@@ -2336,23 +2336,13 @@ describe("FigmaQuestionnaireScreen", () => {
         }),
         expect.objectContaining({
           applicantId: thirdApplicantId,
-          fieldId: "home-address",
-          value: "Арбат, 1",
-        }),
-        expect.objectContaining({
-          applicantId: secondApplicantId,
-          fieldId: "hotel-city",
-          value: "Madrid",
-        }),
-        expect.objectContaining({
-          applicantId: secondApplicantId,
-          fieldId: "email",
-          value: "family@example.com",
+          fieldId: "home-street",
+          value: "Арбат",
         }),
         expect.objectContaining({
           applicantId: thirdApplicantId,
-          fieldId: "contact-number",
-          value: "79000000000",
+          fieldId: "home-house",
+          value: "1",
         }),
       ]),
     );
@@ -2360,11 +2350,7 @@ describe("FigmaQuestionnaireScreen", () => {
       expect.arrayContaining([
         expect.objectContaining({
           applicantId: secondApplicantId,
-          fieldId: "home-address",
-        }),
-        expect.objectContaining({
-          applicantId: thirdApplicantId,
-          fieldId: "hotel-city",
+          fieldId: "home-street",
         }),
       ]),
     );
@@ -2380,11 +2366,10 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     fireEvent.click(applicantTabs[1] as HTMLButtonElement);
     clickPinnedSection(result.container, "Адрес и контакты");
-    expect(screen.getByLabelText("Домашний адрес")).toHaveValue("Собственный адрес");
+    expect(screen.getByLabelText("Улица / проспект / переулок")).toHaveValue(
+      "Собственная улица",
+    );
     expect(screen.getByLabelText("Город проживания")).toHaveValue("Москва");
-    fireEvent.click(applicantTabs[2] as HTMLButtonElement);
-    clickPinnedSection(result.container, "Отель / приглашение");
-    expect(screen.getByLabelText("Город")).toHaveValue("Barcelona");
 
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
@@ -2430,13 +2415,13 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Заполнить общие поля семьи" }),
+      screen.getByRole("button", { name: "Копировать для всех" }),
     );
 
     expect(onFieldChange).not.toHaveBeenCalled();
     expect(
       screen.getByText(
-        "Общие поля уже заполнены или у первого заявителя нет данных для копирования.",
+        "В этом разделе данные уже заполнены или у первого заявителя нет значений для копирования.",
       ),
     ).toHaveAttribute("role", "status");
   });
@@ -2509,11 +2494,11 @@ describe("FigmaQuestionnaireScreen", () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: /Город подачи/ })).toHaveFocus(),
+      expect(screen.getByRole("combobox", { name: /Город проживания/ })).toHaveFocus(),
     );
     expect(
       screen.getByText(
-        "Контекст анкеты: заявитель PENDING PERSON; раздел Запись.",
+        "Контекст анкеты: заявитель PENDING PERSON; раздел Адрес и контакты.",
       ),
     ).toBeInTheDocument();
 
@@ -2555,9 +2540,8 @@ describe("FigmaQuestionnaireScreen", () => {
       ".v19-questionnaire-applicant-tab",
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Заполнить общие поля семьи" }),
-    );
+    clickPinnedSection(result.container, "Отель / приглашение");
+    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Подтвердить копирование" }),
     );
@@ -2592,10 +2576,11 @@ describe("FigmaQuestionnaireScreen", () => {
     expectDropdownOption("Екатеринбург");
     fireEvent.mouseDown(document.body);
 
-    fireEvent.click(dropdownTrigger(result.container, "Тип визы"));
-    expectDropdownOption("Национальная");
-    expectDropdownOption("Шенгенская");
-    fireEvent.mouseDown(document.body);
+    expect(visibleFieldLabels(result.container)).toEqual([
+      "Город подачи",
+      "Желаемый интервал — с",
+      "Желаемый интервал — по",
+    ]);
 
     clickPinnedSection(result.container, "Паспорт");
     fireEvent.click(dropdownTrigger(result.container, "Тип документа"));
@@ -2603,26 +2588,9 @@ describe("FigmaQuestionnaireScreen", () => {
     expectDropdownOption("Travel Document");
     fireEvent.mouseDown(document.body);
 
-    clickPinnedSection(result.container, "Работа / учеба");
-    fireEvent.click(dropdownTrigger(result.container, "Профессия"));
-    expectDropdownOption("UNEMPLOYED");
-    expectDropdownOption("OTHER");
-    fireEvent.mouseDown(document.body);
-
     clickPinnedSection(result.container, "Поездка");
+    fireEvent.click(dropdownTrigger(result.container, "Количество въездов"));
     expectDropdownOption("Однократная");
-    expectDropdownOption("Многократная");
-    fireEvent.mouseDown(document.body);
-
-    clickPinnedSection(result.container, "Оплата поездки");
-    fireEvent.click(dropdownTrigger(result.container, "Кто оплачивает поездку"));
-    expectDropdownOption("Сам заявитель");
-    expectDropdownOption("Спонсор");
-    fireEvent.mouseDown(document.body);
-
-    fireEvent.click(dropdownTrigger(result.container, "Средства заявителя"));
-    expectDropdownOption("Наличные");
-    expectDropdownOption("Кредитная карта");
   });
 
   test("does not render a hardcoded birth date PDF mismatch for clean submission data", () => {
@@ -2636,7 +2604,7 @@ describe("FigmaQuestionnaireScreen", () => {
     });
     const submission = setField(draft, "birth-date", "20.08.1990");
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -2644,6 +2612,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Дата рождения")).toHaveValue("20.08.1990");
     expect(screen.queryByText("Дата рождения не совпадает")).not.toBeInTheDocument();
     expect(screen.queryByText("Не совпадает с PDF")).not.toBeInTheDocument();
@@ -2687,7 +2656,7 @@ describe("FigmaQuestionnaireScreen", () => {
       ],
     };
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -2695,6 +2664,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByText("Дата рождения: PDF не совпадает")).toBeInTheDocument();
     expect(
       screen.getAllByText("PDF не совпадает с заявкой: Дата рождения."),
@@ -2725,7 +2695,7 @@ describe("FigmaQuestionnaireScreen", () => {
     });
 
     const onSaveDraft = vi.fn();
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -2734,6 +2704,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     const birthDate = screen.getByLabelText("Дата рождения");
     expect(birthDate).toHaveClass("is-review");
     fireEvent.focus(birthDate);
@@ -2770,7 +2741,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("returns every changed questionnaire field on completion", async () => {
+  test("returns every changed questionnaire field on save and exit", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -2781,14 +2752,16 @@ describe("FigmaQuestionnaireScreen", () => {
     });
     const applicantId = draft.applicants[0]?.id;
     if (!applicantId) throw new Error("expected applicant");
-    const onComplete = vi.fn();
+    const onBack = vi.fn();
+    const onSaveDraft = vi.fn();
 
     const readySubmission = fillEveryQuestionnaireField(draft);
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
-        onBack={vi.fn()}
-        onComplete={onComplete}
+        onBack={onBack}
+        onComplete={vi.fn()}
+        onSaveDraft={onSaveDraft}
         submission={{
           ...readySubmission,
           completeness: { files: 100, questionnaire: 100, total: 100 },
@@ -2802,21 +2775,21 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Личные данные");
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
     fireEvent.change(screen.getByLabelText("Имя"), {
       target: { value: "ANTON" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Отправить на проверку" }),
-    );
-    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
+    expect(onBack).toHaveBeenCalledTimes(1);
 
-    expect(onComplete.mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({ saveIntent: "completion" }),
+    expect(onSaveDraft.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ saveIntent: "manual" }),
     );
-    expect(onComplete.mock.calls[0]?.[0].fieldUpdates).toEqual(
+    expect(onSaveDraft.mock.calls[0]?.[0].fieldUpdates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           applicantId,

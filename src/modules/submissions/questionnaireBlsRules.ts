@@ -51,6 +51,8 @@ const blsFormKeyByQuestionnaireFieldId: Record<string, string> = {
   'company-phone': 'companyPhone',
   'cost-covered-by': 'paymentSponsor',
   'departure-date': 'travelEnd',
+  'desired-date-1': 'desiredDate1',
+  'desired-date-2': 'desiredDate2',
   'entry-permit-final-country': 'finalEntryPermit',
   'entry-permit-issued-by': 'finalEntryPermitIssuedBy',
   'entry-permit-valid-from': 'finalEntryPermitValidFrom',
@@ -275,11 +277,10 @@ export function isBlsQuestionnaireSectionApplicable(
 ) {
   switch (sectionId) {
     case 'files':
-      return false;
     case 'euRelative':
-      return euRelativeGroupStarted(formData);
     case 'filler':
-      return fillerGroupStarted(formData);
+    case 'payment':
+      return false;
     case 'appointment':
     case 'personal':
     case 'passport':
@@ -288,7 +289,6 @@ export function isBlsQuestionnaireSectionApplicable(
     case 'employment':
     case 'trip':
     case 'hotel':
-    case 'payment':
       return true;
     default:
       return applicantRole !== undefined || Object.values(formData).some((value) => Boolean(value?.trim()));
@@ -363,12 +363,11 @@ export function isBlsQuestionnaireFieldRequired({
     case 'previous-visa-number':
       return false;
 
-    case 'desired-date-2':
     case 'desired-date-3':
       return false;
 
     case 'guardian-info':
-      return isBlsQuestionnaireMinorApplicant(applicantRole, formData);
+      return false;
 
     case 'eu-relative-details':
     case 'eu-relationship':
@@ -473,6 +472,18 @@ export function validateBlsQuestionnaireField({
     );
     if (arrivalDate && departureDate && departureDate < arrivalDate) {
       return 'Дата выезда должна быть не раньше даты въезда';
+    }
+  }
+
+  if (field.id === 'desired-date-1' || field.id === 'desired-date-2') {
+    const desiredFrom = parseBlsQuestionnaireDate(
+      field.id === 'desired-date-1' ? trimmed : read(formData, 'desiredDate1'),
+    );
+    const desiredTo = parseBlsQuestionnaireDate(
+      field.id === 'desired-date-2' ? trimmed : read(formData, 'desiredDate2'),
+    );
+    if (desiredFrom && desiredTo && desiredTo < desiredFrom) {
+      return 'Конец интервала должен быть не раньше начала';
     }
   }
 

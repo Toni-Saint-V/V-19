@@ -85,19 +85,15 @@ describe("canonical BLS questionnaire readiness", () => {
     expectReadyParity(submission);
   });
 
-  test("requires guardian data for every minor, including a single applicant", () => {
+  test("keeps guardian data optional for a minor", () => {
     let submission = readySingleSubmission();
     submission = setApplicantField(submission, 0, "birth-date", "20.08.2012");
     submission = setApplicantField(submission, 0, "guardian-info", "");
 
-    expect(blsQuestionnaireReadiness(submission).ready).toBe(false);
-    expect(hasMissingRequiredWork(submission)).toBe(true);
-
-    submission = setApplicantField(submission, 0, "guardian-info", "TEST GUARDIAN");
     expectReadyParity(submission);
   });
 
-  test("requires guardian data for the canonical child role", () => {
+  test("keeps guardian data optional for the canonical child role", () => {
     const field = {
       error: undefined,
       id: "guardian-info",
@@ -113,7 +109,7 @@ describe("canonical BLS questionnaire readiness", () => {
         field,
         formData,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test("does not require employer data from a child until a working or study occupation is selected", () => {
@@ -182,17 +178,12 @@ describe("canonical BLS questionnaire readiness", () => {
     ).toBe("complete");
   });
 
-  test("switches from applicant means to sponsor requirements", () => {
+  test("keeps payment compatibility defaults outside the visible questionnaire", () => {
     let submission = readySingleSubmission();
-    submission = setApplicantField(submission, 0, "cost-covered-by", "Спонсор");
-    submission = setApplicantField(submission, 0, "means-of-support", "");
-    submission = setApplicantField(submission, 0, "sponsor-in-host-fields", "Да");
-    submission = setApplicantField(submission, 0, "sponsor-means", "Наличные");
+    submission = setApplicantField(submission, 0, "cost-covered-by", "Сам заявитель");
+    submission = setApplicantField(submission, 0, "means-of-support", "Наличные");
 
     expectReadyParity(submission);
-
-    submission = setApplicantField(submission, 0, "sponsor-means", "");
-    expect(blsQuestionnaireReadiness(submission).ready).toBe(false);
   });
 
   test("requires company fields only for company or business submissions", () => {

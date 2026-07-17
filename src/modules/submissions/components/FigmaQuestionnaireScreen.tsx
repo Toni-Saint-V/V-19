@@ -1,5 +1,4 @@
 import {
-  type ChangeEvent,
   createContext,
   useCallback,
   useContext,
@@ -16,8 +15,8 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
-  FileText,
-  Upload,
+  Copy,
+  Plus,
   Users,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
@@ -40,21 +39,15 @@ import {
   type BlsFormData,
 } from "../questionnaireBlsRules";
 import {
-  passportScanUploadAccept,
-  passportScanUploadFormatLabel,
-  selfieUploadAccept,
-  selfieUploadFormatLabel,
-} from "../mediaStorage";
-import {
   agentQuestionnaireCompletionDecision,
   agentQuestionnaireStatusPresentation,
-  canReplaceDocument,
 } from "../status";
 import {
   passportGateIssues,
   type PassportGateIssue,
 } from "../passportExtractionGuards";
 import { suggestedRussianAddress } from "../russianAddress";
+import { composeQuestionnaireHomeAddress } from "../questionnaireAddressFields";
 import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
@@ -81,21 +74,32 @@ type SectionId =
   | "appointment"
   | "personal"
   | "passport"
-  | "euRelative"
   | "contact"
   | "employment"
   | "trip"
-  | "hotel"
-  | "payment"
-  | "filler";
+  | "hotel";
 
 const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionId }> = [
   {
-    canonicalId: "files",
-    id: "files",
-    meta: "0 файлов",
+    canonicalId: "contacts",
+    id: "contact",
+    meta: "0 из 0",
     status: "pending",
-    title: "Файлы",
+    title: "Адрес и контакты",
+  },
+  {
+    canonicalId: "trip",
+    id: "trip",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Поездка",
+  },
+  {
+    canonicalId: "hotel",
+    id: "hotel",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Отель / приглашение",
   },
   {
     canonicalId: "appointment",
@@ -119,72 +123,23 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
     title: "Паспорт",
   },
   {
-    canonicalId: "euRelative",
-    id: "euRelative",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Родственник ЕС",
-  },
-  {
-    canonicalId: "contacts",
-    id: "contact",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Адрес и контакты",
-  },
-  {
     canonicalId: "employment",
     id: "employment",
     meta: "0 из 0",
     status: "pending",
     title: "Работа / учеба",
   },
-  {
-    canonicalId: "trip",
-    id: "trip",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Поездка",
-  },
-  {
-    canonicalId: "hotel",
-    id: "hotel",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Отель / приглашение",
-  },
-  {
-    canonicalId: "payment",
-    id: "payment",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Оплата поездки",
-  },
-  {
-    canonicalId: "filler",
-    id: "filler",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Кто заполнил",
-  },
 ];
 
 const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
-  appointment: [
-    "appointment-city",
-    "visa-type",
-    "category",
-    "desired-date-1",
-    "desired-date-2",
-    "desired-date-3",
-    "appointment-note",
-  ],
   contact: [
-    "email",
-    "contact-number",
     "home-address",
     "home-country",
     "home-city",
+    "home-street",
+    "home-house",
+    "home-building",
+    "home-unit",
     "postal-code",
     "lives-outside-citizenship",
     "residence-permit-type",
@@ -203,13 +158,6 @@ const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
     "company-org-details",
     "company-contact-person",
     "company-phone",
-  ],
-  payment: [
-    "cost-covered-by",
-    "means-of-support",
-    "sponsor-in-host-fields",
-    "other-sponsor",
-    "sponsor-means",
   ],
   trip: [
     "purpose",
@@ -335,6 +283,10 @@ type QuestionnaireFormData = {
   contactAddress: string;
   contactEmail: string;
   contactPhone: string;
+  homeBuilding: string;
+  homeHouse: string;
+  homeStreet: string;
+  homeUnit: string;
   currentJob: string;
   desiredDate1: string;
   desiredDate2: string;
@@ -415,6 +367,13 @@ type QuestionnaireFieldBinding = {
   sectionId: string;
 };
 
+type StructuredHomeAddressKey =
+  | "homeBuilding"
+  | "homeHouse"
+  | "homeStreet"
+  | "homeUnit";
+
+
 const BLS_COUNTRY_OPTIONS = [
   "Russian Federation",
   "USSR",
@@ -454,6 +413,17 @@ const BLS_COUNTRY_OPTIONS = [
   "Israel",
   "United Arab Emirates",
   "Other",
+];
+
+const RUSSIAN_STREET_TYPE_SUGGESTIONS = [
+  "улица ",
+  "проспект ",
+  "переулок ",
+  "набережная ",
+  "шоссе ",
+  "проезд ",
+  "площадь ",
+  "бульвар ",
 ];
 
 const BLS_OCCUPATION_OPTIONS = [
@@ -1178,11 +1148,8 @@ function FormField({
       ) : null}
 
       {shouldShowError ? (
-        <div
-          className="flex items-start gap-1.5 text-[var(--v19b-size-10-5)] text-white/40 mt-1"
-          id={fieldErrorId}
-        >
-          <span className="v19-questionnaire-field-error flex items-center gap-1.5 font-medium">
+        <div className="v19-questionnaire-field-message is-error" id={fieldErrorId}>
+          <span className="v19-questionnaire-field-error">
             <AlertCircle className="v19-questionnaire-field-error-icon w-3.5 h-3.5" />
             {effectiveErrorMessage}
           </span>
@@ -1228,15 +1195,8 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
         formData,
       }),
     ).length;
-    const completedFiles = requiredQuestionnaireFileTypes.filter((type) =>
-      fileIsReadyForQuestionnaire(
-        submission.files.find(
-          (file) => file.applicantId === applicant.id && file.type === type,
-        ),
-      ),
-    ).length;
-    const completed = completedFields + completedFiles;
-    const total = requiredFields.length + requiredQuestionnaireFileTypes.length;
+    const completed = completedFields;
+    const total = requiredFields.length;
     const hasRisk =
       fields.some((field) =>
         isBlsQuestionnaireFieldBlockingIssue({
@@ -1282,6 +1242,10 @@ function fallbackQuestionnaireFormData(): QuestionnaireFormData {
     contactAddress: "",
     contactEmail: "",
     contactPhone: "",
+    homeBuilding: "",
+    homeHouse: "",
+    homeStreet: "",
+    homeUnit: "",
     currentJob: "",
     desiredDate1: "",
     desiredDate2: "",
@@ -1590,147 +1554,10 @@ function fileIsReadyForQuestionnaire(file: Submission["files"][number] | undefin
   if (!file) return false;
   if (file.status === "missing" || file.status === "needs_replacement") return false;
   if (file.uploadStatus && file.uploadStatus !== "uploaded") return false;
-  if (
-    file.reviewStatus === "replace_required" ||
-    file.reviewStatus === "poor_quality"
-  ) {
-    return false;
-  }
-  return true;
-}
-
-function fileAcceptForQuestionnaire(fileType: RequiredQuestionnaireFileType) {
-  return fileType === "passport_scan" ? passportScanUploadAccept : selfieUploadAccept;
-}
-
-function fileFormatHint(fileType: RequiredQuestionnaireFileType) {
-  return fileType === "passport_scan"
-    ? passportScanUploadFormatLabel
-    : selfieUploadFormatLabel;
-}
-
-function questionnaireFileStatus(file: Submission["files"][number] | undefined) {
-  if (!file) return "Слот файла не создан";
-  if (file.status === "needs_replacement") return "Нужна замена";
-  if (file.status === "missing") return "Нужно добавить";
-  if (
-    file.reviewStatus === "replace_required" ||
-    file.reviewStatus === "poor_quality"
-  ) {
-    return "Нужна замена";
-  }
-  if (file.status === "pending_review") return "На проверке";
-  if (file.status === "accepted") return "Принято";
-  return "Загружено";
-}
-
-function QuestionnaireFileSlot({
-  description,
-  file,
-  fileType,
-  focused,
-  issue,
-  label,
-  onUploadFile,
-  submission,
-}: {
-  description: string;
-  file?: Submission["files"][number];
-  fileType: RequiredQuestionnaireFileType;
-  focused?: boolean;
-  issue?: Submission["issues"][number];
-  label: string;
-  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
-  submission: Submission;
-}) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
-  const needsUpload =
-    file?.status === "missing" || file?.status === "needs_replacement";
-  const canUpload = Boolean(
-    file && needsUpload && onUploadFile && canReplaceDocument(submission, file),
-  );
-  const fileName = file?.originalFileName || file?.generatedFileName;
-  const status = questionnaireFileStatus(file);
-  const actionLabel = file?.status === "needs_replacement" ? "Заменить" : "Загрузить";
-
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFile = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!selectedFile || !file || !onUploadFile) return;
-
-    setUploadError("");
-    setIsUploading(true);
-    try {
-      await onUploadFile(file.id, selectedFile);
-    } catch {
-      setUploadError("Не удалось загрузить файл. Попробуйте ещё раз.");
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  return (
-    <article
-      className={`v19-questionnaire-file-slot${focused ? " is-focus-target" : ""}`}
-      data-file-focused={focused ? "true" : undefined}
-      data-file-id={file?.id}
-      data-file-slot={fileType}
-      tabIndex={focused ? -1 : undefined}
-    >
-      <span className="v19-questionnaire-file-icon" aria-hidden="true">
-        <FileText />
-      </span>
-      <span className="v19-questionnaire-file-copy">
-        <strong>{label}</strong>
-        <span>{fileName || description}</span>
-        <small>{fileFormatHint(fileType)}</small>
-      </span>
-      <span
-        className={`v19-questionnaire-file-status ${fileIsReadyForQuestionnaire(file) ? "is-ready" : ""}`}
-      >
-        {status}
-      </span>
-      {canUpload ? (
-        <label className="v19-questionnaire-file-upload">
-          <Upload aria-hidden="true" />
-          {isUploading ? "Загружаем…" : actionLabel}
-          <input
-            accept={fileAcceptForQuestionnaire(fileType)}
-            aria-label={`${actionLabel} ${label}`}
-            className="sr-only"
-            disabled={isUploading}
-            type="file"
-            onChange={handleFileChange}
-          />
-        </label>
-      ) : null}
-      {issue ? (
-        <div
-          aria-live={issue.status === "fixed_by_agent" ? "polite" : undefined}
-          className={`v19-questionnaire-file-issue${
-            issue.status === "fixed_by_agent" ? " is-awaiting" : ""
-          }`}
-          data-file-issue={issue.id}
-          role={issue.status === "open" ? "alert" : "status"}
-        >
-          <strong>
-            {issue.status === "fixed_by_agent"
-              ? `Исправление отправлено: ${issue.reason}`
-              : `Что исправить: ${issue.reason}`}
-          </strong>
-          {issue.comment && issue.comment !== issue.reason ? (
-            <span>{issue.comment}</span>
-          ) : null}
-        </div>
-      ) : null}
-      {uploadError ? (
-        <span className="v19-questionnaire-file-error" role="alert">
-          {uploadError}
-        </span>
-      ) : null}
-    </article>
-  );
+  return ![
+    "replace_required",
+    "poor_quality",
+  ].includes(file.reviewStatus ?? "");
 }
 
 function riskLabel(count: number) {
@@ -1814,6 +1641,14 @@ function questionnaireFormDataFromSubmission(
       "contact-number",
       fallback.contactPhone,
     ),
+    homeBuilding: submissionFieldValue(
+      applicant,
+      "home-building",
+      fallback.homeBuilding,
+    ),
+    homeHouse: submissionFieldValue(applicant, "home-house", fallback.homeHouse),
+    homeStreet: submissionFieldValue(applicant, "home-street", fallback.homeStreet),
+    homeUnit: submissionFieldValue(applicant, "home-unit", fallback.homeUnit),
     desiredDate1: submissionFieldValue(
       applicant,
       "desired-date-1",
@@ -2179,6 +2014,10 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   },
   { fieldId: "eu-relationship", formKey: "euRelationship", sectionId: "euRelative" },
   { fieldId: "home-address", formKey: "contactAddress", sectionId: "contacts" },
+  { fieldId: "home-street", formKey: "homeStreet", sectionId: "contacts" },
+  { fieldId: "home-house", formKey: "homeHouse", sectionId: "contacts" },
+  { fieldId: "home-building", formKey: "homeBuilding", sectionId: "contacts" },
+  { fieldId: "home-unit", formKey: "homeUnit", sectionId: "contacts" },
   { fieldId: "email", formKey: "contactEmail", sectionId: "contacts" },
   { fieldId: "contact-number", formKey: "contactPhone", sectionId: "contacts" },
   { fieldId: "home-country", formKey: "homeCountry", sectionId: "contacts" },
@@ -2473,17 +2312,15 @@ function sectionForFocus(
     section.includes("медиа") ||
     section.includes("документ")
   )
-    return "files";
+    return "passport";
   if (section.includes("запис")) return "appointment";
   if (section.includes("паспорт")) return "passport";
-  if (section.includes("родствен")) return "euRelative";
   if (section.includes("поезд") || section.includes("маршрут")) return "trip";
   if (section.includes("адрес") || section.includes("контакт")) return "contact";
   if (section.includes("работ")) return "employment";
   if (section.includes("отел") || section.includes("приглаш")) return "hotel";
-  if (section.includes("оплат")) return "payment";
-  if (section.includes("заполн")) return "filler";
-  return "personal";
+  if (section.includes("оплат")) return "trip";
+  return "contact";
 }
 
 function questionnaireTargetForPassportIssue(issue: PassportGateIssue): {
@@ -2492,7 +2329,7 @@ function questionnaireTargetForPassportIssue(issue: PassportGateIssue): {
   sectionId: SectionId;
 } {
   if (issue.code === "passport_not_confirmed") {
-    return { applicantId: issue.applicantId, sectionId: "files" };
+    return { applicantId: issue.applicantId, sectionId: "passport" };
   }
   if (issue.code === "passport_type_not_ordinary") {
     return {
@@ -2533,12 +2370,10 @@ function sectionIdMatches(sectionId: string, canonicalId: string) {
 export function FigmaQuestionnaireScreen({
   initialFocus,
   onBack,
-  onComplete,
   onConfirmPassportReview,
   onFieldChange,
   onMarkIssueFixed,
   onOpenDocuments,
-  onUploadFile,
   onSaveDraft,
   submission,
 }: FigmaQuestionnaireScreenProps) {
@@ -2559,9 +2394,6 @@ export function FigmaQuestionnaireScreen({
     draftSubmission.status,
   );
   const isEditable = questionnaireStatus.canEdit;
-  const isCorrectionResubmission = draftSubmission.status === "returned";
-  const completeActionLabel = questionnaireStatus.completionLabel;
-  const completeActionMobileLabel = completeActionLabel;
   const applicants = useMemo(() => applicantTabs(draftSubmission), [draftSubmission]);
   const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
   const initialFocusApplicant =
@@ -2575,15 +2407,8 @@ export function FigmaQuestionnaireScreen({
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
-  const [focusedFileTarget, setFocusedFileTarget] = useState<
-    Pick<QuestionnaireBlockerTarget, "fileId" | "fileType"> | undefined
-  >(() =>
-    initialFocus?.fileId ? { fileId: initialFocus.fileId } : undefined,
-  );
-  const [euRelativeApplicantIds, setEuRelativeApplicantIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [showPreviousSurnameForMale, setShowPreviousSurnameForMale] = useState(false);
+  const [showPreviousSurname, setShowPreviousSurname] = useState(false);
+  const [showGuardianDetails, setShowGuardianDetails] = useState(false);
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [familyCopyMessage, setFamilyCopyMessage] = useState<string>();
   const [familyCopyPreview, setFamilyCopyPreview] =
@@ -2648,7 +2473,8 @@ export function FigmaQuestionnaireScreen({
   }, [activeApplicant, applicants]);
 
   useEffect(() => {
-    setShowPreviousSurnameForMale(false);
+    setShowPreviousSurname(false);
+    setShowGuardianDetails(false);
   }, [activeApplicant]);
 
   useEffect(() => {
@@ -2662,12 +2488,6 @@ export function FigmaQuestionnaireScreen({
       inline: "center",
     });
   }, [activeApplicant]);
-
-  useEffect(() => {
-    setFocusedFileTarget(
-      initialFocus?.fileId ? { fileId: initialFocus.fileId } : undefined,
-    );
-  }, [initialFocus?.fileId, initialFocus?.section]);
 
   useEffect(() => {
     for (const element of [
@@ -2953,8 +2773,8 @@ export function FigmaQuestionnaireScreen({
         ),
       ),
     );
-    const total = requiredFields.length + requiredFileSlots.length;
-    const completed = completedFields.length + readyFiles.length;
+    const total = requiredFields.length;
+    const completed = completedFields.length;
     const percent = total ? Math.round((completed / total) * 100) : 0;
     const risks = validationRisks + openIssueRisks + passportRisks.length;
 
@@ -2972,39 +2792,10 @@ export function FigmaQuestionnaireScreen({
     };
   }, [draftSubmission]);
 
-  const hasEuRelativeData = Boolean(
-    formData.euRelativeDetails.trim() || formData.euRelationship.trim(),
-  );
-  const showEuRelativeSection =
-    activeSection === "euRelative" ||
-    hasEuRelativeData ||
-    euRelativeApplicantIds.has(activeApplicant);
-
   const sections = useMemo(
     () =>
       sectionDefinitions
-        .filter((definition) => definition.id !== "euRelative" || showEuRelativeSection)
         .map(({ canonicalId, ...definition }) => {
-          if (definition.id === "files") {
-            const applicantFiles = activeApplicantModel
-              ? requiredQuestionnaireFileTypes.map((type) =>
-                  draftSubmission.files.find(
-                    (file) =>
-                      file.applicantId === activeApplicantModel.id &&
-                      file.type === type,
-                  ),
-                )
-              : [];
-            const completed = applicantFiles.filter(fileIsReadyForQuestionnaire).length;
-            const total = requiredQuestionnaireFileTypes.length;
-
-            return {
-              ...definition,
-              meta: `${completed} из ${total}`,
-              status: completed === total ? "complete" : "pending",
-            } satisfies SectionTab & { id: SectionId };
-          }
-
           const sourceSection = activeApplicantModel?.sections.find((section) =>
             sectionIdMatches(section.id, canonicalId),
           );
@@ -3048,7 +2839,7 @@ export function FigmaQuestionnaireScreen({
                 : "pending",
           } satisfies SectionTab & { id: SectionId };
         }),
-    [activeApplicantModel, draftSubmission, showEuRelativeSection],
+    [activeApplicantModel, draftSubmission],
   );
   const activeApplicantContext = applicants.find(
     (applicant) => applicant.id === activeApplicant,
@@ -3057,22 +2848,21 @@ export function FigmaQuestionnaireScreen({
   const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
   const showPurposeDetails = formData.stayPurpose === "OTHER";
   const showPreviousBiometricsDetails = formData.previousBiometrics === "Да";
-  const showPreviousSurname =
-    formData.sex !== "Мужской" ||
-    Boolean(formData.previousSurname.trim()) ||
-    showPreviousSurnameForMale;
-  const showSponsorFields = formData.paymentSponsor === "Спонсор";
-  const showGuardianInfo =
-    isBlsQuestionnaireMinorApplicant(
-      activeApplicantModel?.role,
-      formData as unknown as BlsFormData,
-    ) || Boolean(formData.guardianInfo.trim());
+  const previousSurnameIsVisible =
+    Boolean(formData.previousSurname.trim()) || showPreviousSurname;
+  const applicantIsMinor = isBlsQuestionnaireMinorApplicant(
+    activeApplicantModel?.role,
+    formData as unknown as BlsFormData,
+  );
+  const guardianDetailsAreVisible =
+    applicantIsMinor && (Boolean(formData.guardianInfo.trim()) || showGuardianDetails);
   const showCompanyInviteFields = isBlsQuestionnaireInvitingCompanySelected(formData);
   const primaryApplicant = draftSubmission.applicants[0];
   const canCopyFamilyWide =
     draftSubmission.type === "family" &&
     Boolean(primaryApplicant) &&
     draftSubmission.applicants.length > 1;
+  const canCopyCurrentSection = Boolean(familySharedFieldIds[activeSection]?.length);
 
   const currentSectionIssue = useMemo(() => {
     const currentSection = sections.find((section) => section.id === activeSection);
@@ -3082,16 +2872,6 @@ export function FigmaQuestionnaireScreen({
     )?.canonicalId;
 
     return activeBlockingIssues.find((issue) => {
-      const issueFileType = requiredQuestionnaireFileTypeForIssue(issue);
-      if (
-        currentSection.id === "files" &&
-        (issue.type === "file" ||
-          issue.type === "media" ||
-          Boolean(issueFileType) ||
-          sectionForFocus({ section: issue.target.section }, undefined) === "files")
-      ) {
-        return true;
-      }
       if (!issue.target.field) return false;
       if (issue.target.section === currentSection.title) return true;
 
@@ -3207,6 +2987,15 @@ export function FigmaQuestionnaireScreen({
     }
   }
 
+  function updateStructuredAddressField(
+    key: StructuredHomeAddressKey,
+    value: string,
+  ) {
+    const nextAddressData = { ...formData, [key]: value };
+    updateField(key, value);
+    updateField("contactAddress", composeQuestionnaireHomeAddress(nextAddressData));
+  }
+
   function updatePassportIssueDate(value: string) {
     updateField("passportIssued", value);
 
@@ -3232,8 +3021,17 @@ export function FigmaQuestionnaireScreen({
 
     updateField("dob", value);
     if (suggestedBirthCountry && birthCountryIsUntouchedDefault) {
-      updateField("birthCountry", suggestedBirthCountry);
+      updateBirthCountry(suggestedBirthCountry);
     }
+  }
+
+  function updateBirthCountry(value: string) {
+    updateField("birthCountry", value);
+    updateField("citizenship", "Russian Federation");
+    updateField(
+      "birthCitizenship",
+      value.trim().toUpperCase() === "USSR" ? "USSR" : "Russian Federation",
+    );
   }
 
   function normalizeBirthPlaceField() {
@@ -3265,19 +3063,13 @@ export function FigmaQuestionnaireScreen({
       return;
     }
 
-    const allowlistedFields = (
-      Object.keys(familySharedFieldIds) as SectionId[]
-    ).flatMap((sectionId) => {
-      const canonicalSectionId = sectionDefinitions.find(
-        (definition) => definition.id === sectionId,
-      )?.canonicalId;
-      if (!canonicalSectionId) return [];
-
-      return (familySharedFieldIds[sectionId] ?? []).map((fieldId) => ({
-        canonicalSectionId,
-        fieldId,
-      }));
-    });
+    const canonicalSectionId = sectionDefinitions.find(
+      (definition) => definition.id === activeSection,
+    )?.canonicalId;
+    if (!canonicalSectionId) return;
+    const allowlistedFields = (familySharedFieldIds[activeSection] ?? []).map(
+      (fieldId) => ({ canonicalSectionId, fieldId }),
+    );
     const updates = draftSubmission.applicants.slice(1).flatMap((applicant) =>
       allowlistedFields.flatMap(({ canonicalSectionId, fieldId }) => {
         const sourceField = questionnaireField(primaryApplicant, fieldId);
@@ -3314,7 +3106,7 @@ export function FigmaQuestionnaireScreen({
     );
     if (!updates.length) {
       setFamilyCopyMessage(
-        "Общие поля уже заполнены или у первого заявителя нет данных для копирования.",
+        "В этом разделе данные уже заполнены или у первого заявителя нет значений для копирования.",
       );
       return;
     }
@@ -3436,17 +3228,6 @@ export function FigmaQuestionnaireScreen({
     onFieldChange?.(update);
   }
 
-  function openEuRelativeSection() {
-    if (!isEditable) return;
-    setEuRelativeApplicantIds((current) => {
-      if (current.has(activeApplicant)) return current;
-      const next = new Set(current);
-      next.add(activeApplicant);
-      return next;
-    });
-    setActiveSection("euRelative");
-  }
-
   function fieldErrorMessage(fieldId: string, label: string) {
     const issue = fieldIssue(fieldId, label);
     if (issue) return issue.comment ?? issue.reason;
@@ -3473,15 +3254,6 @@ export function FigmaQuestionnaireScreen({
     if (source === "passport_ocr") return "требует сверки OCR";
     if (source === "pdf_reconciliation") return "требует сверки с PDF";
     return source ? "требует ручной проверки" : undefined;
-  }
-
-  function requiredFileForActiveApplicant(
-    type: (typeof requiredQuestionnaireFileTypes)[number],
-  ) {
-    if (!activeApplicantModel) return undefined;
-    return draftSubmission.files.find(
-      (file) => file.applicantId === activeApplicantModel.id && file.type === type,
-    );
   }
 
   const focusedApplicantId = initialFocus?.applicantId ?? activeApplicant;
@@ -3743,49 +3515,10 @@ export function FigmaQuestionnaireScreen({
     }, 0);
   }
 
-  function focusFileTarget(
-    fileId: string | undefined,
-    fileType: RequiredQuestionnaireFileType | undefined,
-  ) {
-    if (!fileId && !fileType) return;
-    setFocusedFileTarget({ fileId, fileType });
-
-    let attempt = 0;
-    const applyFocus = () => {
-      const byId = fileId
-        ? screenRef.current?.querySelector<HTMLElement>(
-            `[data-file-id="${CSS.escape(fileId)}"]`,
-          )
-        : undefined;
-      const slot =
-        byId ??
-        (fileType
-          ? screenRef.current?.querySelector<HTMLElement>(
-              `[data-file-slot="${fileType}"]`,
-            )
-          : undefined);
-      if (slot) {
-        slot.focus({ preventScroll: true });
-        slot.scrollIntoView?.({ behavior: "smooth", block: "center" });
-        return;
-      }
-      if (attempt < 4) {
-        attempt += 1;
-        window.setTimeout(applyFocus, 16);
-      }
-    };
-
-    window.setTimeout(applyFocus, 0);
-  }
-
   function focusQuestionnaireTarget(target: QuestionnaireBlockerTarget) {
     setActiveApplicant(target.applicantId);
+    if (target.sectionId === "files") return;
     setActiveSection(target.sectionId);
-    if (target.sectionId === "files" && (target.fileId || target.fileType)) {
-      focusFileTarget(target.fileId, target.fileType);
-      return;
-    }
-    setFocusedFileTarget(undefined);
     focusFieldLabel(target.label);
   }
 
@@ -4085,58 +3818,6 @@ export function FigmaQuestionnaireScreen({
     }
   }
 
-  async function completeFromButton() {
-    if (!isEditable || completionInFlightRef.current) return;
-    if (!readinessStats.canSubmit) {
-      focusFirstBlocker();
-      return;
-    }
-
-    completionInFlightRef.current = true;
-    clearAutosaveTimer();
-    const revision = autosaveRevisionRef.current;
-    const payload = completionPayload("completion");
-    setSaveStatus("saving");
-    setSaveMessage("Сохраняем перед отправкой...");
-    try {
-      const hasDraftWork =
-        Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
-        Boolean(inFlightSaveRef.current) ||
-        Boolean(queuedSaveRef.current);
-      if (hasDraftWork && onSaveDraftRef.current) {
-        await enqueueDraftSave(payload, revision);
-      }
-      setSaveStatus("saving");
-      setSaveMessage(
-        isCorrectionResubmission
-          ? "Отправляем исправления..."
-          : "Отправляем на проверку...",
-      );
-      await onComplete(payload);
-      if (autosaveRevisionRef.current === revision) {
-        replacePendingFieldUpdates({});
-        setSaveStatus("saved");
-        setSaveMessage(
-          isCorrectionResubmission
-            ? "Исправления отправлены"
-            : "Отправлено на проверку",
-        );
-      }
-    } catch (error) {
-      setSaveStatus("error");
-      setSaveMessage(
-        error instanceof Error
-          ? error.message
-          : isCorrectionResubmission
-            ? "Не удалось отправить исправления"
-            : "Не удалось отправить анкету",
-      );
-      throw error;
-    } finally {
-      completionInFlightRef.current = false;
-    }
-  }
-
   async function requestBack() {
     if (completionInFlightRef.current) return;
     clearAutosaveTimer();
@@ -4160,74 +3841,6 @@ export function FigmaQuestionnaireScreen({
   }
 
   function renderSectionFields() {
-    if (activeSection === "files") {
-      return (
-        <section aria-label="Файлы заявителя" className="v19-questionnaire-file-list">
-          <p className="v19-questionnaire-file-intro">
-            {onUploadFile
-              ? "Три файла на заявителя. Выберите нужный слот — статус обновится после загрузки."
-              : "Три файла на заявителя. Статусы доступны здесь; загрузка — в рабочем пространстве."}
-          </p>
-          <QuestionnaireFileSlot
-            description="Главная страница загранпаспорта с фото"
-            file={requiredFileForActiveApplicant("passport_scan")}
-            fileType="passport_scan"
-            focused={
-              focusedFileTarget?.fileId ===
-                requiredFileForActiveApplicant("passport_scan")?.id ||
-              focusedFileTarget?.fileType === "passport_scan"
-            }
-            issue={questionnaireFileIssue(
-              draftSubmission.issues,
-              activeApplicant,
-              requiredFileForActiveApplicant("passport_scan"),
-              "passport_scan",
-            )}
-            label="Загранпаспорт"
-            onUploadFile={onUploadFile}
-            submission={draftSubmission}
-          />
-          <QuestionnaireFileSlot
-            description="Фото анфас"
-            file={requiredFileForActiveApplicant("selfie")}
-            fileType="selfie"
-            focused={
-              focusedFileTarget?.fileId === requiredFileForActiveApplicant("selfie")?.id ||
-              focusedFileTarget?.fileType === "selfie"
-            }
-            issue={questionnaireFileIssue(
-              draftSubmission.issues,
-              activeApplicant,
-              requiredFileForActiveApplicant("selfie"),
-              "selfie",
-            )}
-            label="Селфи 1"
-            onUploadFile={onUploadFile}
-            submission={draftSubmission}
-          />
-          <QuestionnaireFileSlot
-            description="Фото в профиль"
-            file={requiredFileForActiveApplicant("selfie_2")}
-            fileType="selfie_2"
-            focused={
-              focusedFileTarget?.fileId ===
-                requiredFileForActiveApplicant("selfie_2")?.id ||
-              focusedFileTarget?.fileType === "selfie_2"
-            }
-            issue={questionnaireFileIssue(
-              draftSubmission.issues,
-              activeApplicant,
-              requiredFileForActiveApplicant("selfie_2"),
-              "selfie_2",
-            )}
-            label="Селфи 2"
-            onUploadFile={onUploadFile}
-            submission={draftSubmission}
-          />
-        </section>
-      );
-    }
-
     if (activeSection === "appointment") {
       return (
         <>
@@ -4241,52 +3854,18 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("appointmentCity", value)}
           />
           <FormField
-            excelMap="Анкета: visa-type"
-            label="Тип визы"
-            modelFieldId="visa-type"
-            number="A2"
-            options={selectOptions.visaType}
-            value={formData.visaType}
-            onChange={(value) => updateField("visaType", value)}
-          />
-          <FormField
-            excelMap="Анкета: category"
-            label="Категория обслуживания"
-            modelFieldId="category"
-            number="A3"
-            options={selectOptions.category}
-            value={formData.category}
-            onChange={(value) => updateField("category", value)}
-          />
-          <FormField
-            label="Желаемая дата 1"
+            label="Желаемый интервал — с"
             modelFieldId="desired-date-1"
-            number="A4"
+            number="A2"
             value={formData.desiredDate1}
             onChange={(value) => updateField("desiredDate1", value)}
           />
           <FormField
-            label="Желаемая дата 2"
+            label="Желаемый интервал — по"
             modelFieldId="desired-date-2"
-            number="A5"
+            number="↳"
             value={formData.desiredDate2}
             onChange={(value) => updateField("desiredDate2", value)}
-          />
-          <FormField
-            label="Желаемая дата 3"
-            modelFieldId="desired-date-3"
-            number="A6"
-            value={formData.desiredDate3}
-            onChange={(value) => updateField("desiredDate3", value)}
-          />
-          <FormField
-            fullWidth
-            label="Примечание"
-            modelFieldId="appointment-note"
-            number="A7"
-            type="textarea"
-            value={formData.appointmentNote}
-            onChange={(value) => updateField("appointmentNote", value)}
           />
         </>
       );
@@ -4398,71 +3977,13 @@ export function FigmaQuestionnaireScreen({
       );
     }
 
-    if (activeSection === "euRelative") {
-      return (
-        <>
-          <FormField
-            excelMap="Анкета: eu-relative-details"
-            fullWidth
-            label="Данные родственника-гражданина ЕС / ЕЭЗ / Швейцарии"
-            modelFieldId="eu-relative-details"
-            number="1"
-            type="textarea"
-            value={formData.euRelativeDetails}
-            onChange={(value) => updateField("euRelativeDetails", value)}
-          />
-          <FormField
-            excelMap="Анкета: eu-relationship"
-            label="Родственная связь"
-            modelFieldId="eu-relationship"
-            number="2"
-            options={selectOptions.euRelationship}
-            value={formData.euRelationship}
-            onChange={(value) => updateField("euRelationship", value)}
-          />
-        </>
-      );
-    }
-
     if (activeSection === "contact") {
       return (
         <>
           <FormField
-            addressAssist
-            excelMap="Cell: D2"
-            fullWidth
-            hint="Пишите коротко: ул, пр, пер, наб, д, корп, кв, под, оф. Предложим полный адрес после номера дома."
-            label="Домашний адрес"
-            modelFieldId="home-address"
-            number="1"
-            placeholder="ул ленина д 5 кв 12"
-            compact
-            value={formData.contactAddress}
-            onChange={(value) => updateField("contactAddress", value)}
-          />
-          <FormField
-            excelMap="Cell: D4"
-            label="Email"
-            modelFieldId="email"
-            number="2"
-            type="email"
-            value={formData.contactEmail}
-            onChange={(value) => updateField("contactEmail", value)}
-          />
-          <FormField
-            excelMap="Cell: D3"
-            label="Телефон"
-            modelFieldId="contact-number"
-            number="3"
-            phonePrefix="+7"
-            placeholder="900 000-00-00"
-            value={formData.contactPhone}
-            onChange={(value) => updateField("contactPhone", value)}
-          />
-          <FormField
             label="Страна проживания"
             modelFieldId="home-country"
-            number="4"
+            number="1"
             options={selectOptions.homeCountry}
             value={formData.homeCountry}
             onChange={(value) => updateField("homeCountry", value)}
@@ -4471,25 +3992,80 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: residence-city"
             label="Город проживания"
             modelFieldId="home-city"
-            number="5"
+            number="2"
             placeholder="Начните: с"
             suggestions={POPULAR_RUSSIAN_CITY_OPTIONS}
             value={formData.residenceCity}
             onChange={(value) => updateField("residenceCity", value)}
           />
           <FormField
+            fullWidth
+            hint="Начните с типа и названия: улица, проспект, переулок, набережная или шоссе."
+            label="Улица / проспект / переулок"
+            modelFieldId="home-street"
+            number="3"
+            placeholder="Например, ул Ленина"
+            compact
+            suggestions={RUSSIAN_STREET_TYPE_SUGGESTIONS}
+            value={formData.homeStreet}
+            onChange={(value) => updateStructuredAddressField("homeStreet", value)}
+          />
+          <FormField
+            label="Дом"
+            modelFieldId="home-house"
+            number="4"
+            placeholder="Например, 15"
+            value={formData.homeHouse}
+            onChange={(value) => updateStructuredAddressField("homeHouse", value)}
+          />
+          <FormField
+            label="Корпус / строение"
+            modelFieldId="home-building"
+            number="5"
+            placeholder="Например, корп 2"
+            value={formData.homeBuilding}
+            onChange={(value) => updateStructuredAddressField("homeBuilding", value)}
+          />
+          <FormField
+            label="Квартира / офис / помещение"
+            modelFieldId="home-unit"
+            number="6"
+            placeholder="Например, кв 12 или офис 4"
+            value={formData.homeUnit}
+            onChange={(value) => updateStructuredAddressField("homeUnit", value)}
+          />
+          <FormField
             excelMap="Анкета: residence-postal-code"
             label="Почтовый индекс"
             modelFieldId="postal-code"
-            number="6"
+            number="7"
             value={formData.residencePostalCode}
             onChange={(value) => updateField("residencePostalCode", value)}
           />
           <FormField
+            excelMap="Cell: D4"
+            label="Email"
+            modelFieldId="email"
+            number="8"
+            type="email"
+            value={formData.contactEmail}
+            onChange={(value) => updateField("contactEmail", value)}
+          />
+          <FormField
+            excelMap="Cell: D3"
+            label="Телефон"
+            modelFieldId="contact-number"
+            number="9"
+            phonePrefix="+7"
+            placeholder="900 000-00-00"
+            value={formData.contactPhone}
+            onChange={(value) => updateField("contactPhone", value)}
+          />
+          <FormField
             excelMap="Анкета: lives-outside-citizenship"
-            label="Проживание не в стране гражданства"
+            label="Есть вид на жительство в другой стране"
             modelFieldId="lives-outside-citizenship"
-            number="7"
+            number="10"
             options={selectOptions.yesNo}
             value={formData.livesOutsideCitizenship}
             onChange={(value) => updateField("livesOutsideCitizenship", value)}
@@ -4500,7 +4076,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: residence-permit-type"
                 label="Вид на жительство / документ"
                 modelFieldId="residence-permit-type"
-                number="8"
+                number="11"
                 value={formData.residencePermitType}
                 onChange={(value) => updateField("residencePermitType", value)}
               />
@@ -4508,7 +4084,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: residence-permit-number"
                 label="Номер документа"
                 modelFieldId="residence-permit-number"
-                number="9"
+                number="12"
                 value={formData.residencePermitNumber}
                 onChange={(value) => updateField("residencePermitNumber", value)}
               />
@@ -4516,7 +4092,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: residence-permit-valid-until"
                 label="Действителен до"
                 modelFieldId="residence-permit-valid-until"
-                number="10"
+                number="13"
                 value={formData.residencePermitValidUntil}
                 onChange={(value) => updateField("residencePermitValidUntil", value)}
               />
@@ -4531,30 +4107,22 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: E2"
-            errorMessage={fieldErrorMessage("occupation", "Профессия")}
-            label="Профессия"
+            errorMessage={fieldErrorMessage("occupation", "Должность")}
+            label="Должность"
             modelFieldId="occupation"
             number="1"
-            options={selectOptions.occupation}
-            reviewSource={fieldReviewSource("occupation", "Профессия")}
-            state={fieldReviewState("occupation", "Профессия")}
+            placeholder="Например, менеджер"
+            reviewSource={fieldReviewSource("occupation", "Должность")}
+            state={fieldReviewState("occupation", "Должность")}
             value={formData.occupation}
             onChange={(value) => updateField("occupation", value)}
-          />
-          <FormField
-            excelMap="Анкета: occupation-specify"
-            label="Уточнение профессии"
-            modelFieldId="occupation-specify"
-            number="2"
-            value={formData.currentJob}
-            onChange={(value) => updateField("currentJob", value)}
           />
           <FormField
             excelMap="Cell: E3"
             fullWidth
             label="Работодатель / учебное заведение"
             modelFieldId="employer-name"
-            number="3"
+            number="2"
             type="textarea"
             value={formData.employerName}
             onChange={(value) => updateField("employerName", value)}
@@ -4563,7 +4131,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: employer-contact"
             label="Телефон работодателя / учебного заведения"
             modelFieldId="employer-contact"
-            number="4"
+            number="3"
             phonePrefix="+7"
             value={formData.employerContact}
             onChange={(value) => updateField("employerContact", value)}
@@ -4575,7 +4143,7 @@ export function FigmaQuestionnaireScreen({
             hint="Пишите коротко — полный вариант появится как предложение после номера дома."
             label="Адрес работодателя / учебного заведения"
             modelFieldId="employer-address"
-            number="5"
+            number="4"
             placeholder="пр мира д 10 оф 4"
             compact
             value={formData.employerAddress}
@@ -4586,13 +4154,15 @@ export function FigmaQuestionnaireScreen({
     }
 
     if (activeSection === "trip") {
+      let visibleTripQuestionNumber = 0;
+      const nextTripQuestionNumber = () => String(++visibleTripQuestionNumber);
       return (
         <>
           <FormField
             excelMap="Cell: F2"
             label="Цель поездки"
             modelFieldId="purpose"
-            number="1"
+            number={nextTripQuestionNumber()}
             options={selectOptions.purpose}
             value={formData.stayPurpose}
             onChange={(value) => updateField("stayPurpose", value)}
@@ -4603,7 +4173,7 @@ export function FigmaQuestionnaireScreen({
               fullWidth
               label="Дополнительные сведения о цели"
               modelFieldId="stay-purpose-details"
-              number="2"
+              number={nextTripQuestionNumber()}
               type="textarea"
               value={formData.stayPurposeDetails}
               onChange={(value) => updateField("stayPurposeDetails", value)}
@@ -4613,7 +4183,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: main-destination"
             label="Основная страна назначения"
             modelFieldId="main-destination"
-            number="3"
+            number={nextTripQuestionNumber()}
             options={selectOptions.country}
             value={formData.mainDestination}
             onChange={(value) => updateField("mainDestination", value)}
@@ -4622,7 +4192,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: F5"
             label="Страна первого въезда"
             modelFieldId="first-entry-country"
-            number="4"
+            number={nextTripQuestionNumber()}
             options={selectOptions.country}
             value={formData.firstEntryCountry}
             onChange={(value) => updateField("firstEntryCountry", value)}
@@ -4631,7 +4201,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: entry-count"
             label="Количество въездов"
             modelFieldId="entry-count"
-            number="5"
+            number={nextTripQuestionNumber()}
             options={selectOptions.entryCount}
             value={formData.entryCount}
             onChange={(value) => updateField("entryCount", value)}
@@ -4642,7 +4212,7 @@ export function FigmaQuestionnaireScreen({
             focused={fieldReviewState("arrival-date", "Дата въезда") === "needs_review"}
             label="Дата въезда"
             modelFieldId="arrival-date"
-            number="6"
+            number={nextTripQuestionNumber()}
             reviewSource={fieldReviewSource("arrival-date", "Дата въезда")}
             state={fieldReviewState("arrival-date", "Дата въезда")}
             value={formData.travelStart}
@@ -4656,7 +4226,7 @@ export function FigmaQuestionnaireScreen({
             }
             label="Дата выезда"
             modelFieldId="departure-date"
-            number="7"
+            number={nextTripQuestionNumber()}
             reviewSource={fieldReviewSource("departure-date", "Дата выезда")}
             state={fieldReviewState("departure-date", "Дата выезда")}
             value={formData.travelEnd}
@@ -4666,7 +4236,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: stay-duration"
             label="Длительность пребывания"
             modelFieldId="stay-duration"
-            number="8"
+            number={nextTripQuestionNumber()}
             hint="Рассчитывается автоматически по датам въезда и выезда"
             readOnly
             type="number"
@@ -4676,7 +4246,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: previous-biometrics"
             label="Отпечатки ранее сдавались"
             modelFieldId="previous-biometrics"
-            number="9"
+            number={nextTripQuestionNumber()}
             options={selectOptions.yesNo}
             value={formData.previousBiometrics}
             onChange={(value) => updateField("previousBiometrics", value)}
@@ -4687,7 +4257,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: previous-biometrics-date"
                 label="Дата сдачи отпечатков"
                 modelFieldId="previous-biometrics-date"
-                number="10"
+                number={nextTripQuestionNumber()}
                 value={formData.previousBiometricsDate}
                 onChange={(value) => updateField("previousBiometricsDate", value)}
               />
@@ -4695,7 +4265,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: previous-visa-number"
                 label="Номер визы"
                 modelFieldId="previous-visa-number"
-                number="11"
+                number={nextTripQuestionNumber()}
                 value={formData.previousVisaNumber}
                 onChange={(value) => updateField("previousVisaNumber", value)}
               />
@@ -4705,7 +4275,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: final-entry-permit"
             label="Разрешение на въезд в конечную страну"
             modelFieldId="final-entry-permit"
-            number="12"
+            number={nextTripQuestionNumber()}
             value={formData.finalEntryPermit}
             onChange={(value) => updateField("finalEntryPermit", value)}
           />
@@ -4713,7 +4283,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: final-entry-permit-issued-by"
             label="Кем выдано"
             modelFieldId="final-entry-permit-issued-by"
-            number="13"
+            number={nextTripQuestionNumber()}
             value={formData.finalEntryPermitIssuedBy}
             onChange={(value) => updateField("finalEntryPermitIssuedBy", value)}
           />
@@ -4721,7 +4291,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: final-entry-permit-valid-from"
             label="Действительно с"
             modelFieldId="final-entry-permit-valid-from"
-            number="14"
+            number={nextTripQuestionNumber()}
             value={formData.finalEntryPermitValidFrom}
             onChange={(value) => updateField("finalEntryPermitValidFrom", value)}
           />
@@ -4729,7 +4299,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: final-entry-permit-valid-to"
             label="Действительно до"
             modelFieldId="final-entry-permit-valid-to"
-            number="15"
+            number={nextTripQuestionNumber()}
             value={formData.finalEntryPermitValidTo}
             onChange={(value) => updateField("finalEntryPermitValidTo", value)}
           />
@@ -4844,96 +4414,6 @@ export function FigmaQuestionnaireScreen({
       );
     }
 
-    if (activeSection === "payment") {
-      return (
-        <>
-          <FormField
-            excelMap="Cell: H2"
-            label="Кто оплачивает поездку"
-            modelFieldId="cost-covered-by"
-            number="1"
-            options={selectOptions.costCoveredBy}
-            value={formData.paymentSponsor}
-            onChange={(value) => updateField("paymentSponsor", value)}
-          />
-          <FormField
-            excelMap="Cell: H3"
-            label="Средства заявителя"
-            modelFieldId="means-of-support"
-            number="2"
-            options={selectOptions.meansOfSupport}
-            value={formData.paymentType}
-            onChange={(value) => updateField("paymentType", value)}
-          />
-          {showSponsorFields ? (
-            <>
-              <FormField
-                excelMap="Анкета: sponsor-in-host-fields"
-                label="Спонсор указан в полях 30/31"
-                modelFieldId="sponsor-in-host-fields"
-                number="3"
-                options={selectOptions.sponsorInHostFields}
-                value={formData.sponsorInHostFields}
-                onChange={(value) => updateField("sponsorInHostFields", value)}
-              />
-              <FormField
-                excelMap="Анкета: other-sponsor"
-                label="Другой спонсор"
-                modelFieldId="other-sponsor"
-                number="4"
-                value={formData.otherSponsor}
-                onChange={(value) => updateField("otherSponsor", value)}
-              />
-              <FormField
-                excelMap="Анкета: sponsor-means"
-                fullWidth
-                label="Средства спонсора"
-                modelFieldId="sponsor-means"
-                number="5"
-                options={selectOptions.sponsorMeans}
-                value={formData.sponsorMeans}
-                onChange={(value) => updateField("sponsorMeans", value)}
-              />
-            </>
-          ) : null}
-        </>
-      );
-    }
-
-    if (activeSection === "filler") {
-      return (
-        <>
-          <FormField
-            excelMap="Анкета: form-filler-name"
-            label="ФИО заполнившего, если не заявитель"
-            modelFieldId="form-filler-name"
-            number="1"
-            value={formData.formFillerName}
-            onChange={(value) => updateField("formFillerName", value)}
-          />
-          <FormField
-            excelMap="Анкета: form-filler-contact"
-            fullWidth
-            label="Адрес/email заполнившего"
-            modelFieldId="form-filler-contact"
-            number="2"
-            type="textarea"
-            value={formData.formFillerContact}
-            onChange={(value) => updateField("formFillerContact", value)}
-          />
-          <FormField
-            excelMap="Анкета: form-filler-phone"
-            label="Телефон заполнившего"
-            modelFieldId="form-filler-phone"
-            number="3"
-            phonePrefix="+7"
-            value={formData.formFillerPhone}
-            onChange={(value) => updateField("formFillerPhone", value)}
-          />
-        </>
-      );
-    }
-
     if (activeSection === "personal") {
       return (
         <>
@@ -4945,12 +4425,12 @@ export function FigmaQuestionnaireScreen({
             value={formData.surname}
             onChange={(value) => updateField("surname", value)}
           />
-          {showPreviousSurname ? (
+          {previousSurnameIsVisible ? (
             <FormField
               excelMap="Анкета: previous-surname"
               label="Фамилия при рождении / предыдущая"
               modelFieldId="previous-surname"
-              number="2"
+              number="1.1"
               value={formData.previousSurname}
               onChange={(value) => updateField("previousSurname", value)}
             />
@@ -4958,16 +4438,17 @@ export function FigmaQuestionnaireScreen({
             <button
               className="v19-questionnaire-optional-reveal"
               type="button"
-              onClick={() => setShowPreviousSurnameForMale(true)}
+              onClick={() => setShowPreviousSurname(true)}
             >
-              Указать предыдущую фамилию
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Добавить предыдущую фамилию
             </button>
           )}
           <FormField
             excelMap="Cell: B3"
             label="Имя"
             modelFieldId="first-name"
-            number="3"
+            number="2"
             value={formData.firstName}
             onChange={(value) => updateField("firstName", value)}
           />
@@ -4976,7 +4457,7 @@ export function FigmaQuestionnaireScreen({
             errorMessage={fieldErrorMessage("birth-date", "Дата рождения")}
             label="Дата рождения"
             modelFieldId="birth-date"
-            number="4"
+            number="3"
             state={fieldReviewState("birth-date", "Дата рождения")}
             value={formData.dob}
             onChange={updateBirthDate}
@@ -4987,7 +4468,7 @@ export function FigmaQuestionnaireScreen({
             hint="Для рождения до 06.09.1991 Санкт-Петербург подставляется как LENINGRAD; сверяйте с загранпаспортом"
             label="Место рождения"
             modelFieldId="birth-place"
-            number="5"
+            number="4"
             onBlur={normalizeBirthPlaceField}
             reviewSource={fieldReviewSource("birth-place", "Место рождения")}
             state={fieldReviewState("birth-place", "Место рождения")}
@@ -4998,43 +4479,16 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: B6"
             label="Страна рождения"
             modelFieldId="birth-country"
-            number="6"
+            number="5"
             options={selectOptions.birthCountry}
             value={formData.birthCountry}
-            onChange={(value) => updateField("birthCountry", value)}
-          />
-          <FormField
-            excelMap="Cell: B7"
-            label="Текущее гражданство"
-            modelFieldId="nationality"
-            number="7"
-            options={selectOptions.citizenship}
-            value={formData.citizenship}
-            onChange={(value) => updateField("citizenship", value)}
-          />
-          <FormField
-            excelMap="Анкета: birth-citizenship"
-            label="Гражданство при рождении, если отличается"
-            modelFieldId="birth-citizenship"
-            number="8"
-            options={selectOptions.birthCitizenship}
-            value={formData.birthCitizenship}
-            onChange={(value) => updateField("birthCitizenship", value)}
-          />
-          <FormField
-            excelMap="Анкета: other-citizenship"
-            label="Иное гражданство"
-            modelFieldId="other-citizenship"
-            number="9"
-            options={selectOptions.otherCitizenship}
-            value={formData.otherCitizenship}
-            onChange={(value) => updateField("otherCitizenship", value)}
+            onChange={updateBirthCountry}
           />
           <FormField
             excelMap="Cell: B8"
             label="Пол"
             modelFieldId="gender"
-            number="10"
+            number="6"
             options={selectOptions.gender}
             value={formData.sex}
             onChange={(value) => updateField("sex", value)}
@@ -5044,31 +4498,32 @@ export function FigmaQuestionnaireScreen({
             fullWidth
             label="Семейное положение"
             modelFieldId="marital-status"
-            number="11"
+            number="7"
             options={selectOptions.maritalStatus}
             value={formData.maritalStatus}
             onChange={(value) => updateField("maritalStatus", value)}
           />
-          {showGuardianInfo ? (
+          {guardianDetailsAreVisible ? (
             <FormField
               excelMap="Анкета: guardian-info"
               fullWidth
               label="Родитель/опекун несовершеннолетнего"
               modelFieldId="guardian-info"
-              number="12"
+              number="8"
               type="textarea"
               value={formData.guardianInfo}
               onChange={(value) => updateField("guardianInfo", value)}
             />
+          ) : applicantIsMinor ? (
+            <button
+              className="v19-questionnaire-optional-reveal"
+              type="button"
+              onClick={() => setShowGuardianDetails(true)}
+            >
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Добавить родителя или опекуна
+            </button>
           ) : null}
-          <FormField
-            excelMap="Анкета: national-id"
-            label="Национальный ID"
-            modelFieldId="national-id"
-            number="13"
-            value={formData.nationalId}
-            onChange={(value) => updateField("nationalId", value)}
-          />
         </>
       );
     }
@@ -5142,38 +4597,20 @@ export function FigmaQuestionnaireScreen({
             {saveMessage}
           </span>
           {isEditable ? (
-            <>
-              {!readinessStats.canSubmit ? (
-                <button
-                  aria-label={`Перейти к блокеру: ${mobileBlockerLabel}`}
-                  className="v19-questionnaire-blocker-button"
-                  type="button"
-                  onClick={focusFirstBlocker}
-                >
-                  К блокеру
-                </button>
-              ) : null}
-              <button
-                className="v19-questionnaire-complete-button is-ready"
-                disabled={saveStatus === "saving"}
-                type="button"
-                onClick={() => void saveAndExitFromButton().catch(() => undefined)}
-              >
+            <button
+              aria-label={saveStatus === "saving" ? "Сохраняем" : "Сохранить и выйти"}
+              className="v19-questionnaire-complete-button v19-questionnaire-save-button is-ready"
+              disabled={saveStatus === "saving"}
+              type="button"
+              onClick={() => void saveAndExitFromButton().catch(() => undefined)}
+            >
+              <span className="hidden sm:inline">
                 {saveStatus === "saving" ? "Сохраняем" : "Сохранить и выйти"}
-              </button>
-              <button
-                aria-label={completeActionLabel}
-                className={`v19-questionnaire-complete-button ${
-                  readinessStats.canSubmit ? "is-ready" : "is-blocked"
-                }${isCorrectionResubmission ? " is-correction-submit" : ""}`}
-                disabled={saveStatus === "saving"}
-                type="button"
-                onClick={() => void completeFromButton().catch(() => undefined)}
-              >
-                <span className="hidden sm:inline">{completeActionLabel}</span>
-                <span className="sm:hidden">{completeActionMobileLabel}</span>
-              </button>
-            </>
+              </span>
+              <span className="sm:hidden">
+                {saveStatus === "saving" ? "Сохраняем" : "Сохранить"}
+              </span>
+            </button>
           ) : questionnaireStatus.readOnly ? (
             <span
               aria-label={questionnaireStatus.readOnly.label}
@@ -5346,22 +4783,12 @@ export function FigmaQuestionnaireScreen({
                 </QuestionnaireProgressBadge>
               </button>
             ))}
-            {isEditable && !showEuRelativeSection ? (
-              <button
-                className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
-                disabled={!isEditable}
-                type="button"
-                onClick={openEuRelativeSection}
-              >
-                Добавить родственника ЕС
-              </button>
-            ) : null}
           </div>
 
           <QuestionnaireWorkspaceShell className="v19-questionnaire-workspace-shell flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
             <aside className="v19-questionnaire-section-nav">
               <V19ReadinessCard
-                description="Пакет можно отправлять, когда обязательные поля и файлы готовы без ошибок."
+                description="Анкету можно отправлять, когда обязательные поля заполнены без ошибок."
                 detail={riskLabel(readinessStats.risks)}
                 scoreLabel={`${readinessStats.percent}%`}
                 value={readinessStats.percent}
@@ -5369,7 +4796,9 @@ export function FigmaQuestionnaireScreen({
 
               <div className="flex flex-col gap-2">
                 <V19SearchField
+                  id="questionnaire-field-search"
                   label="Поиск поля анкеты"
+                  name="questionnaire-field-search"
                   placeholder="Найти поле..."
                   value={fieldSearchQuery}
                   onChange={(event) => setFieldSearchQuery(event.target.value)}
@@ -5453,16 +4882,6 @@ export function FigmaQuestionnaireScreen({
                     </QuestionnaireProgressBadge>
                   </button>
                 ))}
-                {isEditable && !showEuRelativeSection ? (
-                  <button
-                    className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
-                    disabled={!isEditable}
-                    type="button"
-                    onClick={openEuRelativeSection}
-                  >
-                    Добавить родственника ЕС
-                  </button>
-                ) : null}
               </div>
             </aside>
 
@@ -5576,16 +4995,17 @@ export function FigmaQuestionnaireScreen({
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {isEditable && canCopyFamilyWide ? (
+                {isEditable && canCopyFamilyWide && canCopyCurrentSection ? (
                   <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
                     <button
                       aria-describedby={familyCopyMessage ? familyCopyStatusId : undefined}
-                      className="v19-questionnaire-draft-button"
+                      className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
                       disabled={!isEditable || Boolean(familyCopyPreview)}
                       type="button"
                       onClick={copySharedDataToFamily}
                     >
-                      Заполнить общие поля семьи
+                      <Copy aria-hidden="true" />
+                      Копировать для всех
                     </button>
                     {familyCopyPreview ? (
                       <>

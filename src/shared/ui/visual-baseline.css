@@ -515,6 +515,22 @@
   }
 }
 
+@media (max-width: 359px) {
+  .vf-figma-questionnaire-screen .v19-questionnaire-title-wrap {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .vf-figma-questionnaire-screen .v19-questionnaire-section-nav {
+    display: none !important;
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-workspace-shell {
+    display: block !important;
+  }
+}
+
 /* 2026-07-15 premium admin review: two-level traveler workspace. */
 [data-admin-review-drawer-surface="workspace"] .admin-review-tabs {
   grid-template-columns: repeat(2, minmax(var(--v19b-size-0), 1fr)) !important;
@@ -1016,6 +1032,10 @@
 
   .vf-figma-questionnaire-screen .v19-questionnaire-header-actions {
     gap: var(--v19b-size-4);
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-blocker-button {
+    display: none;
   }
 
   .vf-figma-questionnaire-screen
@@ -25428,7 +25448,8 @@ body,
 
 .vf-figma-questionnaire-screen .v19-questionnaire-field-hint {
   color: var(--v19b-color-text-muted);
-  font-size: var(--v19b-size-10-5);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-regular);
   line-height: var(--v19b-line-height-row);
 }
 
@@ -25437,9 +25458,22 @@ body,
   color: var(--v19b-color-text-muted);
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-field-message.is-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--v19b-size-6);
+  margin-top: var(--v19b-size-6);
+}
+
 .vf-figma-questionnaire-screen .v19-questionnaire-field-error {
-  color: var(--v19b-color-text-muted);
-  font-size: var(--v19b-size-14);
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--v19b-size-6);
+  color: var(--v19b-status-danger-text) !important;
+  font-size: var(--v19b-size-11) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-label) !important;
+  letter-spacing: var(--v19b-letter-spacing-normal);
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-family-copy-status {
@@ -25448,7 +25482,20 @@ body,
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-field-error-icon {
+  flex: 0 0 auto;
+  width: var(--v19b-size-12);
+  height: var(--v19b-size-12);
+  margin-top: var(--v19b-size-1);
   color: var(--v19b-dot-danger);
+}
+
+.vf-figma-questionnaire-screen
+  :is(.v19-questionnaire-field-control, .v19-questionnaire-searchbox input, .v19-search-field input)::placeholder {
+  color: var(--v19b-color-text-faint) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-regular) !important;
+  line-height: var(--v19b-line-height-control) !important;
+  opacity: 1;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-review-confirmation {
@@ -32045,4 +32092,57 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
 
 .v19-document-type-group + .v19-document-type-group {
   margin-top: var(--v19b-size-0);
+}
+
+/* Questionnaire hierarchy: two-action header, clear selections, and a flush workspace. */
+.vf-figma-questionnaire-screen.v19-questionnaire-screen-shell {
+  gap: var(--v19b-size-0) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-scroll-frame {
+  width: var(--v19b-size-full) !important;
+  max-width: none !important;
+  margin-inline: var(--v19b-size-0) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-copy-button {
+  gap: var(--v19b-size-8);
+  border-color: var(--v19b-color-primary) !important;
+  background: var(--v19b-color-primary-soft-10) !important;
+  color: var(--v19b-color-primary-text) !important;
+  box-shadow: inset 0 0 0 var(--v19b-size-1) var(--v19b-color-primary-soft-20) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-copy-button > svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  stroke-width: var(--v19b-size-2);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-copy-button:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-primary-bright) !important;
+  background: var(--v19b-color-primary-soft-20) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :is(
+    .v19-questionnaire-applicant-tab.is-active,
+    .v19-questionnaire-section-tab.is-active,
+    .v19-questionnaire-quick-option.is-selected,
+    .v19-questionnaire-passport-validity-option[aria-pressed="true"]
+  ) {
+  border-color: var(--v19b-color-primary-bright) !important;
+  background: var(--v19b-color-primary-soft-20) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow:
+    inset var(--v19b-size-3) 0 var(--v19b-size-0) var(--v19b-color-primary-bright),
+    0 0 0 var(--v19b-size-1) var(--v19b-color-primary-soft-10) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-dropdown-option.is-selected {
+  border-inline-start: var(--v19b-size-3) solid var(--v19b-color-primary-bright) !important;
+  background: var(--v19b-color-primary-soft-20) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-weight: var(--v19b-weight-control) !important;
 }
