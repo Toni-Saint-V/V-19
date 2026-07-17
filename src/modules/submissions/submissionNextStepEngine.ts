@@ -9,6 +9,7 @@ import {
   type IdentityConsistencyReport,
 } from "./identityConsistency";
 import { passportGateIssues } from "./passportExtractionGuards";
+import { requiredPassportReviewMediaSlots } from "./passportReviewContract";
 import {
   blockerCount,
   fixedIssueCount,
@@ -531,9 +532,16 @@ function readinessBlockers(
 }
 
 function mediaCounts(submission: Submission) {
+  const requiredFiles = requiredPassportReviewMediaSlots(submission).map((slot) =>
+    submission.files.find(
+      (file) => file.applicantId === slot.applicantId && file.type === slot.type,
+    ),
+  );
   return {
-    accepted: submission.files.filter((file) => file.status === "accepted").length,
-    required: submission.files.length,
-    uploaded: submission.files.filter((file) => file.status !== "missing").length,
+    accepted: requiredFiles.filter((file) => file?.status === "accepted").length,
+    required: requiredFiles.length,
+    uploaded: requiredFiles.filter(
+      (file) => file && file.status !== "missing" && file.status !== "needs_replacement",
+    ).length,
   };
 }

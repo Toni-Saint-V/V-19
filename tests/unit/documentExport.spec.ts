@@ -182,6 +182,42 @@ describe("document export ZIP builder", () => {
     );
   });
 
+  test("uses the explicit main role when the family order changes", async () => {
+    const source = byId("SUB-1102");
+    const primary = source.applicants.find((applicant) => applicant.role === "main");
+    const spouse = source.applicants.find((applicant) => applicant.role === "spouse");
+    const child = source.applicants.find((applicant) => applicant.role === "child");
+    if (!primary || !spouse || !child) throw new Error("Incomplete family fixture");
+
+    const submission: Submission = {
+      ...source,
+      applicants: [spouse, primary, child],
+    };
+    const result = await buildDocumentsZip({
+      assets: documentAssetsFor(submission),
+      downloadAsset: async (asset) =>
+        new Blob([asset.id], { type: asset.mime ?? "image/jpeg" }),
+      exportDate,
+      submissions: [submission],
+    });
+
+    const names = await zipFileNames(result.zip);
+    expect(result).toMatchObject({ applicantCount: 3, fileCount: 5 });
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011021_selfie_1.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011021_selfie_2.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011022_passport_scan.jpg",
+      ]),
+    );
+    expect(names).not.toEqual(
+      expect.arrayContaining([
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011022_selfie_1.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011022_selfie_2.jpg",
+      ]),
+    );
+  });
+
   test("fails closed before download when any applicant has no passport number", async () => {
     const source = byId("SUB-1102");
     const submission: Submission = {

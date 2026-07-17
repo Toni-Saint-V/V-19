@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AdminReviewDrawer } from "../../src/modules/submissions/components/AdminReviewDrawer";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { ADMIN_PASSPORT_REVIEW_FIELD_IDS } from "../../src/modules/submissions/passportReviewContract";
 import type { DrawerTab, IssueInput, Submission } from "../../src/modules/submissions/types";
 
 const aiMocks = vi.hoisted(() => ({
@@ -38,7 +39,6 @@ function renderDrawer({
   onAddIssue = vi.fn(),
   onAction = vi.fn(),
   onDismissAiSuggestion = vi.fn(),
-  onReviewFileAccept = vi.fn(),
   onRunAiReview = vi.fn(),
   onClose = vi.fn(),
   onVerifyDocument = vi.fn(),
@@ -49,7 +49,6 @@ function renderDrawer({
   onAcceptAiSuggestion?: (suggestionId: string) => void;
   onAddIssue?: (input: IssueInput) => void;
   onDismissAiSuggestion?: (suggestionId: string) => void;
-  onReviewFileAccept?: (input: { applicantId: string; fileType: string }) => void;
   onRunAiReview?: () => void;
   onClose?: () => void;
   onVerifyDocument?: (applicantId: string) => void;
@@ -60,7 +59,6 @@ function renderDrawer({
     onAction,
     onAddIssue,
     onDismissAiSuggestion,
-    onReviewFileAccept,
     onRunAiReview,
     onClose,
     onVerifyDocument,
@@ -76,7 +74,6 @@ function renderDrawer({
         onClose={onClose}
         onClearFocusTarget={() => undefined}
         onDismissAiSuggestion={onDismissAiSuggestion}
-        onReviewFileAccept={onReviewFileAccept}
         onRunAiReview={onRunAiReview}
         onTab={() => undefined}
         onVerifyDocument={onVerifyDocument}
@@ -142,17 +139,46 @@ describe("AdminReviewDrawer", () => {
     opener.remove();
   });
 
-  test("closes a remark composer before closing the review drawer", async () => {
+  test("owns remark focus, traps Tab, closes on Escape, and restores the trigger", async () => {
     const onClose = vi.fn();
-    renderDrawer({ activeTab: "issues", onClose });
+    const { container } = renderDrawer({ activeTab: "issues", onClose });
 
-    fireEvent.click(screen.getByRole("button", { name: "Добавить замечание" }));
-    expect(screen.getByRole("dialog", { name: "Новое замечание" })).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Добавить замечание" });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const remarkDialog = screen.getByRole("dialog", { name: "Новое замечание" });
+    const drawer = container.querySelector(".admin-review-drawer");
+    const closeRemark = within(remarkDialog).getByRole("button", {
+      name: "Закрыть форму замечания",
+    });
+    const submitRemark = within(remarkDialog).getByRole("button", {
+      name: "Отправить замечание",
+    });
+
+    await waitFor(() =>
+      expect(
+        within(remarkDialog).getByPlaceholderText("Что именно не так..."),
+      ).toHaveFocus(),
+    );
+    expect(drawer).toHaveAttribute("aria-hidden", "true");
+    expect(drawer).toHaveAttribute("inert");
+
+    closeRemark.focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(submitRemark).toHaveFocus();
+
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(closeRemark).toHaveFocus();
+
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Новое замечание" })).not.toBeInTheDocument(),
     );
     expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(drawer).not.toHaveAttribute("aria-hidden");
+    expect(drawer).not.toHaveAttribute("inert");
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -209,8 +235,10 @@ describe("AdminReviewDrawer", () => {
   test("jumps from an issue to its exact questionnaire field", async () => {
     const source = adminReviewSubmission();
     const applicant = source.applicants[0];
-    const section = applicant?.sections[0];
-    const field = section?.fields[0];
+    const section = applicant?.sections.find((candidate) =>
+      candidate.fields.some((field) => field.id === "passport-no"),
+    );
+    const field = section?.fields.find((candidate) => candidate.id === "passport-no");
     if (!applicant || !section || !field) throw new Error("Expected questionnaire fixture.");
     const submission: Submission = {
       ...source,
@@ -283,15 +311,165 @@ describe("AdminReviewDrawer", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: /^Заявители/ }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Паспорт" })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: "Паспорт и селфи" }),
+      ).toBeInTheDocument(),
     );
-    expect(screen.getByRole("button", { name: "Селфи" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Селфи" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: /^История/ }));
     await waitFor(() =>
       expect(screen.getByLabelText("История подачи")).toBeInTheDocument(),
     );
     expect(screen.getByText("Агент отправил подачу на проверку")).toBeInTheDocument();
+  });
+
+  test("shows only the eight scan-verifiable passport fields in legacy review tabs", async () => {
+    const { container } = renderDrawer();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Анкета/ }));
+    const questionnairePane = await screen.findByRole("region", {
+      name: "Поля анкеты",
+    });
+    expect(
+      questionnairePane.querySelectorAll(".admin-review-field-row"),
+    ).toHaveLength(8);
+    expect(questionnairePane).toHaveTextContent("Фамилия");
+    expect(questionnairePane).toHaveTextContent("Номер паспорта");
+    expect(questionnairePane).not.toHaveTextContent("Тип паспорта");
+    expect(questionnairePane).not.toHaveTextContent("Страна выдачи");
+    expect(container.querySelector(".admin-review-field-section")).toHaveTextContent(
+      "Паспортные данные",
+    );
+  });
+
+  test("reports the atomic admin approval state as eight of eight", async () => {
+    const source = adminReviewSubmission();
+    const approvedAtIso = "2026-07-17T09:00:00.000Z";
+    const submission: Submission = {
+      ...source,
+      issues: [],
+      applicants: source.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            ADMIN_PASSPORT_REVIEW_FIELD_IDS.some((fieldId) => fieldId === field.id)
+              ? {
+                  ...field,
+                  adminReviewApprovedAtIso: approvedAtIso,
+                  adminReviewApprovedBy: "admin-reviewer",
+                  value: field.value || "APPROVED",
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const { container } = renderDrawer({ activeTab: "questionnaire", submission });
+
+    expect(await screen.findByText("8 / 8 ok")).toBeInTheDocument();
+    expect(container.querySelectorAll(".admin-review-field-row.is-ok")).toHaveLength(8);
+    expect(screen.getByText("8 проверено")).toBeInTheDocument();
+    expect(screen.getByText("0 осталось")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Заявители/ }));
+    expect(await screen.findByText("8/8")).toBeInTheDocument();
+  });
+
+  test("keeps a legacy secondary selfie correction in the admin file review", () => {
+    const source = adminReviewSubmission();
+    const primary = source.applicants[0];
+    const primarySelfie = source.files.find((file) => file.type === "selfie");
+    if (!primary || !primarySelfie) throw new Error("Expected passport fixture.");
+    const secondary = {
+      ...primary,
+      fullName: "Ирина Волкова",
+      id: "з-1053-legacy-secondary",
+      role: "spouse" as const,
+    };
+    const legacySelfie = {
+      ...primarySelfie,
+      applicantId: secondary.id,
+      id: `${secondary.id}-selfie`,
+      linkedIssueId: "legacy-secondary-selfie-issue",
+      status: "pending_review" as const,
+    };
+    const submission: Submission = {
+      ...source,
+      applicants: [primary, secondary],
+      files: [...source.files, legacySelfie],
+      issues: [
+        {
+          comment: "Селфи заменено агентом.",
+          createdAt: "2026-07-17T03:00:00.000Z",
+          createdBy: "admin",
+          id: "legacy-secondary-selfie-issue",
+          reason: "Проверьте заменённое селфи",
+          severity: "warning",
+          status: "fixed_by_agent",
+          target: {
+            applicantId: secondary.id,
+            applicantName: secondary.fullName,
+            field: "Селфи 1",
+            fileType: "selfie",
+            section: "Файлы",
+          },
+          type: "file",
+        },
+      ],
+      status: "corrections_received",
+      type: "family",
+    };
+    const onVerifyDocument = vi.fn();
+
+    renderDrawer({ activeTab: "files", onVerifyDocument, submission });
+
+    const secondarySection = screen
+      .getByText("Ирина Волкова", { selector: ".v19-drawer-file-section-title" })
+      .closest(".v19-drawer-file-section");
+    const legacyTitle = secondarySection
+      ? within(secondarySection as HTMLElement).getByText("Селфи 1", {
+          selector: ".v19-drawer-file-title",
+        })
+      : undefined;
+    const legacyRow = legacyTitle?.closest(".admin-review-file-item");
+    if (!legacyRow) throw new Error("Legacy secondary selfie row was not rendered.");
+    expect(
+      within(legacyRow).queryByRole("button", {
+        name: "Создать замечание: Селфи 1",
+      }),
+    ).not.toBeInTheDocument();
+    expect(within(legacyRow).getByText("Только просмотр")).toBeInTheDocument();
+    fireEvent.click(within(legacyRow).getByRole("button", { name: "Проверить" }));
+    expect(onVerifyDocument).toHaveBeenCalledWith(secondary.id);
+  });
+
+  test("does not offer selfie remarks after selecting a secondary family applicant", () => {
+    const source = adminReviewSubmission();
+    const primary = source.applicants[0];
+    if (!primary) throw new Error("Expected primary applicant.");
+    const secondary = {
+      ...primary,
+      fullName: "Ирина Волкова",
+      id: "family-secondary-remark-target",
+      role: "spouse" as const,
+    };
+    const submission: Submission = {
+      ...source,
+      applicants: [primary, secondary],
+      type: "family",
+    };
+
+    renderDrawer({ activeTab: "issues", submission });
+    fireEvent.click(screen.getByRole("button", { name: "Добавить замечание" }));
+    fireEvent.change(screen.getByRole("combobox", { name: /Заявитель/ }), {
+      target: { value: secondary.id },
+    });
+
+    expect(screen.getByRole("button", { name: "Скан паспорта" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Селфи 1" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Селфи 2" })).not.toBeInTheDocument();
   });
 
   test("creates only canonical admin issue targets", () => {

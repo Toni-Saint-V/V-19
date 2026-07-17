@@ -72,6 +72,7 @@ Apply migrations only in the repository order declared by
 - `20260714190000_fix_complete_export_package_zip_suffix_guard.sql`
 - `20260714200000_harden_null_safe_admin_rpc_guards.sql`
 - `20260715000000_document_assets_source_media_id_update_cascade.sql`
+- `20260717050000_admin_passport_review_media_policy.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

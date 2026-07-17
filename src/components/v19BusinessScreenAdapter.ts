@@ -1,4 +1,5 @@
 import type { AgentNavSection } from '../integration/visaflowBusinessBridge';
+import { requiredPassportReviewMediaTypesForApplicant } from '../modules/submissions/passportReviewContract';
 import type { Issue, Submission, SubmissionAction, SubmissionFile, SubmissionStatus } from '../modules/submissions/types';
 import { canPerformAction, fixedIssueCount, nextProblem, openIssueCount, statusLabelFor } from '../modules/submissions/status';
 
@@ -172,9 +173,11 @@ export function documentCellsForSubmission(submission: Submission): LegacyDocume
     const key = `${issue.target.applicantId}:${issue.target.fileType ?? ''}`;
     issueByApplicantAndType.set(key, (issueByApplicantAndType.get(key) ?? 0) + 1);
   }
-  const slotOrder: SubmissionFile['type'][] = ['passport_scan', 'selfie', 'selfie_2'];
   for (const applicant of submission.applicants) {
-    for (const slot of slotOrder) {
+    for (const slot of requiredPassportReviewMediaTypesForApplicant(
+      submission,
+      applicant.id,
+    )) {
       const file = submission.files.find((item) => item.applicantId === applicant.id && item.type === slot);
       const key = `${applicant.id}:${slot}`;
       cells.push({

@@ -47,6 +47,7 @@ export const requiredMigrationOrder = [
   "20260714190000_fix_complete_export_package_zip_suffix_guard.sql",
   "20260714200000_harden_null_safe_admin_rpc_guards.sql",
   "20260715000000_document_assets_source_media_id_update_cascade.sql",
+  "20260717050000_admin_passport_review_media_policy.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -113,6 +114,7 @@ export const requiredRemoteMigrationOrder = [
   "20260714182809_20260714190000_fix_complete_export_package_zip_suffix_guard",
   "20260714191730_20260714200000_harden_null_safe_admin_rpc_guards",
   "20260715000000_document_assets_source_media_id_update_cascade",
+  "20260717050000_admin_passport_review_media_policy",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

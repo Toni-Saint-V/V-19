@@ -324,10 +324,17 @@ describe("AdminWorkspace production navigation", () => {
     if (!card) throw new Error("Review card was not rendered.");
     fireEvent.click(card);
     fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
+    const passportRow = (
+      await screen.findAllByText("Скан паспорта", {
+        selector: ".v19-drawer-file-title",
+      })
+    )[0]?.closest<HTMLElement>(".admin-review-file-item");
+    if (!passportRow) throw new Error("Passport review row was not rendered.");
+    fireEvent.click(within(passportRow).getByRole("button", { name: "Проверить" }));
     fireEvent.click(
-      (await screen.findAllByRole("button", {
-        name: /Создать замечание: Скан паспорта/,
-      }, { timeout: 5_000 }))[0]!,
+      await screen.findByRole("button", {
+        name: "Добавить замечание: Скан загранпаспорта",
+      }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Отправить замечание" }),
@@ -366,13 +373,20 @@ describe("AdminWorkspace production navigation", () => {
     if (!card) throw new Error("Production-like review card was not rendered.");
     fireEvent.click(card);
     fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
+    const passportRow = (
+      await screen.findAllByText("Скан паспорта", {
+        selector: ".v19-drawer-file-title",
+      })
+    )[0]?.closest<HTMLElement>(".admin-review-file-item");
+    if (!passportRow) throw new Error("Passport review row was not rendered.");
+    fireEvent.click(within(passportRow).getByRole("button", { name: "Проверить" }));
     fireEvent.click(
-      (await screen.findAllByRole("button", {
-        name: /Создать замечание: Скан паспорта/,
-      }, { timeout: 5_000 }))[0]!,
+      await screen.findByRole("button", {
+        name: "Добавить замечание: Скан загранпаспорта",
+      }),
     );
     fireEvent.change(
-      await screen.findByPlaceholderText("Конкретное действие для агента"),
+      await screen.findByPlaceholderText("Опишите, что именно нужно исправить..."),
       { target: { value: "Production lifecycle field correction" } },
     );
     fireEvent.click(
@@ -389,6 +403,7 @@ describe("AdminWorkspace production navigation", () => {
     expect(submission.issues[0]).toMatchObject({
       comment: "Production lifecycle field correction",
       status: "open",
+      target: { applicantId: submission.applicants[0]?.id },
     });
   });
 

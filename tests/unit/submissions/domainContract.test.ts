@@ -171,6 +171,74 @@ describe("Package 1 canonical domain contract", () => {
     ).toBe(false);
   });
 
+  test("requires selfies only for the primary applicant in a family", () => {
+    const family = {
+      applicants: [
+        { id: "family-main", role: "main" },
+        { id: "family-spouse", role: "spouse" },
+      ],
+      files: [
+        { applicantId: "family-main", status: "accepted", type: "passport_scan" },
+        { applicantId: "family-main", status: "accepted", type: "selfie" },
+        { applicantId: "family-main", status: "accepted", type: "selfie_2" },
+        {
+          applicantId: "family-spouse",
+          status: "accepted",
+          type: "passport_scan",
+        },
+      ],
+    };
+
+    expect(canonicalRequiredMediaReadiness(family, { requireAccepted: true })).toEqual({
+      data: true,
+      ok: true,
+    });
+    expect(
+      canonicalRequiredMediaReadiness(
+        {
+          ...family,
+          files: family.files.filter(
+            (file) =>
+              !(file.applicantId === "family-main" && file.type === "selfie_2"),
+          ),
+        },
+        { requireAccepted: true },
+      ),
+    ).toEqual({ ok: false, reason: "Missing selfie_2." });
+    expect(
+      canonicalRequiredMediaReadiness(
+        {
+          ...family,
+          files: family.files.filter(
+            (file) =>
+              !(
+                file.applicantId === "family-spouse" &&
+                file.type === "passport_scan"
+              ),
+          ),
+        },
+        { requireAccepted: true },
+      ),
+    ).toEqual({ ok: false, reason: "Missing passport_scan." });
+  });
+
+  test("creates only the required family media slots", () => {
+    const family = createDraftSubmission({
+      city: "Москва",
+      familyCount: 3,
+      submissions: [],
+      type: "family",
+    });
+
+    expect(family.files.map((file) => [file.applicantId, file.type])).toEqual([
+      [family.applicants[0]?.id, "passport_scan"],
+      [family.applicants[0]?.id, "selfie"],
+      [family.applicants[0]?.id, "selfie_2"],
+      [family.applicants[1]?.id, "passport_scan"],
+      [family.applicants[2]?.id, "passport_scan"],
+    ]);
+  });
+
   test("allows only open -> fixed_by_agent -> closed_by_admin issue lifecycle", () => {
     expect(isIssueTransitionAllowed(null, "open")).toBe(true);
     expect(isIssueTransitionAllowed("open", "fixed_by_agent")).toBe(true);

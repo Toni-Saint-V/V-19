@@ -2,6 +2,10 @@ import {
   completeQuestionnaire,
   updateQuestionnaireField,
 } from "../../../src/modules/submissions/submissionActions";
+import {
+  ADMIN_PASSPORT_REVIEW_FIELD_IDS,
+  requiredPassportReviewMediaSlots,
+} from "../../../src/modules/submissions/passportReviewContract";
 import type {
   QuestionnaireField,
   Submission,
@@ -128,6 +132,58 @@ export function adminApproveQuestionnaireForTest(
         ),
       })),
     })),
+  };
+}
+
+export function adminApprovePassportFieldsForTest(
+  submission: Submission,
+): Submission {
+  const passportFieldIds = new Set<string>(ADMIN_PASSPORT_REVIEW_FIELD_IDS);
+
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => ({
+          ...field,
+          adminReviewApprovedAtIso:
+            passportFieldIds.has(field.id) && field.value.trim() && !field.error
+              ? "2026-07-17T00:00:00.000Z"
+              : undefined,
+          adminReviewApprovedBy:
+            passportFieldIds.has(field.id) && field.value.trim() && !field.error
+              ? "admin-reviewer-test"
+              : undefined,
+        })),
+      })),
+    })),
+  };
+}
+
+export function adminAcceptRequiredMediaForTest(
+  submission: Submission,
+): Submission {
+  const requiredKeys = new Set(
+    requiredPassportReviewMediaSlots(submission).map(
+      (slot) => `${slot.applicantId}:${slot.type}`,
+    ),
+  );
+
+  return {
+    ...submission,
+    files: submission.files.map((file) =>
+      requiredKeys.has(`${file.applicantId}:${file.type}`)
+        ? {
+            ...file,
+            status: "accepted" as const,
+            reviewStatus: "accepted" as const,
+            reviewedAtIso: "2026-07-17T00:00:00.000Z",
+            reviewedBy: "admin-reviewer-test",
+          }
+        : file,
+    ),
   };
 }
 

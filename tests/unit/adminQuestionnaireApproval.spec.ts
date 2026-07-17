@@ -7,8 +7,9 @@ import {
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
 import { adminQuestionnaireReviewReadiness } from "../../src/modules/submissions/status";
+import { ADMIN_PASSPORT_REVIEW_FIELD_IDS } from "../../src/modules/submissions/passportReviewContract";
 import {
-  adminApproveQuestionnaireForTest,
+  adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
@@ -164,9 +165,11 @@ describe("admin questionnaire field approval", () => {
     });
   });
 
-  test("fails closed until every populated questionnaire field is approved", () => {
-    const { field, submission } = reviewFixture();
-    const approved = adminApproveQuestionnaireForTest(submission);
+  test("fails closed until every passport-backed field is approved", () => {
+    const { submission } = reviewFixture();
+    const approved = adminApprovePassportFieldsForTest(
+      fillRequiredQuestionnaireForTest(submission),
+    );
     const pending = {
       ...approved,
       applicants: approved.applicants.map((applicant) => ({
@@ -174,7 +177,7 @@ describe("admin questionnaire field approval", () => {
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: section.fields.map((candidate) =>
-            candidate.id === field.id
+            candidate.id === "surname"
               ? {
                   ...candidate,
                   adminReviewApprovedAtIso: undefined,
@@ -188,12 +191,21 @@ describe("admin questionnaire field approval", () => {
 
     expect(adminQuestionnaireReviewReadiness(pending)).toEqual({
       ok: false,
-      reason: "Подтвердите заполненные поля анкеты перед принятием",
+      reason: "Подтвердите паспортные поля перед принятием",
     });
     expect(adminQuestionnaireReviewReadiness(approved)).toEqual({ ok: true });
+
+    const approvedFieldIds = approved.applicants[0]?.sections
+      .flatMap((section) => section.fields)
+      .filter((field) => field.adminReviewApprovedAtIso)
+      .map((field) => field.id);
+    expect(approvedFieldIds).toEqual(
+      expect.arrayContaining([...ADMIN_PASSPORT_REVIEW_FIELD_IDS]),
+    );
+    expect(approvedFieldIds).toHaveLength(ADMIN_PASSPORT_REVIEW_FIELD_IDS.length);
   });
 
-  test("ignores stale errors on blank child employer fields but reviews populated values", () => {
+  test("ignores admin approvals for populated non-passport fields", () => {
     let submission = fillRequiredQuestionnaireForTest(
       createDraftSubmission({
         city: "Москва",
@@ -244,7 +256,7 @@ describe("admin questionnaire field approval", () => {
             },
       ),
     };
-    const approved = adminApproveQuestionnaireForTest(withBlankEmployerErrors);
+    const approved = adminApprovePassportFieldsForTest(withBlankEmployerErrors);
 
     expect(adminQuestionnaireReviewReadiness(approved)).toEqual({ ok: true });
 
@@ -254,21 +266,7 @@ describe("admin questionnaire field approval", () => {
       sectionId: workSection.id,
       value: "SCHOOL",
     });
-    expect(adminQuestionnaireReviewReadiness(populatedEmployer)).toEqual({
-      ok: false,
-      reason: "Подтвердите заполненные поля анкеты перед принятием",
-    });
-
-    const employerApproved = approveQuestionnaireFieldForAdmin(
-      populatedEmployer,
-      {
-        applicantId: child.id,
-        fieldId: "employer-name",
-        sectionId: workSection.id,
-      },
-      "admin-reviewer",
-    );
-    expect(adminQuestionnaireReviewReadiness(employerApproved)).toEqual({ ok: true });
+    expect(adminQuestionnaireReviewReadiness(populatedEmployer)).toEqual({ ok: true });
   });
 
   test("revokes an existing approval when admin adds a field remark", () => {

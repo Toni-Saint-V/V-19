@@ -312,6 +312,15 @@ export function acceptSubmission(
       questionnaireReview.reason ?? "Questionnaire review must be complete.",
     );
   }
+  const mediaReview = canonicalRequiredMediaReadiness(submission, {
+    requireAccepted: true,
+  });
+  if (!mediaReview.ok) {
+    return failure(
+      "VALIDATION_ERROR",
+      mediaReview.reason ?? "Required media must be accepted before acceptance.",
+    );
+  }
   if (!hasUsableTripDateRange(submission)) {
     return failure("VALIDATION_ERROR", "Trip dates must be complete.");
   }
@@ -320,11 +329,6 @@ export function acceptSubmission(
     withDerivedState({
       ...submission,
       exportState: "ready",
-      files: submission.files.map((file) =>
-        file.status === "uploaded" || file.status === "pending_review"
-          ? { ...file, status: "accepted", reviewStatus: "accepted" }
-          : file,
-      ),
     }),
     {
       actorRole: role,

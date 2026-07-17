@@ -264,7 +264,7 @@ export function AdminWorkspace({
   const reviewDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
-  const adminFileAcceptPendingRef = useRef(false);
+  const adminPassportSectionApprovalPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
   const pendingAccessRequestCount = accessRequests.filter(
     (request) => request.status === "pending",
@@ -511,33 +511,35 @@ export function AdminWorkspace({
     }
   };
 
-  const handleReviewFileAccept = async (input: {
+  const handlePassportSectionApprove = async (input: {
     applicantId: string;
-    fileType: SubmissionFileType;
   }): Promise<boolean> => {
-    if (!selectedRow || adminFileAcceptPendingRef.current) return false;
+    if (!selectedRow || adminPassportSectionApprovalPendingRef.current) return false;
     const payload = { submissionId: selectedRow, ...input };
     setAdminAsyncError("");
 
-    if (!bridge.onAdminFileAccept) {
+    if (!bridge.onAdminPassportSectionApprove) {
       setAdminAsyncError(
-        "Подтверждение файла недоступно: обработчик сохранения не подключён. Состояние подачи не изменено.",
+        "Подтверждение паспортной секции недоступно: обработчик сохранения не подключён. Состояние подачи не изменено.",
       );
       return false;
     }
 
-    adminFileAcceptPendingRef.current = true;
+    adminPassportSectionApprovalPendingRef.current = true;
     try {
-      await bridge.onAdminFileAccept(payload);
-      emitVisaflowUiEvent(bridge, { type: "admin.file.accept", payload });
+      await bridge.onAdminPassportSectionApprove(payload);
+      emitVisaflowUiEvent(bridge, {
+        type: "admin.passport-section.approve",
+        payload,
+      });
       return true;
     } catch {
       setAdminAsyncError(
-        "Не удалось подтвердить файл. Состояние подачи не изменено. Повторите попытку.",
+        "Не удалось подтвердить паспортную секцию. Состояние подачи не изменено. Повторите попытку.",
       );
       return false;
     } finally {
-      adminFileAcceptPendingRef.current = false;
+      adminPassportSectionApprovalPendingRef.current = false;
     }
   };
 
@@ -809,8 +811,9 @@ export function AdminWorkspace({
           applicantId={reviewApplicantId}
           submissionId={selectedRow}
           submission={selectedSubmission}
+          nestedDialogOpen={remarkFormOpen}
           onBack={handleBackToDrawer}
-          onAcceptFile={handleReviewFileAccept}
+          onApproveSection={handlePassportSectionApprove}
           onAddRemark={(field, applicant, fileType, applicantId) =>
             handleOpenRemark(field, applicant, fileType, applicantId)
           }
@@ -838,7 +841,6 @@ export function AdminWorkspace({
           onDismissAiSuggestion={(suggestionId) =>
             void handleAdminAiSuggestion("dismiss", suggestionId)
           }
-          onReviewFileAccept={(input) => void handleReviewFileAccept(input)}
           onRunAiReview={() => void handleAdminAiReview()}
           onTab={setAdminDrawerTab}
           onVerifyDocument={(applicantId) => handleVerifyDocument(applicantId)}

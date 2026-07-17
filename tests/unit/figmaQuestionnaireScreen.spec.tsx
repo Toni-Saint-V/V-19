@@ -1967,6 +1967,63 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onOpenDocuments).toHaveBeenCalledWith("error");
   });
 
+  test("does not require a secondary family selfie in questionnaire document routing", () => {
+    const ready = withReadyQuestionnaireFiles(
+      fillEveryQuestionnaireField(
+        createDraftSubmission({
+          applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
+          city: "Москва",
+          familyCount: 2,
+          idScheme: "local",
+          submissions: [],
+          type: "family",
+        }),
+      ),
+    );
+    const primary = ready.applicants[0];
+    const secondary = ready.applicants[1];
+    const primarySelfie = ready.files.find(
+      (file) => file.applicantId === primary?.id && file.type === "selfie",
+    );
+    if (!primary || !secondary || !primarySelfie) {
+      throw new Error("expected primary, secondary, and primary selfie");
+    }
+    const legacySecondarySelfie = {
+      ...primarySelfie,
+      applicantId: secondary.id,
+      id: `${secondary.id}-legacy-selfie`,
+      status: "missing" as const,
+      uploadStatus: "none" as const,
+    };
+    const submission: Submission = {
+      ...ready,
+      files: [
+        ...ready.files.filter(
+          (file) => !(file.applicantId === secondary.id && file.type === "selfie"),
+        ),
+        legacySecondarySelfie,
+      ],
+    };
+    const onOpenDocuments = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onOpenDocuments={onOpenDocuments}
+        submission={submission}
+      />,
+    );
+
+    const blocker = screen.getByRole("button", { name: "Блокер" });
+    expect(blocker).toBeEnabled();
+    expect(screen.getByTestId("questionnaire-next-blocker")).not.toHaveAccessibleName(
+      /Селфи 1/,
+    );
+    fireEvent.click(blocker);
+    expect(onOpenDocuments).not.toHaveBeenCalled();
+    expect(pinnedSectionTitles(result.container)).not.toContain("Файлы");
+  });
+
   test("resolves an open issue through the full field binding catalog", async () => {
     const submission = withQuestionnaireIssue(
       withReadyQuestionnaireFiles(

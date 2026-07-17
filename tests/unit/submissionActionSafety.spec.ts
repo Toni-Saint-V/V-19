@@ -19,7 +19,8 @@ import {
 } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
 import {
-  adminApproveQuestionnaireForTest,
+  adminAcceptRequiredMediaForTest,
+  adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
@@ -33,7 +34,7 @@ function reviewReadySubmission(): Submission {
     type: "single",
   });
 
-  return adminApproveQuestionnaireForTest({
+  return adminApprovePassportFieldsForTest({
     ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
     status: "in_progress",
     tripDateFrom: "2026-07-10",
@@ -265,7 +266,11 @@ describe("submission action safety", () => {
       "submit_for_review",
       "agent",
     );
-    const accepted = applySubmissionAction(submitted, "accept", "admin");
+    const accepted = applySubmissionAction(
+      adminAcceptRequiredMediaForTest(submitted),
+      "accept",
+      "admin",
+    );
 
     expect(accepted).toMatchObject({
       exportState: "ready",
@@ -369,7 +374,7 @@ describe("submission action safety", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Есть незаполненные поля или недостающие файлы",
+        message: "Подтвердите обязательные файлы перед принятием",
       },
     });
   });

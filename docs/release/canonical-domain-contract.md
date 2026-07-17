@@ -222,9 +222,9 @@ A Package 1 submission is review-submittable only when every applicant has exact
 | Required artifact | Canonical domain key | Required for review | Required for export | Notes |
 |---|---|---:|---:|---|
 | Questionnaire | `questionnaire` | Yes | Yes | All required canonical fields must be complete and valid. |
-| Passport scan | `passport_scan` | Yes | Yes | Passport identity page scan/photo. |
-| Selfie, straight/front | `selfie` | Yes | Yes | Front-facing selfie. |
-| Selfie, side/profile | `selfie_2` | Yes | Yes | Side/profile selfie. Not video. |
+| Passport scan | `passport_scan` | Yes | Yes | Required for every applicant. Passport identity page scan/photo. |
+| Selfie, straight/front | `selfie` | Conditional | Conditional | Required only for a single applicant or the primary applicant of a family. |
+| Selfie, side/profile | `selfie_2` | Conditional | Conditional | Required only for a single applicant or the primary applicant of a family. Not video. |
 
 There is no Package 1 requirement for a white-background photo.
 
@@ -236,9 +236,9 @@ The canonical frontend media types for Package 1 are exactly:
 
 | Canonical frontend type | Semantic meaning | Required |
 |---|---|---:|
-| `passport_scan` | Passport scan | Yes |
-| `selfie` | Straight/front selfie | Yes |
-| `selfie_2` | Side/profile selfie | Yes |
+| `passport_scan` | Passport scan | Yes, every applicant |
+| `selfie` | Straight/front selfie | Yes, single/primary family applicant only |
+| `selfie_2` | Side/profile selfie | Yes, single/primary family applicant only |
 
 The following values are not canonical frontend media types for Package 1:
 
@@ -251,8 +251,9 @@ The following values are not canonical frontend media types for Package 1:
 For each applicant, required media passes readiness only when all of the following are true:
 
 - `passport_scan` exists for the same applicant;
-- `selfie` exists for the same applicant;
-- `selfie_2` exists for the same applicant;
+- for a single applicant or the primary applicant of a family, `selfie` and `selfie_2` exist for the same applicant;
+- for a secondary family applicant, no selfie slot is required;
+- primary family applicant means the first applicant with role `main`, falling back to the first applicant when legacy data has no `main` role;
 - none of the required media slots is `missing`;
 - none of the required media slots is `needs_replacement`;
 - no required media slot is represented by `photo`, `photo_white`, `video`, or any unknown legacy alias;
@@ -315,7 +316,7 @@ Every status-changing command must enforce these guards before mutation:
 | Exact `from` match | Stored status must match the transition `from` status. |
 | Canonical target status | Target status must be canonical. |
 | Export terminality | `exported` cannot transition to any mutable state. |
-| Required package | Questionnaire + `passport_scan` + `selfie` + `selfie_2` must satisfy the guard for the target state. |
+| Required package | Questionnaire + `passport_scan` for every applicant, plus `selfie` + `selfie_2` for a single/primary family applicant, must satisfy the guard for the target state. |
 | Issue consistency | Open/fixed/closed issues must obey the issue lifecycle. |
 | Media consistency | `photo`, `photo_white`, `video`, and unknown media types fail at the canonical boundary. |
 | Atomic command | Failed command must not mutate status, issues, media, questionnaire, export metadata, or history. |
@@ -330,7 +331,7 @@ The following table is the complete Package 1 status transition matrix.
 |---|---|---|---|---|---|
 | T0 | Create submission draft | `agent` | none | `draft` | Agent is known; ownership is assigned; initial status is canonical; no legacy status/media value is written. |
 | T1 | Save/start progress | `agent` | `draft` | `in_progress` | Agent owns the submission; at least one applicant exists; questionnaire/media may be incomplete; no admin issue exists yet. |
-| T2 | Submit for review | `agent` | `in_progress` | `submitted_for_review` | Agent owns the submission; every applicant has complete questionnaire + `passport_scan` + `selfie` + `selfie_2`; no required media is missing/rejected; no `photo`, `photo_white`, `video`, or unknown media value exists in the canonical package; no unresolved issue exists; passport extraction/review gates pass if active. |
+| T2 | Submit for review | `agent` | `in_progress` | `submitted_for_review` | Agent owns the submission; every applicant has a complete questionnaire and `passport_scan`; only a single/primary family applicant additionally requires `selfie` + `selfie_2`; no required media is missing/rejected; no `photo`, `photo_white`, `video`, or unknown media value exists in the canonical package; no unresolved issue exists; passport extraction/review gates pass if active. |
 | T3 | Return with issues | `admin` | `submitted_for_review` | `returned` | Admin is known; at least one valid `open` issue exists; each issue target points to an applicant/questionnaire field/section/media slot in the canonical package; no issue is closed directly from `open`; no export metadata is committed. |
 | T4 | Accept first review | `admin` | `submitted_for_review` | `ready_for_export` | Admin is known; no `open` issue exists; no `fixed_by_agent` issue exists; every applicant package is complete; required media has passed admin acceptance/export-readiness validation; export readiness is initialized but export is not yet completed. |
 | T5 | Submit corrections | `agent` | `returned` | `corrections_received` | Agent owns the submission; at least one `open` issue exists; every `open` issue has a concrete correction; corrected issues move to `fixed_by_agent`; questionnaire/media package remains complete; no closed issue is reopened; no forbidden media value is introduced. |
@@ -470,7 +471,7 @@ Admin must not:
 |---|---|---|
 | Normalize legacy status | Boundary/import/read adapter | Applies Section 3 mapping before canonical logic. |
 | Reject unknown role/status/media | All commands | Fails closed without mutation. |
-| Calculate readiness | Canonical submissions stack | Derives readiness from questionnaire + `passport_scan` + `selfie` + `selfie_2` + issue lifecycle. |
+| Calculate readiness | Canonical submissions stack | Derives readiness from questionnaire + per-applicant `passport_scan` + single/primary `selfie` + `selfie_2` + issue lifecycle. |
 | Preserve history/audit metadata | Successful commands only | Records canonical history after successful mutation. |
 | Prepare export metadata | `ready_for_export` only | Status-preserving; requires package identity/idempotency checks. |
 | Complete export commit | Admin-authorized export only | Writes `exported_at` and moves `ready_for_export -> exported` atomically. |
@@ -511,8 +512,8 @@ Package 1 must fail closed under these conditions:
 | Missing questionnaire | Reject submit/review/export command; no mutation. |
 | Incomplete questionnaire | Reject submit/review/export command; no mutation. |
 | Missing `passport_scan` | Reject submit/review/export command; no mutation. |
-| Missing `selfie` | Reject submit/review/export command; no mutation. |
-| Missing `selfie_2` | Reject submit/review/export command; no mutation. |
+| Missing required `selfie` for single/primary applicant | Reject submit/review/export command; no mutation. |
+| Missing required `selfie_2` for single/primary applicant | Reject submit/review/export command; no mutation. |
 | `photo` present as required media | Reject canonical readiness; no mutation. |
 | `photo_white` present as required media | Reject canonical readiness; no mutation. |
 | `video` present as required media | Reject canonical readiness; no mutation. |
@@ -573,7 +574,7 @@ No canonical write may emit:
 - [ ] `src/types/domain.ts`, `src/lib/workflow.ts`, and `src/services/submissionService.ts` are declared non-canonical legacy/archive/adapter stack.
 - [ ] Canonical statuses are exactly `draft`, `in_progress`, `submitted_for_review`, `returned`, `corrections_received`, `ready_for_export`, `exported`.
 - [ ] Legacy status mapping is specified, including `exported_at` guard for `sent_to_appointment`, `appointment_scheduled`, and `completed`.
-- [ ] Required Package 1 submission package is exactly questionnaire + `passport_scan` + `selfie` + `selfie_2` per applicant.
+- [ ] Required Package 1 submission package is questionnaire + `passport_scan` per applicant, plus `selfie` + `selfie_2` only for a single/primary family applicant.
 - [ ] `selfie` is defined as straight/front selfie.
 - [ ] `selfie_2` is defined as side/profile selfie.
 - [ ] White-background photo is not required and not canonical.

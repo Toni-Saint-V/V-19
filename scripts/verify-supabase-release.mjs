@@ -26,6 +26,14 @@ const productionWorkflowSmokePath = resolve(
   repoRoot,
   "scripts/verify-supabase-production-workflow.mjs",
 );
+const productionCohortReconcilePath = resolve(
+  repoRoot,
+  "scripts/reconcile-production-cohort.mjs",
+);
+const pilotVolumeEnvelopePath = resolve(
+  repoRoot,
+  "scripts/verify-pilot-volume-envelope.mjs",
+);
 const packagePath = resolve(repoRoot, "package.json");
 const smokeEnvPath = resolve(repoRoot, ".env.supabase-smoke.local");
 const allowedSandboxProjectId = "oevvaowoklqttqkraxho";
@@ -325,6 +333,117 @@ function verifyWorkspaceMediaSlotContract() {
   );
 }
 
+function verifyAdminPassportReviewMediaPolicy() {
+  const migration = readProjectFile(
+    resolve(
+      migrationsDir,
+      "20260717050000_admin_passport_review_media_policy.sql",
+    ),
+    "Admin passport review media-policy migration exists",
+  );
+
+  for (const [expected, label] of [
+    [
+      "create or replace function app_private.primary_applicant_id(target_submission_id text)",
+      "Admin passport policy resolves the normalized primary applicant",
+    ],
+    [
+      "create or replace function app_private.cockpit_primary_applicant_id(snapshot jsonb)",
+      "Admin passport policy resolves the cockpit primary applicant",
+    ],
+    [
+      "applicant.role in ('main', 'Основной заявитель')",
+      "Admin passport policy recognizes the persisted primary-applicant role",
+    ],
+    [
+      "A submission must have one unambiguous primary applicant before review",
+      "Review readiness rejects an ambiguous primary applicant",
+    ],
+    [
+      "Cockpit export requires one unambiguous primary applicant",
+      "Cockpit export rejects an ambiguous primary applicant",
+    ],
+    [
+      "Export requires one unambiguous primary applicant",
+      "Normalized export rejects an ambiguous primary applicant",
+    ],
+    [
+      "required_media.type = 'passport_scan'::public.media_slot_type",
+      "Review readiness requires passport_scan for every applicant",
+    ],
+    [
+      "or a.id = app_private.primary_applicant_id(new.id)",
+      "Review readiness limits selfies to the primary applicant",
+    ],
+    [
+      "file.value ->> 'type' = 'passport_scan'",
+      "Cockpit export requires passport_scan for every applicant",
+    ],
+    [
+      "or applicant.value ->> 'id' = app_private.cockpit_primary_applicant_id(cockpit.snapshot)",
+      "Cockpit export limits selfies to the primary applicant",
+    ],
+    [
+      "m.type = 'passport_scan'",
+      "Normalized export requires passport_scan for every applicant",
+    ],
+    [
+      "or a.id = app_private.primary_applicant_id(a.submission_id)",
+      "Normalized export limits selfies to the primary applicant",
+    ],
+    [
+      "issue.value ->> 'status' in ('open', 'fixed_by_agent')",
+      "Cockpit export remains blocked while an issue awaits admin closure",
+    ],
+    [
+      "status in ('open', 'fixed')",
+      "Normalized export remains blocked while a correction awaits admin closure",
+    ],
+    [
+      "Requires passport_scan for every applicant and both selfies only for the single/primary applicant.",
+      "Migration documents the exact passport and selfie policy",
+    ],
+    [
+      "coalesce(array_length(expected_document_asset_ids, 1), 0) <> expected_applicant_count + (coalesce(array_length(submission_ids, 1), 0) * 2)",
+      "Document export wrapper enforces one passport per applicant plus two primary selfies per submission",
+    ],
+    [
+      "asset.applicant_id = app_private.primary_applicant_id(asset.submission_id)",
+      "Document export wrapper limits selfie assets to the primary applicant",
+    ],
+    [
+      "if actor_role is distinct from 'admin' then",
+      "Replaced export core keeps a null-safe admin guard",
+    ],
+    [
+      "safe_admin_guard constant text",
+      "Wrapper migration names the required null-safe admin guard",
+    ],
+    [
+      "position(unsafe_admin_guard in function_definition) > 0",
+      "Wrapper migration rejects a null-unsafe or missing admin guard",
+    ],
+  ]) {
+    expectContains(migration, expected, label);
+  }
+
+  expectContains(
+    migration,
+    "revoke all on function app_private.primary_applicant_id(text) from public, anon, authenticated;",
+    "Normalized primary-applicant helper is not directly client-executable",
+  );
+  expectContains(
+    migration,
+    "revoke all on function app_private.cockpit_primary_applicant_id(jsonb) from public, anon, authenticated;",
+    "Cockpit primary-applicant helper is not directly client-executable",
+  );
+  expectNotContains(
+    migration,
+    "if actor_role <> 'admin' then",
+    "Passport media policy does not restore a null-unsafe admin guard",
+  );
+}
+
 function verifyReturnedPdfHandoffContract() {
   const returnedPdfStoragePolicies = readProjectFile(
     resolve(migrationsDir, "20260627001000_returned_pdf_storage_policies.sql"),
@@ -481,6 +600,14 @@ function verifySmokeGuard() {
     productionWorkflowSmokePath,
     "Supabase production workflow smoke exists",
   );
+  const productionCohortReconcile = readProjectFile(
+    productionCohortReconcilePath,
+    "Supabase production cohort reconciliation exists",
+  );
+  const pilotVolumeEnvelope = readProjectFile(
+    pilotVolumeEnvelopePath,
+    "Supabase pilot volume envelope exists",
+  );
 
   expectContains(
     liveSmoke,
@@ -633,6 +760,66 @@ function verifySmokeGuard() {
     productionWorkflowSmoke,
     "selfie_2",
     "Production workflow smoke uses canonical selfie_2 media",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "expected 5 family required media rows",
+    "Production workflow smoke enforces the five-slot family media policy",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "family submission reaches review with passports for all applicants and selfies for primary",
+    "Production workflow smoke proves reduced family media reaches review",
+  );
+  expectContains(
+    productionCohortReconcile,
+    "const expectedAssetCount = expected.applicantCount + 2",
+    "Production cohort reconciliation uses passports per applicant plus two primary selfies",
+  );
+  expectContains(
+    productionCohortReconcile,
+    '"id,submission_id,role,birth_date,email,passport_number,phone"',
+    "Production cohort reconciliation reads the persisted applicant role",
+  );
+  expectContains(
+    productionCohortReconcile,
+    'row.role === "main" || row.role === "Основной заявитель"',
+    "Production cohort reconciliation resolves primary identity from persisted role",
+  );
+  expectContains(
+    productionCohortReconcile,
+    "primaryApplicants.length === 1",
+    "Production cohort reconciliation requires one explicit primary applicant",
+  );
+  expectContains(
+    productionCohortReconcile,
+    "const isPrimaryApplicant = applicantId === primaryApplicantId",
+    "Production cohort reconciliation applies media policy by primary identity",
+  );
+  expectContains(
+    productionCohortReconcile,
+    '? ["passport_scan", "selfie", "selfie_2"]\n      : ["passport_scan"]',
+    "Production cohort reconciliation requires primary selfies but secondary passports only",
+  );
+  expectContains(
+    productionCohortReconcile,
+    '? ["passport_scan", "selfie_1", "selfie_2"]\n      : ["passport_scan"]',
+    "Production cohort reconciliation projects primary selfie documents but secondary passports only",
+  );
+  expectContains(
+    productionCohortReconcile,
+    "mediaTypes.selfie === 1",
+    "Production cohort reconciliation requires one primary selfie pair",
+  );
+  expectContains(
+    pilotVolumeEnvelope,
+    "maxTotalApplicants + maxTotalSubmissions * 2",
+    "Pilot volume envelope uses the variable family media policy",
+  );
+  expectContains(
+    pilotVolumeEnvelope,
+    "applicantIndex === 1",
+    "Pilot volume envelope gives selfies only to the primary applicant",
   );
   expectNotContains(
     productionWorkflowSmoke,
@@ -962,6 +1149,7 @@ function report() {
 verifyMigrationOrder();
 verifyRuntimeGuards();
 verifyWorkspaceMediaSlotContract();
+verifyAdminPassportReviewMediaPolicy();
 verifyReturnedPdfHandoffContract();
 verifyAiHelperSecurityHardening();
 verifySmokeGuard();

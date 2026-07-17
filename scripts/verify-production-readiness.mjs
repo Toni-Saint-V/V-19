@@ -66,6 +66,8 @@ const remoteMigrationNameOverrides = {
     "20260714182809_20260714190000_fix_complete_export_package_zip_suffix_guard",
   "20260714200000_harden_null_safe_admin_rpc_guards.sql":
     "20260714191730_20260714200000_harden_null_safe_admin_rpc_guards",
+  "20260717050000_admin_passport_review_media_policy.sql":
+    "20260717050000_admin_passport_review_media_policy",
 };
 
 const scopedDiffPaths = [
@@ -91,6 +93,7 @@ const scopedDiffPaths = [
   "supabase/migrations/20260714190000_fix_complete_export_package_zip_suffix_guard.sql",
   "supabase/migrations/20260714200000_harden_null_safe_admin_rpc_guards.sql",
   "supabase/migrations/20260715000000_document_assets_source_media_id_update_cascade.sql",
+  "supabase/migrations/20260717050000_admin_passport_review_media_policy.sql",
   "src/modules/submissions/exportPackageDocumentCommit.ts",
   "src/modules/submissions/exportPackagePersistence.ts",
   "src/modules/submissions/exportWorkflow.ts",
@@ -1445,9 +1448,19 @@ function verifyControlledPilotEnvelope(packet) {
     "Controlled pilot has 1500 total applicants",
   );
   requireActivationIntegerEqual(
+    pilot.primaryApplicantRequiredMediaSlots,
+    3,
+    "Controlled pilot requires 3 media objects for each primary applicant",
+  );
+  requireActivationIntegerEqual(
+    pilot.secondaryApplicantRequiredMediaSlots,
+    1,
+    "Controlled pilot requires 1 media object for each secondary applicant",
+  );
+  requireActivationIntegerEqual(
     pilot.maxRequiredMediaObjects,
-    4500,
-    "Controlled pilot has 4500 required media objects",
+    2500,
+    "Controlled pilot has 2500 required media objects",
   );
   requireActivationPresent(
     pilot.pilotWindowStartedAt,
@@ -1473,7 +1486,7 @@ function verifyControlledPilotEnvelope(packet) {
   );
   requireEvidenceSnippet(
     pilot.workloadEvidenceArtifact,
-    "Max required media objects: `4500`",
+    "Max required media objects: `2500`",
     "Controlled pilot volume evidence records required media objects",
   );
   requireEvidenceSnippet(

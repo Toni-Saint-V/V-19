@@ -80,10 +80,13 @@ describe("Supabase security contract", () => {
     expect(authService).not.toContain(".signUp(");
   });
 
-  test("uses the active admin UUID for file-review persistence", () => {
+  test("uses the active admin UUID for atomic passport-section persistence", () => {
     const app = readProjectFile("src/App.tsx");
 
-    expect(app).toContain("reviewedBy: activeApprovedSession.userId");
+    expect(app).toContain("approvePassportReviewSectionForAdmin(");
+    expect(app).toContain("activeApprovedSession.userId");
+    expect(app).not.toContain("onAdminFileAccept");
+    expect(app).not.toContain("markSubmissionFileAccepted");
     expect(app).not.toContain("reviewedBy: 'local-admin'");
   });
 
@@ -529,6 +532,41 @@ describe("Supabase security contract", () => {
     );
     expect(migration).toContain(
       "revoke all on function public.complete_export_package(jsonb) from authenticated",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.complete_export_package(jsonb) to authenticated",
+    );
+  });
+
+  test("replaces fixed document counts with the primary and secondary passport policy", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260717050000_admin_passport_review_media_policy.sql",
+    );
+
+    expect(migration).toContain("if actor_role is distinct from 'admin' then");
+    expect(migration).not.toContain("if actor_role <> 'admin' then");
+    expect(migration).toContain(
+      "coalesce(array_length(expected_document_asset_ids, 1), 0) <> expected_applicant_count + (coalesce(array_length(submission_ids, 1), 0) * 2)",
+    );
+    expect(migration).toContain(
+      "asset.applicant_id = app_private.primary_applicant_id(asset.submission_id)",
+    );
+    expect(migration).toContain(
+      "issue.value ->> 'status' in ('open', 'fixed_by_agent')",
+    );
+    expect(migration).toContain("status in ('open', 'fixed')");
+    expect(migration).toContain("safe_admin_guard constant text");
+    expect(migration).toContain(
+      "position(unsafe_admin_guard in function_definition) > 0",
+    );
+    expect(migration).toContain(
+      "Deployed complete_export_package wrapper does not have the reviewed null-safe admin guard",
+    );
+    expect(migration).toContain(
+      "Export document assets must exactly match the primary/secondary passport media policy",
+    );
+    expect(migration).toContain(
+      "revoke all on function public.complete_export_package(jsonb) from public, anon, authenticated",
     );
     expect(migration).toContain(
       "grant execute on function public.complete_export_package(jsonb) to authenticated",
@@ -1531,6 +1569,44 @@ describe("Supabase security contract", () => {
     );
     expect(migrationContract).toContain(
       "20260715000000_document_assets_source_media_id_update_cascade.sql",
+    );
+  });
+
+  test("requires passports for every applicant and selfies only for the primary applicant", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260717050000_admin_passport_review_media_policy.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const sql = normalizeSql(migration);
+
+    for (const expected of [
+      "create or replace function app_private.primary_applicant_id(target_submission_id text)",
+      "create or replace function app_private.cockpit_primary_applicant_id(snapshot jsonb)",
+      "applicant.role in ('main', 'Основной заявитель')",
+      "when count(*) filter ( where applicant.role in ('main', 'Основной заявитель') ) > 1 then null",
+      "when count(*) filter ( where applicant.value ->> 'role' in ('main', 'Основной заявитель') ) > 1 then null",
+      "A submission must have one unambiguous primary applicant before review",
+      "Cockpit export requires one unambiguous primary applicant",
+      "Export requires one unambiguous primary applicant",
+      "required_media.type = 'passport_scan'::public.media_slot_type or a.id = app_private.primary_applicant_id(new.id)",
+      "file.value ->> 'type' = 'passport_scan' or applicant.value ->> 'id' = app_private.cockpit_primary_applicant_id(cockpit.snapshot)",
+      "m.type = 'passport_scan' or a.id = app_private.primary_applicant_id(a.submission_id)",
+      "when applicant.value ->> 'id' = app_private.cockpit_primary_applicant_id(cockpit.snapshot) then 3 else 1",
+      "when a.id = app_private.primary_applicant_id(a.submission_id) then 3 else 1",
+    ]) {
+      expect(sql).toContain(normalizeSql(expected));
+    }
+
+    expect(migration).toContain(
+      "revoke all on function app_private.primary_applicant_id(text) from public, anon, authenticated;",
+    );
+    expect(migration).toContain(
+      "revoke all on function app_private.cockpit_primary_applicant_id(jsonb) from public, anon, authenticated;",
+    );
+    expect(migrationContract).toContain(
+      "20260717050000_admin_passport_review_media_policy.sql",
     );
   });
 });

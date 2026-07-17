@@ -1,9 +1,11 @@
 // src/modules/documents/documentExport.ts
 import JSZip from "jszip";
 import type { Submission, Applicant } from "../submissions/types";
+import { requiredPassportReviewMediaTypesForApplicant } from "../submissions/passportReviewContract";
 import {
   documentExtension,
   DOCUMENT_TYPES,
+  normalizeDocumentType,
   type DocumentAsset,
   type DocumentType,
 } from "./documentTypes";
@@ -12,6 +14,16 @@ import { validateDocumentAsset } from "./documentValidation";
 export const EXPORT_DOCUMENT_TYPES = DOCUMENT_TYPES;
 
 export type ExportDocumentType = (typeof EXPORT_DOCUMENT_TYPES)[number];
+
+export function requiredDocumentTypesForApplicant(
+  submission: Submission,
+  applicantId: string,
+): readonly DocumentType[] {
+  return requiredPassportReviewMediaTypesForApplicant(submission, applicantId).map(
+    normalizeDocumentType,
+  );
+}
+
 export type ExportDocumentAsset = DocumentAsset;
 
 export type DocumentZipBlockedReason =
@@ -73,12 +85,15 @@ export async function buildDocumentsZip(
   let fileCount = 0;
 
   for (const submission of input.submissions) {
-    for (const [applicantIndex, applicant] of submission.applicants.entries()) {
+    for (const applicant of submission.applicants) {
       const applicantDocs = input.assets.filter(
         (asset) =>
           asset.submissionId === submission.id && asset.applicantId === applicant.id,
       );
-      for (const type of exportDocumentTypesForApplicant(applicantIndex)) {
+      for (const type of requiredDocumentTypesForApplicant(
+        submission,
+        applicant.id,
+      )) {
         const asset = applicantDocs.find((candidate) => candidate.type === type);
         if (!asset) {
           throw new DocumentZipBuilderError(
@@ -111,7 +126,10 @@ export async function buildDocumentsZip(
         (asset) =>
           asset.submissionId === submission.id && asset.applicantId === applicant.id,
       );
-      const requiredTypes = exportDocumentTypesForApplicant(applicantIndex);
+      const requiredTypes = requiredDocumentTypesForApplicant(
+        submission,
+        applicant.id,
+      );
 
       for (const type of requiredTypes) {
         const asset = applicantDocs.find((candidate) => candidate.type === type);
@@ -186,14 +204,6 @@ export async function buildDocumentsZip(
     rootFolder,
     zip,
   };
-}
-
-export function exportDocumentTypesForApplicant(
-  applicantIndex: number,
-): readonly DocumentType[] {
-  return applicantIndex === 0
-    ? EXPORT_DOCUMENT_TYPES
-    : ["passport_scan"];
 }
 
 export function archiveDocumentFileName(input: {

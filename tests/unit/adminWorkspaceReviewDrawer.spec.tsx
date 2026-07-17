@@ -21,6 +21,7 @@ import type {
   Submission,
   SubmissionFile,
 } from "../../src/modules/submissions/types";
+import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 afterEach(() => {
   cleanup();
@@ -31,8 +32,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("routes the four review outcomes through the canonical admin actions", () => {
     const corrections = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!corrections) throw new Error("Expected corrections-received fixture.");
+    const reviewedCorrections = adminApproveQuestionnaireForTest(corrections);
     const cleanReview = {
-      ...corrections,
+      ...reviewedCorrections,
       status: "submitted_for_review" as const,
       issues: [],
     };
@@ -44,8 +46,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       severity: "blocker",
       type: "field",
     });
-    const correctionsWithIssue = addPreciseAdminIssue(corrections, {
-      applicantId: corrections.applicants[0]?.id ?? "",
+    const correctionsWithIssue = addPreciseAdminIssue(reviewedCorrections, {
+      applicantId: reviewedCorrections.applicants[0]?.id ?? "",
       comment: "Исправление не прошло повторную проверку.",
       field: "Адрес отеля",
       reason: "Адрес отеля всё ещё требует исправления",
@@ -60,7 +62,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         action: "return_with_issues",
       },
       {
-        submission: corrections,
+        submission: reviewedCorrections,
         button: "Принять на выгрузку",
         action: "close_issues_accept",
       },
@@ -99,8 +101,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("moves a clean accepted submission directly to the export workspace", async () => {
     const corrections = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!corrections) throw new Error("Expected corrections-received fixture.");
+    const reviewedCorrections = adminApproveQuestionnaireForTest(corrections);
     const cleanReview = {
-      ...corrections,
+      ...reviewedCorrections,
       status: "submitted_for_review" as const,
       issues: [],
     };
@@ -221,13 +224,14 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("offers close-and-accept when all remaining issues are fixed by the agent", () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!submission) throw new Error("Expected corrections-received fixture.");
+    const reviewedSubmission = adminApproveQuestionnaireForTest(submission);
     const onPrimaryAction = vi.fn();
 
     render(
       <AdminReviewDrawer
         isOpen
-        submission={submission}
-        submissionId={submission.id}
+        submission={reviewedSubmission}
+        submissionId={reviewedSubmission.id}
         onAddRemark={vi.fn()}
         onClose={vi.fn()}
         onPrimaryAction={onPrimaryAction}
@@ -241,7 +245,10 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       screen.queryByRole("button", { name: "Отправить на исправление" }),
     ).not.toBeInTheDocument();
     fireEvent.click(accept);
-    expect(onPrimaryAction).toHaveBeenCalledWith(submission.id, "close_issues_accept");
+    expect(onPrimaryAction).toHaveBeenCalledWith(
+      reviewedSubmission.id,
+      "close_issues_accept",
+    );
   });
 
   test("uses roving tab focus and arrow, Home, and End navigation", async () => {
@@ -319,9 +326,26 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     const source = initialSubmissions.find((item) => item.id === "ПД-1053");
     const applicant = source?.applicants[0];
     if (!source || !applicant) throw new Error("Expected admin review fixture.");
+    const errorField = applicant.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "appointment-city");
+    if (!errorField) throw new Error("Expected questionnaire field fixture.");
     const submission = {
       ...source,
-      applicants: [{ ...applicant, questionnaireStatus: "needs_fix" as const }],
+      applicants: [
+        {
+          ...applicant,
+          questionnaireStatus: "needs_fix" as const,
+          sections: applicant.sections.map((section) => ({
+            ...section,
+            fields: section.fields.map((field) =>
+              field.id === errorField.id
+                ? { ...field, error: "Нужно исправить значение" }
+                : field,
+            ),
+          })),
+        },
+      ],
     };
 
     render(
@@ -340,6 +364,71 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       expect(screen.getByText("Нужны исправления")).toBeVisible();
     });
     expect(screen.queryByText("needs_fix")).not.toBeInTheDocument();
+  });
+
+  test("keeps the selected tourist when moving from applicants to questionnaire", async () => {
+    const submission = initialSubmissions.find((item) => item.applicants.length > 1);
+    const secondApplicant = submission?.applicants[1];
+    if (!submission || !secondApplicant) {
+      throw new Error("Expected a family submission fixture.");
+    }
+    const isReviewable = (value: string) => {
+      const normalized = value.trim().toLocaleLowerCase("ru-RU");
+      return Boolean(normalized) && normalized !== "—" && normalized !== "не заполнено";
+    };
+    const applicantReviewableFields = secondApplicant.sections
+      .flatMap((section) => section.fields)
+      .filter((field) => isReviewable(field.value));
+    const applicantApprovedFields = applicantReviewableFields.filter(
+      (field) => field.adminReviewApprovedAtIso && field.adminReviewApprovedBy,
+    );
+    const packageReviewableFieldCount = submission.applicants
+      .flatMap((applicant) =>
+        applicant.sections.flatMap((section) => section.fields),
+      )
+      .filter((field) => isReviewable(field.value)).length;
+
+    render(
+      <AdminReviewDrawer
+        isOpen
+        submission={submission}
+        submissionId={submission.id}
+        onAddRemark={() => undefined}
+        onClose={() => undefined}
+        onVerifyDocument={() => undefined}
+      />,
+    );
+
+    const applicantName = screen.getByText(secondApplicant.fullName, {
+      selector: "nav[aria-label='Заявители пакета'] strong",
+    });
+    fireEvent.click(applicantName.closest("button") as HTMLButtonElement);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: secondApplicant.fullName }),
+      ).toBeVisible(),
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Анкета/ }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: `Выбранный заявитель: ${secondApplicant.fullName}`,
+        }),
+      ).toBeVisible(),
+    );
+    expect(
+      screen.getByRole("button", {
+        name: new RegExp(
+          `Проверено\\s+${applicantApprovedFields.length}\\s+из\\s+${applicantReviewableFields.length}\\s+заполненных`,
+        ),
+      }),
+    ).toBeVisible();
+    const questionnaireTab = screen.getByRole("tab", { name: /Анкета/ });
+    expect(questionnaireTab).toHaveTextContent(String(packageReviewableFieldCount));
+    expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByText(/Проверено \d+ из \d+ заполненных/)).not.toHaveLength(0);
   });
 
   test("uses truthful field labels and an accessible review dialog", async () => {
@@ -852,7 +941,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
 });
 
 describe("ReviewWorkspace passport section contract", () => {
-  const reviewFieldValues: Record<string, string> = {
+  const passportValues: Record<string, string> = {
     surname: "VOLKOVA",
     "first-name": "NINA",
     "birth-date": "20.08.1990",
@@ -863,20 +952,20 @@ describe("ReviewWorkspace passport section contract", () => {
     "passport-expiry-date": "26.02.2032",
   };
 
-  function withReviewFieldValues(applicant: Applicant): Applicant {
+  function withPassportValues(applicant: Applicant): Applicant {
     return {
       ...applicant,
       sections: applicant.sections.map((section) => ({
         ...section,
         fields: section.fields.map((field) => ({
           ...field,
-          value: reviewFieldValues[field.id] ?? field.value,
+          value: passportValues[field.id] ?? field.value,
         })),
       })),
     };
   }
 
-  function protectedReviewFile(
+  function protectedFile(
     submissionId: string,
     applicantId: string,
     type: "passport_scan" | "selfie" | "selfie_2",
@@ -902,24 +991,26 @@ describe("ReviewWorkspace passport section contract", () => {
     };
   }
 
-  function singleReviewSubmission(): Submission {
+  function singleSubmission(): Submission {
     const source = initialSubmissions.find((item) => item.id === "ПД-1053");
     const applicant = source?.applicants[0];
     if (!source || !applicant) throw new Error("Expected admin review fixture.");
 
+    const reviewApplicant = withPassportValues(applicant);
     return {
       ...source,
-      applicants: [withReviewFieldValues(applicant)],
+      applicants: [reviewApplicant],
       files: [
-        protectedReviewFile(source.id, applicant.id, "passport_scan"),
-        protectedReviewFile(source.id, applicant.id, "selfie"),
-        protectedReviewFile(source.id, applicant.id, "selfie_2"),
+        protectedFile(source.id, reviewApplicant.id, "passport_scan"),
+        protectedFile(source.id, reviewApplicant.id, "selfie"),
+        protectedFile(source.id, reviewApplicant.id, "selfie_2"),
       ],
+      type: "single",
     };
   }
 
-  test("shows exactly eight passport-backed fields and one section confirmation", () => {
-    const submission = singleReviewSubmission();
+  test("shows exactly eight fields, per-item remarks, and one confirmation", () => {
+    const submission = singleSubmission();
     const { container } = render(
       <ReviewWorkspace
         applicantId={submission.applicants[0]?.id}
@@ -934,27 +1025,53 @@ describe("ReviewWorkspace passport section contract", () => {
       Array.from(container.querySelectorAll("[data-passport-field-id]")).map((field) =>
         field.getAttribute("data-passport-field-id"),
       ),
-    ).toEqual([
-      "surname",
-      "first-name",
-      "birth-date",
-      "birth-place",
-      "passport-no",
-      "passport-issue-place",
-      "passport-issue-date",
-      "passport-expiry-date",
-    ]);
-    expect(screen.queryByText("Город подачи")).not.toBeInTheDocument();
-    expect(screen.queryByText("Тип визы")).not.toBeInTheDocument();
-    expect(screen.queryByText("Текущее гражданство")).not.toBeInTheDocument();
+    ).toEqual(Object.keys(passportValues));
+    expect(container.querySelectorAll(".v19-admin-passport-field-remark")).toHaveLength(8);
+    expect(container.querySelectorAll("[data-review-media]")).toHaveLength(3);
     expect(screen.queryByRole("button", { name: /^Подтвердить:/ })).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("button", { name: "Подтвердить паспортную секцию" }),
     ).toHaveLength(1);
   });
 
-  test("keeps a field remark attached to the exact applicant and field", () => {
-    const submission = singleReviewSubmission();
+  test("keeps the section action disabled when any passport field is invalid", () => {
+    const submission = singleSubmission();
+    const invalidSubmission: Submission = {
+      ...submission,
+      applicants: submission.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "passport-no"
+              ? { ...field, error: "Неверный формат номера" }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    render(
+      <ReviewWorkspace
+        applicantId={invalidSubmission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        submission={invalidSubmission}
+        submissionId={invalidSubmission.id}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Заполнены не все паспортные поля или в данных есть ошибка/),
+    ).toBeInTheDocument();
+  });
+
+  test("keeps a field remark attached to its exact applicant and label", () => {
+    const submission = singleSubmission();
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Expected applicant.");
     const onAddRemark = vi.fn();
@@ -968,7 +1085,6 @@ describe("ReviewWorkspace passport section contract", () => {
         submissionId={submission.id}
       />,
     );
-
     fireEvent.click(
       screen.getByRole("button", { name: "Добавить замечание: Номер паспорта" }),
     );
@@ -980,20 +1096,20 @@ describe("ReviewWorkspace passport section contract", () => {
     );
   });
 
-  test("shows passport and both selfies for single and confirms them with one action", async () => {
-    const submission = singleReviewSubmission();
+  test("confirms the primary passport section through one batch callback", async () => {
+    const submission = singleSubmission();
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Expected applicant.");
-    const onAcceptFile = vi.fn().mockResolvedValue(true);
+    const onApproveSection = vi.fn().mockResolvedValue(true);
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(async ({ path }) =>
       `https://example.test/${encodeURIComponent(path)}.jpg`,
     );
 
-    const { container } = render(
+    render(
       <ReviewWorkspace
         applicantId={applicant.id}
-        onAcceptFile={onAcceptFile}
         onAddRemark={() => undefined}
+        onApproveSection={onApproveSection}
         onBack={() => undefined}
         submission={submission}
         submissionId={submission.id}
@@ -1001,126 +1117,301 @@ describe("ReviewWorkspace passport section contract", () => {
     );
 
     await waitFor(() =>
-      expect(container.querySelectorAll("[data-review-media]")).toHaveLength(3),
+      expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
-    await waitFor(() => {
-      expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible();
-    }, { timeout: 5_000 });
     expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible();
     expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible();
-
     const confirmButton = screen.getByRole("button", {
       name: "Подтвердить паспортную секцию",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
 
-    await waitFor(() => expect(onAcceptFile).toHaveBeenCalledTimes(3));
-    expect(onAcceptFile).toHaveBeenNthCalledWith(1, {
-      applicantId: applicant.id,
-      fileType: "passport_scan",
-    });
-    expect(onAcceptFile).toHaveBeenNthCalledWith(2, {
-      applicantId: applicant.id,
-      fileType: "selfie",
-    });
-    expect(onAcceptFile).toHaveBeenNthCalledWith(3, {
-      applicantId: applicant.id,
-      fileType: "selfie_2",
-    });
+    await waitFor(() => expect(onApproveSection).toHaveBeenCalledTimes(1));
+    expect(onApproveSection).toHaveBeenCalledWith({ applicantId: applicant.id });
     await waitFor(() => expect(screen.getByText("Секция подтверждена")).toBeVisible());
   });
 
-  test("fails closed when a protected path belongs to another applicant", () => {
-    const submission = singleReviewSubmission();
-    const applicant = submission.applicants[0];
-    if (!applicant) throw new Error("Expected applicant.");
-    const foreignPassport = protectedReviewFile(
-      submission.id,
-      "з-9999-1",
-      "passport_scan",
-    );
-    const mismatchedSubmission: Submission = {
-      ...submission,
-      files: submission.files.map((file) =>
-        file.type === "passport_scan"
-          ? { ...foreignPassport, applicantId: applicant.id }
-          : file,
-      ),
+  test("blocks confirmation when a family has more than one primary applicant", async () => {
+    const source = singleSubmission();
+    const primary = source.applicants[0];
+    if (!primary) throw new Error("Expected applicant.");
+    const duplicatePrimary = {
+      ...primary,
+      fullName: "Ирина Волкова",
+      id: `${primary.id}-duplicate-main`,
+      role: "main" as const,
     };
-    const createSignedUrl = vi.spyOn(mediaStorage, "createMediaSignedUrl");
+    const submission: Submission = {
+      ...source,
+      applicants: [primary, duplicatePrimary],
+      files: [
+        ...source.files,
+        protectedFile(source.id, duplicatePrimary.id, "passport_scan"),
+      ],
+      type: "family",
+    };
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://example.test/ambiguous-primary.jpg",
+    );
 
     render(
       <ReviewWorkspace
-        applicantId={applicant.id}
-        onAcceptFile={vi.fn()}
+        applicantId={primary.id}
         onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
         onBack={() => undefined}
-        submission={mismatchedSubmission}
+        submission={submission}
         submissionId={submission.id}
       />,
     );
 
+    const confirmButton = screen.getByRole("button", {
+      name: "Подтвердить паспортную секцию",
+    });
+    await waitFor(() => expect(confirmButton).toBeDisabled());
     expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toBeDisabled();
-    expect(createSignedUrl).toHaveBeenCalledTimes(2);
+      screen.getByText(/ровно один основной заявитель/),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("protected-media-preview-selfie")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("protected-media-preview-selfie_2")).not.toBeInTheDocument();
   });
 
-  test("shows and confirms only the passport for a non-primary family member", async () => {
-    const source = singleReviewSubmission();
-    const primaryApplicant = source.applicants[0];
-    if (!primaryApplicant) throw new Error("Expected primary applicant.");
-    const secondApplicant: Applicant = {
-      ...withReviewFieldValues(primaryApplicant),
-      fullName: "Ирина Волкова",
-      id: "з-1053-2",
-      role: "spouse",
-    };
-    const familySubmission: Submission = {
+  test("does not treat broad personal or passport section issues as passport-review issues", async () => {
+    const source = singleSubmission();
+    const applicant = source.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+    const submission: Submission = {
       ...source,
-      applicants: [primaryApplicant, secondApplicant],
-      files: [
-        ...source.files,
-        protectedReviewFile(source.id, secondApplicant.id, "passport_scan"),
+      issues: [
+        {
+          comment: "Проверить прежнюю фамилию.",
+          createdAt: "2026-07-17T03:00:00.000Z",
+          createdBy: "admin",
+          id: "personal-section-non-passport-field",
+          reason: "Уточнить личные данные",
+          severity: "warning",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Прежняя фамилия",
+            section: "Личные данные заявителя",
+          },
+          type: "section",
+        },
+        {
+          comment: "Проверить тип документа.",
+          createdAt: "2026-07-17T03:00:00.000Z",
+          createdBy: "admin",
+          id: "passport-section-non-passport-field",
+          reason: "Уточнить тип паспорта",
+          severity: "warning",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Тип паспорта",
+            section: "Паспортные данные",
+          },
+          type: "section",
+        },
       ],
-      title: "Семья Волковых",
-      type: "family",
     };
-    const onAcceptFile = vi.fn().mockResolvedValue(true);
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
-      "https://example.test/family-passport.jpg",
+      "https://example.test/non-passport-section-issue.jpg",
     );
 
-    const { container } = render(
+    render(
       <ReviewWorkspace
-        applicantId={secondApplicant.id}
-        onAcceptFile={onAcceptFile}
+        applicantId={applicant.id}
         onAddRemark={() => undefined}
+        onApproveSection={vi.fn().mockResolvedValue(true)}
         onBack={() => undefined}
-        submission={familySubmission}
-        submissionId={familySubmission.id}
+        submission={submission}
+        submissionId={submission.id}
       />,
     );
 
-    expect(await screen.findByTestId("protected-media-preview-passport_scan")).toBeVisible();
-    expect(container.querySelectorAll("[data-review-media]")).toHaveLength(1);
-    expect(screen.queryByTestId("protected-media-preview-selfie")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("protected-media-preview-selfie_2")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+      ).toBeEnabled(),
+    );
+    expect(
+      screen.queryByText(/Есть открытое замечание паспортной секции/),
+    ).not.toBeInTheDocument();
+  });
 
-    const confirmButton = screen.getByRole("button", {
+  test("wires the workspace confirmation to one persisted passport-section command", async () => {
+    const submission = singleSubmission();
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+    const onAdminPassportSectionApprove = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://example.test/protected-passport-section.jpg",
+    );
+
+    const { container } = render(
+      <VisaflowBusinessBridgeProvider
+        bridge={{
+          onAdminPassportSectionApprove,
+        }}
+      >
+        <AdminWorkspace
+          currentEmail="qa-admin@example.test"
+          onSignOut={() => undefined}
+          submissions={[submission]}
+          usesSupabase
+        />
+      </VisaflowBusinessBridgeProvider>,
+    );
+
+    const opener = container.querySelector<HTMLButtonElement>(
+      `[data-submission-id="${submission.id}"]`,
+    );
+    if (!opener) throw new Error("Review queue opener was not rendered.");
+    fireEvent.click(opener);
+    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
+    const passportFileLabel = await screen.findByText("Скан паспорта", {
+      selector: ".v19-drawer-file-title",
+    });
+    const passportFileItem = passportFileLabel.closest(".admin-review-file-item");
+    if (!passportFileItem) throw new Error("Passport file row was not rendered.");
+    fireEvent.click(within(passportFileItem).getByRole("button", { name: "Проверить" }));
+
+    const confirmButton = await screen.findByRole("button", {
       name: "Подтвердить паспортную секцию",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
 
     await waitFor(() =>
-      expect(onAcceptFile).toHaveBeenCalledWith({
-        applicantId: secondApplicant.id,
-        fileType: "passport_scan",
+      expect(onAdminPassportSectionApprove).toHaveBeenCalledWith({
+        applicantId: applicant.id,
+        submissionId: submission.id,
       }),
     );
-    expect(onAcceptFile).toHaveBeenCalledTimes(1);
+    expect(onAdminPassportSectionApprove).toHaveBeenCalledTimes(1);
+  });
+
+  test("confirms only passport media for a non-primary family member", async () => {
+    const source = singleSubmission();
+    const primary = source.applicants[0];
+    if (!primary) throw new Error("Expected primary applicant.");
+    const secondary: Applicant = {
+      ...withPassportValues(primary),
+      fullName: "Ирина Волкова",
+      id: "з-1053-2",
+      role: "spouse",
+    };
+    const family: Submission = {
+      ...source,
+      applicants: [primary, secondary],
+      files: [
+        ...source.files,
+        protectedFile(source.id, secondary.id, "passport_scan"),
+      ],
+      type: "family",
+    };
+    const onApproveSection = vi.fn().mockResolvedValue(true);
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://example.test/family-passport.jpg",
+    );
+
+    const { container } = render(
+      <ReviewWorkspace
+        applicantId={secondary.id}
+        onAddRemark={() => undefined}
+        onApproveSection={onApproveSection}
+        onBack={() => undefined}
+        submission={family}
+        submissionId={family.id}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
+    );
+    expect(container.querySelectorAll("[data-review-media]")).toHaveLength(1);
+    expect(screen.queryByTestId("protected-media-preview-selfie")).not.toBeInTheDocument();
+    const confirmButton = screen.getByRole("button", {
+      name: "Подтвердить паспортную секцию",
+    });
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(onApproveSection).toHaveBeenCalledTimes(1));
+    expect(onApproveSection).toHaveBeenCalledWith({ applicantId: secondary.id });
+  });
+
+  test("shows a protected legacy secondary selfie only while its correction awaits review", async () => {
+    const source = singleSubmission();
+    const primary = source.applicants[0];
+    if (!primary) throw new Error("Expected primary applicant.");
+    const secondary: Applicant = {
+      ...withPassportValues(primary),
+      fullName: "Ирина Волкова",
+      id: "з-1053-2",
+      role: "spouse",
+    };
+    const legacySelfie = protectedFile(source.id, secondary.id, "selfie");
+    const family: Submission = {
+      ...source,
+      applicants: [primary, secondary],
+      files: [
+        ...source.files,
+        protectedFile(source.id, secondary.id, "passport_scan"),
+        legacySelfie,
+      ],
+      issues: [
+        {
+          comment: "Селфи заменено агентом.",
+          createdAt: "2026-07-17T03:00:00.000Z",
+          createdBy: "admin",
+          id: "legacy-secondary-selfie-issue",
+          reason: "Проверьте заменённое селфи",
+          severity: "warning",
+          status: "fixed_by_agent",
+          target: {
+            applicantId: secondary.id,
+            applicantName: secondary.fullName,
+            field: "Селфи 1",
+            fileType: "selfie",
+            section: "Файлы",
+          },
+          type: "file",
+        },
+      ],
+      status: "corrections_received",
+      type: "family",
+    };
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://example.test/legacy-secondary-selfie.jpg",
+    );
+
+    const { container } = render(
+      <ReviewWorkspace
+        applicantId={secondary.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn().mockResolvedValue(true)}
+        onBack={() => undefined}
+        submission={family}
+        submissionId={family.id}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
+    );
+    expect(container.querySelectorAll("[data-review-media]")).toHaveLength(2);
+    expect(screen.getByText("Селфи по замечанию")).toBeVisible();
+    expect(screen.queryByTestId("protected-media-preview-selfie_2")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+      ).toBeEnabled(),
+    );
   });
 });
 
@@ -1128,14 +1419,17 @@ describe("AdminReviewDrawer document comparison", () => {
   test("keeps document comparison separate from remarks and restores the original queue focus", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
+    const onVerifyDocument = vi.fn();
 
     const { container } = render(
-      <AdminWorkspace
-        currentEmail="qa-admin@example.test"
-        onSignOut={() => undefined}
-        submissions={[submission]}
-        usesSupabase
-      />,
+      <VisaflowBusinessBridgeProvider bridge={{ onVerifyDocument }}>
+        <AdminWorkspace
+          currentEmail="qa-admin@example.test"
+          onSignOut={() => undefined}
+          submissions={[submission]}
+          usesSupabase
+        />
+      </VisaflowBusinessBridgeProvider>,
     );
 
     const opener = container.querySelector<HTMLButtonElement>(
@@ -1153,6 +1447,7 @@ describe("AdminReviewDrawer document comparison", () => {
     if (!passportFileItem) throw new Error("Passport file row was not rendered.");
     fireEvent.click(within(passportFileItem).getByRole("button", { name: "Проверить" }));
 
+    expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
     expect(
       await screen.findByRole("dialog", { name: "Сверка паспорта" }),
     ).toBeInTheDocument();

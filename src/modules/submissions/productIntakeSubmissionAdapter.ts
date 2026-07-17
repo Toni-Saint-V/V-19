@@ -25,10 +25,13 @@ import type {
   ProductIntakeDraft,
   ProductIntakeFile,
 } from './productIntakeFlow';
+import {
+  requiredPassportReviewMediaTypesForApplicant,
+  type PassportReviewMediaType,
+} from './passportReviewContract';
 import { isCity } from './types';
 
 const fallbackCity: City = 'Москва';
-const canonicalRequiredFileTypes = ['passport_scan', 'selfie', 'selfie_2'] as const;
 const passportQuestionnaireFieldIds = new Set([
   'surname',
   'first-name',
@@ -238,7 +241,7 @@ function looksLikeSelfie2(file: ProductIntakeFile) {
 function intakeFileForRequiredSlot(
   draft: ProductIntakeDraft,
   applicantIndex: number,
-  type: (typeof canonicalRequiredFileTypes)[number],
+  type: PassportReviewMediaType,
 ) {
   if (type === 'passport_scan') {
     const passports = filesOfKind(draft, 'passport');
@@ -278,8 +281,13 @@ function buildRequiredFiles(
   submissionId: string,
   useIntakeFilesAsLocalDemoUploads: boolean,
 ): SubmissionFile[] {
+  const passportReviewSubmission = { applicants };
+
   return applicants.flatMap((applicant, applicantIndex) =>
-    canonicalRequiredFileTypes.map((type) => {
+    requiredPassportReviewMediaTypesForApplicant(
+      passportReviewSubmission,
+      applicant.id,
+    ).map((type) => {
       const intakeFile = useIntakeFilesAsLocalDemoUploads
         ? intakeFileForRequiredSlot(draft, applicantIndex, type)
         : undefined;

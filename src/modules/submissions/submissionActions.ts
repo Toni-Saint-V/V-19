@@ -30,8 +30,20 @@ import {
   toCanonicalStorageMediaType,
 } from "./domainContract";
 import {
+  ADMIN_PASSPORT_REVIEW_FIELD_IDS,
+  hasAdminPassportReviewValue,
+  hasUnambiguousPrimaryApplicantForPassportReview,
+  isAdminPassportReviewIssueInScope,
+  passportReviewMediaTypeForIssue,
+  passportReviewMediaTypesVisibleForApplicant,
+  requiredPassportReviewMediaSlots,
+  requiredPassportReviewMediaTypesForApplicant,
+  type PassportReviewMediaType,
+} from "./passportReviewContract";
+import {
   applicantFileStatusForFiles,
   fileCompletenessPercent,
+  isPersistablePrivateFileAssetAtSubmissionTarget,
 } from "./fileAsset";
 import { normalizeCollectionDocuments } from "./documentCollectionIntake";
 import type {
@@ -143,6 +155,241 @@ export function approveQuestionnaireFieldForAdmin(
     ),
     updatedAt: approvedAtIso,
   };
+}
+
+export type AdminPassportReviewSectionApproval = {
+  applicantId: string;
+};
+
+export function approvePassportReviewSectionForAdmin(
+  submission: Submission,
+  input: AdminPassportReviewSectionApproval,
+  actorId: string,
+  approvedAtIso = new Date().toISOString(),
+): CommandResult<Submission> {
+  if (!hasUnambiguousPrimaryApplicantForPassportReview(submission)) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "У подачи должен быть ровно один основной заявитель.",
+      },
+    };
+  }
+
+  if (!actorId.trim()) {
+    return {
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Только известный администратор может подтвердить секцию.",
+      },
+    };
+  }
+  if (!["submitted_for_review", "corrections_received"].includes(submission.status)) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Паспортную секцию можно подтвердить только во время проверки.",
+      },
+    };
+  }
+
+  const applicant = submission.applicants.find(
+    (candidate) => candidate.id === input.applicantId,
+  );
+  if (!applicant) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_ERROR", message: "Заявитель не найден." },
+    };
+  }
+
+  const fieldsById = new Map(
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .map((field) => [field.id, field] as const),
+  );
+  const passportFields = ADMIN_PASSPORT_REVIEW_FIELD_IDS.map((fieldId) =>
+    fieldsById.get(fieldId),
+  );
+  if (
+    passportFields.some(
+      (field) =>
+        !field || !hasAdminPassportReviewValue(field.value) || Boolean(field.error),
+    )
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Заполните и исправьте восемь паспортных полей.",
+      },
+    };
+  }
+
+  const passportIssueFields = passportFields.filter(
+    (field): field is NonNullable<typeof field> => Boolean(field),
+  );
+  const allowedPassportReviewMediaTypes =
+    passportReviewMediaTypesVisibleForApplicant(submission, applicant.id);
+
+  const passportIssueInScope = (issue: Submission["issues"][number]) => {
+    return isAdminPassportReviewIssueInScope(issue, {
+      applicantId: applicant.id,
+      fields: passportIssueFields,
+      mediaTypes: allowedPassportReviewMediaTypes,
+    });
+  };
+  const passportIssues = submission.issues.filter(passportIssueInScope);
+  const hasOpenPassportIssue = passportIssues.some(
+    (issue) => issue.status === "open",
+  );
+  if (hasOpenPassportIssue) {
+    return {
+      ok: false,
+      error: {
+        code: "ACCEPTANCE_BLOCKED",
+        message: "Закройте замечания паспортной секции перед подтверждением.",
+      },
+    };
+  }
+
+  const requiredMediaTypes = requiredPassportReviewMediaTypesForApplicant(
+    submission,
+    applicant.id,
+  );
+  const fixedPassportIssues = passportIssues.filter(
+    (issue) => issue.status === "fixed_by_agent",
+  );
+  const protectedReviewMediaTypes = Array.from(
+    new Set<SubmissionFileType>([
+      ...requiredMediaTypes,
+      ...fixedPassportIssues
+        .map(passportReviewMediaTypeForIssue)
+        .filter((fileType): fileType is PassportReviewMediaType => Boolean(fileType)),
+    ]),
+  );
+  const requiredFiles = requiredMediaTypes.map((fileType) =>
+    submission.files.find(
+      (file) => file.applicantId === applicant.id && file.type === fileType,
+    ),
+  );
+  const protectedReviewFiles = protectedReviewMediaTypes.map((fileType) =>
+    submission.files.find(
+      (file) => file.applicantId === applicant.id && file.type === fileType,
+    ),
+  );
+  if (
+    protectedReviewFiles.some(
+      (file, index) =>
+        !file ||
+        !isPersistablePrivateFileAssetAtSubmissionTarget(file, {
+          applicantId: applicant.id,
+          fileType: protectedReviewMediaTypes[index]!,
+          submissionId: submission.id,
+        }),
+    )
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Защищённые оригиналы паспортной секции недоступны.",
+      },
+    };
+  }
+
+  const hasFieldChanges = passportFields.some(
+    (field) =>
+      field &&
+      (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
+  );
+  const hasFileChanges = requiredFiles.some(
+    (file) =>
+      file &&
+      (file.status !== "accepted" ||
+        file.reviewStatus !== "accepted" ||
+        !file.reviewedAtIso ||
+        !file.reviewedBy),
+  );
+  const hasIssueChanges = fixedPassportIssues.length > 0;
+  if (!hasFieldChanges && !hasFileChanges && !hasIssueChanges) {
+    return { ok: true, data: submission };
+  }
+
+  const requiredMediaTypeSet = new Set<SubmissionFileType>(requiredMediaTypes);
+  const next = {
+    ...submission,
+    applicants: submission.applicants.map((candidate) =>
+      candidate.id !== applicant.id
+        ? candidate
+        : {
+            ...candidate,
+            sections: candidate.sections.map((section) => ({
+              ...section,
+              fields: section.fields.map((field) => {
+                if (!ADMIN_PASSPORT_REVIEW_FIELD_IDS.some((id) => id === field.id)) {
+                  return field;
+                }
+                if (field.adminReviewApprovedAtIso && field.adminReviewApprovedBy) {
+                  return field;
+                }
+                return {
+                  ...field,
+                  adminReviewApprovedAtIso: approvedAtIso,
+                  adminReviewApprovedBy: actorId,
+                };
+              }),
+            })),
+          },
+    ),
+    files: submission.files.map((file) => {
+      if (
+        file.applicantId !== applicant.id ||
+        !requiredMediaTypeSet.has(file.type)
+      ) {
+        return file;
+      }
+      if (
+        file.status === "accepted" &&
+        file.reviewStatus === "accepted" &&
+        file.reviewedAtIso &&
+        file.reviewedBy
+      ) {
+        return file;
+      }
+      return {
+        ...file,
+        status: "accepted" as const,
+        reviewedAtIso: approvedAtIso,
+        reviewedBy: actorId,
+        reviewStatus: "accepted" as const,
+      };
+    }),
+    issues: submission.issues.map((issue) =>
+      issue.status === "fixed_by_agent" && passportIssueInScope(issue)
+        ? { ...issue, status: "closed_by_admin" as const }
+        : issue,
+    ),
+    history: [
+      {
+        id: `и-${submission.id}-${applicant.id}-passport-section-approved-${submission.history.length + 1}`,
+        actorId,
+        at: approvedAtIso,
+        createdAt: approvedAtIso,
+        source: "admin" as const,
+        text: hasIssueChanges
+          ? "Администратор перепроверил паспортную секцию и закрыл исправленные замечания"
+          : "Администратор подтвердил паспортную секцию",
+      },
+      ...submission.history,
+    ],
+    updatedAt: approvedAtIso,
+  };
+
+  return { ok: true, data: withRecalculatedSubmissionProgress(next) };
 }
 
 export function applyUploadedFileMetadata(
@@ -782,6 +1029,22 @@ export function addPreciseAdminIssue(
   );
   if (!applicant) return submission;
 
+  const passportReviewMediaType =
+    issueInput.fileType === "passport_scan" ||
+    issueInput.fileType === "selfie" ||
+    issueInput.fileType === "selfie_2"
+      ? issueInput.fileType
+      : undefined;
+  if (
+    passportReviewMediaType &&
+    !requiredPassportReviewMediaTypesForApplicant(
+      submission,
+      applicant.id,
+    ).includes(passportReviewMediaType)
+  ) {
+    return submission;
+  }
+
   const newIssue: Issue = {
     id: `зм-${submission.id}-новое-${submission.issues.length + 1}`,
     type: issueInput.type,
@@ -825,61 +1088,6 @@ export function addPreciseAdminIssue(
       },
       ...submission.history,
     ],
-  };
-}
-
-export function markSubmissionFileAccepted(
-  submission: Submission,
-  input: {
-    applicantId: string;
-    fileType: SubmissionFileType;
-    reviewedBy?: string;
-  },
-): Submission {
-  const targetFile = submission.files.find(
-    (file) => file.applicantId === input.applicantId && file.type === input.fileType,
-  );
-
-  if (!targetFile || targetFile.status === "missing") return submission;
-
-  const files = submission.files.map((file) =>
-    file.applicantId === input.applicantId && file.type === input.fileType
-      ? {
-          ...file,
-          status: "accepted" as const,
-          reviewedAtIso: new Date().toISOString(),
-          reviewedBy: input.reviewedBy ?? file.reviewedBy ?? "Администратор",
-          reviewStatus: "accepted" as const,
-        }
-      : file,
-  );
-  const filePercent = fileCompleteness(files);
-
-  return {
-    ...submission,
-    applicants: submission.applicants.map((applicant) => ({
-      ...applicant,
-      fileStatus: applicantFileStatus(
-        files.filter((file) => file.applicantId === applicant.id),
-      ),
-    })),
-    completeness: {
-      ...submission.completeness,
-      files: filePercent,
-      total: Math.round((submission.completeness.questionnaire + filePercent) / 2),
-    },
-    files,
-    history: [
-      {
-        id: `и-${submission.id}-file-accepted-${targetFile.id}`,
-        at: "сейчас",
-        detail: fileTypeName(input.fileType),
-        source: "admin",
-        text: "Администратор принял файл",
-      },
-      ...submission.history,
-    ],
-    updatedAt: "сейчас",
   };
 }
 
@@ -1278,8 +1486,9 @@ function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {
     templates.map((file) => [`${file.applicantId}:${file.type}`, file]),
   );
 
-  return submission.applicants.flatMap((applicant) =>
-    CANONICAL_FRONTEND_MEDIA_TYPES.map((type) => {
+  const requiredFiles = submission.applicants.flatMap((applicant) =>
+    requiredPassportReviewMediaTypesForApplicant(submission, applicant.id).map(
+      (type) => {
       const key = `${applicant.id}:${type}`;
       const existing = canonicalFiles.get(key);
       if (existing) return existing;
@@ -1291,8 +1500,19 @@ function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {
         type,
         status: "missing" as const,
       };
-    }),
+      },
+    ),
   );
+  const requiredKeys = new Set(
+    requiredPassportReviewMediaSlots(submission).map(
+      (slot) => `${slot.applicantId}:${slot.type}`,
+    ),
+  );
+  const optionalExistingFiles = [...canonicalFiles.entries()]
+    .filter(([key]) => !requiredKeys.has(key))
+    .map(([, file]) => file);
+
+  return [...requiredFiles, ...optionalExistingFiles];
 }
 
 function issueSnapshot(submission: Submission, input: IssueInput) {
@@ -1354,8 +1574,10 @@ function requiredFilesForApplicants(
   idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
-    CANONICAL_FRONTEND_MEDIA_TYPES.map(
-      (type, fileIndex) => ({
+    requiredPassportReviewMediaTypesForApplicant({ applicants }, applicant.id).map(
+      (type) => {
+        const fileIndex = CANONICAL_FRONTEND_MEDIA_TYPES.indexOf(type);
+        return {
         id:
           idScheme === "supabase"
             ? `file-${draftIdToken}-${applicantIndex + 1}-${fileIndex + 1}`
@@ -1363,7 +1585,8 @@ function requiredFilesForApplicants(
         applicantId: applicant.id,
         type,
         status: "missing" as const,
-      }),
+        };
+      },
     ),
   );
 }

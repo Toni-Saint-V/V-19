@@ -34,7 +34,8 @@ import type {
   Submission,
 } from "../../src/modules/submissions/types";
 import {
-  adminApproveQuestionnaireForTest,
+  adminAcceptRequiredMediaForTest,
+  adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
@@ -77,12 +78,14 @@ function firstIssueInput(submission: Submission): IssueInput {
 }
 
 function completeInProgressSubmission(): Submission {
-  return adminApproveQuestionnaireForTest({
-    ...fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
-    id: "ПД-DOMAIN-READY",
-    status: "in_progress",
-    exportState: "not_ready",
-  });
+  return adminAcceptRequiredMediaForTest(
+    adminApprovePassportFieldsForTest({
+      ...fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
+      id: "ПД-DOMAIN-READY",
+      status: "in_progress",
+      exportState: "not_ready",
+    }),
+  );
 }
 
 describe("V-19 domain engine", () => {
@@ -332,12 +335,12 @@ describe("V-19 domain engine", () => {
     const reviewed = completeInProgressSubmission();
     const submitted: Submission = {
       ...reviewed,
-      applicants: reviewed.applicants.map((applicant, applicantIndex) => ({
+      applicants: reviewed.applicants.map((applicant) => ({
         ...applicant,
-        sections: applicant.sections.map((section, sectionIndex) => ({
+        sections: applicant.sections.map((section) => ({
           ...section,
-          fields: section.fields.map((field, fieldIndex) =>
-            applicantIndex === 0 && sectionIndex === 0 && fieldIndex === 0
+          fields: section.fields.map((field) =>
+            field.id === "surname"
               ? {
                   ...field,
                   adminReviewApprovedAtIso: undefined,
@@ -354,10 +357,40 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Подтвердите заполненные поля анкеты перед принятием",
+        message: "Подтвердите паспортные поля перед принятием",
       },
     });
     expect(canAdminApproveForExport(submitted)).toBe(false);
+  });
+
+  it("ignores non-passport field approvals but never auto-accepts required media", () => {
+    const ready: Submission = {
+      ...completeInProgressSubmission(),
+      status: "submitted_for_review",
+    };
+    const pendingMedia: Submission = {
+      ...ready,
+      files: ready.files.map((file) => ({
+        ...file,
+        reviewStatus: "not_reviewed",
+        status: "pending_review",
+      })),
+    };
+
+    expect(canAdminApproveForExport(ready)).toBe(true);
+    expect(unwrap(acceptSubmission(ready, "admin")).status).toBe(
+      "ready_for_export",
+    );
+    expect(acceptSubmission(pendingMedia, "admin")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Required passport_scan is not accepted.",
+      },
+    });
+    expect(pendingMedia.files.every((file) => file.status === "pending_review")).toBe(
+      true,
+    );
   });
 
   it("treats exported as terminal for mutation commands", () => {

@@ -18,14 +18,16 @@ const envelope = {
   registeredAgents: 10,
   maxSubmissionsPerAgent: 50,
   maxApplicantsPerSubmission: 3,
-  requiredMediaSlotsPerApplicant: 3,
+  primaryApplicantRequiredMediaSlots: 3,
+  secondaryApplicantRequiredMediaSlots: 1,
 };
 
-const requiredMediaSlots = ["passport_scan", "selfie", "selfie_2"];
+const primaryRequiredMediaSlots = ["passport_scan", "selfie", "selfie_2"];
+const secondaryRequiredMediaSlots = ["passport_scan"];
 const maxTotalSubmissions = envelope.registeredAgents * envelope.maxSubmissionsPerAgent;
 const maxTotalApplicants = maxTotalSubmissions * envelope.maxApplicantsPerSubmission;
 const maxRequiredMediaObjects =
-  maxTotalApplicants * envelope.requiredMediaSlotsPerApplicant;
+  maxTotalApplicants + maxTotalSubmissions * 2;
 const readiness = readJsonIfExists(readinessPath);
 const pilotWindowStartedAt = clean(readiness.controlledPilot?.pilotWindowStartedAt);
 const adminEnv = readEnvIfExists(adminEnvPath);
@@ -358,6 +360,10 @@ for (let agentIndex = 1; agentIndex <= envelope.registeredAgents; agentIndex += 
         submissionId,
       });
 
+      const requiredMediaSlots =
+        applicantIndex === 1
+          ? primaryRequiredMediaSlots
+          : secondaryRequiredMediaSlots;
       for (const slot of requiredMediaSlots) {
         const generatedFileName = `v19pilot_${applicantId}_${slot}.jpg`;
         const storagePath = storagePathFor(
@@ -434,7 +440,8 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 - Max total submissions: \`${maxTotalSubmissions}\`
 - Max applicants per submission: \`${envelope.maxApplicantsPerSubmission}\`
 - Max total applicants: \`${maxTotalApplicants}\`
-- Required media slots per applicant: \`${envelope.requiredMediaSlotsPerApplicant}\`
+- Required media slots for the primary applicant: \`${envelope.primaryApplicantRequiredMediaSlots}\`
+- Required media slots for each secondary applicant: \`${envelope.secondaryApplicantRequiredMediaSlots}\`
 - Max required media objects: \`${maxRequiredMediaObjects}\`
 
 ## Proof

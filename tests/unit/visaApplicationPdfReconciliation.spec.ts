@@ -25,7 +25,8 @@ import {
 } from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
 import {
-  adminApproveQuestionnaireForTest,
+  adminAcceptRequiredMediaForTest,
+  adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
@@ -414,7 +415,9 @@ destino, si procede)/
   });
 
   test("does not block acceptance because returned PDF review is post-export", () => {
-    const submitted = adminApproveQuestionnaireForTest(submittedFixture());
+    const submitted = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(submittedFixture()),
+    );
     const withPdfReview = applyVisaApplicationPdfReview(
       submitted,
       pdfTextFrom669308614,

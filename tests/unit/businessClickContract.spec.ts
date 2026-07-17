@@ -19,7 +19,6 @@ import {
   addPreciseAdminIssue,
   applyExportStateToSelection,
   createDraftSubmission,
-  markSubmissionFileAccepted,
   uploadRequiredFile,
   uploadRequiredFiles,
   updateQuestionnaireField,
@@ -36,7 +35,8 @@ import type {
   SubmissionAction,
 } from "../../src/modules/submissions/types";
 import {
-  adminApproveQuestionnaireForTest,
+  adminAcceptRequiredMediaForTest,
+  adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
@@ -209,19 +209,6 @@ describe("V-19 business click contract", () => {
     const fixedFile = uploadRequiredFile(returned.data, fileToReplace.id);
     expect(fixedFile.issues[0]?.status).toBe("fixed_by_agent");
 
-    const reviewedFile = markSubmissionFileAccepted(submitted, {
-      applicantId: submitted.applicants[0]?.id ?? "",
-      fileType: "passport_scan",
-      reviewedBy: "admin-prod-like",
-    });
-    expect(
-      reviewedFile.files.find((file) => file.type === "passport_scan"),
-    ).toMatchObject({
-      reviewStatus: "accepted",
-      reviewedBy: "admin-prod-like",
-      status: "accepted",
-    });
-
     const readyForExport = readyForExportFixture();
     const generated = applyExportStateToSelection(
       [readyForExport],
@@ -294,8 +281,10 @@ function successFixtureFor(action: SubmissionAction): Submission {
     case "accept":
       return approvedSubmittedFixture();
     case "close_issues_accept":
-      return adminApproveQuestionnaireForTest(
-        correctionsReceivedWithFixedIssueFixture(),
+      return adminAcceptRequiredMediaForTest(
+        adminApprovePassportFieldsForTest(
+          correctionsReceivedWithFixedIssueFixture(),
+        ),
       );
     case "return_again":
       return correctionsReceivedWithOpenIssueFixture();
@@ -352,7 +341,9 @@ function submittedFixture(): Submission {
 }
 
 function approvedSubmittedFixture(): Submission {
-  return adminApproveQuestionnaireForTest(submittedFixture());
+  return adminAcceptRequiredMediaForTest(
+    adminApprovePassportFieldsForTest(submittedFixture()),
+  );
 }
 
 function submittedWithOpenIssueFixture(): Submission {

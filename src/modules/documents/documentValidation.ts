@@ -136,11 +136,12 @@ export function validateDocumentAsset(
 
 export function validateDocuments(
   docs: DocumentAsset[],
+  requiredTypes: readonly DocumentType[] = REQUIRED_DOCUMENT_TYPES,
 ): DocumentValidationResult {
   const failures: DocumentValidationFailure[] = [];
   const readyByType = new Map<DocumentType, DocumentAsset>();
 
-  for (const type of REQUIRED_DOCUMENT_TYPES) {
+  for (const type of requiredTypes) {
     const typedDocs = docs.filter((doc) => doc.type === type);
     if (typedDocs.length > 1) {
       failures.push({
@@ -156,7 +157,7 @@ export function validateDocuments(
     if (ready) readyByType.set(type, ready);
   }
 
-  const missing = REQUIRED_DOCUMENT_TYPES.filter(
+  const missing = requiredTypes.filter(
     (type) => !readyByType.has(type),
   );
   failures.push(

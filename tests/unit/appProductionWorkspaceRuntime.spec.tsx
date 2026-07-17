@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 const runtime = vi.hoisted(() => ({
   actionActorId: "",
   issueActorId: "",
+  passportSectionActorId: "",
   lastMutationError: null as Error | null,
   lastMutationPromise: Promise.resolve() as Promise<void>,
   loadPromise: Promise.resolve({
@@ -179,29 +180,14 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
             type="button"
             onClick={() =>
               capture(
-                bridge.onAdminFileAccept?.({
+                bridge.onAdminPassportSectionApprove?.({
                   applicantId: "applicant-1",
-                  fileType: "passport_scan",
                   submissionId: "submission-1",
                 }),
               )
             }
           >
-            Accept passport file
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              capture(
-                bridge.onAdminFileAccept?.({
-                  applicantId: "missing-applicant",
-                  fileType: "passport_scan",
-                  submissionId: "submission-1",
-                }),
-              )
-            }
-          >
-            Accept invalid passport file
+            Approve passport section
           </button>
           <button
             type="button"
@@ -268,10 +254,17 @@ vi.mock("../../src/modules/submissions/submissionActions", () => ({
         : submission,
     );
   },
-  markSubmissionFileAccepted: (submission: Record<string, unknown>) => ({
-    ...submission,
-    fileAccepted: true,
-  }),
+  approvePassportReviewSectionForAdmin: (
+    submission: Record<string, unknown>,
+    _input: unknown,
+    actorId: string,
+  ) => {
+    runtime.passportSectionActorId = actorId;
+    return {
+      data: { ...submission, passportSectionApproved: true },
+      ok: true,
+    };
+  },
 }));
 
 vi.mock("../../src/modules/submissions/aiSuggestions", () => ({
@@ -357,6 +350,7 @@ import App from "../../src/App";
 function resetDeferredRuntime() {
   runtime.actionActorId = "";
   runtime.issueActorId = "";
+  runtime.passportSectionActorId = "";
   runtime.lastMutationError = null;
   runtime.lastMutationPromise = Promise.resolve();
   runtime.exportStateCalls = [];
@@ -475,9 +469,15 @@ describe("App production workspace runtime", () => {
     });
   });
 
-  test("persists an exact protected passport before notifying the external bridge", async () => {
-    const externalFileAccept = vi.fn(async () => undefined);
-    render(<App bridge={{ onAdminFileAccept: externalFileAccept }} />);
+  test("persists the whole passport section once before notifying the external bridge", async () => {
+    const externalPassportSectionApprove = vi.fn(async () => undefined);
+    render(
+      <App
+        bridge={{
+          onAdminPassportSectionApprove: externalPassportSectionApprove,
+        }}
+      />,
+    );
     await screen.findByText("Загрузка данных Supabase...");
     await act(async () => {
       runtime.resolveLoad({
@@ -487,49 +487,31 @@ describe("App production workspace runtime", () => {
     });
     await screen.findByTestId("admin-workspace");
 
-    fireEvent.click(screen.getByRole("button", { name: "Accept passport file" }));
-    await waitFor(() =>
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
-    );
-    expect(externalFileAccept).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Approve passport section" }));
+    await waitFor(() => {
+      expect(runtime.passportSectionActorId).toBe("admin-production-uuid");
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    });
+    expect(externalPassportSectionApprove).not.toHaveBeenCalled();
+    expect(
+      persistenceMocks.saveCockpitSubmissionsForProfile.mock.calls[0]?.[1],
+    ).toEqual([
+      expect.objectContaining({
+        id: "submission-1",
+        passportSectionApproved: true,
+      }),
+    ]);
 
     await act(async () => {
       runtime.resolveSave(new Map([["submission-1", "agent-owner-uuid"]]));
       await runtime.lastMutationPromise;
     });
 
-    expect(externalFileAccept).toHaveBeenCalledWith({
+    expect(externalPassportSectionApprove).toHaveBeenCalledWith({
       applicantId: "applicant-1",
-      fileType: "passport_scan",
       submissionId: "submission-1",
     });
-  });
-
-  test("does not persist or notify for a passport outside the selected applicant", async () => {
-    const externalFileAccept = vi.fn(async () => undefined);
-    runtime.savePromise = Promise.resolve(new Map([["submission-1", "agent-owner-uuid"]]));
-    render(<App bridge={{ onAdminFileAccept: externalFileAccept }} />);
-    await screen.findByText("Загрузка данных Supabase...");
-    await act(async () => {
-      runtime.resolveLoad({
-        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
-        submissions: [loadedSubmission],
-      });
-    });
-    await screen.findByTestId("admin-workspace");
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Accept invalid passport file" }),
-    );
-    await act(async () => {
-      await runtime.lastMutationPromise;
-    });
-
-    expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
-    expect(externalFileAccept).not.toHaveBeenCalled();
-    expect(runtime.lastMutationError?.message).toBe(
-      "Нельзя подтвердить файл без защищённого оригинала выбранного заявителя.",
-    );
+    expect(externalPassportSectionApprove).toHaveBeenCalledTimes(1);
   });
 
   test("keeps the canonical workspace and surfaces a rejected Supabase mutation", async () => {

@@ -90,6 +90,8 @@ import type {
 } from "../../src/modules/submissions/types";
 import { matchesReviewTab } from "../../src/modules/submissions/uiTypes";
 import {
+  adminAcceptRequiredMediaForTest,
+  adminApprovePassportFieldsForTest,
   adminApproveQuestionnaireForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
@@ -288,9 +290,11 @@ describe("V-19 submission status rules", () => {
   });
 
   it("blocks role-incompatible actions", () => {
-    const submitted = adminApproveQuestionnaireForTest(
-      canonicalMediaSubmission(
-        fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+    const submitted = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(
+        canonicalMediaSubmission(
+          fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+        ),
       ),
     );
 
@@ -339,7 +343,9 @@ describe("V-19 submission status rules", () => {
   });
 
   it("keeps the corrected demo family ready for explicit admin closeout", () => {
-    const corrected = adminApproveQuestionnaireForTest(byId("ПД-1055"));
+    const corrected = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(byId("ПД-1055")),
+    );
 
     expect(hasMissingRequiredWork(corrected)).toBe(false);
     expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
@@ -1303,7 +1309,16 @@ describe("V-19 submission actions", () => {
     expect(draft.type).toBe("family");
     expect(draft.status).toBe("draft");
     expect(draft.applicants).toHaveLength(3);
-    expect(draft.files).toHaveLength(9);
+    expect(draft.files).toHaveLength(5);
+    expect(
+      draft.files.map((file) => [file.applicantId, file.type]),
+    ).toEqual([
+      [draft.applicants[0]?.id, "passport_scan"],
+      [draft.applicants[0]?.id, "selfie"],
+      [draft.applicants[0]?.id, "selfie_2"],
+      [draft.applicants[1]?.id, "passport_scan"],
+      [draft.applicants[2]?.id, "passport_scan"],
+    ]);
     expect(draft.history[0].source).toBe("agent");
   });
 
@@ -2033,29 +2048,39 @@ describe("V-19 submission actions", () => {
     expect(updated.history[0].source).toBe("admin");
   });
 
-  it("records the admin reviewer when accepting uploaded media", () => {
+  it("requires reviewed media before acceptance and preserves its reviewer", () => {
     const adminProfileId = "00000000-0000-4000-8000-000000000002";
-    const submission = adminApproveQuestionnaireForTest(
+    const submission = adminApprovePassportFieldsForTest(
       canonicalMediaSubmission(
         fillRequiredQuestionnaireForTest(byId("ПД-1053")),
       ),
     );
-    const reviewableFiles = submission.files.filter((file) =>
-      ["uploaded", "pending_review", "accepted"].includes(file.status),
-    );
-
-    const accepted = applySubmissionAction(
+    const blocked = applySubmissionAction(
       submission,
       "accept",
       "admin",
       adminProfileId,
     );
+    expect(blocked).toBe(submission);
 
+    const reviewed = adminAcceptRequiredMediaForTest(submission);
+    const reviewableFiles = reviewed.files.filter((file) =>
+      file.status === "accepted",
+    );
+
+    const accepted = applySubmissionAction(
+      reviewed,
+      "accept",
+      "admin",
+      adminProfileId,
+    );
+
+    expect(accepted.status).toBe("ready_for_export");
     expect(reviewableFiles.length).toBeGreaterThan(0);
     for (const file of reviewableFiles) {
       expect(accepted.files.find((item) => item.id === file.id)).toMatchObject({
         reviewStatus: "accepted",
-        reviewedBy: adminProfileId,
+        reviewedBy: "admin-reviewer-test",
         status: "accepted",
       });
     }
@@ -2100,9 +2125,9 @@ describe("V-19 submission actions", () => {
       "00000000-0000-4000-8000-000000000002",
     );
 
-    expect(withIssue.files).toHaveLength(12);
-    expect(withIssue.completeness.files).toBe(92);
-    expect(withIssue.completeness.total).toBe(96);
+    expect(withIssue.files).toHaveLength(6);
+    expect(withIssue.completeness.files).toBe(83);
+    expect(withIssue.completeness.total).toBe(92);
     expect(
       withIssue.files.find(
         (file) => file.applicantId === applicant.id && file.type === "selfie_2",

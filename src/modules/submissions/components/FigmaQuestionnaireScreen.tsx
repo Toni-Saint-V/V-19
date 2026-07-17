@@ -43,6 +43,12 @@ import {
   agentQuestionnaireStatusPresentation,
 } from "../status";
 import {
+  passportReviewMediaTypeForIssue,
+  passportReviewMediaTypesVisibleForApplicant,
+  requiredPassportReviewMediaTypesForApplicant,
+  type PassportReviewMediaType,
+} from "../passportReviewContract";
+import {
   passportGateIssues,
   type PassportGateIssue,
 } from "../passportExtractionGuards";
@@ -1352,8 +1358,7 @@ function questionnaireField(
 
 type QuestionnaireModelField = NonNullable<ReturnType<typeof questionnaireField>>;
 
-const requiredQuestionnaireFileTypes = ["passport_scan", "selfie", "selfie_2"] as const;
-type RequiredQuestionnaireFileType = (typeof requiredQuestionnaireFileTypes)[number];
+type RequiredQuestionnaireFileType = PassportReviewMediaType;
 
 type QuestionnaireBlockerTarget = {
   applicantId: string;
@@ -1377,28 +1382,14 @@ const requiredQuestionnaireFileLabels: Record<
 function requiredQuestionnaireFileTypeForIssue(
   issue: Submission["issues"][number],
 ): RequiredQuestionnaireFileType | undefined {
-  const fileType = issue.target.fileType;
-  if (
-    fileType === "passport_scan" ||
-    fileType === "selfie" ||
-    fileType === "selfie_2"
-  ) {
-    return fileType;
-  }
+  return passportReviewMediaTypeForIssue(issue);
+}
 
-  const target = `${issue.target.field ?? ""}`
-    .toLocaleLowerCase("ru-RU")
-    .replace(/ё/g, "е");
-  if (
-    target.includes("скан пасп") ||
-    target.includes("passport scan") ||
-    target.includes("passport_scan")
-  ) {
-    return "passport_scan";
-  }
-  if (target.includes("селфи 2") || target.includes("профил")) return "selfie_2";
-  if (target.includes("селфи") || target.includes("selfie")) return "selfie";
-  return undefined;
+function questionnaireVisibleFileTypes(
+  submission: Submission,
+  applicantId: string,
+): RequiredQuestionnaireFileType[] {
+  return passportReviewMediaTypesVisibleForApplicant(submission, applicantId);
 }
 
 function questionnaireFileIssue(
@@ -2770,7 +2761,10 @@ export function FigmaQuestionnaireScreen({
     const passportRisks = passportGateIssues(draftSubmission);
     const completionDecision = agentQuestionnaireCompletionDecision(draftSubmission);
     const requiredFileSlots = draftSubmission.applicants.flatMap((applicant) =>
-      requiredQuestionnaireFileTypes.map((type) => ({
+      requiredPassportReviewMediaTypesForApplicant(
+        draftSubmission,
+        applicant.id,
+      ).map((type) => ({
         applicantId: applicant.id,
         type,
       })),
@@ -3637,7 +3631,11 @@ export function FigmaQuestionnaireScreen({
     }
 
     for (const applicant of scopedApplicants) {
-      for (const fileType of requiredQuestionnaireFileTypes) {
+      const requiredFileTypes = questionnaireVisibleFileTypes(
+        draftSubmission,
+        applicant.id,
+      );
+      for (const fileType of requiredFileTypes) {
         const file = draftSubmission.files.find(
           (candidate) =>
             candidate.applicantId === applicant.id && candidate.type === fileType,
@@ -3673,12 +3671,24 @@ export function FigmaQuestionnaireScreen({
     );
     if (passportIssue) return questionnaireTargetForPassportIssue(passportIssue);
 
-    const issue = draftSubmission.issues.find(
-      (candidate) =>
-        candidate.status === "open" &&
-        candidate.target.applicantId &&
-        (!applicantId || candidate.target.applicantId === applicantId),
-    );
+    const issue = draftSubmission.issues.find((candidate) => {
+      if (
+        candidate.status !== "open" ||
+        !candidate.target.applicantId ||
+        (applicantId && candidate.target.applicantId !== applicantId)
+      ) {
+        return false;
+      }
+
+      const candidateFileType = requiredQuestionnaireFileTypeForIssue(candidate);
+      return (
+        !candidateFileType ||
+        questionnaireVisibleFileTypes(
+          draftSubmission,
+          candidate.target.applicantId,
+        ).includes(candidateFileType)
+      );
+    });
     if (!issue?.target.applicantId) return undefined;
 
     const issueFileType = requiredQuestionnaireFileTypeForIssue(issue);

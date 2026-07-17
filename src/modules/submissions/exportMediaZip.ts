@@ -4,7 +4,7 @@ import {
   buildDocumentsZip,
   DocumentZipBuilderError,
   EXPORT_DOCUMENT_TYPES,
-  exportDocumentTypesForApplicant,
+  requiredDocumentTypesForApplicant,
   type DocumentZipDownloader,
 } from "../documents/documentExport";
 import {
@@ -496,9 +496,12 @@ function buildArchiveManifest(
     rootFolder: counts.rootFolder,
     workbookFileName: counts.workbookFileName,
     submissions: submissions.map((submission) => ({
-      applicants: submission.applicants.map((applicant, applicantIndex) => ({
+      applicants: submission.applicants.map((applicant) => ({
         id: applicant.id,
-        documentTypes: exportDocumentTypesForApplicant(applicantIndex),
+        documentTypes: requiredDocumentTypesForApplicant(
+          submission,
+          applicant.id,
+        ),
         name: applicant.fullName,
       })),
       city: submission.city,

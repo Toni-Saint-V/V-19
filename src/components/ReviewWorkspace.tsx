@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   AlertCircle,
@@ -13,6 +13,15 @@ import {
   mediaStorageBucket,
 } from "../modules/submissions/mediaStorage";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
+import {
+  ADMIN_PASSPORT_REVIEW_FIELD_IDS,
+  hasAdminPassportReviewValue,
+  hasUnambiguousPrimaryApplicantForPassportReview,
+  isAdminPassportReviewIssueInScope,
+  passportReviewMediaTypesVisibleForApplicant,
+  requiredPassportReviewMediaTypesForApplicant,
+  type AdminPassportReviewFieldId,
+} from "../modules/submissions/passportReviewContract";
 import type {
   Applicant,
   Submission,
@@ -25,10 +34,8 @@ interface ReviewWorkspaceProps {
   submissionId: string;
   submission?: Submission | null;
   onBack: () => void;
-  onAcceptFile?: (input: {
-    applicantId: string;
-    fileType: SubmissionFileType;
-  }) => boolean | Promise<boolean>;
+  nestedDialogOpen?: boolean;
+  onApproveSection?: (input: { applicantId: string }) => boolean | Promise<boolean>;
   onAddRemark: (
     field?: string,
     applicant?: string,
@@ -40,8 +47,11 @@ interface ReviewWorkspaceProps {
 type ReviewMediaType = "passport_scan" | "selfie" | "selfie_2";
 
 type ReviewField = {
+  alreadyApproved: boolean;
+  hasError: boolean;
   id: string;
   label: string;
+  sectionId: string;
   sourceLabel: string;
   value: string;
 };
@@ -59,20 +69,27 @@ type PreviewState = {
 
 type PreviewStateMap = Partial<Record<ReviewMediaType, PreviewState>>;
 
-const passportFieldDefinitions = [
-  { id: "surname", fallbackLabel: "Фамилия" },
-  { id: "first-name", fallbackLabel: "Имя" },
-  { id: "birth-date", fallbackLabel: "Дата рождения" },
-  { id: "birth-place", fallbackLabel: "Место рождения" },
-  { id: "passport-no", fallbackLabel: "Номер паспорта" },
-  {
-    id: "passport-issue-place",
-    fallbackLabel: "Место выдачи",
+const passportFieldLabels: Record<
+  AdminPassportReviewFieldId,
+  { displayLabel?: string; fallbackLabel: string }
+> = {
+  surname: { fallbackLabel: "Фамилия" },
+  "first-name": { fallbackLabel: "Имя" },
+  "birth-date": { fallbackLabel: "Дата рождения" },
+  "birth-place": { fallbackLabel: "Место рождения" },
+  "passport-no": { fallbackLabel: "Номер паспорта" },
+  "passport-issue-place": {
     displayLabel: "Кем / где выдан",
+    fallbackLabel: "Место выдачи",
   },
-  { id: "passport-issue-date", fallbackLabel: "Дата выдачи" },
-  { id: "passport-expiry-date", fallbackLabel: "Действителен до" },
-] as const;
+  "passport-issue-date": { fallbackLabel: "Дата выдачи" },
+  "passport-expiry-date": { fallbackLabel: "Действителен до" },
+};
+
+const passportFieldDefinitions = ADMIN_PASSPORT_REVIEW_FIELD_IDS.map((id) => ({
+  id,
+  ...passportFieldLabels[id],
+}));
 
 const passportMediaTarget: ReviewMediaTarget = {
   alt: "Оригинал загранпаспорта",
@@ -92,27 +109,30 @@ const primaryApplicantMediaTargets: readonly ReviewMediaTarget[] = [
 ];
 const unavailablePreview: PreviewState = { status: "unavailable" };
 
-function hasReviewValue(value: string) {
-  const normalized = value.trim().toLocaleLowerCase("ru-RU");
-  return Boolean(normalized) && normalized !== "—" && normalized !== "не заполнено";
-}
-
 function reviewFieldsForApplicant(applicant?: Applicant): ReviewField[] {
   if (!applicant) return [];
 
   const fieldsById = new Map(
-    applicant.sections
-      .flatMap((section) => section.fields)
-      .map((field) => [field.id, field] as const),
+    applicant.sections.flatMap((section) =>
+      section.fields.map(
+        (field) => [field.id, { field, sectionId: section.id }] as const,
+      ),
+    ),
   );
 
   return passportFieldDefinitions.map((definition) => {
-    const field = fieldsById.get(definition.id);
+    const fieldEntry = fieldsById.get(definition.id);
+    const field = fieldEntry?.field;
     const sourceLabel = field?.label ?? definition.fallbackLabel;
 
     return {
+      alreadyApproved: Boolean(
+        field?.adminReviewApprovedAtIso && field.adminReviewApprovedBy,
+      ),
+      hasError: Boolean(field?.error),
       id: definition.id,
-      label: "displayLabel" in definition ? definition.displayLabel : sourceLabel,
+      label: definition.displayLabel ?? sourceLabel,
+      sectionId: fieldEntry?.sectionId ?? "",
       sourceLabel,
       value: field?.value ?? "",
     };
@@ -146,6 +166,7 @@ function needsExternalViewer(file?: SubmissionFile) {
 
 function ProtectedMediaCard({
   applicantName,
+  canRemark = true,
   file,
   preview,
   target,
@@ -153,6 +174,7 @@ function ProtectedMediaCard({
   onRemark,
 }: {
   applicantName?: string;
+  canRemark?: boolean;
   file?: SubmissionFile;
   preview: PreviewState;
   target: ReviewMediaTarget;
@@ -165,10 +187,10 @@ function ProtectedMediaCard({
   return (
     <article
       aria-label={`${target.label}: ${applicantName ?? "заявитель"}`}
-      className="v19-admin-passport-media-card overflow-hidden rounded-2xl border border-[#242529] bg-[#161617]"
+      className="v19-admin-passport-media-card overflow-hidden rounded-2xl border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)]"
       data-review-media={target.type}
     >
-      <header className="flex items-center justify-between gap-3 border-b border-[#242529] px-4 py-3">
+      <header className="flex items-center justify-between gap-3 border-b border-[var(--v19b-color-border-strong)] px-4 py-3">
         <div className="flex min-w-0 items-center gap-2 text-white/70">
           {isPassport ? (
             <FileText className="w-4 shrink-0" />
@@ -176,23 +198,29 @@ function ProtectedMediaCard({
             <UserRound className="w-4 shrink-0" />
           )}
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold text-white">
+            <p className="truncate text-[length:var(--v19b-size-13)] font-semibold text-white">
               {target.label}
             </p>
-            <p className="mt-0.5 truncate text-[11px] text-white/45">
+            <p className="mt-0.5 truncate text-[length:var(--v19b-size-11)] text-white/45">
               {reviewFileName(target, file)}
             </p>
           </div>
         </div>
-        <button
-          aria-label={`Добавить замечание: ${target.label}`}
-          className="admin-review-remark-action flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-[#6f64ff]/20 bg-[#6f64ff]/10 px-3 text-[12px] font-medium text-[#b8baff] transition-colors hover:bg-[#6f64ff]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
-          onClick={() => onRemark(target.type, target.label)}
-          type="button"
-        >
-          <MessageSquarePlus className="w-4" />
-          Замечание
-        </button>
+        {canRemark ? (
+          <button
+            aria-label={`Добавить замечание: ${target.label}`}
+            className="admin-review-remark-action flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-[var(--v19b-color-primary-soft-20)] bg-[var(--v19b-color-primary-soft-10)] px-3 text-[length:var(--v19b-size-12)] font-medium text-[var(--v19b-color-primary-text)] transition-colors hover:bg-[var(--v19b-color-primary-soft-20)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)]"
+            onClick={() => onRemark(target.type, target.label)}
+            type="button"
+          >
+            <MessageSquarePlus className="w-4" />
+            Замечание
+          </button>
+        ) : (
+          <span className="text-[length:var(--v19b-size-11)] text-white/45">
+            Только просмотр
+          </span>
+        )}
       </header>
 
       {preview.status === "loading" ? (
@@ -201,13 +229,13 @@ function ProtectedMediaCard({
             <h2 className="text-sm font-semibold text-white">
               Загружаем защищённый оригинал
             </h2>
-            <p className="mt-2 text-[12px] text-white/55">
+            <p className="mt-2 text-[length:var(--v19b-size-12)] text-white/55">
               Получаем временный доступ к файлу подачи.
             </p>
           </div>
         </div>
       ) : readyUrl ? (
-        <figure className="bg-[#0e0e10]">
+        <figure className="bg-[var(--v19b-color-app)]">
           {isPdfFile(file) ? (
             <object
               aria-label={target.alt}
@@ -216,7 +244,7 @@ function ProtectedMediaCard({
               type="application/pdf"
             >
               <a
-                className="text-[#b8baff] underline"
+                className="text-[var(--v19b-color-primary-text)] underline"
                 href={readyUrl}
                 rel="noreferrer"
                 target="_blank"
@@ -230,11 +258,11 @@ function ProtectedMediaCard({
                 <p className="text-sm font-semibold text-white">
                   Оригинал готов к просмотру
                 </p>
-                <p className="mt-2 text-[12px] text-white/55">
+                <p className="mt-2 text-[length:var(--v19b-size-12)] text-white/55">
                   Формат открывается во внешнем просмотрщике.
                 </p>
                 <a
-                  className="mt-4 inline-flex h-10 items-center rounded-xl border border-[#6f64ff]/20 bg-[#6f64ff]/10 px-4 text-[12px] font-medium text-[#b8baff]"
+                  className="mt-4 inline-flex h-10 items-center rounded-xl border border-[var(--v19b-color-primary-soft-20)] bg-[var(--v19b-color-primary-soft-10)] px-4 text-[length:var(--v19b-size-12)] font-medium text-[var(--v19b-color-primary-text)]"
                   href={readyUrl}
                   rel="noreferrer"
                   target="_blank"
@@ -256,18 +284,18 @@ function ProtectedMediaCard({
               src={readyUrl}
             />
           )}
-          <figcaption className="border-t border-[#242529] px-3 py-2 text-[11px] text-white/50">
+          <figcaption className="border-t border-[var(--v19b-color-border-strong)] px-3 py-2 text-[length:var(--v19b-size-11)] text-white/50">
             Оригинал из защищённого хранилища. Доступ действует ограниченное время.
           </figcaption>
         </figure>
       ) : (
-        <div className="grid min-h-64 place-items-center bg-[#221d13] p-5 text-center">
+        <div className="grid min-h-64 place-items-center bg-[var(--v19b-admin-drawer-orange-bg)] p-5 text-center">
           <div>
-            <AlertCircle className="mx-auto mb-3 w-6 text-[#f6c66b]" />
+            <AlertCircle className="mx-auto mb-3 w-6 text-[var(--vf-warning)]" />
             <h2 className="text-sm font-semibold text-white">
               {file ? "Защищённый оригинал недоступен" : "Файл не загружен"}
             </h2>
-            <p className="mt-2 text-[12px] leading-relaxed text-white/60">
+            <p className="mt-2 text-[length:var(--v19b-size-12)] leading-relaxed text-white/60">
               Подтверждение секции заблокировано. Добавьте точное замечание к этому
               файлу.
             </p>
@@ -283,25 +311,53 @@ export function ReviewWorkspace({
   submissionId,
   submission,
   onBack,
-  onAcceptFile,
+  nestedDialogOpen = false,
+  onApproveSection,
   onAddRemark,
 }: ReviewWorkspaceProps) {
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const initialFocusAppliedRef = useRef(false);
+  const onBackRef = useRef(onBack);
+  onBackRef.current = onBack;
   const selectedApplicant = applicantId
     ? submission?.applicants.find((applicant) => applicant.id === applicantId)
     : submission?.applicants.length === 1
       ? submission.applicants[0]
       : undefined;
   const selectedApplicantId = selectedApplicant?.id;
-  const primaryApplicant =
-    submission?.applicants.find((applicant) => applicant.role === "main") ??
-    submission?.applicants[0];
-  const showSelfies = Boolean(
-    selectedApplicant &&
-    (submission?.type === "single" || selectedApplicant.id === primaryApplicant?.id),
+  const hasUnambiguousPrimaryApplicant = Boolean(
+    submission && hasUnambiguousPrimaryApplicantForPassportReview(submission),
   );
-  const mediaTargets = showSelfies
+  const showSelfies = Boolean(
+    submission &&
+      selectedApplicantId &&
+      requiredPassportReviewMediaTypesForApplicant(
+        submission,
+        selectedApplicantId,
+      ).includes("selfie"),
+  );
+  const requiredMediaTargets = showSelfies
     ? primaryApplicantMediaTargets
     : passportOnlyMediaTargets;
+  const mediaTargets = useMemo(
+    () =>
+      submission && selectedApplicantId
+        ? passportReviewMediaTypesVisibleForApplicant(
+            submission,
+            selectedApplicantId,
+          ).map((fileType) =>
+            fileType === "passport_scan"
+              ? passportMediaTarget
+              : selfieMediaTargets.find((target) => target.type === fileType)!,
+          )
+        : requiredMediaTargets,
+    [requiredMediaTargets, selectedApplicantId, submission],
+  );
+  const visibleSelfieTargets = mediaTargets.filter(
+    (target) => target.type !== "passport_scan",
+  );
+  const hasLegacyCorrectionMedia =
+    mediaTargets.length > requiredMediaTargets.length;
   const reviewFields = reviewFieldsForApplicant(selectedApplicant);
   const mediaEntries = mediaTargets.map((target) => ({
     file: submission?.files.find(
@@ -309,17 +365,98 @@ export function ReviewWorkspace({
     ),
     target,
   }));
-  const [mediaPreviews, setMediaPreviews] = useState<PreviewStateMap>({});
-  const [pendingFileType, setPendingFileType] = useState<ReviewMediaType>();
-  const [acceptedFileTypes, setAcceptedFileTypes] = useState<Set<ReviewMediaType>>(
-    () => new Set(),
+  const requiredMediaEntries = requiredMediaTargets.map((target) => ({
+    file: submission?.files.find(
+      (file) => file.applicantId === selectedApplicantId && file.type === target.type,
+    ),
+    target,
+  }));
+  const passportIssueInScope = (issue: Submission["issues"][number]) => {
+    if (!selectedApplicantId) return false;
+    return isAdminPassportReviewIssueInScope(issue, {
+      applicantId: selectedApplicantId,
+      fields: reviewFields.map((field) => ({
+        id: field.id,
+        label: field.sourceLabel,
+      })),
+      mediaTypes: mediaTargets.map((target) => target.type),
+    });
+  };
+  const hasOpenPassportIssue = Boolean(
+    submission?.issues.some(
+      (issue) => issue.status === "open" && passportIssueInScope(issue),
+    ),
   );
+  const hasFixedPassportIssue = Boolean(
+    submission?.issues.some(
+      (issue) => issue.status === "fixed_by_agent" && passportIssueInScope(issue),
+    ),
+  );
+  const [mediaPreviews, setMediaPreviews] = useState<PreviewStateMap>({});
+  const [sectionApprovalPending, setSectionApprovalPending] = useState(false);
+  const [sectionApprovedLocally, setSectionApprovedLocally] = useState(false);
   const [acceptanceError, setAcceptanceError] = useState("");
 
   useEffect(() => {
-    setAcceptedFileTypes(new Set());
+    setSectionApprovedLocally(false);
     setAcceptanceError("");
   }, [selectedApplicantId, submissionId]);
+
+  useEffect(() => {
+    if (nestedDialogOpen) return;
+    const focusFrame = initialFocusAppliedRef.current
+      ? undefined
+      : window.requestAnimationFrame(() => {
+          initialFocusAppliedRef.current = true;
+          workspaceRef.current
+            ?.querySelector<HTMLButtonElement>('button:not([disabled])')
+            ?.focus({ preventScroll: true });
+        });
+
+    function handleWorkspaceKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onBackRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusableElements = Array.from(
+        workspaceRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), object, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter(
+        (element) =>
+          element.getAttribute("aria-hidden") !== "true" &&
+          element.getClientRects().length > 0,
+      );
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements.at(-1);
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        workspaceRef.current?.focus({ preventScroll: true });
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus({ preventScroll: true });
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus({ preventScroll: true });
+      } else if (!workspaceRef.current?.contains(document.activeElement)) {
+        event.preventDefault();
+        firstElement.focus({ preventScroll: true });
+      }
+    }
+
+    document.addEventListener("keydown", handleWorkspaceKeyDown);
+    return () => {
+      if (focusFrame !== undefined) window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleWorkspaceKeyDown);
+    };
+  }, [nestedDialogOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -389,40 +526,58 @@ export function ReviewWorkspace({
 
   const allFieldsFilled =
     reviewFields.length === passportFieldDefinitions.length &&
-    reviewFields.every((field) => hasReviewValue(field.value));
+    reviewFields.every(
+      (field) =>
+        Boolean(field.sectionId) &&
+        hasAdminPassportReviewValue(field.value) &&
+        !field.hasError,
+    );
   const allProtectedMediaReady = mediaTargets.every(
     (target) => mediaPreviews[target.type]?.status === "ready",
   );
-  const sectionAlreadyAccepted = mediaEntries.every(
-    ({ file, target }) =>
-      file?.status === "accepted" || acceptedFileTypes.has(target.type),
+  const allFieldsApproved = reviewFields.every((field) => field.alreadyApproved);
+  const allMediaAccepted = requiredMediaEntries.every(
+    ({ file }) => file?.status === "accepted",
   );
+  const sectionAlreadyAccepted =
+    sectionApprovedLocally ||
+    (allFieldsApproved && allMediaAccepted && !hasFixedPassportIssue);
   const canConfirmSection = Boolean(
     selectedApplicantId &&
-    onAcceptFile &&
+    hasUnambiguousPrimaryApplicant &&
+    onApproveSection &&
     allFieldsFilled &&
     allProtectedMediaReady &&
+    !hasOpenPassportIssue &&
     !sectionAlreadyAccepted &&
-    !pendingFileType,
+    !sectionApprovalPending,
   );
 
   let completionReason =
     "Сверьте значения со сканом и добавьте замечание к каждому расхождению.";
   if (!selectedApplicantId) {
     completionReason = "Не выбран заявитель. Подтверждение недоступно.";
+  } else if (!hasUnambiguousPrimaryApplicant) {
+    completionReason =
+      "У подачи должен быть ровно один основной заявитель. Подтверждение недоступно.";
   } else if (!allFieldsFilled) {
     completionReason =
-      "Заполнены не все паспортные поля. Добавьте замечание к отсутствующему значению.";
+      "Заполнены не все паспортные поля или в данных есть ошибка. Добавьте точное замечание.";
   } else if (!allProtectedMediaReady) {
-    completionReason = showSelfies
-      ? "Нужны защищённые оригиналы паспорта и двух селфи. Подтверждение недоступно."
-      : "Нужен защищённый оригинал паспорта. Подтверждение недоступно.";
-  } else if (!onAcceptFile) {
+    completionReason = hasLegacyCorrectionMedia
+      ? "Нужны защищённые оригиналы паспорта и файлов по активным замечаниям. Подтверждение недоступно."
+      : showSelfies
+        ? "Нужны защищённые оригиналы паспорта и двух селфи. Подтверждение недоступно."
+        : "Нужен защищённый оригинал паспорта. Подтверждение недоступно.";
+  } else if (hasOpenPassportIssue) {
+    completionReason =
+      "Есть открытое замечание паспортной секции. Сначала агент должен отправить исправление.";
+  } else if (!onApproveSection) {
     completionReason =
       "Сохранение результата не подключено. Состояние подачи не изменится.";
   } else if (sectionAlreadyAccepted) {
     completionReason = "Паспортная секция уже подтверждена.";
-  } else if (pendingFileType) {
+  } else if (sectionApprovalPending) {
     completionReason = "Сохраняем подтверждение паспортной секции.";
   }
 
@@ -443,41 +598,26 @@ export function ReviewWorkspace({
   }
 
   async function handleConfirmSection() {
-    const acceptFile = onAcceptFile;
-    if (!canConfirmSection || !selectedApplicantId || !acceptFile) return;
+    if (!canConfirmSection || !selectedApplicantId || !onApproveSection) return;
 
     setAcceptanceError("");
-    const acceptedInThisRun = new Set(acceptedFileTypes);
-
-    for (const { file, target } of mediaEntries) {
-      if (file?.status === "accepted" || acceptedInThisRun.has(target.type)) continue;
-
-      setPendingFileType(target.type);
-      try {
-        const accepted = await acceptFile({
-          applicantId: selectedApplicantId,
-          fileType: target.type,
-        });
-        if (accepted === false) {
-          setAcceptanceError(
-            `Не удалось подтвердить «${target.label}». Повторите попытку.`,
-          );
-          setPendingFileType(undefined);
-          return;
-        }
-      } catch {
+    setSectionApprovalPending(true);
+    try {
+      const approved = await onApproveSection({ applicantId: selectedApplicantId });
+      if (approved === false) {
         setAcceptanceError(
-          `Не удалось подтвердить «${target.label}». Повторите попытку.`,
+          "Не удалось подтвердить паспортную секцию. Повторите попытку.",
         );
-        setPendingFileType(undefined);
         return;
       }
-
-      acceptedInThisRun.add(target.type);
-      setAcceptedFileTypes(new Set(acceptedInThisRun));
+      setSectionApprovedLocally(true);
+    } catch {
+      setAcceptanceError(
+        "Не удалось подтвердить паспортную секцию. Повторите попытку.",
+      );
+    } finally {
+      setSectionApprovalPending(false);
     }
-
-    setPendingFileType(undefined);
   }
 
   return (
@@ -485,43 +625,49 @@ export function ReviewWorkspace({
       animate={{ opacity: 1, scale: 1 }}
       aria-label="Сверка паспорта"
       aria-modal="true"
-      className="v19-admin-passport-workspace fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#101011] text-white"
+      aria-hidden={nestedDialogOpen ? "true" : undefined}
+      className="v19-admin-passport-workspace fixed inset-0 z-[var(--v19b-z-modal)] flex flex-col overflow-hidden bg-[var(--v19b-color-app)] text-white"
       exit={{ opacity: 0, scale: 0.985 }}
       initial={{ opacity: 0, scale: 0.985 }}
+      ref={workspaceRef}
       role="dialog"
+      inert={nestedDialogOpen ? true : undefined}
+      tabIndex={-1}
     >
-      <header className="v19-admin-passport-header flex h-[64px] shrink-0 items-center gap-4 border-b border-[#202124] bg-[#141416]/95 px-4 backdrop-blur-md lg:px-6">
+      <header className="v19-admin-passport-header flex h-[var(--v19b-size-64)] shrink-0 items-center gap-4 border-b border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] px-4 backdrop-blur-md lg:px-6">
         <button
           aria-label="Вернуться к подаче"
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#242529] bg-[#1e1e21] text-white/70 transition-colors hover:bg-[#27272b] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] text-white/70 transition-colors hover:bg-[var(--v19b-color-control-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)]"
           onClick={onBack}
           type="button"
         >
           <ArrowLeft className="w-5" />
         </button>
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-white/62">
+          <p className="text-[length:var(--v19b-size-11)] font-medium uppercase tracking-wider text-white/62">
             Проверка документов
           </p>
-          <h1 className="mt-1 truncate text-[19px] font-semibold leading-none tracking-tight lg:text-[21px]">
+          <h1 className="mt-1 truncate text-[length:var(--v19b-size-19)] font-semibold leading-none tracking-tight lg:text-[length:var(--v19b-size-21)]">
             Паспортная секция · {submissionId}
           </h1>
         </div>
       </header>
 
-      <main className="v19-admin-passport-main grid min-h-0 flex-1 grid-cols-1 overflow-auto xl:grid-cols-[minmax(420px,1fr)_minmax(480px,0.9fr)] xl:overflow-hidden">
-        <section className="v19-admin-passport-document-pane min-h-[320px] border-b border-[#202124] bg-[#0e0e10] p-5 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r lg:p-8">
+      <main className="v19-admin-passport-main grid min-h-0 flex-1 grid-cols-1 overflow-auto xl:overflow-hidden">
+        <section className="v19-admin-passport-document-pane min-h-[var(--v19b-size-320)] border-b border-[var(--v19b-color-border)] bg-[var(--v19b-color-app)] p-5 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r lg:p-8">
           <div className="mb-4">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-white/62">
+            <p className="text-[length:var(--v19b-size-11)] font-medium uppercase tracking-wider text-white/62">
               Защищённые оригиналы
             </p>
-            <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-white">
+            <h2 className="mt-2 text-[length:var(--v19b-size-20)] font-semibold tracking-tight text-white">
               {selectedApplicant?.fullName ?? "Заявитель не выбран"}
             </h2>
-            <p className="mt-2 text-[13px] leading-relaxed text-white/50">
+            <p className="mt-2 text-[length:var(--v19b-size-13)] leading-relaxed text-white/50">
               {showSelfies
                 ? "Скан загранпаспорта и оба селфи открыты в одной секции."
-                : "Для этого члена семьи проверяется только скан загранпаспорта."}
+                : hasLegacyCorrectionMedia
+                  ? "Для этого члена семьи обязателен только паспорт. Дополнительно показано селфи по активному замечанию."
+                  : "Для этого члена семьи проверяется только скан загранпаспорта."}
             </p>
           </div>
 
@@ -536,23 +682,26 @@ export function ReviewWorkspace({
             onRemark={handleMediaRemark}
           />
 
-          {showSelfies ? (
+          {visibleSelfieTargets.length ? (
             <section className="mt-4" aria-labelledby="selfie-review-heading">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3
-                  className="text-[14px] font-semibold text-white"
+                  className="text-[length:var(--v19b-size-14)] font-semibold text-white"
                   id="selfie-review-heading"
                 >
-                  Оба селфи
+                  {showSelfies ? "Оба селфи" : "Селфи по замечанию"}
                 </h3>
-                <span className="text-[11px] text-white/45">
-                  Только single / основной
+                <span className="text-[length:var(--v19b-size-11)] text-white/45">
+                  {showSelfies ? "Только single / основной" : "Legacy correction"}
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {selfieMediaTargets.map((target) => (
+                {visibleSelfieTargets.map((target) => (
                   <ProtectedMediaCard
                     applicantName={selectedApplicant?.fullName}
+                    canRemark={requiredMediaTargets.some(
+                      (requiredTarget) => requiredTarget.type === target.type,
+                    )}
                     file={
                       mediaEntries.find((item) => item.target.type === target.type)
                         ?.file
@@ -569,15 +718,15 @@ export function ReviewWorkspace({
           ) : null}
         </section>
 
-        <section className="v19-admin-passport-form-pane min-w-0 bg-[#141416] p-5 xl:overflow-y-auto lg:p-6">
+        <section className="v19-admin-passport-form-pane min-w-0 bg-[var(--v19b-color-page)] p-5 xl:overflow-y-auto lg:p-6">
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-white/62">
+            <p className="text-[length:var(--v19b-size-11)] font-medium uppercase tracking-wider text-white/62">
               Данные анкеты
             </p>
-            <h2 className="mt-2 text-[24px] font-semibold tracking-tight text-white lg:text-[30px]">
+            <h2 className="mt-2 text-[length:var(--v19b-size-24)] font-semibold tracking-tight text-white lg:text-[length:var(--v19b-size-30)]">
               Сверка со сканом
             </h2>
-            <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/50">
+            <p className="mt-2 max-w-2xl text-[length:var(--v19b-size-13)] leading-relaxed text-white/50">
               На экране только значения, которые можно проверить по загранпаспорту.
             </p>
           </div>
@@ -585,32 +734,34 @@ export function ReviewWorkspace({
           <div className="v19-admin-passport-fields mt-6 space-y-3">
             {reviewFields.map((field) => (
               <article
-                className="v19-admin-passport-field flex flex-col justify-between gap-4 rounded-2xl border border-[#242529] bg-[#161617] p-4 sm:flex-row sm:items-center"
+                className="v19-admin-passport-field flex flex-col justify-between gap-4 rounded-2xl border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] p-4 sm:flex-row sm:items-center"
                 data-passport-field-id={field.id}
                 key={field.id}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-white/40">
+                  <p className="text-[length:var(--v19b-size-11)] font-medium uppercase tracking-wider text-white/40">
                     {field.label}
                   </p>
-                  <p className="mt-1 break-words text-[15px] font-semibold text-white">
-                    {hasReviewValue(field.value) ? field.value : "Не заполнено"}
+                  <p className="mt-1 break-words text-[length:var(--v19b-size-15)] font-semibold text-white">
+                    {hasAdminPassportReviewValue(field.value)
+                      ? field.value
+                      : "Не заполнено"}
                   </p>
                   <p
                     className={
-                      hasReviewValue(field.value)
-                        ? "mt-1 text-[11px] text-white/45"
-                        : "mt-1 text-[11px] text-[var(--vf-warning)]"
+                      hasAdminPassportReviewValue(field.value) && !field.hasError
+                        ? "mt-1 text-[length:var(--v19b-size-11)] text-white/45"
+                        : "mt-1 text-[length:var(--v19b-size-11)] text-[var(--vf-warning)]"
                     }
                   >
-                    {hasReviewValue(field.value)
+                    {hasAdminPassportReviewValue(field.value) && !field.hasError
                       ? "Сверьте значение с оригиналом"
-                      : "Значение отсутствует — требуется замечание"}
+                      : "Значение отсутствует или содержит ошибку — требуется замечание"}
                   </p>
                 </div>
                 <button
                   aria-label={`Добавить замечание: ${field.label}`}
-                  className="v19-admin-passport-field-remark admin-review-remark-action flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#6f64ff]/20 bg-[#6f64ff]/10 px-3 text-[12px] font-medium text-[#b8baff] transition-colors hover:bg-[#6f64ff]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+                  className="v19-admin-passport-field-remark admin-review-remark-action flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[var(--v19b-color-primary-soft-20)] bg-[var(--v19b-color-primary-soft-10)] px-3 text-[length:var(--v19b-size-12)] font-medium text-[var(--v19b-color-primary-text)] transition-colors hover:bg-[var(--v19b-color-primary-soft-20)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)]"
                   onClick={() =>
                     onAddRemark(
                       field.sourceLabel,
@@ -630,14 +781,16 @@ export function ReviewWorkspace({
 
           <section
             aria-live="polite"
-            className="v19-admin-passport-completion mt-6 rounded-2xl border border-[#242529] bg-[#161617] p-4"
+            className="v19-admin-passport-completion mt-6 rounded-2xl border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] p-4"
           >
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 w-5 shrink-0 text-[#b8baff]" />
+              <CheckCircle2 className="mt-0.5 w-5 shrink-0 text-[var(--v19b-color-primary-text)]" />
               <div>
-                <p className="text-[13px] font-semibold text-white">Итог всей секции</p>
+                <p className="text-[length:var(--v19b-size-13)] font-semibold text-white">
+                  Итог всей секции
+                </p>
                 <p
-                  className="mt-1 text-[12px] leading-relaxed text-white/55"
+                  className="mt-1 text-[length:var(--v19b-size-12)] leading-relaxed text-white/55"
                   id="passport-review-completion-reason"
                 >
                   {completionReason}
@@ -655,13 +808,13 @@ export function ReviewWorkspace({
               >
                 {sectionAlreadyAccepted
                   ? "Секция подтверждена"
-                  : pendingFileType
+                  : sectionApprovalPending
                     ? "Сохраняем…"
                     : "Подтвердить всю секцию"}
               </button>
               {acceptanceError ? (
                 <span
-                  className="text-[12px] text-[var(--v19b-status-danger-text)]"
+                  className="text-[length:var(--v19b-size-12)] text-[var(--v19b-status-danger-text)]"
                   role="alert"
                 >
                   {acceptanceError}

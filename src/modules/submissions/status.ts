@@ -24,16 +24,17 @@ import {
 } from "./passportExtractionGuards";
 import {
   canonicalRequiredMediaReadiness,
-  CANONICAL_FRONTEND_MEDIA_TYPES,
   isCanonicalSubmissionStatus,
   isIssueTransitionAllowed,
   isKnownContractRole,
   isStatusTransitionAllowed,
 } from "./domainContract";
 import {
-  blsApplicableQuestionnaireFields,
-  blsQuestionnaireReadiness,
-} from "./questionnaireBlsRules";
+  ADMIN_PASSPORT_REVIEW_FIELD_IDS,
+  hasAdminPassportReviewValue,
+  requiredPassportReviewMediaSlots,
+} from "./passportReviewContract";
+import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -424,12 +425,16 @@ export function calculateSubmissionProgress(
   submission: Submission,
 ): Submission["completeness"] {
   const questionnaire = blsQuestionnaireReadiness(submission).percent;
-  const requiredFiles = submission.files.filter((file) =>
-    CANONICAL_FRONTEND_MEDIA_TYPES.some((type) => type === file.type),
+  const requiredFiles = requiredPassportReviewMediaSlots(submission).map((slot) =>
+    submission.files.find(
+      (file) => file.applicantId === slot.applicantId && file.type === slot.type,
+    ),
   );
-  const filesToScore = requiredFiles.length ? requiredFiles : submission.files;
-  const readyFiles = filesToScore.filter(isFileReadyForProgress);
-  const files = percent(readyFiles.length, filesToScore.length);
+  const readyFiles = requiredFiles.filter(
+    (file): file is Submission["files"][number] =>
+      Boolean(file && isFileReadyForProgress(file)),
+  );
+  const files = percent(readyFiles.length, requiredFiles.length);
   let total = Math.round((questionnaire + files) / 2);
 
   if (submission.status !== "exported") {
@@ -520,7 +525,7 @@ export function canAdminApproveForExport(submission: Submission) {
     !hasBlockingIssues(submission) &&
     !hasMissingRequiredWork(submission) &&
     adminQuestionnaireReviewReadiness(submission).ok &&
-    hasRequiredDocuments(submission) &&
+    canonicalRequiredMediaReadiness(submission, { requireAccepted: true }).ok &&
     hasUsableTripDateRange(submission)
   );
 }
@@ -561,43 +566,53 @@ export function hasMissingRequiredWork(submission: Submission) {
   return (
     !questionnaire.ready ||
     progress.files < 100 ||
-    !media.ok ||
-    submission.files.some(
-      (file) => file.status === "missing" || file.status === "needs_replacement",
-    )
+    !media.ok
   );
-}
-
-function hasAdminReviewValue(value: string) {
-  const normalized = value.trim().toLocaleLowerCase("ru-RU");
-  return Boolean(normalized) && normalized !== "—" && normalized !== "не заполнено";
 }
 
 export function adminQuestionnaireReviewReadiness(submission: Submission): {
   ok: boolean;
   reason?: string;
 } {
-  const fields = submission.applicants.flatMap((applicant) =>
-    blsApplicableQuestionnaireFields(applicant),
-  );
+  const fields = submission.applicants.flatMap((applicant) => {
+    const fieldsById = new Map(
+      applicant.sections
+        .flatMap((section) => section.fields)
+        .map((field) => [field.id, field] as const),
+    );
 
-  if (fields.some((field) => Boolean(field.error))) {
+    return ADMIN_PASSPORT_REVIEW_FIELD_IDS.map((fieldId) =>
+      fieldsById.get(fieldId),
+    );
+  });
+
+  if (fields.some((field) => !field || !hasAdminPassportReviewValue(field.value))) {
     return {
       ok: false,
-      reason: "В анкете есть поля, требующие исправления",
+      reason: "Заполните паспортные поля перед принятием",
     };
   }
 
-  const hasUnapprovedValue = fields.some(
+  const passportFields = fields.filter(
+    (field): field is NonNullable<typeof field> => Boolean(field),
+  );
+
+  if (passportFields.some((field) => Boolean(field.error))) {
+    return {
+      ok: false,
+      reason: "В паспортных данных есть поля, требующие исправления",
+    };
+  }
+
+  const hasUnapprovedValue = passportFields.some(
     (field) =>
-      hasAdminReviewValue(field.value) &&
       (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
   );
 
   return hasUnapprovedValue
     ? {
         ok: false,
-        reason: "Подтвердите заполненные поля анкеты перед принятием",
+        reason: "Подтвердите паспортные поля перед принятием",
       }
     : { ok: true };
 }
@@ -780,9 +795,9 @@ function validateSubmissionActionPolicy(
 
   if (
     (action === "accept" || action === "close_issues_accept") &&
-    !canonicalRequiredMediaReadiness(submission, { requireAccepted: false }).ok
+    !canonicalRequiredMediaReadiness(submission, { requireAccepted: true }).ok
   ) {
-    return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
+    return { ok: false, reason: "Подтвердите обязательные файлы перед принятием" };
   }
 
   if (
@@ -1251,11 +1266,9 @@ export function applySubmissionActionResult(
   }
 
   if (action === "close_issues_accept") {
-    const reviewedAtIso = new Date().toISOString();
     const prepared: Submission = {
       ...submission,
       exportState: "ready",
-      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
       issues: submission.issues.map((issue) =>
         isIssueTransitionAllowed(issue.status, "closed_by_admin")
           ? { ...issue, status: "closed_by_admin" }
@@ -1274,11 +1287,9 @@ export function applySubmissionActionResult(
   }
 
   if (action === "accept") {
-    const reviewedAtIso = new Date().toISOString();
     const prepared: Submission = {
       ...submission,
       exportState: "ready",
-      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
     };
 
     return transitionSubmissionStatus(prepared, {
@@ -1358,30 +1369,6 @@ function domainErrorCodeForBlockedAction(
     return "EXPORT_NOT_READY";
   }
   return "VALIDATION_ERROR";
-}
-
-function markReviewFilesAccepted(
-  files: Submission["files"],
-  reviewedAtIso: string,
-  reviewedBy?: string,
-): Submission["files"] {
-  return files.map((file) => {
-    if (
-      file.status !== "uploaded" &&
-      file.status !== "pending_review" &&
-      file.status !== "accepted"
-    ) {
-      return file;
-    }
-
-    return {
-      ...file,
-      status: "accepted" as const,
-      reviewedAtIso: file.reviewedAtIso ?? reviewedAtIso,
-      reviewedBy: file.reviewedBy ?? reviewedBy,
-      reviewStatus: "accepted" as const,
-    };
-  });
 }
 
 export function isSubmissionIssueResolved(submission: Submission, issue: Issue) {

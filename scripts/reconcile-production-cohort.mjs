@@ -142,7 +142,7 @@ async function main() {
       readRows(
         client,
         "applicants",
-        "id,submission_id,birth_date,email,passport_number,phone",
+        "id,submission_id,role,birth_date,email,passport_number,phone",
         "submission_id",
         submissionIds,
       ),
@@ -218,6 +218,9 @@ async function main() {
       (item) => item.submissionId === found.submissionId,
     );
     const applicantIds = new Set(caseApplicants.map((row) => row.id));
+    const primaryApplicants = caseApplicants.filter(
+      (row) => row.role === "main" || row.role === "Основной заявитель",
+    );
     const mediaTypes = countBy(caseMedia, "type");
     const documentStates = countBy(
       caseDocuments,
@@ -240,6 +243,11 @@ async function main() {
       applicantIds.size === caseApplicants.length,
       `${expected.caseKey} has duplicate applicant identities.`,
     );
+    invariant(
+      primaryApplicants.length === 1,
+      `${expected.caseKey} does not have exactly one explicit primary applicant.`,
+    );
+    const primaryApplicantId = primaryApplicants[0].id;
     invariant(
       [...caseMedia, ...caseDocuments, ...caseAnswers].every((row) =>
         applicantIds.has(row.applicant_id),
@@ -290,12 +298,12 @@ async function main() {
           : stage === "ready_for_export"
             ? { exportStatus: "ready", validationStatus: "passed" }
           : { exportStatus: "not_ready", validationStatus: "pending" };
-      const expectedAssetCount = expected.applicantCount * 3;
+      const expectedAssetCount = expected.applicantCount + 2;
       invariant(
         caseMedia.length === expectedAssetCount &&
           mediaTypes.passport_scan === expected.applicantCount &&
-          mediaTypes.selfie === expected.applicantCount &&
-          mediaTypes.selfie_2 === expected.applicantCount,
+          mediaTypes.selfie === 1 &&
+          mediaTypes.selfie_2 === 1,
         `${expected.caseKey} does not have all required media slots.`,
       );
       invariant(
@@ -305,6 +313,7 @@ async function main() {
       assertExactApplicantProjection(
         expected.caseKey,
         applicantIds,
+        primaryApplicantId,
         caseMedia,
         caseDocuments,
         caseAnswers,
@@ -687,6 +696,7 @@ function answerHasContent(value) {
 function assertExactApplicantProjection(
   caseKey,
   applicantIds,
+  primaryApplicantId,
   media,
   documents,
   answers,
@@ -697,11 +707,16 @@ function assertExactApplicantProjection(
     mediaById.size === media.length,
     `${caseKey} has duplicate media identities.`,
   );
-  const expectedMediaTypes = ["passport_scan", "selfie", "selfie_2"];
-  const expectedDocumentTypes = ["passport_scan", "selfie_1", "selfie_2"];
   let canonicalFieldIds;
 
   for (const applicantId of applicantIds) {
+    const isPrimaryApplicant = applicantId === primaryApplicantId;
+    const expectedMediaTypes = isPrimaryApplicant
+      ? ["passport_scan", "selfie", "selfie_2"]
+      : ["passport_scan"];
+    const expectedDocumentTypes = isPrimaryApplicant
+      ? ["passport_scan", "selfie_1", "selfie_2"]
+      : ["passport_scan"];
     const applicantMedia = media.filter((row) => row.applicant_id === applicantId);
     const applicantDocuments = documents.filter(
       (row) => row.applicant_id === applicantId,

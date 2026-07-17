@@ -24,7 +24,8 @@ import type {
   Submission,
 } from "../../src/modules/submissions/types";
 import {
-  adminApproveQuestionnaireForTest,
+  adminAcceptRequiredMediaForTest,
+  adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
@@ -196,11 +197,13 @@ describe("V-19 pilot click logic state machine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Подтвердите заполненные поля анкеты перед принятием",
+        message: "Подтвердите паспортные поля перед принятием",
       },
     });
-    const questionnaireApproved = adminApproveQuestionnaireForTest(closed);
-    expect(unwrap(acceptSubmission(questionnaireApproved, "admin")).status).toBe(
+    const passportSectionAccepted = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(closed),
+    );
+    expect(unwrap(acceptSubmission(passportSectionAccepted, "admin")).status).toBe(
       "ready_for_export",
     );
   });

@@ -72,7 +72,9 @@
       "20260714020334_atomic_export_guard_null_safe.sql",
       "20260714110000_repair_incomplete_export_document_completion.sql",
       "20260714190000_fix_complete_export_package_zip_suffix_guard.sql",
-      "20260714200000_harden_null_safe_admin_rpc_guards.sql"
+      "20260714200000_harden_null_safe_admin_rpc_guards.sql",
+      "20260715000000_document_assets_source_media_id_update_cascade.sql",
+      "20260717050000_admin_passport_review_media_policy.sql"
     ],
     "appliedRemoteOrder": [
       "20260611000000_visaflow_mvp_foundation",
@@ -379,8 +381,9 @@
     "pilotWindowStartedAt": "2026-07-14T19:20:00Z",
     "maxApplicantsPerSubmission": 3,
     "maxTotalApplicants": 1500,
-    "requiredMediaSlotsPerApplicant": 3,
-    "maxRequiredMediaObjects": 4500,
+    "primaryApplicantRequiredMediaSlots": 3,
+    "secondaryApplicantRequiredMediaSlots": 1,
+    "maxRequiredMediaObjects": 2500,
     "evidenceArtifact": "$V19_TEST_ARTIFACTS_DIR/supabase-production-pilot-security-exception-20260706.md",
     "workloadEvidenceArtifact": "$V19_TEST_ARTIFACTS_DIR/supabase-pilot-volume-envelope-20260706.md",
     "acceptedRisks": {

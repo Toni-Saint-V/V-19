@@ -1,3 +1,8 @@
+import {
+  hasUnambiguousPrimaryApplicantForPassportReview,
+  requiredPassportReviewMediaSlots,
+} from "./passportReviewContract";
+
 export const CANONICAL_SUBMISSION_STATUSES = [
   "draft",
   "in_progress",
@@ -289,7 +294,7 @@ export type MediaReadinessFile = {
 };
 
 export type MediaReadinessSubmission = {
-  applicants: Array<{ id: string }>;
+  applicants: Array<{ id: string; role?: string }>;
   files: MediaReadinessFile[];
 };
 
@@ -297,30 +302,35 @@ export function canonicalRequiredMediaReadiness(
   submission: MediaReadinessSubmission,
   options: { requireAccepted?: boolean; requireStorageIdentity?: boolean } = {},
 ): ContractResult<true> {
+  if (!hasUnambiguousPrimaryApplicantForPassportReview(submission)) {
+    return {
+      ok: false,
+      reason: "Submission must have one unambiguous primary applicant.",
+    };
+  }
+
   for (const file of submission.files) {
     if (!isCanonicalFrontendMediaType(file.type)) {
       return { ok: false, reason: "Canonical package contains rejected media." };
     }
   }
 
-  for (const applicant of submission.applicants) {
-    for (const type of CANONICAL_FRONTEND_MEDIA_TYPES) {
-      const file = submission.files.find(
-        (item) => item.applicantId === applicant.id && item.type === type,
-      );
-      if (!file) return { ok: false, reason: `Missing ${type}.` };
-      if (file.status === "missing" || file.status === "needs_replacement") {
-        return { ok: false, reason: `Required ${type} is not ready.` };
-      }
-      if (options.requireAccepted && file.status !== "accepted") {
-        return { ok: false, reason: `Required ${type} is not accepted.` };
-      }
-      if (
-        options.requireStorageIdentity &&
-        (!file.storageBucket || !file.storagePath || !file.generatedFileName)
-      ) {
-        return { ok: false, reason: `Required ${type} has no storage identity.` };
-      }
+  for (const slot of requiredPassportReviewMediaSlots(submission)) {
+    const file = submission.files.find(
+      (item) => item.applicantId === slot.applicantId && item.type === slot.type,
+    );
+    if (!file) return { ok: false, reason: `Missing ${slot.type}.` };
+    if (file.status === "missing" || file.status === "needs_replacement") {
+      return { ok: false, reason: `Required ${slot.type} is not ready.` };
+    }
+    if (options.requireAccepted && file.status !== "accepted") {
+      return { ok: false, reason: `Required ${slot.type} is not accepted.` };
+    }
+    if (
+      options.requireStorageIdentity &&
+      (!file.storageBucket || !file.storagePath || !file.generatedFileName)
+    ) {
+      return { ok: false, reason: `Required ${slot.type} has no storage identity.` };
     }
   }
 

@@ -171,9 +171,14 @@ async function main() {
 
     await save(agent.client, familyDraftPayload(agent.userId, familyRunId, false));
     await uploadFamilyPrivateMedia(agent.client, familyRunId);
-    await save(agent.client, familyDraftPayload(agent.userId, familyRunId, true));
-    await expectFamilyReload(agent.client, familyRunId);
-    pass("family submission with 3 applicants persists applicants and required media");
+    await save(
+      agent.client,
+      familyDraftPayload(agent.userId, familyRunId, true, "waiting_review"),
+    );
+    await expectFamilyReload(agent.client, familyRunId, "waiting_review");
+    pass(
+      "family submission reaches review with passports for all applicants and selfies for primary",
+    );
 
     await cleanup(adminService);
     await writeEvidenceAndReadiness();
@@ -294,7 +299,7 @@ async function expectStatus(client, id, status) {
 
 async function uploadFamilyPrivateMedia(client, id) {
   for (const applicant of familyApplicants(id)) {
-    for (const slot of requiredMediaSlots) {
+    for (const slot of requiredMediaSlotsForApplicant(applicant)) {
       const path = storagePathFor(
         id,
         applicant.id,
@@ -314,7 +319,7 @@ async function uploadFamilyPrivateMedia(client, id) {
   }
 }
 
-async function expectFamilyReload(client, id) {
+async function expectFamilyReload(client, id, expectedStatus) {
   const [
     { data: submission, error: submissionError },
     { data: applicants, error: applicantsError },
@@ -334,7 +339,7 @@ async function expectFamilyReload(client, id) {
   if (applicantsError)
     throw new Error(`family applicants reload failed: ${applicantsError.message}`);
   if (mediaError) throw new Error(`family media reload failed: ${mediaError.message}`);
-  if (submission.type !== "family" || submission.status !== "draft") {
+  if (submission.type !== "family" || submission.status !== expectedStatus) {
     throw new Error(
       `family submission reload mismatch: ${submission.type}/${submission.status}`,
     );
@@ -342,9 +347,9 @@ async function expectFamilyReload(client, id) {
   if ((applicants ?? []).length !== 3) {
     throw new Error(`expected 3 family applicants, got ${(applicants ?? []).length}`);
   }
-  if ((media ?? []).length !== 9) {
+  if ((media ?? []).length !== 5) {
     throw new Error(
-      `expected 9 family required media rows, got ${(media ?? []).length}`,
+      `expected 5 family required media rows, got ${(media ?? []).length}`,
     );
   }
   if (
@@ -516,7 +521,7 @@ function acceptedPayload(agentId, adminId, id) {
   return payload;
 }
 
-function familyDraftPayload(agentId, id, includeMedia) {
+function familyDraftPayload(agentId, id, includeMedia, status = "draft") {
   const now = new Date().toISOString();
   const applicants = familyApplicants(id);
   const media = includeMedia ? familyMediaRows(id) : [];
@@ -529,7 +534,7 @@ function familyDraftPayload(agentId, id, includeMedia) {
       country: "Испания",
       city: "Москва",
       travel_date: "2026-07-10 - 2026-07-18",
-      status: "draft",
+      status,
       priority: "Средний",
       readiness_percent: includeMedia ? 100 : 40,
       family_intelligence: {
@@ -544,7 +549,8 @@ function familyDraftPayload(agentId, id, includeMedia) {
             city: "Москва",
             tripDateFrom: "2026-07-10",
             tripDateTo: "2026-07-18",
-            status: "in_progress",
+            status:
+              status === "waiting_review" ? "submitted_for_review" : "in_progress",
             applicants: applicants.map((applicant) => ({
               id: applicant.id,
               fullName: applicant.fullName,
@@ -570,7 +576,7 @@ function familyDraftPayload(agentId, id, includeMedia) {
         },
       },
       appointment_status: "not_started",
-      submitted_at: null,
+      submitted_at: status === "waiting_review" ? now : null,
       review_started_at: null,
       accepted_at: null,
       exported_at: null,
@@ -641,7 +647,7 @@ function familyApplicants(id) {
 function familyMediaRows(id) {
   const now = new Date().toISOString();
   return familyApplicants(id).flatMap((applicant) =>
-    requiredMediaSlots.map((slot) => {
+    requiredMediaSlotsForApplicant(applicant).map((slot) => {
       const generatedFileName = `v19smoke_${applicant.suffix}_${slot}.jpg`;
       const storagePath = storagePathFor(id, applicant.id, slot, generatedFileName);
       cleanupPaths.add(storagePath);
@@ -683,6 +689,10 @@ function familyMediaRows(id) {
       };
     }),
   );
+}
+
+function requiredMediaSlotsForApplicant(applicant) {
+  return applicant.role === "main" ? requiredMediaSlots : ["passport_scan"];
 }
 
 function correction(adminId, status, fixedAt) {

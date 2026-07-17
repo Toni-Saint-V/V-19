@@ -118,9 +118,13 @@ function familyWithApplicants(total: number): Submission {
     fullName: `APPLICANT ${index + 1}`,
     id: `family-applicant-${index + 1}`,
     questionnaireStatus: "complete",
+    role: index === 0 ? "main" : "child",
   }));
   const files: SubmissionFile[] = applicants.flatMap((applicant) =>
-    canonicalMediaTypes.map((type) => ({
+    (applicant.role === "main"
+      ? canonicalMediaTypes
+      : (["passport_scan"] as const)
+    ).map((type) => ({
       applicantId: applicant.id,
       generatedFileName: `${applicant.id}-${type}.jpg`,
       id: `${applicant.id}-${type}`,
@@ -171,14 +175,31 @@ describe("submission deterministic rules adversarial stress gate", () => {
     );
   });
 
-  test("single ready submission passes while family of 20 with one missing second selfie fails closed", () => {
+  test("family media requires selfies only for primary and passports for everyone", () => {
     const ready = readyClone({ id: "ПД-READY-SINGLE" });
     const family = familyWithApplicants(20);
-    const brokenFamily = {
+    const secondaryWithoutSelfie = {
       ...family,
       files: family.files.filter(
         (file) =>
           !(file.applicantId === "family-applicant-17" && file.type === "selfie_2"),
+      ),
+    };
+    const primaryWithoutSelfie = {
+      ...family,
+      files: family.files.filter(
+        (file) =>
+          !(file.applicantId === "family-applicant-1" && file.type === "selfie_2"),
+      ),
+    };
+    const secondaryWithoutPassport = {
+      ...family,
+      files: family.files.filter(
+        (file) =>
+          !(
+            file.applicantId === "family-applicant-17" &&
+            file.type === "passport_scan"
+          ),
       ),
     };
 
@@ -192,14 +213,26 @@ describe("submission deterministic rules adversarial stress gate", () => {
       ok: true,
     });
     expect(
-      canonicalRequiredMediaReadiness(brokenFamily, { requireAccepted: true }),
+      canonicalRequiredMediaReadiness(secondaryWithoutSelfie, {
+        requireAccepted: true,
+      }),
+    ).toEqual({ data: true, ok: true });
+    expect(
+      canonicalRequiredMediaReadiness(primaryWithoutSelfie, {
+        requireAccepted: true,
+      }),
     ).toEqual({
       ok: false,
       reason: "Missing selfie_2.",
     });
-    expect(exportSummary([brokenFamily]).blockers.map((item) => item.reason)).toContain(
-      "В выборке есть подачи без полного канонического пакета медиа",
-    );
+    expect(
+      canonicalRequiredMediaReadiness(secondaryWithoutPassport, {
+        requireAccepted: true,
+      }),
+    ).toEqual({ ok: false, reason: "Missing passport_scan." });
+    expect(
+      exportSummary([secondaryWithoutPassport]).blockers.map((item) => item.reason),
+    ).toContain("В выборке есть подачи без полного канонического пакета медиа");
   });
 
   test("mixed city blocks export, while same-city mixed-agent export is warning-only", () => {

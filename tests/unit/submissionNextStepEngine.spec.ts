@@ -13,7 +13,8 @@ import { buildSubmissionNextStepBrief } from "../../src/modules/submissions/subm
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import type { Issue, Submission } from "../../src/modules/submissions/types";
 import {
-  adminApproveQuestionnaireForTest,
+  adminAcceptRequiredMediaForTest,
+  adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
@@ -222,11 +223,13 @@ describe("submission next-step engine", () => {
   });
 
   test("returns admin accept and export actions from lifecycle state", () => {
-    const submitted = adminApproveQuestionnaireForTest(
-      applySubmissionAction(
-        readyForReviewSubmission(),
-        "submit_for_review",
-        "agent",
+    const submitted = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(
+        applySubmissionAction(
+          readyForReviewSubmission(),
+          "submit_for_review",
+          "agent",
+        ),
       ),
     );
     const adminReview = buildSubmissionNextStepBrief({
@@ -383,7 +386,9 @@ describe("submission next-step engine", () => {
   });
 
   test("treats fixed corrections as admin-ready action, not an agent blocker", () => {
-    const ready = adminApproveQuestionnaireForTest(readyForReviewSubmission());
+    const ready = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(readyForReviewSubmission()),
+    );
     const fixedIssue: Issue = {
       id: "issue-fixed-email",
       type: "field",

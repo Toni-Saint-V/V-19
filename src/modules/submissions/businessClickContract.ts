@@ -9,7 +9,6 @@ export type BusinessClickExecutionPath =
   | "uploadRequiredFile"
   | "addPreciseAdminIssue"
   | "markSubmissionIssueFixedResult"
-  | "markSubmissionFileAccepted"
   | "exportSummary"
   | "applyExportStateToSelection"
   | "completeExportPackage"
@@ -107,14 +106,6 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     submissionAction: "submit_corrections",
     surfaces: ["agent-actions", "agent-submissions", "submission-drawer"],
     transition: { from: ["returned"], to: "corrections_received" },
-  },
-  accept_submission_file: {
-    executionPath: "markSubmissionFileAccepted",
-    intent: "file_review",
-    ownerRole: "admin",
-    productionLogic:
-      "src/modules/submissions/submissionActions.markSubmissionFileAccepted",
-    surfaces: ["admin-review", "submission-drawer"],
   },
   accept: {
     executionPath: "applySubmissionActionResult",

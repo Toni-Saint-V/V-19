@@ -22,7 +22,10 @@ async function expectBodyMatches(page: Page, patterns: RegExp[], timeout = 20_00
   await expect
     .poll(
       async () => {
-        const text = await page.locator("body").innerText().catch(() => "");
+        const text = await page
+          .locator("body")
+          .innerText()
+          .catch(() => "");
         return patterns.some((pattern) => pattern.test(text));
       },
       { timeout },
@@ -51,10 +54,10 @@ async function expectWithinViewport(page: Page, locator: Locator) {
       const box = await locator.boundingBox();
       return Boolean(
         box &&
-          box.x >= -0.5 &&
-          box.y >= -0.5 &&
-          box.x + box.width <= viewport.width + 0.5 &&
-          box.y + box.height <= viewport.height + 0.5,
+        box.x >= -0.5 &&
+        box.y >= -0.5 &&
+        box.x + box.width <= viewport.width + 0.5 &&
+        box.y + box.height <= viewport.height + 0.5,
       );
     })
     .toBe(true);
@@ -171,7 +174,9 @@ async function verifyRemarkSubmitActionability(
   await expect(remarkDialog).toHaveCount(0);
   await expect(drawer(page)).toBeVisible();
   await openDrawerTab(page, ["Замечания"]).catch(() => undefined);
-  await expectBodyMatches(page, [/Замечания|Исправить|Требуется|Анкета|Файлы|ПД-|SUB-/i]);
+  await expectBodyMatches(page, [
+    /Замечания|Исправить|Требуется|Анкета|Файлы|ПД-|SUB-/i,
+  ]);
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
@@ -282,9 +287,7 @@ async function verifyEveryAdminDrawerSubview(
     .getByRole("tab", { name: "Обзор" });
   await expect(restoredOverviewTab).toBeVisible();
   await restoredOverviewTab.click();
-  const metricLabels = drawer(page).locator(
-    ".admin-review-traveler-overview dt",
-  );
+  const metricLabels = drawer(page).locator(".admin-review-traveler-overview dt");
   await expect(metricLabels).toHaveCount(4);
   expect(
     await metricLabels.evaluateAll((labels) =>
@@ -292,8 +295,8 @@ async function verifyEveryAdminDrawerSubview(
         const metric = label.parentElement;
         return Boolean(
           metric &&
-            label.scrollWidth <= label.clientWidth &&
-            metric.getBoundingClientRect().width > 0,
+          label.scrollWidth <= label.clientWidth &&
+          metric.getBoundingClientRect().width > 0,
         );
       }),
     ),
@@ -305,82 +308,88 @@ async function verifyEveryAdminDrawerSubview(
 }
 
 test.describe("V-19 pilot admin review click flow", () => {
-  test(
-    "admin navigation reaches every local workspace surface on desktop and mobile",
-    async ({ page }, testInfo) => {
-      const browserProblems = collectBrowserProblems(page);
-      const screens = [
-        {
-          fileName: "review",
-          heading: "Проверка",
-          nav: /^Проверка$/,
-          readyText: "Очередь готова к проверке",
-        },
-        {
-          fileName: "export",
-          heading: "Выгрузка",
-          nav: /^Выгрузка$/,
-          readyText: "Пакеты к выгрузке",
-        },
-        {
-          fileName: "users",
-          heading: "Управление пользователями",
-          nav: /^Пользователи$/,
-          readyText: "Заявки на доступ",
-        },
-        {
-          fileName: "settings",
-          heading: "Системные настройки",
-          nav: /^Настройки$/,
-          readyText: "Уведомления",
-        },
-      ] as const;
+  test("admin navigation reaches every local workspace surface on desktop and mobile", async ({
+    page,
+  }, testInfo) => {
+    const browserProblems = collectBrowserProblems(page);
+    const screens = [
+      {
+        fileName: "review",
+        heading: "Проверка",
+        nav: /^Проверка$/,
+        readyText: "Очередь готова к проверке",
+      },
+      {
+        fileName: "export",
+        heading: "Выгрузка",
+        nav: /^Выгрузка$/,
+        readyText: "Пакеты к выгрузке",
+      },
+      {
+        fileName: "users",
+        heading: "Управление пользователями",
+        nav: /^Пользователи$/,
+        readyText: "Заявки на доступ",
+      },
+      {
+        fileName: "settings",
+        heading: "Системные настройки",
+        nav: /^Настройки$/,
+        readyText: "Уведомления",
+      },
+    ] as const;
 
-      for (const viewport of [
-        { height: 900, width: 1440 },
-        { height: 844, width: 390 },
-      ]) {
-        await page.setViewportSize(viewport);
-        await openFreshWorkspace(page, {
-          heading: "Проверка",
-          workspaceEmail: "admin@visaflow.local",
-        });
+    for (const viewport of [
+      { height: 900, width: 1440 },
+      { height: 844, width: 390 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await openFreshWorkspace(page, {
+        heading: "Проверка",
+        workspaceEmail: "admin@visaflow.local",
+      });
 
-        for (const screen of screens) {
-          await clickWorkspaceButton(page, screen.nav);
-          await expect(
-            page.getByRole("heading", { level: 1, name: screen.heading }),
-          ).toBeVisible();
-          await expect(page.getByText(screen.readyText, { exact: true }).first()).toBeVisible();
-          if (viewport.width < 768 && screen.fileName === "settings") {
-            const activeSettingsTab = page.locator(
-              ".settings-nav button[aria-current='page']",
-            );
-            await expect(activeSettingsTab).toHaveText("Уведомления");
-            await expectWithinViewport(page, activeSettingsTab);
-          }
-          expect(
-            await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-          ).toBe(true);
-
-          const screenshotPath = testInfo.outputPath(
-            `admin-${viewport.width}-${screen.fileName}.png`,
+      for (const screen of screens) {
+        await clickWorkspaceButton(page, screen.nav);
+        await expect(
+          page.getByRole("heading", { level: 1, name: screen.heading }),
+        ).toBeVisible();
+        await expect(
+          page.getByText(screen.readyText, { exact: true }).first(),
+        ).toBeVisible();
+        if (viewport.width < 768 && screen.fileName === "settings") {
+          const activeSettingsTab = page.locator(
+            ".settings-nav button[aria-current='page']",
           );
-          await page.screenshot({ path: screenshotPath });
-          await testInfo.attach(`admin-${viewport.width}-${screen.fileName}`, {
-            contentType: "image/png",
-            path: screenshotPath,
-          });
+          await expect(activeSettingsTab).toHaveText("Уведомления");
+          await expectWithinViewport(page, activeSettingsTab);
         }
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true);
+
+        const screenshotPath = testInfo.outputPath(
+          `admin-${viewport.width}-${screen.fileName}.png`,
+        );
+        await page.screenshot({ path: screenshotPath });
+        await testInfo.attach(`admin-${viewport.width}-${screen.fileName}`, {
+          contentType: "image/png",
+          path: screenshotPath,
+        });
       }
+    }
 
-      expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-        [],
-      );
-    },
-  );
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
+  });
 
-  test("admin settings subviews remain reachable on desktop and mobile", async ({ page }, testInfo) => {
+  test("admin settings subviews remain reachable on desktop and mobile", async ({
+    page,
+  }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
     const sections = [
       ["Профиль", "Профиль"],
@@ -417,7 +426,9 @@ test.describe("V-19 pilot admin review click flow", () => {
           await expectWithinViewport(page, button);
         }
         expect(
-          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
         ).toBe(true);
       }
 
@@ -431,9 +442,10 @@ test.describe("V-19 pilot admin review click flow", () => {
       });
     }
 
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
-    );
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 
   test("admin passport reconciliation stays blocked without protected evidence", async ({
@@ -455,7 +467,9 @@ test.describe("V-19 pilot admin review click flow", () => {
 
     await openDrawerTab(page, ["Файлы"]);
     const verifyPassport = drawer(page)
-      .getByTestId("admin-review-verify-passport")
+      .locator(".v19-drawer-file-item")
+      .filter({ hasText: "Скан паспорта" })
+      .getByRole("button", { name: "Проверить", exact: true })
       .first();
     await expect(verifyPassport).toBeVisible();
     await verifyPassport.click();
@@ -463,14 +477,21 @@ test.describe("V-19 pilot admin review click flow", () => {
     const passportWorkspace = page.locator(".v19-admin-passport-workspace");
     await expect(passportWorkspace).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Сверка паспорта", exact: true }),
+      page.getByRole("heading", { name: /Паспортная секция/ }),
     ).toBeVisible();
     await expect(
-      passportWorkspace.getByText("Предпросмотр оригинала недоступен"),
+      passportWorkspace
+        .locator('[data-review-media="passport_scan"]')
+        .getByText(/Защищённый оригинал недоступен|Файл не загружен/),
     ).toBeVisible();
     await expect(
-      passportWorkspace.getByRole("button", { name: "Завершить сверку паспорта" }),
+      passportWorkspace.getByRole("button", {
+        name: "Подтвердить паспортную секцию",
+      }),
     ).toBeDisabled();
+    await expect(
+      passportWorkspace.getByRole("button", { name: /^Подтвердить:/ }),
+    ).toHaveCount(0);
 
     expect(
       await page.evaluate(() => {
@@ -485,15 +506,15 @@ test.describe("V-19 pilot admin review click flow", () => {
     await passportWorkspace.getByRole("button", { name: "Вернуться к подаче" }).click();
     await expect(drawer(page)).toBeVisible();
 
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
-    );
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 
-  test("admin drawer opens every subview without overflow on desktop and mobile", async (
-    { page },
-    testInfo,
-  ) => {
+  test("admin drawer opens every subview without overflow on desktop and mobile", async ({
+    page,
+  }, testInfo) => {
     await verifyEveryAdminDrawerSubview(page, testInfo, {
       height: 900,
       width: 1440,
@@ -508,12 +529,11 @@ test.describe("V-19 pilot admin review click flow", () => {
     ["desktop 1440x900", { height: 900, width: 1440 }],
     ["mobile 390x844", { height: 844, width: 390 }],
   ] as const) {
-    test(
-      `admin queue issue submit is actionable at ${label}`,
-      async ({ page }, testInfo) => {
-        await verifyRemarkSubmitActionability(page, testInfo, label, viewport);
-      },
-    );
+    test(`admin queue issue submit is actionable at ${label}`, async ({
+      page,
+    }, testInfo) => {
+      await verifyRemarkSubmitActionability(page, testInfo, label, viewport);
+    });
   }
 
   test("admin export surface selects a ready package and prepares Excel", async ({
@@ -563,10 +583,13 @@ test.describe("V-19 pilot admin review click flow", () => {
       await prepareButton.click();
     }
 
-    await expectBodyMatches(page, [/Excel готов|Сформировать ZIP с Excel|Можно сформировать/i]);
+    await expectBodyMatches(page, [
+      /Excel готов|Сформировать ZIP с Excel|Можно сформировать/i,
+    ]);
 
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
-    );
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 });

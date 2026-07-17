@@ -267,6 +267,60 @@ describe("export media mega ZIP", () => {
     ).toBe(false);
   });
 
+  test("keeps primary-only selfies role-aware when family members are reordered", async () => {
+    const family = withCanonicalStorage(byId("SUB-1102"));
+    const primary = family.applicants.find((applicant) => applicant.role === "main");
+    const spouse = family.applicants.find((applicant) => applicant.role === "spouse");
+    const child = family.applicants.find((applicant) => applicant.role === "child");
+    if (!primary || !spouse || !child) throw new Error("Incomplete family fixture");
+
+    const selection = generatedSelection({
+      ...family,
+      applicants: [spouse, primary, child],
+    });
+    const result = await createExportMediaZipArtifact(selection, {
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument: documentDownloader(),
+      expectedIdentity: identityFor(selection),
+      exportDate,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+
+    const names = await zipEntryNames(result.artifact.blob);
+    const mediaNames = mediaEntryNames(names.fileNames);
+    expect(mediaNames).toHaveLength(5);
+    expect(mediaNames).toEqual(
+      expect.arrayContaining([
+        `${rootFolder}/Москва/Семья Волковых/660011021_selfie_1.jpg`,
+        `${rootFolder}/Москва/Семья Волковых/660011021_selfie_2.jpg`,
+        `${rootFolder}/Москва/Семья Волковых/660011022_passport_scan.pdf`,
+      ]),
+    );
+    expect(mediaNames).not.toEqual(
+      expect.arrayContaining([
+        `${rootFolder}/Москва/Семья Волковых/660011022_selfie_1.jpg`,
+        `${rootFolder}/Москва/Семья Волковых/660011022_selfie_2.jpg`,
+      ]),
+    );
+
+    const manifest = JSON.parse(
+      await zipTextEntry(result.artifact.blob, manifestName(names.fileNames)),
+    ) as {
+      submissions: Array<{
+        applicants: Array<{ documentTypes: string[]; id: string }>;
+      }>;
+    };
+    const applicants = manifest.submissions[0]?.applicants ?? [];
+    expect(applicants.find((applicant) => applicant.id === primary.id)).toMatchObject({
+      documentTypes: ["passport_scan", "selfie_1", "selfie_2"],
+    });
+    expect(applicants.find((applicant) => applicant.id === spouse.id)).toMatchObject({
+      documentTypes: ["passport_scan"],
+    });
+  });
+
   test("groups mixed packages by city and submission folder", async () => {
     const selection = generatedSelection(
       withCanonicalStorage(byId("SUB-1101")),

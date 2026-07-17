@@ -6,12 +6,10 @@ import {
 } from "./integration/visaflowBusinessBridge";
 import {
   addPreciseAdminIssue,
-  approveQuestionnaireFieldForAdmin,
+  approvePassportReviewSectionForAdmin,
   applyExportStateToSelection,
   applyActionToSubmissionListResult,
-  markSubmissionFileAccepted,
 } from "./modules/submissions/submissionActions";
-import { isPersistablePrivateFileAssetAtSubmissionTarget } from "./modules/submissions/fileAsset";
 import {
   acceptAiSuggestionAsIssue,
   dismissAiSuggestion,
@@ -942,82 +940,28 @@ export default function App({
         );
         await bridge.onAdminIssueAdd?.({ submissionId, input });
       },
-      onAdminQuestionnaireFieldApprove: async ({
-        submissionId,
-        applicantId,
-        sectionId,
-        fieldId,
-      }) => {
+      onAdminPassportSectionApprove: async ({ submissionId, applicantId }) => {
         if (!activeApprovedSession || activeApprovedSession.role !== "admin") {
-          throw new Error("Только активный администратор может подтвердить поле анкеты.");
-        }
-        const approvedAtIso = new Date().toISOString();
-        let approved = false;
-        await updateAdminSubmission(submissionId, (submission) => {
-          const next = approveQuestionnaireFieldForAdmin(
-            submission,
-            { applicantId, sectionId, fieldId },
-            activeApprovedSession.userId,
-            approvedAtIso,
-          );
-          approved = next !== submission;
-          return next;
-        });
-        if (!approved) {
           throw new Error(
-            "Поле нельзя подтвердить: заполните значение и закройте замечания.",
+            "Только активный администратор может подтвердить паспортную секцию.",
           );
-        }
-        await bridge.onAdminQuestionnaireFieldApprove?.({
-          submissionId,
-          applicantId,
-          sectionId,
-          fieldId,
-        });
-      },
-      onAdminFileAccept: async ({ submissionId, applicantId, fileType }) => {
-        if (activeApprovedSession?.role !== "admin") {
-          throw new Error("Только активный администратор может подтвердить файл.");
         }
 
         let foundSubmission = false;
         await updateAdminSubmission(submissionId, (submission) => {
           foundSubmission = true;
-          const applicantExists = submission.applicants.some(
-            (applicant) => applicant.id === applicantId,
+          const result = approvePassportReviewSectionForAdmin(
+            submission,
+            { applicantId },
+            activeApprovedSession.userId,
           );
-          const file = submission.files.find(
-            (candidate) =>
-              candidate.applicantId === applicantId && candidate.type === fileType,
-          );
-          const isReviewableStatus =
-            file?.status === "uploaded" || file?.status === "pending_review";
-
-          if (
-            !applicantExists ||
-            !file ||
-            !isReviewableStatus ||
-            !isPersistablePrivateFileAssetAtSubmissionTarget(file, {
-              applicantId,
-              fileType,
-              submissionId,
-            })
-          ) {
-            throw new Error(
-              "Нельзя подтвердить файл без защищённого оригинала выбранного заявителя.",
-            );
-          }
-
-          return markSubmissionFileAccepted(submission, {
-            applicantId,
-            fileType,
-            reviewedBy: activeApprovedSession.userId,
-          });
+          if (!result.ok) throw new Error(result.error.message);
+          return result.data;
         });
         if (!foundSubmission) {
-          throw new Error("Подача для подтверждения файла не найдена.");
+          throw new Error("Подача для подтверждения паспортной секции не найдена.");
         }
-        await bridge.onAdminFileAccept?.({ submissionId, applicantId, fileType });
+        await bridge.onAdminPassportSectionApprove?.({ submissionId, applicantId });
       },
       onAdminAiReviewRun: async (submissionId) => {
         await updateAdminSubmission(submissionId, runAiReview);
