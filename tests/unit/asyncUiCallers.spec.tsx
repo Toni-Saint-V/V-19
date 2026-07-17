@@ -308,7 +308,18 @@ describe("async UI callers", () => {
     await waitFor(() => expect(primaryButton).not.toBeDisabled());
   });
 
-  test("operational drawer keeps an accessible tab-panel contract and keyboard navigation", async () => {
+  test("operational drawer keeps the four canonical tabs and keyboard navigation", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        addEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        matches: false,
+        media: query,
+        onchange: null,
+        removeEventListener: vi.fn(),
+      })),
+    });
     const submission = draftSubmission();
     render(
       <FigmaSubmissionDrawer
@@ -326,7 +337,7 @@ describe("async UI callers", () => {
     expect(dialog).toHaveAttribute("aria-labelledby", "v20-submission-drawer-heading");
 
     const tabs = await screen.findAllByRole("tab");
-    expect(tabs).toHaveLength(5);
+    expect(tabs).toHaveLength(4);
     expect(tabs[0]).toHaveAttribute("aria-controls", "v20-submission-drawer-panel-overview");
     expect(tabs[0]).toHaveAttribute("tabindex", "0");
 
@@ -381,8 +392,20 @@ describe("async UI callers", () => {
   });
 
   test("operational drawer awaits mark-fixed and shows an inline error without a false fixed state", async () => {
-    const submission = initialSubmissions.find((item) => item.status === "returned");
-    if (!submission) throw new Error("Missing returned submission fixture.");
+    const source = initialSubmissions.find((item) => item.status === "returned");
+    if (!source) throw new Error("Missing returned submission fixture.");
+    const firstIssue = source.issues[0];
+    if (!firstIssue) throw new Error("Missing returned issue fixture.");
+    const submission: Submission = {
+      ...source,
+      issues: [
+        {
+          ...firstIssue,
+          type: "section",
+          target: { ...firstIssue.target, fileType: undefined },
+        },
+      ],
+    };
     let rejectMarkFixed: ((reason?: unknown) => void) | undefined;
     const pendingMarkFixed = new Promise<void>((_resolve, reject) => {
       rejectMarkFixed = reject;
