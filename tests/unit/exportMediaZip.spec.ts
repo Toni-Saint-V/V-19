@@ -2,7 +2,6 @@ import JSZip from "jszip";
 import { describe, expect, test, vi } from "vitest";
 import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import {
-  auditExportMediaZipArtifact,
   createExportMediaZipArtifact,
   default as downloadExportMediaZip,
   toExportPackageDocumentCommit,
@@ -179,7 +178,7 @@ describe("export media mega ZIP", () => {
     expect(result.artifact.workbookFileName).toMatch(/^visaflow-export-.+\.xlsx$/);
     expect(result.artifact).toMatchObject({
       applicantCount: 1,
-      fileCount: 4,
+      fileCount: 3,
       submissionCount: 1,
     });
 
@@ -197,8 +196,10 @@ describe("export media mega ZIP", () => {
         `${rootFolder}/Москва/Дмитрий Орлов/660010561_passport_scan.pdf`,
         `${rootFolder}/Москва/Дмитрий Орлов/660010561_selfie_1.jpg`,
         `${rootFolder}/Москва/Дмитрий Орлов/660010561_selfie_2.jpg`,
-        `${rootFolder}/Москва/Дмитрий Орлов/660010561_visa_form.pdf`,
       ]),
+    );
+    expect(mediaEntryNames(names.fileNames)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/_visa_form\.pdf$/)]),
     );
   });
 
@@ -237,13 +238,13 @@ describe("export media mega ZIP", () => {
     if (!result.ok) throw new Error(result.safeMessage);
     expect(result.artifact).toMatchObject({
       applicantCount: 3,
-      fileCount: 12,
+      fileCount: 5,
       submissionCount: 1,
     });
 
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
-    expect(mediaNames).toHaveLength(12);
+    expect(mediaNames).toHaveLength(5);
     expect(
       mediaNames.every((name) =>
         name.startsWith(`${rootFolder}/Москва/Семья Волковых/`),
@@ -253,47 +254,17 @@ describe("export media mega ZIP", () => {
       expect.arrayContaining([
         `${rootFolder}/Москва/Семья Волковых/660011021_passport_scan.pdf`,
         `${rootFolder}/Москва/Семья Волковых/660011021_selfie_1.jpg`,
-        `${rootFolder}/Москва/Семья Волковых/660011021_visa_form.pdf`,
+        `${rootFolder}/Москва/Семья Волковых/660011021_selfie_2.jpg`,
         `${rootFolder}/Москва/Семья Волковых/660011022_passport_scan.pdf`,
-        `${rootFolder}/Москва/Семья Волковых/660011023_selfie_2.jpg`,
+        `${rootFolder}/Москва/Семья Волковых/660011023_passport_scan.pdf`,
       ]),
     );
-  });
-
-  test("audits exactly four mapped files and three unique source assets per applicant", async () => {
-    const selection = generatedSelection(withCanonicalStorage(byId("SUB-1102")));
-    const result = await createExportMediaZipArtifact(selection, {
-      documentAssets: documentAssetsFor(selection),
-      downloadDocument: documentDownloader(),
-      expectedIdentity: identityFor(selection),
-      exportDate,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.safeMessage);
-    await expect(auditExportMediaZipArtifact(result.artifact)).resolves.toEqual({
-      ok: true,
-    });
-
-    const archive = await JSZip.loadAsync(await result.artifact.blob.arrayBuffer());
-    const missingForm = Object.keys(archive.files).find((name) =>
-      name.endsWith("660011022_visa_form.pdf"),
-    );
-    if (!missingForm) throw new Error("Missing family visa form fixture.");
-    archive.remove(missingForm);
-    const tamperedBlob = await archive.generateAsync({ type: "blob" });
-
-    await expect(
-      auditExportMediaZipArtifact({ ...result.artifact, blob: tamperedBlob }),
-    ).resolves.toMatchObject({ ok: false, reason: "audit_failed" });
-    await expect(
-      auditExportMediaZipArtifact({
-        ...result.artifact,
-        documentAssetIds: result.artifact.documentAssetIds.map((id, index) =>
-          index === 1 ? result.artifact.documentAssetIds[0]! : id,
-        ),
-      }),
-    ).resolves.toMatchObject({ ok: false, reason: "audit_failed" });
+    expect(
+      mediaNames.some(
+        (name) =>
+          /(660011022|660011023)_selfie_[12]\.jpg$/.test(name),
+      ),
+    ).toBe(false);
   });
 
   test("groups mixed packages by city and submission folder", async () => {
@@ -313,7 +284,7 @@ describe("export media mega ZIP", () => {
 
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
-    expect(mediaNames).toHaveLength(16);
+    expect(mediaNames).toHaveLength(8);
     expect(mediaNames.some((name) => name.includes("/Ольга Фролова/"))).toBe(true);
     expect(mediaNames.some((name) => name.includes("/Семья Волковых/"))).toBe(true);
   });
@@ -375,70 +346,6 @@ describe("export media mega ZIP", () => {
     expect(result).toMatchObject({ ok: false, reason: "storage_unavailable" });
   });
 
-  test("returns a safe field-level correction message for an unrenderable PDF value", async () => {
-    const source = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
-    const selection = source.map((submission) => ({
-      ...submission,
-      applicants: submission.applicants.map((applicant) => ({
-        ...applicant,
-        sections: applicant.sections.map((section) => ({
-          ...section,
-          fields: section.fields.map((field) =>
-            field.id === "home-address" ? { ...field, value: "A".repeat(500) } : field,
-          ),
-        })),
-      })),
-    }));
-    const downloadDocument = documentDownloader();
-    const result = await createExportMediaZipArtifact(selection, {
-      documentAssets: documentAssetsFor(selection),
-      downloadDocument,
-      expectedIdentity: identityFor(selection),
-      exportDate,
-    });
-
-    expect(result).toMatchObject({ ok: false, reason: "questionnaire_incomplete" });
-    if (result.ok)
-      throw new Error("Expected the invalid PDF field to block ZIP creation.");
-    expect(result.safeMessage).toContain("Домашний адрес");
-    expect(downloadDocument).not.toHaveBeenCalled();
-  });
-
-  test("blocks invalid passport and telephone input instead of silently rewriting it", async () => {
-    const source = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
-    const selection = source.map((submission) => ({
-      ...submission,
-      applicants: submission.applicants.map((applicant) => ({
-        ...applicant,
-        sections: applicant.sections.map((section) => ({
-          ...section,
-          fields: section.fields.map((field) => {
-            if (field.id === "passport-no") return { ...field, value: "I".repeat(33) };
-            if (field.id === "contact-number") return { ...field, value: "CALL ME" };
-            if (field.id === "arrival-date") {
-              return { ...field, value: "2026-07-20junk" };
-            }
-            return field;
-          }),
-        })),
-      })),
-    }));
-    const downloadDocument = documentDownloader();
-    const result = await createExportMediaZipArtifact(selection, {
-      documentAssets: documentAssetsFor(selection),
-      downloadDocument,
-      expectedIdentity: identityFor(selection),
-      exportDate,
-    });
-
-    expect(result).toMatchObject({ ok: false, reason: "questionnaire_incomplete" });
-    if (result.ok) throw new Error("Expected unsafe questionnaire data to block ZIP creation.");
-    expect(result.safeMessage).toContain("Номер паспорта");
-    expect(result.safeMessage).toContain("Телефон");
-    expect(result.safeMessage).toContain("Дата въезда");
-    expect(downloadDocument).not.toHaveBeenCalled();
-  });
-
   test("uses document repository assets and maps ZIP facts into the terminal RPC contract", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
     const assets = documentAssetsFor(selection);
@@ -459,7 +366,7 @@ describe("export media mega ZIP", () => {
     expect(toExportPackageDocumentCommit(result.artifact)).toEqual({
       applicantCount: 1,
       assetIds: result.artifact.documentAssetIds,
-      fileCount: 4,
+      fileCount: 3,
       workbookFileName: result.artifact.workbookFileName,
       zipFileName: result.artifact.fileName,
     });

@@ -4,7 +4,6 @@ import {
   type DocumentAsset,
   type DocumentType,
 } from "../documents/documentTypes";
-import { createVisaApplicationFormPdfBlob } from "./visaApplicationFormPdf";
 import { mediaStorageBucket } from "./mediaStorage";
 import type { ExportMediaZipOptions } from "./exportMediaZip";
 import type { Submission, SubmissionFile } from "./types";
@@ -14,19 +13,11 @@ export function buildLocalDemoExportMediaZipOptions(
 ): Pick<ExportMediaZipOptions, "documentAssets" | "downloadDocument"> {
   return {
     documentAssets: localDemoDocumentAssetsFromSubmissionFiles(submissions),
-    downloadDocument: async (asset, context) => {
-      if (asset.type === "visa_form") {
-        return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
-          exportDate: context.exportDate,
-        });
-      }
-
-      return loadLocalDemoJpeg(asset.type);
-    },
+    downloadDocument: async (asset) => loadLocalDemoJpeg(asset.type),
   };
 }
 
-type LocalDemoJpegType = Exclude<DocumentType, "visa_form">;
+type LocalDemoJpegType = DocumentType;
 
 const localDemoJpegUrls: Partial<Record<LocalDemoJpegType, string>> = {
   passport_scan: new URL(

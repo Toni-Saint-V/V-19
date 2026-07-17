@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { Drawer } from "../../src/components/Drawer";
+import { PreUploadScreen } from "../../src/components/PreUploadScreen";
 import { VisaflowBusinessBridgeProvider } from "../../src/integration/visaflowBusinessBridge";
 import { FigmaSubmissionDrawer } from "../../src/modules/submissions/components/adminAiAssistance";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
@@ -56,6 +57,48 @@ function appointmentCitySubmission(): Submission {
 }
 
 describe("async UI callers", () => {
+  test("pre-upload prevents duplicate persistence, exposes rejection, and allows one retry", async () => {
+    let rejectFirstSave: ((reason?: unknown) => void) | undefined;
+    const firstSave = new Promise<void>((_resolve, reject) => {
+      rejectFirstSave = reject;
+    });
+    const onSaveDraft = vi
+      .fn()
+      .mockImplementationOnce(() => firstSave)
+      .mockResolvedValueOnce(undefined);
+
+    render(
+      <PreUploadScreen
+        onBack={vi.fn()}
+        onSaveDraft={onSaveDraft}
+      />,
+    );
+
+    const saveButton = screen.getByRole("button", { name: "Сохранить черновик" });
+    fireEvent.click(saveButton);
+    fireEvent.click(saveButton);
+
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(saveButton).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Назад" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Закрыть создание" })).toBeDisabled();
+
+    await act(async () => {
+      rejectFirstSave?.(new Error("database details must stay private"));
+      await expect(firstSave).rejects.toThrow("database details must stay private");
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Не удалось сохранить черновик. Повторите попытку.",
+    );
+    expect(screen.queryByText("database details must stay private")).not.toBeInTheDocument();
+    await waitFor(() => expect(saveButton).not.toBeDisabled());
+
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
   test("legacy Drawer moves focus into the modal and exposes roving tabs", async () => {
     const trigger = document.createElement("button");
     document.body.appendChild(trigger);
@@ -308,7 +351,18 @@ describe("async UI callers", () => {
     await waitFor(() => expect(primaryButton).not.toBeDisabled());
   });
 
-  test("operational drawer keeps an accessible tab-panel contract and keyboard navigation", async () => {
+  test("operational drawer keeps the four canonical reference tabs with roving focus", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        addEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+        matches: false,
+        media: query,
+        onchange: null,
+        removeEventListener: vi.fn(),
+      })),
+    });
     const submission = draftSubmission();
     render(
       <FigmaSubmissionDrawer
@@ -325,21 +379,154 @@ describe("async UI callers", () => {
     const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveAttribute("aria-labelledby", "v20-submission-drawer-heading");
 
-    const tabs = await screen.findAllByRole("tab");
-    expect(tabs).toHaveLength(5);
-    expect(tabs[0]).toHaveAttribute("aria-controls", "v20-submission-drawer-panel-overview");
-    expect(tabs[0]).toHaveAttribute("tabindex", "0");
-
-    const overviewPanel = await screen.findByRole("tabpanel");
-    expect(overviewPanel).toHaveAttribute("aria-labelledby", "v20-submission-drawer-tab-overview");
-
-    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
-    await waitFor(() => expect(tabs[1]).toHaveAttribute("aria-selected", "true"));
-    await waitFor(() =>
-      expect(
-        document.getElementById("v20-submission-drawer-panel-questionnaire"),
-      ).toHaveAttribute("aria-labelledby", "v20-submission-drawer-tab-questionnaire"),
+    const tablist = await screen.findByRole("tablist", { name: "Разделы подачи" });
+    const tabs = Array.from(tablist.querySelectorAll<HTMLElement>('[role="tab"]'));
+    expect(tabs).toHaveLength(4);
+    expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
+    expect(tabs[0]).toHaveAttribute(
+      "aria-controls",
+      "v20-submission-drawer-panel-overview",
     );
+
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+      expect(tabs[1]).toHaveFocus();
+    });
+    expect(await screen.findByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      "v20-submission-drawer-tab-questionnaire",
+    );
+
+    expect(screen.queryByRole("button", { name: "Ещё" })).not.toBeInTheDocument();
+  });
+
+  test("operational drawer derives questionnaire preview from the real submission", async () => {
+    const source = draftSubmission();
+    const submission: Submission = {
+      ...source,
+      completeness: {
+        ...source.completeness,
+        questionnaire: 100,
+        total: 100,
+      },
+      applicants: source.applicants.map((applicant) => ({
+        ...applicant,
+        questionnaireStatus: "complete",
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          status: "complete",
+        })),
+      })),
+    };
+
+    render(
+      <FigmaSubmissionDrawer
+        activeTab="questionnaire"
+        onAction={vi.fn()}
+        onClose={vi.fn()}
+        onOpenQuestionnaireWorkspace={vi.fn()}
+        role="agent"
+        submission={submission}
+        surface="agent"
+      />,
+    );
+
+    expect(await screen.findByText("Все блоки данных заполнены")).toBeInTheDocument();
+    expect(screen.queryByText("Осталось заполнить 2 блока данных")).not.toBeInTheDocument();
+    expect(screen.getAllByText("100%")).toHaveLength(6);
+  });
+
+  test("operational drawer leads a returned submission through one exact correction at a time", async () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1048");
+    if (!submission) throw new Error("Missing returned fixture ПД-1048.");
+    const onOpenQuestionnaireWorkspace = vi.fn();
+
+    render(
+      <FigmaSubmissionDrawer
+        activeTab="issues"
+        onAction={vi.fn()}
+        onClose={vi.fn()}
+        onOpenQuestionnaireWorkspace={onOpenQuestionnaireWorkspace}
+        role="agent"
+        submission={submission}
+        surface="agent"
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Список задач по замечаниям" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Селфи 1" })).toBeInTheDocument();
+    expect(screen.getByText("Лицо обрезано. Загрузите селфи 1.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Скан паспорта" })).toBeInTheDocument();
+
+    const reloadButtons = screen.getAllByRole("button", { name: "Перезагрузить файл" });
+    fireEvent.click(reloadButtons[1]!);
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        "v20-submission-drawer-heading",
+      ),
+    );
+    expect(onOpenQuestionnaireWorkspace).not.toHaveBeenCalled();
+  });
+
+  test("operational drawer never presents fixed-by-agent issues as actionable corrections", async () => {
+    const source = initialSubmissions.find((item) => item.id === "ПД-1048");
+    if (!source) throw new Error("Missing returned fixture ПД-1048.");
+    const firstIssue = source.issues[0];
+    const secondIssue = source.issues[1];
+    if (!firstIssue || !secondIssue) throw new Error("Expected two correction issues.");
+    const submission: Submission = {
+      ...source,
+      issues: [
+        { ...firstIssue, status: "fixed_by_agent" },
+        secondIssue,
+      ],
+    };
+
+    render(
+      <FigmaSubmissionDrawer
+        activeTab="overview"
+        onAction={vi.fn()}
+        onClose={vi.fn()}
+        onMarkIssueFixed={vi.fn()}
+        onOpenQuestionnaireWorkspace={vi.fn()}
+        role="agent"
+        submission={submission}
+        surface="agent"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Замечания/ }));
+    expect(
+      await screen.findByRole("heading", { name: "Список задач по замечаниям" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Ждет проверки")).toBeInTheDocument();
+    expect(screen.getAllByText("Blocker")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Перезагрузить файл" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Отметить исправленным" })).not.toBeInTheDocument();
+  });
+
+  test("operational drawer restores a pre-existing body scroll lock", async () => {
+    document.body.style.overflow = "clip";
+    const submission = draftSubmission();
+    const { unmount } = render(
+      <FigmaSubmissionDrawer
+        activeTab="overview"
+        onAction={vi.fn()}
+        onClose={vi.fn()}
+        onOpenQuestionnaireWorkspace={vi.fn()}
+        role="agent"
+        submission={submission}
+        surface="agent"
+      />,
+    );
+
+    await screen.findByRole("dialog");
+    expect(document.body.style.overflow).toBe("hidden");
+    unmount();
+    expect(document.body.style.overflow).toBe("clip");
+    document.body.style.overflow = "";
   });
 
   test("operational drawer catches a rejected file upload", async () => {
@@ -381,8 +568,14 @@ describe("async UI callers", () => {
   });
 
   test("operational drawer awaits mark-fixed and shows an inline error without a false fixed state", async () => {
-    const submission = initialSubmissions.find((item) => item.status === "returned");
-    if (!submission) throw new Error("Missing returned submission fixture.");
+    const source = initialSubmissions.find((item) => item.status === "returned");
+    if (!source) throw new Error("Missing returned submission fixture.");
+    const firstIssue = source.issues[0];
+    if (!firstIssue) throw new Error("Missing returned issue fixture.");
+    const submission: Submission = {
+      ...source,
+      issues: [{ ...firstIssue, type: "section", target: { ...firstIssue.target, fileType: undefined } }],
+    };
     let rejectMarkFixed: ((reason?: unknown) => void) | undefined;
     const pendingMarkFixed = new Promise<void>((_resolve, reject) => {
       rejectMarkFixed = reject;

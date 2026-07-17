@@ -16,7 +16,11 @@ import * as mediaStorage from "../../src/modules/submissions/mediaStorage";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionActions";
-import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import type {
+  Applicant,
+  Submission,
+  SubmissionFile,
+} from "../../src/modules/submissions/types";
 
 afterEach(() => {
   cleanup();
@@ -27,9 +31,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("routes the four review outcomes through the canonical admin actions", () => {
     const corrections = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!corrections) throw new Error("Expected corrections-received fixture.");
-    const reviewedCorrections = adminApproveQuestionnaireForTest(corrections);
     const cleanReview = {
-      ...reviewedCorrections,
+      ...corrections,
       status: "submitted_for_review" as const,
       issues: [],
     };
@@ -41,8 +44,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       severity: "blocker",
       type: "field",
     });
-    const correctionsWithIssue = addPreciseAdminIssue(reviewedCorrections, {
-      applicantId: reviewedCorrections.applicants[0]?.id ?? "",
+    const correctionsWithIssue = addPreciseAdminIssue(corrections, {
+      applicantId: corrections.applicants[0]?.id ?? "",
       comment: "Исправление не прошло повторную проверку.",
       field: "Адрес отеля",
       reason: "Адрес отеля всё ещё требует исправления",
@@ -57,7 +60,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         action: "return_with_issues",
       },
       {
-        submission: reviewedCorrections,
+        submission: corrections,
         button: "Принять на выгрузку",
         action: "close_issues_accept",
       },
@@ -96,9 +99,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("moves a clean accepted submission directly to the export workspace", async () => {
     const corrections = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!corrections) throw new Error("Expected corrections-received fixture.");
-    const reviewedCorrections = adminApproveQuestionnaireForTest(corrections);
     const cleanReview = {
-      ...reviewedCorrections,
+      ...corrections,
       status: "submitted_for_review" as const,
       issues: [],
     };
@@ -219,14 +221,13 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   test("offers close-and-accept when all remaining issues are fixed by the agent", () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!submission) throw new Error("Expected corrections-received fixture.");
-    const reviewedSubmission = adminApproveQuestionnaireForTest(submission);
     const onPrimaryAction = vi.fn();
 
     render(
       <AdminReviewDrawer
         isOpen
-        submission={reviewedSubmission}
-        submissionId={reviewedSubmission.id}
+        submission={submission}
+        submissionId={submission.id}
         onAddRemark={vi.fn()}
         onClose={vi.fn()}
         onPrimaryAction={onPrimaryAction}
@@ -240,10 +241,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       screen.queryByRole("button", { name: "Отправить на исправление" }),
     ).not.toBeInTheDocument();
     fireEvent.click(accept);
-    expect(onPrimaryAction).toHaveBeenCalledWith(
-      reviewedSubmission.id,
-      "close_issues_accept",
-    );
+    expect(onPrimaryAction).toHaveBeenCalledWith(submission.id, "close_issues_accept");
   });
 
   test("uses roving tab focus and arrow, Home, and End navigation", async () => {
@@ -321,26 +319,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     const source = initialSubmissions.find((item) => item.id === "ПД-1053");
     const applicant = source?.applicants[0];
     if (!source || !applicant) throw new Error("Expected admin review fixture.");
-    const errorField = applicant.sections
-      .flatMap((section) => section.fields)
-      .find((field) => field.id === "appointment-city");
-    if (!errorField) throw new Error("Expected questionnaire field fixture.");
     const submission = {
       ...source,
-      applicants: [
-        {
-          ...applicant,
-          questionnaireStatus: "needs_fix" as const,
-          sections: applicant.sections.map((section) => ({
-            ...section,
-            fields: section.fields.map((field) =>
-              field.id === errorField.id
-                ? { ...field, error: "Нужно исправить значение" }
-                : field,
-            ),
-          })),
-        },
-      ],
+      applicants: [{ ...applicant, questionnaireStatus: "needs_fix" as const }],
     };
 
     render(
@@ -359,71 +340,6 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       expect(screen.getByText("Нужны исправления")).toBeVisible();
     });
     expect(screen.queryByText("needs_fix")).not.toBeInTheDocument();
-  });
-
-  test("keeps the selected tourist when moving from applicants to questionnaire", async () => {
-    const submission = initialSubmissions.find((item) => item.applicants.length > 1);
-    const secondApplicant = submission?.applicants[1];
-    if (!submission || !secondApplicant) {
-      throw new Error("Expected a family submission fixture.");
-    }
-    const isReviewable = (value: string) => {
-      const normalized = value.trim().toLocaleLowerCase("ru-RU");
-      return Boolean(normalized) && normalized !== "—" && normalized !== "не заполнено";
-    };
-    const applicantReviewableFields = secondApplicant.sections
-      .flatMap((section) => section.fields)
-      .filter((field) => isReviewable(field.value));
-    const applicantApprovedFields = applicantReviewableFields.filter(
-      (field) => field.adminReviewApprovedAtIso && field.adminReviewApprovedBy,
-    );
-    const packageReviewableFieldCount = submission.applicants
-      .flatMap((applicant) =>
-        applicant.sections.flatMap((section) => section.fields),
-      )
-      .filter((field) => isReviewable(field.value)).length;
-
-    render(
-      <AdminReviewDrawer
-        isOpen
-        submission={submission}
-        submissionId={submission.id}
-        onAddRemark={() => undefined}
-        onClose={() => undefined}
-        onVerifyDocument={() => undefined}
-      />,
-    );
-
-    const applicantName = screen.getByText(secondApplicant.fullName, {
-      selector: "nav[aria-label='Заявители пакета'] strong",
-    });
-    fireEvent.click(applicantName.closest("button") as HTMLButtonElement);
-    await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: secondApplicant.fullName }),
-      ).toBeVisible(),
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: /Анкета/ }));
-
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", {
-          name: `Выбранный заявитель: ${secondApplicant.fullName}`,
-        }),
-      ).toBeVisible(),
-    );
-    expect(
-      screen.getByRole("button", {
-        name: new RegExp(
-          `Проверено\\s+${applicantApprovedFields.length}\\s+из\\s+${applicantReviewableFields.length}\\s+заполненных`,
-        ),
-      }),
-    ).toBeVisible();
-    const questionnaireTab = screen.getByRole("tab", { name: /Анкета/ });
-    expect(questionnaireTab).toHaveTextContent(String(packageReviewableFieldCount));
-    expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
-    expect(screen.getAllByText(/Проверено \d+ из \d+ заполненных/)).not.toHaveLength(0);
   });
 
   test("uses truthful field labels and an accessible review dialog", async () => {
@@ -935,13 +851,78 @@ describe("AdminReviewDrawer visual hierarchy", () => {
   });
 });
 
-describe("ReviewWorkspace safety boundary", () => {
-  test("lists only fields that can be verified against a passport", () => {
-    const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
-    if (!submission) throw new Error("Expected admin review fixture.");
+describe("ReviewWorkspace passport section contract", () => {
+  const reviewFieldValues: Record<string, string> = {
+    surname: "VOLKOVA",
+    "first-name": "NINA",
+    "birth-date": "20.08.1990",
+    "birth-place": "KAZAN",
+    "passport-no": "661053001",
+    "passport-issue-place": "FMS 16001",
+    "passport-issue-date": "26.02.2016",
+    "passport-expiry-date": "26.02.2032",
+  };
 
-    render(
+  function withReviewFieldValues(applicant: Applicant): Applicant {
+    return {
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => ({
+          ...field,
+          value: reviewFieldValues[field.id] ?? field.value,
+        })),
+      })),
+    };
+  }
+
+  function protectedReviewFile(
+    submissionId: string,
+    applicantId: string,
+    type: "passport_scan" | "selfie" | "selfie_2",
+  ): SubmissionFile {
+    const generatedFileName = `${applicantId.replace(/\D/g, "")}_${type}.jpg`;
+    const target = buildMediaStoragePath(
+      submissionId,
+      applicantId,
+      type,
+      generatedFileName,
+    );
+    return {
+      applicantId,
+      generatedFileName,
+      id: `${applicantId}-${type}`,
+      mimeType: "image/jpeg",
+      status: "pending_review",
+      storageAdapter: "supabase-private",
+      storageBucket: target.bucket,
+      storagePath: target.path,
+      type,
+      uploadStatus: "uploaded",
+    };
+  }
+
+  function singleReviewSubmission(): Submission {
+    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
+    const applicant = source?.applicants[0];
+    if (!source || !applicant) throw new Error("Expected admin review fixture.");
+
+    return {
+      ...source,
+      applicants: [withReviewFieldValues(applicant)],
+      files: [
+        protectedReviewFile(source.id, applicant.id, "passport_scan"),
+        protectedReviewFile(source.id, applicant.id, "selfie"),
+        protectedReviewFile(source.id, applicant.id, "selfie_2"),
+      ],
+    };
+  }
+
+  test("shows exactly eight passport-backed fields and one section confirmation", () => {
+    const submission = singleReviewSubmission();
+    const { container } = render(
       <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
         onAddRemark={() => undefined}
         onBack={() => undefined}
         submission={submission}
@@ -949,40 +930,38 @@ describe("ReviewWorkspace safety boundary", () => {
       />,
     );
 
-    expect(screen.getByText("Номер паспорта")).toBeInTheDocument();
-    expect(screen.queryByText("Дата выдачи")).not.toBeInTheDocument();
-    expect(screen.queryByText("Не заполнено")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Не подтверждено документом")[0]).toHaveClass(
-      "text-[var(--vf-warning)]",
-    );
+    expect(
+      Array.from(container.querySelectorAll("[data-passport-field-id]")).map((field) =>
+        field.getAttribute("data-passport-field-id"),
+      ),
+    ).toEqual([
+      "surname",
+      "first-name",
+      "birth-date",
+      "birth-place",
+      "passport-no",
+      "passport-issue-place",
+      "passport-issue-date",
+      "passport-expiry-date",
+    ]);
     expect(screen.queryByText("Город подачи")).not.toBeInTheDocument();
     expect(screen.queryByText("Тип визы")).not.toBeInTheDocument();
-    expect(screen.queryByText("Категория обслуживания")).not.toBeInTheDocument();
-    expect(screen.queryByText("Желаемая дата 1")).not.toBeInTheDocument();
-
-    const verifyButton = screen.getAllByRole("button", {
-      name: /^Подтвердить:/,
-    })[0];
-    expect(verifyButton).toBeDisabled();
-    fireEvent.click(verifyButton!);
-    expect(verifyButton).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByText("Текущее гражданство")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Подтвердить:/ })).not.toBeInTheDocument();
     expect(
-      screen
-        .getAllByText("Не подтверждено документом")
-        .find((element) => element.tagName === "P"),
-    ).toHaveClass("text-[var(--vf-warning)]");
-    expect(
-      screen.getByRole("button", { name: "Завершить сверку паспорта" }),
-    ).toBeDisabled();
+      screen.getAllByRole("button", { name: "Подтвердить паспортную секцию" }),
+    ).toHaveLength(1);
   });
 
-  test("blocks completion when protected original and OCR evidence are unavailable", () => {
-    const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
-    if (!submission) throw new Error("Expected admin review fixture.");
+  test("keeps a field remark attached to the exact applicant and field", () => {
+    const submission = singleReviewSubmission();
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
     const onAddRemark = vi.fn();
 
     render(
       <ReviewWorkspace
+        applicantId={applicant.id}
         onAddRemark={onAddRemark}
         onBack={() => undefined}
         submission={submission}
@@ -990,119 +969,27 @@ describe("ReviewWorkspace safety boundary", () => {
       />,
     );
 
-    expect(screen.getByText("Предпросмотр оригинала недоступен")).toBeInTheDocument();
-    expect(screen.getByText("Скан паспорта")).toBeInTheDocument();
-    expect(screen.queryByText("Паспорт не загружен")).not.toBeInTheDocument();
-    expect(screen.queryByText("PETROV")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Завершить сверку паспорта" }),
-    ).toBeDisabled();
-
-    screen.getAllByRole("button", { name: /^Добавить замечание/ })[0]?.click();
-    expect(onAddRemark).toHaveBeenCalledTimes(1);
-  });
-
-  test("persists passport acceptance only after a protected original and all field confirmations", async () => {
-    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
-    if (!source) throw new Error("Expected admin review fixture.");
-    const applicant = source.applicants[0];
-    if (!applicant) throw new Error("Expected applicant.");
-    const generatedFileName = `demo${applicant.id.replace(/\D/g, "")}_passport_scan.jpg`;
-    const passportTarget = buildMediaStoragePath(
-      source.id,
+    fireEvent.click(
+      screen.getByRole("button", { name: "Добавить замечание: Номер паспорта" }),
+    );
+    expect(onAddRemark).toHaveBeenCalledWith(
+      "Номер паспорта",
+      applicant.fullName,
+      undefined,
       applicant.id,
-      "passport_scan",
-      generatedFileName,
-    );
-    const submission = {
-      ...source,
-      files: source.files.map((file) =>
-        file.type === "passport_scan"
-          ? {
-              ...file,
-              generatedFileName,
-              storageAdapter: "supabase-private" as const,
-              storageBucket: passportTarget.bucket,
-              storagePath: passportTarget.path,
-              uploadStatus: "uploaded" as const,
-            }
-          : file,
-      ),
-    };
-    const onAcceptFile = vi.fn().mockResolvedValue(true);
-    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
-      "https://example.test/signed-passport.png",
-    );
-
-    render(
-      <ReviewWorkspace
-        applicantId={applicant.id}
-        onAcceptFile={onAcceptFile}
-        onAddRemark={() => undefined}
-        onBack={() => undefined}
-        submission={submission}
-        submissionId={submission.id}
-      />,
-    );
-
-    await waitFor(() =>
-      expect(
-        screen.getByRole("img", { name: "Оригинал паспорта" }),
-      ).toBeInTheDocument(),
-    );
-    const confirmButtons = screen.getAllByRole("button", { name: /^Подтвердить:/ });
-    expect(confirmButtons.length).toBeGreaterThan(0);
-    for (const button of confirmButtons) fireEvent.click(button);
-
-    const completeButton = screen.getByRole("button", {
-      name: "Завершить сверку паспорта",
-    });
-    await waitFor(() => expect(completeButton).toBeEnabled());
-    fireEvent.click(completeButton);
-
-    await waitFor(() =>
-      expect(onAcceptFile).toHaveBeenCalledWith({
-        applicantId: applicant.id,
-        fileType: "passport_scan",
-      }),
-    );
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Паспорт уже принят" })).toBeDisabled(),
     );
   });
 
-  test("does not sign or accept a passport path that belongs to another applicant", () => {
-    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
-    if (!source) throw new Error("Expected admin review fixture.");
-    const applicant = source.applicants[0];
+  test("shows passport and both selfies for single and confirms them with one action", async () => {
+    const submission = singleReviewSubmission();
+    const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Expected applicant.");
-    const foreignTarget = buildMediaStoragePath(
-      source.id,
-      "з-1053-чужой",
-      "passport_scan",
-      "demo1053foreign_passport_scan.jpg",
+    const onAcceptFile = vi.fn().mockResolvedValue(true);
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(async ({ path }) =>
+      `https://example.test/${encodeURIComponent(path)}.jpg`,
     );
-    const submission = {
-      ...source,
-      files: source.files.map((file) =>
-        file.type === "passport_scan"
-          ? {
-              ...file,
-              generatedFileName: "demo1053foreign_passport_scan.jpg",
-              storageAdapter: "supabase-private" as const,
-              storageBucket: foreignTarget.bucket,
-              storagePath: foreignTarget.path,
-              uploadStatus: "uploaded" as const,
-            }
-          : file,
-      ),
-    };
-    const onAcceptFile = vi.fn();
-    const createSignedUrl = vi
-      .spyOn(mediaStorage, "createMediaSignedUrl")
-      .mockResolvedValue("https://example.test/foreign-passport.png");
 
-    render(
+    const { container } = render(
       <ReviewWorkspace
         applicantId={applicant.id}
         onAcceptFile={onAcceptFile}
@@ -1113,77 +1000,119 @@ describe("ReviewWorkspace safety boundary", () => {
       />,
     );
 
-    expect(screen.getByText("Предпросмотр оригинала недоступен")).toBeInTheDocument();
-    expect(createSignedUrl).not.toHaveBeenCalled();
-    expect(onAcceptFile).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "Завершить сверку паспорта" }),
-    ).toBeDisabled();
+    await waitFor(() =>
+      expect(container.querySelectorAll("[data-review-media]")).toHaveLength(3),
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible();
+    }, { timeout: 5_000 });
+    expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible();
+    expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible();
+
+    const confirmButton = screen.getByRole("button", {
+      name: "Подтвердить паспортную секцию",
+    });
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(onAcceptFile).toHaveBeenCalledTimes(3));
+    expect(onAcceptFile).toHaveBeenNthCalledWith(1, {
+      applicantId: applicant.id,
+      fileType: "passport_scan",
+    });
+    expect(onAcceptFile).toHaveBeenNthCalledWith(2, {
+      applicantId: applicant.id,
+      fileType: "selfie",
+    });
+    expect(onAcceptFile).toHaveBeenNthCalledWith(3, {
+      applicantId: applicant.id,
+      fileType: "selfie_2",
+    });
+    await waitFor(() => expect(screen.getByText("Секция подтверждена")).toBeVisible());
   });
 
-  test("persists only the selected member passport in a family", async () => {
-    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
-    if (!source) throw new Error("Expected admin review fixture.");
-    const firstApplicant = source.applicants[0];
-    const sourcePassport = source.files.find((file) => file.type === "passport_scan");
-    if (!firstApplicant || !sourcePassport) {
-      throw new Error("Expected family review fixture.");
-    }
-    const secondApplicant = {
-      ...firstApplicant,
-      id: "з-1053-2",
-    };
-    const secondPassportTarget = buildMediaStoragePath(
-      source.id,
-      secondApplicant.id,
+  test("fails closed when a protected path belongs to another applicant", () => {
+    const submission = singleReviewSubmission();
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+    const foreignPassport = protectedReviewFile(
+      submission.id,
+      "з-9999-1",
       "passport_scan",
-      "demo10532_passport_scan.jpg",
     );
-    const secondPassport = {
-      ...sourcePassport,
-      applicantId: secondApplicant.id,
-      generatedFileName: "demo10532_passport_scan.jpg",
-      id: "ф-1053-4-second",
-      status: "pending_review" as const,
-      storageAdapter: "supabase-private" as const,
-      storageBucket: secondPassportTarget.bucket,
-      storagePath: secondPassportTarget.path,
-      uploadStatus: "uploaded" as const,
+    const mismatchedSubmission: Submission = {
+      ...submission,
+      files: submission.files.map((file) =>
+        file.type === "passport_scan"
+          ? { ...foreignPassport, applicantId: applicant.id }
+          : file,
+      ),
     };
-    const submission = {
+    const createSignedUrl = vi.spyOn(mediaStorage, "createMediaSignedUrl");
+
+    render(
+      <ReviewWorkspace
+        applicantId={applicant.id}
+        onAcceptFile={vi.fn()}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        submission={mismatchedSubmission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+    ).toBeDisabled();
+    expect(createSignedUrl).toHaveBeenCalledTimes(2);
+  });
+
+  test("shows and confirms only the passport for a non-primary family member", async () => {
+    const source = singleReviewSubmission();
+    const primaryApplicant = source.applicants[0];
+    if (!primaryApplicant) throw new Error("Expected primary applicant.");
+    const secondApplicant: Applicant = {
+      ...withReviewFieldValues(primaryApplicant),
+      fullName: "Ирина Волкова",
+      id: "з-1053-2",
+      role: "spouse",
+    };
+    const familySubmission: Submission = {
       ...source,
-      applicants: [firstApplicant, secondApplicant],
-      files: [...source.files, secondPassport],
+      applicants: [primaryApplicant, secondApplicant],
+      files: [
+        ...source.files,
+        protectedReviewFile(source.id, secondApplicant.id, "passport_scan"),
+      ],
+      title: "Семья Волковых",
+      type: "family",
     };
     const onAcceptFile = vi.fn().mockResolvedValue(true);
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
-      "https://example.test/second-passport.png",
+      "https://example.test/family-passport.jpg",
     );
 
-    render(
+    const { container } = render(
       <ReviewWorkspace
         applicantId={secondApplicant.id}
         onAcceptFile={onAcceptFile}
         onAddRemark={() => undefined}
         onBack={() => undefined}
-        submission={submission}
-        submissionId={submission.id}
+        submission={familySubmission}
+        submissionId={familySubmission.id}
       />,
     );
 
-    await waitFor(() =>
-      expect(
-        screen.getByRole("img", { name: "Оригинал паспорта" }),
-      ).toBeInTheDocument(),
-    );
-    for (const button of screen.getAllByRole("button", { name: /^Подтвердить:/ })) {
-      fireEvent.click(button);
-    }
-    const completeButton = screen.getByRole("button", {
-      name: "Завершить сверку паспорта",
+    expect(await screen.findByTestId("protected-media-preview-passport_scan")).toBeVisible();
+    expect(container.querySelectorAll("[data-review-media]")).toHaveLength(1);
+    expect(screen.queryByTestId("protected-media-preview-selfie")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("protected-media-preview-selfie_2")).not.toBeInTheDocument();
+
+    const confirmButton = screen.getByRole("button", {
+      name: "Подтвердить паспортную секцию",
     });
-    await waitFor(() => expect(completeButton).toBeEnabled());
-    fireEvent.click(completeButton);
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    fireEvent.click(confirmButton);
 
     await waitFor(() =>
       expect(onAcceptFile).toHaveBeenCalledWith({
@@ -1191,10 +1120,7 @@ describe("ReviewWorkspace safety boundary", () => {
         fileType: "passport_scan",
       }),
     );
-    expect(onAcceptFile).not.toHaveBeenCalledWith({
-      applicantId: firstApplicant.id,
-      fileType: "passport_scan",
-    });
+    expect(onAcceptFile).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1202,17 +1128,14 @@ describe("AdminReviewDrawer document comparison", () => {
   test("keeps document comparison separate from remarks and restores the original queue focus", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
-    const onVerifyDocument = vi.fn();
 
     const { container } = render(
-      <VisaflowBusinessBridgeProvider bridge={{ onVerifyDocument }}>
-        <AdminWorkspace
-          currentEmail="qa-admin@example.test"
-          onSignOut={() => undefined}
-          submissions={[submission]}
-          usesSupabase
-        />
-      </VisaflowBusinessBridgeProvider>,
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={() => undefined}
+        submissions={[submission]}
+        usesSupabase
+      />,
     );
 
     const opener = container.querySelector<HTMLButtonElement>(
@@ -1223,18 +1146,25 @@ describe("AdminReviewDrawer document comparison", () => {
     fireEvent.click(opener);
 
     fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
-    fireEvent.click((await screen.findAllByTestId("admin-review-verify-passport"))[0]!);
+    const passportFileLabel = await screen.findByText("Скан паспорта", {
+      selector: ".v19-drawer-file-title",
+    });
+    const passportFileItem = passportFileLabel.closest(".admin-review-file-item");
+    if (!passportFileItem) throw new Error("Passport file row was not rendered.");
+    fireEvent.click(within(passportFileItem).getByRole("button", { name: "Проверить" }));
 
-    expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
     expect(
-      screen.getByRole("heading", { name: "Сверка паспорта" }),
+      await screen.findByRole("dialog", { name: "Сверка паспорта" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: `Паспортная секция · ${submission.id}` }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("dialog", { name: "Добавить замечание" }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Вернуться к подаче" }));
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => expect(opener).toHaveFocus());
   });

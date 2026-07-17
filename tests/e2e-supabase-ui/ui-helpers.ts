@@ -22,7 +22,8 @@ const smokeEnvPath = resolve(
 // The lifecycle fixture intentionally has no MRZ so production exercises the
 // documented manual-review fallback instead of relying on an expired passport.
 const assetSource = resolve(process.cwd(), "src/assets/export-demo/selfie_1.jpg");
-const browserProblemIgnore = /ResizeObserver loop|favicon|net::ERR_ABORTED|Download the React DevTools/i;
+const browserProblemIgnore =
+  /ResizeObserver loop|favicon|net::ERR_ABORTED|Download the React DevTools/i;
 
 function loadSmokeEnv(): Record<string, string> {
   if (!existsSync(smokeEnvPath)) {
@@ -55,7 +56,10 @@ export function smokeCredentials(role: SmokeRole): SmokeCredentials {
   const names: Record<SmokeRole, [string, string]> = {
     admin: ["SUPABASE_SMOKE_ADMIN_EMAIL", "SUPABASE_SMOKE_ADMIN_PASSWORD"],
     agent: ["SUPABASE_SMOKE_AGENT_EMAIL", "SUPABASE_SMOKE_AGENT_PASSWORD"],
-    otherAgent: ["SUPABASE_SMOKE_OTHER_AGENT_EMAIL", "SUPABASE_SMOKE_OTHER_AGENT_PASSWORD"],
+    otherAgent: [
+      "SUPABASE_SMOKE_OTHER_AGENT_EMAIL",
+      "SUPABASE_SMOKE_OTHER_AGENT_PASSWORD",
+    ],
   };
   const [emailName, passwordName] = names[role];
   return {
@@ -93,11 +97,15 @@ export function collectSupabaseMutations(page: Page) {
   page.on("request", (request) => {
     const url = new URL(request.url());
     const method = request.method().toUpperCase();
-    const isSupabaseApi = /\/(?:auth\/v1|rest\/v1|storage\/v1|functions\/v1)(?:\/|$)/.test(
-      url.pathname,
-    );
+    const isSupabaseApi =
+      /\/(?:auth\/v1|rest\/v1|storage\/v1|functions\/v1)(?:\/|$)/.test(url.pathname);
 
-    if (!isSupabaseApi || method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    if (
+      !isSupabaseApi ||
+      method === "GET" ||
+      method === "HEAD" ||
+      method === "OPTIONS"
+    ) {
       return;
     }
 
@@ -153,11 +161,14 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
     "Настройки",
   ];
   const exactNavigationLabel = canonicalNavigationLabels.find((label) =>
-    typeof name === "string" ? label === name : new RegExp(name.source, name.flags).test(label),
+    typeof name === "string"
+      ? label === name
+      : new RegExp(name.source, name.flags).test(label),
   );
-  const control = page.getByRole("button", exactNavigationLabel
-    ? { exact: true, name: exactNavigationLabel }
-    : { name });
+  const control = page.getByRole(
+    "button",
+    exactNavigationLabel ? { exact: true, name: exactNavigationLabel } : { name },
+  );
   const desktopViewport = (page.viewportSize()?.width ?? 0) >= 768;
   if (desktopViewport && (await isVisible(control.first()))) {
     await clickFirstVisible(control);
@@ -174,9 +185,10 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
     await adminMenu.click();
     await expect(dialog).toBeVisible();
     await clickFirstVisible(
-      dialog.getByRole("button", exactNavigationLabel
-        ? { exact: true, name: exactNavigationLabel }
-        : { name }),
+      dialog.getByRole(
+        "button",
+        exactNavigationLabel ? { exact: true, name: exactNavigationLabel } : { name },
+      ),
     );
     await expect(dialog).toBeHidden();
     await expect(adminMenu).toHaveAttribute("aria-expanded", "false");
@@ -199,7 +211,8 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
   await clickFirstVisible(navigationScope.getByRole("button", { name }));
   if (await agentDialog.count()) {
     await expect(agentDialog).toBeHidden();
-    if (await isVisible(menu)) await expect(menu).toHaveAttribute("aria-expanded", "false");
+    if (await isVisible(menu))
+      await expect(menu).toHaveAttribute("aria-expanded", "false");
   }
 }
 
@@ -222,26 +235,41 @@ export async function signIn(page: Page, role: SmokeRole) {
     authResponse,
     page.getByRole("button", { name: "Войти" }).click(),
   ]);
-  expect(response.status(), "Supabase Auth password login must succeed").toBeGreaterThanOrEqual(200);
-  expect(response.status(), "Supabase Auth password login must succeed").toBeLessThan(300);
+  expect(
+    response.status(),
+    "Supabase Auth password login must succeed",
+  ).toBeGreaterThanOrEqual(200);
+  expect(response.status(), "Supabase Auth password login must succeed").toBeLessThan(
+    300,
+  );
 
   const expectedHeading =
-    role === "admin" ? /^(Проверка|Очередь на проверку|Работа)$/ : /^(Мои действия|Мои подачи)$/;
+    role === "admin"
+      ? /^(Проверка|Очередь на проверку|Работа)$/
+      : /^(Мои действия|Мои подачи)$/;
   const accessError = page.getByRole("alert").first();
   await expect
     .poll(
-      async () => (await isVisible(accessError)) || (await isVisible(page.getByRole("heading", {
-        level: 1,
-        name: expectedHeading,
-      }))),
+      async () =>
+        (await isVisible(accessError)) ||
+        (await isVisible(
+          page.getByRole("heading", {
+            level: 1,
+            name: expectedHeading,
+          }),
+        )),
       { timeout: 45_000 },
     )
     .toBe(true);
 
   if (await isVisible(accessError)) {
-    throw new Error(`Sandbox ${role} access is blocked: ${(await accessError.textContent()) ?? "unknown error"}`);
+    throw new Error(
+      `Sandbox ${role} access is blocked: ${(await accessError.textContent()) ?? "unknown error"}`,
+    );
   }
-  await expect(page.getByRole("heading", { level: 1, name: expectedHeading })).toBeVisible({
+  await expect(
+    page.getByRole("heading", { level: 1, name: expectedHeading }),
+  ).toBeVisible({
     timeout: 45_000,
   });
 }
@@ -252,7 +280,9 @@ export async function signOut(page: Page) {
     await directLogout.click();
   } else {
     const mobileMenu = page
-      .getByRole("button", { name: /^(Меню|Открыть меню|Открыть меню администратора)$/ })
+      .getByRole("button", {
+        name: /^(Меню|Открыть меню|Открыть меню администратора)$/,
+      })
       .first();
     if (await isVisible(mobileMenu)) await mobileMenu.click();
     else await clickWorkspaceButton(page, /Настройки/);
@@ -316,10 +346,13 @@ export function runAssets(runId: string, count: number) {
 
 export async function openCreateSubmission(page: Page) {
   const create = page.getByRole("button", { name: /^(Создать пакет|Новая подача)$/ });
-  if (!(await isVisible(create.first()))) await clickWorkspaceButton(page, /Мои подачи/);
+  if (!(await isVisible(create.first())))
+    await clickWorkspaceButton(page, /Мои подачи/);
   await clickFirstVisible(create);
   await expect(drawer(page)).toBeVisible();
-  await expect(drawer(page).getByRole("heading", { name: /Загрузка и первичная сборка/ })).toBeVisible();
+  await expect(
+    drawer(page).getByRole("heading", { name: /Загрузка и первичная сборка/ }),
+  ).toBeVisible();
 }
 
 type QuestionnaireSectionEvidence = {
@@ -343,7 +376,8 @@ export async function fillQuestionnaire(
   const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
   if (!(await isVisible(questionnaire))) {
     const open = drawer(page).getByRole("button", { name: "Открыть анкету" }).first();
-    if (!(await isVisible(open))) throw new Error("Questionnaire workspace is not openable from the UI.");
+    if (!(await isVisible(open)))
+      throw new Error("Questionnaire workspace is not openable from the UI.");
     await open.click();
     await expect(questionnaire).toBeVisible();
   }
@@ -351,10 +385,15 @@ export async function fillQuestionnaire(
   const submissionId = await questionnaire.getAttribute("data-submission-id");
   const applicants = questionnaire.locator(".v19-questionnaire-applicant-tab");
   const applicantCount = await applicants.count();
-  if (!submissionId) throw new Error("Created submission id was not rendered in the questionnaire UI.");
+  if (!submissionId)
+    throw new Error("Created submission id was not rendered in the questionnaire UI.");
   let fieldIndex = 0;
 
-  for (let applicantIndex = 0; applicantIndex < Math.max(applicantCount, 1); applicantIndex += 1) {
+  for (
+    let applicantIndex = 0;
+    applicantIndex < Math.max(applicantCount, 1);
+    applicantIndex += 1
+  ) {
     if (applicantCount > 0) await applicants.nth(applicantIndex).click();
 
     const sections = questionnaire.locator(
@@ -387,7 +426,9 @@ export async function fillQuestionnaire(
         const requiredControl = field.locator('[aria-required="true"]').first();
         if ((await requiredControl.count()) === 0) continue;
 
-        const textControl = field.locator("input:not([readonly]), textarea:not([readonly])").first();
+        const textControl = field
+          .locator("input:not([readonly]), textarea:not([readonly])")
+          .first();
         if (await isVisible(textControl)) {
           if (!(await textControl.inputValue()).trim()) {
             await textControl.fill(
@@ -411,7 +452,9 @@ export async function fillQuestionnaire(
           continue;
         }
 
-        const dropdown = field.locator("button.v19-questionnaire-field-control").first();
+        const dropdown = field
+          .locator("button.v19-questionnaire-field-control")
+          .first();
         if (await isVisible(dropdown)) {
           const currentValue = (await dropdown.innerText()).trim();
           if (currentValue.includes("Выберите")) {
@@ -472,7 +515,7 @@ export async function openDrawerTab(page: Page, name: string | RegExp) {
     : drawerRoot.getByRole("button", { name }).first();
   await expect(control).toBeVisible();
   await control.click();
-  if (await control.getAttribute("role") === "tab") {
+  if ((await control.getAttribute("role")) === "tab") {
     await expect(control).toHaveAttribute("aria-selected", "true");
   }
 }
@@ -480,7 +523,7 @@ export async function openDrawerTab(page: Page, name: string | RegExp) {
 export async function uploadVisibleRequiredFiles(page: Page, assets: string[]) {
   const findUploadSection = async () => {
     const sections = page.locator(".v20-file-section:visible");
-    for (let index = 0; index < await sections.count(); index += 1) {
+    for (let index = 0; index < (await sections.count()); index += 1) {
       const section = sections.nth(index);
       const candidate = section.locator("button").filter({ hasText: "Загрузить" });
       const count = await visibleLocatorCount(candidate);
@@ -491,15 +534,16 @@ export async function uploadVisibleRequiredFiles(page: Page, assets: string[]) {
 
   for (let pass = 0; pass < 20; pass += 1) {
     if (pass === 0) {
-      await expect.poll(
-        async () => Boolean(await findUploadSection()),
-        { timeout: 15_000 },
-      ).toBe(true);
+      await expect
+        .poll(async () => Boolean(await findUploadSection()), { timeout: 15_000 })
+        .toBe(true);
     }
     const section = await findUploadSection();
     if (!section) {
       if (pass === 0) {
-        throw new Error("Production Files tab rendered no upload inputs for the created submission.");
+        throw new Error(
+          "Production Files tab rendered no upload inputs for the created submission.",
+        );
       }
       return;
     }
@@ -525,14 +569,14 @@ export async function uploadVisibleRequiredFiles(page: Page, assets: string[]) {
 
 async function visibleLocatorCount(locator: Locator) {
   let visibleCount = 0;
-  for (let index = 0; index < await locator.count(); index += 1) {
+  for (let index = 0; index < (await locator.count()); index += 1) {
     if (await isVisible(locator.nth(index))) visibleCount += 1;
   }
   return visibleCount;
 }
 
 async function firstVisibleLocator(locator: Locator) {
-  for (let index = 0; index < await locator.count(); index += 1) {
+  for (let index = 0; index < (await locator.count()); index += 1) {
     const candidate = locator.nth(index);
     if (await isVisible(candidate)) return candidate;
   }

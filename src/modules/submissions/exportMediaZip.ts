@@ -4,10 +4,10 @@ import {
   buildDocumentsZip,
   DocumentZipBuilderError,
   EXPORT_DOCUMENT_TYPES,
+  exportDocumentTypesForApplicant,
   type DocumentZipDownloader,
 } from "../documents/documentExport";
 import {
-  DOCUMENT_TYPES,
   documentTypeToFrontendMediaType,
   tryNormalizeDocumentType,
   type DocumentAsset,
@@ -20,11 +20,6 @@ import {
 } from "./exportRules";
 import type { ExportPackageDocumentCommit } from "./exportPackageDocumentCommit";
 import { createExportWorkbookArtifact } from "./exportWorkbook";
-import {
-  createVisaApplicationFormPdfBlob,
-  validateVisaApplicationFormData,
-  visaApplicationFormValidationMessage,
-} from "./visaApplicationFormPdf";
 import {
   downloadMediaFromStorage,
   mediaStorageBucket,
@@ -44,7 +39,6 @@ export type ExportMediaZipBlockedReason =
   | "export_not_ready"
   | "media_not_ready"
   | "passport_number_missing"
-  | "questionnaire_incomplete"
   | "row_mismatch"
   | "storage_download_failed"
   | "storage_unavailable"
@@ -81,14 +75,6 @@ export type ExportMediaZipArtifactResult =
   | {
       ok: false;
       reason: ExportMediaZipBlockedReason;
-      safeMessage: string;
-    };
-
-export type ExportMediaZipAuditResult =
-  | { ok: true }
-  | {
-      ok: false;
-      reason: "audit_failed";
       safeMessage: string;
     };
 
@@ -197,7 +183,6 @@ export async function createExportMediaZipArtifact(
       JSON.stringify(
         buildArchiveManifest(orderedSubmissions, identityResult.identity, {
           applicantCount: documents.applicantCount,
-          documentAssetIds: documents.documentAssetIds,
           documentEntries: documents.entries,
           fileCount: documents.fileCount,
           rootFolder: documents.rootFolder,
@@ -215,7 +200,8 @@ export async function createExportMediaZipArtifact(
         `Applicants: ${documents.applicantCount}`,
         `Document files: ${documents.fileCount}`,
         `Workbook: ${workbookArtifact.fileName}`,
-        "Required files per applicant: passport_scan, selfie_1, selfie_2",
+        "Required files: passport_scan for every applicant; selfie_1 and selfie_2 for the primary applicant only",
+        "Questionnaire PDF is not included.",
         "Archive structure: VisaFlow_Export_YYYY-MM-DD / city / family-or-applicant / documents.",
       ].join("\n"),
     );
@@ -237,154 +223,12 @@ export async function createExportMediaZipArtifact(
       workbookFileName: workbookArtifact.fileName,
     };
 
-    const audit = await auditExportMediaZipArtifact(artifact);
-    if (!audit.ok) return audit;
-
     return { ok: true, artifact };
   } catch (error) {
     if (error instanceof DocumentZipBuilderError) {
       return blocked(error.reason, safeMessageForDocumentZipError(error));
     }
     return blocked("zip_failed", "Не удалось сформировать ZIP-файл.");
-  }
-}
-
-export async function auditExportMediaZipArtifact(
-  artifact: ExportMediaZipArtifact,
-): Promise<ExportMediaZipAuditResult> {
-  try {
-    if (artifact.blob.size <= 0) return failedArchiveAudit();
-
-    const archive = await JSZip.loadAsync(await artifact.blob.arrayBuffer());
-    const fileNames = Object.keys(archive.files).filter(
-      (name) => !archive.files[name]?.dir,
-    );
-    const manifestNames = fileNames.filter((name) =>
-      name.endsWith("/manifest.json"),
-    );
-    if (manifestNames.length !== 1) return failedArchiveAudit();
-
-    const manifestName = manifestNames[0];
-    if (!manifestName) return failedArchiveAudit();
-    const manifestEntry = archive.file(manifestName);
-    if (!manifestEntry) return failedArchiveAudit();
-    const manifest = JSON.parse(await manifestEntry.async("string")) as unknown;
-    if (!isArchiveManifest(manifest)) return failedArchiveAudit();
-
-    if (
-      artifact.applicantCount < 1 ||
-      artifact.submissionCount < 1 ||
-      manifest.applicantCount !== artifact.applicantCount ||
-      manifest.fileCount !== artifact.fileCount ||
-      manifest.workbookFileName !== artifact.workbookFileName ||
-      artifact.workbookFileName !== artifact.packageIdentity.fileName ||
-      artifact.fileName !==
-        `visaflow-export-${artifact.packageIdentity.idempotencyKey}_documents.zip` ||
-      artifact.submissionCount !== artifact.packageIdentity.submissionIds.length ||
-      artifact.applicantCount !== artifact.packageIdentity.rowCount ||
-      artifact.fileCount !== artifact.applicantCount * EXPORT_DOCUMENT_TYPES.length ||
-      artifact.documentAssetIds.length !==
-        artifact.applicantCount * DOCUMENT_TYPES.length ||
-      new Set(artifact.documentAssetIds).size !== artifact.documentAssetIds.length ||
-      !exportPackageIdentityMatches(artifact.packageIdentity, manifest.package) ||
-      !sameStringArray(manifest.requiredDocumentTypes, EXPORT_DOCUMENT_TYPES)
-    ) {
-      return failedArchiveAudit();
-    }
-
-    const documentEntries = manifest.documentEntries;
-    if (
-      documentEntries.length !== artifact.fileCount ||
-      new Set(documentEntries).size !== documentEntries.length ||
-      documentEntries.some(
-        (name) => !name.startsWith(`${manifest.rootFolder}/`),
-      )
-    ) {
-      return failedArchiveAudit();
-    }
-
-    if (
-      manifest.submissions.length !== artifact.submissionCount ||
-      !sameStringSet(
-        manifest.submissions.map((submission) => submission.id),
-        artifact.packageIdentity.submissionIds,
-      )
-    ) {
-      return failedArchiveAudit();
-    }
-
-    const manifestApplicants = manifest.submissions.flatMap(
-      (submission) => submission.applicants,
-    );
-    if (manifestApplicants.length !== artifact.applicantCount) {
-      return failedArchiveAudit();
-    }
-
-    const applicantEntries = manifestApplicants.flatMap(
-      (applicant) => applicant.documentEntries,
-    );
-    const applicantAssetIds = manifestApplicants.flatMap(
-      (applicant) => applicant.documentAssetIds,
-    );
-    if (
-      !sameStringArray(applicantEntries, documentEntries) ||
-      !sameStringArray(applicantAssetIds, artifact.documentAssetIds)
-    ) {
-      return failedArchiveAudit();
-    }
-
-    for (const applicant of manifestApplicants) {
-      if (
-        !sameStringArray(applicant.documentTypes, EXPORT_DOCUMENT_TYPES) ||
-        applicant.documentEntries.length !== EXPORT_DOCUMENT_TYPES.length ||
-        new Set(applicant.documentEntries).size !==
-          applicant.documentEntries.length ||
-        applicant.documentAssetIds.length !== DOCUMENT_TYPES.length ||
-        new Set(applicant.documentAssetIds).size !==
-          applicant.documentAssetIds.length
-      ) {
-        return failedArchiveAudit();
-      }
-
-      const observedTypes = applicant.documentEntries.map(
-        archiveDocumentTypeForEntry,
-      );
-      if (
-        observedTypes.some((type) => type === null) ||
-        !sameStringArray(
-          observedTypes as (typeof EXPORT_DOCUMENT_TYPES)[number][],
-          EXPORT_DOCUMENT_TYPES,
-        )
-      ) {
-        return failedArchiveAudit();
-      }
-    }
-
-    const workbookName = `${manifest.rootFolder}/${artifact.workbookFileName}`;
-    const readmeName = `${manifest.rootFolder}/README_ПАКЕТ.txt`;
-    const expectedNames = new Set([
-      ...documentEntries,
-      manifestName,
-      readmeName,
-      workbookName,
-    ]);
-    if (
-      expectedNames.size !== fileNames.length ||
-      fileNames.some((name) => !expectedNames.has(name))
-    ) {
-      return failedArchiveAudit();
-    }
-
-    for (const name of expectedNames) {
-      const entry = archive.file(name);
-      if (!entry || (await entry.async("uint8array")).byteLength <= 0) {
-        return failedArchiveAudit();
-      }
-    }
-
-    return { ok: true };
-  } catch {
-    return failedArchiveAudit();
   }
 }
 
@@ -415,7 +259,7 @@ export function downloadPreparedExportMediaZip(
     runtime.document.body.append(link);
     link.click();
     link.remove();
-    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 60_000);
+    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 0);
     return {
       ok: true,
       applicantCount: artifact.applicantCount,
@@ -458,19 +302,6 @@ function validateExportMediaZipIdentity(
       reason: ExportMediaZipBlockedReason;
       safeMessage: string;
     } {
-  const incompleteVisaForms = submissions.flatMap((submission) =>
-    submission.applicants.flatMap((applicant) => {
-      const validation = validateVisaApplicationFormData(submission, applicant);
-      return validation.ok ? [] : validation.missingFields;
-    }),
-  );
-  if (incompleteVisaForms.length > 0) {
-    return blocked(
-      "questionnaire_incomplete",
-      visaApplicationFormValidationMessage(incompleteVisaForms),
-    );
-  }
-
   if (!canDownloadExportMediaZip(submissions)) {
     return blocked(
       "export_not_ready",
@@ -564,12 +395,6 @@ function documentDownloaderForOptions(
   if (options.downloadMedia) {
     const legacyDownload = options.downloadMedia;
     return async (asset, context) => {
-      if (asset.type === "visa_form") {
-        return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
-          exportDate: context.exportDate,
-        });
-      }
-
       const frontendType = documentTypeToFrontendMediaType(asset.type);
       const file = submissions
         .find((submission) => submission.id === asset.submissionId)
@@ -596,13 +421,7 @@ function documentDownloaderForOptions(
     };
   }
 
-  return async (asset, context) => {
-    if (asset.type === "visa_form") {
-      return createVisaApplicationFormPdfBlob(context.submission, context.applicant, {
-        exportDate: context.exportDate,
-      });
-    }
-
+  return async (asset) => {
     return downloadMediaFromStorage({
       bucket: mediaStorageBucket,
       path: asset.storage.path,
@@ -662,16 +481,12 @@ function buildArchiveManifest(
   identity: ExportPackageIdentity,
   counts: {
     applicantCount: number;
-    documentAssetIds: string[];
     documentEntries: string[];
     fileCount: number;
     rootFolder: string;
     workbookFileName: string;
   },
 ) {
-  let documentEntryIndex = 0;
-  let documentAssetIndex = 0;
-
   return {
     applicantCount: counts.applicantCount,
     documentEntries: counts.documentEntries,
@@ -681,17 +496,9 @@ function buildArchiveManifest(
     rootFolder: counts.rootFolder,
     workbookFileName: counts.workbookFileName,
     submissions: submissions.map((submission) => ({
-      applicants: submission.applicants.map((applicant) => ({
-        documentAssetIds: counts.documentAssetIds.slice(
-          documentAssetIndex,
-          (documentAssetIndex += DOCUMENT_TYPES.length),
-        ),
-        documentEntries: counts.documentEntries.slice(
-          documentEntryIndex,
-          (documentEntryIndex += EXPORT_DOCUMENT_TYPES.length),
-        ),
+      applicants: submission.applicants.map((applicant, applicantIndex) => ({
         id: applicant.id,
-        documentTypes: EXPORT_DOCUMENT_TYPES,
+        documentTypes: exportDocumentTypesForApplicant(applicantIndex),
         name: applicant.fullName,
       })),
       city: submission.city,
@@ -699,130 +506,6 @@ function buildArchiveManifest(
       title: submission.title,
       type: submission.type,
     })),
-  };
-}
-
-function isArchiveManifest(value: unknown): value is {
-  applicantCount: number;
-  documentEntries: string[];
-  fileCount: number;
-  package: ExportPackageIdentity;
-  requiredDocumentTypes: string[];
-  rootFolder: string;
-  submissions: Array<{
-    applicants: Array<{
-      documentAssetIds: string[];
-      documentEntries: string[];
-      documentTypes: string[];
-      id: string;
-      name: string;
-    }>;
-    id: string;
-  }>;
-  workbookFileName: string;
-} {
-  if (!isRecord(value)) return false;
-  return (
-    Number.isInteger(value.applicantCount) &&
-    Number.isInteger(value.fileCount) &&
-    isStringArray(value.documentEntries) &&
-    isExportPackageIdentity(value.package) &&
-    isStringArray(value.requiredDocumentTypes) &&
-    typeof value.rootFolder === "string" &&
-    value.rootFolder.length > 0 &&
-    isArchiveManifestSubmissions(value.submissions) &&
-    typeof value.workbookFileName === "string" &&
-    value.workbookFileName.length > 0
-  );
-}
-
-function isArchiveManifestSubmissions(
-  value: unknown,
-): value is Array<{
-  applicants: Array<{
-    documentAssetIds: string[];
-    documentEntries: string[];
-    documentTypes: string[];
-    id: string;
-    name: string;
-  }>;
-  id: string;
-}> {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (submission) =>
-        isRecord(submission) &&
-        typeof submission.id === "string" &&
-        Array.isArray(submission.applicants) &&
-        submission.applicants.every(
-          (applicant) =>
-            isRecord(applicant) &&
-            typeof applicant.id === "string" &&
-            typeof applicant.name === "string" &&
-            isStringArray(applicant.documentTypes) &&
-            isStringArray(applicant.documentEntries) &&
-            isStringArray(applicant.documentAssetIds),
-        ),
-    )
-  );
-}
-
-function archiveDocumentTypeForEntry(
-  entryName: string,
-): (typeof EXPORT_DOCUMENT_TYPES)[number] | null {
-  const fileName = entryName.split("/").at(-1) ?? "";
-  return (
-    EXPORT_DOCUMENT_TYPES.find((type) => fileName.includes(`_${type}.`)) ?? null
-  );
-}
-
-function isExportPackageIdentity(value: unknown): value is ExportPackageIdentity {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.contentFingerprint === "string" &&
-    typeof value.fileName === "string" &&
-    (value.format === "csv" || value.format === "xlsx") &&
-    typeof value.idempotencyKey === "string" &&
-    Number.isInteger(value.rowCount) &&
-    isStringArray(value.submissionIds)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
-
-function sameStringArray(
-  left: readonly string[],
-  right: readonly string[],
-): boolean {
-  return (
-    left.length === right.length &&
-    left.every((item, index) => item === right[index])
-  );
-}
-
-function sameStringSet(
-  left: readonly string[],
-  right: readonly string[],
-): boolean {
-  return (
-    left.length === right.length &&
-    new Set(left).size === left.length &&
-    left.every((item) => right.includes(item))
-  );
-}
-
-function failedArchiveAudit(): ExportMediaZipAuditResult {
-  return {
-    ok: false,
-    reason: "audit_failed",
-    safeMessage: "ZIP не прошёл проверку состава. Скачивание и фиксация отменены.",
   };
 }
 
@@ -839,9 +522,6 @@ function safeMessageForDocumentZipError(error: DocumentZipBuilderError): string 
   }
   if (reason === "passport_number_missing") {
     return "У каждого заявителя должен быть проверенный номер паспорта. ZIP не сформирован.";
-  }
-  if (reason === "questionnaire_incomplete") {
-    return error.message;
   }
   return "В выбранном пакете не все обязательные документы прошли проверку.";
 }

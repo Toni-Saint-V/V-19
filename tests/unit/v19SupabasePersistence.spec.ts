@@ -1054,7 +1054,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       reviewOriginSource: "passport_ocr",
       reviewSource: "passport_ocr",
       reviewState: "needs_review",
-      value: submission.city,
+      value: sourceField.value,
     });
 
     mockState.submissionRows = [

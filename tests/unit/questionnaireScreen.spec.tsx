@@ -18,6 +18,12 @@ function fieldValue(submission: Submission, fieldId: string) {
   );
 }
 
+function openPersonalSection() {
+  const button = screen.getAllByRole("button", { name: /Личные данные/ })[0];
+  if (!button) throw new Error("expected personal questionnaire section");
+  fireEvent.click(button);
+}
+
 function readySubmission(status: Submission["status"]) {
   const draft = createDraftSubmission({
     applicantNames: ["VOLKOV ANTON"],
@@ -115,6 +121,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
+    openPersonalSection();
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -170,6 +177,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
+    openPersonalSection();
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -204,6 +212,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
+    openPersonalSection();
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
@@ -247,13 +256,14 @@ describe("QuestionnaireScreen", () => {
     expect(screen.getByTestId("questionnaire-read-only-status")).toHaveTextContent(
       "На проверке",
     );
+    openPersonalSection();
     expect(screen.getByLabelText("Фамилия")).toBeDisabled();
     expect(onSubmissionChange).not.toHaveBeenCalled();
     expect(onSubmitForReview).not.toHaveBeenCalled();
     expect(screen.queryByText("Отправлено на проверку")).not.toBeInTheDocument();
   });
 
-  test("does not retain an optimistic submitted lifecycle after Supabase rejects", async () => {
+  test("keeps the current lifecycle when a questionnaire save is retried", async () => {
     const submission = readySubmission("in_progress");
     const onSubmissionChange = vi
       .fn()
@@ -269,7 +279,10 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Отправить на проверку" }));
+    expect(
+      screen.queryByRole("button", { name: "Отправить на проверку" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() =>
       expect(screen.getAllByText("Supabase недоступен").length).toBeGreaterThan(0),
     );
@@ -281,7 +294,7 @@ describe("QuestionnaireScreen", () => {
     expect(retrySubmission.status).toBe("in_progress");
   });
 
-  test("runs returned corrections from field edit through fixed_by_agent to corrections_received", async () => {
+  test("saves returned corrections without performing the review handoff", async () => {
     const returned = readySubmission("returned");
     const applicant = returned.applicants[0];
     if (!applicant) throw new Error("expected applicant");
@@ -323,6 +336,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
+    openPersonalSection();
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: `${surname.value}A` },
     });
@@ -349,20 +363,14 @@ describe("QuestionnaireScreen", () => {
         submissionId={fixedResult.data.id}
       />,
     );
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Отправить исправления" })).toBeEnabled(),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Отправить исправления" }));
-    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));
-
-    const corrections = onSubmissionChange.mock.calls[1]?.[0] as Submission;
-    expect(corrections.status).toBe("corrections_received");
-    expect(corrections.issues[0]?.status).toBe("fixed_by_agent");
-    expect(corrections.history[0]?.text).toContain("Агент отправил исправления");
-    expect(onSubmitForReview).toHaveBeenCalledWith(corrections.id);
+    expect(
+      screen.queryByRole("button", { name: "Отправить исправления" }),
+    ).not.toBeInTheDocument();
+    expect(onSubmissionChange).toHaveBeenCalledTimes(1);
+    expect(onSubmitForReview).not.toHaveBeenCalled();
   });
 
-  test("blocks untouched OCR values and submits only after explicit confirmation", async () => {
+  test("persists an explicit OCR confirmation without submitting the lifecycle", async () => {
     const submission = withPendingPassportExtraction(
       readySubmission("in_progress"),
     );
@@ -377,11 +385,9 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    const completeButton = screen.getByRole("button", { name: "Отправить на проверку" });
-    expect(completeButton).toBeEnabled();
-    expect(onSubmissionChange).not.toHaveBeenCalled();
-
-    fireEvent.click(completeButton);
+    expect(
+      screen.queryByRole("button", { name: "Отправить на проверку" }),
+    ).not.toBeInTheDocument();
     expect(onSubmissionChange).not.toHaveBeenCalled();
 
     const passportSectionButton = screen
@@ -394,16 +400,15 @@ describe("QuestionnaireScreen", () => {
         name: "Подтвердить поле: Номер паспорта",
       }),
     );
-    await waitFor(() => expect(completeButton).toHaveClass("is-ready"));
-    fireEvent.click(completeButton);
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
 
-    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));
-    const submitted = onSubmissionChange.mock.calls[1]?.[0] as Submission;
+    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
+    const submitted = onSubmissionChange.mock.calls[0]?.[0] as Submission;
     const submittedApplicant = submitted.applicants[0];
     const confirmedPassportNumber = submittedApplicant?.sections
       .flatMap((section) => section.fields)
       .find((field) => field.id === "passport-no");
-    expect(submitted.status).toBe("submitted_for_review");
+    expect(submitted.status).toBe("in_progress");
     expect(confirmedPassportNumber).toMatchObject({
       reviewState: "confirmed",
       reviewSource: "manual",

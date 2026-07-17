@@ -30,7 +30,7 @@ const tripTo = "28.05.2026";
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const fixtureRoot = path.resolve(testDir, "../src/assets/export-demo");
 
-test("ZIP contains real workbook and four real document files per applicant", async () => {
+test("ZIP contains Excel, every passport scan, and selfies only for the primary applicant", async () => {
   const submission = withGeneratedExportPackage(
     fillRequiredQuestionnaireForTest(
       normalizeSubmissionQuestionnaire(
@@ -64,17 +64,7 @@ test("ZIP contains real workbook and four real document files per applicant", as
     submission.exportPackage ?? null,
     {
       documentAssets: localDemoOptions.documentAssets,
-      downloadDocument: async (asset, context) => {
-        if (asset.type === "visa_form") {
-          return createVisaApplicationFormPdfBlob(
-            context.submission,
-            context.applicant,
-            {
-              exportDate: context.exportDate,
-            },
-          );
-        }
-
+      downloadDocument: async (asset) => {
         const fixturePath = {
           passport_scan: path.join(fixtureRoot, "passport_scan.jpeg"),
           selfie_1: path.join(fixtureRoot, "selfie_1.jpg"),
@@ -98,7 +88,7 @@ test("ZIP contains real workbook and four real document files per applicant", as
   const fileNames = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
 
   expect(result.artifact.applicantCount).toBe(2);
-  expect(result.artifact.fileCount).toBe(8);
+  expect(result.artifact.fileCount).toBe(4);
   expect(fileNames).toContain(
     "VisaFlow_Export_2026-05-20/Санкт-Петербург/Семья Волковых/752869613_passport_scan.jpg",
   );
@@ -108,9 +98,7 @@ test("ZIP contains real workbook and four real document files per applicant", as
   expect(fileNames).toContain(
     "VisaFlow_Export_2026-05-20/Санкт-Петербург/Семья Волковых/752869613_selfie_2.jpg",
   );
-  expect(fileNames).toContain(
-    "VisaFlow_Export_2026-05-20/Санкт-Петербург/Семья Волковых/752869613_visa_form.pdf",
-  );
+  expect(fileNames.some((name) => name.endsWith("_visa_form.pdf"))).toBe(false);
   expect(fileNames).toContain(
     `VisaFlow_Export_2026-05-20/${result.artifact.workbookFileName}`,
   );
@@ -149,34 +137,17 @@ test("ZIP contains real workbook and four real document files per applicant", as
     expect(isJpeg(passportBytes)).toBe(true);
     expect(passportBytes.length).toBeGreaterThan(200_000);
 
-    const selfie1Bytes = await zip
-      .file(
-        `VisaFlow_Export_2026-05-20/Санкт-Петербург/Семья Волковых/${passport}_selfie_1.jpg`,
-      )!
-      .async("uint8array");
-    expect(isJpeg(selfie1Bytes)).toBe(true);
-    expect(selfie1Bytes.length).toBeGreaterThan(10_000);
-
-    const selfie2Bytes = await zip
-      .file(
-        `VisaFlow_Export_2026-05-20/Санкт-Петербург/Семья Волковых/${passport}_selfie_2.jpg`,
-      )!
-      .async("uint8array");
-    expect(isJpeg(selfie2Bytes)).toBe(true);
-    expect(selfie2Bytes.length).toBeGreaterThan(5_000);
-
-    const formBytes = await zip
-      .file(
-        `VisaFlow_Export_2026-05-20/Санкт-Петербург/Семья Волковых/${passport}_visa_form.pdf`,
-      )!
-      .async("uint8array");
-    const formText = new TextDecoder().decode(formBytes);
-    expect(formText.startsWith("%PDF-1.4")).toBe(true);
-    expect(formText).toContain("/Count 4");
-    expect(formText).toContain(passport);
-    expect(formText).toContain("/VF");
-    expect(formText).toContain("ST PETERSBURG, 20-05-2026");
   }
+
+  for (const type of ["selfie_1", "selfie_2"] as const) {
+    const bytes = await zip
+      .file(
+        `VisaFlow_Export_2026-05-20/Санкт-Петербург/Семья Волковых/752869613_${type}.jpg`,
+      )!
+      .async("uint8array");
+    expect(isJpeg(bytes)).toBe(true);
+  }
+  expect(fileNames.some((name) => /752869614_selfie_[12]\.jpg$/.test(name))).toBe(false);
 
   const manifest = JSON.parse(
     await zip.file("VisaFlow_Export_2026-05-20/manifest.json")!.async("string"),
@@ -185,9 +156,16 @@ test("ZIP contains real workbook and four real document files per applicant", as
     "passport_scan",
     "selfie_1",
     "selfie_2",
-    "visa_form",
   ]);
-  expect(manifest.fileCount).toBe(8);
+  expect(manifest.fileCount).toBe(4);
+  expect(manifest.submissions[0].applicants[0].documentTypes).toEqual([
+    "passport_scan",
+    "selfie_1",
+    "selfie_2",
+  ]);
+  expect(manifest.submissions[0].applicants[1].documentTypes).toEqual([
+    "passport_scan",
+  ]);
 });
 
 test("generated visa form is a four-page filled PDF, not a text placeholder", async () => {

@@ -16,7 +16,12 @@ const productionEnvPath = resolve(
   process.cwd(),
   process.env.SUPABASE_UI_E2E_ENV_FILE ?? ".env.supabase-production.local",
 );
-const qaAssetsDirectory = resolve(process.cwd(), "docs", "Для теста");
+const qaAssetsDirectory = resolve(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  "production-media",
+);
 const permittedQaAssetNames = [
   "E2E_TEST_PERSON_ONE_910000001.png",
   "E2E_TEST_PERSON_TWO_910000002.png",
@@ -557,7 +562,8 @@ export function assertProductionNetworkRecordsHealthy(
     );
     invariant(
       authRecords.every(
-        (record) => record.status === 0 || (record.status >= 200 && record.status < 300),
+        (record) =>
+          record.status === 0 || (record.status >= 200 && record.status < 300),
       ),
       `${label}: password auth returned a non-retryable HTTP failure.`,
     );
@@ -695,9 +701,9 @@ export async function signInCohortAccount(
   await page.goto("/");
   const switchToLogin = page.getByRole("button", { name: "Уже есть доступ? Войти" });
   if (await isVisible(switchToLogin)) await switchToLogin.click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Вход" }),
-  ).toBeVisible({ timeout: productionWorkspaceReadyTimeoutMs });
+  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible({
+    timeout: productionWorkspaceReadyTimeoutMs,
+  });
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Пароль", { exact: true }).fill(account.password);
   const loginCheckpoint = ledger.checkpoint();
@@ -1134,9 +1140,7 @@ async function findCreatingCaseByPassportMarker(
     await openSubmissionById(page, submissionId);
     await expect(drawer(page)).toContainText(submissionId, { timeout: 45_000 });
     const filesTab = drawer(page).getByRole("tab", { name: /Файлы/ }).first();
-    const filesButton = drawer(page)
-      .getByRole("button", { name: /Файлы/ })
-      .first();
+    const filesButton = drawer(page).getByRole("button", { name: /Файлы/ }).first();
     const filesControl = (await isVisible(filesTab)) ? filesTab : filesButton;
     if (!(await isVisible(filesControl))) {
       await closeDrawerIfOpen(page);
@@ -1285,9 +1289,7 @@ async function assertCheckpointMatchesCohortCase(
   submissionId: string,
 ) {
   const filesTab = drawer(page).getByRole("tab", { name: /Файлы/ }).first();
-  const filesButton = drawer(page)
-    .getByRole("button", { name: /Файлы/ })
-    .first();
+  const filesButton = drawer(page).getByRole("button", { name: /Файлы/ }).first();
   const filesControl = (await isVisible(filesTab)) ? filesTab : filesButton;
   if (await isVisible(filesControl)) {
     await filesControl.click();
@@ -1298,9 +1300,7 @@ async function assertCheckpointMatchesCohortCase(
     const questionnaire = await openQuestionnaireFromDrawer(page);
     await clickQuestionnaireSection(questionnaire, /Личные данные/);
     await expect(
-      questionnaire
-        .locator('[data-field-label="Фамилия"] input')
-        .first(),
+      questionnaire.locator('[data-field-label="Фамилия"] input').first(),
     ).toHaveValue(new RegExp(cohortCase.caseMarker), { timeout: 45_000 });
     await questionnaire.getByRole("button", { name: "Назад" }).click();
     await expect(questionnaire).toHaveCount(0);
@@ -1369,11 +1369,7 @@ export async function createOrResumeCohortCase(input: {
     await clickWorkspaceButton(page, /Мои подачи/);
     await waitForAgentSubmissionsSettled(page);
     await openSubmissionById(page, checkpoint.submissionId);
-    await assertCheckpointMatchesCohortCase(
-      page,
-      cohortCase,
-      checkpoint.submissionId,
-    );
+    await assertCheckpointMatchesCohortCase(page, cohortCase, checkpoint.submissionId);
     const visibleDrawerText = await drawer(page).innerText();
     const statusPill = drawer(page).locator(".v20-status-pill").first();
     const statusPillText = (await isVisible(statusPill))
@@ -1390,9 +1386,7 @@ export async function createOrResumeCohortCase(input: {
     }
     if (
       checkpoint.stage === "submitted" ||
-      /^(?:На проверке|Отправлено на проверку|проверка)$/i.test(
-        statusPillText,
-      ) ||
+      /^(?:На проверке|Отправлено на проверку|проверка)$/i.test(statusPillText) ||
       /На проверке|Отправлено на проверку/i.test(visibleDrawerText)
     ) {
       if (statusPillText) {
@@ -1400,9 +1394,7 @@ export async function createOrResumeCohortCase(input: {
           /^(?:На проверке|Отправлено на проверку|проверка)$/i,
         );
       } else {
-        await expect(drawer(page)).toContainText(
-          /На проверке|Отправлено на проверку/i,
-        );
+        await expect(drawer(page)).toContainText(/На проверке|Отправлено на проверку/i);
       }
       await assertAgentDrawerCaseContract(page, cohortCase);
       checkpoint.stage = "submitted";
@@ -1542,11 +1534,7 @@ export async function createOrResumeCohortCase(input: {
       timeout: 45_000,
     });
     ledger.assertHealthySince(mutationCheckpoint, `submit ${cohortCase.caseKey}`);
-    await assertCheckpointMatchesCohortCase(
-      page,
-      cohortCase,
-      checkpoint.submissionId,
-    );
+    await assertCheckpointMatchesCohortCase(page, cohortCase, checkpoint.submissionId);
     await assertAgentDrawerCaseContract(page, cohortCase);
     checkpoint.stage = "submitted";
     await saveCohortResumeState(resumeState);
@@ -1589,12 +1577,8 @@ export async function verifyAdminSeesSubmittedCase(
   await row.click();
   await expect(drawer(page)).toBeVisible();
   const overviewTab = drawer(page).getByRole("tab", { name: /Обзор/ }).first();
-  const overviewButton = drawer(page)
-    .getByRole("button", { name: /Обзор/ })
-    .first();
-  const overviewControl = (await isVisible(overviewTab))
-    ? overviewTab
-    : overviewButton;
+  const overviewButton = drawer(page).getByRole("button", { name: /Обзор/ }).first();
+  const overviewControl = (await isVisible(overviewTab)) ? overviewTab : overviewButton;
   if (await isVisible(overviewControl)) await overviewControl.click();
   await expect(drawer(page)).toContainText(cohortCase.city);
   await expect(
@@ -1603,9 +1587,7 @@ export async function verifyAdminSeesSubmittedCase(
     }),
   ).toBeVisible();
   await openDrawerTab(page, /Заявители/);
-  const applicantCards = drawer(page).locator(
-    ".admin-review-applicants-tab > article",
-  );
+  const applicantCards = drawer(page).locator(".admin-review-applicants-tab > article");
   if ((await applicantCards.count()) > 0) {
     await expect(applicantCards).toHaveCount(cohortCase.applicantCount);
   } else {

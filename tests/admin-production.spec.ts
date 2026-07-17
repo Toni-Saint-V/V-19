@@ -447,7 +447,9 @@ test("admin export package: same-city sorting, Excel state, ZIP folders, passpor
   if (!zipResult.ok) throw new Error(`${zipResult.reason}: ${zipResult.safeMessage}`);
   expect(zipResult.ok).toBe(true);
   expect(zipResult.artifact.applicantCount).toBe(11);
-  expect(zipResult.artifact.fileCount).toBe(44);
+  expect(zipResult.artifact.fileCount).toBe(
+    zipResult.artifact.applicantCount + selectedGenerated.length * 2,
+  );
 
   const zip = await JSZip.loadAsync(await zipResult.artifact.blob.arrayBuffer());
   const files = Object.keys(zip.files).filter((name) => !zip.files[name]!.dir);
@@ -455,18 +457,16 @@ test("admin export package: same-city sorting, Excel state, ZIP folders, passpor
   expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_passport_scan.jpg");
   expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_selfie_1.jpg");
   expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_selfie_2.jpg");
-  expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_visa_form.pdf");
-  expect(files).toContain("VisaFlow_Export_2026-05-20/Санкт-Петербург/Applicant1 SingleFour/669308611_visa_form.pdf");
+  expect(files.some((name) => name.endsWith("_visa_form.pdf"))).toBe(false);
 
   const manifestFile = zip.file("VisaFlow_Export_2026-05-20/manifest.json");
   expect(manifestFile).not.toBeNull();
   const manifest = JSON.parse(await manifestFile!.async("string"));
-  expect(manifest.requiredDocumentTypes).toEqual(["passport_scan", "selfie_1", "selfie_2", "visa_form"]);
-  expect(manifest.documentEntries).toHaveLength(44);
+  expect(manifest.requiredDocumentTypes).toEqual(["passport_scan", "selfie_1", "selfie_2"]);
+  expect(manifest.documentEntries).toHaveLength(
+    zipResult.artifact.applicantCount + selectedGenerated.length * 2,
+  );
   expect(manifest.applicantCount).toBe(11);
-
-  const formPdf = await zip.file("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_visa_form.pdf")!.async("uint8array");
-  expect(new TextDecoder().decode(formPdf.slice(0, 8))).toBe("%PDF-1.4");
 
   const selfie = await zip.file("VisaFlow_Export_2026-05-20/Санкт-Петербург/Family Alpha/669308601_selfie_1.jpg")!.async("uint8array");
   expect(Array.from(selfie.slice(0, 3))).toEqual([0xff, 0xd8, 0xff]);

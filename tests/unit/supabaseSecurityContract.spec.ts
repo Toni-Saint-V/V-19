@@ -71,7 +71,9 @@ describe("Supabase security contract", () => {
     const authService = readProjectFile("src/services/authService.ts");
 
     expect(authService).toContain("client.auth.signInWithPassword");
-    expect(authService).toContain("Production profile repair requires owner-approved role assignment");
+    expect(authService).toContain(
+      "Production profile repair requires owner-approved role assignment",
+    );
     expect(authService).not.toContain("allowMissingProfileRecovery");
     expect(authService).not.toContain("upsertProfile");
     expect(authService).not.toContain("client.auth.signUp");
@@ -98,16 +100,24 @@ describe("Supabase security contract", () => {
     );
 
     expect(migration).toContain("create table public.access_requests");
-    expect(migration).toContain("alter table public.access_requests enable row level security");
+    expect(migration).toContain(
+      "alter table public.access_requests enable row level security",
+    );
     expect(migration).toContain('create policy "access requests admin read"');
     expect(migration).toContain('create policy "access requests requester read own"');
     expect(migration).toContain("using (user_id = (select auth.uid()))");
-    expect(migration).toContain("requested_role public.profile_role not null default 'agent'");
+    expect(migration).toContain(
+      "requested_role public.profile_role not null default 'agent'",
+    );
     expect(migration).toContain("check (requested_role = 'agent')");
     expect(migration).toContain("where status = 'pending'");
-    expect(migration).toContain("revoke all on public.access_requests from anon, authenticated");
-    expect(migration).toContain("grant select on public.access_requests to authenticated");
-    expect(authService).toContain(".from(\"access_requests\")");
+    expect(migration).toContain(
+      "revoke all on public.access_requests from anon, authenticated",
+    );
+    expect(migration).toContain(
+      "grant select on public.access_requests to authenticated",
+    );
+    expect(authService).toContain('.from("access_requests")');
     expect(authService).toContain("Заявка отправлена");
     expect(authService).toContain("Заявка отклонена");
     expect(accessRequestFunction).toContain('action === "approve"');
@@ -118,7 +128,7 @@ describe("Supabase security contract", () => {
     expect(accessRequestFunction).toContain("reviewed_at: null");
     expect(accessRequestFunction).toContain("reviewed_by_admin_id: null");
     expect(accessRequestFunction).toContain("inviteUserByEmail");
-    expect(accessRequestFunction).toContain("role: \"agent\"");
+    expect(accessRequestFunction).toContain('role: "agent"');
     expect(accessRequestFunction).toContain("requireAdminProfile");
     expect(accessRequestFunction).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(accessRequestFunction).not.toContain("email_confirm: true");
@@ -133,7 +143,9 @@ describe("Supabase security contract", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260629193805_v19_access_requests_admin_pdfs.sql",
     );
-    const storagePolicy = readProjectFile("src/modules/submissions/mediaStoragePolicy.ts");
+    const storagePolicy = readProjectFile(
+      "src/modules/submissions/mediaStoragePolicy.ts",
+    );
     const adminPdfService = readProjectFile(
       "src/modules/submissions/adminPdfArtifacts.ts",
     );
@@ -149,22 +161,24 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("position('/' in file_name) = 0");
     expect(migration).toContain("position(chr(92) in file_name) = 0");
     expect(migration).toContain("file_name !~ '[[:cntrl:]]'");
+    expect(migration).toContain("create unique index admin_pdf_artifacts_slot_uidx");
     expect(migration).toContain(
-      "create unique index admin_pdf_artifacts_slot_uidx",
+      'create policy "admin pdf artifacts read owner or admin"',
     );
-    expect(migration).toContain('create policy "admin pdf artifacts read owner or admin"');
     expect(migration).toContain('create policy "admin pdf artifacts admin insert"');
     expect(migration).toContain('create policy "admin pdf artifacts admin update"');
     expect(migration).toContain('create policy "admin pdf artifacts admin delete"');
     expect(migration).toContain("from public.admin_pdf_artifacts a");
     expect(migration).toContain("and a.storage_path = name");
-    expect(migration).toContain("split_part(name, '/', 3) in ('appointment_pdf', 'application_pdf')");
-    expect(storagePolicy).toContain("\"application_pdf\"");
+    expect(migration).toContain(
+      "split_part(name, '/', 3) in ('appointment_pdf', 'application_pdf')",
+    );
+    expect(storagePolicy).toContain('"application_pdf"');
     expect(storagePolicy).toContain("buildApplicationPdfStorageTarget");
     expect(adminPdfService).toContain("uploadAdminPdfArtifact");
     expect(adminPdfService).toContain("deleteMediaFromStorage(target)");
     expect(adminPdfService).toContain("crypto.subtle.digest");
-    expect(adminPdfService).toContain("onConflict: \"submission_id,artifact_kind\"");
+    expect(adminPdfService).toContain('onConflict: "submission_id,artifact_kind"');
   });
 
   test("blocks agent-owned writes from changing operator review and handoff state", () => {
@@ -432,9 +446,7 @@ describe("Supabase security contract", () => {
       "create or replace function public.complete_export_package(payload jsonb)",
     );
     expect(migration).toContain("security definer");
-    expect(migration).toContain(
-      "set search_path = pg_catalog, public, app_private",
-    );
+    expect(migration).toContain("set search_path = pg_catalog, public, app_private");
     expect(migration).toContain("payload -> 'document_export'");
     expect(migration).toContain("Export document asset ids must be unique UUIDs");
     expect(migration).toContain(
@@ -497,21 +509,15 @@ describe("Supabase security contract", () => {
       "create or replace function public.complete_export_package(payload jsonb)",
     );
     expect(migration).toContain("security definer");
-    expect(migration).toContain(
-      "set search_path = pg_catalog, public, app_private",
-    );
+    expect(migration).toContain("set search_path = pg_catalog, public, app_private");
     expect(migration).toContain(
       "right(lower(document_record.zip_file_name), 4) <> '.zip'",
     );
-    expect(migration).not.toMatch(
-      /lower\(document_record\.zip_file_name\)\s*!~/,
-    );
+    expect(migration).not.toMatch(/lower\(document_record\.zip_file_name\)\s*!~/);
     expect(migration).toContain(
       "document_record.zip_file_name <> replace(replace(document_record.zip_file_name, '/', ''), chr(92), '')",
     );
-    expect(migration).toContain(
-      "position('..' in document_record.zip_file_name) > 0",
-    );
+    expect(migration).toContain("position('..' in document_record.zip_file_name) > 0");
     expect(migration).toContain(
       "core_result := app_private.complete_export_package_core(payload)",
     );
@@ -720,9 +726,13 @@ describe("Supabase security contract", () => {
 
     expect(readinessMigration).toContain("m.storage_bucket = 'submission-media'");
     expect(readinessMigration).toContain("m.storage_path !~ '(^/|//|\\.\\.)'");
-    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 1) = 'submissions'");
+    expect(readinessMigration).toContain(
+      "split_part(m.storage_path, '/', 1) = 'submissions'",
+    );
     expect(readinessMigration).toContain("split_part(m.storage_path, '/', 2) = new.id");
-    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 3) = 'applicants'");
+    expect(readinessMigration).toContain(
+      "split_part(m.storage_path, '/', 3) = 'applicants'",
+    );
     expect(readinessMigration).toContain("split_part(m.storage_path, '/', 4) = a.id");
     expect(readinessMigration).toContain(
       "split_part(m.storage_path, '/', 5) = required_media.type::text",
@@ -757,9 +767,7 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("set search_path = public, app_private");
     expect(migration).toContain("actor_role public.profile_role;");
     expect(migration).toContain("if tg_op = 'UPDATE' then");
-    expect(migration).toContain(
-      "actor_role := app_private.current_profile_role();",
-    );
+    expect(migration).toContain("actor_role := app_private.current_profile_role();");
     expect(
       sql.indexOf("actor_role := app_private.current_profile_role()"),
     ).toBeGreaterThan(blockingIssueGuard);
@@ -822,9 +830,7 @@ describe("Supabase security contract", () => {
     expect(rollbackTemplate).toContain("readiness_trigger.tgdeferrable");
     expect(rollbackTemplate).toContain("readiness_trigger.tginitdeferred");
     expect(rollbackTemplate).toContain("readiness_trigger.tgfoid");
-    expect(rollbackTemplate).toContain(
-      "trigger_record.tgenabled is distinct from 'O'",
-    );
+    expect(rollbackTemplate).toContain("trigger_record.tgenabled is distinct from 'O'");
     expect(migrationContract).not.toContain(
       "20260712201203_allow_admin_waiting_review_issue_checkpoint.rollback.sql",
     );
@@ -894,9 +900,7 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(" SECURITY INVOKER");
     expect(migration).toContain(" SET search_path TO 'public'");
     expect(migration).not.toContain("SECURITY DEFINER");
-    expect(migration).not.toContain(
-      "app_private.enforce_submission_agent_mutation",
-    );
+    expect(migration).not.toContain("app_private.enforce_submission_agent_mutation");
     expect(updateStatement).toContain("where id = submission_record.id;");
     expect(updateStatement).not.toMatch(/\bagent_id\s*=/i);
     expect(submissionWrite).toContain(
@@ -939,10 +943,7 @@ describe("Supabase security contract", () => {
     const functionStart = rollbackTemplate.indexOf(
       "CREATE OR REPLACE FUNCTION app_private.save_submission_draft_without_questionnaire_rows(payload jsonb)",
     );
-    const functionDelimiter = rollbackTemplate.indexOf(
-      "$function$;",
-      functionStart,
-    );
+    const functionDelimiter = rollbackTemplate.indexOf("$function$;", functionStart);
     const functionEnd = functionDelimiter + "$function$".length;
     const restoredFunction = rollbackTemplate.slice(functionStart, functionEnd);
 
@@ -1019,9 +1020,7 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("status_history_source_check");
     expect(migration).toContain("source in ('agent', 'admin', 'bb', 'system')");
     expect(migration).toContain("payload_without_status_history");
-    expect(migration).toContain(
-      "payload_without_status_history",
-    );
+    expect(migration).toContain("payload_without_status_history");
     expect(migration).toContain("insert into public.status_history");
     expect(migration).toContain("source,");
     expect(migration).toContain("note,");
@@ -1283,20 +1282,36 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("name !~ '(^/|//|(^|/)\\.\\.?(/|$))'");
     expect(migration).toContain("split_part(name, '/', 1) = 'submissions'");
     expect(migration).toContain("split_part(name, '/', 3) = 'applicants'");
-    expect(migration).toContain("split_part(name, '/', 5) in ('selfie', 'selfie_2', 'passport_scan', 'visa_application_pdf')");
+    expect(migration).toContain(
+      "split_part(name, '/', 5) in ('selfie', 'selfie_2', 'passport_scan', 'visa_application_pdf')",
+    );
     expect(migration).toContain("split_part(name, '/', 1) <> 'submissions'");
-    expect(migration).toContain("split_part(name, '/', 3) in ('selfie', 'selfie_2', 'passport_scan', 'visa_application_pdf')");
+    expect(migration).toContain(
+      "split_part(name, '/', 3) in ('selfie', 'selfie_2', 'passport_scan', 'visa_application_pdf')",
+    );
     expect(migration).toContain("split_part(name, '/', 3) = 'common'");
-    expect(migration).toContain("split_part(name, '/', 4) in ('application_pdf', 'appointment_pdf')");
+    expect(migration).toContain(
+      "split_part(name, '/', 4) in ('application_pdf', 'appointment_pdf')",
+    );
     expect(migration).toContain("split_part(name, '/', 2) = 'common'");
-    expect(migration).toContain("split_part(name, '/', 3) in ('application_pdf', 'appointment_pdf')");
+    expect(migration).toContain(
+      "split_part(name, '/', 3) in ('application_pdf', 'appointment_pdf')",
+    );
     expect(migration).toContain("where agent_id = (select auth.uid())");
-    expect(migration).toContain("status in ('draft', 'filling', 'returned', 'ready_for_review')");
+    expect(migration).toContain(
+      "status in ('draft', 'filling', 'returned', 'ready_for_review')",
+    );
     expect(migration).toContain("from public.admin_pdf_artifacts a");
     expect(migration).toContain("from public.returned_pdf_handoff_artifacts h");
-    expect(migration).toContain("storage.extension(name) in ('jpg', 'jpeg', 'png', 'heic', 'heif', 'pdf')");
-    expect(migration).toContain("coalesce(metadata ->> 'mimetype', '') in ('image/jpeg', 'image/png', 'image/heic', 'image/heif')");
-    expect(migration).toContain("coalesce(metadata ->> 'mimetype', '') = 'application/pdf'");
+    expect(migration).toContain(
+      "storage.extension(name) in ('jpg', 'jpeg', 'png', 'heic', 'heif', 'pdf')",
+    );
+    expect(migration).toContain(
+      "coalesce(metadata ->> 'mimetype', '') in ('image/jpeg', 'image/png', 'image/heic', 'image/heif')",
+    );
+    expect(migration).toContain(
+      "coalesce(metadata ->> 'mimetype', '') = 'application/pdf'",
+    );
   });
 
   test("rejects legacy submission-media object paths as write targets", () => {
@@ -1456,10 +1471,7 @@ describe("Supabase security contract", () => {
       migration,
       "create or replace function app_private.enforce_media_asset_review_boundary()",
     );
-    expectSqlStatement(
-      migration,
-      "if actor_role = 'agent' then",
-    );
+    expectSqlStatement(migration, "if actor_role = 'agent' then");
     expectSqlStatement(
       migration,
       "raise exception 'Agents cannot set media review state'",

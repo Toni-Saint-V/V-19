@@ -323,14 +323,11 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Review card was not rendered.");
     fireEvent.click(card);
-    const applicantTabs = await screen.findByRole("tablist", {
-      name: /Разделы заявителя/,
-    });
+    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
     fireEvent.click(
-      within(applicantTabs).getByRole("tab", { name: /Файлы/ }),
-    );
-    fireEvent.click(
-      (await screen.findAllByTestId("admin-review-add-file-remark"))[0]!,
+      (await screen.findAllByRole("button", {
+        name: /Создать замечание: Скан паспорта/,
+      }, { timeout: 5_000 }))[0]!,
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Отправить замечание" }),
@@ -368,17 +365,14 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Production-like review card was not rendered.");
     fireEvent.click(card);
-    const applicantTabs = await screen.findByRole("tablist", {
-      name: /Разделы заявителя/,
-    });
+    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
     fireEvent.click(
-      within(applicantTabs).getByRole("tab", { name: /Файлы/ }),
-    );
-    fireEvent.click(
-      (await screen.findAllByTestId("admin-review-add-file-remark"))[0]!,
+      (await screen.findAllByRole("button", {
+        name: /Создать замечание: Скан паспорта/,
+      }, { timeout: 5_000 }))[0]!,
     );
     fireEvent.change(
-      await screen.findByPlaceholderText("Опишите, что именно нужно исправить..."),
+      await screen.findByPlaceholderText("Конкретное действие для агента"),
       { target: { value: "Production lifecycle field correction" } },
     );
     fireEvent.click(

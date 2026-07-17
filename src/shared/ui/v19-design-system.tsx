@@ -618,6 +618,7 @@ export function V19QueueToolbar({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/38" />
           <input
             aria-label={searchAriaLabel ?? searchPlaceholder}
+            name="queue-search"
             className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[11px] font-medium text-white/70 placeholder:text-[#525151] outline-none focus:border-[#6f64ff]/55"
             placeholder={searchPlaceholder}
             value={searchValue}

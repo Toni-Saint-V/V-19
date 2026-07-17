@@ -11,10 +11,8 @@ import {
   UploadCloud,
   User,
   Users,
-  X,
 } from 'lucide-react';
 import type {
-  CollectionDocumentUpload,
   Submission,
   SubmissionFile,
   SubmissionFileType,
@@ -28,39 +26,29 @@ import {
   safeUnavailablePassportExtractionResult,
   type PassportExtractionResult,
 } from '../modules/submissions/passportExtractionContract';
-import {
-  V19SearchField,
-  V19SummaryTile,
-  V19SummaryTileGrid,
-} from '../shared/ui/v19-design-system';
+import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
-import { searchSubmissions } from '../modules/submissions/selectors';
 import {
   canonicalCollectionDocTypes,
-  collectionDocumentDocTypes,
   collectionDocTypes,
   detectCollectionDocType,
-  findCollectionDocumentUpload,
   normalizeCollectionPassportNumber,
   passportNumberFromCollectionText,
   resolveCollectionUploadTarget,
-  upsertCollectionDocumentUpload,
   type CollectionDocType,
 } from '../modules/submissions/documentCollectionIntake';
 import { fileToDocumentStatus } from './v19BusinessScreenAdapter';
-import { canPerformAction } from '../modules/submissions/status';
 
 interface DraftsScreenProps {
   initialFilter?: DraftSummaryFilter;
   onOpenDrawer: (id: string) => void;
   onOpenIssue: (target: DocumentIssueTarget) => void;
-  onSubmitForReview?: (id: string) => void | Promise<void>;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   submissions?: Submission[];
 }
 
 type DocStatus = 'verified' | 'processing' | 'error' | 'missing';
-export type DraftSummaryFilter = 'missing' | 'processing' | 'error' | 'ready';
+export type DraftSummaryFilter = 'missing' | 'processing' | 'error';
 
 type MatrixApplicant = {
   docs: Record<CollectionDocType, DocStatus>;
@@ -73,7 +61,6 @@ type MatrixApplicant = {
 
 type MatrixSubmission = {
   applicants: MatrixApplicant[];
-  canSubmitForReview: boolean;
   city: string;
   country: string;
   deadline: string;
@@ -102,9 +89,10 @@ type UnmatchedUpload = {
   submissionId?: string;
 };
 
-const docTypes = collectionDocTypes.filter((doc) => canonicalCollectionDocTypes.has(doc.key));
+const docTypes = collectionDocTypes.filter((doc) =>
+  canonicalCollectionDocTypes.has(doc.key),
+);
 const passportCollectionExtractionTimeoutMs = 10_000;
-const documentsBatchSize = 6;
 
 function requiredDocTypesForApplicant(applicant: MatrixApplicant) {
   return applicant.isPrimary
@@ -152,17 +140,6 @@ function fileStatusToDocStatus(file?: SubmissionFile): DocStatus {
   return fileToDocumentStatus(file);
 }
 
-function collectionStatus(
-  submission: Submission,
-  applicant: Submission['applicants'][number],
-  docType: CollectionDocType,
-): DocStatus {
-  const upload = findCollectionDocumentUpload(submission, applicant.id, docType);
-  if (upload) return upload.status === 'needs_review' ? 'processing' : 'verified';
-
-  return 'missing';
-}
-
 function applicantDocs(
   submission: Submission,
   applicant: Submission['applicants'][number],
@@ -172,7 +149,7 @@ function applicantDocs(
     passport: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'passport_scan')),
     selfie: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'selfie')),
     selfie2: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'selfie_2')),
-    questionnaire: collectionStatus(submission, applicant, 'questionnaire'),
+    questionnaire: 'missing',
   };
 }
 
@@ -206,7 +183,6 @@ function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
 
     return {
       applicants,
-      canSubmitForReview: canPerformAction(submission, 'submit_for_review', 'agent').ok,
       city: submission.city,
       country: submission.country,
       deadline: submissionDeadline(submission),
@@ -332,48 +308,6 @@ async function attachPassportExtractionForUpload(
   );
 }
 
-function applyCollectionDocumentUpload(
-  submissions: Submission[],
-  target: PendingCellTarget,
-  file: File,
-  passportNumber?: string,
-) {
-  if (!collectionDocumentDocTypes.has(target.docType)) {
-    return { applied: false, nextSubmissions: submissions };
-  }
-
-  let applied = false;
-  const nextSubmissions = submissions.map((submission) => {
-    if (submission.id !== target.submissionId) return submission;
-    applied = true;
-    return upsertCollectionDocumentUpload(
-      submission,
-      assignmentRecord(target, file, passportNumber),
-    );
-  });
-
-  return { applied, nextSubmissions };
-}
-
-function assignmentRecord(
-  target: PendingCellTarget,
-  file: File,
-  passportNumber?: string,
-): CollectionDocumentUpload {
-  return {
-    applicantId: target.applicantId,
-    docType: 'questionnaire',
-    fileName: file.name,
-    id: `collection-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    mimeType: mimeTypeForFile(file, target.docType),
-    passportNumber,
-    sizeBytes: file.size,
-    status: 'uploaded',
-    submissionId: target.submissionId,
-    uploadedAtIso: new Date().toISOString(),
-  };
-}
-
 async function passportNumberFromPassportOcr(file: File) {
   try {
     const { invokePassportExtraction } = await import('../modules/submissions/passportExtractionService');
@@ -398,6 +332,19 @@ function applicantIndex(submissions: Submission[]) {
       submissionId: submission.id,
     })),
   );
+}
+
+function targetRequiresDocType(
+  submissions: Submission[],
+  target: PendingCellTarget,
+) {
+  if (!canonicalCollectionDocTypes.has(target.docType)) return false;
+  if (target.docType === 'passport') return true;
+  const submission = submissions.find((candidate) => candidate.id === target.submissionId);
+  const applicant = submission?.applicants.find(
+    (candidate) => candidate.id === target.applicantId,
+  );
+  return applicant?.role === 'main';
 }
 
 async function detectedPassportNumber(file: File, detectedDocType: CollectionDocType | 'unknown') {
@@ -431,7 +378,7 @@ const DocCell = ({
   onUpload: () => void;
   status: DocStatus;
 }) => {
-  const className = `w-8 h-8 rounded-lg flex items-center justify-center border mx-auto transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${docStatusClass(status)}`;
+  const className = `v19-document-desktop-cell is-${status} w-8 h-8 rounded-lg flex items-center justify-center border mx-auto transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${docStatusClass(status)}`;
   const actionLabel = `${label}: ${docStatusLabel(status)}`;
   if (status === 'missing') {
     return (
@@ -473,7 +420,7 @@ const MobileDocSlot = ({
     <button
       aria-label={`${label}: ${docStatusLabel(status)}`}
       data-testid="document-mobile-slot"
-      className={`v19-document-mobile-slot flex min-h-[64px] items-center justify-between gap-1 rounded-xl border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] sm:gap-2 sm:px-3 ${docStatusClass(status)}`}
+      className={`v19-document-mobile-slot is-${status} flex min-h-[64px] items-center justify-between gap-1 rounded-xl border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] sm:gap-2 sm:px-3 ${docStatusClass(status)}`}
       type="button"
       onClick={status === 'error' ? onReview : onUpload}
       title={`${label}: ${docStatusLabel(status)}`}
@@ -498,7 +445,6 @@ export function DraftsScreen({
   initialFilter = 'missing',
   onOpenDrawer,
   onOpenIssue,
-  onSubmitForReview,
   onSubmissionsChange,
   submissions = [],
 }: DraftsScreenProps) {
@@ -507,12 +453,8 @@ export function DraftsScreen({
   const [uploadError, setUploadError] = useState('');
   const [pendingCellTarget, setPendingCellTarget] = useState<PendingCellTarget | null>(null);
   const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>(initialFilter);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [visibleDraftCount, setVisibleDraftCount] = useState(documentsBatchSize);
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
   useEffect(() => {
     setDraftSummaryFilter(initialFilter);
-    setSearchQuery('');
   }, [initialFilter]);
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
@@ -520,66 +462,33 @@ export function DraftsScreen({
   const visibleDrafts = useMemo(
     () =>
       allDrafts.filter((submission) =>
-        draftSummaryFilter === 'ready'
-          ? submission.canSubmitForReview
-          : submission.applicants.some((applicant) =>
-              requiredDocTypesForApplicant(applicant).some(
-                (doc) => applicant.docs[doc.key] === draftSummaryFilter,
-              ),
-            ),
+        submission.applicants.some((applicant) =>
+          requiredDocTypesForApplicant(applicant).some(
+            (doc) => applicant.docs[doc.key] === draftSummaryFilter,
+          ),
+        ),
       ),
     [allDrafts, draftSummaryFilter],
   );
-  const searchedSubmissionIds = useMemo(
-    () =>
-      new Set(
-        searchSubmissions(submissions, searchQuery, 'Все города').map(
-          (submission) => submission.id,
-        ),
-      ),
-    [searchQuery, submissions],
+  const draftGroups = useMemo(
+    () => groupSubmissionsByType(visibleDrafts),
+    [visibleDrafts],
   );
-  const searchedDrafts = useMemo(
-    () => visibleDrafts.filter((submission) => searchedSubmissionIds.has(submission.id)),
-    [searchedSubmissionIds, visibleDrafts],
-  );
-  const pagedDrafts = searchedDrafts.slice(0, visibleDraftCount);
-  const pagedDraftGroups = groupSubmissionsByType(pagedDrafts);
-  const remainingDrafts = Math.max(0, searchedDrafts.length - pagedDrafts.length);
-  useEffect(() => {
-    setVisibleDraftCount(documentsBatchSize);
-  }, [draftSummaryFilter, searchQuery]);
   const summary = useMemo(() => {
     const statuses = allDrafts.flatMap((submission) =>
       submission.applicants.flatMap((applicant) =>
-        requiredDocTypesForApplicant(applicant).map((doc) => applicant.docs[doc.key]),
+        requiredDocTypesForApplicant(applicant).map(
+          (doc) => applicant.docs[doc.key],
+        ),
       ),
     );
     return {
       error: statuses.filter((status) => status === 'error').length,
       missing: statuses.filter((status) => status === 'missing').length,
       processing: statuses.filter((status) => status === 'processing').length,
-      ready: allDrafts.filter((submission) => submission.canSubmitForReview).length,
       submissions: allDrafts.length,
     };
   }, [allDrafts]);
-
-  const submitForReview = async (submissionId: string) => {
-    if (!onSubmitForReview || submittingId) return;
-    setUploadError('');
-    setSubmittingId(submissionId);
-    try {
-      await onSubmitForReview(submissionId);
-    } catch (error) {
-      setUploadError(
-        error instanceof Error
-          ? error.message
-          : 'Не удалось отправить подачу на проверку.',
-      );
-    } finally {
-      setSubmittingId(null);
-    }
-  };
 
   const commitSubmissions = async (nextSubmissions: Submission[]) => {
     setUploadError('');
@@ -599,9 +508,8 @@ export function DraftsScreen({
   const assignFileToTarget = async (
     target: PendingCellTarget,
     file: File,
-    passportNumber?: string,
   ) => {
-    if (canonicalCollectionDocTypes.has(target.docType)) {
+    if (targetRequiresDocType(submissions, target)) {
       const result = applyCanonicalUpload(submissions, target, file);
       if (result.applied) {
         const nextSubmissions =
@@ -617,9 +525,7 @@ export function DraftsScreen({
       return false;
     }
 
-    const result = applyCollectionDocumentUpload(submissions, target, file, passportNumber);
-    if (!result.applied) return false;
-    return commitSubmissions(result.nextSubmissions);
+    return false;
   };
 
   const triggerCellUpload = (target: PendingCellTarget) => {
@@ -631,11 +537,9 @@ export function DraftsScreen({
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file || !pendingCellTarget) return;
-    void assignFileToTarget(
-      pendingCellTarget,
-      file,
-      passportNumberFromCollectionText(file.name),
-    ).finally(() => setPendingCellTarget(null));
+    void assignFileToTarget(pendingCellTarget, file).finally(() =>
+      setPendingCellTarget(null),
+    );
   };
 
   const handleBulkFiles = async (files: FileList | File[]) => {
@@ -644,17 +548,12 @@ export function DraftsScreen({
     setBulkBusy(true);
     const unmatched: UnmatchedUpload[] = [];
     const autoAssigned: UnmatchedUpload[] = [];
-    let questionnaireRejected = false;
     let workingSubmissions = submissions;
     let submissionsChanged = false;
 
     try {
       for (const file of uploadFiles) {
         const detectedDocType = detectCollectionDocType(file.name);
-        if (detectedDocType === 'questionnaire') {
-          questionnaireRejected = true;
-          continue;
-        }
         const passportNumber = await detectedPassportNumber(file, detectedDocType);
         const resolution = resolveCollectionUploadTarget({
           applicants: applicantIndex(submissions),
@@ -675,9 +574,39 @@ export function DraftsScreen({
         }
 
         const target = resolution.target;
-        const result = canonicalCollectionDocTypes.has(target.docType)
-          ? applyCanonicalUpload(workingSubmissions, target, file)
-          : applyCollectionDocumentUpload(workingSubmissions, target, file, passportNumber);
+        if (!canonicalCollectionDocTypes.has(target.docType)) {
+          unmatched.push({
+            applicantId: target.applicantId,
+            detectedDocType,
+            file,
+            id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            passportNumber,
+            reason: 'Этот тип файла не входит в пакет документов.',
+            submissionId: target.submissionId,
+          });
+          continue;
+        }
+
+        const targetSubmission = workingSubmissions.find(
+          (submission) => submission.id === target.submissionId,
+        );
+        const targetApplicant = targetSubmission?.applicants.find(
+          (applicant) => applicant.id === target.applicantId,
+        );
+        if (target.docType !== 'passport' && targetApplicant?.role !== 'main') {
+          unmatched.push({
+            applicantId: target.applicantId,
+            detectedDocType,
+            file,
+            id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            passportNumber,
+            reason: 'Для члена семьи требуется только скан загранпаспорта.',
+            submissionId: target.submissionId,
+          });
+          continue;
+        }
+
+        const result = applyCanonicalUpload(workingSubmissions, target, file);
 
         if (result.applied) {
           workingSubmissions = result.nextSubmissions;
@@ -710,11 +639,6 @@ export function DraftsScreen({
         if (!saved) unmatched.push(...autoAssigned);
       }
       setUnmatchedUploads((current) => [...unmatched, ...current]);
-      if (questionnaireRejected) {
-        setUploadError(
-          'Анкета не загружается в сборе документов — заполните её в разделе «Анкета».',
-        );
-      }
     } catch (error) {
       setUploadError(
         error instanceof Error
@@ -741,7 +665,6 @@ export function DraftsScreen({
         submissionId: upload.submissionId,
       },
       upload.file,
-      upload.passportNumber,
     );
     if (applied) {
       setUnmatchedUploads((current) => current.filter((item) => item.id !== upload.id));
@@ -775,7 +698,7 @@ export function DraftsScreen({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="space-y-6 lg:space-y-8"
+      className="v19-documents-screen space-y-6 lg:space-y-8"
     >
       <input
         data-testid="document-cell-file-input"
@@ -795,7 +718,7 @@ export function DraftsScreen({
         onChange={handleBulkFileInput}
       />
 
-      <V19SummaryTileGrid className="v19-documents-summary-grid grid-cols-2 sm:grid-cols-4">
+      <V19SummaryTileGrid className="v19-documents-summary-grid v19-admin-review-metrics grid-cols-3">
         <V19SummaryTile
           active={draftSummaryFilter === 'missing'}
           detail={`ожидают · ${summary.submissions}`}
@@ -823,30 +746,22 @@ export function DraftsScreen({
           value={summary.error}
           onClick={() => setDraftSummaryFilter('error')}
         />
-        <V19SummaryTile
-          active={draftSummaryFilter === 'ready'}
-          detail="анкета и файлы"
-          icon={CheckCircle2}
-          label="Готовы"
-          tone="green"
-          value={summary.ready}
-          onClick={() => setDraftSummaryFilter('ready')}
-        />
       </V19SummaryTileGrid>
 
       <div
-        className="flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]"
+        className="v19-documents-board flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]"
         data-testid="document-collection-matrix"
       >
-        <div className="flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
-          <div>
+        <div className="v19-documents-board-header flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
+          <div className="v19-documents-board-heading">
             <h2>Документы заявителей</h2>
             <p className="mt-1 text-[11px] text-white/50 sm:text-[12px]">
               Скан загранпаспорта — для каждого. Два селфи — только для заявителя подачи.
             </p>
           </div>
           <button
-            className="v19-documents-bulk-upload flex shrink-0 items-center gap-2 rounded-[8px] border border-white/5 bg-[#301e39] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#3a2645] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
+            aria-label="Массовая загрузка документов"
+            className="v19-documents-upload-action flex h-9 shrink-0 items-center gap-2 rounded-[8px] border border-white/5 bg-[#301e39] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#3a2645] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
             type="button"
             onClick={() => bulkInputRef.current?.click()}
             disabled={bulkBusy}
@@ -863,44 +778,8 @@ export function DraftsScreen({
           </div>
         ) : null}
 
-        <div className="v19-documents-search-toolbar">
-          <div className="v19-documents-search-control">
-            <V19SearchField
-              className="v19-documents-search-field"
-              label="Поиск по пакетам документов"
-              placeholder="ID, пакет, заявитель или город"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.currentTarget.value)}
-            />
-            {searchQuery ? (
-              <button
-                aria-label="Очистить поиск по пакетам"
-                className="v19-documents-search-clear"
-                type="button"
-                onClick={() => setSearchQuery('')}
-              >
-                <X aria-hidden="true" />
-              </button>
-            ) : null}
-          </div>
-          <span aria-live="polite" className="v19-documents-search-count">
-            Найдено: {searchedDrafts.length}
-          </span>
-        </div>
-
-        {!searchedDrafts.length ? (
-          <div className="v19-documents-search-empty" role="status">
-            <strong>{searchQuery ? 'Пакеты не найдены' : 'В этом статусе нет пакетов'}</strong>
-            <span>
-              {searchQuery
-                ? 'Измените запрос или очистите поиск.'
-                : 'Выберите другой статус в сводке выше.'}
-            </span>
-          </div>
-        ) : null}
-
-        <div className="v19-documents-mobile-list p-3 xl:hidden" id="document-mobile-packages">
-          {pagedDraftGroups.map((group) => (
+        <div className="v19-documents-mobile-list p-3 xl:hidden">
+          {draftGroups.map((group) => (
             <div className={`v19-document-type-group is-${group.key}`} key={group.key}>
               <div
                 className="v19-document-type-divider flex items-center gap-3"
@@ -951,7 +830,7 @@ export function DraftsScreen({
                               {app.isPrimary ? (
                                 <button
                                   aria-label={`Открыть пакет ${sub.title}`}
-                                  className="v19-documents-package-open ml-auto flex shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                                  className="v19-document-mobile-menu ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                                   onClick={() => onOpenDrawer(sub.id)}
                                   title="Открыть пакет"
                                   type="button"
@@ -987,23 +866,6 @@ export function DraftsScreen({
                           </div>
                         ))}
                       </div>
-                      {sub.canSubmitForReview && onSubmitForReview ? (
-                        <div className="v19-documents-submit-review-row">
-                          <button
-                            className="v19-documents-submit-review"
-                            disabled={submittingId === sub.id}
-                            onClick={() => void submitForReview(sub.id)}
-                            type="button"
-                          >
-                            {submittingId === sub.id ? (
-                              <Loader2 aria-hidden="true" className="animate-spin" />
-                            ) : (
-                              <CheckCircle2 aria-hidden="true" />
-                            )}
-                            Отправить на проверку
-                          </button>
-                        </div>
-                      ) : null}
                     </section>
                   </div>
                 ))}
@@ -1012,9 +874,9 @@ export function DraftsScreen({
           ))}
         </div>
 
-        <div className="hidden w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent xl:block">
-          <div className="min-w-[700px]">
-            <div className="flex items-center border-b border-[#242529] bg-[#111113]/50">
+        <div className="v19-documents-table-scroll hidden w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent xl:block">
+          <div className="v19-documents-table min-w-[700px]">
+            <div className="v19-documents-table-header flex items-center border-b border-[#242529] bg-[#111113]/50">
               <div className="sticky left-0 z-20 w-[280px] shrink-0 border-r border-[#242529] bg-[#111113] px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-white/40 lg:w-[320px]">
                 Пакет / Заявитель
               </div>
@@ -1028,8 +890,8 @@ export function DraftsScreen({
               <div className="w-[60px] shrink-0" />
             </div>
 
-            <div id="document-desktop-packages">
-              {pagedDraftGroups.map((group) => (
+            <div>
+              {draftGroups.map((group) => (
                 <div className={`v19-document-type-group is-${group.key}`} key={group.key}>
                   <div
                     className="v19-document-type-divider v19-document-type-divider-desktop flex items-center gap-3"
@@ -1046,7 +908,7 @@ export function DraftsScreen({
                           <div aria-hidden="true" className="v19-document-family-divider" />
                         ) : null}
                 <div
-                  className="group/sub"
+                  className="v19-document-desktop-package group/sub"
                   data-document-submission-id={sub.id}
                 >
                   <div className="divide-y divide-white/5">
@@ -1105,7 +967,7 @@ export function DraftsScreen({
                           {app.isPrimary ? (
                             <button
                               aria-label={`Открыть пакет ${sub.title}`}
-                              className="v19-documents-package-open flex items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                               onClick={() => onOpenDrawer(sub.id)}
                               title={`Открыть пакет ${sub.title}`}
                               type="button"
@@ -1117,23 +979,6 @@ export function DraftsScreen({
                       </div>
                     ))}
                   </div>
-                  {sub.canSubmitForReview && onSubmitForReview ? (
-                    <div className="v19-documents-submit-review-row">
-                      <button
-                        className="v19-documents-submit-review"
-                        disabled={submittingId === sub.id}
-                        onClick={() => void submitForReview(sub.id)}
-                        type="button"
-                      >
-                        {submittingId === sub.id ? (
-                          <Loader2 aria-hidden="true" className="animate-spin" />
-                        ) : (
-                          <CheckCircle2 aria-hidden="true" />
-                        )}
-                        Отправить на проверку
-                      </button>
-                    </div>
-                  ) : null}
                 </div>
                       </div>
                     ))}
@@ -1143,23 +988,6 @@ export function DraftsScreen({
             </div>
           </div>
         </div>
-
-        {remainingDrafts ? (
-          <div className="v19-documents-pagination">
-            <span aria-live="polite">
-              Показано {pagedDrafts.length} из {searchedDrafts.length}
-            </span>
-            <button
-              aria-controls="document-mobile-packages document-desktop-packages"
-              type="button"
-              onClick={() =>
-                setVisibleDraftCount((current) => current + documentsBatchSize)
-              }
-            >
-              Показать ещё {Math.min(documentsBatchSize, remainingDrafts)}
-            </button>
-          </div>
-        ) : null}
       </div>
 
       {unmatchedUploads.length ? (

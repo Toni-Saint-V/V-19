@@ -219,6 +219,12 @@ function fileCountLabel(count: number) {
   return countLabel(count, ["файл", "файла", "файлов"]);
 }
 
+function exportPackageMediaCount(
+  item: Pick<ExportItem, "applicantsCount" | "type">,
+) {
+  return item.type === "single" ? 3 : item.applicantsCount + 2;
+}
+
 export function AdminExportScreen({
   submissions = [],
 }: {
@@ -936,7 +942,7 @@ export function AdminExportScreen({
                 )}
             </button>
             <div>Подача</div>
-            <div>Заявитель</div>
+            <div>Заявитель / пакет</div>
             <div>Даты поездки</div>
             <div>Агент</div>
           </div>
@@ -989,6 +995,17 @@ export function AdminExportScreen({
                         )}
                         <span className="text-[14px] font-medium text-white">
                           {item.title}
+                        </span>
+                      </div>
+                      <div className="v19-admin-export-row-package-v2">
+                        <span>
+                          {item.applicantsCount}{" "}
+                          {applicantCountLabel(item.applicantsCount)}
+                        </span>
+                        <i aria-hidden="true" />
+                        <span>
+                          Excel + {exportPackageMediaCount(item)}{" "}
+                          {fileCountLabel(exportPackageMediaCount(item))}
                         </span>
                       </div>
                       {item.blockerReasons[0] ? (

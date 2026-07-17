@@ -1,39 +1,23 @@
 // src/modules/documents/documentExport.ts
 import JSZip from "jszip";
 import type { Submission, Applicant } from "../submissions/types";
-import { mediaStorageBucket } from "../submissions/mediaStoragePolicy";
-import { documentExtension, DOCUMENT_TYPES, type DocumentAsset } from "./documentTypes";
-import { validateDocumentAsset, validateDocuments } from "./documentValidation";
 import {
-  validateVisaApplicationFormData,
-  visaApplicationFormValidationMessage,
-} from "../submissions/visaApplicationFormPdf";
+  documentExtension,
+  DOCUMENT_TYPES,
+  type DocumentAsset,
+  type DocumentType,
+} from "./documentTypes";
+import { validateDocumentAsset } from "./documentValidation";
 
-export const GENERATED_DOCUMENT_TYPES = ["visa_form"] as const;
-export const EXPORT_DOCUMENT_TYPES = [
-  ...DOCUMENT_TYPES,
-  ...GENERATED_DOCUMENT_TYPES,
-] as const;
+export const EXPORT_DOCUMENT_TYPES = DOCUMENT_TYPES;
 
-export type GeneratedDocumentType = (typeof GENERATED_DOCUMENT_TYPES)[number];
 export type ExportDocumentType = (typeof EXPORT_DOCUMENT_TYPES)[number];
-
-export type GeneratedDocumentAsset = Omit<
-  DocumentAsset,
-  "sourceMediaAssetId" | "type"
-> & {
-  generated: true;
-  sourceMediaAssetId?: null;
-  type: GeneratedDocumentType;
-};
-
-export type ExportDocumentAsset = DocumentAsset | GeneratedDocumentAsset;
+export type ExportDocumentAsset = DocumentAsset;
 
 export type DocumentZipBlockedReason =
   | "empty_file"
   | "media_not_ready"
   | "passport_number_missing"
-  | "questionnaire_incomplete"
   | "storage_download_failed"
   | "storage_unavailable";
 
@@ -89,6 +73,31 @@ export async function buildDocumentsZip(
   let fileCount = 0;
 
   for (const submission of input.submissions) {
+    for (const [applicantIndex, applicant] of submission.applicants.entries()) {
+      const applicantDocs = input.assets.filter(
+        (asset) =>
+          asset.submissionId === submission.id && asset.applicantId === applicant.id,
+      );
+      for (const type of exportDocumentTypesForApplicant(applicantIndex)) {
+        const asset = applicantDocs.find((candidate) => candidate.type === type);
+        if (!asset) {
+          throw new DocumentZipBuilderError(
+            "media_not_ready",
+            `Missing validated ${type}.`,
+          );
+        }
+        const failures = validateDocumentAsset(asset);
+        if (failures.length > 0) {
+          throw new DocumentZipBuilderError(
+            "media_not_ready",
+            failures[0]?.message ?? "Document is not ready for export.",
+          );
+        }
+      }
+    }
+  }
+
+  for (const submission of input.submissions) {
     const cityFolder = safeArchiveName(submission.city, "city");
     const submissionFolder = safeArchiveName(
       submission.type === "family"
@@ -98,31 +107,14 @@ export async function buildDocumentsZip(
     );
 
     for (const [applicantIndex, applicant] of submission.applicants.entries()) {
-      const visaFormValidation = validateVisaApplicationFormData(submission, applicant);
-      if (!visaFormValidation.ok) {
-        throw new DocumentZipBuilderError(
-          "questionnaire_incomplete",
-          visaApplicationFormValidationMessage(visaFormValidation.missingFields),
-        );
-      }
-
       const applicantDocs = input.assets.filter(
         (asset) =>
           asset.submissionId === submission.id && asset.applicantId === applicant.id,
       );
-      const readiness = validateDocuments(applicantDocs);
-      if (!readiness.ok) {
-        throw new DocumentZipBuilderError(
-          "media_not_ready",
-          readiness.failures[0]?.message ?? "Applicant documents are not ready.",
-        );
-      }
+      const requiredTypes = exportDocumentTypesForApplicant(applicantIndex);
 
-      for (const type of EXPORT_DOCUMENT_TYPES) {
-        const asset =
-          type === "visa_form"
-            ? generatedVisaFormAsset(submission, applicant, applicantIndex)
-            : applicantDocs.find((candidate) => candidate.type === type);
+      for (const type of requiredTypes) {
+        const asset = applicantDocs.find((candidate) => candidate.type === type);
         if (!asset) {
           throw new DocumentZipBuilderError(
             "media_not_ready",
@@ -130,14 +122,12 @@ export async function buildDocumentsZip(
           );
         }
 
-        if (asset.type !== "visa_form") {
-          const assetFailures = validateDocumentAsset(asset);
-          if (assetFailures.length > 0) {
-            throw new DocumentZipBuilderError(
-              "media_not_ready",
-              assetFailures[0]?.message ?? "Document is not ready for export.",
-            );
-          }
+        const assetFailures = validateDocumentAsset(asset);
+        if (assetFailures.length > 0) {
+          throw new DocumentZipBuilderError(
+            "media_not_ready",
+            assetFailures[0]?.message ?? "Document is not ready for export.",
+          );
         }
 
         let blob: Blob | null;
@@ -180,7 +170,7 @@ export async function buildDocumentsZip(
 
         zip.file(entryName, await blob.arrayBuffer());
         entries.push(entryName);
-        if (asset.type !== "visa_form") documentAssetIds.push(asset.id);
+        documentAssetIds.push(asset.id);
         fileCount += 1;
       }
 
@@ -196,6 +186,14 @@ export async function buildDocumentsZip(
     rootFolder,
     zip,
   };
+}
+
+export function exportDocumentTypesForApplicant(
+  applicantIndex: number,
+): readonly DocumentType[] {
+  return applicantIndex === 0
+    ? EXPORT_DOCUMENT_TYPES
+    : ["passport_scan"];
 }
 
 export function archiveDocumentFileName(input: {
@@ -215,55 +213,6 @@ export function archiveDocumentFileName(input: {
     );
   }
   return `${passportNumber}_${input.type}.${extension}`;
-}
-
-function generatedVisaFormAsset(
-  submission: Submission,
-  applicant: Applicant,
-  applicantIndex: number,
-): GeneratedDocumentAsset {
-  const now = "1970-01-01T00:00:00.000Z";
-  const passportNumber = passportNumberForApplicant(applicant);
-  if (!passportNumber) {
-    throw new DocumentZipBuilderError(
-      "passport_number_missing",
-      "A verified passport number is required for every exported document.",
-    );
-  }
-  const filename = `${passportNumber}_visa_form.pdf`;
-
-  return {
-    checksum: null,
-    createdAt: now,
-    exportStatus: "ready",
-    generated: true,
-    id: `${submission.id}-${applicant.id}-visa-form-${applicantIndex}`,
-    applicantId: applicant.id,
-    mime: "application/pdf",
-    ownerUserId: submission.agentId,
-    size: 1,
-    sourceMediaAssetId: null,
-    storage: {
-      bucket: mediaStorageBucket,
-      filename,
-      path: [
-        "generated",
-        "submissions",
-        safeFilenameSegment(submission.id, "submission"),
-        "applicants",
-        safeFilenameSegment(applicant.id, "applicant"),
-        "visa_form",
-        filename,
-      ].join("/"),
-    },
-    submissionId: submission.id,
-    type: "visa_form",
-    updatedAt: now,
-    uploadedAt: now,
-    uploadStatus: "uploaded",
-    validatedAt: now,
-    validationStatus: "passed",
-  };
 }
 
 function passportNumberForApplicant(applicant: Applicant): string | null {
@@ -323,20 +272,6 @@ export function safeArchiveName(value: string, fallback: string): string {
     .slice(0, 96);
 
   return safe || fallback;
-}
-
-function safeFilenameSegment(value: string, fallback: string): string {
-  const safe = value
-    .normalize("NFKC")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^\p{L}\p{N}_-]+/gu, "")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 72);
-
-  return safe || safeFilenameSegment(fallback, "applicant");
 }
 
 function sanitizeExtension(value: string): string {

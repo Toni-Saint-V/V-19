@@ -84,7 +84,10 @@ async function revealLastDrawerFile(
     lastFile.boundingBox(),
     footer.boundingBox(),
   ]);
-  expect(fileBox, "the last file must stay above the drawer footer after user scroll").not.toBeNull();
+  expect(
+    fileBox,
+    "the last file must stay above the drawer footer after user scroll",
+  ).not.toBeNull();
   expect(footerBox, "the drawer footer must remain visible").not.toBeNull();
   if (fileBox && footerBox) {
     expect(fileBox.y).toBeGreaterThanOrEqual(0);
@@ -131,7 +134,9 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
   test.describe.configure({ mode: "serial" });
 
   for (const viewport of viewports) {
-    test(`${viewport.label}: filters, reset and drawer stay truthful`, async ({ page }, testInfo) => {
+    test(`${viewport.label}: filters, reset and drawer stay truthful`, async ({
+      page,
+    }, testInfo) => {
       test.skip(testInfo.project.name !== "chromium", "focused local UI proof");
       mkdirSync(evidenceDir, { recursive: true });
       await page.setViewportSize(viewport);
@@ -168,10 +173,9 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       expect(await cards.count()).toBeGreaterThan(0);
 
       await page.getByRole("button", { exact: true, name: "Проверить" }).click();
-      await expect(page.getByRole("button", { exact: true, name: "Проверить" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
+      await expect(
+        page.getByRole("button", { exact: true, name: "Проверить" }),
+      ).toHaveAttribute("aria-pressed", "true");
       await expect(cards).toHaveCount(reviewCount);
       await expect(listHeaderCount).toContainText("Проверить");
       const reviewCardTexts = await cards.allTextContents();
@@ -209,9 +213,10 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         name: "Фильтр подач: К выгрузке",
       });
       await readyStatusFilter.click();
-      await expect(
-        page.getByRole("option", { name: "К выгрузке" }),
-      ).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByRole("option", { name: "К выгрузке" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
       await page.keyboard.press("Escape");
 
       for (const key of ["Enter", "Space"]) {
@@ -248,7 +253,9 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         .click();
 
       await page.getByLabel("Поиск по подачам").fill("__no_matching_submission__");
-      const emptyState = page.getByRole("status").filter({ hasText: "Ничего не найдено" });
+      const emptyState = page
+        .getByRole("status")
+        .filter({ hasText: "Ничего не найдено" });
       await expect(emptyState).toBeVisible();
       await page.screenshot({
         fullPage: true,
@@ -257,26 +264,39 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       await emptyState.getByRole("button", { name: "Сбросить фильтры" }).click();
       await expect(cards).toHaveCount(totalCards);
 
-      const correctionsCard = page.locator('button.v19-queue-card[data-submission-id="ПД-1055"]');
+      const correctionsCard = page.locator(
+        'button.v19-queue-card[data-submission-id="ПД-1055"]',
+      );
       await expect(correctionsCard).toBeVisible();
       await expect(correctionsCard).toContainText("Исправление");
       await expect(correctionsCard).toContainText("Открыть");
-      expect(await correctionsCard.evaluate((element) => element.tagName)).toBe("BUTTON");
+      expect(await correctionsCard.evaluate((element) => element.tagName)).toBe(
+        "BUTTON",
+      );
       await correctionsCard.click();
       const submissionDrawer = drawer(page);
       await expect(submissionDrawer).toBeVisible();
-      await expect(submissionDrawer.getByText("Исправления получены", { exact: true })).toBeVisible();
-      await expect(submissionDrawer.getByText("Черновик", { exact: true })).toHaveCount(0);
-      await expect.poll(async () => {
-        const box = await submissionDrawer.boundingBox();
-        return Boolean(
-          box &&
-          box.x >= 0 &&
-          box.y >= 0 &&
-          box.x + box.width <= viewport.width &&
-          box.y + box.height <= viewport.height,
-        );
-      }, { timeout: 1_500 }).toBe(true);
+      await expect(
+        submissionDrawer.getByText("Исправления получены", { exact: true }),
+      ).toBeVisible();
+      await expect(submissionDrawer.getByText("Черновик", { exact: true })).toHaveCount(
+        0,
+      );
+      await expect
+        .poll(
+          async () => {
+            const box = await submissionDrawer.boundingBox();
+            return Boolean(
+              box &&
+              box.x >= 0 &&
+              box.y >= 0 &&
+              box.x + box.width <= viewport.width &&
+              box.y + box.height <= viewport.height,
+            );
+          },
+          { timeout: 1_500 },
+        )
+        .toBe(true);
       const drawerBox = await submissionDrawer.boundingBox();
       expect(drawerBox).not.toBeNull();
       if (drawerBox) {
@@ -290,15 +310,23 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         path: join(evidenceDir, `${viewport.label}-drawer.png`),
       });
 
-        const drawerTabs = [
-        { label: "Заявители", panelText: "Состав подачи и готовность анкеты каждого участника.", screenshot: "applicants" },
+      const drawerTabs = [
+        {
+          label: "Заявители",
+          panelText: "Состав подачи и готовность анкеты каждого участника.",
+          screenshot: "applicants",
+        },
         { label: "Анкета", panelText: "Смотреть анкету", screenshot: "questionnaire" },
         { label: "Файлы", panelText: "Файлы подачи", screenshot: "files" },
-        { label: "Замечания", panelText: "Список задач по замечаниям", screenshot: "issues" },
+        {
+          label: "Замечания",
+          panelText: "Список задач по замечаниям",
+          screenshot: "issues",
+        },
         { label: "История", panelText: undefined, screenshot: "history" },
       ] as const;
 
-        for (const tabProof of drawerTabs) {
+      for (const tabProof of drawerTabs) {
         const tab = submissionDrawer.getByRole("tab", {
           name: new RegExp(`^${tabProof.label}`),
         });
@@ -307,21 +335,24 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
         const panel = submissionDrawer.getByRole("tabpanel", { name: tabProof.label });
         await expect(panel).toBeVisible();
         if (tabProof.panelText) await expect(panel).toContainText(tabProof.panelText);
-          await page.screenshot({
-            fullPage: false,
-            path: join(evidenceDir, `${viewport.label}-drawer-${tabProof.screenshot}.png`),
-          });
+        await page.screenshot({
+          fullPage: false,
+          path: join(
+            evidenceDir,
+            `${viewport.label}-drawer-${tabProof.screenshot}.png`,
+          ),
+        });
 
-          if (tabProof.screenshot === "files") {
-            await revealLastDrawerFile(page, submissionDrawer, viewport);
-          }
+        if (tabProof.screenshot === "files") {
+          await revealLastDrawerFile(page, submissionDrawer, viewport);
         }
+      }
 
       const questionnaireTab = submissionDrawer.getByRole("tab", { name: /^Анкета/ });
       await questionnaireTab.click();
-      await expect(submissionDrawer.getByRole("tabpanel", { name: "Анкета" })).toContainText(
-        "Исправления отправлены",
-      );
+      await expect(
+        submissionDrawer.getByRole("tabpanel", { name: "Анкета" }),
+      ).toContainText("Исправления отправлены");
       await submissionDrawer.getByRole("button", { name: "Смотреть анкету" }).click();
       await expect(submissionDrawer).toBeHidden();
       await expectQuestionnaireAndReturn(
@@ -335,13 +366,15 @@ test.describe("V-19 applicants toolbar lifecycle contract", () => {
       await expect(submissionDrawer).toBeVisible();
       const issuesTab = submissionDrawer.getByRole("tab", { name: /^Замечания/ });
       await issuesTab.click();
-      await expect(submissionDrawer.getByRole("tabpanel", { name: "Замечания" })).toContainText(
-        "Исправления на проверке",
-      );
+      await expect(
+        submissionDrawer.getByRole("tabpanel", { name: "Замечания" }),
+      ).toContainText("Исправления на проверке");
       await expect(
         submissionDrawer.getByRole("button", { name: "Исправить в анкете" }),
       ).toHaveCount(0);
-      await submissionDrawer.getByRole("button", { name: /Закрыть (подачу|панель)/ }).click();
+      await submissionDrawer
+        .getByRole("button", { name: /Закрыть (подачу|панель)/ })
+        .click();
 
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,

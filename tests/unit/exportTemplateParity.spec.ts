@@ -50,9 +50,11 @@ function sectionBody(xml: string, name: string): string {
 }
 
 function elements(xml: string, name: string): string[] {
-  return [...xml.matchAll(new RegExp(`<${name}\\b[^>]*\\/>|<${name}\\b[^>]*>[\\s\\S]*?<\\/${name}>`, "g"))].map(
-    (match) => compactXml(match[0]),
-  );
+  return [
+    ...xml.matchAll(
+      new RegExp(`<${name}\\b[^>]*\\/>|<${name}\\b[^>]*>[\\s\\S]*?<\\/${name}>`, "g"),
+    ),
+  ].map((match) => compactXml(match[0]));
 }
 
 function headerValues(parts: OoxmlParts): string[] {
@@ -62,7 +64,8 @@ function headerValues(parts: OoxmlParts): string[] {
         .map((text) => text[1] ?? "")
         .join(""),
   );
-  const row = parts.worksheet.match(/<row\b[^>]*r="1"[^>]*>([\s\S]*?)<\/row>/)?.[1] ?? "";
+  const row =
+    parts.worksheet.match(/<row\b[^>]*r="1"[^>]*>([\s\S]*?)<\/row>/)?.[1] ?? "";
   return [...row.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)]
     .filter((cell) => {
       const column = cell[1]?.match(/\br="([A-Z]+)1"/)?.[1] ?? "";
@@ -84,7 +87,11 @@ function columnNumber(column: string): number {
 function safeWorksheetSignature(xml: string) {
   const columns = elements(sectionBody(xml, "cols"), "col").slice(0, 56);
   const conditionalFormatting = elements(xml, "conditionalFormatting");
-  const header = xml.match(/<row\b([^>]*)r="1"([^>]*)>/)?.slice(1).join(" ") ?? "";
+  const header =
+    xml
+      .match(/<row\b([^>]*)r="1"([^>]*)>/)
+      ?.slice(1)
+      .join(" ") ?? "";
   return {
     columns,
     conditionalFormatting,

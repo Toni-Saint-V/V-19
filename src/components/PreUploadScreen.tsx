@@ -23,11 +23,18 @@ import {
   type ProductPackageType,
 } from '../modules/submissions/productIntakeFlow';
 import type { PassportExtractionField } from '../modules/submissions/passportExtractionContract';
+import type { PreliminaryIntakeDraft } from '../modules/submissions/types';
 
 interface PreUploadScreenProps {
   onBack: () => void;
-  onSaveDraft?: (draft: ProductIntakeDraft) => void;
-  onComplete?: (draft: ProductIntakeDraft) => void;
+  onSaveDraft?: (
+    draft: ProductIntakeDraft,
+    preliminaryIntake: PreliminaryIntakeDraft,
+  ) => Promise<void> | void;
+  onComplete?: (
+    draft: ProductIntakeDraft,
+    preliminaryIntake: PreliminaryIntakeDraft,
+  ) => Promise<void> | void;
   initialPackageType?: ProductPackageType;
 }
 
@@ -43,6 +50,7 @@ function passportExtractionValues(fields: PassportExtractionField[]) {
     if (field.key === 'firstName') values.firstName = field.value;
     if (field.key === 'birthDate') values.birthDate = field.value;
     if (field.key === 'birthPlace') values.birthPlace = field.value;
+    if (field.key === 'birthCountry') values.birthCountry = field.value;
     if (field.key === 'citizenship') values.nationality = field.value;
     if (field.key === 'gender') values.gender = field.value;
     if (field.key === 'passportType') values.passportType = field.value;
@@ -68,6 +76,8 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [manualUpload, setManualUpload] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionPending, setActionPending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pipelineRunRef = useRef(0);
   const timersRef = useRef<number[]>([]);
@@ -92,14 +102,29 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     return phase === 'ready' || phase === 'review' || sourceReady;
   });
   const showExtractionStatus = files.length > 0 && packageType === 'family';
-  const hasRecognizedFiles = recognizedCount > 0;
+  const hasRecognizedPassport = files.some(
+    (file) => file.kind === 'passport' && file.status === 'recognized',
+  );
+  const hasReviewablePassportUpload = files.some(
+    (file) =>
+      file.kind === 'passport' &&
+      Boolean(file.fileRef) &&
+      ['recognized', 'needs_review'].includes(file.status),
+  );
   const filesAreFinal = files.length > 0 && files.every((file) => finalStatuses.includes(file.status));
-  const extractionIsDone = phase === 'ready' && filesAreFinal && hasRecognizedFiles && previewFields.length > 0;
-  const canContinueToQuestionnaire = extractionIsDone;
+  const extractionIsDone =
+    phase === 'ready' &&
+    filesAreFinal &&
+    hasRecognizedPassport &&
+    previewFields.length > 0;
+  const canContinueToQuestionnaire =
+    ['review', 'ready'].includes(phase) &&
+    filesAreFinal &&
+    hasReviewablePassportUpload;
   const extractionNeedsReview =
     filesAreFinal &&
     ['review', 'ready'].includes(phase) &&
-    !canContinueToQuestionnaire;
+    !extractionIsDone;
   const extractionStatusText = extractionIsDone
     ? 'Успешно распознано'
     : extractionNeedsReview
@@ -240,14 +265,17 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     setDraftSeedIso(new Date().toISOString());
     setFiles([]);
     setActiveFileId(null);
+    setActionError('');
     setPhase('selecting');
   };
 
   const handleFiles = (fileList: FileList | File[]) => {
+    if (actionPending) return;
     const nextFiles = createBrowserIntakeFiles(Array.from(fileList), packageType);
     if (!nextFiles.length) return;
 
     setManualUpload(true);
+    setActionError('');
     setDraftSeedIso(new Date().toISOString());
     runPipeline(nextFiles, { extractPassports: true });
   };
@@ -263,13 +291,35 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     if (event.dataTransfer.files?.length) handleFiles(event.dataTransfer.files);
   };
 
-  const completeDraft = () => {
+  const completeDraft = async () => {
     if (!canContinueToQuestionnaire) return;
-    onComplete?.(buildProductIntakeDraft(packageType, files, draftSeedIso));
+    setActionError('');
+    setActionPending(true);
+    try {
+      await onComplete?.(
+        buildProductIntakeDraft(packageType, files, draftSeedIso),
+        preliminaryIntakeFromFamilyResidence(familyResidence),
+      );
+    } catch {
+      setActionError('Не удалось создать подачу. Повторите попытку.');
+    } finally {
+      setActionPending(false);
+    }
   };
 
-  const saveDraft = () => {
-    onSaveDraft?.(buildProductIntakeDraft(packageType, files, draftSeedIso));
+  const saveDraft = async () => {
+    setActionError('');
+    setActionPending(true);
+    try {
+      await onSaveDraft?.(
+        buildProductIntakeDraft(packageType, files, draftSeedIso),
+        preliminaryIntakeFromFamilyResidence(familyResidence),
+      );
+    } catch {
+      setActionError('Не удалось сохранить черновик. Повторите попытку.');
+    } finally {
+      setActionPending(false);
+    }
   };
 
   useEffect(() => {
@@ -297,6 +347,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
       <header className="h-[64px] shrink-0 border-b border-[#202124] bg-[#141416]/95 backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
         <button
           aria-label="Назад"
+          disabled={actionPending}
           onClick={onBack}
           className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#242529] bg-[#1e1e21] text-white/70 transition-colors hover:bg-[#27272b] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
         >
@@ -312,6 +363,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         </div>
         <button
           aria-label="Закрыть создание"
+          disabled={actionPending}
           onClick={onBack}
           className="ml-auto flex h-8 w-8 items-center justify-center rounded-[9px] border border-transparent bg-transparent text-white/45 transition-colors hover:text-white/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
         >
@@ -350,10 +402,11 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                       const active = packageType === item.type;
 
                       return (
-                        <button
-                          key={item.type}
-                          type="button"
-                          onClick={() => resetScenario(item.type)}
+                          <button
+                            key={item.type}
+                            type="button"
+                            disabled={actionPending}
+                            onClick={() => resetScenario(item.type)}
                           className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${
                             active
                               ? 'bg-[#6f64ff]/24 text-white shadow-[0_0_18px_rgba(111,100,255,0.18)]'
@@ -431,6 +484,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                                   <button
                                     key={value}
                                     type="button"
+                                    disabled={actionPending}
                                     onClick={() => setFamilyResidence((current) => ({ ...current, [key]: value }))}
                                     className={`h-8 px-2.5 text-[11px] font-medium transition-colors ${familyResidence[key as keyof typeof familyResidence] === value ? 'bg-[#6f64ff]/25 text-[#d7d5ff]' : 'text-white/45 hover:text-white/70'}`}
                                   >
@@ -463,7 +517,9 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 onDragLeave={() => setDropActive(false)}
                 onDrop={handleDrop}
                 className={`relative mt-4 min-h-[180px] flex-1 rounded-3xl border border-dashed p-6 lg:p-8 flex flex-col items-center justify-center text-center group transition-colors cursor-pointer overflow-hidden ${dropActive ? 'border-[#8fa3ff] bg-[#6f64ff]/[0.14]' : 'border-[#6f64ff]/40 bg-[#6f64ff]/5 hover:bg-[#6f64ff]/10'}`}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => {
+                  if (!actionPending) fileInputRef.current?.click();
+                }}
               >
                 <motion.div
                   aria-hidden
@@ -487,6 +543,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 </p>
                 <button
                   type="button"
+                  disabled={actionPending}
                   className="v19-file-picker-button mt-5"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -495,25 +552,31 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 >
                   Выбрать файлы
                 </button>
-                <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" onChange={handleFileInput} />
+                <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" disabled={actionPending} onChange={handleFileInput} />
               </div>
 
               <div className="sticky bottom-0 z-20 -mx-5 mt-4 grid shrink-0 grid-cols-2 gap-2 border-t border-white/[0.06] bg-gradient-to-t from-[#141416] via-[#141416]/95 to-[#141416]/70 px-5 pb-4 pt-3 lg:-mx-6 lg:px-6 xl:rounded-b-3xl">
+                {actionError ? (
+                  <p className="col-span-2 m-0 text-left text-[12px] text-[var(--v19b-status-danger-text)]" role="alert">
+                    {actionError}
+                  </p>
+                ) : null}
                 <button
                   type="button"
-                  onClick={saveDraft}
+                  disabled={actionPending}
+                  onClick={() => void saveDraft()}
                   className="h-11 rounded-[8px] border border-white/10 bg-transparent px-3 text-[13px] font-medium text-white/62 transition-colors hover:border-white/18 hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                 >
-                  Сохранить черновик
+                  {actionPending ? 'Сохраняем…' : 'Сохранить черновик'}
                 </button>
                 <button
                   type="button"
-                  onClick={completeDraft}
+                  onClick={() => void completeDraft()}
                   aria-disabled={completeBlocked}
-                  disabled={completeBlocked}
+                  disabled={completeBlocked || actionPending}
                   className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#25252a] disabled:text-white/35 disabled:shadow-none"
                 >
-                  Далее
+                  {actionPending ? 'Сохраняем…' : 'Далее'}
                 </button>
               </div>
             </motion.div>
@@ -585,4 +648,22 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
       </main>
     </motion.div>
   );
+}
+
+function preliminaryIntakeFromFamilyResidence(
+  familyResidence: { russia: string; spain: string },
+): PreliminaryIntakeDraft {
+  return {
+    arrivalPlace: '',
+    homeAddress: '',
+    sameArrivalPlace: false,
+    sameHomeAddress: familyResidence.russia === 'yes',
+    sameSpainStay: familyResidence.spain === 'yes',
+    sameTripDates: false,
+    spainStayAddress: '',
+    spainStayCity: '',
+    spainStayName: '',
+    tripDateFrom: '',
+    tripDateTo: '',
+  };
 }

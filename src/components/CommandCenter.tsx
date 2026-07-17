@@ -29,7 +29,6 @@ import {
   type DraftSummaryFilter,
 } from "./DraftsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
-import { CreateSubmissionDrawer } from "../modules/submissions/components/CreateSubmissionDrawer";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from "../modules/submissions/components/adminAiAssistance";
 import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
@@ -68,7 +67,10 @@ import {
   saveProductIntakeDrafts,
   type ProductIntakeDraft,
 } from "../modules/submissions/productIntakeFlow";
-import { productIntakeDraftToSubmission } from "../modules/submissions/productIntakeSubmissionAdapter";
+import {
+  productIntakeDraftToPassportUploads,
+  productIntakeDraftToSubmission,
+} from "../modules/submissions/productIntakeSubmissionAdapter";
 import {
   agentActionQueue,
   searchAgentActions,
@@ -132,14 +134,6 @@ type CommandCenterProps = {
 };
 
 const agentMobileNavigationId = "v19-agent-mobile-navigation";
-const mobileNavFocusableSelector = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
 
 function questionnaireFocusForAgentAction(
   action: AgentActionItem,
@@ -362,14 +356,11 @@ export function CommandCenter({
   const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() =>
     usesSupabase ? [] : loadProductIntakeDrafts(),
   );
-  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
-  const mobileNavPanelRef = useRef<HTMLElement | null>(null);
-  const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [createCity, setCreateCity] = useState<City>("Москва");
-  const [createFamilyCount, setCreateFamilyCount] = useState(2);
-  const [createType, setCreateType] = useState<Submission["type"]>("single");
+  const createCity: City = "Москва";
+  const createFamilyCount = 2;
+  const createType: Submission["type"] = "single";
   const [canonicalOverrides, setCanonicalOverrides] = useState<
     Record<string, Submission>
   >({});
@@ -511,54 +502,6 @@ export function CommandCenter({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-    if (!mobileNavOpen) return;
-
-    const trigger = mobileNavTriggerRef.current;
-    const panel = mobileNavPanelRef.current;
-    const animationFrame = window.requestAnimationFrame(() => {
-      const closeButton = panel?.querySelector<HTMLButtonElement>(
-        "[data-agent-mobile-nav-close]",
-      );
-      (closeButton ?? panel)?.focus({ preventScroll: true });
-    });
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setMobileNavOpen(false);
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      const controls = Array.from(
-        panel?.querySelectorAll<HTMLElement>(mobileNavFocusableSelector) ?? [],
-      ).filter((control) => control.getClientRects().length > 0);
-      if (!controls.length) {
-        event.preventDefault();
-        panel?.focus({ preventScroll: true });
-        return;
-      }
-
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !panel?.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !panel?.contains(active))) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      document.removeEventListener("keydown", handleKeyDown);
-      if (window.innerWidth < 768) trigger?.focus({ preventScroll: true });
-    };
-  }, [mobileNavOpen]);
 
   useEffect(() => {
     const handleCommandPaletteShortcut = (event: KeyboardEvent) => {
@@ -727,17 +670,17 @@ export function CommandCenter({
   const createPackage = () => {
     bridge.onCreatePackage?.();
     emitVisaflowUiEvent(bridge, { type: "package.create" });
-    if (usesSupabase) {
-      setCreateDrawerOpen(true);
-      return;
-    }
     setCurrentView("upload");
   };
 
   const executeCreateCanonicalDraft = async (
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
-    options?: { openQuestionnaire?: boolean },
+    options?: {
+      familyCount?: number;
+      openQuestionnaire?: boolean;
+      type?: Submission["type"];
+    },
   ) => {
     const applicantNames: string[] = [];
     for (const upload of passportUploads) {
@@ -757,11 +700,11 @@ export function CommandCenter({
         agentId,
         applicantNames,
         city: createCity,
-        familyCount: createFamilyCount,
+        familyCount: options?.familyCount ?? createFamilyCount,
         idScheme: "supabase",
         preliminaryIntake,
         submissions: canonicalSubmissions ?? [],
-        type: createType,
+        type: options?.type ?? createType,
       });
       if (!result.ok) throw new Error(result.error.message);
       pendingSubmission = result.data;
@@ -792,7 +735,6 @@ export function CommandCenter({
       ...current,
       [nextSubmission.id]: nextSubmission,
     }));
-    setCreateDrawerOpen(false);
     setActiveNav("submissions");
     setSearchQuery("");
     if (options?.openQuestionnaire) {
@@ -805,7 +747,11 @@ export function CommandCenter({
   const createCanonicalDraft = (
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
-    options?: { openQuestionnaire?: boolean },
+    options?: {
+      familyCount?: number;
+      openQuestionnaire?: boolean;
+      type?: Submission["type"];
+    },
   ) => {
     if (createSubmissionPromiseRef.current) {
       return createSubmissionPromiseRef.current;
@@ -911,30 +857,19 @@ export function CommandCenter({
     }));
   };
 
-  const executeAgentSubmissionActionFor = async (
-    submissionId: string,
-    action: SubmissionAction,
-  ) => {
-    const submission = (canonicalSubmissions ?? []).find(
-      (candidate) => candidate.id === submissionId,
-    );
-    if (!submission) throw new Error("Подача не найдена. Обновите страницу.");
+  const executeAgentSubmissionAction = async (action: SubmissionAction) => {
+    if (!selectedCanonicalSubmission) return;
 
     const result = applySubmissionActionResult(
-      submission,
+      selectedCanonicalSubmission,
       action,
       "agent",
-      agentId ?? submission.agentId,
+      agentId ?? selectedCanonicalSubmission.agentId,
     );
     if (!result.ok) throw new Error(result.error.message);
 
     await onSubmissionsChange?.([result.data]);
     setCanonicalOverrides((current) => ({ ...current, [result.data.id]: result.data }));
-  };
-
-  const executeAgentSubmissionAction = async (action: SubmissionAction) => {
-    if (!selectedCanonicalSubmission) return;
-    await executeAgentSubmissionActionFor(selectedCanonicalSubmission.id, action);
   };
 
   const markAgentIssueFixed = async (issueId: string) => {
@@ -975,6 +910,23 @@ export function CommandCenter({
     setCurrentView("questionnaire");
   };
 
+  const persistSupabasePreUploadDraft = async (
+    draft: ProductIntakeDraft,
+    preliminaryIntake: PreliminaryIntakeDraft,
+    openQuestionnaire: boolean,
+  ) => {
+    await createCanonicalDraft(
+      productIntakeDraftToPassportUploads(draft),
+      preliminaryIntake,
+      {
+        familyCount: draft.applicants.length,
+        openQuestionnaire,
+        type: draft.type,
+      },
+    );
+    if (!openQuestionnaire) setCurrentView("main");
+  };
+
   const handleUploadDraftSave = (draft: ProductIntakeDraft) => {
     setIntakeDrafts((current) =>
       [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8),
@@ -1006,7 +958,7 @@ export function CommandCenter({
         aria-current={active ? "page" : undefined}
         aria-label={navLabel(normalizeAgentNav(section))}
         onClick={() => navigateTo(section)}
-        className={`v19-agent-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 border px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${active ? "is-active" : "border-transparent hover:bg-white/5 text-white/70 hover:text-white"}`}
+        className={`v19-agent-sidebar-nav-item w-full flex items-center gap-2.5 border px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${active ? "is-active" : "border-transparent hover:bg-white/5 text-white/70 hover:text-white"}`}
       >
         <span
           className={
@@ -1049,10 +1001,9 @@ export function CommandCenter({
         </div>
         <button
           aria-label="Закрыть меню"
-          data-agent-mobile-nav-close=""
           onClick={() => setMobileNavOpen(false)}
           type="button"
-          className="md:hidden min-h-[var(--v19-control-row-height)] min-w-[var(--v19-control-row-height)] rounded-lg text-white/50 hover:text-white flex items-center justify-center"
+          className="md:hidden p-2 text-white/50 hover:text-white"
         >
           <X className="w-5 h-5" />
         </button>
@@ -1479,8 +1430,18 @@ export function CommandCenter({
           <PreUploadScreen
             key="upload"
             onBack={() => setCurrentView("main")}
-            onSaveDraft={handleUploadDraftSave}
-            onComplete={handleUploadComplete}
+            onSaveDraft={
+              usesSupabase
+                ? (draft, preliminaryIntake) =>
+                    persistSupabasePreUploadDraft(draft, preliminaryIntake, false)
+                : handleUploadDraftSave
+            }
+            onComplete={
+              usesSupabase
+                ? (draft, preliminaryIntake) =>
+                    persistSupabasePreUploadDraft(draft, preliminaryIntake, true)
+                : handleUploadComplete
+            }
           />
         )}
       </AnimatePresence>
@@ -1494,8 +1455,7 @@ export function CommandCenter({
         {mobileNavOpen && (
           <div className="md:hidden">
             <motion.button
-              aria-hidden="true"
-              tabIndex={-1}
+              aria-label="Закрыть меню"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -1507,12 +1467,10 @@ export function CommandCenter({
               aria-label="Меню агента"
               aria-modal="true"
               id={agentMobileNavigationId}
-              ref={mobileNavPanelRef}
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               role="dialog"
-              tabIndex={-1}
               transition={{ type: "spring", damping: 25, stiffness: 250 }}
               className="fixed inset-y-0 left-0 w-[280px] bg-[#141416] border-r border-[#202124] z-50 flex flex-col py-3 font-medium shadow-[0_0_40px_rgba(0,0,0,0.5)]"
             >
@@ -1522,18 +1480,12 @@ export function CommandCenter({
         )}
       </AnimatePresence>
 
-      <aside
-        aria-hidden={mobileNavOpen ? "true" : undefined}
-        inert={mobileNavOpen}
-        className="hidden md:flex w-[288px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20"
-      >
+      <aside className="hidden md:flex w-[288px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20">
         {renderNavContent()}
       </aside>
 
       <main
         aria-label="Рабочая область подач"
-        aria-hidden={mobileNavOpen ? "true" : undefined}
-        inert={mobileNavOpen}
         className="flex-1 min-w-0 flex flex-col bg-[#141416]"
       >
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
@@ -1542,7 +1494,6 @@ export function CommandCenter({
               aria-controls={agentMobileNavigationId}
               aria-expanded={mobileNavOpen}
               aria-label="Меню"
-              ref={mobileNavTriggerRef}
               onClick={() => setMobileNavOpen(true)}
               type="button"
               className="md:hidden w-10 h-10 -ml-2 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/70"
@@ -1557,7 +1508,7 @@ export function CommandCenter({
             <button
               aria-label="Новая подача"
               onClick={createPackage}
-              className="h-[var(--v19-control-row-height)] px-3.5 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="h-[36px] lg:h-10 px-3.5 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Создать пакет</span>
@@ -1574,9 +1525,6 @@ export function CommandCenter({
                   initialFilter={documentsFilter}
                   onOpenDrawer={handleRowClick}
                   onOpenIssue={handleOpenDocumentIssue}
-                  onSubmitForReview={(submissionId) =>
-                    executeAgentSubmissionActionFor(submissionId, "submit_for_review")
-                  }
                   onSubmissionsChange={onSubmissionsChange}
                   submissions={canonicalSubmissions}
                 />
@@ -1633,21 +1581,6 @@ export function CommandCenter({
         />
       )}
 
-      <AnimatePresence>
-        {usesSupabase && createDrawerOpen && (
-          <CreateSubmissionDrawer
-            city={createCity}
-            familyCount={createFamilyCount}
-            onCity={setCreateCity}
-            onClose={() => setCreateDrawerOpen(false)}
-            onCreate={createCanonicalDraft}
-            onFamilyCount={setCreateFamilyCount}
-            onPassportFilesSelected={() => undefined}
-            onType={setCreateType}
-            type={createType}
-          />
-        )}
-      </AnimatePresence>
       <CommandPalette
         open={commandPaletteOpen}
         role="agent"

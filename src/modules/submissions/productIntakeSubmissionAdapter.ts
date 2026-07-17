@@ -12,6 +12,7 @@ import type {
   PassportExtractedField,
   PassportExtractedFieldKey,
   PassportExtractionReviewState,
+  PassportUploadDraft,
   QuestionnaireReviewSource,
   QuestionnaireSection,
   Submission,
@@ -45,6 +46,25 @@ const passportQuestionnaireFieldIds = new Set([
 ]);
 
 const supplementalQuestionnaireSource = 'pdf_reconciliation' satisfies QuestionnaireReviewSource;
+
+const passportUploadFieldMap: Array<[
+  keyof ProductApplicantFields,
+  PassportExtractedFieldKey,
+]> = [
+  ['firstName', 'firstName'],
+  ['surname', 'surname'],
+  ['birthDate', 'birthDate'],
+  ['birthPlace', 'birthPlace'],
+  ['birthCountry', 'birthCountry'],
+  ['nationality', 'citizenship'],
+  ['gender', 'gender'],
+  ['passportType', 'passportType'],
+  ['passportNo', 'passportNumber'],
+  ['passportIssuePlace', 'passportIssuePlace'],
+  ['passportIssueCountry', 'passportIssueCountry'],
+  ['passportIssuedAt', 'passportIssuedAt'],
+  ['passportExpiresAt', 'passportExpiresAt'],
+];
 
 function sourceForDraftQuestionnaireField(fieldId: string): QuestionnaireReviewSource {
   return passportQuestionnaireFieldIds.has(fieldId)
@@ -110,6 +130,42 @@ export type ProductIntakeSubmissionOptions = {
   submissionId?: string;
   useIntakeFilesAsLocalDemoUploads?: boolean;
 };
+
+export function productIntakeDraftToPassportUploads(
+  draft: ProductIntakeDraft,
+): PassportUploadDraft[] {
+  const passportFiles = draft.files.filter((file) => file.kind === 'passport');
+
+  return passportFiles.flatMap((file, applicantIndex) => {
+    if (!file.fileRef) return [];
+    const needsManualReview = file.status !== 'recognized';
+    const extractedFields = passportUploadFieldMap.flatMap(([sourceKey, targetKey]) => {
+      const rawValue = file.extractedValues?.[sourceKey]?.trim() ?? '';
+      if (!rawValue) return [];
+      return [{
+        confidence: needsManualReview ? 'medium' : 'high',
+        key: targetKey,
+        needsManualReview,
+        source: 'passport_scan',
+        value: normalizedPassportExtractionValue(sourceKey, rawValue),
+      } satisfies PassportExtractedField];
+    });
+
+    return {
+      applicantIndex,
+      extractedFields,
+      file: file.fileRef,
+      fileName: file.name,
+      id: file.id,
+      status:
+        file.status === 'recognized'
+          ? 'ready'
+          : file.status === 'failed'
+            ? 'failed'
+            : 'unavailable',
+    };
+  });
+}
 
 function stableToken(input: string) {
   let hash = 0;
@@ -264,7 +320,11 @@ function normalizedPassportExtractionValue(
   draftKey: keyof ProductApplicantFields,
   rawValue: string,
 ) {
-  if (draftKey === 'nationality' || draftKey === 'passportIssueCountry') {
+  if (
+    draftKey === 'birthCountry' ||
+    draftKey === 'nationality' ||
+    draftKey === 'passportIssueCountry'
+  ) {
     return normalizeCountry(rawValue);
   }
   if (draftKey === 'gender') return normalizeGender(rawValue);

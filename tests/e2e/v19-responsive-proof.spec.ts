@@ -311,7 +311,10 @@ test.describe("V-19 responsive proof", () => {
       const generateButton = await selectReadyExportPackage(page);
       await generateButton.scrollIntoViewIfNeeded();
       await expect(generateButton).toBeEnabled();
-      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: selected export`);
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: selected export`,
+      );
       await screenshot(page, viewport, "export");
     }
 

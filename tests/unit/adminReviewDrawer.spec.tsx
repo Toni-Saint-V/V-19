@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AdminReviewDrawer } from "../../src/modules/submissions/components/AdminReviewDrawer";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
@@ -40,6 +40,9 @@ function renderDrawer({
   onDismissAiSuggestion = vi.fn(),
   onReviewFileAccept = vi.fn(),
   onRunAiReview = vi.fn(),
+  onClose = vi.fn(),
+  onVerifyDocument = vi.fn(),
+  submission = adminReviewSubmission(),
 }: {
   activeTab?: DrawerTab;
   onAction?: () => void;
@@ -48,6 +51,9 @@ function renderDrawer({
   onDismissAiSuggestion?: (suggestionId: string) => void;
   onReviewFileAccept?: (input: { applicantId: string; fileType: string }) => void;
   onRunAiReview?: () => void;
+  onClose?: () => void;
+  onVerifyDocument?: (applicantId: string) => void;
+  submission?: Submission;
 } = {}) {
   return {
     onAcceptAiSuggestion,
@@ -56,21 +62,24 @@ function renderDrawer({
     onDismissAiSuggestion,
     onReviewFileAccept,
     onRunAiReview,
+    onClose,
+    onVerifyDocument,
     ...render(
       <AdminReviewDrawer
         activeTab={activeTab}
         actionError=""
         focusTarget={undefined}
-        submission={adminReviewSubmission()}
+        submission={submission}
         onAction={onAction}
         onAcceptAiSuggestion={onAcceptAiSuggestion}
         onAddIssue={onAddIssue}
-        onClose={() => undefined}
+        onClose={onClose}
         onClearFocusTarget={() => undefined}
         onDismissAiSuggestion={onDismissAiSuggestion}
         onReviewFileAccept={onReviewFileAccept}
         onRunAiReview={onRunAiReview}
         onTab={() => undefined}
+        onVerifyDocument={onVerifyDocument}
       />,
     ),
   };
@@ -97,6 +106,173 @@ describe("AdminReviewDrawer", () => {
     ]) {
       expect(screen.getByRole("tab", { name: tab })).toBeVisible();
     }
+  });
+
+  test("exposes roving tabs, traps Escape at the top layer, and restores opener focus", async () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+    const onClose = vi.fn();
+    const { unmount } = renderDrawer({ onClose });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Закрыть проверку" })).toHaveFocus(),
+    );
+    const tablist = screen.getByRole("tablist", { name: "Рабочие вкладки проверки" });
+    const tabs = within(tablist).getAllByRole("tab");
+    expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
+    expect(tabs[0]).toHaveAttribute("aria-controls", "admin-review-panel-overview");
+
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(tabs[1]).toHaveAttribute("aria-selected", "true");
+      expect(tabs[1]).toHaveFocus();
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        "admin-review-tab-applicants",
+      ),
+    );
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
+  test("closes a remark composer before closing the review drawer", async () => {
+    const onClose = vi.fn();
+    renderDrawer({ activeTab: "issues", onClose });
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить замечание" }));
+    expect(screen.getByRole("dialog", { name: "Новое замечание" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Новое замечание" })).not.toBeInTheDocument(),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("keeps a family file remark attached to the file applicant", () => {
+    const source = adminReviewSubmission();
+    const firstApplicant = source.applicants[0];
+    const passport = source.files.find((file) => file.type === "passport_scan");
+    if (!firstApplicant || !passport) throw new Error("Expected applicant and passport fixture.");
+    const secondApplicant = {
+      ...firstApplicant,
+      fullName: "Ирина Волкова",
+      id: "family-second-applicant",
+    };
+    const secondPassport = {
+      ...passport,
+      applicantId: secondApplicant.id,
+      id: "family-second-passport",
+    };
+    const submission: Submission = {
+      ...source,
+      applicants: [firstApplicant, secondApplicant],
+      files: [...source.files, secondPassport],
+      title: "Семья Волковых",
+      type: "family",
+    };
+    const onAddIssue = vi.fn();
+    renderDrawer({ activeTab: "files", onAddIssue, submission });
+
+    const targetFile = document.getElementById(
+      "workspace-media-family-second-applicant-passport_scan",
+    );
+    if (!targetFile) throw new Error("Expected second applicant passport row.");
+    fireEvent.click(
+      within(targetFile).getByRole("button", {
+        name: "Создать замечание: Скан паспорта",
+      }),
+    );
+
+    expect(screen.getByRole("combobox", { name: /Заявитель/ })).toHaveValue(
+      secondApplicant.id,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Отправить замечание" }));
+    expect(onAddIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        applicantId: secondApplicant.id,
+        fileType: "passport_scan",
+        type: "file",
+      }),
+    );
+  });
+
+  test("jumps from an issue to its exact questionnaire field", async () => {
+    const source = adminReviewSubmission();
+    const applicant = source.applicants[0];
+    const section = applicant?.sections[0];
+    const field = section?.fields[0];
+    if (!applicant || !section || !field) throw new Error("Expected questionnaire fixture.");
+    const submission: Submission = {
+      ...source,
+      issues: [
+        {
+          comment: "Исправьте точное поле.",
+          createdAt: "сейчас",
+          createdBy: "admin",
+          id: "exact-field-issue",
+          reason: "Поле требует уточнения",
+          severity: "blocker",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: field.id,
+            section: section.title,
+          },
+          type: "field",
+        },
+      ],
+    };
+    const { container } = renderDrawer({ activeTab: "issues", submission });
+
+    fireEvent.click(screen.getByRole("button", { name: "Перейти к месту" }));
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /^Анкета/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(container.querySelector(".admin-review-field-row.is-ai-target")).toBeTruthy();
+    });
+    expect(container.querySelector(".admin-review-field-row.is-ai-target")).toHaveTextContent(
+      field.label,
+    );
+  });
+
+  test("renders truthful zero states without exposing a no-op remark action", async () => {
+    const source = adminReviewSubmission();
+    const submission: Submission = {
+      ...source,
+      applicants: [],
+      completeness: { files: 0, questionnaire: 0, total: 0 },
+      files: [],
+      history: [],
+      issues: [],
+    };
+    renderDrawer({ activeTab: "files", submission });
+
+    expect(screen.getByText("Файлы для проверки не загружены")).toBeInTheDocument();
+    expect(screen.getByText("0/0")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Заявители/ }));
+    expect(await screen.findByText("Заявители не добавлены")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^История/ }));
+    expect(await screen.findByText("История пока пуста")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Замечания/ }));
+    expect(await screen.findByText("Открытых замечаний нет")).toBeInTheDocument();
+    expect(screen.queryByText(/Пакет можно принимать/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Добавить замечание" })).toBeDisabled();
   });
 
   test("opens overview, applicant, and history admin subscreens from tabs", async () => {
@@ -148,24 +324,16 @@ describe("AdminReviewDrawer", () => {
     );
   });
 
-  test("opens the passport workspace and accepts the scanned passport through its callback", async () => {
-    const onReviewFileAccept = vi.fn();
-    renderDrawer({ activeTab: "files", onReviewFileAccept });
+  test("routes the selected passport into the protected review workspace", () => {
+    const submission = adminReviewSubmission();
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+    const onVerifyDocument = vi.fn();
+    renderDrawer({ activeTab: "files", onVerifyDocument, submission });
 
     fireEvent.click(screen.getAllByRole("button", { name: "Проверить" }).at(-1)!);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Сверить" })).toBeInTheDocument(),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Сверить" }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("dialog", { name: "Сверка паспорта" })).toBeInTheDocument(),
-    );
-    fireEvent.click(screen.getAllByRole("button", { name: "Завершить сверку" }).at(-1)!);
-
-    expect(onReviewFileAccept).toHaveBeenCalledWith(
-      expect.objectContaining({ fileType: "passport_scan" }),
-    );
+    expect(onVerifyDocument).toHaveBeenCalledWith(applicant.id);
   });
 
   test("runs admin drawer AI through the edge helper and fails closed when unavailable", async () => {

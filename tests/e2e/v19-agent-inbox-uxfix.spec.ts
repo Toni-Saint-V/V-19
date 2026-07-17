@@ -33,9 +33,7 @@ async function clickWorkspaceButton(page: Page, name: string | RegExp) {
 async function openFreshAgentActions(page: Page) {
   await page.goto("/");
   await page.evaluate(() => {
-    (
-      globalThis as unknown as { localStorage: { clear(): void } }
-    ).localStorage.clear();
+    (globalThis as unknown as { localStorage: { clear(): void } }).localStorage.clear();
   });
   await page.reload();
   await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
@@ -74,13 +72,16 @@ async function expectActionBoardFits(page: Page) {
     };
   });
 
-  expect(metrics.scrollWidth, "agent actions board should not clip horizontally").toBeLessThanOrEqual(
-    metrics.clientWidth + 1,
-  );
+  expect(
+    metrics.scrollWidth,
+    "agent actions board should not clip horizontally",
+  ).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
 test.describe("V-19 agent actions triage UX", () => {
-  test("action row stays explicit and opens the real submission drawer", async ({ page }) => {
+  test("action row stays explicit and opens the real submission drawer", async ({
+    page,
+  }) => {
     const browserProblems: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") browserProblems.push(message.text());

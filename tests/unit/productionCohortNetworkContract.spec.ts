@@ -1184,11 +1184,11 @@ describe("production lifecycle mutation audit", () => {
       status: "unreviewed",
       v19CockpitSnapshot: { submission: baseline, version: 1 },
     };
-    const reason = "Требуется исправить поле «Примечание»";
+    const reason = "Требуется исправить поле «Номер паспорта»";
     const comment = "RUN A2-S1: add lifecycle issue";
     const mutation = productionDraftSnapshotMutationFromBaseline(envelope, {
       comment,
-      fieldLabel: "Примечание",
+      fieldLabel: "Номер паспорта",
       mode: "add_issue",
       reason,
     });
@@ -1199,7 +1199,7 @@ describe("production lifecycle mutation audit", () => {
     const actual = addPreciseAdminIssue(baseline, {
       applicantId: applicant.id,
       comment,
-      field: "Примечание",
+      field: "Номер паспорта",
       reason,
       severity: "blocker",
       type: "field",

@@ -119,7 +119,10 @@ function smokeClient(env = loadSmokeEnv()): SupabaseClient {
 }
 
 async function signedSmokeAgentClient() {
-  return signedSmokeClient("SUPABASE_SMOKE_AGENT_EMAIL", "SUPABASE_SMOKE_AGENT_PASSWORD");
+  return signedSmokeClient(
+    "SUPABASE_SMOKE_AGENT_EMAIL",
+    "SUPABASE_SMOKE_AGENT_PASSWORD",
+  );
 }
 
 async function signedSmokeOtherAgentClient() {
@@ -130,7 +133,10 @@ async function signedSmokeOtherAgentClient() {
 }
 
 async function signedSmokeAdminClient() {
-  return signedSmokeClient("SUPABASE_SMOKE_ADMIN_EMAIL", "SUPABASE_SMOKE_ADMIN_PASSWORD");
+  return signedSmokeClient(
+    "SUPABASE_SMOKE_ADMIN_EMAIL",
+    "SUPABASE_SMOKE_ADMIN_PASSWORD",
+  );
 }
 
 async function signedSmokeClient(emailKey: string, passwordKey: string) {
@@ -575,7 +581,9 @@ async function openUploadSmokeDraft(page: Page) {
   const workTab = page.getByRole("tab", { name: "В работе" });
   if ((await workTab.count()) > 0) await workTab.click();
   await submissionSearch(page).fill(uploadSmokeApplicantName);
-  const card = page.locator(`[data-submission-id="${uploadSmokeSubmissionId}"]`).first();
+  const card = page
+    .locator(`[data-submission-id="${uploadSmokeSubmissionId}"]`)
+    .first();
 
   await expect(card).toBeVisible({ timeout: 15_000 });
   await card.click();
@@ -585,12 +593,13 @@ async function openUploadSmokeDraft(page: Page) {
   const workspaceHeading = page.getByRole("heading", {
     name: `Анкета: ${uploadSmokeApplicantName}`,
   });
-  await expect(
-    drawerHeading.or(workspaceHeading),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(drawerHeading.or(workspaceHeading)).toBeVisible({ timeout: 10_000 });
 }
 
-async function openSyncSmokeSubmission(page: Page, searchTerm = syncSmokeApplicantName) {
+async function openSyncSmokeSubmission(
+  page: Page,
+  searchTerm = syncSmokeApplicantName,
+) {
   await submissionSearch(page).fill(searchTerm);
   const card = page.locator(`[data-submission-id="${syncSmokeSubmissionId}"]`).first();
 
@@ -620,9 +629,9 @@ function submissionSearch(page: Page) {
 }
 
 async function openSyncSmokeReviewDrawer(page: Page) {
-  await expect(
-    page.getByRole("dialog", { name: "Проверка пакета" }),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("dialog", { name: "Проверка пакета" })).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 async function openDrawerFilesSection(page: Page) {
@@ -647,14 +656,12 @@ async function openDrawerIssuesSection(page: Page) {
     return;
   }
 
-  await drawer(page).getByRole("button", { name: /Замечания/ }).click();
+  await drawer(page)
+    .getByRole("button", { name: /Замечания/ })
+    .click();
 }
 
-async function chooseQuestionnaireOption(
-  page: Page,
-  label: string,
-  value: string,
-) {
+async function chooseQuestionnaireOption(page: Page, label: string, value: string) {
   const field = page.locator(`[data-field-label="${label}"]`).first();
   await expect(field).toBeVisible();
   const dropdown = field.getByRole("combobox");
@@ -762,9 +769,9 @@ async function signOut(page: Page) {
     await adminProfile.click();
     await page.getByRole("button", { name: "Выйти", exact: true }).click();
   }
-  await expect(
-    page.getByRole("main", { name: "Вход в рабочий кабинет" }),
-  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("main", { name: "Вход в рабочий кабинет" })).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 async function waitForSyncSmokeStatus(
@@ -913,9 +920,7 @@ test("exposes only browser-safe Supabase values", async ({ page }) => {
   await expect(
     page.getByRole("main", { name: "Вход в рабочий кабинет" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Заявка на доступ" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Заявка на доступ" })).toBeVisible();
   await expect(
     page.getByText(
       "Заполните данные агентства. Доступ появится после подтверждения администратором.",
@@ -1051,14 +1056,9 @@ test.describe("Supabase sandbox auth smoke", () => {
         .click();
       const returnSaveResponse = await returnSave;
       expect(returnSaveResponse.ok(), "Admin return save must succeed.").toBe(true);
-      await expect(
-        page.getByRole("dialog", { name: "Проверка пакета" }),
-      ).toBeHidden();
+      await expect(page.getByRole("dialog", { name: "Проверка пакета" })).toBeHidden();
       await waitForSyncSmokeStatus(adminClient, "returned", "returned");
-      await expectCorrectionHandoffRejectedForClient(
-        adminClient,
-        syncOwnerAgentId,
-      );
+      await expectCorrectionHandoffRejectedForClient(adminClient, syncOwnerAgentId);
       const { client: otherAgentClient } = await signedSmokeOtherAgentClient();
       await expectCorrectionHandoffRejectedForClient(
         otherAgentClient,
@@ -1119,8 +1119,14 @@ test.describe("Supabase sandbox auth smoke", () => {
         correctionSaveResponse.ok(),
         `submit_corrections_handoff failed with ${correctionSaveResponse.status()}: ${correctionSaveBody}`,
       ).toBe(true);
-      await expect(page.getByText("· Исправления отправлены", { exact: true })).toBeVisible();
-      await waitForSyncSmokeStatus(adminClient, "waiting_review", "corrections_received");
+      await expect(
+        page.getByText("· Исправления отправлены", { exact: true }),
+      ).toBeVisible();
+      await waitForSyncSmokeStatus(
+        adminClient,
+        "waiting_review",
+        "corrections_received",
+      );
       await page.getByRole("button", { name: "Назад" }).click();
       await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
 
