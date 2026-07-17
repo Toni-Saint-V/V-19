@@ -23,7 +23,11 @@ import type {
 } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import { ApplicantsScreen } from "./ApplicantsScreen";
 import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
-import { DraftsScreen, type DraftSummaryFilter } from "./DraftsScreen";
+import {
+  DraftsScreen,
+  type DocumentIssueTarget,
+  type DraftSummaryFilter,
+} from "./DraftsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
 import { CreateSubmissionDrawer } from "../modules/submissions/components/CreateSubmissionDrawer";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
@@ -46,11 +50,14 @@ import {
 import { createDraft } from "../modules/submissions/domainEngine";
 import type {
   City,
+  DrawerTab,
   PassportUploadDraft,
   PreliminaryIntakeDraft,
   Submission,
   SubmissionAction,
+  SubmissionFileType,
 } from "../modules/submissions/types";
+import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
 import {
   listItemsFromSubmissions,
   type LegacyAgentNavSection,
@@ -100,6 +107,15 @@ type AgentShellNavSection = Extract<
 >;
 type ActionSummaryFilter = "blockers" | "open" | "today" | "week" | "completed";
 type ActionSort = "tripDate" | "createdAt";
+
+function submissionFileTypeForDocumentIssue(
+  docType: DocumentIssueTarget["docType"],
+): SubmissionFileType | undefined {
+  if (docType === "passport") return "passport_scan";
+  if (docType === "selfie") return "selfie";
+  if (docType === "selfie2") return "selfie_2";
+  return undefined;
+}
 
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
@@ -329,6 +345,8 @@ export function CommandCenter({
   const [questionnaireInitialFocus, setQuestionnaireInitialFocus] =
     useState<QuestionnaireInitialFocus>();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerActiveTab, setDrawerActiveTab] = useState<DrawerTab>("overview");
+  const [drawerFocusTarget, setDrawerFocusTarget] = useState<WorkspaceTarget>();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
@@ -606,7 +624,34 @@ export function CommandCenter({
 
     bridge.onSubmissionOpen?.(id);
     emitVisaflowUiEvent(bridge, { type: "submission.open", submissionId: id });
+    setDrawerActiveTab("overview");
+    setDrawerFocusTarget(undefined);
     setSelectedRow(id);
+    setDrawerOpen(true);
+  };
+
+  const handleOpenDocumentIssue = (target: DocumentIssueTarget) => {
+    const submission = effectiveCanonicalSubmissions.find(
+      (candidate) => candidate.id === target.submissionId,
+    );
+    const fileType = submissionFileTypeForDocumentIssue(target.docType);
+    const issue = submission?.issues.find(
+      (candidate) =>
+        candidate.status !== "closed_by_admin" &&
+        candidate.target.applicantId === target.applicantId &&
+        candidate.target.fileType === fileType,
+    );
+
+    bridge.onSubmissionOpen?.(target.submissionId);
+    emitVisaflowUiEvent(bridge, {
+      type: "submission.open",
+      submissionId: target.submissionId,
+    });
+    setDrawerActiveTab("issues");
+    setDrawerFocusTarget(
+      issue ? { issueId: issue.id, tab: "issues" } : undefined,
+    );
+    setSelectedRow(target.submissionId);
     setDrawerOpen(true);
   };
 
@@ -1528,6 +1573,7 @@ export function CommandCenter({
                 <DraftsScreen
                   initialFilter={documentsFilter}
                   onOpenDrawer={handleRowClick}
+                  onOpenIssue={handleOpenDocumentIssue}
                   onSubmitForReview={(submissionId) =>
                     executeAgentSubmissionActionFor(submissionId, "submit_for_review")
                   }
@@ -1551,7 +1597,9 @@ export function CommandCenter({
       {usesSupabase ? (
         drawerOpen && selectedCanonicalSubmission ? (
           <OperationalSubmissionDrawer
-            activeTab="overview"
+            activeTab={drawerActiveTab}
+            focusTarget={drawerFocusTarget}
+            onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
             onAction={executeAgentSubmissionAction}
             onClose={() => setDrawerOpen(false)}
             onMarkIssueFixed={async (issueId) => {
@@ -1569,6 +1617,7 @@ export function CommandCenter({
       ) : (
         <Drawer
           allowDemoFallback
+          initialTab={drawerActiveTab}
           isOpen={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           submissionId={selectedRow}

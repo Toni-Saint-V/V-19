@@ -77,6 +77,7 @@ function historyPresentation(event: CanonicalSubmission['history'][number]) {
 }
 
 interface DrawerProps {
+  initialTab?: TabId;
   isOpen: boolean;
   onClose: () => void;
   submissionId: string | null;
@@ -488,6 +489,7 @@ const HistoryTab = ({ data }: { data: SubmissionDetail }) => data.history.length
 
 // --- Main Drawer Component ---
 export function Drawer({
+  initialTab = 'overview',
   isOpen,
   onClose,
   submissionId,
@@ -498,7 +500,7 @@ export function Drawer({
   onSubmissionAction,
 }: DrawerProps) {
   const bridge = useVisaflowBusinessBridge();
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [status, setStatus] = useState<DrawerState>('idle');
   const [data, setData] = useState<SubmissionDetail | null>(null);
   const [actionError, setActionError] = useState('');
@@ -529,7 +531,7 @@ export function Drawer({
     if (isOpen && submissionId) {
       actionRequestIdRef.current += 1;
       setStatus('loading');
-      setActiveTab('overview');
+      setActiveTab(initialTab);
       setActionError('');
       setActionPending(false);
       actionPendingRef.current = false;
@@ -582,7 +584,7 @@ export function Drawer({
       const resetTimer = setTimeout(() => setStatus('idle'), 300);
       return () => clearTimeout(resetTimer);
     }
-  }, [allowDemoFallback, isOpen, submission, submissionId]);
+  }, [allowDemoFallback, initialTab, isOpen, submission, submissionId]);
 
   const tabs: { id: TabId; label: string; getCount?: (d: SubmissionDetail) => number; isWarning?: boolean; tone: string }[] = [
     { id: 'overview', label: 'Обзор', tone: 'overview' },
