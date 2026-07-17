@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { testArtifactPath } from "./lib/artifact-paths.mjs";
 
 const MAX_LANES = 4;
 const initialCwd = process.cwd();
@@ -27,13 +28,8 @@ const worktreeRoot =
   config.worktreeRoot ??
   process.env.V19_LANE_ROOT ??
   path.join(os.homedir(), ".codex", "worktrees", "v19-e2e-closure", runId);
-const generatedRootRelative = path.join(
-  "docs",
-  "qa",
-  "generated-lane-prompts",
-  runId,
-);
-const manifestRelativePath = path.join(generatedRootRelative, "launch-manifest.json");
+const generatedRoot = testArtifactPath("generated-lane-prompts", runId);
+const manifestPath = path.join(generatedRoot, "launch-manifest.json");
 const openWindows = !config.noOpen;
 const dryRun = Boolean(config.dryRun);
 const skipPluginInstall = Boolean(config.noPluginInstall) || dryRun;
@@ -63,7 +59,9 @@ function main() {
   if (dryRun) {
     printLanePlans(lanePlans);
     console.log("");
-    console.log("Dry run complete. No branches, worktrees, prompts, manifest, or windows were created.");
+    console.log(
+      "Dry run complete. No branches, worktrees, prompts, manifest, or windows were created.",
+    );
     return;
   }
 
@@ -84,7 +82,7 @@ function main() {
 
   console.log("");
   console.log(`Launch complete. Worktrees root: ${worktreeRoot}`);
-  console.log(`Manifest: ${path.join(repoRoot, manifestRelativePath)}`);
+  console.log(`Manifest: ${manifestPath}`);
 }
 
 function parseArgs(args) {
@@ -98,10 +96,12 @@ function parseArgs(args) {
     else if (arg === "--print-commands") parsed.printCommands = true;
     else if (arg === "--allow-dirty-source") parsed.allowDirtySource = true;
     else if (arg === "--base-ref") parsed.baseRef = readValue(args, ++index, arg);
-    else if (arg === "--run-id") parsed.runId = sanitizeRunId(readValue(args, ++index, arg));
+    else if (arg === "--run-id")
+      parsed.runId = sanitizeRunId(readValue(args, ++index, arg));
     else if (arg === "--model") parsed.model = readValue(args, ++index, arg);
     else if (arg === "--reasoning") parsed.reasoning = readValue(args, ++index, arg);
-    else if (arg === "--plan-reasoning") parsed.planReasoning = readValue(args, ++index, arg);
+    else if (arg === "--plan-reasoning")
+      parsed.planReasoning = readValue(args, ++index, arg);
     else if (arg === "--profile") parsed.profile = readValue(args, ++index, arg);
     else if (arg === "--worktree-root")
       parsed.worktreeRoot = path.resolve(readValue(args, ++index, arg));
@@ -156,13 +156,22 @@ function buildPreflight() {
   const missingContext = requiredContextFiles.filter(
     (file) => !fs.existsSync(path.join(repoRoot, file)),
   );
-  const missingSkills = requiredSkillEntries.filter((skill) => !fs.existsSync(skill.source));
+  const missingSkills = requiredSkillEntries.filter(
+    (skill) => !fs.existsSync(skill.source),
+  );
   const codexPath = commandPath("codex");
   const osascriptPath = process.platform === "darwin" ? commandPath("osascript") : "";
-  const codexVersion = codexPath ? exec("codex", ["--version"]).trim() : "";
+  const codexVersionProbe = codexPath
+    ? spawnSync("codex", ["--version"], { encoding: "utf8" })
+    : undefined;
+  const codexVersion =
+    codexVersionProbe?.status === 0 ? codexVersionProbe.stdout.trim() : "";
 
   if (gitRoot !== repoRoot) blockers.push(`Unexpected git root: ${gitRoot}`);
   if (!codexPath) blockers.push("Codex CLI not found on PATH.");
+  if (codexPath && !codexVersion) {
+    blockers.push("Codex CLI is present but cannot start; reinstall or repair it.");
+  }
   if (openWindows && process.platform === "darwin" && !osascriptPath) {
     blockers.push("osascript not found; cannot open macOS Terminal windows.");
   }
@@ -180,7 +189,9 @@ function buildPreflight() {
     blockers.push("No lanes configured.");
   }
   if (lanes.length > maxLanes) {
-    blockers.push(`Too many lanes configured: ${lanes.length}. Maximum allowed is ${maxLanes}.`);
+    blockers.push(
+      `Too many lanes configured: ${lanes.length}. Maximum allowed is ${maxLanes}.`,
+    );
   }
   if (dirtySource.length > 0 && !config.allowDirtySource) {
     blockers.push(
@@ -285,7 +296,9 @@ function ensurePlugins(selectors) {
 
   return {
     skipped: false,
-    plugins: selectors.map((selector) => pluginResult(selector, "verified", after.get(selector))),
+    plugins: selectors.map((selector) =>
+      pluginResult(selector, "verified", after.get(selector)),
+    ),
   };
 }
 
@@ -314,10 +327,8 @@ function pluginMap() {
 function buildLanePlan(lane) {
   const branch = `codex/v19-e2e-${runId}-${lane.id}`;
   const worktree = path.join(worktreeRoot, lane.id, "V-19");
-  const promptRelativePath = path.join(generatedRootRelative, `${lane.id}.md`);
-  const promptPath = path.join(worktree, promptRelativePath);
-  const contextRoot = path.join(worktree, generatedRootRelative, "context");
-  const manifestPath = path.join(worktree, manifestRelativePath);
+  const promptPath = path.join(generatedRoot, `${lane.id}.md`);
+  const contextRoot = path.join(generatedRoot, lane.id, "context");
   const command = codexCommand({ lane, promptPath, worktree });
 
   return {
@@ -327,7 +338,6 @@ function buildLanePlan(lane) {
     id: lane.id,
     manifestPath,
     promptPath,
-    promptRelativePath,
     title: lane.title,
     worktree,
   };
@@ -356,7 +366,7 @@ function buildManifest(preflight, pluginSnapshot, lanePlans) {
       branch: lane.branch,
       command: lane.command,
       id: lane.id,
-      prompt: path.relative(lane.worktree, lane.promptPath),
+      prompt: lane.promptPath,
       title: lane.title,
       worktree: lane.worktree,
     })),
@@ -449,7 +459,9 @@ function assertPromptBundle(lanePlan) {
     lanePlan.manifestPath,
     ...requiredContextFiles.map((file) => path.join(lanePlan.contextRoot, file)),
     ...requiredAssetFiles.map((file) => path.join(lanePlan.contextRoot, file)),
-    ...requiredSkillEntries.map((skill) => path.join(lanePlan.contextRoot, skill.targetRelative)),
+    ...requiredSkillEntries.map((skill) =>
+      path.join(lanePlan.contextRoot, skill.targetRelative),
+    ),
   ];
   const missing = required.filter((file) => !fs.existsSync(file));
   if (missing.length > 0) {
@@ -458,7 +470,7 @@ function assertPromptBundle(lanePlan) {
 }
 
 function writeRootManifest(manifest) {
-  writeJson(path.join(repoRoot, manifestRelativePath), manifest);
+  writeJson(manifestPath, manifest);
 }
 
 function lanePrompt(lane, lanePlan) {
@@ -472,18 +484,18 @@ function lanePrompt(lane, lanePlan) {
     runId,
   });
   const contextList = requiredContextFiles
-    .map((file) => `- ${path.join(generatedRootRelative, "context", file)}`)
+    .map((file) => `- ${path.join(lanePlan.contextRoot, file)}`)
     .join("\n");
   const skillList = requiredSkillEntries
     .map(
       (skill) =>
-        `- ${skill.name}: ${path.join(generatedRootRelative, "context", skill.targetRelative)}`,
+        `- ${skill.name}: ${path.join(lanePlan.contextRoot, skill.targetRelative)}`,
     )
     .join("\n");
   const assetList =
     requiredAssetFiles.length > 0
       ? requiredAssetFiles
-          .map((file) => `- ${path.join(generatedRootRelative, "context", file)}`)
+          .map((file) => `- ${path.join(lanePlan.contextRoot, file)}`)
           .join("\n")
       : "- none";
 
@@ -494,7 +506,7 @@ function lanePrompt(lane, lanePlan) {
 Role: ${lane.title}
 Branch: ${lanePlan.branch}
 Worktree: ${lanePlan.worktree}
-Launch manifest: ${manifestRelativePath}
+Launch manifest: ${manifestPath}
 
 Mission:
 ${lane.mission}
@@ -564,7 +576,9 @@ function expandAssetPattern(pattern) {
 
   const match = pattern.match(/^(.+)\/\*\.([a-zA-Z0-9]+)$/);
   if (!match) {
-    throw new Error(`Unsupported asset pattern: ${pattern}. Use dir/*.ext patterns only.`);
+    throw new Error(
+      `Unsupported asset pattern: ${pattern}. Use dir/*.ext patterns only.`,
+    );
   }
 
   const [, dir, extension] = match;

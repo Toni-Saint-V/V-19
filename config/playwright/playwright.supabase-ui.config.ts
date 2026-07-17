@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 const sandboxProjectId = "oevvaowoklqttqkraxho";
 const sandboxOrigin = `https://${sandboxProjectId}.supabase.co`;
 const smokeEnvPath = resolve(
@@ -41,20 +43,28 @@ function loadSandboxBrowserEnv(): Record<string, string> {
     throw new Error("Supabase UI E2E refused: project id is not the approved sandbox.");
   }
   const supabaseUrl = smokeEnv.VITE_SUPABASE_URL?.trim();
-  if (!supabaseUrl) throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is missing.");
+  if (!supabaseUrl)
+    throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is missing.");
   try {
     if (new URL(supabaseUrl).origin !== sandboxOrigin) {
-      throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is not the approved sandbox.");
+      throw new Error(
+        "Supabase UI E2E refused: VITE_SUPABASE_URL is not the approved sandbox.",
+      );
     }
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Supabase UI E2E refused:")) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Supabase UI E2E refused:")
+    ) {
       throw error;
     }
     throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is not a valid URL.");
   }
   const edgeFunctionsUrl = smokeEnv.VITE_SUPABASE_EDGE_FUNCTIONS_URL?.trim();
   if (!edgeFunctionsUrl) {
-    throw new Error("Supabase UI E2E refused: VITE_SUPABASE_EDGE_FUNCTIONS_URL is missing.");
+    throw new Error(
+      "Supabase UI E2E refused: VITE_SUPABASE_EDGE_FUNCTIONS_URL is missing.",
+    );
   }
   try {
     const edgeUrl = new URL(edgeFunctionsUrl);
@@ -68,7 +78,10 @@ function loadSandboxBrowserEnv(): Record<string, string> {
       );
     }
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Supabase UI E2E refused:")) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Supabase UI E2E refused:")
+    ) {
       throw error;
     }
     throw new Error(
@@ -92,8 +105,10 @@ function loadSandboxBrowserEnv(): Record<string, string> {
 }
 
 export default defineConfig({
+  outputDir: testArtifactPath("playwright", "supabase-ui"),
+  preserveOutput: "never",
   metadata: { uiEvidenceRunId },
-  testDir: "./tests/e2e-supabase-ui",
+  testDir: "../../tests/e2e-supabase-ui",
   reporter: [["list"]],
   timeout: 300_000,
   workers: 1,

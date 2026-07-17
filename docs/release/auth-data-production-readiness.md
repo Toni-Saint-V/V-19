@@ -31,7 +31,7 @@ Reason:
 
 Recorded: 2026-06-28
 
-- Pilot auth/access evidence: `docs/qa/pilot-auth-gate-evidence-20260628.md`
+- Pilot auth/access evidence: `$V19_TEST_ARTIFACTS_DIR/pilot-auth-gate-evidence-20260628.md`
 - Pilot verdict: `GO_DUMMY_ONLY`
 - Production verdict remains: `NO_GO`
 - Closed pilot only; dummy/test documents only; no real passports; no public

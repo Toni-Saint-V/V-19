@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
 const browserAuditTarget =
@@ -74,11 +76,15 @@ function loadBrowserSafeSmokeEnv(): Record<string, string> {
 }
 
 export default defineConfig({
-  testDir: "./tests/e2e-supabase",
+  outputDir: testArtifactPath("playwright", "supabase-browser"),
+  preserveOutput: "never",
+  testDir: "../../tests/e2e-supabase",
   reporter: [["list"]],
   use: {
     baseURL: "http://127.0.0.1:4198",
-    trace: "retain-on-failure",
+    screenshot: "off",
+    trace: "off",
+    video: "off",
   },
   webServer: {
     command: "npm run dev -- --port 4198 --strictPort",

@@ -9,6 +9,7 @@ import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionAc
 import { markSubmissionIssueFixedResult } from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
 
+import { testArtifactPath } from "../support/artifacts";
 import {
   PRODUCTION_PROJECT_REF,
   buildProductionCohortPlan,
@@ -2911,14 +2912,7 @@ export async function writeProductionLifecycleEvidence(
   value: unknown,
 ) {
   const evidenceLane = `production-lifecycle-${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY.toLowerCase()}`;
-  const path = resolve(
-    process.cwd(),
-    "output",
-    "playwright",
-    evidenceLane,
-    runMarker,
-    "evidence.json",
-  );
+  const path = testArtifactPath("playwright", evidenceLane, runMarker, "evidence.json");
   await writeJsonAtomic(path, value);
   return path;
 }

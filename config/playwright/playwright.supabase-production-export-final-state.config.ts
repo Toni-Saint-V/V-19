@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { defineConfig } from "@playwright/test";
+
+import { testArtifactPath } from "../../tests/support/artifacts";
 
 import {
   PRODUCTION_COHORT_APP_ORIGIN,
@@ -8,21 +11,7 @@ import {
   PRODUCTION_SUPABASE_ORIGIN,
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
-} from "./tests/e2e-supabase-ui/production-cohort-helpers";
-import {
-  RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
-  assertProductionLifecycleWriteUnlock,
-} from "./tests/e2e-supabase-ui/production-lifecycle-helpers";
-
-if (process.env.V19_PRODUCTION_LIFECYCLE_FRESH_BUILD !== "1") {
-  throw new Error(
-    "Production lifecycle must run through npm run test:e2e:supabase:production:lifecycle so preview uses a freshly verified production bundle.",
-  );
-}
-
-assertProductionLifecycleWriteUnlock();
-requiredProductionRunMarker();
-loadProductionCohortAccounts();
+} from "../../tests/e2e-supabase-ui/production-cohort-helpers";
 
 process.env.SUPABASE_UI_E2E_ENV_FILE = ".env.supabase-production.local";
 
@@ -47,10 +36,9 @@ const browserSafeEnvNames = [
 function loadProductionEnv() {
   if (!existsSync(productionEnvPath)) {
     throw new Error(
-      ".env.supabase-production.local is required for the production lifecycle.",
+      ".env.supabase-production.local is required for the read-only production export gate.",
     );
   }
-
   const values: Record<string, string> = {};
   for (const line of readFileSync(productionEnvPath, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -64,20 +52,22 @@ function loadProductionEnv() {
   }
 
   if (values.VITE_SUPABASE_PROJECT_ID !== PRODUCTION_PROJECT_REF) {
-    throw new Error("Production lifecycle refuses an unapproved Supabase project ref.");
+    throw new Error(
+      "Read-only export gate refuses an unapproved Supabase project ref.",
+    );
   }
   if (values.VITE_SUPABASE_URL !== PRODUCTION_SUPABASE_ORIGIN) {
-    throw new Error("Production lifecycle refuses an unapproved Supabase URL.");
+    throw new Error("Read-only export gate refuses an unapproved Supabase URL.");
   }
   if (values.VITE_SUPABASE_BACKEND_TARGET !== "supabase") {
     throw new Error(
-      "Production lifecycle requires VITE_SUPABASE_BACKEND_TARGET=supabase.",
+      "Read-only export gate requires VITE_SUPABASE_BACKEND_TARGET=supabase.",
     );
   }
   const functionsUrl = values.VITE_SUPABASE_EDGE_FUNCTIONS_URL?.trim();
   if (functionsUrl && new URL(functionsUrl).origin !== PRODUCTION_SUPABASE_ORIGIN) {
     throw new Error(
-      "Production lifecycle refuses an unapproved Edge Functions origin.",
+      "Read-only export gate refuses an unapproved Edge Functions origin.",
     );
   }
 
@@ -88,7 +78,7 @@ function loadProductionEnv() {
   }
   if (!selected.VITE_SUPABASE_PUBLISHABLE_KEY) {
     throw new Error(
-      "VITE_SUPABASE_PUBLISHABLE_KEY is required for the production lifecycle.",
+      "VITE_SUPABASE_PUBLISHABLE_KEY is required for the read-only production export gate.",
     );
   }
 
@@ -101,15 +91,23 @@ function loadProductionEnv() {
   };
 }
 
+// This test is intentionally read-only: no production write unlock is loaded
+// or accepted by this config. The browser network gate independently aborts
+// every business mutation.
+requiredProductionRunMarker();
+loadProductionCohortAccounts();
+
 export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
-  outputDir: `test-results/production-lifecycle-${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY.toLowerCase()}`,
+  outputDir: testArtifactPath("playwright", "production-export-final-state"),
+  preserveOutput: "never",
+  preserveOutput: "never",
   reporter: [["list"]],
   retries: 0,
-  testDir: "./tests/e2e-supabase-ui",
-  testMatch: /production-lifecycle-resumable\.spec\.ts/,
-  timeout: 1_800_000,
+  testDir: "../../tests/e2e-supabase-ui",
+  testMatch: /production-export-a1-f6-final-state\.spec\.ts/,
+  timeout: 360_000,
   use: {
     actionTimeout: 45_000,
     baseURL: PRODUCTION_COHORT_APP_ORIGIN,
@@ -123,7 +121,7 @@ export default defineConfig({
       "npm run build:supabase-production && npm run preview -- --host 127.0.0.1 --port 4202 --strictPort",
     env: loadProductionEnv(),
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 240_000,
     url: PRODUCTION_COHORT_APP_ORIGIN,
   },
   workers: 1,

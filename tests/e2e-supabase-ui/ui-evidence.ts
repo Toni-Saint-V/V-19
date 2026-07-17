@@ -1,8 +1,5 @@
-import {
-  appendFileSync,
-  mkdirSync,
-  writeFileSync,
-} from "node:fs";
+import { testArtifactPath } from "../support/artifacts";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Page, TestInfo } from "@playwright/test";
 
@@ -30,11 +27,7 @@ export function uiEvidenceDirectory(testInfo: TestInfo) {
   if (!runId) {
     throw new Error("A fresh UI evidence run id is required.");
   }
-  return resolve(
-    process.cwd(),
-    "docs/qa/supabase-production-pilot-10",
-    `ui-e2e-full-flow-${runId}`,
-  );
+  return testArtifactPath("supabase-production-pilot-10", `ui-e2e-full-flow-${runId}`);
 }
 
 function ensureEvidenceDirectory(testInfo: TestInfo) {

@@ -3,13 +3,15 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 import {
   PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
   PRODUCTION_SUPABASE_ORIGIN,
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
-} from "./tests/e2e-supabase-ui/production-cohort-helpers";
+} from "../../tests/e2e-supabase-ui/production-cohort-helpers";
 
 requiredProductionRunMarker();
 loadProductionCohortAccounts();
@@ -47,7 +49,9 @@ const browserSafeEnvNames = [
 
 function loadProductionEnv() {
   if (!existsSync(productionEnvPath)) {
-    throw new Error("The production public environment is required for abort-only proof.");
+    throw new Error(
+      "The production public environment is required for abort-only proof.",
+    );
   }
   const values: Record<string, string> = {};
   for (const line of readFileSync(productionEnvPath, "utf8").split(/\r?\n/)) {
@@ -93,10 +97,7 @@ function loadProductionEnv() {
 }
 
 function productionServerCommand() {
-  if (
-    process.env.V19_PRODUCTION_A2_S1_VERIFIED_DIST_UNLOCK !==
-    verifiedDistUnlock
-  ) {
+  if (process.env.V19_PRODUCTION_A2_S1_VERIFIED_DIST_UNLOCK !== verifiedDistUnlock) {
     return "npm run build:supabase-production && npm run preview -- --host 127.0.0.1 --port 4202 --strictPort";
   }
 
@@ -120,11 +121,12 @@ function productionServerCommand() {
 export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
-  outputDir: "test-results/production-export-a2-s1-abort",
+  outputDir: testArtifactPath("playwright", "production-export-a2-s1-abort"),
+  preserveOutput: "never",
   preserveOutput: "never",
   reporter: [["list"]],
   retries: 0,
-  testDir: "./tests/e2e-supabase-ui",
+  testDir: "../../tests/e2e-supabase-ui",
   testMatch: /production-export-a1-s1-resumable\.spec\.ts/,
   timeout: 1_800_000,
   use: {

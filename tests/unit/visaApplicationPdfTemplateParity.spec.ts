@@ -3,16 +3,19 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import { verifyVisaApplicationPdfTemplateParity } from "../../src/lib/export/visaApplicationPdfTemplateParity";
 
-const filledReferencePath = "docs/пиздец/Выгрузка_Анкета.pdf";
-const allegedBlankTemplatePath = "docs/пиздец/Щаблон_анкета.pdf";
+const filledReferencePath = "tests/fixtures/reference-exports/Выгрузка_Анкета.pdf";
+const allegedBlankTemplatePath = "tests/fixtures/reference-exports/Щаблон_анкета.pdf";
 
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
 function pdfPageCount(bytes: Uint8Array): number {
-  return (Buffer.from(bytes).toString("latin1").match(/\/Type\s*\/Page\b/g) ?? [])
-    .length;
+  return (
+    Buffer.from(bytes)
+      .toString("latin1")
+      .match(/\/Type\s*\/Page\b/g) ?? []
+  ).length;
 }
 
 describe("visa application PDF template parity gate", () => {

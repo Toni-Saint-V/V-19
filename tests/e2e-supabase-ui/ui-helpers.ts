@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import { testArtifactPath } from "../support/artifacts";
 import {
   questionnaireFixturePreferredOption,
   questionnaireFixtureTextValue,
@@ -301,9 +302,7 @@ export function runAssets(runId: string, count: number) {
 
   const assets: string[] = [];
   for (let index = 0; index < count; index += 1) {
-    const target = resolve(
-      process.cwd(),
-      "test-results",
+    const target = testArtifactPath(
       "supabase-ui-inputs",
       runId,
       `${runId}-passport-${index + 1}.jpeg`,

@@ -1,26 +1,27 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 const e2eHost = process.env.PW_BASE_HOST ?? "localhost";
 const e2eServerHost = process.env.PW_SERVER_HOST ?? "0.0.0.0";
 const e2ePort = process.env.PW_BASE_PORT ?? "4207";
 const e2eUrl = `http://${e2eHost}:${e2ePort}`;
 
 export default defineConfig({
-  testDir: "./tests/e2e",
+  outputDir: testArtifactPath("playwright", "fastlane"),
+  preserveOutput: "never",
+  testDir: "../../tests/e2e",
   timeout: 60_000,
   expect: {
     timeout: 20_000,
   },
   fullyParallel: false,
-  reporter: [
-    ["list"],
-    ["html", { outputFolder: "playwright-report-e2e-fastlane", open: "never" }],
-  ],
+  reporter: [["list"]],
   use: {
     baseURL: e2eUrl,
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
-    video: process.env.PW_VIDEO === "1" ? "retain-on-failure" : "off",
+    trace: "off",
+    screenshot: "off",
+    video: "off",
     launchOptions: {
       args: [
         "--no-first-run",

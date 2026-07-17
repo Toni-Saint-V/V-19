@@ -1,10 +1,11 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { testArtifactPath } from "../support/artifacts";
 
 import { expect, test, type Page } from "@playwright/test";
 import { clickWorkspaceButton, isVisible } from "./v19-pilot-helpers";
 
-const proofDir = "docs/qa/2026-07-01-b-full-ui-copy";
+const proofDir = testArtifactPath("2026-07-01-b-full-ui-copy");
 
 type ProofViewport = {
   height: number;

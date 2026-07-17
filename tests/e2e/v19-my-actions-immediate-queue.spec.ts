@@ -1,11 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { testArtifactPath } from "../support/artifacts";
 
 import { expect, test, type Page } from "@playwright/test";
 
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
 
-const evidenceDirectory = "docs/qa/2026-07-15-my-actions-pass-01";
+const evidenceDirectory = testArtifactPath("2026-07-15-my-actions-pass-01");
 
 type ActionAnimationRecord = { delay: number; submissionId: string | null };
 

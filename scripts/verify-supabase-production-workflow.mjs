@@ -2,16 +2,23 @@ import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
+import { testArtifactPath } from "./lib/artifact-paths.mjs";
 
 const repoRoot = process.cwd();
 const publicEnvPath = resolve(repoRoot, ".env.supabase-production.local");
 const adminEnvPath = resolve(repoRoot, ".env.supabase-production-admin.local");
-const readinessPath = resolve(repoRoot, "docs/release/supabase-production-readiness.json");
-const evidencePath = resolve(repoRoot, "docs/qa/supabase-production-workflow-smoke-20260701.md");
+const readinessPath = resolve(
+  repoRoot,
+  "docs/release/supabase-production-readiness.json",
+);
+const evidencePath = testArtifactPath("supabase-production-workflow-smoke-20260701.md");
 const productionProjectId = "tsymifccglpepvbmrcgh";
 const sandboxProjectId = "oevvaowoklqttqkraxho";
 const bucket = "submission-media";
-const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+const stamp = new Date()
+  .toISOString()
+  .replace(/[-:.TZ]/g, "")
+  .slice(0, 14);
 const runId = `VF-PROD-WORKFLOW-${stamp}`;
 const familyRunId = `${runId}-FAMILY`;
 const malformedBucketReadinessId = `${runId}-MALFORMED-BUCKET`;
@@ -38,24 +45,52 @@ const projectUrl =
   clean(adminEnv.SUPABASE_PROJECT_URL) ||
   clean(readiness.productionTarget?.projectUrl);
 const publishableKey = clean(publicEnv.VITE_SUPABASE_PUBLISHABLE_KEY);
-const adminCleanupKey = clean(adminEnv[["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_")]);
+const adminCleanupKey = clean(
+  adminEnv[["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_")],
+);
 
 await main();
 
 async function main() {
-  assert(projectId === productionProjectId, "target is production project", "project id mismatch");
-  assert(projectId !== sandboxProjectId, "target is not sandbox", "sandbox project selected");
-  assert(projectUrl === `https://${productionProjectId}.supabase.co`, "production URL is exact", "URL mismatch");
-  assert(publishableKey.startsWith("sb_publishable_"), "publishable key is present", "missing publishable key");
-  assert(Boolean(adminCleanupKey), "admin cleanup key is available locally", "missing admin key");
+  assert(
+    projectId === productionProjectId,
+    "target is production project",
+    "project id mismatch",
+  );
+  assert(
+    projectId !== sandboxProjectId,
+    "target is not sandbox",
+    "sandbox project selected",
+  );
+  assert(
+    projectUrl === `https://${productionProjectId}.supabase.co`,
+    "production URL is exact",
+    "URL mismatch",
+  );
+  assert(
+    publishableKey.startsWith("sb_publishable_"),
+    "publishable key is present",
+    "missing publishable key",
+  );
+  assert(
+    Boolean(adminCleanupKey),
+    "admin cleanup key is available locally",
+    "missing admin key",
+  );
 
   const adminService = supabase(adminCleanupKey);
-  const agent = await signedClient("SUPABASE_SMOKE_AGENT_EMAIL", "SUPABASE_SMOKE_AGENT_PASSWORD");
+  const agent = await signedClient(
+    "SUPABASE_SMOKE_AGENT_EMAIL",
+    "SUPABASE_SMOKE_AGENT_PASSWORD",
+  );
   const otherAgent = await signedClient(
     "SUPABASE_SMOKE_OTHER_AGENT_EMAIL",
     "SUPABASE_SMOKE_OTHER_AGENT_PASSWORD",
   );
-  const adminUser = await signedClient("SUPABASE_SMOKE_ADMIN_EMAIL", "SUPABASE_SMOKE_ADMIN_PASSWORD");
+  const adminUser = await signedClient(
+    "SUPABASE_SMOKE_ADMIN_EMAIL",
+    "SUPABASE_SMOKE_ADMIN_PASSWORD",
+  );
 
   try {
     await cleanup(adminService);
@@ -70,18 +105,35 @@ async function main() {
     pass("agent can upload private media and signed URLs are owner-scoped");
 
     await expectRejected(
-      save(agent.client, incompleteWaitingReviewPayload(agent.userId, `${runId}-incomplete`)),
+      save(
+        agent.client,
+        incompleteWaitingReviewPayload(agent.userId, `${runId}-incomplete`),
+      ),
       "incomplete waiting_review is rejected",
     );
-    await expectMalformedBucketReadinessRejected(agent.client, adminService, agent.userId);
-    await expectMalformedPathReadinessRejected(agent.client, adminService, agent.userId);
+    await expectMalformedBucketReadinessRejected(
+      agent.client,
+      adminService,
+      agent.userId,
+    );
+    await expectMalformedPathReadinessRejected(
+      agent.client,
+      adminService,
+      agent.userId,
+    );
 
-    await save(agent.client, validReviewPayload(agent.userId, runId, "ready_for_review"));
+    await save(
+      agent.client,
+      validReviewPayload(agent.userId, runId, "ready_for_review"),
+    );
     await save(agent.client, validReviewPayload(agent.userId, runId, "waiting_review"));
     await expectStatus(adminService, runId, "waiting_review");
     pass("valid waiting_review reaches admin queue");
 
-    await save(adminUser.client, returnedPayload(agent.userId, adminUser.userId, runId));
+    await save(
+      adminUser.client,
+      returnedPayload(agent.userId, adminUser.userId, runId),
+    );
     await expectStatus(adminService, runId, "returned");
     pass("admin can return case with blocking correction");
 
@@ -105,7 +157,10 @@ async function main() {
     await expectStatus(adminService, runId, "waiting_review");
     pass("assigned agent can hand off fixed corrections");
 
-    await save(adminUser.client, acceptedPayload(agent.userId, adminUser.userId, runId));
+    await save(
+      adminUser.client,
+      acceptedPayload(agent.userId, adminUser.userId, runId),
+    );
     await expectStatus(adminService, runId, "accepted");
     pass("admin can accept case");
 
@@ -175,7 +230,8 @@ async function signedClient(emailKey, passwordKey) {
   const client = supabase(publishableKey);
   const email = clean(publicEnv[emailKey]);
   const password = clean(publicEnv[passwordKey]);
-  if (!email || !password) throw new Error(`${emailKey}/${passwordKey} are required locally`);
+  if (!email || !password)
+    throw new Error(`${emailKey}/${passwordKey} are required locally`);
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error(`${emailKey} sign-in failed`);
   pass(`${emailKey.replace("_EMAIL", "").toLowerCase()} sign-in works`);
@@ -214,7 +270,9 @@ async function uploadPrivateMedia(client) {
 }
 
 async function createScopedSignedUrl(client, shouldPass) {
-  const { data, error } = await client.storage.from(bucket).createSignedUrl(uploadPath, 60);
+  const { data, error } = await client.storage
+    .from(bucket)
+    .createSignedUrl(uploadPath, 60);
   if (shouldPass && (error || !data?.signedUrl)) {
     throw new Error(`own signed URL failed: ${error?.message ?? "missing URL"}`);
   }
@@ -230,13 +288,19 @@ async function expectStatus(client, id, status) {
     .eq("id", id)
     .single();
   if (error) throw new Error(`status read failed: ${error.message}`);
-  if (data.status !== status) throw new Error(`expected ${id}=${status}, got ${data.status}`);
+  if (data.status !== status)
+    throw new Error(`expected ${id}=${status}, got ${data.status}`);
 }
 
 async function uploadFamilyPrivateMedia(client, id) {
   for (const applicant of familyApplicants(id)) {
     for (const slot of requiredMediaSlots) {
-      const path = storagePathFor(id, applicant.id, slot, `v19smoke_${applicant.suffix}_${slot}.jpg`);
+      const path = storagePathFor(
+        id,
+        applicant.id,
+        slot,
+        `v19smoke_${applicant.suffix}_${slot}.jpg`,
+      );
       cleanupPaths.add(path);
       const { error } = await client.storage
         .from(bucket)
@@ -244,34 +308,44 @@ async function uploadFamilyPrivateMedia(client, id) {
           contentType: "image/jpeg",
           upsert: true,
         });
-      if (error) throw new Error(`family private media upload failed: ${error.message}`);
+      if (error)
+        throw new Error(`family private media upload failed: ${error.message}`);
     }
   }
 }
 
 async function expectFamilyReload(client, id) {
-  const [{ data: submission, error: submissionError }, { data: applicants, error: applicantsError }, { data: media, error: mediaError }] =
-    await Promise.all([
-      client.from("submissions").select("id,type,status").eq("id", id).single(),
-      client.from("applicants").select("id").eq("submission_id", id),
-      client
-        .from("media_assets")
-        .select("applicant_id,type,upload_status,storage_path")
-        .eq("submission_id", id)
-        .in("type", requiredMediaSlots),
-    ]);
+  const [
+    { data: submission, error: submissionError },
+    { data: applicants, error: applicantsError },
+    { data: media, error: mediaError },
+  ] = await Promise.all([
+    client.from("submissions").select("id,type,status").eq("id", id).single(),
+    client.from("applicants").select("id").eq("submission_id", id),
+    client
+      .from("media_assets")
+      .select("applicant_id,type,upload_status,storage_path")
+      .eq("submission_id", id)
+      .in("type", requiredMediaSlots),
+  ]);
 
-  if (submissionError) throw new Error(`family submission reload failed: ${submissionError.message}`);
-  if (applicantsError) throw new Error(`family applicants reload failed: ${applicantsError.message}`);
+  if (submissionError)
+    throw new Error(`family submission reload failed: ${submissionError.message}`);
+  if (applicantsError)
+    throw new Error(`family applicants reload failed: ${applicantsError.message}`);
   if (mediaError) throw new Error(`family media reload failed: ${mediaError.message}`);
   if (submission.type !== "family" || submission.status !== "draft") {
-    throw new Error(`family submission reload mismatch: ${submission.type}/${submission.status}`);
+    throw new Error(
+      `family submission reload mismatch: ${submission.type}/${submission.status}`,
+    );
   }
   if ((applicants ?? []).length !== 3) {
     throw new Error(`expected 3 family applicants, got ${(applicants ?? []).length}`);
   }
   if ((media ?? []).length !== 9) {
-    throw new Error(`expected 9 family required media rows, got ${(media ?? []).length}`);
+    throw new Error(
+      `expected 9 family required media rows, got ${(media ?? []).length}`,
+    );
   }
   if (
     !(media ?? []).every(
@@ -281,12 +355,21 @@ async function expectFamilyReload(client, id) {
         row.storage_path.startsWith(`submissions/${id}/applicants/`),
     )
   ) {
-    throw new Error("family media reload returned invalid upload state or storage path");
+    throw new Error(
+      "family media reload returned invalid upload state or storage path",
+    );
   }
 }
 
-async function expectMalformedBucketReadinessRejected(agentClient, adminClient, agentId) {
-  await save(agentClient, malformedMediaReadinessPayload(agentId, malformedBucketReadinessId));
+async function expectMalformedBucketReadinessRejected(
+  agentClient,
+  adminClient,
+  agentId,
+) {
+  await save(
+    agentClient,
+    malformedMediaReadinessPayload(agentId, malformedBucketReadinessId),
+  );
   const { error: mediaError } = await adminClient
     .from("media_assets")
     .update({
@@ -320,7 +403,10 @@ async function expectMalformedBucketReadinessRejected(agentClient, adminClient, 
 }
 
 async function expectMalformedPathReadinessRejected(agentClient, adminClient, agentId) {
-  await save(agentClient, malformedMediaReadinessPayload(agentId, malformedPathReadinessId));
+  await save(
+    agentClient,
+    malformedMediaReadinessPayload(agentId, malformedPathReadinessId),
+  );
   const { error: mediaError } = await adminClient
     .from("media_assets")
     .update({
@@ -784,8 +870,7 @@ async function writeEvidenceAndReadiness() {
     transactionalPersistenceTested: true,
     rlsPolicyTestsPassed: true,
     storagePolicyTestsPassed: true,
-    productionWorkflowEvidenceArtifact:
-      "docs/qa/supabase-production-workflow-smoke-20260701.md",
+    productionWorkflowEvidenceArtifact: evidencePath,
   };
   packet.postActivationChecks = {
     ...packet.postActivationChecks,
@@ -798,7 +883,7 @@ async function writeEvidenceAndReadiness() {
     adminCanAcceptOrReturnCase: true,
     postHandoffAgentMutationBlocked: true,
     privateMediaSignedUrlScoped: true,
-    workflowEvidenceArtifact: "docs/qa/supabase-production-workflow-smoke-20260701.md",
+    workflowEvidenceArtifact: evidencePath,
   };
   writeFileSync(readinessPath, `${JSON.stringify(packet, null, 2)}\n`);
 }

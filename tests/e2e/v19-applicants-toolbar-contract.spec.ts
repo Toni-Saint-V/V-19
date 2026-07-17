@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { testArtifactPath } from "../support/artifacts";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
@@ -9,10 +10,7 @@ import {
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
 
-const evidenceDir = join(
-  process.cwd(),
-  "docs/qa/2026-07-15-submissions-pass-01",
-);
+const evidenceDir = testArtifactPath("2026-07-15-submissions-pass-01");
 
 const viewports = [
   { height: 844, label: "mobile-390", width: 390 },

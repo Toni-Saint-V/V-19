@@ -1,41 +1,51 @@
-node_modules/
-dist/
-.cache/
-.playwright-mcp/
-.vercel/
-supabase/.temp/
-supabase/.branches/
-codex-context-export/
-codex-plugin-export/
-codex-context-export.zip
-install-all-codex-plugins.zsh
-playwright-report/
-test-results/
-coverage/
+# Dependencies and build output
+/node_modules/
+/dist/
+/coverage/
+/.cache/
+*.tsbuildinfo
+
+# Test and browser artifacts must never live in the repository
+/playwright-report*/
+/test-results*/
+/.playwright-*/
+/output/
+/docs/qa/
+
+# Local environments and runtime state
+.env
+.env.*
+!.env.example
+*.local
+*.local.json
+/.vercel/
+/.claude-octopus/
+
+# Supabase local state
+/supabase/.temp/
+/supabase/.branches/
+
+# Tool exports and temporary work
+/codex-context-export/
+/codex-plugin-export/
+/research_*/
+/src.backup.*/
+/.v19-backups/
+/.runtime/
+
+# Generated archives and screenshots
+/*.zip
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.gif
+/docs/*.zip
+
+# Logs and operating-system files
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-*.tsbuildinfo
 .DS_Store
-*.local
-*.local.json
-.vercel
-
-# Local Codex/research/runtime artifacts.
-/research_*/
-/research_*.zip
-/src.backup.*/
-/codex-agent-system-visaflow.zip
-/v19-*.png
-/*.png
-/.claude-octopus/
-/.playwright-cli/
-/output/
-/docs/*.zip
-/docs/passport.jpeg
-/docs/References/passport.jpeg
-/docs/Для теста/passport.jpeg
-/docs/Для теста/скан_1.png
-/docs/Для теста/Скан_2.png

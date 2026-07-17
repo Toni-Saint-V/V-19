@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createQuestionnaireSections } from "../../src/modules/submissions/questionnaire";
+import { testArtifactPath } from "../support/artifacts";
 
 const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
@@ -947,8 +948,8 @@ test("exposes only browser-safe Supabase values", async ({ page }) => {
     fullPage: true,
     path:
       browserAuditTarget === "production"
-        ? "docs/qa/supabase-production-browser-key-audit-desktop.png"
-        : "docs/qa/supabase-browser-key-audit-desktop.png",
+        ? testArtifactPath("supabase-production-browser-key-audit-desktop.png")
+        : testArtifactPath("supabase-browser-key-audit-desktop.png"),
   });
 });
 
@@ -962,13 +963,15 @@ test.describe("Supabase sandbox auth smoke", () => {
     await signInSmokeAgent(page);
     await page.getByRole("button", { name: /Мои подачи/ }).click();
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Новая подача" }).first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Новая подача" }).first(),
+    ).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path:
         browserAuditTarget === "production"
-          ? "docs/qa/supabase-production-auth-smoke-desktop.png"
-          : "docs/qa/supabase-auth-smoke-desktop.png",
+          ? testArtifactPath("supabase-production-auth-smoke-desktop.png")
+          : testArtifactPath("supabase-auth-smoke-desktop.png"),
     });
   });
 
@@ -991,7 +994,7 @@ test.describe("Supabase sandbox auth smoke", () => {
 
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/supabase-private-media-upload-desktop.png",
+        path: testArtifactPath("supabase-private-media-upload-desktop.png"),
       });
     } finally {
       await resetUploadSmokeSubmissionWithTimeout();

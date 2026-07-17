@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { testArtifactPath } from "../support/artifacts";
 
 const viewports = [
   { height: 900, label: "1440x900", width: 1440 },
@@ -127,7 +128,7 @@ test.describe("V-19 agent actions triage UX", () => {
       }
       await page.screenshot({
         fullPage: true,
-        path: `docs/qa/2026-06-30-agent-actions-uxfix-${viewport.label}.png`,
+        path: testArtifactPath(`2026-06-30-agent-actions-uxfix-${viewport.label}.png`),
       });
     }
 

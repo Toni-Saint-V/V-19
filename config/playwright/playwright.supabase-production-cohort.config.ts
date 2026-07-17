@@ -1,18 +1,19 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-
 import { defineConfig } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 import {
-  PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
+  PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_SUPABASE_ORIGIN,
+  assertProductionCohortWriteUnlock,
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
-} from "./tests/e2e-supabase-ui/production-cohort-helpers";
-import { assertProductionExportWriteUnlock } from "./tests/e2e-supabase-ui/production-export-a1-f6-helpers";
+} from "../../tests/e2e-supabase-ui/production-cohort-helpers";
 
-assertProductionExportWriteUnlock();
+assertProductionCohortWriteUnlock();
 requiredProductionRunMarker();
 loadProductionCohortAccounts();
 
@@ -39,7 +40,7 @@ const browserSafeEnvNames = [
 function loadProductionEnv() {
   if (!existsSync(productionEnvPath)) {
     throw new Error(
-      ".env.supabase-production.local is required for the production export gate.",
+      ".env.supabase-production.local is required for the production cohort.",
     );
   }
   const values: Record<string, string> = {};
@@ -55,19 +56,19 @@ function loadProductionEnv() {
   }
 
   if (values.VITE_SUPABASE_PROJECT_ID !== PRODUCTION_PROJECT_REF) {
-    throw new Error("Production export refuses an unapproved Supabase project ref.");
+    throw new Error("Production cohort refuses an unapproved Supabase project ref.");
   }
   if (values.VITE_SUPABASE_URL !== PRODUCTION_SUPABASE_ORIGIN) {
-    throw new Error("Production export refuses an unapproved Supabase URL.");
+    throw new Error("Production cohort refuses an unapproved Supabase URL.");
   }
   if (values.VITE_SUPABASE_BACKEND_TARGET !== "supabase") {
     throw new Error(
-      "Production export requires VITE_SUPABASE_BACKEND_TARGET=supabase.",
+      "Production cohort requires VITE_SUPABASE_BACKEND_TARGET=supabase.",
     );
   }
   const functionsUrl = values.VITE_SUPABASE_EDGE_FUNCTIONS_URL?.trim();
   if (functionsUrl && new URL(functionsUrl).origin !== PRODUCTION_SUPABASE_ORIGIN) {
-    throw new Error("Production export refuses an unapproved Edge Functions origin.");
+    throw new Error("Production cohort refuses an unapproved Edge Functions origin.");
   }
 
   const selected: Record<string, string> = {};
@@ -76,8 +77,11 @@ function loadProductionEnv() {
     if (value) selected[name] = value;
   }
   if (!selected.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    throw new Error("VITE_SUPABASE_PUBLISHABLE_KEY is required for production export.");
+    throw new Error(
+      "VITE_SUPABASE_PUBLISHABLE_KEY is required for the production cohort.",
+    );
   }
+
   return {
     ...selected,
     VITE_SUPABASE_ACTIVATION_TARGET: "production",
@@ -90,15 +94,14 @@ function loadProductionEnv() {
 export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
-  outputDir: "test-results/production-export-a1-f6",
+  outputDir: testArtifactPath("playwright", "production-cohort"),
   preserveOutput: "never",
   reporter: [["list"]],
   retries: 0,
-  testDir: "./tests/e2e-supabase-ui",
-  testMatch: /production-export-a1-f6-resumable\.spec\.ts/,
-  timeout: 1_800_000,
+  testDir: "../../tests/e2e-supabase-ui",
+  testMatch: /production-cohort-3x9\.spec\.ts/,
+  timeout: 10_800_000,
   use: {
-    acceptDownloads: true,
     actionTimeout: 45_000,
     baseURL: PRODUCTION_COHORT_APP_ORIGIN,
     launchOptions: { args: ["--disable-ipv6"] },
@@ -111,7 +114,7 @@ export default defineConfig({
       "npm run build:supabase-production && npm run preview -- --host 127.0.0.1 --port 4202 --strictPort",
     env: loadProductionEnv(),
     reuseExistingServer: false,
-    timeout: 240_000,
+    timeout: 120_000,
     url: PRODUCTION_COHORT_APP_ORIGIN,
   },
   workers: 1,

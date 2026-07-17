@@ -52,19 +52,10 @@
   "requiredContextFiles": [
     "AGENTS.md",
     "docs/architecture/v19-flow-state-model.md",
-    "docs/qa/v19-e2e-closure-prework.md",
-    "docs/qa/v19-e2e-flow-matrix.md",
-    "docs/qa/v19-click-inventory.md",
-    "docs/qa/v19-screenshots-index.md",
     "docs/prompts/v19-e2e-lanes/shared.md",
     "docs/prompts/v19-e2e-lanes/lanes.json"
   ],
-  "requiredAssetGlobs": [
-    "docs/qa/*.png",
-    "docs/qa/*.jpg",
-    "docs/qa/*.jpeg",
-    "docs/qa/*.webp"
-  ],
+  "requiredAssetGlobs": [],
   "lanes": [
     {
       "id": "01-state-integration-captain",
@@ -72,9 +63,6 @@
       "mission": "Own the shared Submission state model, reconcile all lane findings against it, and block any fake PASS or local exception that bypasses domain ownership.",
       "owns": [
         "docs/architecture/v19-flow-state-model.md",
-        "docs/qa/v19-e2e-flow-matrix.md",
-        "docs/qa/v19-click-inventory.md",
-        "docs/qa/v19-screenshots-index.md",
         "final state/readiness verdict"
       ],
       "mustNotTouch": [
@@ -110,7 +98,7 @@
       "checks": [
         "npm run test -- tests/unit/v19DomainEngine.spec.ts",
         "targeted Playwright proof for create single/family and correction resubmit",
-        "fresh desktop and mobile screenshots under docs/qa/"
+        "fresh desktop and mobile runtime assertions; optional screenshots stay in V19_TEST_ARTIFACTS_DIR"
       ]
     },
     {
@@ -158,7 +146,7 @@
         "npm run test -- tests/unit/exportWorkbook.spec.ts tests/unit/submissionExportWorkflow.spec.ts",
         "npx playwright test tests/e2e/app-smoke.spec.ts --project=chromium -g \"export\"",
         "npx playwright test tests/e2e/v19-responsive-proof.spec.ts --project=chromium",
-        "record BUG/BLOCKED rows in docs/qa/v19-click-inventory.md"
+        "record BUG/BLOCKED rows in the external lane manifest"
       ]
     }
   ]

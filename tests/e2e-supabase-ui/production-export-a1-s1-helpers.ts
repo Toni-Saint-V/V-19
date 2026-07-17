@@ -22,6 +22,7 @@ import type {
   Submission,
   SubmissionAction,
 } from "../../src/modules/submissions/types";
+import { testArtifactPath } from "../support/artifacts";
 import {
   attachDurableMediaAssetRows,
   attachDurableStatusHistoryRows,
@@ -861,16 +862,12 @@ export async function saveProductionA1S1ExportState(state: ProductionA1S1ExportS
   );
 }
 
-export async function writeProductionA1S1ExportEvidence(runMarker: string, value: unknown) {
+export async function writeProductionA1S1ExportEvidence(
+  runMarker: string,
+  value: unknown,
+) {
   const evidenceLane = `production-export-${PRODUCTION_EXPORT_CASE_KEY.toLowerCase()}`;
-  const path = resolve(
-    process.cwd(),
-    "output",
-    "playwright",
-    evidenceLane,
-    runMarker,
-    "evidence.json",
-  );
+  const path = testArtifactPath("playwright", evidenceLane, runMarker, "evidence.json");
   await writeJsonAtomic(path, value);
   return path;
 }
@@ -879,9 +876,7 @@ export async function writeProductionA2S1AbortEvidence(
   runMarker: string,
   value: unknown,
 ) {
-  const path = resolve(
-    process.cwd(),
-    "output",
+  const path = testArtifactPath(
     "playwright",
     "production-export-a2-s1-abort",
     runMarker,
@@ -895,9 +890,7 @@ export async function writeProductionA2S1TerminalReadbackEvidence(
   runMarker: string,
   value: unknown,
 ) {
-  const path = resolve(
-    process.cwd(),
-    "output",
+  const path = testArtifactPath(
     "playwright",
     "production-export-a2-s1-terminal-readback",
     runMarker,

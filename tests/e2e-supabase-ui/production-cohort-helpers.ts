@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { lstat, mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { expect, type BrowserContext, type Locator, type Page } from "@playwright/test";
+import { testArtifactPath } from "../support/artifacts";
 import { clickWorkspaceButton } from "./ui-helpers";
 
 export const PRODUCTION_PROJECT_REF = "tsymifccglpepvbmrcgh";
@@ -502,9 +503,7 @@ export async function saveCohortResumeState(state: CohortResumeState) {
 }
 
 export async function writeCohortEvidence(runMarker: string, value: unknown) {
-  const path = resolve(
-    process.cwd(),
-    "output",
+  const path = testArtifactPath(
     "playwright",
     "production-cohort",
     runMarker,

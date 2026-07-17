@@ -31,7 +31,7 @@ critic hardening. Target quality is 95+:
 Before touching implementation, read:
 
 ```text
-docs/qa/generated-lane-prompts/{{runId}}/context/docs/architecture/v19-flow-state-model.md
+$V19_TEST_ARTIFACTS_DIR/generated-lane-prompts/{{runId}}/context/docs/architecture/v19-flow-state-model.md
 ```
 
 All screens, clicks, PDF behavior, export behavior, issue lifecycle, and history
@@ -79,13 +79,17 @@ Every lane must begin with:
 
 ```md
 ## Skill Activation
+
 Applied:
+
 - [skill/tool name] - [resolved path if skill] - [why used]
 
 Unavailable:
+
 - [skill/tool name] - [why unavailable or skipped]
 
 Scope:
+
 - What this lane owns:
 - What this lane must not touch:
 ```

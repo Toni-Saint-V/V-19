@@ -1,9 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
 import baseConfig from "./playwright.supabase-ui.config";
+import { testArtifactPath } from "../../tests/support/artifacts";
 
 export default defineConfig({
   ...baseConfig,
+  outputDir: testArtifactPath("playwright", "real-supabase-e2e"),
+  preserveOutput: "never",
   fullyParallel: false,
   projects: [
     {

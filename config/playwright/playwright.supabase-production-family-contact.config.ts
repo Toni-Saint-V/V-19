@@ -3,17 +3,19 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 import {
   PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
   PRODUCTION_SUPABASE_ORIGIN,
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
-} from "./tests/e2e-supabase-ui/production-cohort-helpers";
+} from "../../tests/e2e-supabase-ui/production-cohort-helpers";
 import {
   assertProductionFamilyContactWriteUnlock,
   requiredProductionFamilyContactCaseKey,
-} from "./tests/e2e-supabase-ui/production-family-contact-helpers";
+} from "../../tests/e2e-supabase-ui/production-family-contact-helpers";
 
 if (process.env.V19_PRODUCTION_FAMILY_CONTACT_FRESH_BUILD !== "1") {
   throw new Error(
@@ -27,10 +29,7 @@ loadProductionCohortAccounts();
 
 process.env.SUPABASE_UI_E2E_ENV_FILE = ".env.supabase-production.local";
 
-const productionEnvPath = resolve(
-  process.cwd(),
-  ".env.supabase-production.local",
-);
+const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
 const browserSafeEnvNames = [
   "VITE_SUPABASE_BACKEND_TARGET",
   "VITE_SUPABASE_BROWSER_KEY_AUDITED",
@@ -71,10 +70,7 @@ function loadProductionEnv() {
     throw new Error("Family-contact remediation refuses an unapproved target.");
   }
   const functionsUrl = values.VITE_SUPABASE_EDGE_FUNCTIONS_URL?.trim();
-  if (
-    functionsUrl &&
-    new URL(functionsUrl).origin !== PRODUCTION_SUPABASE_ORIGIN
-  ) {
+  if (functionsUrl && new URL(functionsUrl).origin !== PRODUCTION_SUPABASE_ORIGIN) {
     throw new Error("Family-contact remediation refuses an unapproved Functions URL.");
   }
   const selected: Record<string, string> = {};
@@ -99,10 +95,14 @@ const caseKey = requiredProductionFamilyContactCaseKey();
 export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
-  outputDir: `test-results/production-family-contact-${caseKey.toLowerCase()}`,
+  outputDir: testArtifactPath(
+    "playwright",
+    `production-family-contact-${caseKey.toLowerCase()}`,
+  ),
+  preserveOutput: "never",
   reporter: [["list"]],
   retries: 0,
-  testDir: "./tests/e2e-supabase-ui",
+  testDir: "../../tests/e2e-supabase-ui",
   testMatch: /production-family-contact-remediation\.spec\.ts/,
   timeout: 1_800_000,
   use: {

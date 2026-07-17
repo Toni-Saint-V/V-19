@@ -1,13 +1,11 @@
 import { readFile } from "node:fs/promises";
 import JSZip from "jszip";
 import { describe, expect, test } from "vitest";
-import {
-  EXPECTED_EXPORT_CONTRACT_HEADERS,
-} from "../../src/lib/export/exportContractCore";
+import { EXPECTED_EXPORT_CONTRACT_HEADERS } from "../../src/lib/export/exportContractCore";
 import { createExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
 
-const filledReferencePath = "docs/пиздец/Выгрузка_excel.xlsx";
-const templateReferencePath = "docs/пиздец/Шаблон_ексель.xlsx";
+const filledReferencePath = "tests/fixtures/reference-exports/Выгрузка_excel.xlsx";
+const templateReferencePath = "tests/fixtures/reference-exports/Шаблон_ексель.xlsx";
 
 type OoxmlParts = {
   sharedStrings: string;

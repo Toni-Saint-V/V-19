@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 if (process.env.SUPABASE_PRODUCTION_E2E_UNLOCK !== "1") {
   throw new Error(
     "Production UI E2E is locked. Set SUPABASE_PRODUCTION_E2E_UNLOCK=1 explicitly.",
@@ -32,7 +34,9 @@ const browserSafeEnvNames = [
 
 function loadEnvFile(path: string): Record<string, string> {
   if (!existsSync(path)) {
-    throw new Error(".env.supabase-production.local is required for production UI E2E.");
+    throw new Error(
+      ".env.supabase-production.local is required for production UI E2E.",
+    );
   }
 
   const values: Record<string, string> = {};
@@ -66,7 +70,8 @@ function loadProductionBrowserEnv(): Record<string, string> {
     "VITE_SUPABASE_URL",
   ];
   for (const name of required) {
-    if (!selectedEnv[name]) throw new Error(`${name} is required for production UI E2E.`);
+    if (!selectedEnv[name])
+      throw new Error(`${name} is required for production UI E2E.`);
   }
 
   if (selectedEnv.VITE_SUPABASE_PROJECT_ID !== expectedProductionProjectId) {
@@ -86,15 +91,17 @@ function loadProductionBrowserEnv(): Record<string, string> {
 }
 
 export default defineConfig({
-  testDir: "./tests/e2e-supabase-ui",
+  outputDir: testArtifactPath("playwright", "supabase-production-ui"),
+  preserveOutput: "never",
+  testDir: "../../tests/e2e-supabase-ui",
   reporter: [["list"]],
   timeout: 300_000,
   workers: 1,
   use: {
     baseURL: "http://127.0.0.1:4201",
     launchOptions: { args: ["--disable-ipv6"] },
-    screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    screenshot: "off",
+    trace: "off",
     video: "off",
   },
   testMatch: /production-readonly\.spec\.ts/,

@@ -3,13 +3,20 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
+import { testArtifactPath } from "../../tests/support/artifacts";
+
 import {
   PRODUCTION_COHORT_APP_ORIGIN,
   PRODUCTION_PROJECT_REF,
   PRODUCTION_SUPABASE_ORIGIN,
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
-} from "./tests/e2e-supabase-ui/production-cohort-helpers";
+} from "../../tests/e2e-supabase-ui/production-cohort-helpers";
+import { assertProductionExportWriteUnlock } from "../../tests/e2e-supabase-ui/production-export-a1-f6-helpers";
+
+assertProductionExportWriteUnlock();
+requiredProductionRunMarker();
+loadProductionCohortAccounts();
 
 process.env.SUPABASE_UI_E2E_ENV_FILE = ".env.supabase-production.local";
 
@@ -34,7 +41,7 @@ const browserSafeEnvNames = [
 function loadProductionEnv() {
   if (!existsSync(productionEnvPath)) {
     throw new Error(
-      ".env.supabase-production.local is required for the read-only production export gate.",
+      ".env.supabase-production.local is required for the production export gate.",
     );
   }
   const values: Record<string, string> = {};
@@ -50,19 +57,19 @@ function loadProductionEnv() {
   }
 
   if (values.VITE_SUPABASE_PROJECT_ID !== PRODUCTION_PROJECT_REF) {
-    throw new Error("Read-only export gate refuses an unapproved Supabase project ref.");
+    throw new Error("Production export refuses an unapproved Supabase project ref.");
   }
   if (values.VITE_SUPABASE_URL !== PRODUCTION_SUPABASE_ORIGIN) {
-    throw new Error("Read-only export gate refuses an unapproved Supabase URL.");
+    throw new Error("Production export refuses an unapproved Supabase URL.");
   }
   if (values.VITE_SUPABASE_BACKEND_TARGET !== "supabase") {
     throw new Error(
-      "Read-only export gate requires VITE_SUPABASE_BACKEND_TARGET=supabase.",
+      "Production export requires VITE_SUPABASE_BACKEND_TARGET=supabase.",
     );
   }
   const functionsUrl = values.VITE_SUPABASE_EDGE_FUNCTIONS_URL?.trim();
   if (functionsUrl && new URL(functionsUrl).origin !== PRODUCTION_SUPABASE_ORIGIN) {
-    throw new Error("Read-only export gate refuses an unapproved Edge Functions origin.");
+    throw new Error("Production export refuses an unapproved Edge Functions origin.");
   }
 
   const selected: Record<string, string> = {};
@@ -71,11 +78,8 @@ function loadProductionEnv() {
     if (value) selected[name] = value;
   }
   if (!selected.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    throw new Error(
-      "VITE_SUPABASE_PUBLISHABLE_KEY is required for the read-only production export gate.",
-    );
+    throw new Error("VITE_SUPABASE_PUBLISHABLE_KEY is required for production export.");
   }
-
   return {
     ...selected,
     VITE_SUPABASE_ACTIVATION_TARGET: "production",
@@ -85,23 +89,18 @@ function loadProductionEnv() {
   };
 }
 
-// This test is intentionally read-only: no production write unlock is loaded
-// or accepted by this config. The browser network gate independently aborts
-// every business mutation.
-requiredProductionRunMarker();
-loadProductionCohortAccounts();
-
 export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
-  outputDir: "test-results/production-export-final-state",
+  outputDir: testArtifactPath("playwright", "production-export-a1-f6"),
   preserveOutput: "never",
   reporter: [["list"]],
   retries: 0,
-  testDir: "./tests/e2e-supabase-ui",
-  testMatch: /production-export-a1-f6-final-state\.spec\.ts/,
-  timeout: 360_000,
+  testDir: "../../tests/e2e-supabase-ui",
+  testMatch: /production-export-a1-f6-resumable\.spec\.ts/,
+  timeout: 1_800_000,
   use: {
+    acceptDownloads: true,
     actionTimeout: 45_000,
     baseURL: PRODUCTION_COHORT_APP_ORIGIN,
     launchOptions: { args: ["--disable-ipv6"] },

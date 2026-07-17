@@ -8,13 +8,11 @@ import {
   requiredRemoteMigrationOrder,
   undeclaredMigrationFiles,
 } from "./supabase-migration-contract.mjs";
+import { testArtifactPath } from "./lib/artifact-paths.mjs";
 
 const repoRoot = process.cwd();
 const readinessRelativePath = "docs/release/supabase-production-readiness.json";
-const readinessPath = resolve(
-  repoRoot,
-  readinessRelativePath,
-);
+const readinessPath = resolve(repoRoot, readinessRelativePath);
 const packagePath = resolve(repoRoot, "package.json");
 const migrationsDir = resolve(repoRoot, "supabase/migrations");
 const sandboxProjectId = "oevvaowoklqttqkraxho";
@@ -32,14 +30,12 @@ const remoteMigrationNameOverrides = {
     "20260705235913_day10_required_media_canonical_write_paths",
   "20260706000100_ai_helper_admin_intent_quota_contract.sql":
     "20260710034506_ai_helper_admin_intent_quota_contract",
-  "20260706023000_typed_submission_files.sql":
-    "20260710034513_typed_submission_files",
+  "20260706023000_typed_submission_files.sql": "20260710034513_typed_submission_files",
   "20260707000100_typed_status_history_source.sql":
     "20260709221437_typed_status_history_source",
   "20260707001000_document_assets_production_pipeline.sql":
     "20260709222911_document_assets_production_pipeline",
-  "20260709234515_agent_return_packages.sql":
-    "20260710041440_agent_return_packages",
+  "20260709234515_agent_return_packages.sql": "20260710041440_agent_return_packages",
   "20260710000100_allow_submission_handoff_child_writes.sql":
     "20260709232214_allow_submission_handoff_child_writes",
   "20260710000200_allow_handoff_children_in_draft_rpc.sql":
@@ -74,8 +70,8 @@ const remoteMigrationNameOverrides = {
 
 const scopedDiffPaths = [
   "package.json",
-  "playwright.supabase-production-export-a1-s1.config.ts",
-  "playwright.supabase-production-export-a2-s1-abort.config.ts",
+  "config/playwright/playwright.supabase-production-export-a1-s1.config.ts",
+  "config/playwright/playwright.supabase-production-export-a2-s1-abort.config.ts",
   "scripts/prepare-supabase-production-packet.mjs",
   "scripts/provision-supabase-pilot-cohort.mjs",
   "scripts/supabase-migration-contract.mjs",
@@ -109,29 +105,6 @@ const scopedDiffPaths = [
   "docs/release/supabase-production-approval-checklist.md",
   "docs/release/supabase-production-promotion.md",
   "docs/release/supabase-workspace-pr-package.md",
-  "docs/qa/release-ai-gate-20260627T200633.md",
-  "docs/qa/release-ai-gate-browser-key-audit-unverified-20260627T200633.md",
-  "docs/qa/supabase-browser-key-audit-20260701.md",
-  "docs/qa/supabase-production-browser-key-audit-20260701.md",
-  "docs/qa/supabase-production-blockers-20260704.md",
-  "docs/qa/supabase-production-backup-discovery-20260701.md",
-  "docs/qa/supabase-production-edge-functions-20260701.md",
-  "docs/qa/supabase-production-env-evidence-20260701.md",
-  "docs/qa/supabase-production-migration-evidence-20260701.md",
-  "docs/qa/supabase-production-logs-20260701.md",
-  "docs/qa/supabase-production-owner-approval-20260701.md",
-  "docs/qa/supabase-production-pilot-cohort-20260701.md",
-  "docs/qa/supabase-10-user-readiness-20260706.md",
-  "docs/qa/supabase-pilot-volume-envelope-20260706.md",
-  "docs/qa/supabase-production-migration-evidence-20260706.md",
-  "docs/qa/supabase-production-pilot-security-exception-20260706.md",
-  "docs/qa/supabase-production-preactivation-20260706.md",
-  "docs/qa/supabase-production-security-advisors-20260706.md",
-  "docs/qa/supabase-production-smoke-discovery-20260706.md",
-  "docs/qa/supabase-production-security-advisors-20260701.md",
-  "docs/qa/supabase-production-smoke-discovery-20260701.md",
-  "docs/qa/supabase-production-workflow-smoke-20260701.md",
-  "docs/qa/supabase-security-advisor-hardening-2026-06-15.md",
   "tests/e2e-supabase/browser-key-audit.spec.ts",
   "tests/e2e-supabase-ui/production-export-a1-s1-helpers.ts",
   "tests/e2e-supabase-ui/production-export-a1-s1-resumable.spec.ts",
@@ -228,8 +201,7 @@ function currentScopedDiffSha256() {
   const scopedPayload = [...scopedDiffPaths]
     .sort()
     .map(
-      (fileName) =>
-        `\n--- scoped:${fileName} ---\n${scopedHashContentFor(fileName)}`,
+      (fileName) => `\n--- scoped:${fileName} ---\n${scopedHashContentFor(fileName)}`,
     )
     .join("");
 
@@ -247,25 +219,6 @@ function scopedHashContentFor(fileName) {
     return scopedPackageJsonHashContent(content);
   }
 
-  if (fileName === "docs/qa/supabase-production-preactivation-20260706.md") {
-    return content
-      .replace(
-        /Scoped diff hash: `[^`]*`/g,
-        "Scoped diff hash: `__SCOPED_HASH__`",
-      )
-      .replace(
-        /scopedDiffSha256: `[^`]*`/g,
-        "scopedDiffSha256: `__SCOPED_HASH__`",
-      );
-  }
-
-  if (fileName === "docs/qa/supabase-pilot-volume-envelope-20260706.md") {
-    return content.replace(
-      /Checked at: `[^`]*`/g,
-      "Checked at: `__CHECKED_AT__`",
-    );
-  }
-
   return content;
 }
 
@@ -275,13 +228,7 @@ function scopedPackageJsonHashContent(content) {
     const scripts = packageJson.scripts ?? {};
     const devDependencies = packageJson.devDependencies ?? {};
     const relevantDevDependencies = Object.fromEntries(
-      [
-        "@playwright/test",
-        "@supabase/supabase-js",
-        "typescript",
-        "vite",
-        "vitest",
-      ]
+      ["@playwright/test", "@supabase/supabase-js", "typescript", "vite", "vitest"]
         .filter((name) => devDependencies[name])
         .map((name) => [name, devDependencies[name]]),
     );
@@ -292,15 +239,13 @@ function scopedPackageJsonHashContent(content) {
         devDependencies: relevantDevDependencies,
         scripts: {
           "test:e2e:supabase": scripts["test:e2e:supabase"] ?? "",
-          "verify:auth-data-readiness":
-            scripts["verify:auth-data-readiness"] ?? "",
+          "verify:auth-data-readiness": scripts["verify:auth-data-readiness"] ?? "",
           "verify:supabase-release": scripts["verify:supabase-release"] ?? "",
           "verify:pilot-volume": scripts["verify:pilot-volume"] ?? "",
           "supabase:pilot-cohort": scripts["supabase:pilot-cohort"] ?? "",
           "supabase:production-workflow-smoke":
             scripts["supabase:production-workflow-smoke"] ?? "",
-          "verify:production-readiness":
-            scripts["verify:production-readiness"] ?? "",
+          "verify:production-readiness": scripts["verify:production-readiness"] ?? "",
           "verify:production-packet": scripts["verify:production-packet"] ?? "",
           "verify:security": scripts["verify:security"] ?? "",
         },
@@ -340,10 +285,6 @@ function canonicalReadinessForScopedHash() {
 function unexpectedDirtyFiles() {
   const status = gitOutput(["status", "--porcelain"], "Current git status is readable");
   const allowed = new Set(scopedDiffPaths);
-  const allowedPrefixes = [
-    "docs/qa/supabase-production-security-advisors-",
-    "docs/qa/supabase-storage-security-sandbox-",
-  ];
 
   return status
     .split("\n")
@@ -351,7 +292,7 @@ function unexpectedDirtyFiles() {
     .map((line) => line.slice(3))
     .filter((fileName) => {
       if (allowed.has(fileName)) return false;
-      return !allowedPrefixes.some((prefix) => fileName.startsWith(prefix));
+      return true;
     });
 }
 
@@ -476,7 +417,9 @@ function verifyBrowserKeyAuditEvidence(sandbox) {
       "Sandbox browser key audit screenshot exists",
     );
   } else {
-    pass("Sandbox browser key audit screenshot is optional when evidence artifact exists");
+    pass(
+      "Sandbox browser key audit screenshot is optional when evidence artifact exists",
+    );
   }
 }
 
@@ -490,61 +433,66 @@ const blockerActions = [
     match: /Sandbox browser key audit/,
     owner: "Codex browser QA operator",
     command: "npm run test:e2e:supabase",
-    artifact: "docs/qa/supabase-production-browser-key-audit-20260701.md",
+    artifact: testArtifactPath("supabase-production-browser-key-audit-20260701.md"),
   },
   {
-    match: /smoke account|auth user count|profile count|orphan auth user|Agent smoke|Other-agent smoke|Admin smoke|Production has no auth users/,
+    match:
+      /smoke account|auth user count|profile count|orphan auth user|Agent smoke|Other-agent smoke|Admin smoke|Production has no auth users/,
     owner: "Supabase production operator",
     command: "npm run supabase:pilot-cohort -- --check --required-size 20",
-    artifact: "docs/qa/supabase-production-smoke-discovery-20260701.md and docs/qa/supabase-production-pilot-cohort-20260701.md",
+    artifact: `${testArtifactPath("supabase-production-smoke-discovery-20260701.md")} and ${testArtifactPath("supabase-production-pilot-cohort-20260701.md")}`,
   },
   {
     match: /Backup|Restore|RPO\/RTO|rollback communication/i,
     owner: "Supabase project owner",
     command: "npm run verify:production-readiness",
-    artifact: "docs/qa/supabase-production-backup-discovery-20260701.md",
+    artifact: testArtifactPath("supabase-production-backup-discovery-20260701.md"),
   },
   {
-    match: /Pre-activation|verify:supabase-release evidence|test:supabase-live|test:e2e:supabase|verify:full|Final diff/,
+    match:
+      /Pre-activation|verify:supabase-release evidence|test:supabase-live|test:e2e:supabase|verify:full|Final diff/,
     owner: "Codex release operator",
-    command: "npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet",
-    artifact: "docs/qa/supabase-production-preactivation-20260706.md",
+    command:
+      "npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet",
+    artifact: testArtifactPath("supabase-production-preactivation-20260706.md"),
   },
   {
-    match: /Production release switch|Production env|Production approval|Browser QA|Browser key audit|public config/i,
+    match:
+      /Production release switch|Production env|Production approval|Browser QA|Browser key audit|public config/i,
     owner: "Rollout owner",
     command: "npm run verify:production-readiness",
-    artifact: "docs/qa/supabase-production-env-evidence-20260701.md and docs/qa/supabase-production-owner-approval-20260701.md",
+    artifact: `${testArtifactPath("supabase-production-env-evidence-20260701.md")} and ${testArtifactPath("supabase-production-owner-approval-20260701.md")}`,
   },
   {
     match: /Edge Function/i,
     owner: "Supabase production operator",
     command: "npm run verify:production-readiness",
-    artifact: "docs/qa/supabase-production-edge-functions-20260701.md",
+    artifact: testArtifactPath("supabase-production-edge-functions-20260701.md"),
   },
   {
-    match: /migration|Transactional persistence|RLS policy|Storage policy|workflow|Post-activation|waiting_review|Admin can accept|media|handoff/i,
+    match:
+      /migration|Transactional persistence|RLS policy|Storage policy|workflow|Post-activation|waiting_review|Admin can accept|media|handoff/i,
     owner: "Supabase production operator",
     command: "npm run supabase:production-workflow-smoke",
-    artifact: "docs/qa/supabase-production-migration-evidence-20260701.md and docs/qa/supabase-production-workflow-smoke-20260701.md",
+    artifact: `${testArtifactPath("supabase-production-migration-evidence-20260701.md")} and ${testArtifactPath("supabase-production-workflow-smoke-20260701.md")}`,
   },
   {
     match: /security advisor|leaked password|Auth security|plan eligibility|advisor/i,
     owner: "Supabase project owner",
     command: "npm run verify:production-readiness",
-    artifact: "docs/qa/supabase-production-security-advisors-20260701.md",
+    artifact: testArtifactPath("supabase-production-security-advisors-20260701.md"),
   },
   {
     match: /Logs and error rate/,
     owner: "Supabase production operator",
     command: "npm run verify:production-readiness",
-    artifact: "docs/qa/supabase-production-logs-20260701.md",
+    artifact: testArtifactPath("supabase-production-logs-20260701.md"),
   },
   {
     match: /Go \/ No-Go/,
     owner: "Rollout owner",
     command: "npm run verify:production-readiness",
-    artifact: "docs/qa/supabase-production-blockers-20260704.md",
+    artifact: testArtifactPath("supabase-production-blockers-20260704.md"),
   },
 ];
 
@@ -553,7 +501,7 @@ function blockerAction(label) {
     blockerActions.find((action) => action.match.test(label)) ?? {
       owner: "Rollout owner",
       command: "npm run verify:production-readiness",
-      artifact: "docs/qa/supabase-production-blockers-20260704.md",
+      artifact: testArtifactPath("supabase-production-blockers-20260704.md"),
     }
   );
 }
@@ -631,7 +579,9 @@ function verifyMigrationOrder(packet) {
 
   const missingRemoteCoverage = requiredMigrationOrder
     .map(expectedRemoteMigrationName)
-    .filter((remoteMigration) => !requiredRemoteMigrationOrder.includes(remoteMigration));
+    .filter(
+      (remoteMigration) => !requiredRemoteMigrationOrder.includes(remoteMigration),
+    );
   if (missingRemoteCoverage.length === 0) {
     pass("Remote migration contract covers every local required migration");
   } else {
@@ -869,7 +819,12 @@ function verifyPreActivationCheck(pre, key, command, label, verifierSha256) {
   );
 }
 
-function verifyPreActivationFreshness(pre, verifierSha256, gitHead, controlledPilot = false) {
+function verifyPreActivationFreshness(
+  pre,
+  verifierSha256,
+  gitHead,
+  controlledPilot = false,
+) {
   const scopedDiffSha256 = currentScopedDiffSha256();
   requireActivationEqual(
     pre.readinessContractVersion,
@@ -1114,10 +1069,7 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead, controlledPi
       if (packageLockStatus.length === 0) {
         pass("Final scoped diff review has no package-lock drift");
       } else {
-        block(
-          "Final scoped diff review has no package-lock drift",
-          packageLockStatus,
-        );
+        block("Final scoped diff review has no package-lock drift", packageLockStatus);
       }
       if (review.packageLockDrift === "none") {
         pass("Final scoped diff review records package-lock drift status");
@@ -1261,10 +1213,8 @@ function verifyProductionWorkflowEvidence(packet, env, post) {
     env.storagePolicyTestsPassed,
     post.agentCanCreateDraft,
     post.agentCanUploadRequiredMedia,
-    post.incompleteWaitingReviewRejected ??
-      post.incompleteSubmittedForReviewRejected,
-    post.validWaitingReviewReachesQueue ??
-      post.validSubmittedForReviewReachesQueue,
+    post.incompleteWaitingReviewRejected ?? post.incompleteSubmittedForReviewRejected,
+    post.validWaitingReviewReachesQueue ?? post.validSubmittedForReviewReachesQueue,
     post.adminCanAcceptOrReturnCase,
     post.postHandoffAgentMutationBlocked,
     post.privateMediaSignedUrlScoped,
@@ -1323,7 +1273,8 @@ function productionWorkflowEvidenceConfirmed(env, post) {
 function isControlledPilot(packet) {
   return (
     packet.goNoGo?.scope === "controlled-10-registered-agent-500-submission-pilot" &&
-    packet.controlledPilot?.scope === "controlled-10-registered-agent-500-submission-pilot"
+    packet.controlledPilot?.scope ===
+      "controlled-10-registered-agent-500-submission-pilot"
   );
 }
 
@@ -1361,7 +1312,10 @@ function controlledPilotEvidenceConfirmed(packet, key) {
   const riskMarkers = controlledPilotRiskEvidenceMarkers[key];
 
   if (!isControlledPilot(packet)) {
-    block(label, "packet is not scoped to controlled-10-registered-agent-500-submission-pilot");
+    block(
+      label,
+      "packet is not scoped to controlled-10-registered-agent-500-submission-pilot",
+    );
     controlledPilotRiskEvidenceCache.set(key, false);
     return false;
   }
@@ -1390,7 +1344,10 @@ function controlledPilotEvidenceConfirmed(packet, key) {
     structuredIssues.push("evidenceArtifact");
   }
   if (structuredIssues.length > 0) {
-    block(label, `structured acceptance missing/invalid: ${structuredIssues.join(", ")}`);
+    block(
+      label,
+      `structured acceptance missing/invalid: ${structuredIssues.join(", ")}`,
+    );
     controlledPilotRiskEvidenceCache.set(key, false);
     return false;
   }
@@ -1598,7 +1555,10 @@ function verifyControlledPilotEnvelope(packet) {
 
   const constraints = Array.isArray(pilot.constraints) ? pilot.constraints : [];
   const constraintText = constraints.join("\n").toLowerCase();
-  if (constraintText.includes("no public") || constraintText.includes("public sign-up closed")) {
+  if (
+    constraintText.includes("no public") ||
+    constraintText.includes("public sign-up closed")
+  ) {
     pass("Controlled pilot constraints close public sign-up");
   } else {
     activationBlock("Controlled pilot constraints close public sign-up", "missing");
@@ -1606,7 +1566,10 @@ function verifyControlledPilotEnvelope(packet) {
   if (constraintText.includes("500") && constraintText.includes("submissions")) {
     pass("Controlled pilot constraints record 500-submission cap");
   } else {
-    activationBlock("Controlled pilot constraints record 500-submission cap", "missing");
+    activationBlock(
+      "Controlled pilot constraints record 500-submission cap",
+      "missing",
+    );
   }
 }
 
@@ -1825,7 +1788,10 @@ function verifyPacket(packet, rawContent) {
       "Latest backup timestamp is recorded",
     );
     requireActivationTrue(backup.restorePathConfirmed, "Restore path is confirmed");
-    requireActivationTrue(backup.restoreEvidenceRecorded, "Restore evidence is recorded");
+    requireActivationTrue(
+      backup.restoreEvidenceRecorded,
+      "Restore evidence is recorded",
+    );
     requireActivationTrue(backup.rpoRtoAcceptedByOwner, "RPO/RTO is accepted by owner");
   }
   requireActivationPresent(
@@ -1839,14 +1805,19 @@ function verifyPacket(packet, rawContent) {
     pre.verifyAuthDataReadinessPassed,
     "verify:auth-data-readiness passed",
   );
-  requireActivationTrue(pre.verifySupabaseReleasePassed, "verify:supabase-release passed");
+  requireActivationTrue(
+    pre.verifySupabaseReleasePassed,
+    "verify:supabase-release passed",
+  );
   if (controlledPilot) {
     pass("test:supabase-live is not required for controlled production pilot");
   } else {
     requireActivationTrue(pre.testSupabaseLivePassed, "test:supabase-live passed");
   }
   if (controlledPilotEvidenceConfirmed(packet, "crossRoleBrowserQaDeferred")) {
-    pass("test:e2e:supabase full cross-role browser workflow is deferred for controlled pilot");
+    pass(
+      "test:e2e:supabase full cross-role browser workflow is deferred for controlled pilot",
+    );
   } else {
     requireActivationTrue(pre.testE2eSupabasePassed, "test:e2e:supabase passed");
   }
@@ -1948,8 +1919,12 @@ function verifyPacket(packet, rawContent) {
     );
   }
   if (controlledPilotEvidenceConfirmed(packet, "leakedPasswordProtectionDeferred")) {
-    pass("Supabase Auth leaked password protection is deferred for controlled registered-agent pilot");
-    pass("Supabase security advisor warning is accepted for controlled registered-agent pilot");
+    pass(
+      "Supabase Auth leaked password protection is deferred for controlled registered-agent pilot",
+    );
+    pass(
+      "Supabase security advisor warning is accepted for controlled registered-agent pilot",
+    );
   } else {
     requireActivationTrue(
       authSecurity.leakedPasswordProtectionPlanEligible,
@@ -1984,7 +1959,9 @@ function verifyPacket(packet, rawContent) {
       key === "logsAndErrorRateChecked" &&
       controlledPilotEvidenceConfirmed(packet, "logsReviewDeferred")
     ) {
-      pass("Logs and error-rate review is deferred for controlled registered-agent pilot");
+      pass(
+        "Logs and error-rate review is deferred for controlled registered-agent pilot",
+      );
       continue;
     }
     if (!workflowEvidenceConfirmed) {
@@ -2013,7 +1990,11 @@ function verifyPacket(packet, rawContent) {
           packet.productionTarget?.projectId ?? "",
           "Go / No-Go blocker evidence records production project id",
         );
-        requireSnippet(evidence, "Owner:", "Go / No-Go blocker evidence records owners");
+        requireSnippet(
+          evidence,
+          "Owner:",
+          "Go / No-Go blocker evidence records owners",
+        );
         requireSnippet(
           evidence,
           "Verification command:",

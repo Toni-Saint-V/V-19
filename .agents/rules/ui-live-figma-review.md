@@ -2,7 +2,6 @@
 paths:
   - "src/shared/ui/system.css"
   - "src/modules/submissions/**"
-  - "docs/qa/**"
 ---
 
 # UI Live And Figma Review Rule
@@ -11,7 +10,7 @@ paths:
 - For reference-driven UI work, the agent must inspect the best available Figma/design-system variants and use them as mechanics references for controls, density, spacing, states, rows, drawers, and responsive behavior.
 - Do not copy product semantics, brand decoration, gradients, neon, or unrelated visual language from donor design systems.
 - If Figma or the source design-system reference is unavailable, record the blocker and continue only against the approved V-19 visual contract; do not claim exact reference fidelity.
-- Each screen must be reviewed mobile and desktop, with fresh screenshots/runtime proof when feasible.
+- Each screen must be reviewed mobile and desktop with fresh runtime proof. Optional screenshots are ephemeral and live outside the repository.
 - Live UI proof fallback order: use Computer Use when direct local app inspection is needed; if Computer Use is unavailable or unsuitable, use Chrome; if Chrome is unavailable or unsuitable, use the in-app Browser; if all UI-control paths fail, record the blocker and do not claim visual approval.
 - Do not move to the next screen until the current screen receives `premium-design-ux-review` approval or the remaining blocker is explicitly documented and accepted.
 - Use at least four relevant skills for V-19 screen-by-screen design-system implementation; read and apply them to the current slice, not as a checklist.

@@ -8,6 +8,14 @@ coverage/
 playwright-report/
 test-results/
 .playwright-mcp/
+.playwright-cli/
+playwright-report-*/
+test-results-*/
+docs/
+tests/
+config/playwright/
+.agents/
+supabase/
 supabase/.temp/
 .DS_Store
 /VisaFlow_AI_*.html

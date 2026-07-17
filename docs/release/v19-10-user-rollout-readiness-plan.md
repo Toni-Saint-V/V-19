@@ -47,7 +47,7 @@ Required:
 
 - Commit the closeout branch with code/docs/tests/verifier updates.
 - Exclude generated Playwright screenshot churn unless deliberately kept as evidence.
-- Keep the obsolete `docs/qa/v19-agent-inbox-reference-2026-06-20.png` deleted because `Входящие` is no longer a reference screen.
+- Keep the obsolete `$V19_TEST_ARTIFACTS_DIR/v19-agent-inbox-reference-2026-06-20.png` deleted because `Входящие` is no longer a reference screen.
 - Record remaining blockers in the final merge report.
 - Keep `docs/release/v19-thread-merge-ledger-20260704.md` current when a
   thread change is integrated, reconciled, or deliberately excluded.

@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { testArtifactPath } from "../support/artifacts";
 
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
 
-const evidenceDirectory = "docs/qa/agent-action-p0-2026-07-15";
+const evidenceDirectory = testArtifactPath("agent-action-p0-2026-07-15");
 const returnedSubmissionId = "ПД-1048";
 
 async function assertNoHorizontalOverflow(page: Page) {
