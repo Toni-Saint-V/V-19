@@ -606,7 +606,10 @@ export function V19QueueToolbar({
               className={`v19-admin-city-filter ${cityActive ? 'is-active' : ''}`}
               icon={MapPin}
               label="Город"
-              options={cityOptions.map((city) => ({ label: city, value: city }))}
+              options={cityOptions.map((city) => ({
+                label: city === 'Все города' ? 'Города' : city,
+                value: city,
+              }))}
               value={cityFilter}
               onChange={onCityFilterChange}
             />
