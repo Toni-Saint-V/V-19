@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowLeftRight,
   ArrowUpDown,
@@ -88,6 +88,7 @@ import {
   mediaSlotTypeForSubmissionFileType,
   uploadRequiredFile,
 } from "../modules/submissions/submissionActions";
+import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
   buildMediaStoragePath,
   mediaMimeTypeForFile,
@@ -333,6 +334,7 @@ export function CommandCenter({
   usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
+  const prefersReducedMotion = useReducedMotion();
   const [activeNav, setActiveNav] = useState<AgentShellNavSection>("actions");
   const [currentView, setCurrentView] = useState<ViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
@@ -985,7 +987,10 @@ export function CommandCenter({
   const actionStatusTagClass = (action: AgentActionItem) => `tone-${action.severity}`;
 
   const actionPeopleCount = (action: AgentActionItem) =>
-    action.submission.type === "family" ? action.submission.applicants.length : null;
+    action.submission.applicants.length;
+
+  const shouldShowActionContext = (action: AgentActionItem) =>
+    !action.context.startsWith("Заполнить анкету");
 
   const renderNavContent = () => (
     <>
@@ -1225,8 +1230,9 @@ export function CommandCenter({
                 key="empty-actions"
                 initial={false}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
                 className="v19-legacy-actions-empty"
+                role="status"
               >
                 Нет открытых действий по текущим подачам.
               </motion.div>
@@ -1238,8 +1244,12 @@ export function CommandCenter({
                   key={action.id}
                   initial={false}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.992 }}
-                  transition={{ duration: 0.2 }}
+                  exit={
+                    prefersReducedMotion
+                      ? { opacity: 0 }
+                      : { opacity: 0, x: 120, scale: 0.992 }
+                  }
+                  transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
                   onClick={() => handleActionOpen(action)}
                   tabIndex={0}
                   onKeyDown={(event) => {
@@ -1256,23 +1266,29 @@ export function CommandCenter({
                     <div className="v19-legacy-action-title-line">
                       <span className="v19-legacy-action-labels">
                         <span className="v19-legacy-action-id">
-                          {action.submission.id}
+                          {submissionPublicId(action.submission)}
                         </span>
-                        {actionPeopleCount(action) ? (
-                          <span
-                            aria-label={`Семья: ${actionPeopleCount(action)} человек`}
-                            className="v19-legacy-action-family-tag"
-                          >
-                            <Users aria-hidden="true" />
-                            <span>{actionPeopleCount(action)}</span>
-                          </span>
-                        ) : null}
+                        <span
+                          aria-hidden="true"
+                          className="v19-legacy-action-label-separator"
+                        >
+                          ·
+                        </span>
+                        <span
+                          aria-label={`Количество человек: ${actionPeopleCount(action)}`}
+                          className="v19-legacy-action-family-tag"
+                        >
+                          <Users aria-hidden="true" />
+                          <span>{actionPeopleCount(action)}</span>
+                        </span>
                       </span>
                       <strong className="v19-legacy-action-title">
                         {action.title}
                       </strong>
                     </div>
-                    <span className="v19-legacy-action-context">{action.context}</span>
+                    {shouldShowActionContext(action) ? (
+                      <span className="v19-legacy-action-context">{action.context}</span>
+                    ) : null}
                   </div>
                   <div className="v19-legacy-action-meta">
                     <span
@@ -1306,8 +1322,10 @@ export function CommandCenter({
                   </div>
                   <div className="v19-legacy-action-cta-wrap">
                     <button
+                      aria-label={`${action.cta}: ${action.title}`}
                       className="v19-legacy-action-cta"
                       data-testid="agent-action-cta"
+                      type="button"
                       onClick={(event) => {
                         event.stopPropagation();
                         handleActionOpen(action);

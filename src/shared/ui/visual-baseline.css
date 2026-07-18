@@ -28233,6 +28233,34 @@ body,
   min-width: var(--v19b-size-0);
 }
 
+.v19-legacy-action-label-separator {
+  flex: 0 0 auto;
+  color: var(--v19b-color-text-faint);
+  font-size: var(--v19b-size-10);
+  line-height: var(--v19b-line-height-control);
+}
+
+/* My Actions desktop row: keep the identity labels and action title on one
+   horizontal reading line. Mobile keeps the approved stacked cell contract. */
+@media (min-width: 1024px) {
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-title-line {
+    display: grid;
+    grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    column-gap: var(--v19b-size-10);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-labels {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-title {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
 .v19-legacy-action-title {
   min-width: var(--v19b-size-0);
   overflow: hidden;

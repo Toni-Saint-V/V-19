@@ -435,6 +435,7 @@ export type SubmissionHistoryItem = {
 
 export type Submission = {
   id: string;
+  publicNumber?: number;
   agentId: AgentOwnerId;
   title: string;
   listTitle?: string;
