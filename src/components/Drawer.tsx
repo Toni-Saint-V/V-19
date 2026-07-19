@@ -438,14 +438,14 @@ const OverviewTab = ({
   const readyFilesCount = submission.files.filter(isFileReady).length;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] rounded-xl p-4 hover:border-[var(--v19b-color-border-soft)] transition-colors">
-          <h3 className="text-[11px] font-medium [color:var(--v19b-color-text-40)] uppercase tracking-wider mb-4">
+        <div className="bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] rounded-xl p-5 hover:border-[var(--v19b-color-border-soft)] transition-colors">
+          <h3 className="text-[11px] font-medium [color:var(--v19b-color-text-40)] uppercase tracking-wider mb-5">
             Маршрут и подача
           </h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex gap-3">
+          <div className="space-y-4 text-sm">
+            <div className="flex gap-4">
               <Calendar className="w-5 h-5 [color:var(--v19b-color-text-30)] shrink-0" />
               <div>
                 <div className="[color:var(--v19b-color-text)] font-medium">
@@ -456,7 +456,7 @@ const OverviewTab = ({
                 </div>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <MapPin className="w-5 h-5 [color:var(--v19b-color-text-30)] shrink-0" />
               <div>
                 <div className="[color:var(--v19b-color-text)] font-medium">
@@ -470,7 +470,7 @@ const OverviewTab = ({
           </div>
         </div>
 
-        <div className="bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] rounded-xl p-4 hover:border-[var(--v19b-color-border-soft)] transition-colors flex flex-col">
+        <div className="bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] rounded-xl p-5 hover:border-[var(--v19b-color-border-soft)] transition-colors flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-[11px] font-medium [color:var(--v19b-color-text-40)] uppercase tracking-wider">
               Чеклист документов
@@ -479,7 +479,7 @@ const OverviewTab = ({
               {readyFilesCount}/{submission.files.length}
             </span>
           </div>
-          <div className="space-y-2.5 flex-1 flex flex-col justify-center">
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
             {packageItems.map((doc) => (
               <div key={doc.label} className="flex items-center gap-3">
                 {doc.status === "done" ? (
@@ -498,15 +498,15 @@ const OverviewTab = ({
         </div>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         <h3 className="text-[11px] font-medium [color:var(--v19b-color-text-40)] uppercase tracking-wider pl-1">
           Участники ({data.applicantsCount})
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data.applicants.map((applicant) => (
             <div
               key={applicant.name}
-              className="flex items-center px-3 py-2.5 bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] hover:border-[var(--v19b-color-border-soft)] rounded-xl transition-all group"
+              className="flex items-center p-3 bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] hover:border-[var(--v19b-color-border-soft)] rounded-xl transition-all group"
             >
               <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[var(--v19b-color-border-selected)] to-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-soft)] flex items-center justify-center text-xs font-semibold [color:var(--v19b-color-text-70)] shadow-inner mr-3">
                 {applicantInitials(applicant.name)}
@@ -816,23 +816,23 @@ function historyEventIcon(tone: string) {
 }
 
 const HistoryTab = ({ submission }: { submission: Submission }) => (
-  <div className="relative pl-5 space-y-6 before:absolute before:inset-y-2 before:left-[33px] before:w-px before:bg-[var(--v19b-color-border-soft)]">
+  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-[var(--v19b-color-border-soft)]">
     {submission.history.map((event) => {
       const tone = historyEventTone(event.text);
 
       return (
-        <div key={event.id} className="relative flex gap-4">
+        <div key={event.id} className="relative flex gap-5">
           <div
-            className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border-2 bg-[var(--v19b-color-app)] z-10
+            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[var(--v19b-color-app)] z-10
           ${historyEventBorderClass(tone)}`}
           >
             {historyEventIcon(tone)}
           </div>
-          <div className="pt-1">
+          <div className="pt-1.5">
             <div className="text-[14px] font-medium [color:var(--v19b-color-text)]">
               {event.text}
             </div>
-            <div className="flex items-center gap-2 mt-1 text-[12px] [color:var(--v19b-color-text-40)]">
+            <div className="flex items-center gap-2 mt-1.5 text-[12px] [color:var(--v19b-color-text-40)]">
               <span>{historyTimestampForUser(event.createdAt ?? event.at)}</span>
               <span className="w-1 h-1 rounded-full bg-[var(--v19b-color-text-25)]" />
               <span>{historySourceLabel(event.source)}</span>
