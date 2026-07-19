@@ -37140,6 +37140,48 @@ section[data-testid="agent-actions-screen"]
   }
 }
 
+/* Production touch targets and interaction feedback for the My Actions chrome.
+   Action-cell controls keep their independently owned layout and states. */
+.v19-action-surface-create,
+section[data-testid="agent-actions-screen"] .v19-admin-toolbar-select-trigger {
+  touch-action: manipulation;
+  transition:
+    background-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    box-shadow var(--v19b-motion-fast) var(--v19b-ease-standard),
+    transform var(--v19b-motion-fast) var(--v19b-ease-standard);
+}
+
+.v19-action-surface-create {
+  min-height: var(--v19b-size-40);
+}
+
+.v19-action-surface-create:not(:disabled):active,
+section[data-testid="agent-actions-screen"]
+  .v19-admin-toolbar-select-trigger:not(:disabled):active {
+  transform: var(--v19b-transform-press);
+}
+
+.v19-action-surface-create:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
+@media (max-width: 1023px) {
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    :is(.v19-admin-toolbar-select, .v19-admin-city-filter) {
+    height: var(--v19b-size-42);
+    min-height: var(--v19b-size-42);
+  }
+}
+
+@media (max-width: 767px) {
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    grid-template-rows: var(--v19b-size-40) var(--v19b-size-42) !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v19-priority-hero-trigger > svg {
     animation: none;

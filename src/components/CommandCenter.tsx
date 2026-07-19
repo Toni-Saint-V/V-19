@@ -1587,7 +1587,7 @@ export function CommandCenter({
             <button
               aria-label="Новая подача"
               onClick={createPackage}
-              className="h-[36px] lg:h-10 px-3.5 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="v19-action-surface-create h-[36px] lg:h-10 px-3.5 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Новая подача</span>
