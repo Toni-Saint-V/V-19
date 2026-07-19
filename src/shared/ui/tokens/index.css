@@ -998,6 +998,7 @@
     --vf-ref-font-family-uineg-monospace-sfmononeg-regular-menlo-consolas-monospace
   );
   --v19b-font-family-mono: var(--v19b-font-mono);
+  --v19-font-family-mono: var(--v19b-font-mono);
 
   --v19b-color-clear: transparent;
   --v19b-color-black: rgb(0 0 0);
@@ -1180,6 +1181,7 @@
   --v19b-size-188: 188px;
   --v19b-size-200: 200px;
   --v19b-size-220: 220px;
+  --v19b-size-224: 224px;
   --v19b-size-228: var(--vf-ref-size-228px);
   --v19b-size-240: 240px;
   --v19b-size-304: 304px;
@@ -1224,6 +1226,7 @@
   --v19b-weight-regular: var(--v19b-weight-body);
   --v19b-weight-control: 500;
   --v19b-font-weight-medium: var(--v19b-weight-control);
+  --v19b-font-weight-semibold: var(--v19b-weight-title);
   --v19b-weight-title: 600;
   --v19b-weight-row-title: 600;
 
@@ -1234,6 +1237,7 @@
   --v19b-line-height-copy: 1.45;
   --v19b-line-height-label: 1.5;
   --v19b-letter-spacing-normal: 0;
+  --v19b-letter-spacing-tight: var(--v19b-letter-spacing-normal);
   --v19b-letter-spacing-label: var(--v19b-letter-spacing-wide);
   --v19b-letter-spacing-title: var(--v19b-letter-spacing-normal);
   --v19b-letter-spacing-wide: var(--v19b-tracking-wide);
@@ -1258,6 +1262,7 @@
   --v19b-motion-reduced-min: 0.001ms;
   --v19b-motion-xfast: 130ms ease;
   --v19b-motion-fast: 140ms ease;
+  --v19b-ease-standard: var(--v19-motion-ease);
   --v19b-motion-quick: 150ms ease;
   --v19b-motion-quick-duration: 150ms;
   --v19b-motion-fast-duration: 140ms;

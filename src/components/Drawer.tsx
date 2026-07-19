@@ -835,12 +835,10 @@ export function Drawer({
         return;
       }
       emitVisaflowUiEvent(bridge, { type: 'submission.action', payload });
-    } catch (error) {
+    } catch {
       if (requestId !== actionRequestIdRef.current) return;
       setActionError(
-        error instanceof Error && error.message
-          ? error.message
-          : 'Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.',
+        'Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.',
       );
     } finally {
       if (requestId === actionRequestIdRef.current) {

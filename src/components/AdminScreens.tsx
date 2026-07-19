@@ -496,7 +496,7 @@ export function ReviewScreen({
             searchValue={searchQuery}
           />
 
-          <V19OperationalCardGrid>
+          <V19OperationalCardGrid className="v19-admin-review-card-grid">
             {visibleReviews.map((item) => (
               <ReviewQueueCard
                 key={item.id}

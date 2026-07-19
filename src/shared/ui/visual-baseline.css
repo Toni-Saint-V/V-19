@@ -35922,6 +35922,415 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   }
 }
 
+/* Pre-upload family controls. Raw values live in the token layer. */
+.v19-preupload-family-controls {
+  position: relative;
+  min-height: 0;
+}
+
+.v19-preupload-applicant-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v19b-size-8);
+}
+
+.v19-preupload-applicant-grid article {
+  display: grid;
+  min-width: 0;
+  min-height: var(--v19b-size-44);
+  grid-template-columns: minmax(0, 1fr) var(--v19b-size-36);
+  align-items: stretch;
+  overflow: hidden;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-panel);
+}
+
+.v19-preupload-applicant-grid article.has-file {
+  border-color: var(--v19b-color-border-selected);
+}
+
+.v19-preupload-applicant-grid article.is-recognized {
+  border-color: var(--v19b-status-success-border);
+}
+
+.v19-preupload-applicant-grid article.is-recognized .v19-preupload-applicant-icon {
+  color: var(--v19b-dot-success);
+}
+
+.v19-preupload-applicant-label,
+.v19-preupload-applicant-icon,
+.v19-preupload-family-add {
+  border: 0;
+  color: var(--v19b-color-text-70);
+  background: transparent;
+}
+
+.v19-preupload-applicant-label {
+  min-width: 0;
+  padding: 0 var(--v19b-size-6) 0 var(--v19b-size-10);
+  overflow: hidden;
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-control);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v19-preupload-applicant-icon {
+  display: grid;
+  width: var(--v19b-size-36);
+  min-height: var(--v19b-size-44);
+  place-items: center;
+  border-left: var(--v19b-size-1) solid var(--v19b-color-border);
+  color: var(--v19b-color-text-50);
+}
+
+.v19-preupload-applicant-icon svg,
+.v19-preupload-family-add svg {
+  width: var(--v19b-size-14);
+  height: var(--v19b-size-14);
+}
+
+.v19-preupload-remove-icon {
+  display: none;
+}
+
+.v19-preupload-applicant-grid article.has-file .v19-preupload-applicant-icon:hover .v19-preupload-passport-icon {
+  display: none;
+}
+
+.v19-preupload-applicant-grid article.has-file .v19-preupload-applicant-icon:hover .v19-preupload-remove-icon {
+  display: block;
+}
+
+.v19-preupload-applicant-label:hover:not(:disabled),
+.v19-preupload-applicant-icon:hover:not(:disabled),
+.v19-preupload-family-add:hover:not(:disabled) {
+  color: var(--v19b-color-text);
+  background: var(--v19b-color-control-hover);
+}
+
+.v19-preupload-applicant-label:focus-visible,
+.v19-preupload-applicant-icon:focus-visible,
+.v19-preupload-family-add:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: var(--v19b-size-2) solid var(--v19b-color-primary);
+  outline-offset: calc(var(--v19b-size-2) * -1);
+}
+
+.v19-preupload-family-add {
+  display: grid;
+  width: var(--v19b-size-28);
+  height: var(--v19b-size-28);
+  place-items: center;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+}
+
+.v19-preupload-progress-line {
+  width: min(100%, var(--v19b-size-560));
+  height: var(--v19b-size-4);
+  flex: none;
+  align-self: center;
+  overflow: hidden;
+  border-radius: var(--v19b-radius-pill);
+  background: var(--v19b-color-control-hover);
+}
+
+.v19-preupload-progress-stack {
+  display: flex;
+  width: min(100%, var(--v19b-size-560));
+  flex: none;
+  align-self: center;
+  flex-direction: column;
+  gap: var(--v19b-size-6);
+}
+
+.v19-preupload-progress-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--v19b-color-text-50);
+  font-size: var(--v19b-size-11);
+}
+
+.v19-preupload-progress-status strong {
+  color: var(--v19b-color-text-70);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-preupload-upload-group {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--v19b-size-10);
+  justify-content: flex-end;
+  margin-top: var(--v19b-size-12);
+}
+
+.v19-preupload-progress-line span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--v19b-color-primary);
+  transition: width var(--v19b-motion-target-duration) var(--v19-motion-ease-out);
+}
+
+.v19-preupload-dropzone {
+  width: 100%;
+  height: auto;
+  max-height: 40dvh;
+  flex: 1 1 auto;
+  align-self: stretch;
+}
+
+@media (max-width: 1279px) {
+  .v19-preupload-card {
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 374px) {
+  .v19-preupload-applicant-grid {
+    gap: var(--v19b-size-6);
+  }
+
+  .v19-preupload-applicant-grid article {
+    grid-template-columns: minmax(0, 1fr) var(--v19b-size-28);
+  }
+
+  .v19-preupload-applicant-label {
+    padding-right: 0;
+    padding-left: var(--v19b-size-4);
+    font-size: var(--v19b-size-9);
+  }
+
+  .v19-preupload-applicant-icon {
+    width: var(--v19b-size-28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v19-preupload-progress-line span {
+    transition: none;
+  }
+}
+
+/* My Actions cell composition. Raw values live in the token layer. */
+section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
+  white-space: nowrap;
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+  container-type: inline-size;
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-date-column {
+  display: none;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-context-tag {
+  width: fit-content;
+  max-width: var(--v19b-size-full);
+  overflow: hidden;
+  padding-inline: var(--v19b-size-8);
+  font-size: var(--v19b-size-11);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-legacy-action-status, .v19-legacy-action-badge) {
+  height: var(--v19b-action-cell-chip-height-fluid);
+  min-height: var(--v19b-action-cell-chip-height-fluid);
+  font-size: var(--v19b-action-cell-label-font-fluid);
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
+  font-size: var(--v19b-action-cell-cta-font-fluid);
+}
+
+@media (max-width: 1199px) {
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    grid-template-rows: auto var(--v19b-size-1) auto;
+    align-items: stretch;
+    column-gap: var(--v19b-size-12);
+    row-gap: var(--v19b-size-10);
+    min-height: var(--v19b-size-132);
+    padding: var(--v19b-size-12) var(--v19b-size-14);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-meta {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+    padding: var(--v19b-size-0);
+    border: var(--v19b-size-0);
+  }
+
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-legacy-action-city-column, .v19-legacy-action-date-column) {
+    display: none;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-badge.is-desktop-badge {
+    display: none;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-cta-wrap {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: center;
+    justify-self: end;
+    width: max(var(--v19b-size-104), var(--v19b-mobile-row-action-fraction));
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-context-tag {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: center;
+    justify-self: start;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
+    width: var(--v19b-size-full);
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-40);
+    padding-inline: var(--v19b-size-10);
+  }
+}
+
+@media (min-width: 1200px) {
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+    grid-template-columns:
+      minmax(var(--v19b-size-176), var(--v19b-grid-fr))
+      minmax(var(--v19b-size-88), var(--v19b-size-120))
+      minmax(var(--v19b-size-120), var(--v19b-size-160))
+      minmax(var(--v19b-size-160), var(--v19b-size-176))
+      minmax(var(--v19b-size-110), var(--v19b-size-150));
+    grid-template-rows: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    column-gap: var(--v19b-size-24);
+    row-gap: var(--v19b-size-0);
+    min-height: var(--v19b-size-96);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-meta {
+    position: static;
+    grid-column: 4;
+    grid-row: 1;
+    align-self: center;
+    justify-self: start;
+    padding: var(--v19b-size-0);
+    border: var(--v19b-size-0);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-city-column {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-date-column {
+    display: flex;
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-legacy-action-badges, .v19-legacy-action-context-tag) {
+    display: none;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-cta-wrap {
+    grid-column: 5;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row.has-context {
+    min-height: var(--v19b-size-96);
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-legacy-action-main
+    .v19-submission-identity-route {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-legacy-action-status, [data-testid="agent-action-status"]) {
+    font-size: var(--v19b-size-9);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
+    grid-column: 1 / -1;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+    min-height: var(--v19b-size-148);
+  }
+}
+
+section[data-testid="agent-actions-screen"] .v19-operational-card-route {
+  display: flex;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  gap: var(--v19b-size-8);
+  margin-top: var(--v19b-size-6);
+}
+
+section[data-testid="agent-actions-screen"]
+  .v19-operational-card-route
+  .v19-operational-card-location {
+  min-width: var(--v19b-size-0);
+  margin-top: var(--v19b-size-0);
+}
+
+@media (max-width: 360px) {
+  section[data-testid="agent-actions-screen"] .v19-submission-identity-tags {
+    max-width: calc(
+      var(--v19b-size-full) - var(--v19b-size-136) - var(--v19b-size-6)
+    );
+    gap: var(--v19b-size-3);
+    overflow: hidden;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-submission-identity-id, .v19-submission-identity-people) {
+    padding-inline: var(--v19b-size-4);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-context-tag {
+    grid-column: 1 / -1;
+    max-width: calc(var(--v19b-size-full) - var(--v19b-size-112));
+  }
+}
+
 /* Shared operational summary. This is the final design-system owner for the
    identical three-card metric block used by agent and admin workspaces. */
 .v19-metric-strip {

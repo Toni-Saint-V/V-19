@@ -23,7 +23,6 @@ import {
 } from '../modules/submissions/productIntakeFlow';
 import type { PassportExtractionField } from '../modules/submissions/passportExtractionContract';
 import type { PreliminaryIntakeDraft } from '../modules/submissions/types';
-import './PreUploadScreen.css';
 
 interface PreUploadScreenProps {
   onBack: () => void;

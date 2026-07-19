@@ -285,7 +285,9 @@ export function V19OperationalCard<T extends ElementType = "button">({
       <span className="v19-operational-card-header">
         <span className="v19-operational-card-identity">
           <span className="v19-operational-card-meta">
-            <span className="v19-operational-card-id">{publicId}</span>
+            <span className="v19-operational-card-id v19-admin-review-card-id">
+              {publicId}
+            </span>
             <i aria-hidden="true" />
             <span className="v19-operational-card-people">
               {peopleCount > 1 ? (

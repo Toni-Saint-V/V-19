@@ -835,61 +835,6 @@ export function uploadRequiredFiles(submission: Submission): Submission {
   );
 }
 
-export function markSubmissionFileAccepted(
-  submission: Submission,
-  input: {
-    applicantId: string;
-    fileType: SubmissionFileType;
-    reviewedBy?: string;
-  },
-): Submission {
-  const targetFile = submission.files.find(
-    (file) => file.applicantId === input.applicantId && file.type === input.fileType,
-  );
-
-  if (!targetFile || targetFile.status === "missing") return submission;
-
-  const files = submission.files.map((file) =>
-    file.applicantId === input.applicantId && file.type === input.fileType
-      ? {
-          ...file,
-          status: "accepted" as const,
-          reviewedAtIso: new Date().toISOString(),
-          reviewedBy: input.reviewedBy ?? file.reviewedBy ?? "Администратор",
-          reviewStatus: "accepted" as const,
-        }
-      : file,
-  );
-  const filePercent = fileCompleteness(files);
-
-  return {
-    ...submission,
-    applicants: submission.applicants.map((applicant) => ({
-      ...applicant,
-      fileStatus: applicantFileStatus(
-        files.filter((file) => file.applicantId === applicant.id),
-      ),
-    })),
-    completeness: {
-      ...submission.completeness,
-      files: filePercent,
-      total: Math.round((submission.completeness.questionnaire + filePercent) / 2),
-    },
-    files,
-    history: [
-      {
-        id: `и-${submission.id}-file-accepted-${targetFile.id}`,
-        at: "сейчас",
-        detail: fileTypeName(input.fileType),
-        source: "admin",
-        text: "Администратор принял файл",
-      },
-      ...submission.history,
-    ],
-    updatedAt: "сейчас",
-  };
-}
-
 export function normalizeSubmissionForCanonicalRuntime(
   submission: Submission,
   options: { exportedAt?: unknown; statusFallback?: SubmissionStatus } = {},
@@ -1411,7 +1356,7 @@ function draftTitle(
 
   return (
     familyDisplayTitleFromMainApplicantName(familySurname || firstApplicantName) ??
-    "Новая семейная подача"
+    `Семья ${(familySurname || firstApplicantName).trim().split(/\s+/)[0]}`
   );
 }
 

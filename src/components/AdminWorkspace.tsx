@@ -264,7 +264,6 @@ export function AdminWorkspace({
   const reviewDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
-  const adminFileAcceptPendingRef = useRef(false);
   const adminPassportSectionApprovalPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
   const pendingAccessRequestCount = accessRequests.filter(
@@ -509,36 +508,6 @@ export function AdminWorkspace({
       });
     } catch {
       setAdminAsyncError("Не удалось применить действие AI-помощника.");
-    }
-  };
-
-  const handleReviewFileAccept = async (input: {
-    applicantId: string;
-    fileType: SubmissionFileType;
-  }): Promise<boolean> => {
-    if (!selectedRow || adminFileAcceptPendingRef.current) return false;
-    const payload = { submissionId: selectedRow, ...input };
-    setAdminAsyncError("");
-
-    if (!bridge.onAdminFileAccept) {
-      setAdminAsyncError(
-        "Подтверждение файла недоступно: обработчик сохранения не подключён. Состояние подачи не изменено.",
-      );
-      return false;
-    }
-
-    adminFileAcceptPendingRef.current = true;
-    try {
-      await bridge.onAdminFileAccept(payload);
-      emitVisaflowUiEvent(bridge, { type: "admin.file.accept", payload });
-      return true;
-    } catch {
-      setAdminAsyncError(
-        "Не удалось подтвердить файл. Состояние подачи не изменено. Повторите попытку.",
-      );
-      return false;
-    } finally {
-      adminFileAcceptPendingRef.current = false;
     }
   };
 
@@ -862,7 +831,7 @@ export function AdminWorkspace({
           onAction={(action) =>
             void handleAdminPrimaryAction(selectedSubmission.id, action)
           }
-          onAddIssue={handleAddIssue}
+          onAddIssue={(input) => void handleAddIssue(input)}
           onClose={() => {
             setAdminDrawerOpen(false);
             window.requestAnimationFrame(() =>
@@ -872,7 +841,6 @@ export function AdminWorkspace({
           onDismissAiSuggestion={(suggestionId) =>
             void handleAdminAiSuggestion("dismiss", suggestionId)
           }
-          onReviewFileAccept={handleReviewFileAccept}
           onRunAiReview={() => void handleAdminAiReview()}
           onTab={setAdminDrawerTab}
           onVerifyDocument={(applicantId) => handleVerifyDocument(applicantId)}

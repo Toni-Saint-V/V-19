@@ -5779,6 +5779,7 @@ export function FigmaSubmissionDrawer({
   const [status, setStatus] = useState<"loading" | "success">("loading");
   const [localActionError, setLocalActionError] = useState("");
   const [actionPending, setActionPending] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const actionRequestIdRef = useRef(0);
   const actionPendingRef = useRef(false);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -5828,6 +5829,7 @@ export function FigmaSubmissionDrawer({
     setTab(initialTab(activeTab));
     setLocalActionError("");
     setActionPending(false);
+    setMobileMoreOpen(false);
     actionPendingRef.current = false;
     setStatus("success");
   }, [activeTab, isOpen, submission.id]);
@@ -5939,12 +5941,6 @@ export function FigmaSubmissionDrawer({
 
   const tabs: DrawerTabConfig[] = [
     { icon: Info, id: "overview", label: "Обзор" },
-    {
-      getCount: (detail) => detail.applicantsCount,
-      icon: User,
-      id: "applicants",
-      label: "Заявители",
-    },
     { icon: FileText, id: "questionnaire", label: "Анкета" },
     {
       getCount: () => submission.files.length,
@@ -5961,9 +5957,13 @@ export function FigmaSubmissionDrawer({
     },
     { icon: History, id: "history", label: "История" },
   ];
+  const mobileSecondaryTabs = tabs.filter((item) =>
+    ["files", "issues", "history"].includes(item.id),
+  );
 
   function selectDrawerTab(nextTab: TabId) {
     setTab(nextTab);
+    setMobileMoreOpen(false);
   }
 
   function focusDrawerTab(nextTab: TabId) {
@@ -6014,12 +6014,10 @@ export function FigmaSubmissionDrawer({
     actionPendingRef.current = true;
     try {
       await onAction(primaryAction.action);
-    } catch (error) {
+    } catch {
       if (requestId !== actionRequestIdRef.current) return;
       setLocalActionError(
-        error instanceof Error && error.message
-          ? error.message
-          : "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
+        "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
       );
     } finally {
       if (requestId === actionRequestIdRef.current) {
@@ -6096,7 +6094,7 @@ export function FigmaSubmissionDrawer({
                   <button
                     aria-controls={drawerPanelId(item.id)}
                     aria-selected={isActive}
-                    className={`v20-tab-button ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""}`}
+                    className={`v20-tab-button ${mobileSecondaryTabs.some((secondary) => secondary.id === item.id) ? "is-mobile-secondary" : ""} ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""}`}
                     data-drawer-tab={item.id}
                     id={drawerTabId(item.id)}
                     key={item.id}
@@ -6124,6 +6122,44 @@ export function FigmaSubmissionDrawer({
                 );
               })}
             </nav>
+            <div className="v20-tabbar-more">
+              <button
+                aria-expanded={mobileMoreOpen}
+                aria-haspopup="menu"
+                className={`v20-tabbar-more-trigger ${mobileSecondaryTabs.some((item) => item.id === tab) ? "is-active" : ""}`}
+                onClick={() => setMobileMoreOpen((open) => !open)}
+                type="button"
+              >
+                Ещё
+              </button>
+              {mobileMoreOpen ? (
+                <div
+                  aria-label="Дополнительные разделы подачи"
+                  className="v20-tabbar-more-menu"
+                  role="menu"
+                >
+                  {mobileSecondaryTabs.map((item) => {
+                    const count = item.getCount ? item.getCount(data) : undefined;
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        aria-current={tab === item.id ? "page" : undefined}
+                        key={item.id}
+                        onClick={() => selectDrawerTab(item.id)}
+                        role="menuitem"
+                        type="button"
+                      >
+                        <Icon aria-hidden="true" className="v20-tab-icon" />
+                        {item.label}
+                        {typeof count === "number" && count > 0 ? (
+                          <span className="v20-tab-count">{count}</span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {status === "loading" ? (

@@ -40,10 +40,6 @@ import {
   type BlsFormData,
 } from "../questionnaireBlsRules";
 import {
-  canonicalRequiredMediaTypesForApplicant,
-  type CanonicalFrontendMediaType,
-} from "../domainContract";
-import {
   agentQuestionnaireCompletionDecision,
   agentQuestionnaireStatusPresentation,
 } from "../status";

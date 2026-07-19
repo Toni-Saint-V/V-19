@@ -74,7 +74,7 @@ describe("async UI callers", () => {
       />,
     );
 
-    const saveButton = screen.getByRole("button", { name: "Сохранить черновик" });
+    const saveButton = screen.getByRole("button", { name: "Сохранить" });
     fireEvent.click(saveButton);
     fireEvent.click(saveButton);
 
@@ -445,7 +445,7 @@ describe("async UI callers", () => {
     tabs.forEach((tab, index) => {
       const tabId = tabIds[index];
       if (!tabId) throw new Error("Missing expected operational Drawer tab id.");
-      expect(tab).toHaveAccessibleName(new RegExp(`^${tabLabels[index]}(?:\\d+)?$`));
+      expect(tab).toHaveAccessibleName(new RegExp(`^${tabLabels[index]}(?:\\s*\\d+)?$`));
       expect(tab).toHaveAttribute("aria-controls", `v20-submission-drawer-panel-${tabId}`);
     });
     expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
@@ -459,9 +459,11 @@ describe("async UI callers", () => {
       expect(tabs[1]).toHaveAttribute("aria-selected", "true");
       expect(tabs[1]).toHaveFocus();
     });
-    expect(await screen.findByRole("tabpanel")).toHaveAttribute(
-      "aria-labelledby",
-      "v20-submission-drawer-tab-questionnaire",
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        "v20-submission-drawer-tab-questionnaire",
+      ),
     );
 
     const mobileMoreButton = container.querySelector<HTMLButtonElement>(
@@ -479,7 +481,7 @@ describe("async UI callers", () => {
     );
     expect(mobileMenuItems).toHaveLength(3);
     ["Файлы", "Замечания", "История"].forEach((label, index) => {
-      expect(mobileMenuItems[index]).toHaveAccessibleName(new RegExp(`^${label}(?:\\d+)?$`));
+      expect(mobileMenuItems[index]).toHaveAccessibleName(new RegExp(`^${label}(?:\\s*\\d+)?$`));
     });
 
     fireEvent.click(mobileMenuItems[0]!);

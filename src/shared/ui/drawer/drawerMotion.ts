@@ -58,15 +58,21 @@ export function drawerTabExit(reducedMotion: boolean) {
   return reducedMotion ? { opacity: 0, y: 0 } : { opacity: 0, y: -8 };
 }
 
+function drawerDesktopMediaQuery() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return null;
+  }
+  return window.matchMedia("(min-width: 1024px)");
+}
+
 export function useDrawerDesktopQuery() {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window === "undefined"
-      ? true
-      : window.matchMedia("(min-width: 1024px)").matches,
+  const [isDesktop, setIsDesktop] = useState(
+    () => drawerDesktopMediaQuery()?.matches ?? true,
   );
 
   useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
+    const media = drawerDesktopMediaQuery();
+    if (!media) return;
     const update = () => setIsDesktop(media.matches);
     update();
     media.addEventListener("change", update);

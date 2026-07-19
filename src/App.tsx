@@ -9,9 +9,7 @@ import {
   approvePassportReviewSectionForAdmin,
   applyExportStateToSelection,
   applyActionToSubmissionListResult,
-  markSubmissionFileAccepted,
 } from "./modules/submissions/submissionActions";
-import { isPersistablePrivateFileAssetAtSubmissionTarget } from "./modules/submissions/fileAsset";
 import {
   acceptAiSuggestionAsIssue,
   dismissAiSuggestion,
@@ -964,50 +962,6 @@ export default function App({
           throw new Error("Подача для подтверждения паспортной секции не найдена.");
         }
         await bridge.onAdminPassportSectionApprove?.({ submissionId, applicantId });
-      },
-      onAdminFileAccept: async ({ submissionId, applicantId, fileType }) => {
-        if (activeApprovedSession?.role !== "admin") {
-          throw new Error("Только активный администратор может подтвердить файл.");
-        }
-
-        let foundSubmission = false;
-        await updateAdminSubmission(submissionId, (submission) => {
-          foundSubmission = true;
-          const applicantExists = submission.applicants.some(
-            (applicant) => applicant.id === applicantId,
-          );
-          const file = submission.files.find(
-            (candidate) =>
-              candidate.applicantId === applicantId && candidate.type === fileType,
-          );
-          const isReviewableStatus =
-            file?.status === "uploaded" || file?.status === "pending_review";
-
-          if (
-            !applicantExists ||
-            !file ||
-            !isReviewableStatus ||
-            !isPersistablePrivateFileAssetAtSubmissionTarget(file, {
-              applicantId,
-              fileType,
-              submissionId,
-            })
-          ) {
-            throw new Error(
-              "Нельзя подтвердить файл без защищённого оригинала выбранного заявителя.",
-            );
-          }
-
-          return markSubmissionFileAccepted(submission, {
-            applicantId,
-            fileType,
-            reviewedBy: activeApprovedSession.userId,
-          });
-        });
-        if (!foundSubmission) {
-          throw new Error("Подача для подтверждения файла не найдена.");
-        }
-        await bridge.onAdminFileAccept?.({ submissionId, applicantId, fileType });
       },
       onAdminAiReviewRun: async (submissionId) => {
         await updateAdminSubmission(submissionId, runAiReview);

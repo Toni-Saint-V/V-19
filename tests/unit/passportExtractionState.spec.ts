@@ -397,7 +397,7 @@ describe("passport extraction state", () => {
       withPrimaryFields.applicants[1]?.id ?? "",
     );
 
-    expect(autofilled.title).toBe("Семья VOLKOVых");
+    expect(autofilled.title).toBe("Семья Волковых");
     expect(autofilled.applicants.map((applicant) => applicant.fullName)).toEqual([
       "VOLKOV ANTON",
       "PETROVA ANNA",

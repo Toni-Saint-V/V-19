@@ -472,16 +472,6 @@ export function applicantChecklistStatus(
   return "in_progress";
 }
 
-function requiredSubmissionFiles(submission: Submission) {
-  return submission.applicants.flatMap((applicant) =>
-    canonicalRequiredMediaTypesForApplicant(submission, applicant.id).map((type) =>
-      submission.files.find(
-        (file) => file.applicantId === applicant.id && file.type === type,
-      ),
-    ),
-  );
-}
-
 export function calculateSubmissionProgress(
   submission: Submission,
 ): Submission["completeness"] {

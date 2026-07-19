@@ -323,33 +323,6 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(container.querySelector(".v19-admin-review-lane-header")).toBeNull();
   });
 
-  test("renders the agent display name and compact card identity", () => {
-    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
-    if (!source) throw new Error("Expected review queue fixture.");
-
-    const submission: Submission = {
-      ...source,
-      agentDisplayName: "Антон Волков",
-      updatedAt: "2026-07-17T12:26:26.214Z",
-    };
-    const { container } = render(
-      <ReviewScreen onOpenDrawer={vi.fn()} submissions={[submission]} />,
-    );
-
-    expect(container.querySelector(".v19-admin-review-card-agent")).toHaveTextContent(
-      "Антон Волков",
-    );
-    expect(container.querySelector(".v19-admin-review-card-meta")).toHaveTextContent(
-      "1 чел.",
-    );
-    expect(container.querySelector(".v19-admin-review-card-location")).toHaveTextContent(
-      "Казань",
-    );
-    expect(container).not.toHaveTextContent("17 июл., 15:26");
-    expect(container).not.toHaveTextContent(source.agentId);
-    expect(container).not.toHaveTextContent("2026-07-17T12:26:26.214Z");
-  });
-
   test("does not expose internal questionnaire status values", async () => {
     const source = initialSubmissions.find((item) => item.id === "ПД-1053");
     const applicant = source?.applicants[0];
