@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 
 import { tripDateRangeForSubmission } from "../../src/components/v19BusinessScreenAdapter";
+import {
+  agentActionQueue,
+  agentActionWorkspaceTarget,
+  type AgentActionItem,
+} from "../../src/modules/submissions/agentActions";
+import { initialSubmissions } from "../../src/modules/submissions/mockData";
 
 describe("CommandCenter presentation helpers", () => {
   test("omits a trip date when neither boundary is specified", () => {
@@ -31,5 +37,70 @@ describe("CommandCenter presentation helpers", () => {
     expect(
       tripDateRangeForSubmission({ tripDateFrom: "", tripDateTo: "не указано" }),
     ).toBeUndefined();
+  });
+
+  test("routes a file correction to the exact applicant and file slot", () => {
+    const action = agentActionQueue(initialSubmissions).open.find((candidate) =>
+      candidate.id.startsWith("replace-"),
+    );
+    if (!action) throw new Error("Missing replacement action fixture.");
+    const file = action.submission.files.find((candidate) =>
+      action.id.endsWith(`-${candidate.id}`),
+    );
+    if (!file) throw new Error("Missing replacement file fixture.");
+
+    expect(agentActionWorkspaceTarget(action)).toEqual({
+      applicantId: file.applicantId,
+      fileType: file.type,
+      tab: "files",
+    });
+  });
+
+  test("routes a questionnaire action to the exact applicant", () => {
+    const action = agentActionQueue(initialSubmissions).open.find((candidate) =>
+      candidate.id.startsWith("questionnaire-"),
+    );
+    if (!action) throw new Error("Missing questionnaire action fixture.");
+    const applicant = action.submission.applicants.find((candidate) =>
+      action.id.endsWith(`-${candidate.id}`),
+    );
+    if (!applicant) throw new Error("Missing questionnaire applicant fixture.");
+
+    expect(agentActionWorkspaceTarget(action)).toMatchObject({
+      applicantId: applicant.id,
+      tab: "questionnaire",
+    });
+  });
+
+  test("keeps the send-corrections action inside the issue lifecycle", () => {
+    const source = initialSubmissions.find((submission) => submission.id === "ПД-1048");
+    if (!source) throw new Error("Missing returned submission fixture.");
+    const issue = source.issues[0];
+    if (!issue) throw new Error("Missing returned issue fixture.");
+    const action: AgentActionItem = {
+      badges: [],
+      completed: false,
+      context: "Исправления готовы",
+      cta: "Отправить",
+      due: "week",
+      dueLabel: "Готово к отправке",
+      id: `submit-corrections-${source.id}`,
+      searchText: "",
+      severity: "ready",
+      submission: {
+        ...source,
+        issues: source.issues.map((candidate) => ({
+          ...candidate,
+          status: "fixed_by_agent",
+        })),
+      },
+      tab: "issues",
+      title: "Отправить исправления",
+    };
+
+    expect(agentActionWorkspaceTarget(action)).toEqual({
+      issueId: issue.id,
+      tab: "issues",
+    });
   });
 });

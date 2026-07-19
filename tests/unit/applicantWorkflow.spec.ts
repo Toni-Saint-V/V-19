@@ -90,6 +90,38 @@ describe("applicant workflow actions", () => {
     ).toMatchObject({ issueId: "issue-passport", state: "attention" });
   });
 
+  it("shows an uploaded correction as ready while it waits for admin review", () => {
+    const submission = draft();
+    const passport = submission.files.find((file) => file.type === "passport_scan")!;
+    const uploaded = uploadRequiredFile(submission, passport.id);
+    const withFixedIssue = {
+      ...uploaded,
+      issues: [
+        {
+          id: "issue-passport-fixed",
+          type: "file" as const,
+          target: {
+            applicantId: uploaded.applicants[0]!.id,
+            applicantName: uploaded.applicants[0]!.fullName,
+            fileType: "passport_scan" as const,
+          },
+          reason: "Нечитаемый скан",
+          comment: "Загрузите новый паспорт",
+          severity: "blocker" as const,
+          status: "fixed_by_agent" as const,
+          createdBy: "admin" as const,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+
+    expect(
+      applicantWorkflowActions(withFixedIssue, withFixedIssue.applicants[0]!).find(
+        (action) => action.kind === "passport_scan",
+      ),
+    ).toMatchObject({ state: "ready" });
+  });
+
   it("creates optional secondary selfies only during a real upload", () => {
     const submission = draft("family");
     const secondary = submission.applicants[1]!;

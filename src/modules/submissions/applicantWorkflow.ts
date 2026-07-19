@@ -47,7 +47,7 @@ function activeIssueFor(
 ) {
   return submission.issues.find(
     (issue) =>
-      issue.status !== "closed_by_admin" &&
+      issue.status === "open" &&
       issue.target.applicantId === applicantId &&
       issue.target.fileType === fileType,
   );

@@ -10,6 +10,10 @@ import {
 import { formatAgentActionRowText } from "./listFormatters";
 import { applicantCountLabel, submissionSearchText } from "./selectors";
 import type { DrawerTab, Submission, SubmissionFile } from "./types";
+import {
+  targetForIssue,
+  type WorkspaceTarget,
+} from "./workspaceModel";
 
 export type AgentActionDue = "overdue" | "today" | "week" | "completed";
 export type AgentActionSeverity = "blocker" | "warning" | "ready" | "info";
@@ -148,6 +152,70 @@ export type OperationalWorkEvent = {
   title: string;
   tone: "amber" | "blue" | "danger" | "muted" | "teal";
 };
+
+export function agentActionWorkspaceTarget(
+  action: AgentActionItem,
+): WorkspaceTarget | undefined {
+  const { submission } = action;
+
+  for (const prefix of ["replace", "missing-file"]) {
+    const file = submission.files.find(
+      (candidate) => action.id === `${prefix}-${submission.id}-${candidate.id}`,
+    );
+    if (file) {
+      return {
+        applicantId: file.applicantId,
+        fileType: file.type,
+        tab: "files",
+      };
+    }
+  }
+
+  const questionnaireApplicant = submission.applicants.find(
+    (candidate) => action.id === `questionnaire-${submission.id}-${candidate.id}`,
+  );
+  if (questionnaireApplicant) {
+    const questionnaireIssue = submission.issues.find(
+      (issue) =>
+        issue.status === "open" &&
+        issue.target.applicantId === questionnaireApplicant.id &&
+        !issue.target.fileType,
+    );
+    if (questionnaireIssue) return targetForIssue(questionnaireIssue);
+
+    const incompleteSection = questionnaireApplicant.sections.find(
+      (section) => section.status !== "complete",
+    );
+    const incompleteField = incompleteSection?.fields.find(
+      (field) =>
+        field.reviewState === "needs_review" ||
+        Boolean(field.error?.trim()) ||
+        !field.value.trim(),
+    );
+    return {
+      applicantId: questionnaireApplicant.id,
+      field: incompleteField?.id,
+      section: incompleteSection?.title,
+      tab: "questionnaire",
+    };
+  }
+
+  if (action.id === `submit-corrections-${submission.id}`) {
+    const issue =
+      submission.issues.find((candidate) => candidate.status === "fixed_by_agent") ??
+      submission.issues.find((candidate) => candidate.status === "open");
+    return { issueId: issue?.id, tab: "issues" };
+  }
+
+  if (action.tab === "issues") {
+    const issue =
+      submission.issues.find((candidate) => candidate.status === "open") ??
+      submission.issues.find((candidate) => candidate.status === "fixed_by_agent");
+    return { issueId: issue?.id, tab: "issues" };
+  }
+
+  return undefined;
+}
 
 export function agentActionQueue(submissions: Submission[]) {
   const open = sortAgentActions(submissions.flatMap(agentOpenActions)).map(

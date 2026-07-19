@@ -67,6 +67,7 @@ interface ReviewCard {
   questionnaire: number;
   files: number;
   blockers: number;
+  fixedIssues: number;
   warnings: number;
   aiFlags: number;
   nextAction: string;
@@ -75,21 +76,18 @@ interface ReviewCard {
   tripDateIso: string;
 }
 
-function unresolvedIssues(submission: Submission) {
-  return submission.issues.filter(
-    (issue) => issue.status !== "closed_by_admin",
-  );
+function openIssues(submission: Submission) {
+  return submission.issues.filter((issue) => issue.status === "open");
 }
 
 function unresolvedBlockerCount(submission: Submission) {
-  return unresolvedIssues(submission).filter(
+  return openIssues(submission).filter(
     (issue) => issue.severity === "blocker",
   ).length;
 }
 
 function unresolvedWarningCount(submission: Submission) {
-  const unresolved = unresolvedIssues(submission);
-  const issueWarnings = unresolved.filter(
+  const issueWarnings = openIssues(submission).filter(
     (issue) => issue.severity !== "blocker",
   ).length;
   const readinessWarnings = [
@@ -100,12 +98,9 @@ function unresolvedWarningCount(submission: Submission) {
 }
 
 function reviewLaneForSubmission(submission: Submission): Lane {
+  if (submission.status === "corrections_received") return "returned";
   if (unresolvedBlockerCount(submission) > 0) return "urgent";
-  if (
-    submission.status === "corrections_received" ||
-    submission.status === "returned"
-  )
-    return "returned";
+  if (submission.status === "returned") return "returned";
   return "review";
 }
 
@@ -151,6 +146,9 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
     questionnaire: submission.completeness.questionnaire,
     files: submission.completeness.files,
     blockers,
+    fixedIssues: submission.issues.filter(
+      (issue) => issue.status === "fixed_by_agent",
+    ).length,
     warnings,
     aiFlags,
     nextAction:
@@ -211,13 +209,16 @@ function ReviewQueueCard({
             {item.blockers > 0 ? (
               <span className="tone-danger">{item.blockers} критичных</span>
             ) : null}
+            {item.fixedIssues > 0 ? (
+              <span className="tone-info">{item.fixedIssues} исправлено</span>
+            ) : null}
             {item.warnings > 0 ? (
               <span className="tone-warning">{item.warnings} проверить</span>
             ) : null}
             {item.aiFlags > 0 ? (
               <span className="tone-info">ИИ {item.aiFlags}</span>
             ) : null}
-            {item.blockers === 0 && item.warnings === 0 ? (
+            {item.blockers === 0 && item.fixedIssues === 0 && item.warnings === 0 ? (
               <span className="tone-ready">без замечаний</span>
             ) : null}
           </span>

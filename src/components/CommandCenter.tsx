@@ -15,7 +15,6 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { Drawer } from "./Drawer";
 import { QuestionnaireScreen } from "./QuestionnaireScreen";
 import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import {
@@ -71,6 +70,7 @@ import {
 } from "../modules/submissions/productIntakeSubmissionAdapter";
 import {
   agentActionQueue,
+  agentActionWorkspaceTarget,
   searchAgentActions,
   type AgentActionDue,
   type AgentActionItem,
@@ -130,142 +130,6 @@ type CommandCenterProps = {
 };
 
 const agentMobileNavigationId = "v19-agent-mobile-navigation";
-
-function questionnaireFocusForAgentAction(
-  action: AgentActionItem,
-): QuestionnaireInitialFocus | undefined {
-  const { submission } = action;
-  const openIssue = (applicantId?: string) =>
-    submission.issues.find(
-      (issue) =>
-        issue.status === "open" &&
-        (!applicantId || issue.target.applicantId === applicantId),
-    );
-  const focusForIssue = (issue: ReturnType<typeof openIssue>) =>
-    issue?.target.applicantId
-      ? {
-          applicantId: issue.target.applicantId,
-          field: issue.target.field,
-          section: issue.target.fileType ? "Файлы" : issue.target.section,
-        }
-      : undefined;
-
-  for (const prefix of ["replace", "missing-file"]) {
-    const file = submission.files.find(
-      (candidate) => action.id === `${prefix}-${submission.id}-${candidate.id}`,
-    );
-    if (file) {
-      return {
-        applicantId: file.applicantId,
-        fileId: file.id,
-        section: "Файлы",
-      };
-    }
-  }
-
-  const questionnaireApplicant = submission.applicants.find(
-    (candidate) => action.id === `questionnaire-${submission.id}-${candidate.id}`,
-  );
-  if (questionnaireApplicant) {
-    const issueFocus = focusForIssue(openIssue(questionnaireApplicant.id));
-    if (issueFocus) return issueFocus;
-
-    const incompleteSection = questionnaireApplicant.sections.find(
-      (section) => section.status !== "complete",
-    );
-    const incompleteField = incompleteSection?.fields.find(
-      (field) =>
-        field.reviewState === "needs_review" ||
-        Boolean(field.error?.trim()) ||
-        !field.value.trim(),
-    );
-    return {
-      applicantId: questionnaireApplicant.id,
-      field: incompleteField?.id,
-      section: incompleteSection?.title,
-    };
-  }
-
-  if (action.id === `submit-corrections-${submission.id}`) {
-    const fixedIssue = submission.issues.find(
-      (issue) => issue.status === "fixed_by_agent",
-    );
-    if (fixedIssue?.target.applicantId) {
-      return {
-        applicantId: fixedIssue.target.applicantId,
-        field: fixedIssue.target.field,
-        section: fixedIssue.target.fileType ? "Файлы" : fixedIssue.target.section,
-      };
-    }
-  }
-
-  return focusForIssue(openIssue());
-}
-
-function isDirectAgentAction(action: AgentActionItem) {
-  return ["replace-", "missing-file-", "questionnaire-", "submit-corrections-"].some(
-    (prefix) => action.id.startsWith(prefix),
-  );
-}
-
-const fallbackSubmissions: SubmissionListItem[] = [
-  {
-    id: "SUB-1042",
-    title: "Семья Петровых",
-    type: "family",
-    applicantsCount: 4,
-    city: "Санкт-Петербург",
-    tripDates: "18–23 июл 2026",
-    status: "returned",
-    completeness: 92,
-    updated: "12 мин назад",
-    owner: "Татьяна Н.",
-    issueCount: 2,
-    nextAction: "Исправить замечания администратора",
-  },
-  {
-    id: "SUB-1057",
-    title: "Алина Смирнова",
-    type: "single",
-    applicantsCount: 1,
-    city: "Москва",
-    tripDates: "02–09 авг 2026",
-    status: "in_progress",
-    completeness: 64,
-    updated: "34 мин назад",
-    owner: "Татьяна Н.",
-    issueCount: 0,
-    nextAction: "Дособрать обязательные документы",
-  },
-  {
-    id: "SUB-1061",
-    title: "Семья Орловых",
-    type: "family",
-    applicantsCount: 4,
-    city: "Москва",
-    tripDates: "11–21 авг 2026",
-    status: "submitted_for_review",
-    completeness: 100,
-    updated: "1 ч назад",
-    owner: "Татьяна Н.",
-    issueCount: 0,
-    nextAction: "Ожидать проверки администратора",
-  },
-  {
-    id: "SUB-1078",
-    title: "Дмитрий Волков",
-    type: "single",
-    applicantsCount: 1,
-    city: "Москва",
-    tripDates: "06–12 сен 2026",
-    status: "ready_for_export",
-    completeness: 100,
-    updated: "2 ч назад",
-    owner: "Марина К.",
-    issueCount: 0,
-    nextAction: "Готово к Excel-выгрузке",
-  },
-];
 
 function intakeDraftToListItem(draft: ProductIntakeDraft): SubmissionListItem {
   return {
@@ -407,10 +271,7 @@ export function CommandCenter({
     () =>
       usesSupabase
         ? canonicalRows
-        : [
-            ...intakeRows,
-            ...(canonicalRows.length ? canonicalRows : fallbackSubmissions),
-          ],
+        : [...intakeRows, ...canonicalRows],
     [canonicalRows, intakeRows, usesSupabase],
   );
   const actionQueue = useMemo(
@@ -671,18 +532,20 @@ export function CommandCenter({
   };
 
   const handleActionOpen = (action: AgentActionItem) => {
-    if (action.tab === "files") {
-      focusSubmissionInList(action.submission.id);
+    const target = agentActionWorkspaceTarget(action);
+    if (target) {
+      handleOpenWorkspaceTarget(action.submission.id, target);
       return;
     }
-    if (isDirectAgentAction(action)) {
-      handleOpenQuestionnaire(
-        action.submission.id,
-        questionnaireFocusForAgentAction(action),
-      );
-      return;
-    }
-    handleRowClick(action.submission.id);
+    bridge.onSubmissionOpen?.(action.submission.id);
+    emitVisaflowUiEvent(bridge, {
+      type: "submission.open",
+      submissionId: action.submission.id,
+    });
+    setDrawerActiveTab(action.tab);
+    setDrawerFocusTarget(undefined);
+    setSelectedRow(action.submission.id);
+    setDrawerOpen(true);
   };
 
   const createPackage = () => {
@@ -1643,50 +1506,28 @@ export function CommandCenter({
         </div>
       </main>
 
-      {usesSupabase ? (
-        selectedCanonicalSubmission ? (
-          <OperationalSubmissionDrawer
-            activeTab={drawerActiveTab}
-            focusTarget={drawerFocusTarget}
-            isOpen={drawerOpen}
-            onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
-            onAction={executeAgentSubmissionAction}
-            onClose={() => setDrawerOpen(false)}
-            onMarkIssueFixed={async (issueId) => {
-              await markAgentIssueFixed(issueId);
-            }}
-            onOpenQuestionnaireWorkspace={(target) =>
-              handleOpenQuestionnaire(selectedCanonicalSubmission.id, target)
-            }
-            onUploadFile={
-              selectedCanonicalSubmission
-                ? async (fileId, file) => {
-                    await uploadCanonicalFile(selectedCanonicalSubmission.id, fileId, file);
-                  }
-                : undefined
-            }
-            role="agent"
-            submission={selectedCanonicalSubmission}
-            surface="agent"
-          />
-        ) : null
-      ) : (
-        <Drawer
-          allowDemoFallback
-          initialTab={drawerActiveTab}
+      {selectedCanonicalSubmission ? (
+        <OperationalSubmissionDrawer
+          activeTab={drawerActiveTab}
+          focusTarget={drawerFocusTarget}
           isOpen={drawerOpen}
+          onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
+          onAction={executeAgentSubmissionAction}
           onClose={() => setDrawerOpen(false)}
-          submissionId={selectedRow}
-          submission={selectedCanonicalSubmission}
-          onOpenQuestionnaire={() =>
-            selectedRow && handleOpenQuestionnaire(selectedRow)
-          }
-          onOpenDocuments={() => {
-            if (selectedRow) focusSubmissionInList(selectedRow);
+          onMarkIssueFixed={async (issueId) => {
+            await markAgentIssueFixed(issueId);
           }}
-          onSubmissionAction={(_, action) => executeAgentSubmissionAction(action)}
+          onOpenQuestionnaireWorkspace={(target) =>
+            handleOpenQuestionnaire(selectedCanonicalSubmission.id, target)
+          }
+          onUploadFile={async (fileId, file) => {
+            await uploadCanonicalFile(selectedCanonicalSubmission.id, fileId, file);
+          }}
+          role="agent"
+          submission={selectedCanonicalSubmission}
+          surface="agent"
         />
-      )}
+      ) : null}
 
       <CommandPalette
         open={commandPaletteOpen}

@@ -3,9 +3,9 @@ import type {
   IssueInput,
   SubmissionAction,
   SubmissionFileType,
+  SubmissionStatus,
 } from '../modules/submissions/types';
 import type { ExportPackageCompletionRequest } from '../modules/submissions/exportPackageDocumentCommit';
-import type { SubmissionStatus } from '../components/Drawer';
 
 export type VisaflowWorkspace = 'agent' | 'admin';
 export type AgentNavSection =
