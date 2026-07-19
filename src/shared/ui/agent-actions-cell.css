@@ -1,0 +1,364 @@
+/* My Actions cell composition. Raw values live in the token layer. */
+
+section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
+  white-space: nowrap;
+}
+
+section[data-testid="agent-actions-screen"] .v19-submission-identity {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  align-content: center;
+  justify-items: start;
+  gap: var(--v19b-size-5);
+  color: var(--v19b-color-text);
+  font-family: var(--v19b-font-family);
+}
+
+section[data-testid="agent-actions-screen"] .v19-submission-identity-tags {
+  display: inline-flex;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--v19b-size-8);
+  white-space: nowrap;
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-submission-identity-id, .v19-submission-identity-people, .v19-legacy-action-context-tag) {
+  display: inline-flex;
+  box-sizing: border-box;
+  height: var(--v19b-action-cell-chip-height-fluid);
+  min-height: var(--v19b-action-cell-chip-height-fluid);
+  align-items: center;
+  gap: var(--v19b-size-2);
+  padding-inline: var(--v19b-size-6);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-selected);
+  border-radius: var(--v19b-radius-pill);
+  color: var(--v19b-color-text-muted);
+  background: var(--v19b-color-panel-strong);
+  box-shadow: var(--v19b-shadow-row-inner);
+  font-family: var(--v19b-font-family);
+  font-size: var(--v19b-action-cell-label-font-fluid);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-control);
+}
+
+section[data-testid="agent-actions-screen"] .v19-submission-identity-separator {
+  display: inline-grid;
+  width: var(--v19b-size-4);
+  height: var(--v19b-size-18);
+  flex: 0 0 var(--v19b-size-4);
+  place-items: center;
+  color: var(--v19b-color-text-faint);
+  font-size: var(--v19b-size-14);
+  font-weight: var(--v19b-weight-control);
+}
+
+section[data-testid="agent-actions-screen"] .v19-submission-identity-people > svg {
+  width: var(--v19b-size-8);
+  height: var(--v19b-size-8);
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-submission-identity-city, .v19-submission-trip-dates)
+  > svg {
+  width: var(--v19b-size-9);
+  height: var(--v19b-size-9);
+  flex: 0 0 auto;
+}
+
+section[data-testid="agent-actions-screen"] .v19-submission-identity-title {
+  display: block;
+  width: var(--v19b-size-full);
+  min-width: var(--v19b-size-0);
+  overflow: hidden;
+  color: var(--v19b-color-text);
+  font-family: var(--v19b-font-family) !important;
+  font-size: var(--v19b-action-cell-title-font-fluid) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-row) !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+section[data-testid="agent-actions-screen"] .v19-submission-identity-route {
+  display: inline-flex;
+  min-width: var(--v19b-size-0);
+  max-width: var(--v19b-size-full);
+  align-items: center;
+  gap: var(--v19b-size-8);
+  overflow: hidden;
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-submission-identity-city, .v19-submission-trip-dates) {
+  display: inline-flex;
+  min-width: var(--v19b-size-0);
+  max-width: var(--v19b-size-full);
+  align-items: center;
+  gap: var(--v19b-size-2);
+  overflow: hidden;
+  color: var(--v19b-color-text-70);
+  font-family: var(--v19b-font-family);
+  font-size: var(--v19b-action-cell-label-font-fluid);
+  line-height: var(--v19b-line-height-row);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+  container-type: inline-size;
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-date-column {
+  display: none;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-context-tag {
+  width: fit-content;
+  max-width: var(--v19b-size-full);
+  overflow: hidden;
+  padding-inline: var(--v19b-size-8);
+  font-size: var(--v19b-size-11);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-legacy-action-status, .v19-legacy-action-badge) {
+  height: var(--v19b-action-cell-chip-height-fluid);
+  min-height: var(--v19b-action-cell-chip-height-fluid);
+  font-size: var(--v19b-action-cell-label-font-fluid);
+}
+
+section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
+  font-size: var(--v19b-action-cell-cta-font-fluid);
+}
+
+section[data-testid="agent-actions-screen"]
+  .v19-admin-review-hero[data-v19-component="priority-hero"] {
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  height: var(--v19b-size-80);
+  min-height: var(--v19b-size-80);
+  padding: var(--v19b-size-16) var(--v19b-size-24);
+  border-color: var(--v19b-color-border-strong);
+  background: var(--v19b-color-panel);
+}
+
+section[data-testid="agent-actions-screen"] .v19-priority-hero-action {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+}
+
+section[data-testid="agent-actions-screen"] .v19-priority-hero-trigger {
+  position: relative;
+  display: inline-grid;
+  width: var(--v19b-size-40);
+  min-width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+  min-height: var(--v19b-size-40);
+  padding: var(--v19b-size-0);
+  place-items: center;
+  border: var(--v19b-size-1) solid var(--v19b-admin-red-border);
+  border-radius: var(--v19b-radius-pill);
+  color: var(--v19b-admin-red);
+  background: var(--v19b-admin-red-soft);
+}
+
+section[data-testid="agent-actions-screen"] .v19-priority-hero-trigger > svg {
+  width: var(--v19b-size-18);
+  height: var(--v19b-size-18);
+}
+
+section[data-testid="agent-actions-screen"] .v19-priority-hero-count {
+  position: absolute;
+  right: calc(var(--v19b-size-4) * -1);
+  bottom: calc(var(--v19b-size-4) * -1);
+  display: grid;
+  min-width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  padding-inline: var(--v19b-size-2);
+  place-items: center;
+  border: var(--v19b-size-2) solid var(--v19b-color-panel);
+  border-radius: var(--v19b-radius-pill);
+  color: var(--v19b-admin-red);
+  background: var(--v19b-admin-red-soft);
+  font-size: var(--v19b-size-9);
+  font-weight: var(--v19b-weight-title);
+  pointer-events: none;
+}
+
+@media (max-width: 1199px) {
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    grid-template-rows: auto var(--v19b-size-1) auto;
+    align-items: stretch;
+    column-gap: var(--v19b-size-12);
+    row-gap: var(--v19b-size-10);
+    min-height: var(--v19b-size-132);
+    padding: var(--v19b-size-12) var(--v19b-size-14);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-meta {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+    padding: var(--v19b-size-0);
+    border: var(--v19b-size-0);
+  }
+
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-legacy-action-city-column, .v19-legacy-action-date-column) {
+    display: none;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-badge.is-desktop-badge {
+    display: none;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-cta-wrap {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: center;
+    justify-self: end;
+    width: max(var(--v19b-size-104), var(--v19b-mobile-row-action-fraction));
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-context-tag {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: center;
+    justify-self: start;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
+    width: var(--v19b-size-full);
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-40);
+    padding-inline: var(--v19b-size-10);
+  }
+}
+
+@media (min-width: 1200px) {
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+    grid-template-columns:
+      minmax(var(--v19b-size-176), var(--v19b-grid-fr))
+      minmax(var(--v19b-size-88), var(--v19b-size-120))
+      minmax(var(--v19b-size-120), var(--v19b-size-160))
+      minmax(var(--v19b-size-160), var(--v19b-size-176))
+      minmax(var(--v19b-size-110), var(--v19b-size-150));
+    grid-template-rows: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    column-gap: var(--v19b-size-24);
+    row-gap: var(--v19b-size-0);
+    min-height: var(--v19b-size-96);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-meta {
+    position: static;
+    grid-column: 4;
+    grid-row: 1;
+    align-self: center;
+    justify-self: start;
+    padding: var(--v19b-size-0);
+    border: var(--v19b-size-0);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-city-column {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-date-column {
+    display: flex;
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-legacy-action-badges, .v19-legacy-action-context-tag) {
+    display: none;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-cta-wrap {
+    grid-column: 5;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row.has-context {
+    min-height: var(--v19b-size-96);
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-legacy-action-main
+    .v19-submission-identity-route {
+    display: none;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-submission-identity-id, .v19-submission-identity-people) {
+    height: var(--v19b-size-22);
+    min-height: var(--v19b-size-22);
+    padding-inline: var(--v19b-size-8);
+    font-size: var(--v19b-size-11);
+  }
+}
+
+@media (max-width: 1023px) {
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-review-hero[data-v19-component="priority-hero"] {
+    height: var(--v19b-size-64);
+    min-height: var(--v19b-size-64);
+    padding: var(--v19b-size-8) var(--v19b-size-10) var(--v19b-size-8)
+      var(--v19b-size-14);
+  }
+}
+
+@media (max-width: 767px) {
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
+    grid-column: 1 / -1;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-row {
+    min-height: var(--v19b-size-148);
+  }
+}
+
+@media (max-width: 360px) {
+  section[data-testid="agent-actions-screen"] .v19-submission-identity-tags {
+    max-width: calc(
+      var(--v19b-size-full) - var(--v19b-size-136) - var(--v19b-size-6)
+    );
+    gap: var(--v19b-size-3);
+    overflow: hidden;
+  }
+
+  section[data-testid="agent-actions-screen"]
+    :is(.v19-submission-identity-id, .v19-submission-identity-people) {
+    padding-inline: var(--v19b-size-4);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-legacy-action-context-tag {
+    grid-column: 1 / -1;
+    max-width: calc(var(--v19b-size-full) - var(--v19b-size-112));
+  }
+}
