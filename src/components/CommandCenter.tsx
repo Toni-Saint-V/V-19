@@ -447,6 +447,18 @@ export function CommandCenter({
   const blockerActionCount = actionQueue.open.filter(
     (action) => action.severity === "blocker",
   ).length;
+  const actionFiltersActive =
+    actionSummaryFilter !== "open" ||
+    actionCityFilter !== "Все города" ||
+    Boolean(searchQuery.trim());
+  const actionControlsAreDefault =
+    !actionFiltersActive && actionSort === "tripDate";
+  const resetActionFilters = () => {
+    setActionSummaryFilter("open");
+    setActionCityFilter("Все города");
+    setSearchQuery("");
+    setActionSort("tripDate");
+  };
   const agentName = agentDisplayName(agentId);
   const agentAgency = agentAgencyLabel(agentId);
   const agentAvatar = agentInitials(agentId);
@@ -1253,20 +1265,15 @@ export function CommandCenter({
 
       <div className="v19-admin-review-board v19-agent-actions-board">
         <V19ListHeader
-          actionDisabled={actionSummaryFilter === "open" && actionCityFilter === "Все города" && !searchQuery && actionSort === "tripDate"}
+          actionDisabled={actionControlsAreDefault}
           actionLabel="Все"
           className="v19-admin-review-list-head"
           countLabel={`${visibleActions.length}`}
-          onAction={() => {
-            setActionSummaryFilter("open");
-            setActionCityFilter("Все города");
-            setSearchQuery("");
-            setActionSort("tripDate");
-          }}
+          onAction={resetActionFilters}
           title="Очередь действий"
         />
         <V19QueueToolbar
-          actionDisabled={actionSummaryFilter === "open" && actionCityFilter === "Все города" && !searchQuery && actionSort === "tripDate"}
+          actionDisabled={actionControlsAreDefault}
           actionIcon={RotateCcw}
           cityFilter={actionCityFilter}
           cityOptions={actionCityOptions}
@@ -1303,12 +1310,7 @@ export function CommandCenter({
           }
           filterLabel="Сбросить фильтры"
           onCityFilterChange={setActionCityFilter}
-          onFilterClick={() => {
-            setActionSummaryFilter("open");
-            setActionCityFilter("Все города");
-            setSearchQuery("");
-            setActionSort("tripDate");
-          }}
+          onFilterClick={resetActionFilters}
           onSearchChange={setSearchQuery}
           searchPlaceholder="ID, семья или город"
           searchValue={searchQuery}
@@ -1324,7 +1326,23 @@ export function CommandCenter({
                 className="v19-legacy-actions-empty"
                 role="status"
               >
-                Нет открытых действий по текущим подачам.
+                <span aria-hidden="true" className="v19-legacy-actions-empty-icon">
+                  {actionFiltersActive ? <Search /> : <ListChecks />}
+                </span>
+                <h2>
+                  {actionFiltersActive ? "Ничего не найдено" : "Очередь действий пуста"}
+                </h2>
+                <p>
+                  {actionFiltersActive
+                    ? "Измените поисковый запрос или сбросьте выбранные фильтры."
+                    : "Создайте подачу — следующие шаги появятся здесь автоматически."}
+                </p>
+                <button
+                  type="button"
+                  onClick={actionFiltersActive ? resetActionFilters : createPackage}
+                >
+                  {actionFiltersActive ? "Сбросить фильтры" : "Новая подача"}
+                </button>
               </motion.div>
             ) : (
               visibleActions.map((action) => (

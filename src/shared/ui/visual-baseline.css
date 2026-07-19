@@ -30613,6 +30613,10 @@ body,
 }
 
 .v19-legacy-actions-empty {
+  display: grid;
+  min-height: var(--v19b-size-220);
+  place-items: center;
+  align-content: center;
   padding: var(--v19b-size-32);
   border: var(--v19b-size-1) dashed var(--v19b-color-border-strong);
   border-radius: var(--v19b-radius-row);
@@ -30620,6 +30624,79 @@ body,
   background: var(--v19b-color-panel);
   font-size: var(--v19b-size-13);
   text-align: center;
+}
+
+.v19-legacy-actions-empty-icon {
+  display: inline-grid;
+  width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+  place-items: center;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-selected);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-primary-text);
+  background: var(--v19b-color-control);
+}
+
+.v19-legacy-actions-empty-icon svg {
+  width: var(--v19b-size-18);
+  height: var(--v19b-size-18);
+}
+
+.v19-legacy-actions-empty :is(h2, p) {
+  margin: var(--v19b-size-0);
+}
+
+.v19-legacy-actions-empty h2 {
+  margin-top: var(--v19b-size-12);
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-18);
+  font-weight: var(--v19b-weight-title);
+}
+
+.v19-legacy-actions-empty p {
+  max-width: var(--v19b-size-420);
+  margin-top: var(--v19b-size-8);
+  color: var(--v19b-color-text-muted);
+  line-height: var(--v19b-line-height-row);
+}
+
+.v19-legacy-actions-empty button {
+  min-height: var(--v19b-size-40);
+  margin-top: var(--v19b-size-16);
+  padding-inline: var(--v19b-size-16);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-control);
+  font: inherit;
+  font-weight: var(--v19b-weight-control);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    border-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    background-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    transform var(--v19b-motion-fast) var(--v19b-ease-standard);
+}
+
+.v19-legacy-actions-empty button:hover {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+}
+
+.v19-legacy-actions-empty button:active {
+  transform: var(--v19b-transform-press);
+}
+
+.v19-legacy-actions-empty button:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
+@media (max-width: 767px) {
+  .v19-legacy-actions-empty {
+    min-height: var(--v19b-size-180);
+    padding: var(--v19b-size-24);
+  }
 }
 
 /* Export metadata is operational content, not decorative chrome: keep it at

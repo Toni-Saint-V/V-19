@@ -40,6 +40,32 @@ async function clickOperationalNav(page: Page, name: RegExp) {
 }
 
 test.describe("V-19 UX state proof", () => {
+  test("agent actions recover from a filtered empty state", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "single-project UX state proof");
+
+    const problems = collectBrowserProblems(page);
+
+    await openFreshWorkspace(page, { heading: "Мои действия" });
+    await page.getByPlaceholder("ID, семья или город").fill("нет-такого-действия");
+    const actionEmptyState = page
+      .getByRole("status")
+      .filter({ hasText: "Ничего не найдено" });
+    await expect(
+      actionEmptyState.getByRole("heading", { name: "Ничего не найдено" }),
+    ).toBeVisible();
+    await expect(
+      actionEmptyState.getByRole("button", { name: "Сбросить фильтры" }),
+    ).toBeVisible();
+    await actionEmptyState.getByRole("button", { name: "Сбросить фильтры" }).click();
+    await expect(actionEmptyState).toHaveCount(0);
+    await expect(page.getByPlaceholder("ID, семья или город")).toHaveValue("");
+    await saveScreenshot(page, "agent-actions-filtered-empty-recovered");
+
+    expect(problems, problems.join("\n")).toEqual([]);
+  });
+
   test("primary surfaces expose no-results, disabled-with-reason, dirty, and success states", async ({
     page,
   }, testInfo) => {
