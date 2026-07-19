@@ -36453,6 +36453,11 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
     font-size: var(--v19b-size-9);
   }
 
+  section[data-testid="agent-actions-screen"] .v19-operational-card-title {
+    font-size: var(--v19b-size-15);
+    font-weight: var(--v19b-weight-control);
+  }
+
   section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
     grid-column: 1 / -1;
   }
