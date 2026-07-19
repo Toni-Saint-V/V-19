@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react(), splitLargeCssAssets()],
     build: {
+      manifest: true,
       rollupOptions: {
         output: {
           manualChunks(id) {

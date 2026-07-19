@@ -3,6 +3,7 @@ import { gzipSync } from "node:zlib";
 import { join } from "node:path";
 
 const distAssets = join(process.cwd(), "dist", "assets");
+const manifestPath = join(process.cwd(), "dist", ".vite", "manifest.json");
 
 // Current V-19 cockpit baseline. The shell still ships a large global CSS
 // bundle and several intentionally lazy operational chunks; keep no-growth
@@ -50,6 +51,15 @@ if (!existsSync(distAssets)) {
   console.error("dist/assets not found. Run npm run build before verify:performance.");
   process.exit(1);
 }
+
+if (!existsSync(manifestPath)) {
+  console.error(
+    "dist/.vite/manifest.json not found. Run npm run build before verify:performance.",
+  );
+  process.exit(1);
+}
+
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
 const assets = readdirSync(distAssets)
   .filter((file) => /\.(js|css)$/.test(file))
@@ -99,6 +109,24 @@ for (const asset of assets) {
 
 const jsAssets = assets.filter((asset) => asset.file.endsWith(".js"));
 const cssAssets = assets.filter((asset) => asset.file.endsWith(".css"));
+const entryManifestKeys = Object.entries(manifest)
+  .filter(([, entry]) => entry.isEntry)
+  .map(([key]) => key);
+const workspaceManifestKey = Object.keys(manifest).find(
+  (key) => key === "src/components/WorkspaceSurface.tsx",
+);
+const initialJsAssetFiles = collectStaticJsFiles(manifest, entryManifestKeys);
+const workspaceRoleManifestKeys = workspaceManifestKey
+  ? (manifest[workspaceManifestKey]?.dynamicImports ?? [])
+  : [];
+const workspaceJsAssetFiles = workspaceManifestKey
+  ? collectStaticJsFiles(manifest, [workspaceManifestKey, ...workspaceRoleManifestKeys])
+  : new Set();
+
+for (const initialFile of initialJsAssetFiles) {
+  workspaceJsAssetFiles.delete(initialFile);
+}
+
 const lazyWorkbookAssets = jsAssets.filter((asset) =>
   asset.file.startsWith("exportWorkbook-"),
 );
@@ -110,16 +138,9 @@ const lazyPassportOcrAssets = jsAssets.filter((asset) =>
 );
 const lazyPdfAssets = jsAssets.filter((asset) => asset.file.startsWith("pdf-"));
 const lazyWorkspaceAssets = jsAssets.filter((asset) =>
-  asset.file.startsWith("WorkspaceSurface-"),
+  workspaceJsAssetFiles.has(asset.file),
 );
-const initialJsAssets = jsAssets.filter(
-  (asset) =>
-    !lazyWorkbookAssets.includes(asset) &&
-    !lazySettingsAssets.includes(asset) &&
-    !lazyPassportOcrAssets.includes(asset) &&
-    !lazyPdfAssets.includes(asset) &&
-    !lazyWorkspaceAssets.includes(asset),
-);
+const initialJsAssets = jsAssets.filter((asset) => initialJsAssetFiles.has(asset.file));
 const totalJsRawKb =
   initialJsAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const totalJsGzipKb =
@@ -197,8 +218,30 @@ if (lazyPdfAssets.length > 1) {
   failures.push("PDF review runtime must stay in one lazy JS chunk");
 }
 
-if (lazyWorkspaceAssets.length !== 1) {
-  failures.push("workspace surface must stay lazy and emit one WorkspaceSurface-* JS chunk");
+if (!workspaceManifestKey) {
+  failures.push("workspace surface must stay present in the production manifest");
+}
+
+if (entryManifestKeys.length !== 1) {
+  failures.push("production manifest must expose exactly one initial entry");
+}
+
+if (
+  jsAssets.filter((asset) => asset.file.startsWith("WorkspaceSurface-")).length !== 1
+) {
+  failures.push(
+    "workspace surface must stay lazy and emit one WorkspaceSurface-* JS chunk",
+  );
+}
+
+if (jsAssets.filter((asset) => asset.file.startsWith("CommandCenter-")).length !== 1) {
+  failures.push("agent workspace must stay lazy and emit one CommandCenter-* JS chunk");
+}
+
+if (jsAssets.filter((asset) => asset.file.startsWith("AdminWorkspace-")).length !== 1) {
+  failures.push(
+    "admin workspace must stay lazy and emit one AdminWorkspace-* JS chunk",
+  );
 }
 
 if (lazyWorkbookRawKb > lazyWorkbookRawKbLimit) {
@@ -322,3 +365,29 @@ console.log(
     1,
   )} KB raw, ${lazyWorkspaceGzipKb.toFixed(1)} KB gzip`,
 );
+
+function collectStaticJsFiles(manifestEntries, rootKeys) {
+  const files = new Set();
+  const visited = new Set();
+
+  function visit(key) {
+    if (visited.has(key)) return;
+    visited.add(key);
+
+    const entry = manifestEntries[key];
+    if (!entry) return;
+    if (entry.file?.endsWith(".js")) {
+      files.add(entry.file.replace(/^assets\//, ""));
+    }
+
+    for (const importedKey of entry.imports ?? []) {
+      visit(importedKey);
+    }
+  }
+
+  for (const rootKey of rootKeys) {
+    visit(rootKey);
+  }
+
+  return files;
+}

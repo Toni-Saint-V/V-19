@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
-import type { ComponentProps } from "react";
-import { AdminWorkspace } from "./AdminWorkspace";
-import { CommandCenter } from "./CommandCenter";
+import { lazy, type ComponentProps } from "react";
+import type { AdminWorkspace as AdminWorkspaceComponent } from "./AdminWorkspace";
+import type { CommandCenter as CommandCenterComponent } from "./CommandCenter";
 import {
   VisaflowBusinessBridgeProvider,
   type VisaflowBusinessBridge,
@@ -15,9 +15,19 @@ type WorkspaceDataState = {
   status: WorkspaceDataStatus;
 };
 
+const AdminWorkspace = lazy(async () => {
+  const module = await import("./AdminWorkspace");
+  return { default: module.AdminWorkspace };
+});
+
+const CommandCenter = lazy(async () => {
+  const module = await import("./CommandCenter");
+  return { default: module.CommandCenter };
+});
+
 type WorkspaceSurfaceProps = {
-  adminWorkspaceProps: ComponentProps<typeof AdminWorkspace>;
-  agentWorkspaceProps: ComponentProps<typeof CommandCenter>;
+  adminWorkspaceProps: ComponentProps<typeof AdminWorkspaceComponent>;
+  agentWorkspaceProps: ComponentProps<typeof CommandCenterComponent>;
   bridge: VisaflowBusinessBridge;
   onRetryWorkspace: () => void | Promise<void>;
   workspace: Workspace;
