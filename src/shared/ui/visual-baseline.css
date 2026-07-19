@@ -37103,6 +37103,43 @@ section[data-testid="agent-actions-screen"]
 
 }
 
+/* Keep the first actionable card inside the initial mobile viewport without
+   hiding summary or filter controls. Desktop and tablet retain their spacing. */
+@media (max-width: 767px) {
+  section[data-testid="agent-actions-screen"].v19-legacy-actions-screen {
+    gap: var(--v19b-size-12);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-priority-hero {
+    height: var(--v19b-size-56);
+    min-height: var(--v19b-size-56);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-metric-strip {
+    grid-auto-rows: minmax(var(--v19b-size-64), auto);
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-metric-strip
+    .v19-metric-card {
+    min-height: var(--v19b-size-64);
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-admin-list-header {
+    min-height: var(--v19b-size-48);
+    padding-block: var(--v19b-size-8);
+  }
+
+  section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    padding-block: var(--v19b-size-8) !important;
+  }
+
+  section[data-testid="agent-actions-screen"] .v19-agent-actions-card-grid {
+    padding-top: var(--v19b-size-8);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v19-priority-hero-trigger > svg {
     animation: none;
