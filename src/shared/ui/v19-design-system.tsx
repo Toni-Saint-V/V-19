@@ -241,17 +241,41 @@ export function V19OperationalCardGrid({
   );
 }
 
+export function V19OperationalProgressLine({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <span className="v19-operational-progress-line">
+      <span>
+        <span>{label}</span>
+        <span>{value}%</span>
+      </span>
+      <span aria-hidden="true">
+        <span style={{ width: `${value}%` }} />
+      </span>
+    </span>
+  );
+}
+
 type V19OperationalCardProps<T extends ElementType> = V19QueueCardProps<T> & {
   actionIcon?: ElementType;
   actionLabel?: string;
   actionText: string;
   city?: string;
   footer?: ReactNode;
+  metaDetail?: string;
   peopleCount: number;
   progress?: ReactNode;
   publicId: string;
+  shellDetail?: string;
+  shellIcon?: ElementType;
+  shellLabel?: string;
+  shellMeta?: string;
   title: string;
-  tripDates?: string;
 };
 
 /**
@@ -267,11 +291,15 @@ export function V19OperationalCard<T extends ElementType = "button">({
   city,
   className,
   footer,
+  metaDetail,
   peopleCount,
   progress,
   publicId,
+  shellDetail,
+  shellIcon: ShellIcon = FileCheck2,
+  shellLabel = "Задача",
+  shellMeta,
   title,
-  tripDates,
   ...props
 }: V19OperationalCardProps<T>) {
   const Component = as ?? "button";
@@ -282,58 +310,74 @@ export function V19OperationalCard<T extends ElementType = "button">({
       className={cn("v19-queue-card", "v19-operational-card", className)}
       data-v19-component="operational-card"
     >
-      <span className="v19-operational-card-header">
-        <span className="v19-operational-card-identity">
-          <span className="v19-operational-card-meta">
-            <span className="v19-operational-card-id v19-admin-review-card-id">
-              {publicId}
-            </span>
-            <i aria-hidden="true" />
-            <span className="v19-operational-card-people">
-              {peopleCount > 1 ? (
-                <Users aria-hidden="true" />
-              ) : (
-                <User aria-hidden="true" />
-              )}
-              <span>{peopleCount} чел.</span>
-            </span>
+      <span className="v19-operational-card-shell-header">
+        <span className="v19-operational-card-shell-heading">
+          <span className="v19-operational-card-shell-icon" aria-hidden="true">
+            <ShellIcon />
           </span>
-          <strong className="v19-operational-card-title" title={title}>
-            {title}
-          </strong>
-          {city || tripDates ? (
-            <span className="v19-operational-card-route">
-              {city ? (
-                <span className="v19-operational-card-location">
-                  <MapPin aria-hidden="true" />
-                  <span>{city}</span>
-                </span>
+          <span>
+            <strong>{shellLabel}</strong>
+            {shellDetail ? <small>{shellDetail}</small> : null}
+          </span>
+        </span>
+        {shellMeta ? (
+          <span className="v19-operational-card-shell-meta">{shellMeta}</span>
+        ) : null}
+      </span>
+
+      <span className="v19-operational-card-body">
+        <span className="v19-operational-card-header">
+          <span className="v19-operational-card-identity">
+            <span className="v19-operational-card-meta">
+              <span className="v19-operational-card-id v19-admin-review-card-id">
+                {publicId}
+              </span>
+              <i aria-hidden="true" />
+              <span className="v19-operational-card-people">
+                {peopleCount > 1 ? (
+                  <Users aria-hidden="true" />
+                ) : (
+                  <User aria-hidden="true" />
+                )}
+                <span>{peopleCount} чел.</span>
+              </span>
+              {metaDetail ? <i aria-hidden="true" /> : null}
+              {metaDetail ? (
+                <span>{metaDetail}</span>
               ) : null}
-              <V19SubmissionTripDates dates={tripDates} />
             </span>
-          ) : null}
+            <strong className="v19-operational-card-title" title={title}>
+              {title}
+            </strong>
+            {city ? (
+              <span className="v19-operational-card-location">
+                <MapPin aria-hidden="true" />
+                <span>{city}</span>
+              </span>
+            ) : null}
+          </span>
+          <span className="v19-operational-card-open" aria-hidden="true">
+            <ChevronRight />
+          </span>
         </span>
-        <span className="v19-operational-card-open" aria-hidden="true">
-          <ChevronRight />
-        </span>
-      </span>
 
-      <span className="v19-operational-card-action">
-        <span aria-hidden="true">
-          <ActionIcon />
+        <span className="v19-operational-card-action">
+          <span aria-hidden="true">
+            <ActionIcon />
+          </span>
+          <span>
+            <small>{actionLabel}</small>
+            <strong>{actionText}</strong>
+          </span>
         </span>
-        <span>
-          <small>{actionLabel}</small>
-          <strong>{actionText}</strong>
-        </span>
-      </span>
 
-      {progress ? (
-        <span className="v19-operational-card-progress">{progress}</span>
-      ) : null}
-      {footer ? (
-        <span className="v19-operational-card-footer">{footer}</span>
-      ) : null}
+        {progress ? (
+          <span className="v19-operational-card-progress">{progress}</span>
+        ) : null}
+        {footer ? (
+          <span className="v19-operational-card-footer">{footer}</span>
+        ) : null}
+      </span>
     </Component>
   );
 }

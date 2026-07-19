@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock,
   FileCheck2,
+  Flame,
   MessageSquareWarning,
   RotateCcw,
   ShieldCheck,
@@ -25,6 +26,7 @@ import {
   V19MetricStrip,
   V19OperationalCard,
   V19OperationalCardGrid,
+  V19OperationalProgressLine,
   V19PriorityHero,
 } from "../shared/ui/v19-design-system";
 import {
@@ -177,22 +179,6 @@ function reviewCountLabel(count: number) {
   return 'заявок';
 }
 
-function ProgressLine({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="v19-admin-review-progress-line">
-      <div>
-        <span>{label}</span>
-        <span>{value}%</span>
-      </div>
-      <div>
-        <div
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function reviewActionLabel(item: ReviewCard) {
   if (item.lane === "urgent") return "Разобрать критические замечания";
   if (item.lane === "returned") return "Проверить исправления агента";
@@ -207,6 +193,12 @@ function ReviewQueueCard({
   onOpenDrawer: (id: string) => void;
 }) {
   const hasBlocker = item.blockers > 0;
+  const shortQueueTime = item.timeInQueue.replace(/\s+\d+\s+мин$/, "");
+  const lanePresentation = item.lane === "urgent"
+    ? { detail: "сначала сюда", icon: Flame, label: "Критичные" }
+    : item.lane === "returned"
+      ? { detail: "у агента / на сверке", icon: MessageSquareWarning, label: "Правки" }
+      : { detail: "ручная сверка", icon: ShieldCheck, label: "На проверке" };
 
   return (
     <V19OperationalCard
@@ -234,14 +226,19 @@ function ReviewQueueCard({
           </span>
         </>
       }
+      metaDetail={shortQueueTime}
       peopleCount={item.applicants}
       progress={
         <>
-          <ProgressLine label="Анкета" value={item.questionnaire} />
-          <ProgressLine label="Файлы" value={item.files} />
+          <V19OperationalProgressLine label="Анкета" value={item.questionnaire} />
+          <V19OperationalProgressLine label="Файлы" value={item.files} />
         </>
       }
       publicId={item.publicId}
+      shellDetail={lanePresentation.detail}
+      shellIcon={lanePresentation.icon}
+      shellLabel={lanePresentation.label}
+      shellMeta={`${item.applicants} чел.`}
       title={item.title}
       as="button"
       aria-label={`Ручная проверка заявки ${item.title}`}
