@@ -16684,6 +16684,181 @@ button.v19-summary-tile:not(:disabled):active {
   }
 }
 
+/* Screen-scoped premium color pilot.
+   Raw values live in ./tokens/index.css; this layer only maps them to the
+   active My Actions shell and deliberately excludes Drawer descendants. */
+
+html:has(.v19-fullscreen-app [data-testid="agent-actions-screen"]),
+body:has(.v19-fullscreen-app [data-testid="agent-actions-screen"]) {
+  background: var(--v19-depth-canvas);
+  color: var(--v19-depth-text);
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"]) > div {
+  background: var(--v19-depth-canvas) !important;
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  main[aria-label="Рабочая область подач"] {
+  background: var(--v19-depth-page) !important;
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  main[aria-label="Рабочая область подач"]
+  > header {
+  border-color: var(--v19-depth-border) !important;
+  background: var(--v19-depth-page) !important;
+  box-shadow: var(--v19-depth-inner-highlight);
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  :is(aside:not([role="dialog"]), aside[aria-label="Меню агента"]) {
+  border-color: var(--v19-depth-border) !important;
+  background: var(--v19-depth-shell) !important;
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  .v19-agent-sidebar-nav-item.is-active {
+  border-color: var(--v19-depth-accent-border) !important;
+  background: var(--v19-depth-accent-soft) !important;
+  box-shadow: inset var(--v19b-size-3) var(--v19b-size-0) var(--v19b-size-0)
+    var(--v19-depth-accent) !important;
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  :is(.v19-agent-sidebar-profile, .v19-agent-sidebar-workspace) {
+  border-color: var(--v19-depth-border-strong) !important;
+  background: var(--v19-depth-panel-strong) !important;
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  .v19-action-surface-create {
+  border-color: var(--v19-depth-accent-border) !important;
+  background: var(--v19-depth-accent) !important;
+  color: var(--v19-depth-text-strong) !important;
+  box-shadow: var(--v19-depth-inner-highlight) !important;
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  .v19-action-surface-create:hover {
+  background: var(--v19-depth-accent-hover) !important;
+}
+
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  .v19-action-surface-create:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19-depth-focus) !important;
+  outline-offset: var(--v19b-size-2) !important;
+}
+
+section[data-testid="agent-actions-screen"] {
+  --v19b-color-app: var(--v19-depth-canvas);
+  --v19b-color-page: var(--v19-depth-page);
+  --v19b-color-panel: var(--v19-depth-panel);
+  --v19b-color-panel-strong: var(--v19-depth-panel-strong);
+  --v19b-color-control: var(--v19-depth-control);
+  --v19b-color-control-hover: var(--v19-depth-control-hover);
+  --v19b-color-border: var(--v19-depth-border);
+  --v19b-color-border-strong: var(--v19-depth-border-strong);
+  --v19b-color-border-selected: var(--v19-depth-border-selected);
+  --v19b-color-text-strong: var(--v19-depth-text-strong);
+  --v19b-color-text: var(--v19-depth-text);
+  --v19b-color-text-80: var(--v19-depth-text);
+  --v19b-color-text-70: var(--v19-depth-text-muted);
+  --v19b-color-text-60: var(--v19-depth-text-muted);
+  --v19b-color-text-50: var(--v19-depth-text-faint);
+  --v19b-color-text-40: var(--v19-depth-text-faint);
+  --v19b-color-text-muted: var(--v19-depth-text-muted);
+  --v19b-color-text-faint: var(--v19-depth-text-faint);
+  --v19b-color-focus: var(--v19-depth-focus);
+  --v19b-color-primary: var(--v19-depth-accent);
+  --v19b-color-primary-hover: var(--v19-depth-accent-hover);
+  --v19b-color-primary-text: var(--v19-depth-accent-text);
+  --v19b-color-primary-soft-10: var(--v19-depth-accent-soft);
+  --v19b-color-primary-soft-20: var(--v19-depth-accent-soft);
+  --v19b-color-primary-soft-30: var(--v19-depth-accent-border);
+  --v19b-admin-blue-soft: var(--v19-depth-accent-soft);
+  --v19b-admin-unified-text: var(--v19-depth-accent-text);
+  --v19b-admin-unified-surface: var(--v19-depth-accent-soft);
+  --v19b-shadow-panel: var(--v19-depth-shadow-panel);
+  --v19b-shadow-admin-card: var(--v19-depth-shadow-card);
+  --v19b-shadow-row-inner: var(--v19-depth-inner-highlight);
+  --v19b-shadow-admin-hover: var(--v19-depth-shadow-card);
+  --vf-accent: var(--v19-depth-accent);
+  --vf-accent-soft: var(--v19-depth-accent-soft);
+  --vf-accent-border: var(--v19-depth-accent-border);
+  color: var(--v19-depth-text);
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-priority-hero, .v19-agent-actions-board) {
+  border-color: var(--v19-depth-border-strong);
+  background: var(--v19-depth-panel);
+  box-shadow: var(--v19-depth-shadow-panel);
+}
+
+section[data-testid="agent-actions-screen"] .v19-metric-card {
+  border-color: var(--v19-depth-border-strong);
+  background: var(--v19-depth-page);
+}
+
+section[data-testid="agent-actions-screen"]
+  button.v19-metric-card:is(:hover, .is-active, [aria-pressed="true"]) {
+  border-color: var(--v19-depth-border-selected);
+  background: var(--v19-depth-panel-strong);
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-admin-list-header, .v19-admin-queue-toolbar) {
+  border-color: var(--v19-depth-border-strong);
+  background: var(--v19-depth-panel);
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(
+    .v19-admin-toolbar-select,
+    .v19-admin-city-filter,
+    .v19-admin-queue-toolbar-search input,
+    .v19-two-row-toolbar-search-row > button
+  ) {
+  border-color: var(--v19-depth-border-strong) !important;
+  background: var(--v19-depth-control) !important;
+}
+
+section[data-testid="agent-actions-screen"]
+  .v19-admin-queue-toolbar-search
+  input::placeholder {
+  color: var(--v19-depth-text-faint) !important;
+}
+
+section[data-testid="agent-actions-screen"]
+  :is(.v19-admin-toolbar-select, .v19-admin-city-filter):is(
+    :hover,
+    .is-open,
+    .is-active
+  ),
+section[data-testid="agent-actions-screen"]
+  .v19-two-row-toolbar-search-row
+  > button:not(:disabled):hover {
+  border-color: var(--v19-depth-border-selected) !important;
+  background: var(--v19-depth-control-hover) !important;
+}
+
+section[data-testid="agent-actions-screen"] .v19-operational-card {
+  border-color: var(--v19-depth-border-strong);
+  background: var(--v19-depth-panel);
+  box-shadow: var(--v19-depth-shadow-card);
+}
+
+section[data-testid="agent-actions-screen"] .v19-operational-card-body {
+  border-color: var(--v19-depth-border);
+  background: var(--v19-depth-panel-strong);
+}
+
+section[data-testid="agent-actions-screen"]
+  .v19-operational-card:not(.has-blocker):hover {
+  border-color: var(--v19-depth-border-selected);
+}
+
 /* Linear Style final lock: fullscreen BLS questionnaire. */
 .vf-figma-questionnaire-screen,
 .vf-figma-questionnaire-screen :where(button, input, textarea, label) {

@@ -31,6 +31,34 @@
   --success: 16 185 129;
   --info: 59 130 246;
 
+  /* My Actions premium-depth pilot. Raw values stay in the token owner while
+     the screen-scoped runtime layer consumes them without recoloring Drawer. */
+  --v19-depth-canvas: #090b10;
+  --v19-depth-shell: #0d0f15;
+  --v19-depth-page: #0f1219;
+  --v19-depth-panel: #131722;
+  --v19-depth-panel-strong: #171c29;
+  --v19-depth-control: #171b26;
+  --v19-depth-control-hover: #202638;
+  --v19-depth-border: #202637;
+  --v19-depth-border-strong: #2b3449;
+  --v19-depth-border-selected: #3b4765;
+  --v19-depth-text-strong: #f0f2f8;
+  --v19-depth-text: rgb(231 235 245 / 0.92);
+  --v19-depth-text-muted: rgb(210 217 235 / 0.64);
+  --v19-depth-text-faint: rgb(197 205 227 / 0.6);
+  --v19-depth-accent: #5362cf;
+  --v19-depth-accent-hover: #5968d9;
+  --v19-depth-accent-text: #a9b4ff;
+  --v19-depth-accent-soft: rgb(83 98 207 / 0.14);
+  --v19-depth-accent-border: rgb(137 151 235 / 0.42);
+  --v19-depth-focus: rgb(169 180 255 / 0.86);
+  --v19-depth-inner-highlight: inset 0 1px 0 rgb(255 255 255 / 0.025);
+  --v19-depth-shadow-panel:
+    var(--v19-depth-inner-highlight), 0 14px 40px rgb(0 0 0 / 0.18);
+  --v19-depth-shadow-card:
+    var(--v19-depth-inner-highlight), 0 8px 24px rgb(0 0 0 / 0.14);
+
   --vf-bg-canvas: rgb(var(--canvas));
   --vf-bg-sidebar: rgb(var(--canvas));
   --vf-surface-main: rgb(var(--panel));
