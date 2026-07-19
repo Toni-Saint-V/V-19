@@ -12,6 +12,10 @@ test-results/
 playwright-report-*/
 test-results-*/
 /docs/
+/tests/*
+!/tests/support/
+/tests/support/*
+!/tests/support/artifacts.ts
 config/playwright/
 .agents/
 /supabase/
