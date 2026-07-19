@@ -24,6 +24,7 @@ function legacyPublicNumber(id: string): number | null {
 
 export function submissionPublicNumber(submission: SubmissionIdentity): number | null {
   if (validPublicNumber(submission.publicNumber)) return submission.publicNumber;
+  if (Object.hasOwn(submission, "publicNumber")) return null;
   return legacyPublicNumber(submission.id);
 }
 

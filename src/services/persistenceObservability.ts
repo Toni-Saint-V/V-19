@@ -28,6 +28,7 @@ export type SupabasePersistenceOperation =
   | "export_batches.read_duplicate"
   | "export_batch_members.list"
   | "rpc.complete_export_package"
+  | "rpc.ensure_submission_public_number"
   | "rpc.publish_returned_pdf_handoff"
   | "rpc.start_agent_return_package"
   | "rpc.publish_agent_return_package"

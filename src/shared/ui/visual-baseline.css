@@ -7172,9 +7172,20 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
 }
 
 .v19-agent-submission-family-icon {
+  display: grid;
+  width: var(--v19b-size-44);
+  height: var(--v19b-size-44);
+  flex: 0 0 auto;
+  place-items: center;
   border-radius: var(--v19b-radius-control);
   background: var(--v19b-color-control);
+  border: var(--v19b-size-1) solid;
   border-color: var(--v19b-color-border-strong);
+}
+
+.v19-agent-submission-family-icon .lucide {
+  width: var(--v19b-size-20);
+  height: var(--v19b-size-20);
 }
 
 .v19-agent-actions-board .v19-legacy-action-row,
@@ -7266,14 +7277,40 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
 }
 
 .v19-agent-submissions-board .v19-applicant-member-cell {
-  display: flex;
+  display: grid;
   min-width: var(--v19b-size-0);
+  grid-template-columns: var(--v19b-size-16) minmax(
+      var(--v19b-size-0),
+      var(--v19b-grid-fr)
+    ) auto;
   align-items: center;
   gap: var(--v19b-size-8);
   padding: var(--v19b-size-8) var(--v19b-size-10);
   border: var(--v19b-size-1) solid var(--v19b-color-border);
   border-radius: var(--v19b-radius-control);
   background: var(--v19b-color-app);
+}
+
+.v19-agent-submissions-board .v19-applicant-member-list {
+  display: grid;
+  gap: var(--v19b-size-8);
+  margin-bottom: var(--v19b-size-20);
+}
+
+.v19-agent-submissions-board .v19-applicant-member-identity {
+  display: inline-flex;
+  min-width: var(--v19b-size-0);
+  flex: 1 1 auto;
+  grid-column: 2;
+  align-items: baseline;
+  gap: var(--v19b-size-4);
+}
+
+.v19-agent-submissions-board
+  .v19-applicant-member-cell
+  .v19-applicant-workflow-actions {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .v19-agent-submissions-board .v19-applicant-person-icon {
@@ -7292,10 +7329,9 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
 
 .v19-agent-submissions-board .v19-applicant-member-name {
   min-width: var(--v19b-size-0);
-  flex: 1 1 auto;
   overflow: hidden;
   color: var(--v19b-color-text);
-  font-size: var(--v19b-size-14);
+  font-size: var(--v19b-size-13);
   font-weight: var(--v19b-font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7346,10 +7382,49 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   font-size: var(--v19b-size-12);
 }
 
-.v19-agent-submissions-board .v19-applicant-individual-header,
-.v19-agent-submissions-board .v19-applicant-individual-main {
+.v19-agent-submissions-board .v19-applicant-individual-header {
+  display: grid;
   width: var(--v19b-size-full);
   min-width: var(--v19b-size-0);
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  align-items: start;
+  gap: var(--v19b-size-12);
+  margin-bottom: var(--v19b-size-20);
+}
+
+.v19-agent-submissions-board .v19-applicant-individual-main {
+  display: flex;
+  width: var(--v19b-size-full);
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  gap: var(--v19b-size-12);
+}
+
+.v19-agent-submissions-board
+  .v19-applicant-individual-header
+  :is(.v19-applicant-card-status, .v19-applicant-status-action) {
+  align-self: start;
+  justify-self: end;
+}
+
+.v19-agent-submissions-board .v19-applicant-individual-name-row h3 {
+  min-width: var(--v19b-size-0);
+  margin: var(--v19b-size-0);
+  overflow: hidden;
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-13);
+  font-weight: var(--v19b-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v19-agent-submissions-board .v19-applicant-individual-meta {
+  display: inline-flex;
+  margin: var(--v19b-size-2) var(--v19b-size-0) var(--v19b-size-0);
+  align-items: center;
+  gap: var(--v19b-size-6);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-10);
 }
 
 .v19-agent-submissions-board .v19-applicant-individual-copy {
@@ -7387,30 +7462,176 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   gap: var(--v19b-size-8);
 }
 
-.v19-agent-submissions-board .v19-applicant-open-action {
+.v19-agent-submissions-board .v19-applicant-status-action {
   display: inline-flex;
   min-height: var(--v19b-size-40);
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: var(--v19b-size-2);
-  padding: var(--v19b-size-0) var(--v19b-size-10);
-  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  padding: var(--v19b-size-0) var(--v19b-size-12);
+  border: var(--v19b-size-0);
   border-radius: var(--v19b-radius-control);
-  color: var(--v19b-color-text-strong);
-  background: var(--v19b-color-control);
+  color: var(--v19b-color-primary-text);
+  background: var(--v19b-color-primary);
   font-size: var(--v19b-size-12);
   font-weight: var(--v19b-font-weight-medium);
   line-height: var(--v19b-line-height-tight);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    opacity var(--v19b-motion-fast) var(--v19b-ease-standard);
 }
 
-.v19-agent-submissions-board .v19-applicant-open-action .lucide {
-  width: var(--v19b-size-14);
-  height: var(--v19b-size-14);
+.v19-agent-submissions-board .v19-applicant-status-action:hover {
+  background: var(--v19b-color-primary-hover);
 }
 
-.v19-agent-submissions-board .v19-applicant-open-action:disabled {
+.v19-agent-submissions-board .v19-applicant-status-action:disabled {
   cursor: wait;
   opacity: var(--v19b-opacity-disabled);
+}
+
+.v19-agent-submissions-board .v19-applicant-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v19b-size-8);
+  padding-top: var(--v19b-size-14);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+}
+
+.v19-agent-submissions-board
+  .v19-applicant-card-footer
+  > .v19-applicant-workflow-actions {
+  margin-left: auto;
+}
+
+.v19-agent-submissions-board .v19-applicant-created-at {
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-font-weight-medium);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action-wrap {
+  position: relative;
+  display: grid;
+  width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+  place-items: center;
+}
+
+.v19-agent-submissions-board
+  .v19-applicant-workflow-action-wrap
+  + .v19-applicant-workflow-action-wrap::before {
+  position: absolute;
+  top: var(--v19b-size-10);
+  bottom: var(--v19b-size-10);
+  left: var(--v19b-size-0);
+  width: var(--v19b-size-1);
+  background: var(--v19b-color-border-strong);
+  content: "";
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action {
+  position: relative;
+  display: grid;
+  width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+  min-width: var(--v19b-size-40);
+  min-height: var(--v19b-size-40);
+  place-items: center;
+  border: var(--v19b-size-0);
+  border-radius: var(--v19b-radius-control);
+  background: transparent;
+  color: var(--v19b-color-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    border-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    color var(--v19b-motion-fast) var(--v19b-ease-standard);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action:hover {
+  background: var(--v19b-color-control-hover);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action:focus-visible,
+.v19-agent-submissions-board .v19-applicant-status-action:focus-visible {
+  outline: none;
+  box-shadow: var(--v19b-focus-ring-shadow);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action.is-ready {
+  color: var(--v19b-dot-success);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action.is-attention {
+  color: var(--v19b-color-remark);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action:disabled {
+  cursor: wait;
+  opacity: var(--v19b-opacity-disabled);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-action .lucide {
+  width: var(--v19b-size-18);
+  height: var(--v19b-size-18);
+}
+
+.v19-agent-submissions-board .v19-applicant-workflow-index {
+  position: absolute;
+  right: var(--v19b-size-4);
+  bottom: var(--v19b-size-2);
+  font-size: var(--v19b-size-9);
+  font-weight: var(--v19b-weight-title);
+}
+
+.v19-agent-submissions-board .v19-applicant-empty-state {
+  display: grid;
+  min-height: var(--v19b-size-260);
+  place-items: center;
+  align-content: center;
+  padding: var(--v19b-size-32);
+  border: var(--v19b-size-1) dashed var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-panel);
+  background: var(--v19b-color-panel);
+  text-align: center;
+}
+
+.v19-agent-submissions-board .v19-applicant-empty-state :is(h2, p) {
+  margin: var(--v19b-size-0);
+}
+
+.v19-agent-submissions-board .v19-applicant-empty-state h2 {
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-18);
+}
+
+.v19-agent-submissions-board .v19-applicant-empty-state p {
+  margin-top: var(--v19b-size-8);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-13);
+}
+
+.v19-agent-submissions-board .v19-applicant-empty-state button {
+  min-height: var(--v19b-size-40);
+  margin-top: var(--v19b-size-16);
+  padding-inline: var(--v19b-size-16);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-13);
+  font-weight: var(--v19b-font-weight-medium);
 }
 
 .v19-agent-submissions-board .v19-applicant-submit-error {
@@ -7469,8 +7690,14 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
 
 @media (max-width: 767px) {
   .v19-agent-submissions-board .v19-applicant-family-header {
-    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
     gap: var(--v19b-size-8);
+  }
+
+  .v19-agent-submissions-board
+    .v19-applicant-family-header
+    :is(.v19-applicant-card-status, .v19-applicant-status-action) {
+    justify-self: end;
   }
 
   .v19-agent-submissions-board .v19-applicant-family-main,
@@ -7511,6 +7738,56 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   .v19-agent-submissions-cards {
     gap: var(--v19b-size-12);
     padding: var(--v19b-size-12);
+  }
+}
+
+@media (max-width: 399px) {
+  .v19-agent-submissions-board
+    .v19-applicant-member-cell[data-applicant-role="main"] {
+    grid-template-columns: var(--v19b-size-16) minmax(
+        var(--v19b-size-0),
+        var(--v19b-grid-fr)
+      );
+  }
+
+  .v19-agent-submissions-board
+    .v19-applicant-member-cell[data-applicant-role="main"]
+    .v19-applicant-workflow-actions {
+    grid-column: 2 / -1;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 359px) {
+  .v19-agent-submissions-board .v19-applicant-individual-header {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  }
+
+  .v19-agent-submissions-board .v19-applicant-individual-main {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+
+  .v19-agent-submissions-board
+    .v19-applicant-individual-header
+    :is(.v19-applicant-card-status, .v19-applicant-status-action) {
+    grid-row: 1;
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .v19-agent-submissions-board .v19-applicant-member-cell {
+    grid-template-columns: var(--v19b-size-16) minmax(
+        var(--v19b-size-0),
+        var(--v19b-grid-fr)
+      );
+  }
+
+  .v19-agent-submissions-board
+    .v19-applicant-member-cell
+    .v19-applicant-workflow-actions {
+    grid-column: 2 / -1;
+    justify-self: end;
   }
 }
 

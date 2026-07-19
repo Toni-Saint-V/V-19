@@ -124,6 +124,15 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      ensure_submission_public_number: {
+        Args: {
+          submission_id: string;
+        };
+        Returns: {
+          assignedNow: boolean;
+          publicNumber: number;
+        };
+      };
       complete_export_package: {
         Args: {
           payload: ExportPackageCommitPayload;

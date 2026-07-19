@@ -21,7 +21,11 @@ import type {
   QuestionnaireDocumentsFilter,
   QuestionnaireInitialFocus,
 } from "../modules/submissions/components/FigmaQuestionnaireScreen";
-import { ApplicantsScreen } from "./ApplicantsScreen";
+import {
+  ApplicantsScreen,
+  type ApplicantFocusRequest,
+  type SubmissionTypeFilter,
+} from "./ApplicantsScreen";
 import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
 import {
   DraftsScreen,
@@ -89,6 +93,7 @@ import {
 } from "../modules/submissions/selectors";
 import {
   generatedCockpitMediaFileName,
+  ensureApplicantMediaSlot,
   mediaSlotTypeForSubmissionFileType,
   uploadRequiredFile,
 } from "../modules/submissions/submissionActions";
@@ -104,6 +109,7 @@ import {
   markSubmissionIssueFixedResult,
 } from "../modules/submissions/status";
 import { persistCreatedSubmissionWithPassports } from "../modules/submissions/createSubmissionPassportUseCase";
+import type { PublicNumberAssignment } from "../modules/submissions/supabasePersistence";
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
@@ -126,6 +132,7 @@ function submissionFileTypeForDocumentIssue(
 
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
+  onAssignPublicNumber?: (submissionId: string) => Promise<PublicNumberAssignment>;
   onSubmissionUpdate?: (
     submissionId: string,
     update: (submission: Submission) => Submission,
@@ -329,6 +336,7 @@ function normalizeAgentNav(section: LegacyAgentNavSection): AgentShellNavSection
 
 export function CommandCenter({
   agentId,
+  onAssignPublicNumber,
   onSubmissionUpdate,
   onSubmissionsChange,
   submissions: canonicalSubmissions,
@@ -347,6 +355,10 @@ export function CommandCenter({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerActiveTab, setDrawerActiveTab] = useState<DrawerTab>("overview");
   const [drawerFocusTarget, setDrawerFocusTarget] = useState<WorkspaceTarget>();
+  const [submissionTypeFilter, setSubmissionTypeFilter] =
+    useState<SubmissionTypeFilter>("single");
+  const [submissionFocusRequest, setSubmissionFocusRequest] =
+    useState<ApplicantFocusRequest>();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
@@ -604,6 +616,23 @@ export function CommandCenter({
     setDrawerOpen(true);
   };
 
+  const handleOpenWorkspaceTarget = (submissionId: string, target: WorkspaceTarget) => {
+    if (target.tab === "questionnaire") {
+      handleOpenQuestionnaire(submissionId, {
+        applicantId: target.applicantId,
+        field: target.field,
+        section: target.section,
+      });
+      return;
+    }
+    bridge.onSubmissionOpen?.(submissionId);
+    emitVisaflowUiEvent(bridge, { type: "submission.open", submissionId });
+    setDrawerActiveTab(target.tab);
+    setDrawerFocusTarget(target);
+    setSelectedRow(submissionId);
+    setDrawerOpen(true);
+  };
+
   const handleOpenQuestionnaire = (
     id: string,
     initialFocus?: QuestionnaireInitialFocus,
@@ -647,6 +676,20 @@ export function CommandCenter({
         : row?.querySelector<HTMLElement>("button, [tabindex]");
       fallback?.focus({ preventScroll: true });
     });
+  };
+
+  const showSavedSubmissionInList = (submission: Submission) => {
+    setQuestionnaireInitialFocus(undefined);
+    setDrawerOpen(false);
+    setMobileNavOpen(false);
+    setActiveNav("submissions");
+    setSubmissionTypeFilter(submission.type);
+    setSubmissionFocusRequest((current) => ({
+      revision: (current?.revision ?? 0) + 1,
+      submissionId: submission.id,
+      type: submission.type,
+    }));
+    setCurrentView("main");
   };
 
   const openDocumentsForIssue = (filter: QuestionnaireDocumentsFilter = "missing") => {
@@ -741,9 +784,9 @@ export function CommandCenter({
       ...current,
       [nextSubmission.id]: nextSubmission,
     }));
-    setActiveNav("submissions");
     setSearchQuery("");
     if (options?.openQuestionnaire) {
+      setActiveNav("submissions");
       setSelectedRow(nextSubmission.id);
       setQuestionnaireInitialFocus({
         applicantId: nextSubmission.applicants[0]?.id,
@@ -752,6 +795,8 @@ export function CommandCenter({
       });
       setDrawerOpen(false);
       setCurrentView("questionnaire");
+    } else {
+      showSavedSubmissionInList(nextSubmission);
     }
   };
 
@@ -780,19 +825,18 @@ export function CommandCenter({
     return promise;
   };
 
-  const uploadCanonicalFile = async (
+  const uploadCanonicalApplicantFile = async (
     submissionId: string,
-    fileId: string,
+    applicantId: string,
+    fileType: SubmissionFileType,
     file: File,
   ) => {
     const submission = effectiveCanonicalSubmissions.find(
       (candidate) => candidate.id === submissionId,
     );
-    const targetFile = submission?.files.find((candidate) => candidate.id === fileId);
-    if (!submission || !targetFile) {
-      throw new Error("Не удалось определить слот файла для загрузки.");
-    }
-    if (!canReplaceDocument(submission, targetFile)) {
+    if (!submission) throw new Error("Подача больше не доступна.");
+    const prepared = ensureApplicantMediaSlot(submission, applicantId, fileType);
+    if (!canReplaceDocument(prepared.submission, prepared.file)) {
       throw new Error("Файл нельзя загрузить в текущем статусе подачи.");
     }
     const mimeType = mediaMimeTypeForFile(file);
@@ -801,56 +845,76 @@ export function CommandCenter({
     }
 
     const generatedFileName = generatedCockpitMediaFileName({
-      applicantId: targetFile.applicantId,
-      fileType: targetFile.type,
+      applicantId,
+      fileType,
       mimeType,
       submissionId: submission.id,
       uploadNonce: `${Date.now()}`,
     });
-    const target = buildMediaStoragePath(
-      submission.id,
-      targetFile.applicantId,
-      mediaSlotTypeForSubmissionFileType(targetFile.type),
-      generatedFileName,
-    );
-    const uploaded = await uploadMediaToStorage(target, file, {
-      contentType: mimeType,
-    });
-    if (!uploaded) {
-      throw new Error("Supabase Storage недоступен для загрузки файла.");
-    }
-
-    const metadata = {
+    const uploadedAtIso = new Date().toISOString();
+    const baseMetadata = {
       generatedFileName,
       mimeType,
       originalFileName: file.name,
       sizeBytes: file.size,
-      storageAdapter: "supabase-private" as const,
-      storageBucket: target.bucket,
-      storagePath: uploaded.path,
-      uploadedAtIso: new Date().toISOString(),
+      uploadedAtIso,
     };
-    const applyUploadToLatest = (latestSubmission: Submission) => {
-      const latestTargetFile = latestSubmission.files.find(
-        (candidate) => candidate.id === fileId,
+    let metadata:
+      | (typeof baseMetadata & {
+          storageAdapter: "local-dev";
+        })
+      | (typeof baseMetadata & {
+          storageAdapter: "supabase-private";
+          storageBucket: string;
+          storagePath: string;
+        });
+    if (usesSupabase) {
+      const target = buildMediaStoragePath(
+        submission.id,
+        applicantId,
+        mediaSlotTypeForSubmissionFileType(fileType),
+        generatedFileName,
       );
-      if (!latestTargetFile) {
-        throw new Error("Слот файла больше не существует. Обновите подачу.");
+      const uploaded = await uploadMediaToStorage(target, file, {
+        contentType: mimeType,
+      });
+      if (!uploaded) {
+        throw new Error("Supabase Storage недоступен для загрузки файла.");
       }
-      const uploadedSubmission = uploadRequiredFile(latestSubmission, fileId, metadata);
-      if (uploadedSubmission === latestSubmission) {
+      metadata = {
+        ...baseMetadata,
+        storageAdapter: "supabase-private",
+        storageBucket: target.bucket,
+        storagePath: uploaded.path,
+      };
+    } else {
+      metadata = { ...baseMetadata, storageAdapter: "local-dev" };
+    }
+
+    const applyUploadToLatest = (latestSubmission: Submission) => {
+      const latestPrepared = ensureApplicantMediaSlot(
+        latestSubmission,
+        applicantId,
+        fileType,
+      );
+      const uploadedSubmission = uploadRequiredFile(
+        latestPrepared.submission,
+        latestPrepared.file.id,
+        metadata,
+      );
+      if (uploadedSubmission === latestPrepared.submission) {
         throw new Error("Файл нельзя загрузить в текущем статусе подачи.");
       }
       if (
-        latestTargetFile.type !== "passport_scan" ||
-        latestTargetFile.status === "needs_replacement"
+        latestPrepared.file.type !== "passport_scan" ||
+        latestPrepared.file.status === "needs_replacement"
       ) {
         return uploadedSubmission;
       }
       return {
         ...uploadedSubmission,
         applicants: uploadedSubmission.applicants.map((applicant) =>
-          applicant.id === latestTargetFile.applicantId
+          applicant.id === latestPrepared.file.applicantId
             ? {
                 ...applicant,
                 passportExtraction: latestSubmission.applicants.find(
@@ -871,6 +935,26 @@ export function CommandCenter({
       [nextSubmission.id]: nextSubmission,
     }));
     return nextSubmission;
+  };
+
+  const uploadCanonicalFile = async (
+    submissionId: string,
+    fileId: string,
+    file: File,
+  ) => {
+    const submission = effectiveCanonicalSubmissions.find(
+      (candidate) => candidate.id === submissionId,
+    );
+    const targetFile = submission?.files.find((candidate) => candidate.id === fileId);
+    if (!submission || !targetFile) {
+      throw new Error("Не удалось определить слот файла для загрузки.");
+    }
+    return uploadCanonicalApplicantFile(
+      submissionId,
+      targetFile.applicantId,
+      targetFile.type,
+      file,
+    );
   };
 
   const executeAgentSubmissionActionFor = async (
@@ -975,6 +1059,12 @@ export function CommandCenter({
     setSelectedRow(draft.id);
     setDrawerOpen(false);
     setActiveNav("submissions");
+    setSubmissionTypeFilter(draft.type);
+    setSubmissionFocusRequest((current) => ({
+      revision: (current?.revision ?? 0) + 1,
+      submissionId: draft.id,
+      type: draft.type,
+    }));
     setSearchQuery("");
     setCurrentView("main");
   };
@@ -1440,7 +1530,9 @@ export function CommandCenter({
             submissionId={selectedRow}
             draft={selectedIntakeDraft}
             submission={selectedCanonicalSubmission}
+            onAssignPublicNumber={onAssignPublicNumber}
             onBack={handleQuestionnaireBack}
+            onSavedAndExit={showSavedSubmissionInList}
             onOpenDocuments={openDocumentsForIssue}
             onSubmissionUpdate={
               onSubmissionUpdate && !selectedIntakeDraft
@@ -1567,13 +1659,21 @@ export function CommandCenter({
             {activeNav === "actions" && renderActionsList()}
             {activeNav === "submissions" && (
               <ApplicantsScreen
+                focusRequest={submissionFocusRequest}
                 onOpenDrawer={handleRowClick}
+                onOpenQuestionnaire={handleOpenQuestionnaire}
+                onOpenWorkspaceTarget={handleOpenWorkspaceTarget}
                 onSubmitForReview={(submissionId) =>
                   executeAgentSubmissionActionFor(submissionId, "submit_for_review").then(
                     () => undefined,
                   )
                 }
+                onTypeFilterChange={setSubmissionTypeFilter}
+                onUploadApplicantFile={async (...args) => {
+                  await uploadCanonicalApplicantFile(...args);
+                }}
                 submissions={submissionCards}
+                typeFilter={submissionTypeFilter}
               />
             )}
           </div>

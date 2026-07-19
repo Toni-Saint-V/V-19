@@ -513,6 +513,7 @@ export function createDraftSubmission({
   submissions,
   type,
 }: CreateDraftInput): Submission {
+  const nowIso = new Date().toISOString();
   const nextIndex = nextSubmissionIndex(submissions);
   const draftIdToken = draftIdTokenForScheme(nextIndex, idScheme);
   const applicantTotal = type === "family" ? familyCount : 1;
@@ -534,6 +535,7 @@ export function createDraftSubmission({
 
   const submission: Submission = {
     id: submissionId,
+    publicNumber: null,
     agentId,
     title: draftTitle(type, applicants[0]?.fullName),
     listTitle:
@@ -559,8 +561,8 @@ export function createDraftSubmission({
     aiSuggestions: [],
     aiReviewState: "idle",
     exportState: "not_ready",
-    createdAt: "сейчас",
-    updatedAt: "сейчас",
+    createdAt: nowIso,
+    updatedAt: nowIso,
     history: [
       {
         id:
@@ -568,7 +570,7 @@ export function createDraftSubmission({
             ? `i-${draftIdToken}-created`
             : `и-${draftIdToken}-создано`,
         text: "Черновик создан",
-        at: "сейчас",
+        at: nowIso,
         source: "agent",
       },
     ],
@@ -856,7 +858,14 @@ export function normalizeSubmissionForCanonicalRuntime(
     submission.files,
     issues,
   );
-  const filePercent = fileCompleteness(files);
+  const requiredKeys = new Set(
+    requiredPassportReviewMediaSlots(submission).map(
+      (slot) => `${slot.applicantId}:${slot.type}`,
+    ),
+  );
+  const filePercent = fileCompleteness(
+    files.filter((file) => requiredKeys.has(`${file.applicantId}:${file.type}`)),
+  );
 
   return normalizeSubmissionQuestionnaire({
     ...submission,
@@ -957,6 +966,34 @@ export function uploadRequiredFile(
       ...submission.history,
     ],
   });
+}
+
+export function ensureApplicantMediaSlot(
+  submission: Submission,
+  applicantId: string,
+  fileType: SubmissionFileType,
+): { file: SubmissionFile; submission: Submission } {
+  const existing = submission.files.find(
+    (file) => file.applicantId === applicantId && file.type === fileType,
+  );
+  if (existing) return { file: existing, submission };
+  if (!isCanonicalFrontendMediaType(fileType)) {
+    throw new Error("Неподдерживаемый тип файла.");
+  }
+  if (!submission.applicants.some((applicant) => applicant.id === applicantId)) {
+    throw new Error("Турист больше не доступен в подаче.");
+  }
+
+  const file: SubmissionFile = {
+    applicantId,
+    id: `file-${stableAsciiToken(`${submission.id}:${applicantId}:${fileType}`)}`,
+    status: "missing",
+    type: fileType,
+  };
+  return {
+    file,
+    submission: { ...submission, files: [...submission.files, file] },
+  };
 }
 
 function markReplacementIssuesPendingAdminReview(
@@ -1549,7 +1586,14 @@ function markIssueFileForReplacement(
         }
       : file,
   );
-  const filePercent = fileCompleteness(files);
+  const requiredKeys = new Set(
+    requiredPassportReviewMediaSlots(submission).map(
+      (slot) => `${slot.applicantId}:${slot.type}`,
+    ),
+  );
+  const filePercent = fileCompleteness(
+    files.filter((file) => requiredKeys.has(`${file.applicantId}:${file.type}`)),
+  );
 
   return {
     ...submission,

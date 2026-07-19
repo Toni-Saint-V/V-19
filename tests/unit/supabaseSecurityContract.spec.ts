@@ -1638,4 +1638,89 @@ describe("Supabase security contract", () => {
       "20260718190000_global_submission_public_numbers.sql",
     );
   });
+
+  test("assigns public numbers only after a complete questionnaire through a protected RPC", () => {
+    const migrationFileName =
+      "20260719160000_assign_public_number_after_questionnaire.sql";
+    const previousMigrationFileName =
+      "20260718190000_global_submission_public_numbers.sql";
+    const migration = readProjectFile(`supabase/migrations/${migrationFileName}`);
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const sql = normalizeSql(migration);
+    const existingNumberReturn = sql.indexOf(
+      "if submission_record.public_number is not null then",
+    );
+    const questionnaireGuard = sql.indexOf(
+      "questionnaire must be complete before assigning public number",
+    );
+    const sequenceAdvance = sql.indexOf(
+      "next_number := nextval('public.submission_public_number_seq')",
+    );
+    const previousMigrationIndex = migrationContract.indexOf(
+      `"${previousMigrationFileName}"`,
+    );
+    const migrationIndex = migrationContract.indexOf(`"${migrationFileName}"`);
+
+    expectSqlStatement(
+      migration,
+      "alter table public.submissions alter column public_number drop not null",
+    );
+    expectSqlStatement(
+      migration,
+      "create or replace function public.ensure_submission_public_number(submission_id text)",
+    );
+    expect(migration).toContain("security definer");
+    expect(migration).toContain("set search_path = pg_catalog");
+    expect(migration).toContain("actor_id uuid := auth.uid()");
+    expect(migration).toContain(
+      "actor_role public.profile_role := app_private.current_profile_role()",
+    );
+    expect(migration).toContain("for update");
+    expect(migration).toContain(
+      "submission_record.agent_id <> actor_id and actor_role <> 'admin'",
+    );
+    expect(migration).toContain("applicant.questionnaire_percent < 100");
+    expect(migration).toContain("'assignedNow', false");
+    expect(migration).toContain("'assignedNow', true");
+    expect(migration).toContain(
+      "set_config('app.v19_public_number_assignment', 'allowed', true)",
+    );
+    expect(migration).toContain(
+      "Submission public number must be assigned through ensure_submission_public_number",
+    );
+    expect(migration).toContain("Submission public number is immutable");
+    expect(existingNumberReturn).toBeGreaterThan(-1);
+    expect(questionnaireGuard).toBeGreaterThan(existingNumberReturn);
+    expect(sequenceAdvance).toBeGreaterThan(questionnaireGuard);
+
+    expectSqlStatement(
+      migration,
+      "revoke all on function app_private.assign_submission_public_number() from public, anon, authenticated",
+    );
+    expectSqlStatement(
+      migration,
+      "revoke all on function public.ensure_submission_public_number(text) from public, anon",
+    );
+    expectSqlStatement(
+      migration,
+      "grant execute on function public.ensure_submission_public_number(text) to authenticated",
+    );
+    expectNoSqlStatement(
+      migration,
+      "grant execute on function public.ensure_submission_public_number(text) to anon",
+    );
+    expectNoSqlStatement(
+      migration,
+      "grant execute on function public.ensure_submission_public_number(text) to public",
+    );
+    expectSqlStatement(
+      migration,
+      "revoke all on sequence public.submission_public_number_seq from anon, authenticated",
+    );
+
+    expect(previousMigrationIndex).toBeGreaterThan(-1);
+    expect(migrationIndex).toBeGreaterThan(previousMigrationIndex);
+  });
 });

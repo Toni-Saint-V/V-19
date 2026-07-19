@@ -1014,13 +1014,25 @@ describe("FigmaQuestionnaireScreen", () => {
     });
     expect(duration).toHaveValue(8);
 
+    fireEvent.change(screen.getByLabelText("Дата въезда"), {
+      target: { value: "11022026" },
+    });
+    fireEvent.change(screen.getByLabelText("Дата выезда"), {
+      target: { value: "11022027" },
+    });
+    expect(duration).toHaveValue(366);
+    expect(duration).not.toHaveAttribute("aria-invalid", "true");
+    expect(
+      screen.queryByText("Проверьте длительность пребывания"),
+    ).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     expect(onSaveDraft.mock.calls[0]?.[0].fieldUpdates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           fieldId: "stay-duration",
-          value: "8",
+          value: "366",
         }),
       ]),
     );
@@ -3274,6 +3286,42 @@ describe("FigmaQuestionnaireScreen", () => {
         }),
       ]),
     );
+  });
+
+  test("runs the dedicated save-and-exit callback only after a successful manual save", async () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const save = deferred();
+    const onBack = vi.fn();
+    const onSaveAndExit = vi.fn().mockResolvedValue(undefined);
+    const onSaveDraft = vi.fn().mockReturnValue(save.promise);
+
+    render(
+      <FigmaQuestionnaireScreen
+        onBack={onBack}
+        onComplete={vi.fn()}
+        onSaveAndExit={onSaveAndExit}
+        onSaveDraft={onSaveDraft}
+        submission={submission}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
+    expect(onSaveAndExit).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
+
+    save.resolve();
+
+    await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(1));
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   test("matches open issues by legacy labels after questionnaire label changes", () => {

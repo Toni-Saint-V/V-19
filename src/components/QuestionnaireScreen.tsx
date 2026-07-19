@@ -28,12 +28,16 @@ import type {
   Submission,
 } from "../modules/submissions/types";
 import type { ProductIntakeDraft } from "../modules/submissions/productIntakeFlow";
+import { blsQuestionnaireReadiness } from "../modules/submissions/questionnaireBlsRules";
+import type { PublicNumberAssignment } from "../modules/submissions/supabasePersistence";
 
 interface QuestionnaireScreenProps {
   agentId?: Submission["agentId"];
   initialFocus?: QuestionnaireInitialFocus;
   submissionId: string;
   onBack: () => void;
+  onAssignPublicNumber?: (submissionId: string) => Promise<PublicNumberAssignment>;
+  onSavedAndExit?: (submission: Submission) => void | Promise<void>;
   onOpenDocuments?: (filter?: QuestionnaireDocumentsFilter) => void;
   draft?: ProductIntakeDraft;
   submission?: Submission;
@@ -90,6 +94,7 @@ function fallbackSubmission(
   const createdAt = new Date().toISOString();
   return normalizeSubmissionQuestionnaire({
     id: submissionId,
+    publicNumber: null,
     agentId,
     title: "Новая анкета",
     type: "single",
@@ -346,6 +351,8 @@ export function QuestionnaireScreen({
   initialFocus,
   submissionId,
   onBack,
+  onAssignPublicNumber,
+  onSavedAndExit,
   onOpenDocuments,
   draft,
   submission,
@@ -499,6 +506,30 @@ export function QuestionnaireScreen({
     [persistSubmissionUpdate],
   );
 
+  const handleSaveAndExit = useCallback(async () => {
+    let savedSubmission = workingSubmissionRef.current;
+    if (blsQuestionnaireReadiness(savedSubmission).ready && onAssignPublicNumber) {
+      const assignment = await onAssignPublicNumber(savedSubmission.id);
+      savedSubmission = {
+        ...savedSubmission,
+        publicNumber: assignment.publicNumber,
+      };
+      workingSubmissionRef.current = savedSubmission;
+      setWorkingSubmission(savedSubmission);
+      if (assignment.assignedNow) {
+        window.alert(
+          `Анкета сохранена. Номер подачи: VF-${assignment.publicNumber}`,
+        );
+      }
+    }
+
+    if (onSavedAndExit) {
+      await onSavedAndExit(savedSubmission);
+      return;
+    }
+    onBack();
+  }, [onAssignPublicNumber, onBack, onSavedAndExit]);
+
   return (
     <FigmaQuestionnaireScreen
       initialFocus={initialFocus}
@@ -509,6 +540,7 @@ export function QuestionnaireScreen({
       onMarkIssueFixed={handleMarkIssueFixed}
       onOpenDocuments={onOpenDocuments}
       onSaveDraft={handleSaveDraft}
+      onSaveAndExit={handleSaveAndExit}
       onUploadFile={onUploadFile}
     />
   );

@@ -84,7 +84,7 @@ function mapSubmissionRow(
 ): Submission {
   return normalizeSubmission({
     id: row.id,
-    publicNumber: row.public_number ?? undefined,
+    publicNumber: row.public_number,
     title: row.title,
     type: row.type,
     agentId: row.agent_id,

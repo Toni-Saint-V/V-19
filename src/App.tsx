@@ -27,9 +27,15 @@ import {
 } from "./modules/submissions/exportRules";
 import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submissions/exportPackageDocumentCommit";
 import {
+  ensureSubmissionPublicNumber,
   loadCockpitSubmissionsForProfile,
   saveCockpitSubmissionsForProfile,
+  type PublicNumberAssignment,
 } from "./modules/submissions/supabasePersistence";
+import {
+  submissionPublicNumber,
+  submissionPublicNumberMax,
+} from "./modules/submissions/submissionIdentity";
 import { getSupabaseClient } from "./lib/supabase/client";
 import type {
   AccessRequest,
@@ -170,6 +176,7 @@ export default function App({
   const workspaceSubmissionMutationQueueRef = useRef(
     new Map<string, Promise<Submission>>(),
   );
+  const publicNumberAssignmentQueueRef = useRef<Promise<void>>(Promise.resolve());
   const activeApprovedSession =
     authSession?.status === "active" && authSession.approvalStatus === "approved"
       ? authSession
@@ -185,6 +192,7 @@ export default function App({
       generation: workspaceSessionGenerationRef.current,
     };
     workspaceSubmissionMutationQueueRef.current.clear();
+    publicNumberAssignmentQueueRef.current = Promise.resolve();
   }, []);
 
   const commitAuthSession = useCallback(
@@ -696,6 +704,69 @@ export default function App({
       return tracked;
     },
     [activeApprovedSession, persistSubmissions],
+  );
+
+  const assignVisibleAgentSubmissionPublicNumber = useCallback(
+    (submissionId: string): Promise<PublicNumberAssignment> => {
+      let resolveAssignment!: (assignment: PublicNumberAssignment) => void;
+      let rejectAssignment!: (error: unknown) => void;
+      const result = new Promise<PublicNumberAssignment>((resolve, reject) => {
+        resolveAssignment = resolve;
+        rejectAssignment = reject;
+      });
+      const task = publicNumberAssignmentQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          const current = submissionsRef.current.find(
+            (submission) => submission.id === submissionId,
+          );
+          if (!current) throw new Error("Подача больше не доступна.");
+          const existingNumber = submissionPublicNumber(current);
+          if (existingNumber !== null) {
+            resolveAssignment({ assignedNow: false, publicNumber: existingNumber });
+            return;
+          }
+
+          const assignment = supabaseEnabled
+            ? await ensureSubmissionPublicNumber(submissionId)
+            : {
+                assignedNow: true,
+                publicNumber:
+                  Math.max(
+                    1000,
+                    ...submissionsRef.current.map(
+                      (submission) => submissionPublicNumber(submission) ?? 0,
+                    ),
+                  ) + 1,
+              };
+          if (assignment.publicNumber > submissionPublicNumberMax) {
+            throw new Error("Лимит номеров подач исчерпан.");
+          }
+
+          const nextSubmissions = submissionsRef.current.map((submission) =>
+            submission.id === submissionId
+              ? { ...submission, publicNumber: assignment.publicNumber }
+              : submission,
+          );
+          submissionsRef.current = nextSubmissions;
+          setSubmissions(nextSubmissions);
+          if (supabaseEnabled) {
+            void refreshCanonicalSubmissions();
+          } else {
+            await persistSubmissions(nextSubmissions);
+          }
+          resolveAssignment({
+            assignedNow: assignment.assignedNow,
+            publicNumber: assignment.publicNumber,
+          });
+        })
+        .catch((error) => {
+          rejectAssignment(error);
+        });
+      publicNumberAssignmentQueueRef.current = task;
+      return result;
+    },
+    [persistSubmissions, refreshCanonicalSubmissions, supabaseEnabled],
   );
 
   const handleLogin = useCallback(
@@ -1311,6 +1382,7 @@ export default function App({
         }}
         agentWorkspaceProps={{
           agentId: activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId,
+          onAssignPublicNumber: assignVisibleAgentSubmissionPublicNumber,
           onSubmissionUpdate: updateVisibleAgentSubmission,
           onSubmissionsChange: persistVisibleAgentSubmissions,
           submissions: visibleSubmissions,

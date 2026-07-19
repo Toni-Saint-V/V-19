@@ -92,6 +92,16 @@ describe("canonical BLS questionnaire readiness", () => {
     expect(
       validateBlsQuestionnaireField({ field, formData }),
     ).toBeUndefined();
+
+    expect(
+      validateBlsQuestionnaireField({
+        field: { ...field, value: "366" },
+        formData: {
+          travelEnd: "11.02.2027",
+          travelStart: "11.02.2026",
+        },
+      }),
+    ).toBeUndefined();
   });
 
   test("keeps adult working-applicant readiness aligned with submit policy", () => {

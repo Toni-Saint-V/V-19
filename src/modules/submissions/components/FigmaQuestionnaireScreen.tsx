@@ -231,6 +231,7 @@ const QuestionnaireFieldUiContext = createContext<QuestionnaireFieldUiContract |
 type FigmaQuestionnaireScreenProps = {
   initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
+  onSaveAndExit?: () => void | Promise<void>;
   onComplete: (values: QuestionnaireCommitPayload) => void | Promise<void>;
   onConfirmPassportReview?: (applicantId: string) => void | Promise<void>;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
@@ -2525,6 +2526,7 @@ export function FigmaQuestionnaireScreen({
   onMarkIssueFixed,
   onOpenDocuments,
   onSaveDraft,
+  onSaveAndExit,
   submission,
 }: FigmaQuestionnaireScreenProps) {
   const [passportReviewPending, setPassportReviewPending] = useState(false);
@@ -3362,6 +3364,7 @@ export function FigmaQuestionnaireScreen({
   }
 
   function fieldReviewState(fieldId: string, label: string): FieldState {
+    if (fieldId === "stay-duration") return "normal";
     if (fieldIssue(fieldId, label)) return "invalid";
 
     const field = questionnaireField(activeApplicantModel, fieldId);
@@ -3425,6 +3428,7 @@ export function FigmaQuestionnaireScreen({
   }
 
   function fieldErrorMessage(fieldId: string, label: string) {
+    if (fieldId === "stay-duration") return undefined;
     const issue = fieldIssue(fieldId, label);
     if (issue) return issue.comment ?? issue.reason;
     const field = questionnaireField(activeApplicantModel, fieldId);
@@ -3803,8 +3807,12 @@ export function FigmaQuestionnaireScreen({
 
     const requiredEmpty = fieldSlots.find(
       (slot) =>
-        !slot.field.value.trim() &&
         isBlsQuestionnaireFieldRequired({
+          applicantRole: slot.applicant.role,
+          field: slot.field,
+          formData: slot.formData,
+        }) &&
+        !isBlsQuestionnaireFieldReady({
           applicantRole: slot.applicant.role,
           field: slot.field,
           formData: slot.formData,
@@ -4030,6 +4038,10 @@ export function FigmaQuestionnaireScreen({
   async function saveAndExitFromButton() {
     if (!isEditable || completionInFlightRef.current) return;
     await saveDraftFromButton();
+    if (onSaveAndExit) {
+      await onSaveAndExit();
+      return;
+    }
     onBack();
   }
 
@@ -4830,12 +4842,12 @@ export function FigmaQuestionnaireScreen({
 
         <div className="v19-questionnaire-title-wrap">
           <h1
-            aria-label={`Анкета: ${draftSubmission.title || "Семья Петровых"}`}
+            aria-label={`Анкета: ${draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}`}
             className="v19-questionnaire-title"
           >
             <span className="v19-questionnaire-title-mobile">Анкета</span>
             <span className="v19-questionnaire-title-desktop">
-              Анкета: {draftSubmission.title || "Семья Петровых"}
+              Анкета: {draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}
             </span>
           </h1>
         </div>

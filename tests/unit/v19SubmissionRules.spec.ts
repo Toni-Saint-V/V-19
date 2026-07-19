@@ -1308,6 +1308,8 @@ describe("V-19 submission actions", () => {
     expect(draft.city).toBe("Казань");
     expect(draft.type).toBe("family");
     expect(draft.status).toBe("draft");
+    expect(draft.publicNumber).toBeNull();
+    expect(Number.isNaN(Date.parse(draft.createdAt))).toBe(false);
     expect(draft.applicants).toHaveLength(3);
     expect(draft.files).toHaveLength(5);
     expect(

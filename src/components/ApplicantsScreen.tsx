@@ -1,32 +1,59 @@
-import { useMemo, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
-import type { Submission } from '../modules/submissions/types';
 import {
-  applicantChecklistStatus,
-  canPerformAction,
-  statusLabelFor,
-  type ApplicantChecklistStatus,
-} from '../modules/submissions/status';
-import { familyDisplayTitleFromMainApplicantName } from '../modules/submissions/listFormatters';
-import { updatedLabel } from './v19BusinessScreenAdapter';
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
   ArrowUpDown,
   Baby,
+  Camera,
   CheckCircle2,
-  ChevronRight,
+  ClipboardCheck,
   FileText,
+  IdCard,
   RotateCcw,
   Shapes,
   UserRound,
   Users,
-} from 'lucide-react';
+} from "lucide-react";
+import type {
+  QuestionnaireInitialFocus,
+} from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import {
+  applicantWorkflowActions,
+  type ApplicantWorkflowAction,
+} from "../modules/submissions/applicantWorkflow";
+import { familyDisplayTitleFromMainApplicantName } from "../modules/submissions/listFormatters";
+import {
+  relativeSubmissionCreatedAt,
+  resolveSubmissionCreatedAt,
+  submissionCreatedAtDateTime,
+} from "../modules/submissions/relativeCreatedAt";
 import {
   cityFilterValuesForSubmissions,
   filterAgentSubmissionQueue,
   questionnaireCityForSubmission,
   type AgentSubmissionQueueFilter,
-} from '../modules/submissions/selectors';
+} from "../modules/submissions/selectors";
+import {
+  submissionPublicId,
+  submissionPublicNumber,
+} from "../modules/submissions/submissionIdentity";
+import {
+  canAgentEditSubmission,
+  canPerformAction,
+  statusLabelFor,
+} from "../modules/submissions/status";
+import type {
+  Applicant,
+  Submission,
+  SubmissionFileType,
+} from "../modules/submissions/types";
+import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
 import {
   V19ListHeader,
   V19MetricCard,
@@ -34,338 +61,763 @@ import {
   V19QueueCard,
   V19QueueToolbar,
   V19ToolbarSelect,
-} from '../shared/ui/v19-design-system';
+} from "../shared/ui/v19-design-system";
+
+export type SubmissionTypeFilter = "all" | "family" | "single";
+export type ApplicantSort = "createdAsc" | "createdDesc" | "tripDate";
+
+export type ApplicantFocusRequest = {
+  revision: number;
+  submissionId: string;
+  type: Submission["type"];
+};
 
 interface ApplicantsScreenProps {
+  focusRequest?: ApplicantFocusRequest;
   onOpenDrawer: (id: string) => void;
+  onOpenQuestionnaire?: (
+    id: string,
+    initialFocus?: QuestionnaireInitialFocus,
+  ) => void;
+  onOpenWorkspaceTarget?: (id: string, target: WorkspaceTarget) => void;
   onSubmitForReview?: (id: string) => Promise<void>;
+  onTypeFilterChange?: (filter: SubmissionTypeFilter) => void;
+  onUploadApplicantFile?: (
+    submissionId: string,
+    applicantId: string,
+    fileType: SubmissionFileType,
+    file: File,
+  ) => Promise<void>;
   submissions?: Submission[];
+  typeFilter?: SubmissionTypeFilter;
 }
 
-// View types
-type ApplicantStatus = ApplicantChecklistStatus;
-type ApplicantMarker = 'male' | 'female' | 'child' | 'person';
-type ApplicantSort = 'tripDate' | 'createdAt';
-
-interface FamilyMember {
-  marker: ApplicantMarker;
-  name: string;
-  roleLabel?: string;
-  status: ApplicantStatus;
-}
-
-interface FamilyData {
-  city: string;
-  createdAt: string;
-  id: string;
-  lifecycleStatus: Submission['status'];
-  title: string;
-  members: FamilyMember[];
-  canSubmitForReview: boolean;
-  readinessPercent: number;
-  tripDateFrom: string;
-}
-
-interface IndividualData {
-  city: string;
-  createdAt: string;
-  id: string;
-  lifecycleStatus: Submission['status'];
-  marker: ApplicantMarker;
-  name: string;
-  readinessPercent: number;
-  status: ApplicantStatus;
-  lastActivity: string;
-  tripDateFrom: string;
-}
+type ApplicantMarker = "child" | "female" | "male" | "person";
 
 const emptySubmissions: Submission[] = [];
+const minuteMs = 60_000;
 
-function questionnaireValueForApplicant(submission: Submission, applicantId: string, fieldId: string) {
+const actionLabels: Record<ApplicantWorkflowAction["kind"], string> = {
+  passport_scan: "Паспорт",
+  questionnaire: "Анкета",
+  selfie: "Селфи 1",
+  selfie_2: "Селфи 2",
+};
+
+const actionStateLabels: Record<ApplicantWorkflowAction["state"], string> = {
+  attention: "нужна доработка",
+  missing: "не добавлено",
+  ready: "готово",
+};
+
+function questionnaireValueForApplicant(
+  submission: Submission,
+  applicantId: string,
+  fieldId: string,
+) {
   const applicant = submission.applicants.find((item) => item.id === applicantId);
-  return applicant?.sections
-    .flatMap((section) => section.fields)
-    .find((field) => field.id === fieldId)
-    ?.value.trim() ?? '';
+  return (
+    applicant?.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === fieldId)
+      ?.value.trim() ?? ""
+  );
 }
 
 function applicantMarker(
   submission: Submission,
-  applicant: Submission['applicants'][number],
+  applicant: Applicant,
 ): ApplicantMarker {
-  if (applicant.role === 'child') return 'child';
-  const gender = questionnaireValueForApplicant(submission, applicant.id, 'gender').toLowerCase();
-  if (gender.includes('жен') || gender === 'female' || gender === 'f') return 'female';
-  if (gender.includes('муж') || gender === 'male' || gender === 'm') return 'male';
-  return 'person';
+  if (applicant.role === "child") return "child";
+  const gender = questionnaireValueForApplicant(
+    submission,
+    applicant.id,
+    "gender",
+  ).toLowerCase();
+  if (gender.includes("жен") || gender === "female" || gender === "f") {
+    return "female";
+  }
+  if (gender.includes("муж") || gender === "male" || gender === "m") {
+    return "male";
+  }
+  return "person";
 }
 
 function applicantRoleLabel(
-  role: Submission['applicants'][number]['role'],
+  role: Applicant["role"],
   marker: ApplicantMarker,
 ) {
-  if (role === 'child') return 'Ребёнок';
-  if (role === 'spouse') {
-    return marker === 'male' ? 'Супруг' : marker === 'female' ? 'Супруга' : 'Супруг(а)';
+  if (role === "child") return "Ребёнок";
+  if (role === "spouse") {
+    return marker === "male"
+      ? "Супруг"
+      : marker === "female"
+        ? "Супруга"
+        : "Супруг/супруга";
   }
   return undefined;
 }
 
 function ApplicantMarkerIcon({ marker }: { marker: ApplicantMarker }) {
-  const Icon = marker === 'child' ? Baby : UserRound;
-  const label = marker === 'child' ? 'Ребёнок' : 'Заявитель';
+  const Icon = marker === "child" ? Baby : UserRound;
+  const label = marker === "child" ? "Ребёнок" : "Заявитель";
   return <Icon aria-label={label} className="v19-applicant-person-icon" />;
 }
 
-function runtimeFamiliesFromSubmissions(submissions: Submission[]): FamilyData[] {
-  return submissions
-    .filter((submission) => submission.type === 'family')
-    .map((submission) => {
-      const mainApplicant =
-        submission.applicants.find((applicant) => applicant.role === 'main') ??
-        submission.applicants[0];
-
-      return {
-        canSubmitForReview:
-          canPerformAction(submission, 'submit_for_review', 'agent').ok &&
-          submission.applicants.every(
-            (applicant) => applicantChecklistStatus(submission, applicant.id) === 'ready',
-          ),
-        city: questionnaireCityForSubmission(submission),
-        createdAt: submission.createdAt,
-        id: submission.id,
-        lifecycleStatus: submission.status,
-        title:
-          familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ??
-          submission.title,
-        readinessPercent: submission.completeness.total,
-        tripDateFrom: submission.tripDateFrom,
-        members: submission.applicants.map((applicant) => {
-          const marker = applicantMarker(submission, applicant);
-          return {
-            marker,
-            name: applicant.fullName,
-            roleLabel: applicantRoleLabel(applicant.role, marker),
-            status: applicantChecklistStatus(submission, applicant.id),
-          };
-        }),
-      };
-    });
-}
-
-function runtimeIndividualsFromSubmissions(submissions: Submission[]): IndividualData[] {
-  return submissions
-    .filter((submission) => submission.type === 'single')
-    .map((submission) => {
-      const applicant = submission.applicants[0];
-      return {
-        city: questionnaireCityForSubmission(submission),
-        createdAt: submission.createdAt,
-        id: submission.id,
-        lifecycleStatus: submission.status,
-        marker: applicant ? applicantMarker(submission, applicant) : 'person',
-        name: applicant?.fullName ?? submission.title,
-        readinessPercent: submission.completeness.total,
-        status: applicant
-          ? applicantChecklistStatus(submission, applicant.id)
-          : 'in_progress',
-        lastActivity: updatedLabel(submission.updatedAt),
-        tripDateFrom: submission.tripDateFrom,
-      };
-    });
-}
-
-const getStatusDot = (status: ApplicantStatus) => {
-  switch (status) {
-    case 'ready': return <CheckCircle2 className="w-[14px] h-[14px] text-[var(--v19b-dot-success)]" />;
-    case 'missing_docs': return <AlertCircle className="w-[14px] h-[14px] text-[var(--v19b-color-remark)]" />;
-    case 'in_progress': return <div className="w-2.5 h-2.5 rounded-full bg-[var(--v19b-dot-review)] ring-4 ring-[var(--v19b-color-panel)]" />;
+function actionIcon(action: ApplicantWorkflowAction) {
+  if (action.kind === "questionnaire") {
+    return <ClipboardCheck aria-hidden="true" />;
   }
+  if (action.kind === "passport_scan") return <IdCard aria-hidden="true" />;
+  return (
+    <>
+      <Camera aria-hidden="true" />
+      <span aria-hidden="true" className="v19-applicant-workflow-index">
+        {action.kind === "selfie" ? "1" : "2"}
+      </span>
+    </>
+  );
+}
+
+function ApplicantWorkflowActionButton({
+  action,
+  applicant,
+  onOpenQuestionnaire,
+  onOpenWorkspaceTarget,
+  onUploadApplicantFile,
+  submission,
+}: {
+  action: ApplicantWorkflowAction;
+  applicant: Applicant;
+  onOpenQuestionnaire?: ApplicantsScreenProps["onOpenQuestionnaire"];
+  onOpenWorkspaceTarget?: ApplicantsScreenProps["onOpenWorkspaceTarget"];
+  onUploadApplicantFile?: ApplicantsScreenProps["onUploadApplicantFile"];
+  submission: Submission;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const label = actionLabels[action.kind];
+  const stateLabel = actionStateLabels[action.state];
+  const accessibleLabel = `${label}: ${stateLabel}, ${applicant.fullName}`;
+  const isQuestionnaire = action.kind === "questionnaire";
+  const canPickFile = canAgentEditSubmission(submission) && Boolean(onUploadApplicantFile);
+
+  const activate = () => {
+    if (action.kind === "questionnaire") {
+      if (action.state === "ready") {
+        window.alert("Анкета уже заполнена");
+        return;
+      }
+      onOpenQuestionnaire?.(submission.id, {
+        applicantId: applicant.id,
+        field: action.field,
+        section: action.section,
+      });
+      return;
+    }
+    if (action.issueId) {
+      onOpenWorkspaceTarget?.(submission.id, {
+        issueId: action.issueId,
+        tab: "issues",
+      });
+      return;
+    }
+    if (action.state === "ready") {
+      onOpenWorkspaceTarget?.(submission.id, {
+        applicantId: applicant.id,
+        fileType: action.kind,
+        tab: "files",
+      });
+      return;
+    }
+    if (!canPickFile) {
+      window.alert("Файл нельзя загрузить в текущем статусе подачи.");
+      return;
+    }
+    inputRef.current?.click();
+  };
+
+  const uploadSelectedFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || action.kind === "questionnaire" || !onUploadApplicantFile) return;
+    setUploading(true);
+    try {
+      await onUploadApplicantFile(
+        submission.id,
+        applicant.id,
+        action.kind,
+        file,
+      );
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : "Не удалось загрузить файл.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <span className="v19-applicant-workflow-action-wrap">
+      <button
+        aria-label={accessibleLabel}
+        className={`v19-applicant-workflow-action is-${action.state}`}
+        disabled={uploading}
+        title={accessibleLabel}
+        type="button"
+        onClick={activate}
+      >
+        {actionIcon(action)}
+      </button>
+      {!isQuestionnaire ? (
+        <input
+          ref={inputRef}
+          accept={
+            action.kind === "passport_scan"
+              ? "image/jpeg,image/png,image/webp,application/pdf"
+              : "image/jpeg,image/png,image/webp"
+          }
+          aria-hidden="true"
+          aria-label={`Выбрать файл: ${label}, ${applicant.fullName}`}
+          className="sr-only"
+          hidden
+          tabIndex={-1}
+          type="file"
+          onChange={(event) => void uploadSelectedFile(event)}
+        />
+      ) : null}
+    </span>
+  );
+}
+
+function ApplicantWorkflowActions({
+  applicant,
+  onOpenQuestionnaire,
+  onOpenWorkspaceTarget,
+  onUploadApplicantFile,
+  submission,
+}: {
+  applicant: Applicant;
+  onOpenQuestionnaire?: ApplicantsScreenProps["onOpenQuestionnaire"];
+  onOpenWorkspaceTarget?: ApplicantsScreenProps["onOpenWorkspaceTarget"];
+  onUploadApplicantFile?: ApplicantsScreenProps["onUploadApplicantFile"];
+  submission: Submission;
+}) {
+  return (
+    <div
+      aria-label={`Документы: ${applicant.fullName}`}
+      className="v19-applicant-workflow-actions"
+      role="group"
+    >
+      {applicantWorkflowActions(submission, applicant).map((action) => (
+        <ApplicantWorkflowActionButton
+          action={action}
+          applicant={applicant}
+          key={action.kind}
+          onOpenQuestionnaire={onOpenQuestionnaire}
+          onOpenWorkspaceTarget={onOpenWorkspaceTarget}
+          onUploadApplicantFile={onUploadApplicantFile}
+          submission={submission}
+        />
+      ))}
+    </div>
+  );
+}
+
+function lifecycleStatusTone(status: Submission["status"]) {
+  if (status === "submitted_for_review" || status === "corrections_received") {
+    return "is-review";
+  }
+  if (status === "ready_for_export" || status === "exported") return "is-ready";
+  if (status === "returned" || status === "requires_action") return "is-returned";
+  return "is-progress";
+}
+
+function SubmissionCreatedAt({
+  createdAt,
+  now,
+}: {
+  createdAt: string;
+  now: Date;
+}) {
+  return (
+    <time
+      className="v19-applicant-created-at"
+      dateTime={submissionCreatedAtDateTime(createdAt, now)}
+    >
+      {relativeSubmissionCreatedAt(createdAt, now)}
+    </time>
+  );
+}
+
+type CardCallbacks = Pick<
+  ApplicantsScreenProps,
+  | "onOpenQuestionnaire"
+  | "onOpenWorkspaceTarget"
+  | "onUploadApplicantFile"
+> & {
+  canSubmitForReview: boolean;
+  error?: string;
+  now: Date;
+  onPrimaryAction: (submission: Submission) => void;
+  submitting: boolean;
 };
+
+function AssignedPublicId({ submission }: { submission: Submission }) {
+  return submissionPublicNumber(submission) === null ? null : (
+    <span>{submissionPublicId(submission)}</span>
+  );
+}
+
+function SubmissionStatusAction({
+  canSubmitForReview,
+  label,
+  onPrimaryAction,
+  submission,
+  submitting,
+}: {
+  canSubmitForReview: boolean;
+  label: string;
+  onPrimaryAction: (submission: Submission) => void;
+  submission: Submission;
+  submitting: boolean;
+}) {
+  const canSubmit =
+    canSubmitForReview &&
+    canPerformAction(submission, "submit_for_review", "agent").ok;
+
+  if (canSubmit) {
+    const actionLabel = submitting ? "Отправляем…" : "Отправить на проверку";
+    return (
+      <button
+        aria-label={`${actionLabel}: ${label}`}
+        className="v19-applicant-status-action"
+        disabled={submitting}
+        type="button"
+        onClick={() => onPrimaryAction(submission)}
+      >
+        {actionLabel}
+      </button>
+    );
+  }
+
+  return (
+    <span
+      className={`v19-applicant-card-status ${lifecycleStatusTone(submission.status)}`}
+    >
+      {statusLabelFor(submission.status, "full")}
+    </span>
+  );
+}
+
+function FamilySubmissionCard({
+  canSubmitForReview,
+  error,
+  now,
+  onOpenQuestionnaire,
+  onOpenWorkspaceTarget,
+  onPrimaryAction,
+  onUploadApplicantFile,
+  submission,
+  submitting,
+}: CardCallbacks & { submission: Submission }) {
+  const mainApplicant =
+    submission.applicants.find((applicant) => applicant.role === "main") ??
+    submission.applicants[0];
+  const title =
+    familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ??
+    submission.title;
+
+  return (
+    <V19QueueCard
+      as="article"
+      aria-label={`Подача ${title}`}
+      className="v19-agent-shared-card group"
+      data-submission-id={submission.id}
+    >
+      <div className="v19-applicant-family-header">
+        <div className="v19-applicant-family-main">
+          <div className="v19-agent-submission-family-icon">
+            <Users aria-hidden="true" />
+          </div>
+          <div className="v19-applicant-family-copy">
+            <h3>{title}</h3>
+            <p className="v19-applicant-family-meta">
+              <span>{submission.applicants.length} человек</span>
+              <span aria-hidden="true">·</span>
+              <span>{questionnaireCityForSubmission(submission)}</span>
+              <AssignedPublicId submission={submission} />
+            </p>
+          </div>
+        </div>
+        <SubmissionStatusAction
+          canSubmitForReview={canSubmitForReview}
+          label={title}
+          onPrimaryAction={onPrimaryAction}
+          submission={submission}
+          submitting={submitting}
+        />
+      </div>
+
+      <div className="v19-applicant-member-list">
+        {submission.applicants.map((applicant) => {
+          const marker = applicantMarker(submission, applicant);
+          const roleLabel = applicantRoleLabel(applicant.role, marker);
+          return (
+            <div
+              className="v19-applicant-member-cell"
+              data-applicant-role={applicant.role}
+              key={applicant.id}
+            >
+              <ApplicantMarkerIcon marker={marker} />
+              <div className="v19-applicant-member-identity">
+                <span className="v19-applicant-member-name">{applicant.fullName}</span>
+                {roleLabel ? (
+                  <span className="v19-applicant-member-role">{roleLabel}</span>
+                ) : null}
+              </div>
+              <ApplicantWorkflowActions
+                applicant={applicant}
+                onOpenQuestionnaire={onOpenQuestionnaire}
+                onOpenWorkspaceTarget={onOpenWorkspaceTarget}
+                onUploadApplicantFile={onUploadApplicantFile}
+                submission={submission}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="v19-applicant-card-footer">
+        <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
+        {error ? (
+          <span className="v19-applicant-submit-error" role="alert">
+            {error}
+          </span>
+        ) : null}
+      </div>
+    </V19QueueCard>
+  );
+}
+
+function IndividualSubmissionCard({
+  canSubmitForReview,
+  error,
+  now,
+  onOpenQuestionnaire,
+  onOpenWorkspaceTarget,
+  onPrimaryAction,
+  onUploadApplicantFile,
+  submission,
+  submitting,
+}: CardCallbacks & { submission: Submission }) {
+  const applicant = submission.applicants[0];
+  const name = applicant?.fullName ?? submission.title;
+  const marker = applicant ? applicantMarker(submission, applicant) : "person";
+
+  return (
+    <V19QueueCard
+      as="article"
+      aria-label={`Подача ${name}`}
+      className="v19-agent-shared-card group"
+      data-submission-id={submission.id}
+    >
+      <div className="v19-applicant-individual-header">
+        <div className="v19-applicant-individual-main">
+          <div className="v19-applicant-individual-icon">
+            <ApplicantMarkerIcon marker={marker} />
+          </div>
+          <div className="v19-applicant-individual-copy">
+            <div className="v19-applicant-individual-name-row">
+              <h3>{name}</h3>
+            </div>
+            <p className="v19-applicant-individual-meta">
+              <span>{questionnaireCityForSubmission(submission)}</span>
+              <AssignedPublicId submission={submission} />
+            </p>
+          </div>
+        </div>
+        <SubmissionStatusAction
+          canSubmitForReview={canSubmitForReview}
+          label={name}
+          onPrimaryAction={onPrimaryAction}
+          submission={submission}
+          submitting={submitting}
+        />
+      </div>
+
+      <div className="v19-applicant-card-footer">
+        <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
+        {applicant ? (
+          <ApplicantWorkflowActions
+            applicant={applicant}
+            onOpenQuestionnaire={onOpenQuestionnaire}
+            onOpenWorkspaceTarget={onOpenWorkspaceTarget}
+            onUploadApplicantFile={onUploadApplicantFile}
+            submission={submission}
+          />
+        ) : null}
+        {error ? (
+          <span className="v19-applicant-submit-error" role="alert">
+            {error}
+          </span>
+        ) : null}
+      </div>
+    </V19QueueCard>
+  );
+}
 
 function metricsFromSubmissions(submissions: Submission[]) {
   const count = (filter: AgentSubmissionQueueFilter) =>
     filterAgentSubmissionQueue(submissions, {
-      city: 'Все города',
+      city: "Все города",
       filter,
-      query: '',
+      query: "",
     }).length;
-
   return {
-    exportReady: count('ready'),
-    queue: count('all'),
-    review: count('review'),
+    exportReady: count("ready"),
+    queue: count("all"),
+    review: count("review"),
   };
 }
 
 function profileNoun(count: number) {
   const lastTwo = count % 100;
-  if (lastTwo >= 11 && lastTwo <= 14) return 'профилей';
-
+  if (lastTwo >= 11 && lastTwo <= 14) return "профилей";
   const last = count % 10;
-  if (last === 1) return 'профиль';
-  if (last >= 2 && last <= 4) return 'профиля';
-  return 'профилей';
-}
-
-function profileCountLabel(count: number) {
-  return `${count} ${profileNoun(count)}`;
-}
-
-function peopleCountLabel(count: number) {
-  const lastTwo = count % 100;
-  if (lastTwo >= 11 && lastTwo <= 14) return `${count} человек`;
-
-  const last = count % 10;
-  if (last === 1) return `${count} человек`;
-  if (last >= 2 && last <= 4) return `${count} человека`;
-  return `${count} человек`;
+  if (last === 1) return "профиль";
+  if (last >= 2 && last <= 4) return "профиля";
+  return "профилей";
 }
 
 function queueFilterLabel(filter: AgentSubmissionQueueFilter) {
-  if (filter === 'blockers') return 'Блокеры';
-  if (filter === 'review') return 'Проверить';
-  if (filter === 'ready') return 'К выгрузке';
-  return '';
+  if (filter === "blockers") return "Блокеры";
+  if (filter === "review") return "Проверить";
+  if (filter === "ready") return "К выгрузке";
+  return "";
 }
 
-function lifecycleStatusTone(status: Submission['status']) {
-  if (status === 'submitted_for_review' || status === 'corrections_received') return 'is-review';
-  if (status === 'ready_for_export' || status === 'exported') return 'is-ready';
-  if (status === 'returned' || status === 'requires_action') return 'is-returned';
-  return 'is-progress';
+function typeFilterLabel(filter: SubmissionTypeFilter) {
+  if (filter === "family") return "Семья";
+  if (filter === "single") return "Заявитель";
+  return "Все типы";
 }
 
-function familyActionLabel(family: FamilyData, submitting: boolean) {
-  if (submitting) return 'Отправляем…';
-  if (family.canSubmitForReview) return 'На проверку';
-  if (family.lifecycleStatus === 'submitted_for_review') return 'На проверке';
-  return 'Открыть';
+function sortLabel(sort: ApplicantSort) {
+  if (sort === "createdAsc") return "Сначала старые";
+  if (sort === "tripDate") return "По дате поездки";
+  return "Сначала новые";
+}
+
+function sortedSubmissions(
+  submissions: Submission[],
+  sort: ApplicantSort,
+  now: Date,
+) {
+  return [...submissions].sort((left, right) => {
+    if (sort === "tripDate") {
+      const tripOrder = left.tripDateFrom.localeCompare(right.tripDateFrom);
+      if (tripOrder !== 0) return tripOrder;
+    } else {
+      const leftTime = resolveSubmissionCreatedAt(left.createdAt, now)?.getTime() ?? 0;
+      const rightTime = resolveSubmissionCreatedAt(right.createdAt, now)?.getTime() ?? 0;
+      const createdOrder =
+        sort === "createdAsc" ? leftTime - rightTime : rightTime - leftTime;
+      if (createdOrder !== 0) return createdOrder;
+    }
+    return left.id.localeCompare(right.id);
+  });
 }
 
 export function ApplicantsScreen({
+  focusRequest,
   onOpenDrawer,
+  onOpenQuestionnaire,
+  onOpenWorkspaceTarget,
   onSubmitForReview,
+  onTypeFilterChange,
+  onUploadApplicantFile,
   submissions,
+  typeFilter: controlledTypeFilter,
 }: ApplicantsScreenProps) {
   const prefersReducedMotion = useReducedMotion();
-  const [applicantSummaryFilter, setApplicantSummaryFilter] = useState<AgentSubmissionQueueFilter>('all');
-  const [cityFilter, setCityFilter] = useState('Все города');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<ApplicantSort>('tripDate');
-  const [submittingFamilyId, setSubmittingFamilyId] = useState<string | null>(null);
-  const [submissionError, setSubmissionError] = useState<{ id: string; message: string } | null>(null);
+  const [internalTypeFilter, setInternalTypeFilter] =
+    useState<SubmissionTypeFilter>("single");
+  const typeFilter = controlledTypeFilter ?? internalTypeFilter;
+  const [summaryFilter, setSummaryFilter] =
+    useState<AgentSubmissionQueueFilter>("all");
+  const [cityFilter, setCityFilter] = useState("Все города");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<ApplicantSort>("createdDesc");
+  const [relativeNow, setRelativeNow] = useState(() => Date.now());
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
   const canonicalSubmissions = submissions ?? emptySubmissions;
+  const focusSubmissionId = focusRequest?.submissionId;
+  const focusRevision = focusRequest?.revision;
+
+  const changeTypeFilter = (filter: SubmissionTypeFilter) => {
+    if (controlledTypeFilter === undefined) setInternalTypeFilter(filter);
+    onTypeFilterChange?.(filter);
+  };
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setRelativeNow(Date.now()), minuteMs);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!focusSubmissionId || focusRevision === undefined || !focusRequest) return;
+    changeTypeFilter(focusRequest.type);
+    setSummaryFilter("all");
+    setCityFilter("Все города");
+    setSearchQuery("");
+    setSortBy("createdDesc");
+    let secondFrame: number | undefined;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>(
+            `[data-submission-id="${CSS.escape(focusSubmissionId)}"]`,
+          )
+          ?.scrollIntoView({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+            block: "start",
+          });
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame !== undefined) window.cancelAnimationFrame(secondFrame);
+    };
+    // A new revision is the event boundary; filter callbacks are intentionally not dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRevision, focusSubmissionId, prefersReducedMotion]);
+
+  const typedSubmissions = useMemo(
+    () =>
+      typeFilter === "all"
+        ? canonicalSubmissions
+        : canonicalSubmissions.filter((submission) => submission.type === typeFilter),
+    [canonicalSubmissions, typeFilter],
+  );
   const filteredSubmissions = useMemo(
     () =>
-      filterAgentSubmissionQueue(canonicalSubmissions, {
+      filterAgentSubmissionQueue(typedSubmissions, {
         city: cityFilter,
-        filter: applicantSummaryFilter,
+        filter: summaryFilter,
         query: searchQuery,
       }),
-    [applicantSummaryFilter, canonicalSubmissions, cityFilter, searchQuery],
+    [cityFilter, searchQuery, summaryFilter, typedSubmissions],
   );
-  const families = useMemo(
-    () => runtimeFamiliesFromSubmissions(filteredSubmissions),
-    [filteredSubmissions],
+  const now = useMemo(() => new Date(relativeNow), [relativeNow]);
+  const displayedSubmissions = useMemo(
+    () => sortedSubmissions(filteredSubmissions, sortBy, now),
+    [filteredSubmissions, now, sortBy],
   );
-  const individuals = useMemo(
-    () => runtimeIndividualsFromSubmissions(filteredSubmissions),
-    [filteredSubmissions],
+  const cityOptions = useMemo(
+    () => cityFilterValuesForSubmissions(canonicalSubmissions),
+    [canonicalSubmissions],
   );
-  const cityOptions = useMemo(() => {
-    return cityFilterValuesForSubmissions(canonicalSubmissions);
-  }, [canonicalSubmissions]);
   const metrics = useMemo(
     () => metricsFromSubmissions(canonicalSubmissions),
     [canonicalSubmissions],
   );
-  const displayFamilies = useMemo(
-    () =>
-      [...families].sort((left, right) =>
-        sortBy === 'tripDate'
-          ? left.tripDateFrom.localeCompare(right.tripDateFrom)
-          : right.createdAt.localeCompare(left.createdAt),
-      ),
-    [families, sortBy],
-  );
-  const displayIndividuals = useMemo(
-    () =>
-      [...individuals].sort((left, right) =>
-        sortBy === 'tripDate'
-          ? left.tripDateFrom.localeCompare(right.tripDateFrom)
-          : right.createdAt.localeCompare(left.createdAt),
-      ),
-    [individuals, sortBy],
-  );
-  const hasVisibleApplicants = displayFamilies.length > 0 || displayIndividuals.length > 0;
-  const visibleProfileCount = displayFamilies.length + displayIndividuals.length;
-  const hasActiveFilters = applicantSummaryFilter !== 'all' || cityFilter !== 'Все города' || searchQuery.trim().length > 0 || sortBy !== 'tripDate';
+  const hasActiveFilters =
+    typeFilter !== "all" ||
+    summaryFilter !== "all" ||
+    cityFilter !== "Все города" ||
+    searchQuery.trim().length > 0 ||
+    sortBy !== "createdDesc";
   const activeFilterContext = [
-    queueFilterLabel(applicantSummaryFilter),
-    cityFilter !== 'Все города' ? cityFilter : '',
-    searchQuery.trim() ? 'Поиск' : '',
-    sortBy === 'createdAt' ? 'Сначала новые' : '',
-  ].filter(Boolean).join(' · ');
+    typeFilterLabel(typeFilter),
+    queueFilterLabel(summaryFilter),
+    cityFilter !== "Все города" ? cityFilter : "",
+    searchQuery.trim() ? "Поиск" : "",
+    sortLabel(sortBy),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const resetFilters = () => {
-    setApplicantSummaryFilter('all');
-    setCityFilter('Все города');
-    setSearchQuery('');
-    setSortBy('tripDate');
+    changeTypeFilter("all");
+    setSummaryFilter("all");
+    setCityFilter("Все города");
+    setSearchQuery("");
+    setSortBy("createdDesc");
   };
-  const handleFamilyAction = async (family: FamilyData) => {
-    if (!family.canSubmitForReview || !onSubmitForReview) {
-      onOpenDrawer(family.id);
+
+  const handlePrimaryAction = async (submission: Submission) => {
+    if (
+      !canPerformAction(submission, "submit_for_review", "agent").ok ||
+      !onSubmitForReview
+    ) {
+      onOpenDrawer(submission.id);
       return;
     }
-
     setSubmissionError(null);
-    setSubmittingFamilyId(family.id);
+    setSubmittingId(submission.id);
     try {
-      await onSubmitForReview(family.id);
+      await onSubmitForReview(submission.id);
     } catch (error) {
       setSubmissionError({
-        id: family.id,
-        message: error instanceof Error ? error.message : 'Не удалось отправить подачу на проверку.',
+        id: submission.id,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Не удалось отправить подачу на проверку.",
       });
     } finally {
-      setSubmittingFamilyId(null);
+      setSubmittingId(null);
     }
+  };
+
+  const cardCallbacks = {
+    canSubmitForReview: Boolean(onSubmitForReview),
+    now,
+    onOpenQuestionnaire,
+    onOpenWorkspaceTarget,
+    onPrimaryAction: (submission: Submission) => void handlePrimaryAction(submission),
+    onUploadApplicantFile,
   };
 
   return (
     <motion.div
-      initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
       className="v19-agent-shared-screen"
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+      transition={{ duration: 0.3 }}
     >
       <V19MetricStrip>
         <V19MetricCard
-          active={applicantSummaryFilter === 'all'}
+          active={summaryFilter === "all"}
           detail={profileNoun(metrics.queue)}
           icon={FileText}
           label="В очереди"
           value={metrics.queue}
-          onClick={() => setApplicantSummaryFilter('all')}
+          onClick={() => setSummaryFilter("all")}
         />
         <V19MetricCard
-          active={applicantSummaryFilter === 'review'}
+          active={summaryFilter === "review"}
           detail="ревью"
           icon={AlertCircle}
           label="Проверить"
           tone="amber"
           value={metrics.review}
-          onClick={() => setApplicantSummaryFilter('review')}
+          onClick={() => setSummaryFilter("review")}
         />
         <V19MetricCard
-          active={applicantSummaryFilter === 'ready'}
+          active={summaryFilter === "ready"}
           detail="экспорт"
           icon={CheckCircle2}
           label="К выгрузке"
           tone="green"
           value={metrics.exportReady}
-          onClick={() => setApplicantSummaryFilter('ready')}
+          onClick={() => setSummaryFilter("ready")}
         />
       </V19MetricStrip>
 
@@ -376,8 +828,8 @@ export function ApplicantsScreen({
           className="v19-admin-export-list-head-v2"
           countLabel={
             hasActiveFilters
-              ? `${activeFilterContext} · ${visibleProfileCount}/${metrics.queue}`
-              : profileCountLabel(metrics.queue)
+              ? `${activeFilterContext} · ${displayedSubmissions.length}/${metrics.queue}`
+              : `${metrics.queue} ${profileNoun(metrics.queue)}`
           }
           onAction={resetFilters}
           title="Мои подачи"
@@ -389,28 +841,42 @@ export function ApplicantsScreen({
           cityOptions={cityOptions}
           controls={
             <>
+              <V19ToolbarSelect<SubmissionTypeFilter>
+                ariaLabel="Тип подачи"
+                className={typeFilter !== "all" ? "is-active" : ""}
+                icon={Users}
+                label="Тип"
+                options={[
+                  { label: "Все", value: "all" },
+                  { label: "Заявитель", value: "single" },
+                  { label: "Семья", value: "family" },
+                ]}
+                value={typeFilter}
+                onChange={changeTypeFilter}
+              />
               <V19ToolbarSelect<AgentSubmissionQueueFilter>
                 ariaLabel="Фильтр подач"
-                className={applicantSummaryFilter !== 'all' ? 'is-active' : ''}
+                className={summaryFilter !== "all" ? "is-active" : ""}
                 icon={Shapes}
                 label="Статус"
                 options={[
-                  { label: 'Все', value: 'all' },
-                  { label: 'Блокеры', value: 'blockers' },
-                  { label: 'Проверить', value: 'review' },
-                  { label: 'К выгрузке', value: 'ready' },
+                  { label: "Все", value: "all" },
+                  { label: "Блокеры", value: "blockers" },
+                  { label: "Проверить", value: "review" },
+                  { label: "К выгрузке", value: "ready" },
                 ]}
-                value={applicantSummaryFilter}
-                onChange={setApplicantSummaryFilter}
+                value={summaryFilter}
+                onChange={setSummaryFilter}
               />
               <V19ToolbarSelect<ApplicantSort>
                 ariaLabel="Сортировка подач"
-                className={sortBy !== 'tripDate' ? 'is-active' : ''}
+                className={sortBy !== "createdDesc" ? "is-active" : ""}
                 icon={ArrowUpDown}
                 label="Сортировка"
                 options={[
-                  { label: 'По дате вылета', value: 'tripDate' },
-                  { label: 'По дате создания', value: 'createdAt' },
+                  { label: "Сначала новые", value: "createdDesc" },
+                  { label: "Сначала старые", value: "createdAsc" },
+                  { label: "По дате поездки", value: "tripDate" },
                 ]}
                 value={sortBy}
                 onChange={setSortBy}
@@ -422,155 +888,60 @@ export function ApplicantsScreen({
           onFilterClick={resetFilters}
           onSearchChange={setSearchQuery}
           searchAriaLabel="Поиск по подачам"
-          searchPlaceholder="ID, семья или заявитель"
+          searchPlaceholder="VF-номер, семья или заявитель"
           searchValue={searchQuery}
         />
+
         <div className="v19-agent-submissions-list">
-
-      {!hasVisibleApplicants ? (
-        <div
-          className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#242529] bg-[#161617] p-8 text-center"
-          role="status"
-        >
-          <h2 className="m-0 text-[18px] font-semibold text-white">Ничего не найдено</h2>
-          <p className="m-0 mt-2 max-w-[420px] text-[13px] leading-5 text-white/60">
-            Измените поисковый запрос или фильтр готовности.
-          </p>
-          <button
-            className="mt-4 h-10 rounded-[10px] border border-[#242529] bg-[#1e1e21] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#27272b]"
-            type="button"
-            onClick={resetFilters}
-          >
-            Сбросить фильтры
-          </button>
-        </div>
-      ) : null}
-
-      {displayFamilies.length ? (
-        <section className="v19-agent-submissions-group" aria-labelledby="agent-submissions-families">
-          <h2 id="agent-submissions-families">Семьи</h2>
-          {displayFamilies.map((family) => (
-            <V19QueueCard
-              as="article"
-              aria-label={`Подача ${family.title}`}
-              data-submission-id={family.id}
-              key={family.id}
-              className="v19-agent-shared-card group"
+          {!displayedSubmissions.length ? (
+            <div className="v19-applicant-empty-state" role="status">
+              <h2>Ничего не найдено</h2>
+              <p>Измените поисковый запрос или фильтры.</p>
+              <button type="button" onClick={resetFilters}>
+                Сбросить фильтры
+              </button>
+            </div>
+          ) : (
+            <section
+              aria-labelledby="agent-submissions-visible"
+              className="v19-agent-submissions-group"
             >
-              <div className="v19-applicant-family-header">
-                <div className="v19-applicant-family-main">
-                  <div className="v19-agent-submission-family-icon w-11 h-11 bg-white/5 border border-white/5 flex items-center justify-center shadow-inner group-hover:bg-[var(--v19b-color-primary-soft-10)] group-hover:border-[var(--v19b-color-primary-soft-20)] transition-colors">
-                    <Users className="w-5 h-5 text-white/70 group-hover:text-[var(--v19b-color-primary)] transition-colors" />
-                  </div>
-                  <div className="v19-applicant-family-copy">
-                    <h3>{family.title}</h3>
-                    <p className="v19-applicant-family-meta">
-                      <span>{peopleCountLabel(family.members.length)}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{family.city}</span>
-                    </p>
-                  </div>
-                </div>
-                <div className="v19-applicant-family-summary">
-                  <span className={`v19-applicant-card-status ${lifecycleStatusTone(family.lifecycleStatus)}`}>
-                    {statusLabelFor(family.lifecycleStatus, 'compact')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Members List */}
-              <div className="space-y-1.5 mb-6">
-                {family.members.map((member, i) => (
-                  <div key={i} className="v19-applicant-member-cell">
-                    <ApplicantMarkerIcon marker={member.marker} />
-                    <span className="v19-applicant-member-name">{member.name}</span>
-                    {member.roleLabel ? <span className="v19-applicant-member-role">{member.roleLabel}</span> : null}
-                    <div className="w-5 flex justify-end shrink-0">
-                      {getStatusDot(member.status)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Footer */}
-              <div className="v19-applicant-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-[#242529] pt-4 text-[11.5px] text-white/40">
-                <span className="v19-applicant-readiness">
-                  {family.readinessPercent}% готово
-                </span>
-                <button
-                  aria-label={`${familyActionLabel(family, submittingFamilyId === family.id)}: ${family.title}`}
-                  className="v19-applicant-open-action"
-                  disabled={submittingFamilyId === family.id}
-                  type="button"
-                  onClick={() => void handleFamilyAction(family)}
-                >
-                  {familyActionLabel(family, submittingFamilyId === family.id)}
-                  <ChevronRight aria-hidden="true" />
-                </button>
-                {submissionError?.id === family.id ? (
-                  <span className="v19-applicant-submit-error" role="alert">
-                    {submissionError.message}
-                  </span>
-                ) : null}
-              </div>
-            </V19QueueCard>
-          ))}
-        </section>
-      ) : null}
-
-      {displayFamilies.length && displayIndividuals.length ? (
-        <div aria-hidden="true" className="v19-agent-submissions-divider" />
-      ) : null}
-
-      {displayIndividuals.length ? (
-        <section className="v19-agent-submissions-group" aria-labelledby="agent-submissions-individuals">
-          <h2 id="agent-submissions-individuals">Заявители</h2>
-          {displayIndividuals.map((ind) => (
-            <V19QueueCard
-              as="button"
-              aria-label={`Открыть подачу ${ind.name}`}
-              data-submission-id={ind.id}
-              key={ind.id}
-              onClick={() => onOpenDrawer(ind.id)}
-              className="v19-agent-shared-card group"
-              type="button"
-            >
-              <div className="v19-applicant-individual-header flex justify-between items-start gap-3 mb-6">
-                <div className="v19-applicant-individual-main flex gap-3.5 items-center">
-                  <div className="v19-applicant-individual-icon">
-                    <ApplicantMarkerIcon marker={ind.marker} />
-                  </div>
-                  <div className="v19-applicant-individual-copy">
-                    <div className="v19-applicant-individual-name-row">
-                      <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-white transition-colors group-hover:text-white">{ind.name}</h3>
-                      <span className={`v19-applicant-individual-status ${lifecycleStatusTone(ind.lifecycleStatus)}`}>
-                        {getStatusDot(ind.status)}
-                        {statusLabelFor(ind.lifecycleStatus, 'compact')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="v19-applicant-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-[#242529] pt-4 text-[11.5px] text-white/40">
-                <div className="v19-applicant-card-footer-meta min-w-0 flex-1">
-                  <span>{ind.lastActivity}</span>
-                  <span className="v19-applicant-card-footer-city">{ind.city}</span>
-                </div>
-                <span className="v19-applicant-card-footer-actions flex-wrap justify-end">
-                  <span className="v19-applicant-readiness">
-                    {ind.readinessPercent}% готово
-                  </span>
-                  <span className="v19-applicant-open-action">
-                    Открыть <ChevronRight aria-hidden="true" />
-                  </span>
-                </span>
-              </div>
-            </V19QueueCard>
-          ))}
-        </section>
-      ) : null}
+              <h2 id="agent-submissions-visible">
+                {typeFilter === "family"
+                  ? "Семьи"
+                  : typeFilter === "single"
+                    ? "Заявители"
+                    : "Все подачи"}
+              </h2>
+              {displayedSubmissions.map((submission) =>
+                submission.type === "family" ? (
+                  <FamilySubmissionCard
+                    {...cardCallbacks}
+                    error={
+                      submissionError?.id === submission.id
+                        ? submissionError.message
+                        : undefined
+                    }
+                    key={submission.id}
+                    submission={submission}
+                    submitting={submittingId === submission.id}
+                  />
+                ) : (
+                  <IndividualSubmissionCard
+                    {...cardCallbacks}
+                    error={
+                      submissionError?.id === submission.id
+                        ? submissionError.message
+                        : undefined
+                    }
+                    key={submission.id}
+                    submission={submission}
+                    submitting={submittingId === submission.id}
+                  />
+                ),
+              )}
+            </section>
+          )}
         </div>
       </div>
     </motion.div>

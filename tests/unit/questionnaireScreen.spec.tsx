@@ -187,6 +187,118 @@ describe("QuestionnaireScreen", () => {
     expect(nextSubmission.status).toBe("draft");
   });
 
+  test("assigns and announces a public number only after a complete questionnaire save", async () => {
+    const submission = readySubmission("draft");
+    const onAssignPublicNumber = vi.fn().mockResolvedValue({
+      assignedNow: true,
+      publicNumber: 1059,
+    });
+    const onBack = vi.fn();
+    const onSavedAndExit = vi.fn().mockResolvedValue(undefined);
+    const onSubmissionChange = vi.fn().mockResolvedValue(undefined);
+    const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+
+    render(
+      <QuestionnaireScreen
+        onAssignPublicNumber={onAssignPublicNumber}
+        onBack={onBack}
+        onSavedAndExit={onSavedAndExit}
+        onSubmissionChange={onSubmissionChange}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+
+    await waitFor(() => expect(onSavedAndExit).toHaveBeenCalledTimes(1));
+    expect(onSubmissionChange).toHaveBeenCalledTimes(1);
+    expect(onAssignPublicNumber).toHaveBeenCalledOnce();
+    expect(onAssignPublicNumber).toHaveBeenCalledWith(submission.id);
+    expect(alert).toHaveBeenCalledOnce();
+    expect(alert).toHaveBeenCalledWith(
+      "Анкета сохранена. Номер подачи: VF-1059",
+    );
+    expect(onSavedAndExit).toHaveBeenCalledWith(
+      expect.objectContaining({ publicNumber: 1059 }),
+    );
+    expect(onBack).not.toHaveBeenCalled();
+
+    alert.mockRestore();
+  });
+
+  test("does not repeat the public-number alert when the number was assigned earlier", async () => {
+    const submission = readySubmission("draft");
+    const onAssignPublicNumber = vi.fn().mockResolvedValue({
+      assignedNow: false,
+      publicNumber: 1059,
+    });
+    const onSavedAndExit = vi.fn().mockResolvedValue(undefined);
+    const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+
+    render(
+      <QuestionnaireScreen
+        onAssignPublicNumber={onAssignPublicNumber}
+        onBack={vi.fn()}
+        onSavedAndExit={onSavedAndExit}
+        onSubmissionChange={vi.fn().mockResolvedValue(undefined)}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+
+    await waitFor(() => expect(onSavedAndExit).toHaveBeenCalledTimes(1));
+    expect(onAssignPublicNumber).toHaveBeenCalledOnce();
+    expect(alert).not.toHaveBeenCalled();
+    expect(onSavedAndExit).toHaveBeenCalledWith(
+      expect.objectContaining({ publicNumber: 1059 }),
+    );
+
+    alert.mockRestore();
+  });
+
+  test("exits an incomplete draft without assigning or announcing a public number", async () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onAssignPublicNumber = vi.fn();
+    const onBack = vi.fn();
+    const onSavedAndExit = vi.fn().mockResolvedValue(undefined);
+    const onSubmissionChange = vi.fn().mockResolvedValue(undefined);
+    const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+
+    render(
+      <QuestionnaireScreen
+        onAssignPublicNumber={onAssignPublicNumber}
+        onBack={onBack}
+        onSavedAndExit={onSavedAndExit}
+        onSubmissionChange={onSubmissionChange}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+
+    await waitFor(() => expect(onSavedAndExit).toHaveBeenCalledTimes(1));
+    expect(onSubmissionChange).toHaveBeenCalledTimes(1);
+    expect(onAssignPublicNumber).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
+    expect(onSavedAndExit).toHaveBeenCalledWith(
+      expect.objectContaining({ publicNumber: null, status: "draft" }),
+    );
+    expect(onBack).not.toHaveBeenCalled();
+
+    alert.mockRestore();
+  });
+
   test("applies a questionnaire save to the latest serialized submission snapshot", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],

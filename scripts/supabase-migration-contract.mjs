@@ -49,6 +49,7 @@ export const requiredMigrationOrder = [
   "20260715000000_document_assets_source_media_id_update_cascade.sql",
   "20260717050000_admin_passport_review_media_policy.sql",
   "20260718190000_global_submission_public_numbers.sql",
+  "20260719160000_assign_public_number_after_questionnaire.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [

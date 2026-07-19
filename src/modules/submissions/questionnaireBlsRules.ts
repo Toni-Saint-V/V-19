@@ -349,6 +349,14 @@ function blsQuestionnaireFieldValue({
   return field.value;
 }
 
+function isAutomaticallyCalculatedBlsField(field: BlsFieldForValidation) {
+  return field.id === 'stay-duration';
+}
+
+function hasPersistedBlsFieldError(field: BlsFieldForValidation) {
+  return !isAutomaticallyCalculatedBlsField(field) && Boolean(field.error);
+}
+
 function occupationRequiresEmployer(
   formData: BlsFormData,
   applicantRole?: Applicant['role'],
@@ -435,6 +443,7 @@ export function isBlsQuestionnaireFieldRequired({
 export function validateBlsQuestionnaireField(context: BlsFieldValidationContext) {
   const { applicantRole, field, formData } = context;
   if (!isBlsQuestionnaireFieldApplicable({ applicantRole, field, formData })) return undefined;
+  if (isAutomaticallyCalculatedBlsField(field)) return undefined;
 
   const trimmed = blsQuestionnaireFieldValue(context).trim();
   const required = isBlsQuestionnaireFieldRequired({ applicantRole, field, formData });
@@ -498,20 +507,6 @@ export function validateBlsQuestionnaireField(context: BlsFieldValidationContext
     }
   }
 
-  if (field.id === 'stay-duration') {
-    if (!/^\d+$/.test(trimmed)) return 'Введите количество дней числом';
-    const duration = Number(trimmed);
-    if (duration <= 0 || duration > 365) return 'Проверьте длительность пребывания';
-
-    const expected = blsStayDurationFromDates(
-      read(formData, 'travelStart'),
-      read(formData, 'travelEnd'),
-    );
-    if (expected && trimmed !== expected) {
-      return `Длительность должна быть ${expected} дн.`;
-    }
-  }
-
   if (field.id === 'postal-code' || field.id === 'hotel-postal-code') {
     return /^[A-Z0-9][A-Z0-9\s-]{1,14}[A-Z0-9]$/i.test(trimmed)
       ? undefined
@@ -523,6 +518,9 @@ export function validateBlsQuestionnaireField(context: BlsFieldValidationContext
 
 export function isBlsQuestionnaireFieldReady(context: BlsFieldValidationContext) {
   if (!isBlsQuestionnaireFieldApplicable(context)) return true;
+  if (isAutomaticallyCalculatedBlsField(context.field)) {
+    return Boolean(blsQuestionnaireFieldValue(context).trim());
+  }
 
   const required = isBlsQuestionnaireFieldRequired(context);
   const value = blsQuestionnaireFieldValue(context).trim();
@@ -533,6 +531,7 @@ export function isBlsQuestionnaireFieldReady(context: BlsFieldValidationContext)
 
 export function isBlsQuestionnaireFieldBlockingIssue(context: BlsFieldValidationContext) {
   if (!isBlsQuestionnaireFieldApplicable(context)) return false;
+  if (isAutomaticallyCalculatedBlsField(context.field)) return false;
 
   if (context.field.reviewState === 'needs_review') return true;
 
@@ -598,7 +597,7 @@ export function blsApplicantQuestionnaireStatus(
 
     return (
       isBlsQuestionnaireFieldApplicable(context) &&
-      (Boolean(field.error) || isBlsQuestionnaireFieldBlockingIssue(context))
+      (hasPersistedBlsFieldError(field) || isBlsQuestionnaireFieldBlockingIssue(context))
     );
   });
 
@@ -607,6 +606,40 @@ export function blsApplicantQuestionnaireStatus(
     return 'complete';
   }
   return fields.some((field) => field.value.trim()) ? 'partial' : 'empty';
+}
+
+export function firstBlsQuestionnaireAttentionTarget(applicant: Applicant): {
+  field?: string;
+  section?: string;
+} {
+  const formData = blsFormDataForApplicant(applicant);
+  const candidates = applicant.sections.flatMap((section) =>
+    section.fields.map((field) => ({
+      context: {
+        applicantRole: applicant.role,
+        field,
+        formData,
+      } satisfies BlsFieldValidationContext,
+      field,
+      section,
+    })),
+  );
+  const target =
+    candidates.find(
+      ({ context, field }) =>
+        isBlsQuestionnaireFieldApplicable(context) &&
+        (hasPersistedBlsFieldError(field) ||
+          isBlsQuestionnaireFieldBlockingIssue(context)),
+    ) ??
+    candidates.find(
+      ({ context }) =>
+        isBlsQuestionnaireFieldApplicable(context) &&
+        !isBlsQuestionnaireFieldReady(context),
+    );
+
+  return target
+    ? { field: target.field.id, section: target.section.title }
+    : {};
 }
 
 export function blsQuestionnaireReadiness(

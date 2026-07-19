@@ -24,6 +24,10 @@ import {
 } from "../../services/persistenceObservability";
 import type { AppProfile } from "../../types/session";
 import { familyListTitleFromMainApplicantName } from "./listFormatters";
+import {
+  submissionPublicNumberMax,
+  submissionPublicNumberMin,
+} from "./submissionIdentity";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
 import {
@@ -84,6 +88,50 @@ const agentProfileSelect = "id,display_name" as const;
 export interface CockpitLoadResult {
   ownerIdsBySubmissionId: Map<string, string>;
   submissions: Submission[];
+}
+
+export type PublicNumberAssignment = {
+  assignedNow: boolean;
+  publicNumber: number;
+};
+
+function publicNumberAssignmentFromRpc(value: unknown): PublicNumberAssignment {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Supabase вернул некорректный результат выдачи номера.");
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.assignedNow !== "boolean" ||
+    typeof record.publicNumber !== "number" ||
+    !Number.isSafeInteger(record.publicNumber) ||
+    record.publicNumber < submissionPublicNumberMin ||
+    record.publicNumber > submissionPublicNumberMax
+  ) {
+    throw new Error("Supabase вернул некорректный номер подачи.");
+  }
+  return {
+    assignedNow: record.assignedNow,
+    publicNumber: record.publicNumber,
+  };
+}
+
+export async function ensureSubmissionPublicNumber(
+  submissionId: string,
+): Promise<PublicNumberAssignment> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase недоступен для выдачи номера подачи.");
+  }
+  const { data, error } = await client.rpc("ensure_submission_public_number", {
+    submission_id: submissionId,
+  });
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "rpc.ensure_submission_public_number",
+      fallbackKind: "rpc",
+    });
+  }
+  return publicNumberAssignmentFromRpc(data);
 }
 
 type SnapshotEnvelope = {
@@ -535,7 +583,7 @@ function attachExportPackageRow(
 function reconcileCockpitSnapshotWithSubmissionRow(
   row: Pick<
     SubmissionRow,
-    "agent_id" | "exported_at" | "public_number" | "status" | "updated_at"
+    "agent_id" | "created_at" | "exported_at" | "public_number" | "status" | "updated_at"
   >,
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
@@ -557,7 +605,8 @@ function reconcileCockpitSnapshotWithSubmissionRow(
         statusFallback: rowStatus,
       },
     ),
-    publicNumber: row.public_number ?? undefined,
+    createdAt: row.created_at,
+    publicNumber: row.public_number,
   };
 
   if (rowStatus !== "exported") {
@@ -1201,7 +1250,7 @@ function fallbackSubmissionFromRows(
 
   return normalizeSubmissionQuestionnaire({
     id: row.id,
-    publicNumber: row.public_number ?? undefined,
+    publicNumber: row.public_number,
     agentId: row.agent_id,
     title: row.title,
     listTitle:

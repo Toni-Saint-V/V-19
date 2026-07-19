@@ -23,6 +23,21 @@ describe("submission public identity", () => {
     expect(submissionPublicId({ id: "ПД-1056" })).toBe("VF-1056");
   });
 
+  it("treats explicit null as unassigned instead of parsing the technical id", () => {
+    expect(
+      submissionPublicNumber({
+        id: "VF-1060-mrn9iuax-1-0hvx9nd",
+        publicNumber: null,
+      }),
+    ).toBeNull();
+    expect(
+      submissionPublicId({
+        id: "VF-1060-mrn9iuax-1-0hvx9nd",
+        publicNumber: null,
+      }),
+    ).toBe("VF-—");
+  });
+
   it("does not invent an order number for a technical id", () => {
     expect(
       submissionPublicId({ id: "VF-PROD-WORKFLOW-20260717122436" }),

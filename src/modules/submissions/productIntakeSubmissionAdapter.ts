@@ -546,6 +546,7 @@ export function productIntakeDraftToSubmission(
 
   return withRecalculatedSubmissionProgress(normalizeSubmissionQuestionnaire({
     id: submissionId,
+    publicNumber: null,
     agentId,
     title: draft.title,
     type: draft.type,

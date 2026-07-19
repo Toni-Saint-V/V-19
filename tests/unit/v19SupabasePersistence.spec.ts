@@ -13,10 +13,10 @@ const mockState = vi.hoisted(() => ({
   profileRows: [] as unknown[],
   questionnaireRows: [] as unknown[],
   rpcCalls: [] as Array<{
-    args: { answers?: unknown; payload?: unknown };
+    args: Record<string, unknown>;
     name: string;
   }>,
-  rpcResults: [] as Array<{ error: unknown | null }>,
+  rpcResults: [] as Array<{ data?: unknown; error: unknown | null }>,
   submissionRows: [] as unknown[],
   statusHistoryRows: [] as unknown[],
 }));
@@ -88,7 +88,7 @@ vi.mock("../../src/lib/supabase/client", () => {
             ),
         };
       },
-      rpc: (name: string, args: { answers?: unknown; payload?: unknown }) => {
+      rpc: (name: string, args: Record<string, unknown>) => {
         mockState.rpcCalls.push({ args, name });
         return Promise.resolve(mockState.rpcResults.shift() ?? { error: null });
       },
@@ -107,6 +107,7 @@ import {
   cockpitSnapshotStatus,
   cockpitSnapshotVersion,
   cockpitSubmissionFingerprintMap,
+  ensureSubmissionPublicNumber,
   loadCockpitSubmissionsForProfile,
   readCockpitSnapshot,
   reviewHandoffPersistenceIssues,
@@ -114,6 +115,7 @@ import {
   toCockpitDraftPersistencePayload,
   toCockpitQuestionnaireAnswerInserts,
 } from "../../src/modules/submissions/supabasePersistence";
+import { PersistenceObservableError } from "../../src/services/persistenceObservability";
 
 const agentProfile: AppProfile = {
   displayName: "Agent",
@@ -169,6 +171,60 @@ beforeEach(() => {
 });
 
 describe("V-19 Supabase cockpit persistence", () => {
+  it("assigns a submission public number through the protected RPC", async () => {
+    mockState.rpcResults = [
+      {
+        data: { assignedNow: true, publicNumber: 1059 },
+        error: null,
+      },
+    ];
+
+    await expect(ensureSubmissionPublicNumber("VF-DRAFT-1059")).resolves.toEqual({
+      assignedNow: true,
+      publicNumber: 1059,
+    });
+    expect(mockState.rpcCalls).toEqual([
+      {
+        args: { submission_id: "VF-DRAFT-1059" },
+        name: "ensure_submission_public_number",
+      },
+    ]);
+  });
+
+  it.each([
+    null,
+    { assignedNow: true, publicNumber: "1059" },
+    { assignedNow: true, publicNumber: 10_000 },
+  ])("rejects an invalid public-number RPC payload: %j", async (data) => {
+    mockState.rpcResults = [{ data, error: null }];
+
+    await expect(ensureSubmissionPublicNumber("VF-DRAFT-1059")).rejects.toThrow(
+      /некорректн(ый|ое).*(номер|результат)/i,
+    );
+  });
+
+  it("maps a public-number RPC failure to observable persistence diagnostics", async () => {
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: { code: "42501", message: "permission denied" },
+      },
+    ];
+
+    const error = await ensureSubmissionPublicNumber("VF-DRAFT-1059").catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(PersistenceObservableError);
+    expect((error as PersistenceObservableError).diagnostics).toMatchObject({
+      kind: "rls",
+      operation: "rpc.ensure_submission_public_number",
+      retryable: false,
+      safeCode: "rpc.ensure_submission_public_number:rls:42501",
+      supabaseCode: "42501",
+    });
+  });
+
   it("keeps an empty remote workspace empty instead of loading local demo data", async () => {
     const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
 
