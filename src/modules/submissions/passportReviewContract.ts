@@ -1,14 +1,14 @@
 import { questionnaireFieldMatchesTarget } from "./questionnaire";
 
 export const ADMIN_PASSPORT_REVIEW_FIELD_IDS = [
-  "surname",
   "first-name",
-  "birth-date",
-  "birth-place",
+  "surname",
   "passport-no",
+  "birth-date",
   "passport-issue-place",
-  "passport-issue-date",
   "passport-expiry-date",
+  "birth-place",
+  "birth-country",
 ] as const;
 
 export type AdminPassportReviewFieldId =
@@ -18,14 +18,14 @@ export const ADMIN_PASSPORT_REVIEW_FIELD_LABELS: Record<
   AdminPassportReviewFieldId,
   string
 > = {
-  surname: "Фамилия",
   "first-name": "Имя",
-  "birth-date": "Дата рождения",
-  "birth-place": "Место рождения",
+  surname: "Фамилия",
   "passport-no": "Номер паспорта",
+  "birth-date": "Дата рождения",
   "passport-issue-place": "Кем / где выдан",
-  "passport-issue-date": "Дата выдачи",
-  "passport-expiry-date": "Действителен до",
+  "passport-expiry-date": "Срок действия",
+  "birth-place": "Город рождения",
+  "birth-country": "Страна рождения",
 };
 
 export const PRIMARY_APPLICANT_REQUIRED_MEDIA_TYPES = [

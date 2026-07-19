@@ -208,13 +208,13 @@ describe("AdminWorkspace production navigation", () => {
     expect(screen.queryByText("Только агенту")).not.toBeInTheDocument();
   });
 
-  test("keeps the review drawer open and reports a rejected admin transition", async () => {
-    const onSubmissionAction = vi.fn().mockRejectedValue(new Error("persistence failed"));
-    const onAdminNavChange = vi.fn();
+  test("opens the passport workspace directly without the legacy review drawer", async () => {
+    const onAdminReviewOpen = vi.fn();
+    const onVerifyDocument = vi.fn();
     const submission = acceptableReviewSubmission();
     const { container } = render(
       <VisaflowBusinessBridgeProvider
-        bridge={{ onAdminNavChange, onSubmissionAction }}
+        bridge={{ onAdminReviewOpen, onVerifyDocument }}
       >
         <AdminWorkspace
           currentEmail="qa-admin@example.test"
@@ -230,25 +230,22 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Review card was not rendered.");
     fireEvent.click(card);
-    const acceptButton = await screen.findByRole("button", {
-      name: "Принять на выгрузку",
-    });
-    fireEvent.click(acceptButton);
-    fireEvent.click(acceptButton);
-
     expect(
-      await screen.findByText(/Не удалось применить действие/),
-    ).toBeInTheDocument();
-    expect(onSubmissionAction).toHaveBeenCalledTimes(1);
-    expect(onAdminNavChange).not.toHaveBeenCalledWith("export");
+      await screen.findByRole("dialog", { name: "Сверка паспорта" }),
+    ).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Паспорт" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Селфи 1" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Селфи 2" })).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Принять на выгрузку" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Принять на выгрузку" }),
+    ).not.toBeInTheDocument();
+    expect(onAdminReviewOpen).toHaveBeenCalledWith(submission.id);
+    expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
   });
 
-  test("shows one contextual footer decision and keeps closing on the header icon", async () => {
+  test("keeps the drawer to two screens and restores the queue focus on back", async () => {
     const submission = acceptableReviewSubmission();
-    const { container, rerender } = render(
+    const { container } = render(
       <AdminWorkspace
         currentEmail="qa-admin@example.test"
         onSignOut={vi.fn()}
@@ -257,51 +254,28 @@ describe("AdminWorkspace production navigation", () => {
       />,
     );
 
-    const openDrawer = () => {
-      const card = container.querySelector<HTMLButtonElement>(
-        '[data-submission-id="review-async-failure"]',
-      );
-      if (!card) throw new Error("Review card was not rendered.");
-      fireEvent.click(card);
-    };
-
-    openDrawer();
-    expect(
-      await screen.findByRole("button", { name: "Принять на выгрузку" }),
-    ).toBeEnabled();
-    expect(
-      screen.queryByRole("button", { name: "Отправить на исправление" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Закрыть" })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Закрыть проверку" }));
-    const applicant = submission.applicants[0];
-    if (!applicant) throw new Error("Review applicant was not rendered.");
-    const withIssue = addPreciseAdminIssue(submission, {
-      applicantId: applicant.id,
-      comment: "Исправьте номер паспорта перед повторной проверкой.",
-      field: "Номер паспорта",
-      reason: "Значение не совпадает со сканом паспорта.",
-      severity: "blocker",
-      type: "field",
-    });
-    rerender(
-      <AdminWorkspace
-        currentEmail="qa-admin@example.test"
-        onSignOut={vi.fn()}
-        submissions={[withIssue]}
-        usesSupabase
-      />,
+    const card = container.querySelector<HTMLButtonElement>(
+      '[data-submission-id="review-async-failure"]',
     );
+    if (!card) throw new Error("Review card was not rendered.");
+    card.focus();
+    fireEvent.click(card);
 
-    openDrawer();
-    expect(
-      await screen.findByRole("button", { name: "Отправить на исправление" }),
-    ).toBeEnabled();
-    expect(
-      screen.queryByRole("button", { name: "Принять на выгрузку" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Закрыть" })).not.toBeInTheDocument();
+    const reviewDialog = await screen.findByRole("dialog", {
+      name: "Сверка паспорта",
+    });
+    await waitFor(() => expect(reviewDialog).toBeVisible());
+    expect(container.querySelector('main[aria-hidden="true"]')).toHaveAttribute(
+      "inert",
+    );
+    expect(container.querySelector('aside[aria-hidden="true"]')).toHaveAttribute(
+      "inert",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Вернуться к очереди" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Сверка паспорта" })).not.toBeInTheDocument();
+      expect(card).toHaveFocus();
+    });
   });
 
   test("reports rejected issue creation without an unhandled promise", async () => {
@@ -323,14 +297,6 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Review card was not rendered.");
     fireEvent.click(card);
-    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
-    const passportRow = (
-      await screen.findAllByText("Скан паспорта", {
-        selector: ".v19-drawer-file-title",
-      })
-    )[0]?.closest<HTMLElement>(".admin-review-file-item");
-    if (!passportRow) throw new Error("Passport review row was not rendered.");
-    fireEvent.click(within(passportRow).getByRole("button", { name: "Проверить" }));
     fireEvent.click(
       await screen.findByRole("button", {
         name: "Добавить замечание: Скан загранпаспорта",
@@ -372,14 +338,6 @@ describe("AdminWorkspace production navigation", () => {
     );
     if (!card) throw new Error("Production-like review card was not rendered.");
     fireEvent.click(card);
-    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
-    const passportRow = (
-      await screen.findAllByText("Скан паспорта", {
-        selector: ".v19-drawer-file-title",
-      })
-    )[0]?.closest<HTMLElement>(".admin-review-file-item");
-    if (!passportRow) throw new Error("Passport review row was not rendered.");
-    fireEvent.click(within(passportRow).getByRole("button", { name: "Проверить" }));
     fireEvent.click(
       await screen.findByRole("button", {
         name: "Добавить замечание: Скан загранпаспорта",
@@ -419,19 +377,16 @@ describe("AdminWorkspace production navigation", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Профиль администратора" }),
-    );
-    fireEvent.click(await screen.findByRole("button", { name: "Выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Выйти" }));
 
     expect(
       await screen.findByText(/Не удалось выйти из аккаунта/),
     ).toBeInTheDocument();
     expect(onSignOut).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("qa-admin@example.test")).toBeInTheDocument();
+    expect(screen.getByTitle("qa-admin@example.test")).toBeInTheDocument();
   });
 
-  test("uses real counts and identity without exposing no-op production settings", () => {
+  test("uses real counts and identity in the inserted admin shell", () => {
     render(
       <AdminWorkspace
         currentEmail="qa-admin@example.test"
@@ -448,11 +403,9 @@ describe("AdminWorkspace production navigation", () => {
     expect(
       within(screen.getByRole("button", { name: "Выгрузка" })).getByText("0"),
     ).toBeInTheDocument();
-    expect(screen.getByText("qa-admin@example.test")).toBeInTheDocument();
+    expect(screen.getByTitle("qa-admin@example.test")).toBeInTheDocument();
     expect(screen.queryByText("Алексей Дмитриев")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Настройки" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Настройки" })).toBeVisible();
   });
 
   test("labels the mobile menu and restores focus after Escape", async () => {

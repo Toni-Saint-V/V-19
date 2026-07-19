@@ -98,7 +98,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     }
   });
 
-  test("moves a clean accepted submission directly to the export workspace", async () => {
+  test("keeps general acceptance outside the passport-only drawer", async () => {
     const corrections = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!corrections) throw new Error("Expected corrections-received fixture.");
     const reviewedCorrections = adminApproveQuestionnaireForTest(corrections);
@@ -107,10 +107,10 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       status: "submitted_for_review" as const,
       issues: [],
     };
-    const onSubmissionAction = vi.fn().mockResolvedValue(undefined);
+    const onAdminReviewOpen = vi.fn();
 
     const { container } = render(
-      <VisaflowBusinessBridgeProvider bridge={{ onSubmissionAction }}>
+      <VisaflowBusinessBridgeProvider bridge={{ onAdminReviewOpen }}>
         <AdminWorkspace
           currentEmail="qa-admin@example.test"
           onSignOut={() => undefined}
@@ -125,16 +125,13 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     );
     if (!opener) throw new Error("Review queue opener was not rendered.");
     fireEvent.click(opener);
-    fireEvent.click(await screen.findByRole("button", { name: "Принять на выгрузку" }));
-
-    await waitFor(() => {
-      expect(onSubmissionAction).toHaveBeenCalledWith({
-        action: "accept",
-        source: "admin",
-        submissionId: cleanReview.id,
-      });
-      expect(screen.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
-    });
+    expect(
+      await screen.findByRole("dialog", { name: "Сверка паспорта" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Принять на выгрузку" }),
+    ).not.toBeInTheDocument();
+    expect(onAdminReviewOpen).toHaveBeenCalledWith(cleanReview.id);
   });
 
   test("opens a field remark at its exact questionnaire field", async () => {
@@ -943,14 +940,14 @@ describe("AdminReviewDrawer visual hierarchy", () => {
 
 describe("ReviewWorkspace passport section contract", () => {
   const passportValues: Record<string, string> = {
-    surname: "VOLKOVA",
     "first-name": "NINA",
-    "birth-date": "20.08.1990",
-    "birth-place": "KAZAN",
+    surname: "VOLKOVA",
     "passport-no": "661053001",
+    "birth-date": "20.08.1990",
     "passport-issue-place": "FMS 16001",
-    "passport-issue-date": "26.02.2016",
     "passport-expiry-date": "26.02.2032",
+    "birth-place": "KAZAN",
+    "birth-country": "RUSSIAN FEDERATION",
   };
 
   function withPassportValues(applicant: Applicant): Applicant {
@@ -1067,7 +1064,7 @@ describe("ReviewWorkspace passport section contract", () => {
       screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
     ).toBeDisabled();
     expect(
-      screen.getByText(/Заполнены не все паспортные поля или в данных есть ошибка/),
+      screen.getByText(/Заполнены не все восемь паспортных полей или в данных есть ошибка/),
     ).toBeInTheDocument();
   });
 
@@ -1120,8 +1117,14 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
-    expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible();
-    expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible(),
+    );
     const confirmButton = screen.getByRole("button", {
       name: "Подтвердить паспортную секцию",
     });
@@ -1273,13 +1276,9 @@ describe("ReviewWorkspace passport section contract", () => {
     );
     if (!opener) throw new Error("Review queue opener was not rendered.");
     fireEvent.click(opener);
-    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
-    const passportFileLabel = await screen.findByText("Скан паспорта", {
-      selector: ".v19-drawer-file-title",
-    });
-    const passportFileItem = passportFileLabel.closest(".admin-review-file-item");
-    if (!passportFileItem) throw new Error("Passport file row was not rendered.");
-    fireEvent.click(within(passportFileItem).getByRole("button", { name: "Проверить" }));
+    expect(
+      await screen.findByRole("dialog", { name: "Сверка паспорта" }),
+    ).toBeVisible();
 
     const confirmButton = await screen.findByRole("button", {
       name: "Подтвердить паспортную секцию",
@@ -1402,11 +1401,11 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
     );
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(2);
-    expect(screen.getByText("Селфи по замечанию")).toBeVisible();
     expect(screen.queryByTestId("protected-media-preview-selfie_2")).not.toBeInTheDocument();
     await waitFor(() =>
       expect(
@@ -1417,7 +1416,7 @@ describe("ReviewWorkspace passport section contract", () => {
 });
 
 describe("AdminReviewDrawer document comparison", () => {
-  test("keeps document comparison separate from remarks and restores the original queue focus", async () => {
+  test("opens document comparison directly and restores the original queue focus", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
     if (!submission) throw new Error("Expected admin review fixture.");
     const onVerifyDocument = vi.fn();
@@ -1440,27 +1439,18 @@ describe("AdminReviewDrawer document comparison", () => {
     opener.focus();
     fireEvent.click(opener);
 
-    fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
-    const passportFileLabel = await screen.findByText("Скан паспорта", {
-      selector: ".v19-drawer-file-title",
-    });
-    const passportFileItem = passportFileLabel.closest(".admin-review-file-item");
-    if (!passportFileItem) throw new Error("Passport file row was not rendered.");
-    fireEvent.click(within(passportFileItem).getByRole("button", { name: "Проверить" }));
-
     expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
     expect(
       await screen.findByRole("dialog", { name: "Сверка паспорта" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: `Паспортная секция · ${submission.id}` }),
+      screen.getByRole("heading", { name: `Сверка паспорта · ${submission.id}` }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("dialog", { name: "Добавить замечание" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Вернуться к подаче" }));
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Вернуться к очереди" }));
 
     await waitFor(() => expect(opener).toHaveFocus());
   });

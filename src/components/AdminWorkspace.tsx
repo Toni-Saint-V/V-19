@@ -1,32 +1,27 @@
-import { lazy, Suspense, useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
-  ShieldCheck,
-  DownloadCloud,
-  Settings,
-  Users,
-  Menu,
-  X,
   ArrowLeftRight,
-  CheckCircle2,
-  XCircle,
-  Inbox,
+  DownloadCloud,
+  LogOut,
+  Menu,
+  Settings,
+  ShieldCheck,
+  SlidersHorizontal,
+  Users,
+  X,
 } from "lucide-react";
 import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
-import { ReviewWorkspace } from "./ReviewWorkspace";
-import { AdminReviewDrawer } from "../modules/submissions/components/AdminReviewDrawer";
-import { AdminReturnPackagesScreen } from "./AdminReturnPackagesScreen";
 import { RemarkForm } from "./RemarkForm";
-import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
+import { ReviewWorkspace } from "./ReviewWorkspace";
 import type { AccessRequest } from "../shared/authContract";
 import type {
-  DrawerTab,
   IssueInput,
   Submission,
-  SubmissionAction,
   SubmissionFileType,
 } from "../modules/submissions/types";
+import { primaryApplicantIdForPassportReview } from "../modules/submissions/passportReviewContract";
 import { isAdminReviewQueueSubmission } from "../modules/submissions/uiTypes";
 import {
   emitVisaflowUiEvent,
@@ -34,213 +29,10 @@ import {
   type AdminNavSection as BridgeAdminNavSection,
 } from "../integration/visaflowBusinessBridge";
 
-type AdminNavSection = BridgeAdminNavSection | "users" | "returns";
+type AdminNavSection = BridgeAdminNavSection | "users";
 type AdminViewState = "main" | "review_workspace";
-const SettingsScreen = lazy(
-  () => import("../modules/submissions/pages/SettingsScreen"),
-);
-const adminMobileNavigationId = "admin-mobile-navigation";
-const mobileNavFocusableSelector = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
 
-const accessRequestStatusCopy: Record<AccessRequest["status"], string> = {
-  approved: "Одобрена",
-  pending: "На рассмотрении",
-  rejected: "Отклонена",
-};
-
-const accessRequestStatusClassName: Record<AccessRequest["status"], string> = {
-  approved: "border-[#244238] bg-[#14251f] text-[#8fe7c1]",
-  pending: "border-[#3b321d] bg-[#221d13] text-[#f6c66b]",
-  rejected: "border-[#44262b] bg-[#26191c] text-[#ffadb4]",
-};
-
-function formatAccessRequestDate(createdAt: string) {
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return createdAt;
-
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "2-digit",
-  }).format(date);
-}
-
-function AdminUsersAccessPanel({
-  busy,
-  requests,
-  onApprove,
-  onReject,
-}: {
-  busy: boolean;
-  requests: AccessRequest[];
-  onApprove: (requestId: string) => void;
-  onReject: (requestId: string) => void;
-}) {
-  const pendingCount = requests.filter(
-    (request) => request.status === "pending",
-  ).length;
-  const historyCount = requests.length - pendingCount;
-  const [activeAccessTab, setActiveAccessTab] = useState<"pending" | "history">(
-    "pending",
-  );
-  const visibleRequests = requests.filter((request) =>
-    activeAccessTab === "pending"
-      ? request.status === "pending"
-      : request.status !== "pending",
-  );
-  const emptyTitle =
-    activeAccessTab === "pending" ? "Новых заявок нет" : "История пока пустая";
-  const emptyCopy =
-    activeAccessTab === "pending"
-      ? "Когда агент отправит форму регистрации, карточка появится здесь с действиями одобрения и отклонения."
-      : "Одобренные и отклонённые заявки остаются здесь после рассмотрения.";
-
-  return (
-    <section
-      className="grid gap-4"
-      aria-labelledby="admin-users-access-title"
-      data-testid="admin-users-access-requests"
-    >
-      <div className="flex flex-col gap-3 rounded-2xl border border-[#242529] bg-[#161617] p-5 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.16em] text-white/38">
-            Входящие заявки
-          </p>
-          <h2
-            id="admin-users-access-title"
-            className="m-0 mt-1 text-[22px] font-semibold tracking-tight text-white"
-          >
-            Заявки на доступ
-          </h2>
-          <p className="m-0 mt-2 max-w-[680px] text-[13px] leading-5 text-white/52">
-            Новые агенты попадают сюда после формы регистрации. До одобрения они не
-            видят рабочий кабинет.
-          </p>
-        </div>
-        <div className="grid gap-1 text-right">
-          <div className="flex h-11 min-w-11 items-center justify-center rounded-xl border border-[#26306f] bg-[#18205a] px-3 text-[13px] font-semibold text-[#dfe4ff]">
-            {requests.length}
-          </div>
-          <span className="text-[11px] text-white/38">всего</span>
-        </div>
-      </div>
-
-      <div className="inline-flex w-fit rounded-[11px] border border-[#242529] bg-[#1a1a1d] p-1">
-        <button
-          className={`h-9 rounded-[8px] px-3 text-[12px] font-semibold transition-colors ${
-            activeAccessTab === "pending"
-              ? "bg-[#3a1e24] text-[#ffbdc3]"
-              : "text-white/54 hover:bg-white/[0.04] hover:text-white"
-          }`}
-          type="button"
-          onClick={() => setActiveAccessTab("pending")}
-        >
-          Новые {pendingCount}
-        </button>
-        <button
-          className={`h-9 rounded-[8px] px-3 text-[12px] font-semibold transition-colors ${
-            activeAccessTab === "history"
-              ? "bg-[#18205a] text-[#dfe4ff]"
-              : "text-white/54 hover:bg-white/[0.04] hover:text-white"
-          }`}
-          type="button"
-          onClick={() => setActiveAccessTab("history")}
-        >
-          История {historyCount}
-        </button>
-      </div>
-
-      {visibleRequests.length ? (
-        <div className="grid gap-2.5">
-          {visibleRequests.map((request) => (
-            <article
-              className="grid gap-4 rounded-2xl border border-[#242529] bg-[#161617] p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
-              key={request.id}
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <strong className="text-[15px] font-semibold text-white">
-                    {request.fullName}
-                  </strong>
-                  <span className="rounded-full border border-[#2e2f34] bg-[#202126] px-2 py-0.5 text-[11px] font-medium text-[#b8baff]">
-                    агент
-                  </span>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${accessRequestStatusClassName[request.status]}`}
-                  >
-                    {accessRequestStatusCopy[request.status]}
-                  </span>
-                </div>
-                <p className="m-0 mt-2 text-[13px] text-white/62">
-                  {request.companyName} · {request.city} · {request.phone}
-                </p>
-                <p className="m-0 mt-1 text-[12px] text-white/42">
-                  {request.email} · {formatAccessRequestDate(request.createdAt)}
-                </p>
-              </div>
-
-              {request.status === "pending" ? (
-                <div className="grid grid-cols-2 gap-2 md:flex md:justify-end">
-                  <button
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#2a2224] bg-[#1f1719] px-3 text-[12px] font-semibold text-[#ffadb4] transition-colors hover:border-[#513036] hover:bg-[#281c20] disabled:cursor-not-allowed disabled:opacity-55"
-                    disabled={busy}
-                    type="button"
-                    onClick={() => onReject(request.id)}
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Отклонить
-                  </button>
-                  <button
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#4450c5] bg-[#3a45b4] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#4855d4] disabled:cursor-not-allowed disabled:opacity-55"
-                    disabled={busy}
-                    type="button"
-                    onClick={() => onApprove(request.id)}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Одобрить
-                  </button>
-                </div>
-              ) : (
-                <div className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white/54">
-                  {request.status === "approved" ? "Доступ выдан" : "Заявка отклонена"}
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#242529] bg-[#161617] p-8 text-center">
-          <Users className="mb-4 h-10 w-10 text-white/20" />
-          <h3 className="m-0 text-[16px] font-medium text-white">{emptyTitle}</h3>
-          <p className="m-0 mt-2 max-w-[420px] text-[13px] leading-5 text-white/50">
-            {emptyCopy}
-          </p>
-        </div>
-      )}
-    </section>
-  );
-}
-
-export function AdminWorkspace({
-  accessRequests = [],
-  accessRequestsBusy = false,
-  currentEmail = "",
-  currentDisplayName = "",
-  onApproveAccessRequest = () => undefined,
-  onRejectAccessRequest = () => undefined,
-  onSignOut,
-  onSwitchWorkspace,
-  submissions,
-  usesSupabase = false,
-}: {
+interface AdminWorkspaceProps {
   accessRequests?: AccessRequest[];
   accessRequestsBusy?: boolean;
   currentEmail?: string;
@@ -251,51 +43,51 @@ export function AdminWorkspace({
   onSwitchWorkspace?: () => void;
   submissions?: Submission[];
   usesSupabase?: boolean;
-}) {
+}
+
+export function AdminWorkspace({
+  currentDisplayName = "",
+  currentEmail = "",
+  onSignOut,
+  onSwitchWorkspace,
+  submissions,
+}: AdminWorkspaceProps) {
   const bridge = useVisaflowBusinessBridge();
   const [activeNav, setActiveNav] = useState<AdminNavSection>("review");
   const [currentView, setCurrentView] = useState<AdminViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [reviewApplicantId, setReviewApplicantId] = useState<string>();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [bottomProfileMenuOpen, setBottomProfileMenuOpen] = useState(false);
+  const [remarkFormOpen, setRemarkFormOpen] = useState(false);
   const [adminAsyncError, setAdminAsyncError] = useState("");
+  const [remarkContext, setRemarkContext] = useState<{
+    applicantId?: string;
+    applicant?: string;
+    field?: string;
+    fileType?: SubmissionFileType;
+  }>({});
+  const reviewReturnFocusRef = useRef<HTMLElement | null>(null);
   const mobileNavPanelRef = useRef<HTMLElement | null>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const reviewDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
-  const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
-  const adminPassportSectionApprovalPendingRef = useRef(false);
+  const adminPassportApprovalPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
-  const pendingAccessRequestCount = accessRequests.filter(
-    (request) => request.status === "pending",
-  ).length;
+
+  const selectedSubmission =
+    submissions?.find((submission) => submission.id === selectedRow) ?? null;
   const reviewQueueCount = (submissions ?? []).filter(
     isAdminReviewQueueSubmission,
   ).length;
   const exportQueueCount = (submissions ?? []).filter(
     (submission) => submission.status === "ready_for_export",
   ).length;
-  const adminIdentityName = currentDisplayName.trim() || "Администратор";
-  const adminIdentityLabel = currentEmail.trim() || "Администратор";
-  const adminIdentityToken = adminIdentityName
-    .split("@")[0]
-    ?.replace(/[^\p{L}\p{N}]+/gu, "")
-    .slice(0, 2)
-    .toUpperCase();
-  const adminInitials = adminIdentityToken || "АД";
-
-  const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
-  const [adminDrawerTab, setAdminDrawerTab] = useState<DrawerTab>("questionnaire");
-  const [remarkFormOpen, setRemarkFormOpen] = useState(false);
-  const [reviewApplicantId, setReviewApplicantId] = useState<string>();
-  const [remarkContext, setRemarkContext] = useState<{
-    applicantId?: string;
-    field?: string;
-    fileType?: SubmissionFileType;
-    applicant?: string;
-  }>({});
-  const selectedSubmission =
-    submissions?.find((submission) => submission.id === selectedRow) ?? null;
+  const adminIdentity = currentDisplayName.trim() || currentEmail.trim() || "Администратор";
+  const adminInitials =
+    adminIdentity
+      .split("@", 1)[0]
+      ?.replace(/[^\p{L}\p{N}]+/gu, "")
+      .slice(0, 2)
+      .toUpperCase() || "АД";
 
   useEffect(() => {
     const handleResize = () => {
@@ -307,14 +99,14 @@ export function AdminWorkspace({
 
   useEffect(() => {
     if (!mobileNavOpen) return;
-
-    const trigger = mobileNavTriggerRef.current;
     const panel = mobileNavPanelRef.current;
-    const animationFrame = window.requestAnimationFrame(() => {
-      const closeButton = panel?.querySelector<HTMLButtonElement>(
-        "[data-admin-mobile-nav-close]",
-      );
-      (closeButton ?? panel)?.focus({ preventScroll: true });
+    const trigger = mobileNavTriggerRef.current;
+    const frame = window.requestAnimationFrame(() => {
+      panel
+        ?.querySelector<HTMLButtonElement>(
+          '[aria-label="Закрыть меню администратора"]',
+        )
+        ?.focus({ preventScroll: true });
     });
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -323,67 +115,57 @@ export function AdminWorkspace({
         return;
       }
       if (event.key !== "Tab") return;
-
       const controls = Array.from(
-        panel?.querySelectorAll<HTMLElement>(mobileNavFocusableSelector) ?? [],
+        panel?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
       ).filter((control) => control.getClientRects().length > 0);
-      if (!controls.length) {
-        event.preventDefault();
-        panel?.focus({ preventScroll: true });
-        return;
-      }
-
       const first = controls[0];
-      const last = controls[controls.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !panel?.contains(active))) {
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (active === last || !panel?.contains(active))) {
+      } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault();
         first.focus();
       }
     };
-
     document.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.cancelAnimationFrame(animationFrame);
+      window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", handleKeyDown);
-      if (window.innerWidth < 768) {
-        trigger?.focus({ preventScroll: true });
-      }
+      trigger?.focus({ preventScroll: true });
     };
   }, [mobileNavOpen]);
 
-  const handleOpenReviewDrawer = (id: string) => {
-    reviewDrawerReturnFocusRef.current =
+  const handleOpenReviewDrawer = (submissionId: string) => {
+    const submission = submissions?.find((item) => item.id === submissionId);
+    reviewReturnFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    bridge.onAdminReviewOpen?.(id);
+    bridge.onAdminReviewOpen?.(submissionId);
+    bridge.onVerifyDocument?.(submissionId);
     emitVisaflowUiEvent(bridge, {
       type: "admin.review.open",
-      submissionId: id,
+      submissionId,
     });
-    setSelectedRow(id);
-    setAdminDrawerTab("questionnaire");
-    setAdminDrawerOpen(true);
-  };
-
-  const handleVerifyDocument = (applicantId?: string) => {
-    bridge.onVerifyDocument?.(selectedRow);
     emitVisaflowUiEvent(bridge, {
       type: "admin.document.verify",
-      submissionId: selectedRow,
+      submissionId,
     });
+    setAdminAsyncError("");
+    setSelectedRow(submissionId);
     setReviewApplicantId(
-      applicantId ?? selectedSubmission?.applicants[0]?.id,
+      submission ? primaryApplicantIdForPassportReview(submission) : undefined,
     );
-    setAdminDrawerOpen(false);
     setCurrentView("review_workspace");
   };
 
-  const handleBackToDrawer = () => {
+  const handleBackToQueue = () => {
     setCurrentView("main");
-    setAdminDrawerOpen(true);
+    window.requestAnimationFrame(() => {
+      reviewReturnFocusRef.current?.focus({ preventScroll: true });
+    });
   };
 
   const handleOpenRemark = (
@@ -392,73 +174,30 @@ export function AdminWorkspace({
     fileType?: SubmissionFileType,
     applicantId?: string,
   ) => {
-    const payload = { submissionId: selectedRow, applicantId, field, fileType, applicant };
+    const payload = {
+      applicant,
+      applicantId,
+      field,
+      fileType,
+      submissionId: selectedRow,
+    };
     bridge.onRemarkOpen?.(payload);
     emitVisaflowUiEvent(bridge, { type: "remark.open", payload });
-    setRemarkContext({ applicantId, field, fileType, applicant });
+    setRemarkContext({ applicant, applicantId, field, fileType });
     setRemarkFormOpen(true);
-  };
-
-  const handleAdminPrimaryAction = async (
-    submissionId: string,
-    action: SubmissionAction,
-  ) => {
-    if (action === "generate_export") {
-      setAdminDrawerOpen(false);
-      navigateTo("export");
-      return;
-    }
-
-    setAdminAsyncError("");
-    if (!bridge.onSubmissionAction) {
-      setAdminAsyncError(
-        "Действие недоступно: обработчик сохранения не подключён. Состояние подачи не изменено.",
-      );
-      return;
-    }
-    if (adminPrimaryActionPendingRef.current) return;
-    adminPrimaryActionPendingRef.current = true;
-    try {
-      await bridge.onSubmissionAction({
-        submissionId,
-        action,
-        source: "admin",
-      });
-    } catch {
-      setAdminAsyncError(
-        "Не удалось применить действие. Состояние подачи не изменено. Повторите попытку.",
-      );
-      return;
-    } finally {
-      adminPrimaryActionPendingRef.current = false;
-    }
-    emitVisaflowUiEvent(bridge, {
-      type: "submission.action",
-      payload: { submissionId, action, source: "admin" },
-    });
-    setAdminDrawerOpen(false);
-
-    if (action === "accept" || action === "close_issues_accept") {
-      bridge.onAdminNavChange?.("export");
-      emitVisaflowUiEvent(bridge, { type: "admin.nav", section: "export" });
-      setActiveNav("export");
-      setMobileNavOpen(false);
-      setBottomProfileMenuOpen(false);
-    }
   };
 
   const handleAddIssue = async (input: IssueInput): Promise<boolean> => {
     if (!selectedRow || adminIssuePendingRef.current) return false;
-    const payload = { submissionId: selectedRow, input };
-    setAdminAsyncError("");
-
     if (!bridge.onAdminIssueAdd) {
       setAdminAsyncError(
-        "Добавление замечаний недоступно: обработчик сохранения не подключён.",
+        "Добавление замечаний недоступно: сохранение не подключено.",
       );
       return false;
     }
 
+    const payload = { input, submissionId: selectedRow };
+    setAdminAsyncError("");
     adminIssuePendingRef.current = true;
     try {
       await bridge.onAdminIssueAdd(payload);
@@ -466,7 +205,7 @@ export function AdminWorkspace({
       return true;
     } catch {
       setAdminAsyncError(
-        "Не удалось добавить замечание. Подача не была изменена. Повторите попытку.",
+        "Не удалось добавить замечание. Подача не была изменена.",
       );
       return false;
     } finally {
@@ -474,58 +213,20 @@ export function AdminWorkspace({
     }
   };
 
-  const handleAdminAiReview = async () => {
-    if (!selectedRow || !bridge.onAdminAiReviewRun) return;
-    setAdminAsyncError("");
-    try {
-      await bridge.onAdminAiReviewRun(selectedRow);
-      emitVisaflowUiEvent(bridge, {
-        type: "admin.ai.run",
-        submissionId: selectedRow,
-      });
-    } catch {
-      setAdminAsyncError("Не удалось выполнить AI-сверку.");
-    }
-  };
-
-  const handleAdminAiSuggestion = async (
-    action: "accept" | "dismiss",
-    suggestionId: string,
-  ) => {
-    if (!selectedRow) return;
-    const payload = { submissionId: selectedRow, suggestionId };
-    const handler =
-      action === "accept"
-        ? bridge.onAdminAiSuggestionAccept
-        : bridge.onAdminAiSuggestionDismiss;
-    if (!handler) return;
-    setAdminAsyncError("");
-    try {
-      await handler(payload);
-      emitVisaflowUiEvent(bridge, {
-        type: action === "accept" ? "admin.ai.accept" : "admin.ai.dismiss",
-        payload,
-      });
-    } catch {
-      setAdminAsyncError("Не удалось применить действие AI-помощника.");
-    }
-  };
-
   const handlePassportSectionApprove = async (input: {
     applicantId: string;
   }): Promise<boolean> => {
-    if (!selectedRow || adminPassportSectionApprovalPendingRef.current) return false;
-    const payload = { submissionId: selectedRow, ...input };
-    setAdminAsyncError("");
-
+    if (!selectedRow || adminPassportApprovalPendingRef.current) return false;
     if (!bridge.onAdminPassportSectionApprove) {
       setAdminAsyncError(
-        "Подтверждение паспортной секции недоступно: обработчик сохранения не подключён. Состояние подачи не изменено.",
+        "Подтверждение паспортной секции недоступно: сохранение не подключено.",
       );
       return false;
     }
 
-    adminPassportSectionApprovalPendingRef.current = true;
+    const payload = { submissionId: selectedRow, ...input };
+    setAdminAsyncError("");
+    adminPassportApprovalPendingRef.current = true;
     try {
       await bridge.onAdminPassportSectionApprove(payload);
       emitVisaflowUiEvent(bridge, {
@@ -535,39 +236,19 @@ export function AdminWorkspace({
       return true;
     } catch {
       setAdminAsyncError(
-        "Не удалось подтвердить паспортную секцию. Состояние подачи не изменено. Повторите попытку.",
+        "Не удалось подтвердить паспортную секцию. Состояние не изменено.",
       );
       return false;
     } finally {
-      adminPassportSectionApprovalPendingRef.current = false;
+      adminPassportApprovalPendingRef.current = false;
     }
-  };
-
-  const handleSignOut = () => {
-    if (signOutPendingRef.current) return;
-    setAdminAsyncError("");
-    signOutPendingRef.current = true;
-
-    const signOut = async () => {
-      try {
-        await onSignOut();
-      } catch {
-        setAdminAsyncError(
-          "Не удалось выйти из аккаунта. Сессия остаётся активной. Повторите попытку.",
-        );
-      } finally {
-        signOutPendingRef.current = false;
-      }
-    };
-
-    void signOut();
   };
 
   const handleRemarkSubmit = async (input: {
     applicantId?: string;
+    applicant?: string;
     field?: string;
     fileType?: SubmissionFileType;
-    applicant?: string;
     message: string;
     severity: "warning" | "critical";
   }): Promise<boolean> => {
@@ -575,415 +256,300 @@ export function AdminWorkspace({
     const applicant = input.applicantId
       ? selectedSubmission.applicants.find((item) => item.id === input.applicantId)
       : input.applicant
-        ? selectedSubmission.applicants.find((item) => item.fullName === input.applicant)
+        ? selectedSubmission.applicants.find(
+            (item) => item.fullName === input.applicant,
+          )
         : selectedSubmission.applicants.length === 1
           ? selectedSubmission.applicants[0]
           : undefined;
     if (!applicant) return false;
 
     return handleAddIssue({
-      type: input.fileType ? "file" : input.field ? "field" : "section",
       applicantId: applicant.id,
+      comment: input.message,
       field: input.fileType ? undefined : input.field,
       fileType: input.fileType,
-      section: input.fileType ? "Файлы" : undefined,
       reason: input.fileType
         ? `Требуется заменить файл «${input.field ?? input.fileType}»`
         : input.field
           ? `Требуется исправить поле «${input.field}»`
-          : "Требуется исправить данные",
-      comment: input.message,
+          : "Требуется исправить паспортные данные",
+      section: "Паспорт",
       severity: input.severity === "critical" ? "blocker" : "warning",
+      type: input.fileType ? "file" : input.field ? "field" : "section",
     });
   };
 
-  const navigateTo = (nav: AdminNavSection) => {
+  const handleSignOut = () => {
+    if (signOutPendingRef.current) return;
+    signOutPendingRef.current = true;
     setAdminAsyncError("");
+    void Promise.resolve(onSignOut())
+      .catch(() => {
+        setAdminAsyncError("Не удалось выйти из аккаунта. Повторите попытку.");
+      })
+      .finally(() => {
+        signOutPendingRef.current = false;
+      });
+  };
+
+  const navigateTo = (nav: AdminNavSection) => {
     if (nav === "review" || nav === "export" || nav === "settings") {
       bridge.onAdminNavChange?.(nav);
       emitVisaflowUiEvent(bridge, { type: "admin.nav", section: nav });
     }
     setActiveNav(nav);
     setMobileNavOpen(false);
-    setBottomProfileMenuOpen(false);
   };
 
   const renderNavContent = () => (
     <>
-      <div className="flex items-center gap-3 px-10 pt-3 pb-2.5 mb-2 border-b border-[#242529]">
-        <img
-          src={visaflowLogo}
-          alt="VisaFlow"
-          className="h-8 w-8 rounded-lg object-cover shadow-[0_0_24px_rgba(111,100,255,0.10)]"
-        />
+      <div className="flex items-center gap-2.5 px-2 pb-4 mb-2 border-b border-[#242529]">
+        <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center font-bold text-sm shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+          A
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[16px] font-[500] tracking-tight">VisaFlow V-19</div>
+          <div className="text-sm font-semibold tracking-tight">VisaFlow V-19</div>
+          <div className="text-[11px] text-orange-400 font-medium">Admin Zone</div>
         </div>
         <button
           aria-label="Закрыть меню администратора"
-          data-admin-mobile-nav-close=""
-          type="button"
           onClick={() => setMobileNavOpen(false)}
-          className="md:hidden min-h-[var(--v19-control-row-height)] min-w-[var(--v19-control-row-height)] rounded-lg text-white/50 hover:text-white flex items-center justify-center"
+          className="md:hidden p-2 text-white/50 hover:text-white"
+          type="button"
         >
-          <X aria-hidden="true" className="w-5 h-5" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-4 space-y-5 scrollbar-hide">
-        <nav className="space-y-0.5">
+        <nav className="space-y-0.5" aria-label="Очередь администратора">
           <div className="px-2 pb-1 text-[11px] text-white/40 font-medium tracking-wide uppercase">
             Очередь
           </div>
           <button
             aria-label="Проверка"
             onClick={() => navigateTo("review")}
-            className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "review" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "review" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            type="button"
           >
-            <ShieldCheck className="w-4 h-4 text-white/55" />{" "}
+            <ShieldCheck className="w-4 h-4 text-orange-400/80" />
             <span className="flex-1 text-left">Проверка</span>
-            <span className="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/62 text-[11px] font-medium">
+            <span className="px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 text-[11px] font-medium">
               {reviewQueueCount}
             </span>
           </button>
           <button
             aria-label="Выгрузка"
             onClick={() => navigateTo("export")}
-            className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "export" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "export" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            type="button"
           >
-            <DownloadCloud className="w-4 h-4 text-[#b8baff]/75" />{" "}
+            <DownloadCloud className="w-4 h-4 text-emerald-400/80" />
             <span className="flex-1 text-left">Выгрузка</span>
-            <span className="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-[#b8baff] text-[11px] font-medium">
+            <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[11px] font-medium">
               {exportQueueCount}
             </span>
           </button>
-          {usesSupabase ? (
-            <button
-              aria-label="Возврат"
-              onClick={() => navigateTo("returns")}
-              className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "returns" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
-            >
-              <Inbox className="w-4 h-4 text-[#8fe7c1]" />{" "}
-              <span className="flex-1 text-left">Возврат</span>
-            </button>
-          ) : null}
         </nav>
 
-        <nav className="space-y-0.5">
+        <nav className="space-y-0.5" aria-label="Система администратора">
           <div className="px-2 pb-1 text-[11px] text-white/40 font-medium tracking-wide uppercase">
             Система
           </div>
           <button
-            aria-label="Пользователи"
             onClick={() => navigateTo("users")}
-            className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "users" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "users" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            type="button"
           >
-            <Users className="w-4 h-4" />{" "}
+            <Users className="w-4 h-4" />
             <span className="flex-1 text-left">Пользователи</span>
-            {pendingAccessRequestCount ? (
-              <span className="px-1.5 py-0.5 rounded-md bg-[#5a1f2a] text-[#ffccd1] text-[11px] font-medium">
-                {pendingAccessRequestCount}
-              </span>
-            ) : null}
           </button>
-          {!usesSupabase ? (
-            <button
-              aria-label="Настройки"
-              onClick={() => navigateTo("settings")}
-              className={`v19-admin-sidebar-nav-item min-h-[var(--v19-control-row-height)] w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "settings" ? "is-active bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
-            >
-              <Settings className="w-4 h-4" />{" "}
-              <span className="flex-1 text-left">Настройки</span>
-            </button>
-          ) : null}
+          <button
+            onClick={() => navigateTo("settings")}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "settings" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            type="button"
+          >
+            <Settings className="w-4 h-4" />
+            <span className="flex-1 text-left">Настройки</span>
+          </button>
         </nav>
       </div>
 
-      <div className="relative mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
+      <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
+        {onSwitchWorkspace ? (
+          <button
+            onClick={onSwitchWorkspace}
+            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+            type="button"
+          >
+            <ArrowLeftRight className="w-4 h-4 text-white/50" />
+            В агентскую зону
+          </button>
+        ) : null}
         <button
-          onClick={() => setBottomProfileMenuOpen((open) => !open)}
-          aria-label="Профиль администратора"
-          aria-expanded={bottomProfileMenuOpen}
-          className="v19-admin-sidebar-profile w-full min-h-[64px] px-3 py-2 border rounded-xl text-left transition-colors flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          onClick={handleSignOut}
+          className="w-full h-10 px-3 text-[13px] font-medium text-white/60 hover:text-white transition-colors flex items-center justify-center gap-2"
+          type="button"
         >
-          <span className="v19-admin-sidebar-avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold text-white">
-            {adminInitials}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block whitespace-normal text-[12.5px] font-medium leading-4 text-white">
-              {adminIdentityName}
-            </span>
-            <span className="block text-[10.5px] font-medium leading-4 text-white/42">
-              Администратор
-            </span>
-            <span className="block truncate text-[9.5px] font-medium leading-3 text-white/30">
-              {adminIdentityLabel}
-            </span>
-          </span>
-          <ArrowLeftRight className="w-4 h-4 shrink-0 text-white/42" />
+          <LogOut className="w-4 h-4" />
+          Выйти
         </button>
-        <AnimatePresence>
-          {bottomProfileMenuOpen ? (
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              transition={{ duration: 0.14 }}
-              className="absolute bottom-[88px] left-3 right-3 z-40 rounded-xl border border-[#242529] bg-[#1a1a1d] p-1 shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
-            >
-              {!usesSupabase ? (
-                <button
-                  type="button"
-                  onClick={() => navigateTo("settings")}
-                  className="flex h-10 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
-                >
-                  <Settings className="h-4 w-4 text-white/55" />
-                  Настройки
-                </button>
-              ) : null}
-              {onSwitchWorkspace ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBottomProfileMenuOpen(false);
-                    onSwitchWorkspace();
-                  }}
-                  className="flex h-10 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
-                >
-                  <ArrowLeftRight className="h-4 w-4 text-white/55" />В агентскую зону
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setBottomProfileMenuOpen(false);
-                  handleSignOut();
-                }}
-                className="flex h-10 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[13px] font-medium text-[#ffadb4] transition-colors hover:bg-[#281c20] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
-              >
-                <XCircle className="h-4 w-4" />
-                Выйти
-              </button>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
       </div>
     </>
   );
 
-  const getPageTitle = () => {
-    switch (activeNav) {
-      case "review":
-        return "Проверка";
-      case "export":
-        return "Выгрузка";
-      case "returns":
-        return "Возврат документов";
-      case "users":
-        return "Управление пользователями";
-      case "settings":
-        return "Системные настройки";
-    }
-  };
+  const pageTitle =
+    activeNav === "review"
+      ? "Очередь на проверку"
+      : activeNav === "export"
+        ? "Центр выгрузки"
+        : activeNav === "users"
+          ? "Управление пользователями"
+          : "Системные настройки";
 
   return (
-    <div className="v19-admin-workspace flex h-full w-full bg-[#101011] relative overflow-hidden">
+    <div className="flex h-full w-full bg-[#101011] relative overflow-hidden">
       {adminAsyncError ? (
         <div
-          className="fixed left-1/2 top-4 z-[120] flex w-[min(92vw,620px)] -translate-x-1/2 items-start gap-3 rounded-xl border border-[#5b2b32] bg-[#26191c] px-4 py-3 text-[13px] text-[#ffccd1] shadow-[0_18px_45px_rgba(0,0,0,0.45)]"
-          data-testid="admin-async-error"
+          className="fixed left-1/2 top-3 z-[90] flex w-[min(92vw,560px)] -translate-x-1/2 items-center gap-3 rounded-xl border border-red-500/30 bg-[#211416] px-4 py-3 text-[13px] text-white shadow-2xl"
           role="alert"
         >
-          <XCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="min-w-0 flex-1">{adminAsyncError}</span>
           <button
             aria-label="Закрыть сообщение об ошибке"
-            className="shrink-0 text-[#ffccd1]/70 hover:text-[#ffccd1]"
-            type="button"
             onClick={() => setAdminAsyncError("")}
+            type="button"
           >
-            <X aria-hidden="true" className="h-4 w-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       ) : null}
-      {currentView === "review_workspace" && selectedRow && (
+
+      {currentView === "review_workspace" && selectedRow ? (
         <ReviewWorkspace
           applicantId={reviewApplicantId}
-          submissionId={selectedRow}
-          submission={selectedSubmission}
           nestedDialogOpen={remarkFormOpen}
-          onBack={handleBackToDrawer}
+          onAddRemark={handleOpenRemark}
+          onApplicantChange={setReviewApplicantId}
           onApproveSection={handlePassportSectionApprove}
-          onAddRemark={(field, applicant, fileType, applicantId) =>
-            handleOpenRemark(field, applicant, fileType, applicantId)
-          }
-        />
-      )}
-
-      {adminDrawerOpen && selectedSubmission ? (
-        <AdminReviewDrawer
-          actionError=""
-          activeTab={adminDrawerTab}
+          onBack={handleBackToQueue}
           submission={selectedSubmission}
-          onAcceptAiSuggestion={(suggestionId) =>
-            void handleAdminAiSuggestion("accept", suggestionId)
-          }
-          onAction={(action) =>
-            void handleAdminPrimaryAction(selectedSubmission.id, action)
-          }
-          onAddIssue={(input) => void handleAddIssue(input)}
-          onClose={() => {
-            setAdminDrawerOpen(false);
-            window.requestAnimationFrame(() =>
-              reviewDrawerReturnFocusRef.current?.focus(),
-            );
-          }}
-          onDismissAiSuggestion={(suggestionId) =>
-            void handleAdminAiSuggestion("dismiss", suggestionId)
-          }
-          onRunAiReview={() => void handleAdminAiReview()}
-          onTab={setAdminDrawerTab}
-          onVerifyDocument={(applicantId) => handleVerifyDocument(applicantId)}
+          submissionId={selectedRow}
         />
       ) : null}
 
       <RemarkForm
-        isOpen={remarkFormOpen}
-        onClose={() => setRemarkFormOpen(false)}
-        submissionId={selectedRow || ""}
-        defaultField={remarkContext.field}
-        defaultFileType={remarkContext.fileType}
         defaultApplicant={remarkContext.applicant}
         defaultApplicantId={remarkContext.applicantId}
+        defaultField={remarkContext.field}
+        defaultFileType={remarkContext.fileType}
+        isOpen={remarkFormOpen}
+        onClose={() => setRemarkFormOpen(false)}
         onSubmit={handleRemarkSubmit}
+        submissionId={selectedRow ?? ""}
       />
 
-      {/* Mobile Nav Overlay */}
       <AnimatePresence>
-        {mobileNavOpen && (
+        {mobileNavOpen ? (
           <div className="md:hidden">
-            <motion.button
-              aria-hidden="true"
-              tabIndex={-1}
-              type="button"
-              initial={{ opacity: 0 }}
+            <motion.div
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setMobileNavOpen(false)}
+              aria-hidden="true"
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }}
+              onClick={() => setMobileNavOpen(false)}
             />
             <motion.aside
+              animate={{ x: 0 }}
               aria-label="Меню администратора"
               aria-modal="true"
-              id={adminMobileNavigationId}
+              className="fixed inset-y-0 left-0 w-[280px] bg-[#161617] border-r border-[#202124] z-50 flex flex-col py-3 shadow-[0_0_40px_rgba(0,0,0,0.5)]"
+              exit={{ x: "-100%" }}
+              id="admin-mobile-navigation"
+              initial={{ x: "-100%" }}
               ref={mobileNavPanelRef}
               role="dialog"
-              tabIndex={-1}
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 250 }}
-              className="v19-admin-sidebar fixed inset-y-0 left-0 w-[280px] bg-[#161617] border-r border-[#202124] z-50 flex flex-col py-3 shadow-[0_0_40px_rgba(0,0,0,0.5)]"
+              transition={{ damping: 25, stiffness: 250, type: "spring" }}
             >
               {renderNavContent()}
             </motion.aside>
           </div>
-        )}
+        ) : null}
       </AnimatePresence>
 
-      {/* Desktop Sidebar */}
       <aside
-        aria-hidden={mobileNavOpen ? "true" : undefined}
-        inert={mobileNavOpen}
-        className="v19-admin-sidebar hidden md:flex w-[260px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20"
+        aria-hidden={currentView === "review_workspace" ? "true" : undefined}
+        className="hidden md:flex w-[260px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20"
+        inert={currentView === "review_workspace" ? true : undefined}
       >
         {renderNavContent()}
       </aside>
 
-      {/* Main Content */}
       <main
-        aria-label="Рабочая область подач"
-        aria-hidden={mobileNavOpen ? "true" : undefined}
-        inert={mobileNavOpen}
-        className="v19-admin-main flex-1 min-w-0 flex flex-col bg-[#141416]"
+        aria-hidden={currentView === "review_workspace" ? "true" : undefined}
+        className="flex-1 min-w-0 flex flex-col bg-[#141416]"
+        inert={currentView === "review_workspace" ? true : undefined}
       >
-        {/* Topbar */}
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
           <div className="flex items-center gap-3">
             <button
-              aria-controls={adminMobileNavigationId}
+              aria-controls="admin-mobile-navigation"
               aria-expanded={mobileNavOpen}
               aria-label="Открыть меню администратора"
-              ref={mobileNavTriggerRef}
-              type="button"
               onClick={() => setMobileNavOpen(true)}
               className="md:hidden w-10 h-10 -ml-2 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/70"
+              ref={mobileNavTriggerRef}
+              type="button"
             >
-              <Menu aria-hidden="true" className="w-5 h-5" />
+              <Menu className="w-5 h-5" />
             </button>
             <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight text-white m-0 leading-none">
-              {getPageTitle()}
+              {pageTitle}
             </h1>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <div
+              aria-label={adminIdentity}
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-medium text-white/70 shadow-inner"
+              title={adminIdentity}
+            >
+              {adminInitials}
+            </div>
           </div>
         </header>
 
-        {/* Dynamic View Content */}
-        <div className="v19-admin-main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
-          <div className="v19-admin-main-inner mx-auto h-full max-w-[1460px]">
-            {activeNav === "review" && (
+        <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+          <div className="max-w-[1460px] mx-auto h-full">
+            {activeNav === "review" ? (
               <ReviewScreen
-                submissions={submissions}
                 onOpenDrawer={handleOpenReviewDrawer}
                 onOpenExport={() => navigateTo("export")}
+                submissions={submissions}
               />
-            )}
-            {activeNav === "export" && <AdminExportScreen submissions={submissions} />}
-            {usesSupabase && activeNav === "returns" && <AdminReturnPackagesScreen />}
-            {activeNav === "users" && (
-              <AdminUsersAccessPanel
-                busy={accessRequestsBusy}
-                requests={accessRequests}
-                onApprove={onApproveAccessRequest}
-                onReject={onRejectAccessRequest}
-              />
-            )}
-            {!usesSupabase && activeNav === "settings" && (
-              <Suspense
-                fallback={
-                  <div
-                    className="flex min-h-[360px] items-center justify-center rounded-2xl border border-[#242529] bg-[#161617] text-[13px] text-white/54"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    Загрузка настроек...
-                  </div>
-                }
-              >
-                <SettingsScreen
-                  accessRequests={accessRequests}
-                  accessRequestsBusy={accessRequestsBusy}
-                  confirmLeave={false}
-                  dirty={false}
-                  email={currentEmail}
-                  isSupabaseMode={usesSupabase}
-                  onApproveAccessRequest={onApproveAccessRequest}
-                  onCancelLeave={() => undefined}
-                  onConfirmLeave={() => undefined}
-                  onRejectAccessRequest={onRejectAccessRequest}
-                  onReset={() => undefined}
-                  onSave={() => undefined}
-                  onSettings={() => undefined}
-                  onSignOut={onSignOut}
-                  role="admin"
-                  saveState="idle"
-                  settings={{
-                    compactLists: true,
-                    digest: "instant",
-                    drawerHints: true,
-                  }}
-                />
-              </Suspense>
-            )}
+            ) : null}
+            {activeNav === "export" ? (
+              <AdminExportScreen submissions={submissions} />
+            ) : null}
+            {activeNav === "users" ? (
+              <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-[#242529] rounded-2xl bg-[#161617]">
+                <Users className="w-10 h-10 text-white/20 mb-4" />
+                <h3 className="text-white font-medium">Пользователи</h3>
+                <p className="text-[13px] text-white/50 mt-1">
+                  Управление ролями и доступом
+                </p>
+              </div>
+            ) : null}
+            {activeNav === "settings" ? (
+              <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-[#242529] rounded-2xl bg-[#161617]">
+                <SlidersHorizontal className="w-10 h-10 text-white/20 mb-4" />
+                <h3 className="text-white font-medium">Настройки системы</h3>
+                <p className="text-[13px] text-white/50 mt-1">
+                  Управление справочниками и правилами экспорта
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </main>
