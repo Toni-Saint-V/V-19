@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+function expectPngDimensions(bytes: Buffer, size: number) {
+  expect(bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+  expect(bytes.readUInt32BE(16)).toBe(size);
+  expect(bytes.readUInt32BE(20)).toBe(size);
+}
+
 test("production shell exposes the V-19 browser identity", async ({ page }) => {
   await page.goto("/");
 
@@ -24,6 +30,9 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
   const manifestLink = page.locator('link[rel="manifest"]');
   await expect(manifestLink).toHaveAttribute("href", "/manifest.webmanifest");
 
+  const appleTouchIcon = page.locator('link[rel="apple-touch-icon"]');
+  await expect(appleTouchIcon).toHaveAttribute("href", "/v19-apple-touch-icon-v1.png");
+
   const iconResponse = await page.request.get("/v19-app-icon.svg");
   expect(iconResponse.status()).toBe(200);
   expect(iconResponse.headers()["content-type"]).toContain("image/svg+xml");
@@ -44,6 +53,18 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
     icons: [
       {
         purpose: "any maskable",
+        sizes: "192x192",
+        src: "/v19-app-icon-192-v1.png",
+        type: "image/png",
+      },
+      {
+        purpose: "any maskable",
+        sizes: "512x512",
+        src: "/v19-app-icon-512-v1.png",
+        type: "image/png",
+      },
+      {
+        purpose: "any maskable",
         sizes: "any",
         src: "/v19-app-icon.svg",
         type: "image/svg+xml",
@@ -57,4 +78,15 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
     start_url: "/",
     theme_color: "#101011",
   });
+
+  for (const [assetPath, size] of [
+    ["/v19-apple-touch-icon-v1.png", 180],
+    ["/v19-app-icon-192-v1.png", 192],
+    ["/v19-app-icon-512-v1.png", 512],
+  ] as const) {
+    const response = await page.request.get(assetPath);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("image/png");
+    expectPngDimensions(await response.body(), size);
+  }
 });

@@ -37,6 +37,9 @@ verifyRule("/v19-app-icon.svg", {
 verifyRule("/manifest.webmanifest", {
   "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
 });
+verifyRule("/v19-(.*)-v1.png", {
+  "cache-control": "public, max-age=31536000, immutable",
+});
 
 if (failures.length > 0) {
   console.error(failures.join("\n"));
