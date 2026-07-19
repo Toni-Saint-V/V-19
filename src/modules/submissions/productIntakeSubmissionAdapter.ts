@@ -139,8 +139,9 @@ export function productIntakeDraftToPassportUploads(
 ): PassportUploadDraft[] {
   const passportFiles = draft.files.filter((file) => file.kind === 'passport');
 
-  return passportFiles.flatMap((file, applicantIndex) => {
+  return passportFiles.flatMap((file, fallbackApplicantIndex) => {
     if (!file.fileRef) return [];
+    const applicantIndex = file.applicantIndex ?? fallbackApplicantIndex;
     const needsManualReview = file.status !== 'recognized';
     const extractedFields = passportUploadFieldMap.flatMap(([sourceKey, targetKey]) => {
       const rawValue = file.extractedValues?.[sourceKey]?.trim() ?? '';
@@ -228,6 +229,17 @@ function filesOfKind(draft: ProductIntakeDraft, kind: ProductFileKind) {
   return finalIntakeFiles(draft).filter((file) => file.kind === kind);
 }
 
+function intakeFileForApplicant(
+  files: ProductIntakeFile[],
+  applicantIndex: number,
+) {
+  const assignedFile = files.find((file) => file.applicantIndex === applicantIndex);
+  if (assignedFile) return assignedFile;
+  return files.some((file) => file.applicantIndex !== undefined)
+    ? undefined
+    : files[applicantIndex];
+}
+
 function normalizedName(value: string) {
   return value.trim().toLocaleLowerCase('ru-RU');
 }
@@ -245,7 +257,10 @@ function intakeFileForRequiredSlot(
 ) {
   if (type === 'passport_scan') {
     const passports = filesOfKind(draft, 'passport');
-    return passports[applicantIndex] ?? (draft.type === 'single' ? passports[0] : undefined);
+    return (
+      intakeFileForApplicant(passports, applicantIndex) ??
+      (draft.type === 'single' ? passports[0] : undefined)
+    );
   }
 
   const photos = filesOfKind(draft, 'photo');
@@ -345,8 +360,10 @@ function passportExtractionFromDraft(
   applicant: ProductIntakeDraft['applicants'][number],
   applicantIndex: number,
 ): PassportExtractionReviewState | undefined {
-  const passportFile = filesOfKind(draft, 'passport')[applicantIndex] ??
-    (draft.type === 'single' ? filesOfKind(draft, 'passport')[0] : undefined);
+  const passportFiles = filesOfKind(draft, 'passport');
+  const passportFile =
+    intakeFileForApplicant(passportFiles, applicantIndex) ??
+    (draft.type === 'single' ? passportFiles[0] : undefined);
 
   if (!passportFile) return undefined;
 
@@ -468,8 +485,12 @@ function issueApplicantId(
   draft: ProductIntakeDraft,
 ) {
   const fileId = issue.id.replace(/-(blocker|warning|info)$/u, '');
-  const passportIndex = filesOfKind(draft, 'passport').findIndex((file) => file.id === fileId);
-  if (passportIndex >= 0) return applicants[passportIndex]?.id ?? applicants[0]?.id;
+  const passportFiles = filesOfKind(draft, 'passport');
+  const passportIndex = passportFiles.findIndex((file) => file.id === fileId);
+  if (passportIndex >= 0) {
+    const applicantIndex = passportFiles[passportIndex]?.applicantIndex ?? passportIndex;
+    return applicants[applicantIndex]?.id ?? applicants[0]?.id;
+  }
   const photoIndex = filesOfKind(draft, 'photo').findIndex((file) => file.id === fileId);
   if (photoIndex >= 0) return applicants[photoIndex]?.id ?? applicants[0]?.id;
   return applicants[0]?.id;

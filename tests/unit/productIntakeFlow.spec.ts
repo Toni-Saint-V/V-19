@@ -161,6 +161,68 @@ describe("product intake passport prefill", () => {
     );
   });
 
+  test("keeps an explicitly selected family slot when passport files arrive out of order", () => {
+    const fourthFile = new File(["fourth"], "passport-fourth.jpeg", {
+      type: "image/jpeg",
+    });
+    const secondFile = new File(["second"], "passport-second.jpeg", {
+      type: "image/jpeg",
+    });
+    const draft = buildProductIntakeDraft(
+      "family",
+      [
+        {
+          applicantIndex: 3,
+          extractedFieldKeys: ["surname", "firstName"],
+          extractedValues: { firstName: "CHILD", surname: "FOUR" },
+          fileRef: fourthFile,
+          id: "passport-fourth",
+          kind: "passport",
+          name: fourthFile.name,
+          progress: 100,
+          status: "recognized",
+        },
+        {
+          applicantIndex: 1,
+          extractedFieldKeys: ["surname", "firstName"],
+          extractedValues: { firstName: "SPOUSE", surname: "TWO" },
+          fileRef: secondFile,
+          id: "passport-second",
+          kind: "passport",
+          name: secondFile.name,
+          progress: 100,
+          status: "recognized",
+        },
+      ],
+      "2026-07-19T09:00:00.000Z",
+      4,
+    );
+
+    expect(draft.applicants).toHaveLength(4);
+    expect(draft.applicants.map((applicant) => applicant.fullName)).toEqual([
+      "Заявитель 1",
+      "SPOUSE TWO",
+      "Заявитель 3",
+      "CHILD FOUR",
+    ]);
+    expect(productIntakeDraftToPassportUploads(draft)).toEqual([
+      expect.objectContaining({ applicantIndex: 3, file: fourthFile }),
+      expect.objectContaining({ applicantIndex: 1, file: secondFile }),
+    ]);
+  });
+
+  test("builds the requested empty family grid before any passport is uploaded", () => {
+    const draft = buildProductIntakeDraft(
+      "family",
+      [],
+      "2026-07-19T09:10:00.000Z",
+      4,
+    );
+
+    expect(draft.applicants).toHaveLength(4);
+    expect(draft.files).toEqual([]);
+  });
+
   test("preserves applicant indexes when an earlier passport has no live File reference", () => {
     const secondFile = new File(["second"], "passport-second.jpeg", {
       type: "image/jpeg",

@@ -19,6 +19,7 @@ export type ProductIntakeFile = {
   kind: ProductFileKind;
   status: ProductFileStatus;
   progress: number;
+  applicantIndex?: number;
   extractedValues?: Partial<ProductApplicantFields>;
   fileRef?: File;
   issue?: string;
@@ -331,17 +332,41 @@ function extractedApplicantFieldsForFile(file: ProductIntakeFile | undefined) {
   return file.extractedValues ?? {};
 }
 
-function buildApplicants(type: ProductPackageType, files: ProductIntakeFile[]): ProductIntakeApplicant[] {
-  const passportFiles = files.filter((file) =>
-    file.kind === 'passport' && ['recognized', 'needs_review'].includes(file.status),
+function buildApplicants(
+  type: ProductPackageType,
+  files: ProductIntakeFile[],
+  requestedApplicantCount?: number,
+): ProductIntakeApplicant[] {
+  const passportFiles = files.filter((file) => file.kind === 'passport');
+  const highestAssignedApplicantIndex = passportFiles.reduce(
+    (highest, file) => Math.max(highest, file.applicantIndex ?? -1),
+    -1,
   );
-  const queuedPassportCount = files.filter((file) => file.kind === 'passport').length;
-  const count = type === 'family' ? Math.max(2, passportFiles.length, queuedPassportCount) : 1;
+  const count =
+    type === 'family'
+      ? Math.max(
+          2,
+          requestedApplicantCount ?? 0,
+          passportFiles.length,
+          highestAssignedApplicantIndex + 1,
+        )
+      : 1;
 
   return Array.from({ length: count }, (_, index) => {
+    const assignedPassport = passportFiles.find(
+      (file) => file.applicantIndex === index,
+    );
+    const fallbackPassport = passportFiles.some(
+      (file) => file.applicantIndex !== undefined,
+    )
+      ? undefined
+      : passportFiles[index];
+    const passportFile = assignedPassport ?? fallbackPassport;
     const fields = {
       ...emptyApplicantFields(),
-      ...extractedApplicantFieldsForFile(passportFiles[index] ?? (type === 'single' ? passportFiles[0] : undefined)),
+      ...extractedApplicantFieldsForFile(
+        passportFile ?? (type === 'single' ? passportFiles[0] : undefined),
+      ),
     };
     const fullName = [fields.firstName, fields.surname].filter(Boolean).join(' ');
     return {
@@ -354,8 +379,13 @@ function buildApplicants(type: ProductPackageType, files: ProductIntakeFile[]): 
   });
 }
 
-export function buildProductIntakeDraft(type: ProductPackageType, files: ProductIntakeFile[], seedIso = new Date().toISOString()): ProductIntakeDraft {
-  const applicants = buildApplicants(type, files);
+export function buildProductIntakeDraft(
+  type: ProductPackageType,
+  files: ProductIntakeFile[],
+  seedIso = new Date().toISOString(),
+  requestedApplicantCount?: number,
+): ProductIntakeDraft {
+  const applicants = buildApplicants(type, files, requestedApplicantCount);
   const namedApplicants = applicants
     .map((applicant) => applicant.fullName)
     .filter((name) => !/^Заявитель \d+$/.test(name));
