@@ -1,6 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 
-import { testArtifactPath } from "./tests/support/artifacts";
+const configuredArtifactsRoot = process.env.V19_TEST_ARTIFACTS_DIR?.trim();
+const testArtifactsRoot = configuredArtifactsRoot
+  ? resolve(configuredArtifactsRoot)
+  : resolve(tmpdir(), "visaflow-v19");
+const testArtifactPath = (...segments: string[]) =>
+  resolve(testArtifactsRoot, ...segments);
 
 const e2eHost = process.env.PW_BASE_HOST ?? "localhost";
 const e2ePort = process.env.PW_BASE_PORT ?? "4207";
