@@ -289,7 +289,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Заявители: VOLKOV ANTON" }),
+      screen.getByRole("heading", { name: "Анкета: VOLKOV ANTON" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Номер паспорта")).toHaveValue("752869613");
     expect(screen.getByLabelText("Дата выдачи")).toHaveValue("26.02.2016");
@@ -328,7 +328,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Желаемый интервал — по")).toHaveFocus(),
+      expect(screen.getByLabelText("По какое число")).toHaveFocus(),
     );
     expect(
       screen.getByText(
@@ -524,6 +524,7 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Личные данные");
     expect(visibleFieldLabels(result.container)).toEqual([
       "Фамилия",
+      "Предыдущие фамилии",
       "Имя",
       "Дата рождения",
       "Место рождения",
@@ -582,10 +583,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Дата выезда",
       "Длительность пребывания",
       "Отпечатки ранее сдавались",
-      "Разрешение на въезд в конечную страну",
-      "Кем выдано",
-      "Действительно с",
-      "Действительно до",
     ]);
 
     clickPinnedSection(result.container, "Отель / приглашение");
@@ -601,7 +598,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ]);
   });
 
-  test("hides the rare previous surname field for male applicants until requested", () => {
+  test("keeps previous surnames visible and optional for every applicant", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -621,12 +618,10 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Личные данные");
     fireEvent.click(screen.getByRole("button", { name: "Мужской" }));
 
-    expect(visibleFieldLabels(result.container)).not.toContain(
-      "Фамилия при рождении / предыдущая",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Добавить предыдущую фамилию" }));
-    expect(visibleFieldLabels(result.container)).toContain(
-      "Фамилия при рождении / предыдущая",
+    expect(visibleFieldLabels(result.container)).toContain("Предыдущие фамилии");
+    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveAttribute(
+      "aria-required",
+      "true",
     );
   });
 
@@ -782,10 +777,11 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Отель / приглашение");
     const hotelPhone = screen.getByLabelText("Телефон");
     fireEvent.focus(hotelPhone);
-    expect(hotelPhone).toHaveValue("+34");
+    expect(hotelPhone).toHaveValue("");
+    expect(hotelPhone).toHaveAttribute("placeholder", "Номер с кодом страны");
   });
 
-  test("calculates the inclusive stay duration from travel dates", () => {
+  test("keeps stay duration as a manual field when travel dates change", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -804,7 +800,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Поездка");
     const duration = screen.getByLabelText("Длительность пребывания");
-    expect(duration).toHaveAttribute("readonly");
+    expect(duration).not.toHaveAttribute("readonly");
     expect(duration).toHaveValue(null);
 
     fireEvent.change(screen.getByLabelText("Дата въезда"), {
@@ -813,12 +809,12 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Дата выезда"), {
       target: { value: "22012027" },
     });
-    expect(duration).toHaveValue(8);
-
-    fireEvent.change(screen.getByLabelText("Дата выезда"), {
-      target: { value: "14012027" },
-    });
     expect(duration).toHaveValue(null);
+
+    fireEvent.change(duration, {
+      target: { value: "8" },
+    });
+    expect(duration).toHaveValue(8);
   });
 
   test("defaults Russia-related fields and derives USSR for a pre-1991 birth date", async () => {
@@ -2362,9 +2358,21 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Копировать для всех" }),
+    const copyButton = screen.getByRole("button", {
+      name: "Копировать для всех",
+    });
+    const workToolbar = copyButton.closest(
+      ".v19-questionnaire-work-toolbar",
     );
+    expect(workToolbar).not.toBeNull();
+    expect(workToolbar).toContainElement(
+      screen.getByTestId("questionnaire-next-blocker"),
+    );
+    expect(copyButton.parentElement).toHaveClass(
+      "v19-questionnaire-work-toolbar-copy",
+    );
+
+    fireEvent.click(copyButton);
     expect(onFieldChange).not.toHaveBeenCalled();
     expect(screen.getByText(/Предпросмотр:/)).toHaveAttribute("role", "status");
     fireEvent.click(
@@ -2635,8 +2643,8 @@ describe("FigmaQuestionnaireScreen", () => {
 
     expect(visibleFieldLabels(result.container)).toEqual([
       "Город подачи",
-      "Желаемый интервал — с",
-      "Желаемый интервал — по",
+      "С какого числа",
+      "По какое число",
     ]);
 
     clickPinnedSection(result.container, "Паспорт");

@@ -27588,6 +27588,23 @@ body,
   gap: var(--v19b-size-4);
 }
 
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-quick-options[data-option-count="3"]:not(.is-collapsed) {
+  grid-template-columns: repeat(
+    3,
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+  );
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-quick-options[data-option-count="3"]:not(.is-collapsed)
+  .v19-questionnaire-quick-option {
+  min-width: var(--v19b-size-0);
+  padding-inline: var(--v19b-size-6);
+  font-size: var(--v19b-size-11);
+  white-space: nowrap;
+}
+
 .vf-figma-questionnaire-screen .v19-questionnaire-quick-option {
   justify-content: center;
   text-align: center;
@@ -36646,6 +36663,119 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   font-size: var(--v19b-size-10) !important;
   opacity: 1;
   text-transform: lowercase;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-work-toolbar {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  gap: var(--v19b-size-8);
+  margin-bottom: var(--v19b-size-12);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-work-toolbar.has-copy {
+  grid-template-columns: repeat(
+    2,
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+  );
+}
+
+.vf-figma-questionnaire-screen
+  :is(
+    .v19-questionnaire-work-toolbar-notice,
+    .v19-questionnaire-work-toolbar-copy
+  ) {
+  min-width: var(--v19b-size-0);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-work-toolbar-notice {
+  display: flex;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-toolbar-notice
+  > :is(.v19-questionnaire-next-blocker, .v19-questionnaire-review-alert) {
+  width: var(--v19b-size-full);
+  height: var(--v19b-size-full);
+  margin: var(--v19b-size-0) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-work-toolbar-copy {
+  display: flex;
+  align-items: stretch;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-toolbar-copy
+  .v19-questionnaire-copy-button {
+  justify-content: center;
+  width: var(--v19b-size-full);
+  min-height: var(--v19b-size-40);
+  margin: var(--v19b-size-0) !important;
+  white-space: normal;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-date-range {
+  display: flex;
+  min-width: var(--v19b-size-0);
+  flex-direction: column;
+  gap: var(--v19b-size-6);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-date-range-heading {
+  display: flex;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  gap: var(--v19b-size-6);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-font-weight-semibold);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-date-range-controls {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  grid-template-columns: repeat(
+    2,
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+  );
+  overflow: hidden;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-date-range-controls
+  > .v19-questionnaire-field-cell {
+  min-width: var(--v19b-size-0);
+  gap: var(--v19b-size-4);
+  padding: var(--v19b-size-8) var(--v19b-size-10);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-date-range-controls
+  > .v19-questionnaire-field-cell
+  + .v19-questionnaire-field-cell {
+  border-left: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-date-range-controls
+  .v19-questionnaire-field-label {
+  min-height: auto;
+  margin: var(--v19b-size-0) !important;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  color: var(--v19b-color-text-faint);
+  font-size: var(--v19b-size-10) !important;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-date-range-controls
+  .v19-questionnaire-field-control {
+  min-height: var(--v19b-size-40) !important;
+  border: var(--v19b-size-0) !important;
+  background: transparent !important;
+  padding-inline: var(--v19b-size-0) !important;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-quick-option.is-selected {

@@ -31,7 +31,6 @@ import {
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
 import {
-  blsStayDurationFromDates,
   isBlsQuestionnaireFieldBlockingIssue,
   isBlsQuestionnaireFieldReady,
   isBlsQuestionnaireFieldRequired,
@@ -928,6 +927,7 @@ function FormField({
               ? " is-collapsed"
               : ""
           }`}
+          data-option-count={visibleQuickOptions?.length}
           role="group"
         >
           {visibleQuickOptions?.map((option) => (
@@ -1217,6 +1217,47 @@ function FormField({
       ) : null}
 
       {hint ? <p className="v19-questionnaire-field-hint">{hint}</p> : null}
+    </div>
+  );
+}
+
+type QuestionnaireDateRangeProps = {
+  endValue: string;
+  onEndChange: (value: string) => void;
+  onStartChange: (value: string) => void;
+  startValue: string;
+};
+
+function QuestionnaireDateRange({
+  endValue,
+  onEndChange,
+  onStartChange,
+  startValue,
+}: QuestionnaireDateRangeProps) {
+  return (
+    <div
+      aria-label="Желаемый интервал"
+      className="v19-questionnaire-date-range v19-questionnaire-field-cell col-span-1"
+      role="group"
+    >
+      <div className="v19-questionnaire-date-range-heading">
+        <span className="v19-questionnaire-field-number">A2</span>
+        <span>Желаемый интервал</span>
+      </div>
+      <div className="v19-questionnaire-date-range-controls">
+        <FormField
+          label="С какого числа"
+          modelFieldId="desired-date-1"
+          value={startValue}
+          onChange={onStartChange}
+        />
+        <FormField
+          label="По какое число"
+          modelFieldId="desired-date-2"
+          value={endValue}
+          onChange={onEndChange}
+        />
+      </div>
     </div>
   );
 }
@@ -2275,6 +2316,8 @@ const questionnaireFieldLabelAliases: Record<string, string[]> = {
   "company-contact-person": ["Контакт компании"],
   "company-org-details": ["Компания и адрес"],
   "cost-covered-by": ["Кто оплачивает"],
+  "desired-date-1": ["Желаемый интервал — с", "С какого числа"],
+  "desired-date-2": ["Желаемый интервал — по", "По какое число"],
   "employer-address": ["Адрес работодателя"],
   "employer-contact": ["Телефон работодателя"],
   "employer-name": ["Работа / учеба"],
@@ -2478,9 +2521,6 @@ export function FigmaQuestionnaireScreen({
   const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const queuedSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const onSaveDraftRef = useRef(onSaveDraft);
-  const updateFieldRef = useRef<
-    (key: keyof QuestionnaireFormData, value: string) => void
-  >(() => undefined);
   const canSaveDraft = Boolean(onSaveDraft);
   const initialFocusAppliedRef = useRef(false);
   const saveRequestRunnerRef = useRef<(request: QuestionnaireSaveRequest) => void>(
@@ -2920,6 +2960,8 @@ export function FigmaQuestionnaireScreen({
     Boolean(primaryApplicant) &&
     draftSubmission.applicants.length > 1;
   const canCopyCurrentSection = Boolean(familySharedFieldIds[activeSection]?.length);
+  const showFamilyCopyControl =
+    isEditable && canCopyFamilyWide && canCopyCurrentSection;
 
   const currentSectionIssue = useMemo(() => {
     const currentSection = sections.find((section) => section.id === activeSection);
@@ -3060,8 +3102,6 @@ export function FigmaQuestionnaireScreen({
     for (const update of familyAppointmentUpdates) onFieldChange?.(update);
   }
 
-  updateFieldRef.current = updateField;
-
   function updateStructuredAddressField(
     key: StructuredHomeAddressKey,
     value: string,
@@ -3120,34 +3160,6 @@ export function FigmaQuestionnaireScreen({
     );
     if (normalized !== formData.birthPlace) updateField("birthPlace", normalized);
   }
-
-  function updateTravelDate(key: "travelStart" | "travelEnd", value: string) {
-    const travelStart = key === "travelStart" ? value : formData.travelStart;
-    const travelEnd = key === "travelEnd" ? value : formData.travelEnd;
-
-    updateField(key, value);
-    updateField(
-      "stayDuration",
-      blsStayDurationFromDates(travelStart, travelEnd),
-    );
-  }
-
-  useEffect(() => {
-    if (!isEditable) return;
-
-    const calculatedDuration = blsStayDurationFromDates(
-      formData.travelStart,
-      formData.travelEnd,
-    );
-    if (calculatedDuration === formData.stayDuration) return;
-
-    updateFieldRef.current("stayDuration", calculatedDuration);
-  }, [
-    formData.stayDuration,
-    formData.travelEnd,
-    formData.travelStart,
-    isEditable,
-  ]);
 
   function copySharedDataToFamily() {
     if (
@@ -4005,19 +4017,11 @@ export function FigmaQuestionnaireScreen({
             value={formData.appointmentCity}
             onChange={(value) => updateField("appointmentCity", value)}
           />
-          <FormField
-            label="Желаемый интервал — с"
-            modelFieldId="desired-date-1"
-            number="A2"
-            value={formData.desiredDate1}
-            onChange={(value) => updateField("desiredDate1", value)}
-          />
-          <FormField
-            label="Желаемый интервал — по"
-            modelFieldId="desired-date-2"
-            number="↳"
-            value={formData.desiredDate2}
-            onChange={(value) => updateField("desiredDate2", value)}
+          <QuestionnaireDateRange
+            endValue={formData.desiredDate2}
+            startValue={formData.desiredDate1}
+            onEndChange={(value) => updateField("desiredDate2", value)}
+            onStartChange={(value) => updateField("desiredDate1", value)}
           />
         </>
       );
@@ -4375,7 +4379,7 @@ export function FigmaQuestionnaireScreen({
             reviewSource={fieldReviewSource("arrival-date", "Дата въезда")}
             state={fieldReviewState("arrival-date", "Дата въезда")}
             value={formData.travelStart}
-            onChange={(value) => updateTravelDate("travelStart", value)}
+            onChange={(value) => updateField("travelStart", value)}
           />
           <FormField
             excelMap="Cell: F4"
@@ -4389,17 +4393,16 @@ export function FigmaQuestionnaireScreen({
             reviewSource={fieldReviewSource("departure-date", "Дата выезда")}
             state={fieldReviewState("departure-date", "Дата выезда")}
             value={formData.travelEnd}
-            onChange={(value) => updateTravelDate("travelEnd", value)}
+            onChange={(value) => updateField("travelEnd", value)}
           />
           <FormField
             excelMap="Анкета: stay-duration"
             label="Длительность пребывания"
             modelFieldId="stay-duration"
             number={nextTripQuestionNumber()}
-            hint="Рассчитывается автоматически по датам въезда и выезда"
-            readOnly
             type="number"
             value={formData.stayDuration}
+            onChange={(value) => updateField("stayDuration", value)}
           />
           <FormField
             excelMap="Анкета: previous-biometrics"
@@ -4430,38 +4433,6 @@ export function FigmaQuestionnaireScreen({
               />
             </>
           ) : null}
-          <FormField
-            excelMap="Анкета: final-entry-permit"
-            label="Разрешение на въезд в конечную страну"
-            modelFieldId="final-entry-permit"
-            number={nextTripQuestionNumber()}
-            value={formData.finalEntryPermit}
-            onChange={(value) => updateField("finalEntryPermit", value)}
-          />
-          <FormField
-            excelMap="Анкета: final-entry-permit-issued-by"
-            label="Кем выдано"
-            modelFieldId="final-entry-permit-issued-by"
-            number={nextTripQuestionNumber()}
-            value={formData.finalEntryPermitIssuedBy}
-            onChange={(value) => updateField("finalEntryPermitIssuedBy", value)}
-          />
-          <FormField
-            excelMap="Анкета: final-entry-permit-valid-from"
-            label="Действительно с"
-            modelFieldId="final-entry-permit-valid-from"
-            number={nextTripQuestionNumber()}
-            value={formData.finalEntryPermitValidFrom}
-            onChange={(value) => updateField("finalEntryPermitValidFrom", value)}
-          />
-          <FormField
-            excelMap="Анкета: final-entry-permit-valid-to"
-            label="Действительно до"
-            modelFieldId="final-entry-permit-valid-to"
-            number={nextTripQuestionNumber()}
-            value={formData.finalEntryPermitValidTo}
-            onChange={(value) => updateField("finalEntryPermitValidTo", value)}
-          />
         </>
       );
     }
@@ -4718,6 +4689,10 @@ export function FigmaQuestionnaireScreen({
     sections.find((section) => section.id === mobileBlockerTarget?.sectionId)?.title ??
     "Следующее обязательное поле";
   const mobileBlockerReason = mobileBlockerTarget?.reason?.trim();
+  const showWorkToolbar =
+    showFamilyCopyControl ||
+    Boolean(currentSectionIssue) ||
+    (isEditable && !readinessStats.canSubmit);
 
   return (
     <motion.div
@@ -5067,111 +5042,135 @@ export function FigmaQuestionnaireScreen({
                   </span>
                 </button>
               ) : null}
-              {isEditable && !readinessStats.canSubmit && !currentSectionIssue ? (
-                <button
-                  aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
-                    mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
-                  }`}
-                  className="v19-questionnaire-next-blocker"
-                  data-testid="questionnaire-next-blocker"
-                  type="button"
-                  onClick={focusFirstBlocker}
-                >
-                  <AlertCircle aria-hidden="true" className="w-4 h-4" />
-                  <span>
-                    Заполните: <strong>{mobileBlockerLabel}</strong>
-                  </span>
-                  <ArrowRight aria-hidden="true" className="w-4 h-4" />
-                </button>
-              ) : null}
-              {currentSectionIssue ? (
+              {showWorkToolbar ? (
                 <div
-                  aria-atomic={
-                    currentSectionIssue.status === "fixed_by_agent" ? "true" : undefined
-                  }
-                  aria-live={
-                    currentSectionIssue.status === "fixed_by_agent"
-                      ? "polite"
-                      : undefined
-                  }
-                  className={`v19-questionnaire-review-alert ${
-                    currentSectionIssue.status === "fixed_by_agent" ? "is-awaiting" : ""
+                  className={`v19-questionnaire-work-toolbar${
+                    showFamilyCopyControl ? " has-copy" : ""
                   }`}
-                  role={
-                    currentSectionIssue.status === "fixed_by_agent"
-                      ? "status"
-                      : undefined
-                  }
                 >
-                  <div className="v19-questionnaire-review-strip" />
-                  <div className="v19-questionnaire-review-icon">
-                    {currentSectionIssue.status === "fixed_by_agent" ? (
-                      <CheckCircle2 className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
-                    ) : (
-                      <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
-                      {currentSectionIssue.status === "fixed_by_agent"
-                        ? `Исправление${
-                            currentSectionIssue.target.field
-                              ? ` по полю «${currentSectionIssue.target.field}»`
-                              : ""
-                          } отправлено, ожидает проверки администратора`
-                        : currentSectionIssue.target.field
-                          ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
-                          : currentSectionIssue.reason}
-                    </div>
-                    <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
-                      {currentSectionIssue.status === "fixed_by_agent"
-                        ? "Исправление сохранено и не блокирует повторную отправку. Администратор увидит его при проверке."
-                        : currentSectionIssue.comment}
-                    </p>
-                  </div>
-                  {isEditable && currentSectionIssue.status === "open" && onMarkIssueFixed ? (
-                    <div className="flex shrink-0 flex-col items-end gap-2">
+                  <div className="v19-questionnaire-work-toolbar-notice">
+                    {isEditable &&
+                    !readinessStats.canSubmit &&
+                    !currentSectionIssue ? (
                       <button
-                        aria-busy={
-                          pendingIssueResolutionId === currentSectionIssue.id
-                        }
-                        className="v19-questionnaire-draft-button"
-                        disabled={pendingIssueResolutionId !== null}
+                        aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
+                          mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
+                        }`}
+                        className="v19-questionnaire-next-blocker"
+                        data-testid="questionnaire-next-blocker"
                         type="button"
-                        onClick={() => void resolveCurrentIssue()}
+                        onClick={focusFirstBlocker}
                       >
-                        {pendingIssueResolutionId === currentSectionIssue.id
-                          ? "Сохраняем…"
-                          : "Пометить исправленным"}
-                      </button>
-                      {issueResolutionError ? (
-                        <span
-                          className="max-w-[var(--v19b-size-220)] text-right text-[var(--v19b-size-11)] text-[var(--v19b-dot-danger)]"
-                          role="alert"
-                        >
-                          {issueResolutionError}
+                        <AlertCircle aria-hidden="true" className="w-4 h-4" />
+                        <span>
+                          Заполните: <strong>{mobileBlockerLabel}</strong>
                         </span>
-                      ) : null}
+                        <ArrowRight aria-hidden="true" className="w-4 h-4" />
+                      </button>
+                    ) : null}
+                    {currentSectionIssue ? (
+                      <div
+                        aria-atomic={
+                          currentSectionIssue.status === "fixed_by_agent"
+                            ? "true"
+                            : undefined
+                        }
+                        aria-live={
+                          currentSectionIssue.status === "fixed_by_agent"
+                            ? "polite"
+                            : undefined
+                        }
+                        className={`v19-questionnaire-review-alert ${
+                          currentSectionIssue.status === "fixed_by_agent"
+                            ? "is-awaiting"
+                            : ""
+                        }`}
+                        role={
+                          currentSectionIssue.status === "fixed_by_agent"
+                            ? "status"
+                            : undefined
+                        }
+                      >
+                        <div className="v19-questionnaire-review-strip" />
+                        <div className="v19-questionnaire-review-icon">
+                          {currentSectionIssue.status === "fixed_by_agent" ? (
+                            <CheckCircle2 className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+                          ) : (
+                            <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
+                            {currentSectionIssue.status === "fixed_by_agent"
+                              ? `Исправление${
+                                  currentSectionIssue.target.field
+                                    ? ` по полю «${currentSectionIssue.target.field}»`
+                                    : ""
+                                } отправлено, ожидает проверки администратора`
+                              : currentSectionIssue.target.field
+                                ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
+                                : currentSectionIssue.reason}
+                          </div>
+                          <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
+                            {currentSectionIssue.status === "fixed_by_agent"
+                              ? "Исправление сохранено и не блокирует повторную отправку. Администратор увидит его при проверке."
+                              : currentSectionIssue.comment}
+                          </p>
+                        </div>
+                        {isEditable &&
+                        currentSectionIssue.status === "open" &&
+                        onMarkIssueFixed ? (
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <button
+                              aria-busy={
+                                pendingIssueResolutionId === currentSectionIssue.id
+                              }
+                              className="v19-questionnaire-draft-button"
+                              disabled={pendingIssueResolutionId !== null}
+                              type="button"
+                              onClick={() => void resolveCurrentIssue()}
+                            >
+                              {pendingIssueResolutionId === currentSectionIssue.id
+                                ? "Сохраняем…"
+                                : "Пометить исправленным"}
+                            </button>
+                            {issueResolutionError ? (
+                              <span
+                                className="max-w-[var(--v19b-size-220)] text-right text-[var(--v19b-size-11)] text-[var(--v19b-dot-danger)]"
+                                role="alert"
+                              >
+                                {issueResolutionError}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {showFamilyCopyControl ? (
+                    <div className="v19-questionnaire-work-toolbar-copy">
+                      <button
+                        aria-describedby={
+                          familyCopyMessage ? familyCopyStatusId : undefined
+                        }
+                        className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
+                        disabled={!isEditable || Boolean(familyCopyPreview)}
+                        type="button"
+                        onClick={copySharedDataToFamily}
+                      >
+                        <Copy aria-hidden="true" />
+                        Копировать для всех
+                      </button>
                     </div>
                   ) : null}
                 </div>
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {isEditable && canCopyFamilyWide && canCopyCurrentSection ? (
+                {showFamilyCopyControl &&
+                (familyCopyPreview || lastFamilyCopyTarget || familyCopyMessage) ? (
                   <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
-                    <button
-                      aria-describedby={familyCopyMessage ? familyCopyStatusId : undefined}
-                      className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
-                      disabled={!isEditable || Boolean(familyCopyPreview)}
-                      type="button"
-                      onClick={copySharedDataToFamily}
-                    >
-                      <Copy aria-hidden="true" />
-                      {activeSection === "appointment"
-                        ? "Копировать"
-                        : "Копировать для всех"}
-                    </button>
                     {familyCopyPreview ? (
                       <>
                         <button
