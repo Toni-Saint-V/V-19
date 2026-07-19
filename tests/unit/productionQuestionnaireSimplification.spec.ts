@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { composeQuestionnaireHomeAddress } from "../../src/modules/submissions/questionnaireAddressFields";
+import {
+  composeQuestionnaireHomeAddress,
+  structuredQuestionnaireHomeAddressFromText,
+} from "../../src/modules/submissions/questionnaireAddressFields";
 import {
   createQuestionnaireSections,
   questionnaireSectionPreviews,
@@ -65,6 +68,35 @@ describe("production questionnaire simplification", () => {
         homeUnit: "офис 4",
       }),
     ).toBe("улица Ленина, д 15, корп 2, офис 4");
+  });
+
+  test("splits a short normalized home address back into structured fields", () => {
+    expect(
+      structuredQuestionnaireHomeAddressFromText(
+        "ул ленина д 5 корп 2 кв 12",
+      ),
+    ).toEqual({
+      homeBuilding: "2",
+      homeHouse: "5",
+      homeStreet: "улица Ленина",
+      homeUnit: "12",
+    });
+  });
+
+  test("keeps every address suffix when structured fields are recomposed", () => {
+    const structured = structuredQuestionnaireHomeAddressFromText(
+      "ул ленина д 5 корп 2 стр 1 кв 12 под 3 этаж 4",
+    );
+
+    expect(structured).toEqual({
+      homeBuilding: "корпус 2, строение 1",
+      homeHouse: "5",
+      homeStreet: "улица Ленина",
+      homeUnit: "квартира 12, подъезд 3, этаж 4",
+    });
+    expect(structured && composeQuestionnaireHomeAddress(structured)).toBe(
+      "улица Ленина, д 5, корпус 2, строение 1, квартира 12, подъезд 3, этаж 4",
+    );
   });
 
   test("keeps guardian details optional even for a child", () => {

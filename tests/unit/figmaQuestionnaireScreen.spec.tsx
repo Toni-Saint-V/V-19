@@ -340,6 +340,40 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toHaveLength(1);
   });
 
+  test("renders the desired interval as one paired numeric date control", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON", "VOLKOVA MARIA"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Запись");
+    const interval = screen.getByRole("group", {
+      name: "Желаемый интервал",
+    });
+    const start = within(interval).getByLabelText("С какого числа");
+    const end = within(interval).getByLabelText("По какое число");
+
+    fireEvent.change(start, { target: { value: "01082027" } });
+    fireEvent.change(end, { target: { value: "15082027" } });
+
+    expect(start).toHaveValue("01.08.2027");
+    expect(end).toHaveValue("15.08.2027");
+    expect(
+      screen.getByRole("button", { name: "Копировать для всех" }),
+    ).toBeInTheDocument();
+  });
+
   test("opens a non-passport issue on its exact bound questionnaire field", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -1262,10 +1296,12 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "single",
     });
+    const onFieldChange = vi.fn();
     const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
         submission={submission}
       />,
     );
@@ -1279,6 +1315,28 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByLabelText("Дом")).toBeInTheDocument();
     expect(screen.getByLabelText("Корпус / строение")).toBeInTheDocument();
     expect(screen.getByLabelText("Квартира / офис / помещение")).toBeInTheDocument();
+
+    fireEvent.change(street, {
+      target: { value: "ул ленина д 5 корп 2 кв 12" },
+    });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Подставить адрес: Улица / проспект / переулок",
+      }),
+    );
+    expect(street).toHaveValue("улица Ленина");
+    expect(screen.getByLabelText("Дом")).toHaveValue("5");
+    expect(screen.getByLabelText("Корпус / строение")).toHaveValue("2");
+    expect(screen.getByLabelText("Квартира / офис / помещение")).toHaveValue(
+      "12",
+    );
+    expect(onFieldChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fieldId: "home-address",
+        value: "улица Ленина, д 5, корп 2, кв 12",
+      }),
+    );
 
     const city = screen.getByLabelText("Город проживания");
     fireEvent.focus(city);

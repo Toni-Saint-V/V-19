@@ -34502,15 +34502,15 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-field-control {
-  height: var(--v19b-size-44);
-  min-height: var(--v19b-size-44);
+  height: var(--v19b-field-height);
+  min-height: var(--v19b-field-height);
   padding-inline: var(--v19b-size-12);
   font-size: var(--v19b-size-13);
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-field-control.is-textarea {
   height: auto !important;
-  min-height: var(--v19b-size-88) !important;
+  min-height: var(--v19b-size-80) !important;
   padding: var(--v19b-size-12) !important;
   line-height: var(--v19b-line-height-copy) !important;
 }
@@ -36810,7 +36810,7 @@ section[data-testid="agent-actions-screen"]
 .vf-figma-questionnaire-screen
   .v19-questionnaire-field-cell.has-review-confirmation
   > .v19-questionnaire-review-confirmation {
-  min-height: var(--v19b-size-44);
+  min-height: var(--v19b-field-height);
   align-self: end;
   padding: var(--v19b-size-0);
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
@@ -36832,8 +36832,8 @@ section[data-testid="agent-actions-screen"]
   .v19-questionnaire-field-cell.has-review-confirmation
   > .v19-questionnaire-review-confirmation
   > button {
-  min-height: var(--v19b-size-44);
-  height: var(--v19b-size-44);
+  min-height: var(--v19b-field-height);
+  height: var(--v19b-field-height);
   border: var(--v19b-size-0);
   border-radius: inherit;
   background: var(--v19b-color-control);
@@ -37137,7 +37137,7 @@ section[data-testid="agent-actions-screen"]
   gap: var(--v19b-size-6);
   color: var(--v19b-color-text-muted);
   font-size: var(--v19b-size-12);
-  font-weight: var(--v19b-font-weight-semibold);
+  font-weight: var(--v19b-weight-title);
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-date-range-controls {
