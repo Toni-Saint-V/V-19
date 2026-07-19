@@ -40,6 +40,48 @@ async function clickOperationalNav(page: Page, name: RegExp) {
 }
 
 test.describe("V-19 UX state proof", () => {
+  test("app runtime shell bridges access and lazy workspace loading", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "single-project UX state proof");
+
+    const problems = collectBrowserProblems(page);
+    await page.route("**/src/shared/authRegistration.ts*", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      await route.continue();
+    });
+    await page.route("**/src/components/WorkspaceSurface.tsx*", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      await route.continue();
+    });
+
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", { name: "Проверяем доступ" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("app-runtime-state")).toHaveAttribute(
+      "role",
+      "status",
+    );
+    await expect(page.getByText("Загрузка доступа...")).toBeVisible();
+    await saveScreenshot(page, "app-runtime-access-loading");
+
+    await page.getByRole("button", { name: "Уже есть доступ? Войти" }).click();
+    await page.locator("#workspace-email").fill("1@1.ru");
+    await page.locator("#workspace-password").fill("11");
+    await page.getByRole("button", { name: "Войти в кабинет" }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Открываем рабочую область" }),
+    ).toBeVisible();
+    await expect(page.getByText("Загрузка рабочей области...")).toBeVisible();
+    await saveScreenshot(page, "app-runtime-workspace-loading");
+
+    await expect(page.getByRole("heading", { name: "Мои действия" })).toBeVisible();
+    await expect(page.getByTestId("app-runtime-state")).toHaveCount(0);
+    expect(problems, problems.join("\n")).toEqual([]);
+  });
+
   test("agent actions recover from a filtered empty state", async ({
     page,
   }, testInfo) => {

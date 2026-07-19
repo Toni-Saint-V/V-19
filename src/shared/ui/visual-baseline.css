@@ -19,6 +19,243 @@
   height: var(--v19b-size-0);
 }
 
+/* App bootstrap and fail-closed states keep one calm, branded shell while
+   preserving the existing auth, Supabase, retry, and lazy-loading contracts. */
+.v19-app-runtime-state {
+  display: grid;
+  width: var(--v19b-size-full);
+  min-height: var(--v19b-viewport-height);
+  place-items: center;
+  padding: var(--v19b-size-24);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-app);
+  font-family: var(--v19-font-family);
+}
+
+.v19-app-runtime-card {
+  display: grid;
+  width: var(--v19b-size-full);
+  max-width: var(--v19b-size-420);
+  min-height: var(--v19b-size-320);
+  align-content: start;
+  padding: var(--v19b-size-32);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-panel);
+  background: var(--v19b-color-panel);
+  box-shadow: var(--v19b-shadow-panel);
+}
+
+.v19-app-runtime-brand {
+  display: flex;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  gap: var(--v19b-size-10);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-control);
+  letter-spacing: var(--v19b-tracking-wide);
+  text-transform: uppercase;
+}
+
+.v19-app-runtime-brand-mark {
+  display: inline-grid;
+  width: var(--v19b-size-32);
+  height: var(--v19b-size-32);
+  min-width: var(--v19b-size-32);
+  place-items: center;
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-soft-30);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-primary-text);
+  background: var(--v19b-color-app);
+  font-size: var(--v19b-size-14);
+  font-weight: var(--v19b-weight-title);
+}
+
+.v19-app-runtime-icon {
+  display: inline-grid;
+  width: var(--v19b-size-56);
+  height: var(--v19b-size-56);
+  place-items: center;
+  margin-top: var(--v19b-size-32);
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-soft-30);
+  border-radius: var(--v19b-radius-row);
+  color: var(--v19b-color-primary-text);
+  background: var(--v19b-color-primary-soft-10);
+}
+
+.v19-app-runtime-icon svg {
+  width: var(--v19b-size-24);
+  height: var(--v19b-size-24);
+}
+
+.v19-app-runtime-state.is-loading .v19-app-runtime-icon,
+.v19-app-runtime-state.is-loading .v19-app-runtime-progress > span {
+  animation: v19-app-runtime-pulse var(--v19b-motion-loop-fast)
+    var(--v19b-ease-standard) infinite alternate;
+}
+
+.v19-app-runtime-eyebrow,
+.v19-app-runtime-card h1,
+.v19-app-runtime-copy,
+.v19-app-runtime-detail {
+  margin: var(--v19b-size-0);
+}
+
+.v19-app-runtime-eyebrow {
+  margin-top: var(--v19b-size-20);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-control);
+  letter-spacing: var(--v19b-tracking-wide);
+  text-transform: uppercase;
+}
+
+.v19-app-runtime-card h1 {
+  margin-top: var(--v19b-size-8);
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-24);
+  font-weight: var(--v19b-weight-title);
+  line-height: var(--v19b-line-height-title);
+}
+
+.v19-app-runtime-copy {
+  margin-top: var(--v19b-size-12);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-14);
+  line-height: var(--v19b-line-height-copy);
+}
+
+.v19-app-runtime-detail {
+  margin-top: var(--v19b-size-16);
+  padding-top: var(--v19b-size-16);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+  color: var(--v19b-color-text-faint);
+  font-family: var(--v19b-font-mono);
+  font-size: var(--v19b-size-11);
+  line-height: var(--v19b-line-height-copy);
+  overflow-wrap: anywhere;
+}
+
+.v19-app-runtime-progress {
+  display: flex;
+  min-height: var(--v19b-size-40);
+  align-items: center;
+  gap: var(--v19b-size-8);
+  margin-top: var(--v19b-size-24);
+  padding-inline: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-muted);
+  background: var(--v19b-color-control);
+}
+
+.v19-app-runtime-progress > span {
+  width: var(--v19b-size-8);
+  height: var(--v19b-size-8);
+  min-width: var(--v19b-size-8);
+  border-radius: var(--v19b-radius-pill);
+  background: var(--v19b-color-primary-text);
+}
+
+.v19-app-runtime-progress strong {
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-app-runtime-card button {
+  display: inline-flex;
+  width: var(--v19b-size-full);
+  min-height: var(--v19b-size-40);
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19b-size-8);
+  margin-top: var(--v19b-size-24);
+  padding-inline: var(--v19b-size-16);
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-deep-border);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-primary);
+  font: inherit;
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    border-color var(--v19b-motion-fast) var(--v19b-ease-standard),
+    transform var(--v19b-motion-fast) var(--v19b-ease-standard);
+}
+
+.v19-app-runtime-card button svg {
+  width: var(--v19b-size-18);
+  height: var(--v19b-size-18);
+}
+
+.v19-app-runtime-card button:hover {
+  background: var(--v19b-color-primary-hover);
+}
+
+.v19-app-runtime-card button:active {
+  transform: var(--v19b-transform-press);
+}
+
+.v19-app-runtime-card button:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
+.v19-app-runtime-state.is-error .v19-app-runtime-card,
+.v19-app-runtime-state.is-error .v19-app-runtime-icon {
+  border-color: var(--v19b-admin-red-border);
+}
+
+.v19-app-runtime-state.is-error .v19-app-runtime-icon {
+  color: var(--v19b-admin-red);
+  background: var(--v19b-admin-red-soft);
+}
+
+.v19-app-runtime-state.is-blocked .v19-app-runtime-card,
+.v19-app-runtime-state.is-blocked .v19-app-runtime-icon {
+  border-color: var(--v19b-admin-orange-border);
+}
+
+.v19-app-runtime-state.is-blocked .v19-app-runtime-icon {
+  color: var(--v19b-admin-orange);
+  background: var(--v19b-admin-orange-soft);
+}
+
+@keyframes v19-app-runtime-pulse {
+  from {
+    opacity: var(--v19b-opacity-full);
+  }
+
+  to {
+    opacity: var(--v19b-opacity-disabled);
+  }
+}
+
+@media (max-width: 767px) {
+  .v19-app-runtime-state {
+    padding: var(--v19b-size-16);
+  }
+
+  .v19-app-runtime-card {
+    min-height: var(--v19b-size-280);
+    padding: var(--v19b-size-24);
+  }
+
+  .v19-app-runtime-icon {
+    margin-top: var(--v19b-size-24);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v19-app-runtime-state.is-loading .v19-app-runtime-icon,
+  .v19-app-runtime-state.is-loading .v19-app-runtime-progress > span {
+    animation: none;
+  }
+}
+
 /* Agent sidebar: profile and selected-navigation accents stay token-driven. */
 .v19-agent-sidebar-nav-item.is-active {
   border-color: var(--vf-accent-border) !important;

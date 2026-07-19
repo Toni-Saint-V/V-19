@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LoaderCircle, RefreshCw, ShieldAlert, TriangleAlert } from "lucide-react";
 import { AccessGate } from "./components/AccessGate";
 import {
   noopVisaflowBusinessBridge,
@@ -79,6 +80,76 @@ type WorkspaceDataState = {
   sessionUserId?: string;
   status: WorkspaceDataStatus;
 };
+
+type AppRuntimeStateProps = {
+  actionLabel?: string;
+  description: string;
+  detail?: string;
+  eyebrow: string;
+  id: string;
+  onAction?: () => void;
+  statusText?: string;
+  title: string;
+  tone: "blocked" | "error" | "loading";
+};
+
+function AppRuntimeState({
+  actionLabel,
+  description,
+  detail,
+  eyebrow,
+  id,
+  onAction,
+  statusText,
+  title,
+  tone,
+}: AppRuntimeStateProps) {
+  const isLoading = tone === "loading";
+  const StateIcon = isLoading
+    ? LoaderCircle
+    : tone === "blocked"
+      ? ShieldAlert
+      : TriangleAlert;
+
+  return (
+    <div
+      aria-busy={isLoading || undefined}
+      aria-labelledby={id}
+      aria-live={isLoading ? "polite" : "assertive"}
+      className={`v19-app-runtime-state is-${tone}`}
+      data-testid="app-runtime-state"
+      role={isLoading ? "status" : "alert"}
+    >
+      <section className="v19-app-runtime-card">
+        <div className="v19-app-runtime-brand">
+          <span aria-hidden="true" className="v19-app-runtime-brand-mark">
+            V
+          </span>
+          <span>VisaFlow V-19</span>
+        </div>
+        <span aria-hidden="true" className="v19-app-runtime-icon">
+          <StateIcon />
+        </span>
+        <p className="v19-app-runtime-eyebrow">{eyebrow}</p>
+        <h1 id={id}>{title}</h1>
+        <p className="v19-app-runtime-copy">{description}</p>
+        {detail ? <p className="v19-app-runtime-detail">{detail}</p> : null}
+        {isLoading && statusText ? (
+          <div className="v19-app-runtime-progress">
+            <span aria-hidden="true" />
+            <strong>{statusText}</strong>
+          </div>
+        ) : null}
+        {actionLabel && onAction ? (
+          <button type="button" onClick={onAction}>
+            <RefreshCw aria-hidden="true" />
+            <span>{actionLabel}</span>
+          </button>
+        ) : null}
+      </section>
+    </div>
+  );
+}
 
 function sessionFromSupabase(appSession: AppSession): Session {
   const { profile, supabaseSession } = appSession;
@@ -1254,38 +1325,27 @@ export default function App({
 
   if (!authChecked) {
     return (
-      <div className="min-h-dvh bg-[#101011] text-white grid place-items-center">
-        <span className="text-sm text-white/50">Загрузка доступа...</span>
-      </div>
+      <AppRuntimeState
+        description="Восстанавливаем защищённую сессию и права доступа к рабочей области."
+        eyebrow="Безопасный вход"
+        id="access-loading-title"
+        statusText="Загрузка доступа..."
+        title="Проверяем доступ"
+        tone="loading"
+      />
     );
   }
 
   if (supabaseActivationBlocked) {
     return (
-      <div className="min-h-dvh bg-[#101011] text-white grid place-items-center px-6">
-        <section
-          aria-labelledby="production-runtime-blocked-title"
-          className="max-w-xl rounded-[16px] border border-[#242529] bg-[#161617] p-6"
-        >
-          <p className="text-[12px] font-medium uppercase tracking-wide text-white/45">
-            Production data source blocked
-          </p>
-          <h1
-            className="mt-2 text-[22px] font-semibold text-white"
-            id="production-runtime-blocked-title"
-          >
-            Supabase не активирован
-          </h1>
-          <p className="mt-3 text-[14px] leading-6 text-white/62">
-            Для выбранного Supabase target локальные демо-данные отключены. Приложение
-            остановлено fail-closed, чтобы не загрузить seed/mock данные вместо
-            production source.
-          </p>
-          <p className="mt-4 text-[12px] leading-5 text-white/45">
-            {workspaceDataState.error || supabaseRuntimeConfig.activation.boundary}
-          </p>
-        </section>
-      </div>
+      <AppRuntimeState
+        description="Для выбранного Supabase target локальные демо-данные отключены. Приложение остановлено fail-closed, чтобы не загрузить seed/mock данные вместо production source."
+        detail={workspaceDataState.error || supabaseRuntimeConfig.activation.boundary}
+        eyebrow="Production safety"
+        id="production-runtime-blocked-title"
+        title="Supabase не активирован"
+        tone="blocked"
+      />
     );
   }
 
@@ -1318,54 +1378,42 @@ export default function App({
 
   if (initialWorkspaceGate === "loading") {
     return (
-      <div
-        aria-busy="true"
-        aria-live="polite"
-        className="min-h-dvh bg-[#101011] text-white grid place-items-center"
-        role="status"
-      >
-        <span className="text-sm text-white/50">Загрузка данных Supabase...</span>
-      </div>
+      <AppRuntimeState
+        description="Получаем актуальные подачи и права доступа из Supabase."
+        eyebrow="Рабочая область"
+        id="workspace-loading-title"
+        statusText="Загрузка данных Supabase..."
+        title="Загружаем рабочую область"
+        tone="loading"
+      />
     );
   }
 
   if (initialWorkspaceGate === "error") {
     return (
-      <div className="min-h-dvh bg-[#101011] text-white grid place-items-center px-6">
-        <section
-          aria-labelledby="workspace-load-error-title"
-          className="max-w-xl rounded-[16px] border border-[#7f3d45] bg-[#211416] p-6"
-          role="alert"
-        >
-          <h1 className="text-[20px] font-semibold" id="workspace-load-error-title">
-            Не удалось загрузить данные Supabase
-          </h1>
-          <p className="mt-3 text-[13px] leading-5 text-white/70">
-            {workspaceDataState.error ?? "Повторите загрузку рабочей области."}
-          </p>
-          <button
-            className="mt-5 h-10 rounded-[10px] border border-[#7f3d45] px-4 text-[12px] font-semibold"
-            type="button"
-            onClick={() => void refreshCanonicalSubmissions()}
-          >
-            Повторить
-          </button>
-        </section>
-      </div>
+      <AppRuntimeState
+        actionLabel="Повторить"
+        description={workspaceDataState.error ?? "Повторите загрузку рабочей области."}
+        eyebrow="Синхронизация Supabase"
+        id="workspace-load-error-title"
+        onAction={() => void refreshCanonicalSubmissions()}
+        title="Не удалось загрузить данные Supabase"
+        tone="error"
+      />
     );
   }
 
   return (
     <Suspense
       fallback={
-        <div
-          aria-busy="true"
-          aria-live="polite"
-          className="min-h-dvh bg-[#101011] text-white grid place-items-center"
-          role="status"
-        >
-          <span className="text-sm text-white/50">Загрузка рабочей области...</span>
-        </div>
+        <AppRuntimeState
+          description="Подключаем интерфейс и рабочие инструменты."
+          eyebrow="Интерфейс"
+          id="workspace-interface-loading-title"
+          statusText="Загрузка рабочей области..."
+          title="Открываем рабочую область"
+          tone="loading"
+        />
       }
     >
       <WorkspaceSurface

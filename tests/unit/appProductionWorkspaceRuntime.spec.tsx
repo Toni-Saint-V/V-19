@@ -406,8 +406,14 @@ describe("App production workspace runtime", () => {
   test("shows a blocking retry state instead of a false empty workspace on initial load failure", async () => {
     render(<App />);
     await screen.findByText("Загрузка данных Supabase...");
+    expect(
+      screen.getByRole("heading", { name: "Загружаем рабочую область" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("app-runtime-state")).toHaveClass("is-loading");
     await waitFor(() => {
-      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      );
     });
 
     await act(async () => {
@@ -420,7 +426,17 @@ describe("App production workspace runtime", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("Supabase read failed safely")).toBeInTheDocument();
+    expect(screen.getByTestId("app-runtime-state")).toHaveClass("is-error");
     expect(screen.queryByTestId("admin-workspace")).not.toBeInTheDocument();
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValueOnce({
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Повторить" }));
+
+    expect(await screen.findByTestId("admin-workspace")).toBeInTheDocument();
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
   });
 
   test("gates the workspace until Supabase resolves and awaits mutations with the real actor", async () => {
