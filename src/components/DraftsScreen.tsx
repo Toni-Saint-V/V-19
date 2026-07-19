@@ -776,7 +776,7 @@ export function DraftsScreen({
           active={draftSummaryFilter === 'processing'}
           detail="OCR"
           icon={ScanLine}
-          label="В обработке"
+          label="OCR"
           tone="indigo"
           value={summary.processing}
           onClick={() => setDraftSummaryFilter('processing')}
