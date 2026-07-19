@@ -1,0 +1,21 @@
+{
+  "name": "VisaFlow V-19",
+  "short_name": "V-19",
+  "description": "Операционная рабочая область VisaFlow V-19",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101011",
+  "theme_color": "#101011",
+  "lang": "ru",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/v19-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

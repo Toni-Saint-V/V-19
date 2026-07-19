@@ -34,6 +34,9 @@ verifyRule("/assets/(.*)", {
 verifyRule("/v19-app-icon.svg", {
   "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
 });
+verifyRule("/manifest.webmanifest", {
+  "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
+});
 
 if (failures.length > 0) {
   console.error(failures.join("\n"));
@@ -41,7 +44,7 @@ if (failures.length > 0) {
 }
 
 console.log(
-  "Deployment header guard passed: security baseline, no-index policy, revalidated HTML, immutable hashed assets, refreshable app icon.",
+  "Deployment header guard passed: security baseline, no-index policy, revalidated HTML, immutable hashed assets, refreshable app identity.",
 );
 
 function verifyRule(source, expectedHeaders) {
