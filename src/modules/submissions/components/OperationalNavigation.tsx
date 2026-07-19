@@ -1,15 +1,17 @@
 import type { ReactNode } from "react";
 import {
-  ClipboardCheck,
-  FileText,
-  FileWarning,
+  ContactRound,
+  FileClock,
   FileSpreadsheet,
-  ImageIcon,
-  Menu,
-  Settings,
+  FileStack,
+  Files,
+  Images,
+  ListChecks,
+  Plus,
+  ScanSearch,
   Search,
-  Users,
-  UsersRound,
+  SlidersHorizontal,
+  TriangleAlert,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -142,9 +144,7 @@ export function OperationalSidebar({
           onClick={createAction.onClick}
         >
           <span aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <Plus focusable="false" />
           </span>
           <strong>{createAction.label}</strong>
         </Button>
@@ -155,17 +155,17 @@ export function OperationalSidebar({
 }
 
 const operationalIconMap: Array<[needle: string, Icon: LucideIcon]> = [
-  ["actions", Menu],
-  ["documents", FileText],
-  ["drafts", FileText],
-  ["applicants", Users],
-  ["media", ImageIcon],
-  ["issues", FileWarning],
-  ["submissions", UsersRound],
-  ["review", ClipboardCheck],
-  ["work", ClipboardCheck],
+  ["actions", ListChecks],
+  ["documents", Files],
+  ["drafts", FileClock],
+  ["applicants", ContactRound],
+  ["media", Images],
+  ["issues", TriangleAlert],
+  ["submissions", FileStack],
+  ["review", ScanSearch],
+  ["work", ListChecks],
   ["export", FileSpreadsheet],
-  ["settings", Settings],
+  ["settings", SlidersHorizontal],
 ];
 
 function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {

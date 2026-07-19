@@ -6,8 +6,8 @@ import {
   FolderCheck,
   History,
   UploadCloud,
-  User,
-  Users,
+  UserRound,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -265,9 +265,9 @@ function AdminExportCompositionItem({
     >
       <span aria-hidden="true">
         {item.type === "family" ? (
-          <Users focusable="false" size={16} />
+          <UsersRound focusable="false" size={16} />
         ) : (
-          <User focusable="false" size={16} />
+          <UserRound focusable="false" size={16} />
         )}
       </span>
       <strong>{item.title}</strong>

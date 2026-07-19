@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronDown, MapPin } from "lucide-react";
 
 import { agentOwnerDisplayName } from "../ownership";
 import type { AgentOwnerId } from "../types";
@@ -43,10 +44,7 @@ export function CityFilterMenu({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="v19-city-filter-pin" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M12 21s6-5.3 6-11a6 6 0 0 0-12 0c0 5.7 6 11 6 11Z" />
-            <circle cx="12" cy="10" r="2.2" />
-          </svg>
+          <MapPin focusable="false" />
         </span>
         <span className="v19-city-filter-value v19-city-filter-value-full">
           {value === "Все города" ? "Все города" : value}
@@ -54,9 +52,7 @@ export function CityFilterMenu({
         <span className="v19-city-filter-value v19-city-filter-value-compact" aria-hidden="true">
           {value === "Все города" ? "Все" : value}
         </span>
-        <svg className="v19-city-filter-chevron" aria-hidden="true" viewBox="0 0 24 24">
-          <path d="m7 10 5 5 5-5" />
-        </svg>
+        <ChevronDown className="v19-city-filter-chevron" aria-hidden="true" />
       </button>
       {open ? (
         <div className="v19-city-filter-menu" role="listbox" aria-label="Город">

@@ -1,5 +1,12 @@
 import { Command } from "cmdk";
-import { FileText, ListTodo, Plus, Search, Settings, UserRound } from "lucide-react";
+import {
+  FileStack,
+  ListChecks,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  UserRound,
+} from "lucide-react";
 import { submissionPublicId } from "../submissionIdentity";
 import type { Submission } from "../types";
 
@@ -62,7 +69,7 @@ export function CommandPalette({
                 onSelect={() => runCommand(onNavigateAgentActions)}
                 value="go-agent-actions"
               >
-                <ListTodo aria-hidden="true" focusable="false" size={16} />
+                <ListChecks aria-hidden="true" focusable="false" size={16} />
                 <span>Мои действия</span>
                 <em>Очередь</em>
               </Command.Item>
@@ -71,7 +78,7 @@ export function CommandPalette({
                 onSelect={() => runCommand(onNavigateAgentSubmissions)}
                 value="go-agent-submissions"
               >
-                <FileText aria-hidden="true" focusable="false" size={16} />
+                <FileStack aria-hidden="true" focusable="false" size={16} />
                 <span>Мои подачи</span>
                 <em>Профили</em>
               </Command.Item>
@@ -82,7 +89,7 @@ export function CommandPalette({
             onSelect={() => runCommand(onNavigateSettings)}
             value="go-settings"
           >
-            <Settings aria-hidden="true" focusable="false" size={16} />
+            <SlidersHorizontal aria-hidden="true" focusable="false" size={16} />
             <span>Настройки</span>
             <em>Доступ</em>
           </Command.Item>

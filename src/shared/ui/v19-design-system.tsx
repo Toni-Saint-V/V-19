@@ -29,8 +29,8 @@ import {
   MapPin,
   Search,
   ShieldCheck,
-  User,
-  Users,
+  UserRound,
+  UsersRound,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -335,9 +335,9 @@ export function V19OperationalCard<T extends ElementType = "button">({
               <i aria-hidden="true" />
               <span className="v19-operational-card-people">
                 {peopleCount > 1 ? (
-                  <Users aria-hidden="true" />
+                  <UsersRound aria-hidden="true" />
                 ) : (
-                  <User aria-hidden="true" />
+                  <UserRound aria-hidden="true" />
                 )}
                 <span>{peopleCount} чел.</span>
               </span>
@@ -413,7 +413,7 @@ export function V19SubmissionIdentity({
               aria-label={`Количество человек: ${peopleCount}`}
               className="v19-submission-identity-people"
             >
-              <Users aria-hidden="true" />
+              <UsersRound aria-hidden="true" />
               <span>{peopleCount}</span>
             </span>
           </>
@@ -922,12 +922,12 @@ export function V19EntityTypeSwitch({
       label: allLabel,
     },
     {
-      icon: <Users aria-hidden="true" size={16} />,
+      icon: <UsersRound aria-hidden="true" size={16} />,
       id: "family",
       label: familyLabel,
     },
     {
-      icon: <User aria-hidden="true" size={16} />,
+      icon: <UserRound aria-hidden="true" size={16} />,
       id: "single",
       label: singleLabel,
     },
@@ -1454,23 +1454,7 @@ export function V19SubmissionCollectionRow({
       </span>
       <span className="v19-event-main">
         <span className="v19-submission-kind-icon" aria-hidden="true">
-          <V19SvgIcon>
-            {kind === "family" ? (
-              <>
-                <path d="M16 21v-2a4 4 0 0 0-8 0v2" />
-                <circle cx="12" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                <path d="M2 21v-2a4 4 0 0 1 3-3.87" />
-                <path d="M8 3.13a4 4 0 0 0 0 7.75" />
-              </>
-            ) : (
-              <>
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </>
-            )}
-          </V19SvgIcon>
+          {kind === "family" ? <UsersRound size={16} /> : <UserRound size={16} />}
         </span>
         <strong title={title}>{title}</strong>
         {searchText ? <span className="sr-only">{searchText}</span> : null}
@@ -1522,9 +1506,7 @@ export function V19SubmissionCollectionRow({
         title={action}
       >
         <span className="v19-event-action-label">{action}</span>
-        <V19SvgIcon>
-          <path d="M9 6l6 6-6 6" />
-        </V19SvgIcon>
+        <ChevronRight aria-hidden="true" size={16} />
       </span>
       <span className="v19-mobile-summary-foot" aria-hidden="true">
         <span className="v19-mobile-summary-route">
@@ -1532,9 +1514,7 @@ export function V19SubmissionCollectionRow({
           {mobileSecondaryDetail ? <em>{mobileSecondaryDetail}</em> : null}
         </span>
         <span className="v19-mobile-summary-tail">
-          <V19SvgIcon>
-            <path d="M9 6l6 6-6 6" />
-          </V19SvgIcon>
+          <ChevronRight aria-hidden="true" size={16} />
         </span>
       </span>
       {operationalDetails.length ? (
@@ -1630,25 +1610,6 @@ export function V19ProgressMeter({
       max={safeMax}
       value={safeValue}
     />
-  );
-}
-
-export function V19SvgIcon({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      focusable="false"
-      height="16"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-      width="16"
-    >
-      {children}
-    </svg>
   );
 }
 
@@ -1807,7 +1768,7 @@ export function V19FamilyProfileCard({
       </span>
       <span className="vf-figma-family-head">
         <span className="vf-figma-family-icon">
-          <Users aria-hidden="true" size={26} />
+          <UsersRound aria-hidden="true" size={26} />
         </span>
         <span>
           <strong>{title}</strong>

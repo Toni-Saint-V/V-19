@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import {
   ChevronRight,
-  FileText,
+  Files,
   FolderOpen,
-  User,
-  Users,
+  UserRound,
+  UsersRound,
 } from "lucide-react";
 
 import { Button } from "../../../shared/ui/primitives";
@@ -195,7 +195,7 @@ export function AgentDocumentCollectionScreen({
       </div>
 
       <LinearSectionHeader
-        icon={<FileText size={18} strokeWidth={1.8} />}
+        icon={<Files size={18} strokeWidth={1.8} />}
         kicker="Сегодня"
         title="Сбор документов"
         action={
@@ -219,7 +219,11 @@ export function AgentDocumentCollectionScreen({
               <div className="vf-linear-card-main">
                 <div className="vf-linear-card-title-row">
                   <span className="vf-linear-type-mark" aria-hidden="true">
-                    {submission.type === "family" ? <Users size={16} /> : <User size={16} />}
+                    {submission.type === "family" ? (
+                      <UsersRound size={16} />
+                    ) : (
+                      <UserRound size={16} />
+                    )}
                   </span>
                   <div>
                     <small>{submissionPublicId(submission)}</small>

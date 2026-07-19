@@ -9,14 +9,15 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import {
   X,
   CheckCircle2,
-  FileText,
-  Image as ImageIcon,
+  ClipboardPenLine,
+  Files,
   Users,
+  UsersRound,
   History,
   ScanText,
   MessageSquarePlus,
   AlertCircle,
-  FileWarning,
+  TriangleAlert,
   Info,
   DownloadCloud,
   ChevronDown,
@@ -457,11 +458,11 @@ function ApplicantsTab({
     count?: number;
   }> = [
     { id: "overview", label: "Обзор", icon: Info },
-    { id: "media", label: "Файлы", icon: ImageIcon, count: applicantFiles.length },
+    { id: "media", label: "Файлы", icon: Files, count: applicantFiles.length },
     {
       id: "issues",
       label: "Замечания",
-      icon: FileWarning,
+      icon: TriangleAlert,
       count: applicantIssues.length,
     },
     {
@@ -1534,13 +1535,13 @@ export function AdminReviewDrawer({
       {
         id: "applicants" as const,
         label: "Заявители",
-        icon: Users,
+        icon: UsersRound,
         count: submission?.applicants.length,
       },
       {
         id: "questionnaire" as const,
         label: "Анкета",
-        icon: FileText,
+        icon: ClipboardPenLine,
         count: submission?.applicants.flatMap((applicant) =>
           applicant.sections.flatMap((section) => section.fields),
         ).filter((field) => hasReviewValue(field.value)).length,

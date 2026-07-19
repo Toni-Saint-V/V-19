@@ -2,6 +2,11 @@
    Raw reusable values live in ./tokens/index.css. Rules below must use var(...).
    Media-query breakpoints are the only CSS limitation exception. */
 
+/* One outline weight keeps Lucide icons coherent across agent, admin, drawers, and auth. */
+#root .lucide {
+  stroke-width: var(--v19-icon-stroke-width);
+}
+
 /* Keep the operational canvas clean while preserving wheel, touch, and keyboard scrolling. */
 :where(html, body, #root, #root *) {
   -ms-overflow-style: none;

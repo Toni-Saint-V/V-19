@@ -17,7 +17,7 @@ import {
   ChevronDown,
   Copy,
   Plus,
-  Users,
+  UsersRound,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
 import type { Submission } from "../types";
@@ -4986,7 +4986,7 @@ export function FigmaQuestionnaireScreen({
             </div>
 
             <div className="v19-questionnaire-family-summary hidden md:flex shrink-0 items-center gap-2 text-[var(--v19b-size-12)] text-white/50 px-3 border-l border-white/5">
-              <Users className="w-4 h-4" />
+              <UsersRound className="w-4 h-4" />
               <span>
                 {draftSubmission.type === "family"
                   ? `Семья, ${Math.max(draftSubmission.applicants.length, 1)} чел.`

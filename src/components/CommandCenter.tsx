@@ -5,14 +5,15 @@ import {
   ArrowUpDown,
   CheckCircle2,
   Clock,
-  FileText,
+  Files,
+  FileStack,
+  ListChecks,
   Menu,
   Plus,
   RotateCcw,
   Search,
-  Settings,
   Shapes,
-  Users,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { Drawer } from "./Drawer";
@@ -1177,17 +1178,17 @@ export function CommandCenter({
           </div>
           {renderNavButton(
             "actions",
-            <Menu className="w-4 h-4" />,
+            <ListChecks className="w-4 h-4" />,
             actionQueue.summary.open,
           )}
           {renderNavButton(
             "documents",
-            <FileText className="w-4 h-4" />,
+            <Files className="w-4 h-4" />,
             rows.filter((item) => item.completeness < 100 || item.status === "returned")
               .length,
           )}
-          {renderNavButton("submissions", <Users className="w-4 h-4" />, rows.length)}
-          {renderNavButton("settings", <Settings className="w-4 h-4" />)}
+          {renderNavButton("submissions", <FileStack className="w-4 h-4" />, rows.length)}
+          {renderNavButton("settings", <SlidersHorizontal className="w-4 h-4" />)}
         </nav>
       </div>
 
@@ -1213,7 +1214,7 @@ export function CommandCenter({
                 {agentAgency}
               </span>
             </span>
-            <Settings
+            <SlidersHorizontal
               className="v19-agent-sidebar-profile-icon h-4 w-4 shrink-0"
               aria-hidden="true"
             />
@@ -1270,7 +1271,7 @@ export function CommandCenter({
         <V19MetricCard
           active={actionSummaryFilter === "open"}
           detail="в работе"
-          icon={FileText}
+          icon={ListChecks}
           label="Открыто"
           tone="neutral"
           value={actionQueue.summary.open}
@@ -1374,7 +1375,7 @@ export function CommandCenter({
             ) : (
               visibleActions.map((action) => (
                 <V19OperationalCard
-                  actionIcon={FileText}
+                  actionIcon={ListChecks}
                   actionText={action.context}
                   as={motion.button}
                   city={action.submission.city}
@@ -1406,7 +1407,7 @@ export function CommandCenter({
                   }
                   publicId={submissionPublicId(action.submission)}
                   shellDetail={actionAreaLabel(action)}
-                  shellIcon={FileText}
+                  shellIcon={ListChecks}
                   shellLabel="Задача"
                   shellMeta={action.dueLabel}
                   title={action.title}
@@ -1448,7 +1449,7 @@ export function CommandCenter({
     >
       <div>
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
-          <Settings className="w-3.5 h-3.5" /> Canonical V19
+          <SlidersHorizontal className="w-3.5 h-3.5" /> Canonical V19
         </div>
         <h2
           className="m-0 text-[24px] font-semibold tracking-tight text-white"

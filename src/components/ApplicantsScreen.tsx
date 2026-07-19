@@ -12,13 +12,13 @@ import {
   Baby,
   Camera,
   CheckCircle2,
-  ClipboardCheck,
-  FileText,
+  ClipboardPenLine,
+  FileStack,
   IdCard,
+  ListFilter,
   RotateCcw,
-  Shapes,
   UserRound,
-  Users,
+  UsersRound,
 } from "lucide-react";
 import type {
   QuestionnaireInitialFocus,
@@ -166,7 +166,7 @@ function ApplicantMarkerIcon({ marker }: { marker: ApplicantMarker }) {
 
 function actionIcon(action: ApplicantWorkflowAction) {
   if (action.kind === "questionnaire") {
-    return <ClipboardCheck aria-hidden="true" />;
+    return <ClipboardPenLine aria-hidden="true" />;
   }
   if (action.kind === "passport_scan") return <IdCard aria-hidden="true" />;
   return (
@@ -439,7 +439,7 @@ function FamilySubmissionCard({
       <div className="v19-applicant-family-header">
         <div className="v19-applicant-family-main">
           <div className="v19-agent-submission-family-icon">
-            <Users aria-hidden="true" />
+            <UsersRound aria-hidden="true" />
           </div>
           <div className="v19-applicant-family-copy">
             <h3>{title}</h3>
@@ -796,7 +796,7 @@ export function ApplicantsScreen({
         <V19MetricCard
           active={summaryFilter === "all"}
           detail={profileNoun(metrics.queue)}
-          icon={FileText}
+          icon={FileStack}
           label="В очереди"
           value={metrics.queue}
           onClick={() => setSummaryFilter("all")}
@@ -844,7 +844,7 @@ export function ApplicantsScreen({
               <V19ToolbarSelect<SubmissionTypeFilter>
                 ariaLabel="Тип подачи"
                 className={typeFilter !== "all" ? "is-active" : ""}
-                icon={Users}
+                icon={UsersRound}
                 label="Тип"
                 options={[
                   { label: "Все", value: "all" },
@@ -857,7 +857,7 @@ export function ApplicantsScreen({
               <V19ToolbarSelect<AgentSubmissionQueueFilter>
                 ariaLabel="Фильтр подач"
                 className={summaryFilter !== "all" ? "is-active" : ""}
-                icon={Shapes}
+                icon={ListFilter}
                 label="Статус"
                 options={[
                   { label: "Все", value: "all" },

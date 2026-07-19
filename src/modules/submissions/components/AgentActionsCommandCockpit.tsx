@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User, Users } from "lucide-react";
+import { UserRound, UsersRound } from "lucide-react";
 
 import { Badge, Button } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
@@ -378,7 +378,11 @@ function ActionTaskCard({
     >
       <span className="v19-actions-queue-strip" aria-hidden="true" />
       <span className="v19-actions-queue-icon" aria-hidden="true">
-        {task.submission.type === "family" ? <Users size={17} /> : <User size={17} />}
+        {task.submission.type === "family" ? (
+          <UsersRound size={17} />
+        ) : (
+          <UserRound size={17} />
+        )}
       </span>
       <span className="v19-actions-queue-main">
         <span className="v19-actions-queue-topline">

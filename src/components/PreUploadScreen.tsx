@@ -6,7 +6,7 @@ import {
   Plus,
   UploadCloud,
   UserRound,
-  Users,
+  UsersRound,
   Wand2,
   X,
 } from 'lucide-react';
@@ -451,7 +451,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 <div className="relative w-full space-y-3">
                   <div className="flex w-fit rounded-full border border-[#242529] bg-[#141416]/76 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
                     {[
-                      { icon: Users, label: 'Семья', type: 'family' as const },
+                      { icon: UsersRound, label: 'Семья', type: 'family' as const },
                       { icon: UserRound, label: 'Заявитель', type: 'single' as const },
                     ].map((item) => {
                       const Icon = item.icon;

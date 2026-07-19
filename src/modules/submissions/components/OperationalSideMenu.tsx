@@ -1,3 +1,4 @@
+import { ArrowLeftRight, Ellipsis } from "lucide-react";
 import { Button } from "../../../shared/ui/primitives";
 import type { Role } from "../types";
 import {
@@ -70,10 +71,7 @@ export function OperationalSideMenu({
         onCloseMobile();
       }}
     >
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M7 7h10M7 7l3-3M7 7l3 3" />
-        <path d="M17 17H7m10 0-3-3m3 3-3 3" />
-      </svg>
+      <ArrowLeftRight aria-hidden="true" />
       В админскую зону
     </Button>
   ) : null;
@@ -118,11 +116,7 @@ export function OperationalSideMenu({
               </strong>
               <small>{role === "agent" ? "Visa Center Spb" : "Администратор"}</small>
             </div>
-            <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
-              <circle cx="5" cy="12" r="1" />
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-            </svg>
+            <Ellipsis className="ops-user-more" aria-hidden="true" />
           </Button>
         </>
       ) : (
@@ -140,11 +134,7 @@ export function OperationalSideMenu({
             <strong>{footerName}</strong>
             <small>{footerRole}</small>
           </div>
-          <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
-            <circle cx="5" cy="12" r="1" />
-            <circle cx="12" cy="12" r="1" />
-            <circle cx="19" cy="12" r="1" />
-          </svg>
+          <Ellipsis className="ops-user-more" aria-hidden="true" />
         </Button>
       )}
     </>

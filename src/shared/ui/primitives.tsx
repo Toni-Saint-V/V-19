@@ -14,6 +14,7 @@ import {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
+import { Search, X } from "lucide-react";
 import { cn } from "./cn";
 
 function mergeAriaIds(
@@ -282,10 +283,7 @@ export function SearchBar({
       )}
     >
       <span className="icon search-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false">
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="m16 16 5 5" />
-        </svg>
+        <Search focusable="false" />
       </span>
       <span className="sr-only">{label}</span>
       <input
@@ -304,9 +302,7 @@ export function SearchBar({
         type="button"
         onClick={handleClear}
       >
-        <svg className="icon sm" aria-hidden="true" viewBox="0 0 24 24">
-          <path d="m6 6 12 12M18 6 6 18" />
-        </svg>
+        <X className="icon sm" aria-hidden="true" />
       </button>
     </label>
   );
@@ -864,9 +860,7 @@ export function BottomSheet({
             variant="ghost"
             onClick={onClose}
           >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
+            <X aria-hidden="true" />
           </Button>
         </div>
         <div className="mp-bottom-sheet-body">{children}</div>

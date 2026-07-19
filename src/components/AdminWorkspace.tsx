@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeftRight,
-  DownloadCloud,
+  FileSpreadsheet,
   LogOut,
   Menu,
-  Settings,
-  ShieldCheck,
+  ScanSearch,
   SlidersHorizontal,
-  Users,
+  UsersRound,
   X,
 } from "lucide-react";
 import { ReviewScreen } from "./AdminScreens";
@@ -333,7 +332,7 @@ export function AdminWorkspace({
             className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "review" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
-            <ShieldCheck className="w-4 h-4 text-orange-400/80" />
+            <ScanSearch className="w-4 h-4 text-orange-400/80" />
             <span className="flex-1 text-left">Проверка</span>
             <span className="px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 text-[11px] font-medium">
               {reviewQueueCount}
@@ -345,7 +344,7 @@ export function AdminWorkspace({
             className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "export" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
-            <DownloadCloud className="w-4 h-4 text-emerald-400/80" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400/80" />
             <span className="flex-1 text-left">Выгрузка</span>
             <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[11px] font-medium">
               {exportQueueCount}
@@ -362,7 +361,7 @@ export function AdminWorkspace({
             className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "users" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
-            <Users className="w-4 h-4" />
+            <UsersRound className="w-4 h-4" />
             <span className="flex-1 text-left">Пользователи</span>
           </button>
           <button
@@ -370,7 +369,7 @@ export function AdminWorkspace({
             className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "settings" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
-            <Settings className="w-4 h-4" />
+            <SlidersHorizontal className="w-4 h-4" />
             <span className="flex-1 text-left">Настройки</span>
           </button>
         </nav>
@@ -534,7 +533,7 @@ export function AdminWorkspace({
             ) : null}
             {activeNav === "users" ? (
               <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-[#242529] rounded-2xl bg-[#161617]">
-                <Users className="w-10 h-10 text-white/20 mb-4" />
+                <UsersRound className="w-10 h-10 text-white/20 mb-4" />
                 <h3 className="text-white font-medium">Пользователи</h3>
                 <p className="text-[13px] text-white/50 mt-1">
                   Управление ролями и доступом

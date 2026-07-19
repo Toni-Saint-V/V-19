@@ -15,7 +15,7 @@ import {
   FileArchive,
   FileCheck2,
   FileSpreadsheet,
-  FileText,
+  FileStack,
   Filter,
   Flame,
   FolderCheck,
@@ -29,7 +29,7 @@ import {
   Sparkles,
   UploadCloud,
   User,
-  Users,
+  UsersRound,
   X,
   XCircle,
   type LucideIcon,
@@ -102,7 +102,6 @@ import {
   ContextPanel,
   CollectionToolbar,
   PanelActionFooter,
-  SvgIcon,
   ToolbarIconButton,
 } from "../components/CollectionPrimitives";
 import {
@@ -1863,7 +1862,7 @@ function AdminReviewQueueCard({
           <h3>{formatSubmissionListTitle(submission)}</h3>
           <em>
             {family ? (
-              <Users aria-hidden="true" size={14} strokeWidth={1.8} />
+              <UsersRound aria-hidden="true" size={14} strokeWidth={1.8} />
             ) : (
               <User aria-hidden="true" size={14} strokeWidth={1.8} />
             )}
@@ -2276,7 +2275,7 @@ export function AdminReviewScreen({
         </div>
 
         <div className="v19-admin-cockpit-metrics" aria-label="Сводка проверки">
-          <AdminReviewMetricCard icon={FileText} label="В очереди" value={`${allQueue.length}`} />
+          <AdminReviewMetricCard icon={FileStack} label="В очереди" value={`${allQueue.length}`} />
           <AdminReviewMetricCard
             icon={Flame}
             label="Блокеры"
@@ -2432,7 +2431,7 @@ export function AdminReviewScreen({
               </button>
             </div>
             <div className="v19-admin-mobile-metrics">
-              <AdminReviewMetricCard icon={FileText} label="В очереди" value={`${allQueue.length}`} />
+              <AdminReviewMetricCard icon={FileStack} label="В очереди" value={`${allQueue.length}`} />
               <AdminReviewMetricCard
                 icon={Flame}
                 label="Блокеры"
@@ -2665,9 +2664,7 @@ function AdminWorkEmptyState({
   return (
     <div className={`v19-empty-state v17-admin-empty-state tone-${iconTone}`}>
       <span className="v17-admin-empty-icon" aria-hidden="true">
-        <SvgIcon>
-          <path d="m5 12 4 4L19 6" />
-        </SvgIcon>
+        <CheckCircle2 size={16} />
       </span>
       <h3>{title}</h3>
       <p>{description}</p>
@@ -2714,16 +2711,7 @@ function ExportGuardItem({
 }) {
   return (
     <div className={`v17-export-check ${ok ? "is-ok" : "is-fail"}`}>
-      <SvgIcon>
-        {ok ? (
-          <path d="m5 12 4 4L19 6" />
-        ) : (
-          <>
-            <path d="M6 6l12 12" />
-            <path d="M18 6 6 18" />
-          </>
-        )}
-      </SvgIcon>
+      {ok ? <CheckCircle2 aria-hidden="true" size={16} /> : <XCircle aria-hidden="true" size={16} />}
       <span>
         <strong>{label}</strong>
         {detail ? <small>{detail}</small> : null}
@@ -3226,9 +3214,7 @@ export function LegacyExportScreen({
                   aria-label="Закрыть панель"
                   onClick={() => setExportPanelOpen(false)}
                 >
-                  <SvgIcon>
-                    <path d="M6 6l12 12M18 6 6 18" />
-                  </SvgIcon>
+                  <X aria-hidden="true" size={16} />
                 </button>
               </div>
             }
@@ -3330,11 +3316,7 @@ export function LegacyExportScreen({
                 </div>
               </CardComponent>
               <div className={`v17-blocker-callout ${exportCalloutTone(exportPlan)}`}>
-                <SvgIcon>
-                  <path d="M10.3 4.3 2.8 17.4A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.6L13.7 4.3a2 2 0 0 0-3.4 0Z" />
-                  <path d="M12 9v4" />
-                  <path d="M12 17h.01" />
-                </SvgIcon>
+                <AlertTriangle aria-hidden="true" size={16} />
                 <span>
                   <strong>{exportCalloutTitle(exportPlan)}</strong>
                   {exportPlan.blockers.length > 0 ? (
@@ -4099,7 +4081,7 @@ function AdminExportRow({
         ) : blocked ? (
           <AlertTriangle aria-hidden="true" focusable="false" size={14} />
         ) : history ? (
-          <FileText aria-hidden="true" focusable="false" size={14} />
+          <FileStack aria-hidden="true" focusable="false" size={14} />
         ) : null}
       </button>
 
@@ -4112,7 +4094,7 @@ function AdminExportRow({
         <span className="v19-admin-export-row-title">
           <span className="v19-admin-export-row-kind" aria-hidden="true">
             {submission.type === "family" ? (
-              <Users focusable="false" size={16} />
+              <UsersRound focusable="false" size={16} />
             ) : (
               <User focusable="false" size={16} />
             )}
@@ -4121,7 +4103,7 @@ function AdminExportRow({
           <small>{submissionPublicId(submission)}</small>
         </span>
         <span className="v19-admin-export-row-meta">
-          <FileText aria-hidden="true" focusable="false" size={14} />
+          <FileStack aria-hidden="true" focusable="false" size={14} />
           <span>
             {applicantCountLabel(submission.applicants.length)} · {documentLabel}
           </span>
@@ -4200,7 +4182,7 @@ function AdminExportCompositionItem({
     >
       <span aria-hidden="true">
         {submission.type === "family" ? (
-          <Users focusable="false" size={16} />
+          <UsersRound focusable="false" size={16} />
         ) : (
           <User focusable="false" size={16} />
         )}

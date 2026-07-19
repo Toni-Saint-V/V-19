@@ -7,6 +7,17 @@ import {
   useState,
 } from "react";
 import {
+  ArrowUpDown,
+  ChevronRight,
+  ListFilter,
+  PanelRightOpen,
+  Rows3,
+  Search,
+  UserRound,
+  UsersRound,
+  X,
+} from "lucide-react";
+import {
   Badge,
   BottomSheet,
   Button,
@@ -193,11 +204,7 @@ function ActiveFiltersRow({
             {chip.onRemove ? (
               <IconButton
                 className="v19-active-filter-remove"
-                icon={
-                  <SvgIcon>
-                    <path d="m6 6 12 12M18 6 6 18" />
-                  </SvgIcon>
-                }
+                icon={<X aria-hidden="true" size={16} />}
                 label={`Удалить фильтр ${chip.label}`}
                 onClick={chip.onRemove}
               />
@@ -484,9 +491,7 @@ export function ContextRail({
         aria-label="Скрыть контекст"
         onClick={onClose}
       >
-        <SvgIcon>
-          <path d="m6 6 12 12M18 6 6 18" />
-        </SvgIcon>
+        <X aria-hidden="true" size={16} />
       </button>
     </div>
   ) : null;
@@ -632,21 +637,9 @@ export function CollectionRow({
           aria-hidden="true"
         >
           {family ? (
-            <SvgIcon>
-              <path d="M15.5 18.5v-1a3.5 3.5 0 0 0-7 0v1" />
-              <circle cx="12" cy="8.5" r="3" />
-              <path d="M20 18.5v-.8a3.1 3.1 0 0 0-2.3-3" />
-              <path d="M16.9 5.8a2.8 2.8 0 0 1 0 5.4" />
-              <path d="M4 18.5v-.8a3.1 3.1 0 0 1 2.3-3" />
-              <path d="M7.1 5.8a2.8 2.8 0 0 0 0 5.4" />
-            </SvgIcon>
+            <UsersRound size={16} />
           ) : (
-            <SvgIcon>
-              <path d="M18 20a6 6 0 0 0-12 0" />
-              <circle cx="12" cy="8" r="4" />
-              <path d="M18.5 8.5h2" />
-              <path d="M19.5 7.5v2" />
-            </SvgIcon>
+            <UserRound size={16} />
           )}
         </span>
         <span className="v19-event-main">
@@ -726,9 +719,7 @@ export function ActionRow({
       </span>
       <span className="v19-event-action">
         <span className="v19-event-action-label">{cta}</span>
-        <SvgIcon>
-          <path d="M9 6l6 6-6 6" />
-        </SvgIcon>
+        <ChevronRight aria-hidden="true" size={16} />
       </span>
     </button>
   );
@@ -851,70 +842,22 @@ function submissionStatusTone(
   return "amber";
 }
 
-export function SvgIcon({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      focusable="false"
-      height="16"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-      width="16"
-    >
-      {children}
-    </svg>
-  );
-}
-
 function ToolbarIcon({ icon }: { icon: ToolbarIconName }) {
   if (icon === "search") {
-    return (
-      <SvgIcon>
-        <circle cx="10.5" cy="10.5" r="6.5" />
-        <path d="m16 16 5 5" />
-      </SvgIcon>
-    );
+    return <Search aria-hidden="true" size={16} />;
   }
 
   if (icon === "filter") {
-    return (
-      <SvgIcon>
-        <path d="M4 5h16" />
-        <path d="m7 9 5 5 5-5" />
-        <path d="M12 14v5" />
-      </SvgIcon>
-    );
+    return <ListFilter aria-hidden="true" size={16} />;
   }
 
   if (icon === "view") {
-    return (
-      <SvgIcon>
-        <path d="M4 6.5h16" />
-        <path d="M4 12h16" />
-        <path d="M4 17.5h16" />
-      </SvgIcon>
-    );
+    return <Rows3 aria-hidden="true" size={16} />;
   }
 
   if (icon === "sort") {
-    return (
-      <SvgIcon>
-        <path d="M8 5v14" />
-        <path d="m5 16 3 3 3-3" />
-        <path d="M16 19V5" />
-        <path d="m13 8 3-3 3 3" />
-      </SvgIcon>
-    );
+    return <ArrowUpDown aria-hidden="true" size={16} />;
   }
 
-  return (
-    <SvgIcon>
-      <rect x="3" y="4" width="18" height="16" rx="1" />
-      <path d="M15 4v16" />
-    </SvgIcon>
-  );
+  return <PanelRightOpen aria-hidden="true" size={16} />;
 }

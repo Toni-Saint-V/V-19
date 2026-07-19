@@ -6,11 +6,12 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { ChevronRight } from "lucide-react";
 
 import { Badge, Button } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
 import type { SubmissionHistoryItem } from "../types";
-import { ProgressMeter, SvgIcon } from "./CollectionPrimitives";
+import { ProgressMeter } from "./CollectionPrimitives";
 
 export type RailBadgeTone = "amber" | "blue" | "danger" | "default" | "muted" | "teal";
 
@@ -191,9 +192,7 @@ export function RailIssueList({
               <strong>{issue.reason}</strong>
               <small>{issue.targetLine}</small>
             </span>
-            <SvgIcon>
-              <path d="M9 6l6 6-6 6" />
-            </SvgIcon>
+            <ChevronRight aria-hidden="true" size={16} />
           </button>
         ))}
       </div>
