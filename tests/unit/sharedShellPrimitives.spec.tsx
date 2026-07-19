@@ -11,6 +11,7 @@ import {
   V19MetricStrip,
   V19OperationalCard,
   V19OperationalCardGrid,
+  V19OperationalProgressLine,
   V19PriorityHero,
 } from "../../src/shared/ui/v19-design-system";
 
@@ -78,7 +79,17 @@ describe("shared shell primitives", () => {
             </span>
           }
           peopleCount={2}
+          progress={
+            <>
+              <V19OperationalProgressLine label="Анкета" value={75} />
+              <V19OperationalProgressLine label="Файлы" value={50} />
+            </>
+          }
           publicId="VF-1060"
+          shellDetail="Анкета"
+          shellIcon={TestIcon}
+          shellLabel="Задача"
+          shellMeta="Сегодня"
           title="ANTON VOLKOV"
           onClick={handleOpen}
         />
@@ -93,6 +104,16 @@ describe("shared shell primitives", () => {
     ).toHaveClass("v19-operational-card");
     expect(screen.getByText("Следующий шаг")).toBeInTheDocument();
     expect(screen.getByText("Добавить селфи 1")).toBeInTheDocument();
+    expect(screen.getByText("Задача")).toBeInTheDocument();
+    expect(screen.getByText("Сегодня")).toBeInTheDocument();
+    expect(screen.getByText("75%")).toBeInTheDocument();
+    expect(container.querySelector(".v19-operational-card-body")).toBeInTheDocument();
+    expect(container.querySelector(".v19-operational-card-meta")).toHaveTextContent("VF-1060");
+    expect(container.querySelector(".v19-operational-card-meta")).toHaveTextContent("2 чел.");
+    expect(container.querySelector(".v19-operational-card-location")).toHaveTextContent(
+      "Москва",
+    );
+    expect(container.querySelector(".v19-submission-trip-dates")).not.toBeInTheDocument();
     expect(container.querySelector(".v19-admin-review-card")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /ANTON VOLKOV/ }));

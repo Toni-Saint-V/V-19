@@ -43,6 +43,7 @@ import {
   V19MetricStrip,
   V19OperationalCard,
   V19OperationalCardGrid,
+  V19OperationalProgressLine,
   V19PriorityHero,
   V19QueueToolbar,
   V19ToolbarSelect,
@@ -60,7 +61,6 @@ import type {
 import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
 import {
   listItemsFromSubmissions,
-  tripDateRangeForSubmission,
   type LegacyAgentNavSection,
   type LegacySubmissionListItem,
 } from "./v19BusinessScreenAdapter";
@@ -1037,6 +1037,14 @@ export function CommandCenter({
   const actionPeopleCount = (action: AgentActionItem) =>
     action.submission.applicants.length;
 
+  const actionAreaLabel = (action: AgentActionItem) => {
+    if (action.tab === "questionnaire") return "Анкета";
+    if (action.tab === "files") return "Файлы";
+    if (action.tab === "issues") return "Замечания";
+    if (action.tab === "history") return "История";
+    return "Подача";
+  };
+
   const renderNavContent = () => (
     <>
       <div className="flex items-center gap-2.5 px-2 pb-4 mb-2">
@@ -1289,25 +1297,29 @@ export function CommandCenter({
                         >
                           {action.dueLabel}
                         </span>
-                        {action.badges.slice(0, 1).map((badge) => (
-                          <span key={`${action.id}-${badge.label}`}>
-                            {badge.label}
-                          </span>
-                        ))}
-                      </span>
-                      <span
-                        className="v19-operational-card-cta"
-                        data-testid="agent-action-cta"
-                      >
-                        {action.cta}
                       </span>
                     </>
                   }
                   layout
                   peopleCount={actionPeopleCount(action)}
+                  progress={
+                    <>
+                      <V19OperationalProgressLine
+                        label="Анкета"
+                        value={action.submission.completeness.questionnaire}
+                      />
+                      <V19OperationalProgressLine
+                        label="Файлы"
+                        value={action.submission.completeness.files}
+                      />
+                    </>
+                  }
                   publicId={submissionPublicId(action.submission)}
+                  shellDetail={actionAreaLabel(action)}
+                  shellIcon={FileText}
+                  shellLabel="Задача"
+                  shellMeta={action.dueLabel}
                   title={action.title}
-                  tripDates={tripDateRangeForSubmission(action.submission)}
                   type="button"
                   key={action.id}
                   initial={false}
