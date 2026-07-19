@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { lazy, type ComponentProps } from "react";
 import type { AdminWorkspace as AdminWorkspaceComponent } from "./AdminWorkspace";
 import type { CommandCenter as CommandCenterComponent } from "./CommandCenter";
@@ -7,6 +7,7 @@ import {
   type VisaflowBusinessBridge,
 } from "../integration/visaflowBusinessBridge";
 import type { WorkspaceDataStatus } from "../lib/supabase/workspaceRuntime";
+import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
 
 type Workspace = "agent" | "admin";
 
@@ -46,6 +47,9 @@ export function WorkspaceSurface({
   workspace,
   workspaceDataState,
 }: WorkspaceSurfaceProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const workspaceMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
+
   return (
     <VisaflowBusinessBridgeProvider bridge={bridge}>
       <div className="h-dvh w-full bg-[#101011] text-white overflow-hidden">
@@ -80,10 +84,7 @@ export function WorkspaceSurface({
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={workspace}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            {...workspaceMotion}
             className="v19-fullscreen-app h-full w-full"
           >
             {workspace === "agent" ? (
