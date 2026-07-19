@@ -35566,8 +35566,6 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
 .v19-metric-strip .v19-metric-card strong {
   position: static;
-  width: 2ch;
-  min-width: 2ch;
   flex: none;
   color: var(--v19b-color-text-strong);
   font-size: var(--v19b-size-28);
