@@ -1317,7 +1317,7 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
         completed: 0,
         id: "app-1",
         index: 1,
-        name: "Иван Петров",
+        name: "Заявитель 1",
         status: "pending",
         total: 0,
       },
@@ -1359,13 +1359,26 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
           issue.status === "open" && issue.target.applicantId === applicant.id,
       );
 
+    const questionnaireName = [formData.firstName, formData.surname]
+      .map((part) => (part ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
+    const sourceName = questionnaireName || applicant.fullName.trim();
+    const hasActualName =
+      Boolean(sourceName) && !/^(?:заявитель|applicant)\s*\d*$/iu.test(sourceName);
+    const displayName = hasActualName
+      ? sourceName
+          .toLocaleLowerCase("ru-RU")
+          .replace(/(^|[\s'-])(\p{L})/gu, (_, separator: string, letter: string) =>
+            `${separator}${letter.toLocaleUpperCase("ru-RU")}`,
+          )
+      : `Заявитель ${index + 1}`;
+
     return {
       completed,
       id: applicant.id ?? `app-${index + 1}`,
       index: index + 1,
-      name:
-        applicant.fullName ||
-        (index === 0 ? "Иван Петров" : `Заявитель ${index + 1}`),
+      name: displayName,
       status: hasRisk
         ? "issue"
         : total > 0 && completed === total
@@ -3938,10 +3951,6 @@ export function FigmaQuestionnaireScreen({
     } satisfies QuestionnaireBlockerTarget;
   }
 
-  function focusNextIncomplete() {
-    focusFirstBlocker();
-  }
-
   function continueSectionFlow() {
     if (nextSection) {
       setRevealRequiredErrors(false);
@@ -3980,17 +3989,6 @@ export function FigmaQuestionnaireScreen({
     }
 
     void saveAndExitFromButton().catch(() => undefined);
-  }
-
-  function focusApplicantNextIncomplete(applicantId: string) {
-    const target = firstQuestionnaireBlockerTarget(applicantId);
-    if (target) {
-      setRevealRequiredErrors(true);
-      focusQuestionnaireTarget(target);
-      return;
-    }
-
-    setActiveApplicant(applicantId);
   }
 
   function focusFirstBlocker() {
@@ -4674,7 +4672,7 @@ export function FigmaQuestionnaireScreen({
             label="Фамилия"
             modelFieldId="surname"
             number="1"
-            placeholder="Например, Volkov"
+            placeholder="Например, Волков"
             value={formData.surname}
             onChange={(value) => updateField("surname", value)}
           />
@@ -4683,7 +4681,7 @@ export function FigmaQuestionnaireScreen({
             label="Предыдущие фамилии"
             modelFieldId="previous-surname"
             number="1.1"
-            placeholder="Например, Petrova или нет"
+            placeholder="Например, Петрова или нет"
             value={formData.previousSurname}
             onChange={(value) => updateField("previousSurname", value)}
           />
@@ -4692,7 +4690,7 @@ export function FigmaQuestionnaireScreen({
             label="Имя"
             modelFieldId="first-name"
             number="2"
-            placeholder="Например, Anton"
+            placeholder="Например, Антон"
             value={formData.firstName}
             onChange={(value) => updateField("firstName", value)}
           />
@@ -4714,7 +4712,7 @@ export function FigmaQuestionnaireScreen({
             modelFieldId="birth-place"
             number="4"
             onBlur={normalizeBirthPlaceField}
-            placeholder="Например, Moscow"
+            placeholder="Например, Москва"
             reviewSource={fieldReviewSource("birth-place", "Место рождения")}
             state={fieldReviewState("birth-place", "Место рождения")}
             value={formData.birthPlace}
@@ -4970,17 +4968,6 @@ export function FigmaQuestionnaireScreen({
                         )}
                       </QuestionnaireProgressBadge>
                     </button>
-                    {isEditable && applicant.status !== "complete" ? (
-                      <button
-                        aria-label={`Следующее незаполненное: ${applicant.name}`}
-                        className="v19-questionnaire-draft-button min-w-[var(--v19b-size-40)] min-h-[var(--v19b-size-40)] shrink-0 px-0"
-                        title={`Перейти к следующему незаполненному полю: ${applicant.name}`}
-                        type="button"
-                        onClick={() => focusApplicantNextIncomplete(applicant.id)}
-                      >
-                        <ArrowRight className="w-[var(--v19b-size-16)] h-[var(--v19b-size-16)]" />
-                      </button>
-                    ) : null}
                   </div>
                 );
               })}
@@ -5078,25 +5065,6 @@ export function FigmaQuestionnaireScreen({
                       : saveMessage}
                   </div>
                 ) : null}
-                {isEditable ? (
-                  <div className="v19-questionnaire-sidebar-actions">
-                    <button
-                      className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
-                      type="button"
-                      onClick={focusNextIncomplete}
-                    >
-                      Следующее поле
-                    </button>
-                    <button
-                      className="v19-questionnaire-draft-button v19-questionnaire-sidebar-action"
-                      disabled={readinessStats.canSubmit}
-                      type="button"
-                      onClick={focusFirstBlocker}
-                    >
-                      Блокер
-                    </button>
-                  </div>
-                ) : null}
               </div>
 
               <div
@@ -5177,9 +5145,7 @@ export function FigmaQuestionnaireScreen({
                   }`}
                 >
                   <div className="v19-questionnaire-work-toolbar-notice">
-                    {isEditable &&
-                    !readinessStats.canSubmit &&
-                    !currentSectionIssue ? (
+                    {isEditable && !readinessStats.canSubmit ? (
                       <button
                         aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
                           mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
@@ -5359,7 +5325,9 @@ export function FigmaQuestionnaireScreen({
                 >
                   {nextSection
                     ? `Далее: ${nextSection.title}`
-                    : "Готово — сохранить и выйти"}
+                    : nextApplicant
+                      ? `Далее: ${nextApplicant.name}`
+                      : "Готово — сохранить и выйти"}
                 </button>
               ) : null}
             </div>

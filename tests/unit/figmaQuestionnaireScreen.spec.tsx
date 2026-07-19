@@ -332,7 +332,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     expect(
       screen.getByText(
-        "Контекст анкеты: заявитель VOLKOV ANTON; раздел Запись.",
+        "Контекст анкеты: заявитель Volkov Anton; раздел Запись.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -496,7 +496,7 @@ describe("FigmaQuestionnaireScreen", () => {
     await waitFor(() => expect(birthPlace).toHaveFocus());
     expect(
       screen.getByText(
-        "Контекст анкеты: заявитель VOLKOV ANTON; раздел Личные данные.",
+        "Контекст анкеты: заявитель Volkov Anton; раздел Личные данные.",
       ),
     ).toBeInTheDocument();
   });
@@ -1594,16 +1594,16 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Фамилия")).toHaveAttribute(
       "placeholder",
-      "Volkov",
+      "Волков",
     );
     expect(screen.getByLabelText("Предыдущие фамилии")).toHaveAttribute(
       "placeholder",
-      "Petrova или нет",
+      "Петрова или нет",
     );
-    expect(screen.getByLabelText("Имя")).toHaveAttribute("placeholder", "Anton");
+    expect(screen.getByLabelText("Имя")).toHaveAttribute("placeholder", "Антон");
     expect(screen.getByLabelText("Место рождения")).toHaveAttribute(
       "placeholder",
-      "Moscow",
+      "Москва",
     );
   });
 
@@ -2161,7 +2161,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Следующее поле" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     const address = screen.getByLabelText("Улица / проспект / переулок");
     await waitFor(() => expect(address).toHaveFocus());
@@ -2197,12 +2197,12 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     await waitFor(() => expect(screen.getByLabelText("Почтовый индекс")).toHaveFocus());
     expect(
       screen.getByText(
-        "Контекст анкеты: заявитель VOLKOV ANTON; раздел Отель / приглашение.",
+        "Контекст анкеты: заявитель Volkov Anton; раздел Отель / приглашение.",
       ),
     ).toBeInTheDocument();
   });
@@ -2244,7 +2244,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     expect(screen.getByLabelText("Файлы заявителя")).toBeInTheDocument();
     const focusedSlot = result.container.querySelector(`[data-file-id="${passport.id}"]`);
@@ -2282,7 +2282,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     const focusedSlot = result.container.querySelector(`[data-file-id="${selfie.id}"]`);
     expect(focusedSlot).toHaveAttribute("data-file-focused", "true");
@@ -2328,7 +2328,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     expect(onOpenDocuments).toHaveBeenCalledWith("error");
   });
@@ -2380,7 +2380,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    const blocker = screen.getByRole("button", { name: "Блокер" });
+    const blocker = screen.getByTestId("questionnaire-next-blocker");
     expect(blocker).toBeEnabled();
     expect(screen.getByTestId("questionnaire-next-blocker")).not.toHaveAccessibleName(
       /Селфи 1/,
@@ -2415,14 +2415,14 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     await waitFor(() =>
       expect(screen.getByLabelText("Почтовый индекс")).toHaveFocus(),
     );
     expect(
       screen.getByText(
-        "Контекст анкеты: заявитель VOLKOV ANTON; раздел Отель / приглашение.",
+        "Контекст анкеты: заявитель Ready Ready; раздел Отель / приглашение.",
       ),
     ).toBeInTheDocument();
   });
@@ -2522,7 +2522,7 @@ describe("FigmaQuestionnaireScreen", () => {
         submission={submissionWithLongPassportTypeOptions}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     const passportType = await screen.findByRole("combobox", { name: /Тип документа/ });
     const errorId = passportType.getAttribute("aria-describedby");
@@ -2559,12 +2559,12 @@ describe("FigmaQuestionnaireScreen", () => {
         submission={submission}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Блокер" }));
+    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     await waitFor(() => expect(screen.getByLabelText("Почтовый индекс")).toHaveFocus());
     expect(
       screen.getByText(
-        "Контекст анкеты: заявитель VOLKOV ANTON; раздел Отель / приглашение.",
+        "Контекст анкеты: заявитель Ready Ready; раздел Отель / приглашение.",
       ),
     ).toBeInTheDocument();
   });
@@ -2656,7 +2656,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
       expect(
         screen.getByText(
-          "Контекст анкеты: заявитель IVANOV ANTON; раздел Отель / приглашение.",
+          "Контекст анкеты: заявитель Ivanov Anton; раздел Отель / приглашение.",
         ),
       ).toHaveAttribute("aria-live", "polite");
       expect(scrollIntoView).toHaveBeenCalled();
@@ -2865,7 +2865,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toHaveAttribute("role", "status");
   });
 
-  test("shows applicant completion and blocker cues with direct next-incomplete navigation", async () => {
+  test("shows applicant completion and blocker cues without duplicate next-field buttons", () => {
     const draft = createDraftSubmission({
       applicantNames: ["READY PERSON", "PENDING PERSON", "BLOCKED PERSON"],
       city: "Москва",
@@ -2911,46 +2911,68 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /READY PERSON: \d+ из \d+, готов/ }),
+      screen.getByRole("button", { name: /Ready Ready: \d+ из \d+, готов/ }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /PENDING PERSON: \d+ из \d+, не завершён/,
+        name: /Pending Person: \d+ из \d+, не завершён/,
       }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /BLOCKED PERSON: \d+ из \d+, есть блокер/,
+        name: /Ready Ready: \d+ из \d+, есть блокер/,
       }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Следующее незаполненное: READY PERSON" }),
+      screen.queryByRole("button", { name: /^Следующее незаполненное:/u }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Следующее незаполненное: PENDING PERSON",
+        name: /Pending Person: \d+ из \d+, не завершён/,
       }),
-    );
-    await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: /Город проживания/ })).toHaveFocus(),
     );
     expect(
       screen.getByText(
-        "Контекст анкеты: заявитель PENDING PERSON; раздел Адрес и контакты.",
+        "Контекст анкеты: заявитель Pending Person; раздел Личные данные.",
       ),
     ).toBeInTheDocument();
+  });
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Следующее незаполненное: BLOCKED PERSON",
-      }),
+  test("continues to the next family applicant before offering save and exit", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
     );
-    await waitFor(() => expect(screen.getByLabelText("Номер паспорта")).toHaveFocus());
+
+    clickPinnedSection(result.container, "Отель / приглашение");
+    const nextApplicantButton = screen.getByRole("button", {
+      name: "Далее: Ivanov Anton",
+    });
     expect(
-      screen.getByText(
-        "Контекст анкеты: заявитель BLOCKED PERSON; раздел Паспорт.",
-      ),
+      screen.queryByRole("button", { name: "Готово — сохранить и выйти" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(nextApplicantButton);
+
+    expect(
+      screen.getByRole("button", {
+        name: /Ivanov Anton: \d+ из \d+, не завершён/,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    clickPinnedSection(result.container, "Отель / приглашение");
+    expect(
+      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
     ).toBeInTheDocument();
   });
 

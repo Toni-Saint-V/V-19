@@ -36946,8 +36946,33 @@ section[data-testid="agent-actions-screen"]
     .v19-questionnaire-applicant-tab.is-active,
     .v19-questionnaire-section-tab.is-active
   ) {
-  border-color: var(--v19b-color-primary-bright) !important;
+  border: var(--v19b-size-0) !important;
   background: var(--v19b-color-primary-soft-20) !important;
+  box-shadow: var(--v19b-shadow-none) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :is(
+    .v19-questionnaire-applicant-tab.is-active,
+    .v19-questionnaire-section-tab.is-active
+  ):focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-section-tab.status-issue:not(.is-active) {
+  border-color: var(--v19b-color-border-strong) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :is(.v19-questionnaire-applicant-tab, .v19-questionnaire-section-tab)
+  .v19-questionnaire-progress-badge.status-issue {
+  width: var(--v19b-size-20);
+  min-width: var(--v19b-size-20) !important;
+  height: var(--v19b-size-20) !important;
+  border: var(--v19b-size-0) !important;
+  background: transparent !important;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-field-control:is(:hover, :focus-visible) {
@@ -37080,6 +37105,7 @@ section[data-testid="agent-actions-screen"]
   .vf-figma-questionnaire-screen .v19-questionnaire-scroll-frame {
     height: auto !important;
     min-height: var(--v19b-size-full) !important;
+    gap: var(--v19b-size-8) !important;
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-workspace-shell {
@@ -37099,6 +37125,8 @@ section[data-testid="agent-actions-screen"]
   .vf-figma-questionnaire-screen .v19-questionnaire-applicant-bar {
     min-height: var(--v19b-size-44) !important;
     padding: var(--v19b-size-0) !important;
+    border: var(--v19b-size-0) !important;
+    background: transparent !important;
   }
 
   .vf-figma-questionnaire-screen
@@ -37109,18 +37137,34 @@ section[data-testid="agent-actions-screen"]
     overflow-x: auto !important;
     overscroll-behavior-inline: contain;
     gap: var(--v19b-size-6) !important;
-    padding-bottom: var(--v19b-size-2) !important;
-    scroll-snap-type: inline proximity;
+    padding-bottom: var(--v19b-size-0) !important;
+    scrollbar-width: none;
+    scroll-snap-type: inline mandatory;
+  }
+
+  .vf-figma-questionnaire-screen
+    .v19-questionnaire-applicant-bar
+    > div:first-child::-webkit-scrollbar {
+    display: none;
   }
 
   .vf-figma-questionnaire-screen
     .v19-questionnaire-applicant-bar
     > div:first-child
     > div {
-    width: var(--v19b-size-160);
-    min-width: var(--v19b-size-160);
-    flex: 0 0 var(--v19b-size-160);
+    width: calc((var(--v19b-size-full) - var(--v19b-size-6)) / 2);
+    min-width: var(--v19b-size-148);
+    flex: 0 0 calc((var(--v19b-size-full) - var(--v19b-size-6)) / 2);
     scroll-snap-align: start;
+  }
+
+  .vf-figma-questionnaire-screen
+    .v19-questionnaire-applicant-bar
+    > div:first-child
+    > div:only-child {
+    width: var(--v19b-size-full);
+    min-width: var(--v19b-size-0);
+    flex-basis: var(--v19b-size-full);
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-applicant-tab {
@@ -37153,16 +37197,23 @@ section[data-testid="agent-actions-screen"]
     overflow-x: auto;
     overscroll-behavior-inline: contain;
     gap: var(--v19b-size-4) !important;
-    padding-bottom: var(--v19b-size-2);
-    scroll-snap-type: inline proximity;
+    padding-bottom: var(--v19b-size-0);
+    scrollbar-width: none;
+    scroll-snap-type: inline mandatory;
+  }
+
+  .vf-figma-questionnaire-screen
+    .v19-questionnaire-section-list--pinned::-webkit-scrollbar {
+    display: none;
   }
 
   .vf-figma-questionnaire-screen
     .v19-questionnaire-section-list--pinned
     .v19-questionnaire-section-tab {
-    width: var(--v19b-size-160) !important;
-    min-width: var(--v19b-size-160) !important;
-    max-width: var(--v19b-size-160) !important;
+    width: calc((var(--v19b-size-full) - var(--v19b-size-4)) / 2) !important;
+    min-width: var(--v19b-size-148) !important;
+    max-width: none !important;
+    flex: 0 0 calc((var(--v19b-size-full) - var(--v19b-size-4)) / 2);
     min-height: var(--v19b-size-44) !important;
     padding: var(--v19b-size-6) var(--v19b-size-8) !important;
     scroll-snap-align: start;
@@ -37270,14 +37321,44 @@ section[data-testid="agent-actions-screen"]
     scroll-snap-align: start;
     white-space: nowrap !important;
   }
+
+  .vf-figma-questionnaire-screen
+    .v19-questionnaire-quick-options[data-wrap-options="true"][data-option-count="3"]:not(.is-collapsed) {
+    display: grid !important;
+    grid-template-columns: repeat(
+      2,
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    ) !important;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  .vf-figma-questionnaire-screen
+    .v19-questionnaire-quick-options[data-wrap-options="true"][data-option-count="3"]:not(.is-collapsed)
+    .v19-questionnaire-quick-option {
+    width: var(--v19b-size-full) !important;
+    min-width: var(--v19b-size-0) !important;
+    white-space: normal !important;
+  }
+
+  .vf-figma-questionnaire-screen
+    .v19-questionnaire-quick-options[data-wrap-options="true"][data-option-count="3"]:not(.is-collapsed)
+    .v19-questionnaire-quick-option:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-work-toolbar {
+    gap: var(--v19b-size-6);
+    margin-bottom: var(--v19b-size-8);
+  }
 }
 
 .vf-figma-questionnaire-screen
   .v19-questionnaire-field-control[placeholder]::placeholder {
   color: var(--v19b-color-text-faint) !important;
-  font-size: var(--v19b-size-10) !important;
+  font-size: var(--v19b-size-11) !important;
   opacity: 1;
-  text-transform: lowercase;
+  text-transform: none;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-work-toolbar {

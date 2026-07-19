@@ -168,7 +168,8 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expect(page.locator(".v19-questionnaire-applicant-bar")).toBeVisible();
     await expect(page.locator(".v19-questionnaire-section-nav")).toBeVisible();
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
-    await expect(page.getByRole("button", { exact: true, name: "Следующее поле" })).toBeVisible();
+    await expect(page.getByRole("button", { exact: true, name: "Следующее поле" })).toHaveCount(0);
+    await expect(page.getByRole("button", { exact: true, name: "Блокер" })).toHaveCount(0);
 
     await page.getByRole("button", { name: /Личные данные/ }).first().click();
     const reviewField = page.locator(".v19-questionnaire-field-control.is-review:visible").first();
@@ -246,6 +247,54 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(headerBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(844 * 0.15);
 
     await expect(page.locator(".v19-questionnaire-header-actions")).toBeVisible();
+    const selectionPresentation = await page.evaluate(() => {
+      const style = (selector: string) => {
+        const element = document.querySelector<HTMLElement>(selector);
+        const computed = element ? getComputedStyle(element) : undefined;
+        const box = element?.getBoundingClientRect();
+        return computed && box
+          ? {
+              backgroundColor: computed.backgroundColor,
+              borderColor: computed.borderColor,
+              borderWidth: computed.borderWidth,
+              boxShadow: computed.boxShadow,
+              hasIcon: Boolean(element?.querySelector("svg")),
+              height: box.height,
+              width: box.width,
+            }
+          : null;
+      };
+
+      return {
+        activeApplicant: style(".v19-questionnaire-applicant-tab.is-active"),
+        activeSection: style(".v19-questionnaire-section-tab.is-active"),
+        issueBadge: style(".v19-questionnaire-progress-badge.status-issue"),
+        issueSection: style(
+          ".v19-questionnaire-section-tab.status-issue:not(.is-active)",
+        ),
+        pendingSection: style(
+          ".v19-questionnaire-section-tab.status-pending:not(.is-active)",
+        ),
+      };
+    });
+    expect(selectionPresentation.activeApplicant?.borderWidth).toBe("0px");
+    expect(selectionPresentation.activeApplicant?.boxShadow).toBe("none");
+    expect(selectionPresentation.activeSection?.borderWidth).toBe("0px");
+    expect(selectionPresentation.activeSection?.boxShadow).toBe("none");
+    expect(selectionPresentation.issueBadge?.borderWidth).toBe("0px");
+    expect(selectionPresentation.issueBadge?.backgroundColor).toBe(
+      "rgba(0, 0, 0, 0)",
+    );
+    expect(selectionPresentation.issueBadge?.hasIcon).toBe(true);
+    expect(
+      Math.abs(
+        (selectionPresentation.issueBadge?.width ?? 0) -
+          (selectionPresentation.issueBadge?.height ?? 0),
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(selectionPresentation.issueSection?.borderColor).toBe(
+      selectionPresentation.pendingSection?.borderColor,
+    );
     const blocker = page.getByRole("button", {
       name: /^Перейти к следующему обязательному действию:/,
     });
@@ -256,23 +305,61 @@ test.describe("V-19 questionnaire live sanity", () => {
       page.getByRole("button", { name: "Сохранить и выйти" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
-
     const applicantNextButtons = page.locator(
       '[aria-label^="Следующее незаполненное:"]',
     );
-    expect(await applicantNextButtons.count()).toBeGreaterThan(0);
-    await expect(applicantNextButtons.first()).toBeHidden();
+    await expect(applicantNextButtons).toHaveCount(0);
+
+    await page.getByRole("button", { name: /Отель \/ приглашение/ }).first().click();
+    const invitingPartyOptions = page.locator(
+      '.v19-questionnaire-quick-options[data-wrap-options="true"]',
+    );
+    await expect(invitingPartyOptions).toBeVisible();
+    const quickOptionsGeometry = await invitingPartyOptions.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(quickOptionsGeometry.scrollWidth).toBeLessThanOrEqual(
+      quickOptionsGeometry.clientWidth,
+    );
+
+    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
 
     const pinnedSections = page.locator(
       ".v19-questionnaire-section-list--pinned",
     );
+    await expect
+      .poll(() =>
+        pinnedSections.evaluate((element) => {
+          const containerBox = element.getBoundingClientRect();
+          const activeSectionBox = element
+            .querySelector<HTMLElement>(
+              ".v19-questionnaire-section-tab.is-active",
+            )
+            ?.getBoundingClientRect();
+          return Boolean(
+            activeSectionBox &&
+              activeSectionBox.left >= containerBox.left - 1 &&
+              activeSectionBox.right <= containerBox.right + 1,
+          );
+        }),
+      )
+      .toBe(true);
     const pinnedSectionLayout = await pinnedSections.evaluate((element) => {
       const style = getComputedStyle(element);
       const firstSection = element.querySelector<HTMLElement>(
         ".v19-questionnaire-section-tab",
       );
+      const activeSection = element.querySelector<HTMLElement>(
+        ".v19-questionnaire-section-tab.is-active",
+      );
+      const containerBox = element.getBoundingClientRect();
+      const activeSectionBox = activeSection?.getBoundingClientRect();
       return {
+        activeSectionRight: activeSectionBox?.right ?? 0,
+        activeSectionX: activeSectionBox?.x ?? 0,
+        containerRight: containerBox.right,
+        containerX: containerBox.x,
         display: style.display,
         firstSectionHeight: firstSection?.getBoundingClientRect().height ?? 0,
         overflowX: style.overflowX,
@@ -281,6 +368,12 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(pinnedSectionLayout.display).toBe("flex");
     expect(pinnedSectionLayout.firstSectionHeight).toBeLessThanOrEqual(48);
     expect(["auto", "scroll"]).toContain(pinnedSectionLayout.overflowX);
+    expect(pinnedSectionLayout.activeSectionX).toBeGreaterThanOrEqual(
+      pinnedSectionLayout.containerX - 1,
+    );
+    expect(pinnedSectionLayout.activeSectionRight).toBeLessThanOrEqual(
+      pinnedSectionLayout.containerRight + 1,
+    );
     const [applicantTabBox, sectionTabBox] = await Promise.all([
       page.locator(".v19-questionnaire-applicant-tab").first().boundingBox(),
       page.locator(".v19-questionnaire-section-tab").first().boundingBox(),
@@ -290,6 +383,72 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(
       Math.abs((applicantTabBox?.height ?? 0) - (sectionTabBox?.height ?? 0)),
     ).toBeLessThanOrEqual(1);
+
+    const topComposition = await page.evaluate(() => {
+      const applicantScroller = document.querySelector<HTMLElement>(
+        ".v19-questionnaire-applicant-bar > div:first-child",
+      );
+      const applicantCards = Array.from(
+        applicantScroller?.children ?? [],
+      ).slice(0, 2) as HTMLElement[];
+      const sectionScroller = document.querySelector<HTMLElement>(
+        ".v19-questionnaire-section-list--pinned",
+      );
+      const visibleSectionCards = Array.from(
+        sectionScroller?.querySelectorAll<HTMLElement>(
+          ".v19-questionnaire-section-tab",
+        ) ?? [],
+      ).filter((card) => {
+        const cardBox = card.getBoundingClientRect();
+        const scrollerBox = sectionScroller?.getBoundingClientRect();
+        return Boolean(
+          scrollerBox &&
+            cardBox.left >= scrollerBox.left - 1 &&
+            cardBox.right <= scrollerBox.right + 1,
+        );
+      });
+      const headerBox = document
+        .querySelector<HTMLElement>(".v19-questionnaire-screen-header")
+        ?.getBoundingClientRect();
+      const workPanelBox = document
+        .querySelector<HTMLElement>(".v19-questionnaire-work-panel")
+        ?.getBoundingClientRect();
+
+      return {
+        applicantCoverage:
+          applicantCards.length > 0
+            ? applicantCards.reduce(
+                (sum, card) => sum + card.getBoundingClientRect().width,
+                0,
+              ) +
+              Math.max(applicantCards.length - 1, 0) * 6
+            : 0,
+        applicantScrollerWidth: applicantScroller?.clientWidth ?? 0,
+        sectionCoverage:
+          visibleSectionCards.length >= 2
+            ? visibleSectionCards
+                .slice(0, 2)
+                .reduce(
+                  (sum, card) => sum + card.getBoundingClientRect().width,
+                  0,
+                ) + 4
+            : 0,
+        sectionScrollerWidth: sectionScroller?.clientWidth ?? 0,
+        topStackHeight:
+          headerBox && workPanelBox ? workPanelBox.top - headerBox.bottom : 0,
+      };
+    });
+    expect(
+      Math.abs(
+        topComposition.applicantCoverage - topComposition.applicantScrollerWidth,
+      ),
+    ).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(
+        topComposition.sectionCoverage - topComposition.sectionScrollerWidth,
+      ),
+    ).toBeLessThanOrEqual(2);
+    expect(topComposition.topStackHeight).toBeLessThanOrEqual(132);
 
     const [countryBox, cityBox] = await Promise.all([
       page.locator('[data-field-label="Страна проживания"]').boundingBox(),
@@ -375,8 +534,8 @@ test.describe("V-19 questionnaire live sanity", () => {
           textTransform: style.textTransform,
         };
       });
-    expect(placeholderPresentation.fontSize).toBeLessThanOrEqual(10);
-    expect(placeholderPresentation.textTransform).toBe("lowercase");
+    expect(placeholderPresentation.fontSize).toBeGreaterThanOrEqual(11);
+    expect(placeholderPresentation.textTransform).toBe("none");
     expect(placeholderPresentation.color).not.toBe("rgb(255, 255, 255)");
 
     const maleChoice = page.getByRole("button", { exact: true, name: "Мужской" });
