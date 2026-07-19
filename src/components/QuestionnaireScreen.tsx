@@ -359,14 +359,16 @@ export function QuestionnaireScreen({
   const bridge = useVisaflowBusinessBridge();
   const sourceSubmission = useMemo(
     () =>
-      submission ??
-      (draft
-        ? productIntakeDraftToSubmission(draft, {
-            agentId,
-            submissionId,
-            useIntakeFilesAsLocalDemoUploads: true,
-          })
-        : fallbackSubmission(submissionId, agentId)),
+      normalizeSubmissionQuestionnaire(
+        submission ??
+          (draft
+            ? productIntakeDraftToSubmission(draft, {
+                agentId,
+                submissionId,
+                useIntakeFilesAsLocalDemoUploads: true,
+              })
+          : fallbackSubmission(submissionId, agentId)),
+      ),
     [agentId, draft, submission, submissionId],
   );
   const [workingSubmission, setWorkingSubmission] = useState(sourceSubmission);

@@ -101,6 +101,59 @@ function withPendingPassportExtraction(submission: Submission): Submission {
 }
 
 describe("QuestionnaireScreen", () => {
+  test("normalizes a hidden legacy nationality from the passport issue country", async () => {
+    const draft = readySubmission("in_progress");
+    const submission: Submission = {
+      ...draft,
+      applicants: draft.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) => {
+            if (field.id === "passport-issue-country") {
+              return { ...field, value: "Spain" };
+            }
+            if (field.id === "nationality") {
+              return {
+                ...field,
+                error: "Обязательное поле",
+                required: true,
+                value: "",
+              };
+            }
+            return field;
+          }),
+        })),
+      })),
+    };
+    const onSubmissionChange = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <QuestionnaireScreen
+        onBack={vi.fn()}
+        onSubmissionChange={onSubmissionChange}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /Текущее гражданство/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
+
+    const normalized = onSubmissionChange.mock.calls[0]?.[0] as Submission;
+    const nationality = normalized.applicants[0]?.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "nationality");
+    expect(nationality).toMatchObject({
+      error: undefined,
+      reviewState: "confirmed",
+      value: "Spain",
+    });
+  });
+
   test("saves partial questionnaire changes as a draft through the agent submission bridge", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],

@@ -37,6 +37,18 @@ describe('PreUploadScreen', () => {
   test('shows two compact family applicants without shared-address questions and adds slots', () => {
     render(<PreUploadScreen onBack={() => undefined} />);
 
+    expect(screen.getByTestId('preupload-applicant-count')).toHaveTextContent(
+      'Заявителей: 2',
+    );
+    expect(
+      screen.getByText('Паспорта загружайте по порядку: 1, 2, 3…'),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Загрузить паспорт: Основной заявитель' }),
+    ).toHaveTextContent('1Основной заявитель');
+    expect(
+      screen.getByRole('button', { name: 'Загрузить паспорт: Второй заявитель' }),
+    ).toHaveTextContent('2Второй заявитель');
     expect(screen.getByRole('heading', { name: 'Prefill-поля' })).toBeInTheDocument();
     expect(screen.getByText('Поля появляются здесь по мере распознавания паспорта.')).toBeInTheDocument();
     expect(screen.queryByText(/Критичных расхождений нет/)).not.toBeInTheDocument();
@@ -46,6 +58,9 @@ describe('PreUploadScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Добавить заявителя' }));
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByTestId('preupload-applicant-count')).toHaveTextContent(
+      'Заявителей: 3',
+    );
   });
 
   test('binds a passport chosen from a family cell to that exact applicant', async () => {

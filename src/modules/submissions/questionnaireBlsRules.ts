@@ -334,6 +334,21 @@ export function blsStayDurationFromDates(
   return String(daysInclusive(travelStart, travelEnd));
 }
 
+function blsQuestionnaireFieldValue({
+  field,
+  formData,
+  value,
+}: BlsFieldValidationContext) {
+  if (value !== undefined) return value;
+  if (field.id === 'stay-duration') {
+    return blsStayDurationFromDates(
+      read(formData, 'travelStart'),
+      read(formData, 'travelEnd'),
+    );
+  }
+  return field.value;
+}
+
 function occupationRequiresEmployer(
   formData: BlsFormData,
   applicantRole?: Applicant['role'],
@@ -417,15 +432,11 @@ export function isBlsQuestionnaireFieldRequired({
   }
 }
 
-export function validateBlsQuestionnaireField({
-  applicantRole,
-  field,
-  formData,
-  value = field.value,
-}: BlsFieldValidationContext) {
+export function validateBlsQuestionnaireField(context: BlsFieldValidationContext) {
+  const { applicantRole, field, formData } = context;
   if (!isBlsQuestionnaireFieldApplicable({ applicantRole, field, formData })) return undefined;
 
-  const trimmed = value.trim();
+  const trimmed = blsQuestionnaireFieldValue(context).trim();
   const required = isBlsQuestionnaireFieldRequired({ applicantRole, field, formData });
   const baseError = validateQuestionnaireFieldValue(
     { ...field, required, value: trimmed },
@@ -514,7 +525,7 @@ export function isBlsQuestionnaireFieldReady(context: BlsFieldValidationContext)
   if (!isBlsQuestionnaireFieldApplicable(context)) return true;
 
   const required = isBlsQuestionnaireFieldRequired(context);
-  const value = (context.value ?? context.field.value).trim();
+  const value = blsQuestionnaireFieldValue(context).trim();
   if (!required && !value) return true;
   if (required && !value) return false;
   return !validateBlsQuestionnaireField(context);
@@ -525,7 +536,7 @@ export function isBlsQuestionnaireFieldBlockingIssue(context: BlsFieldValidation
 
   if (context.field.reviewState === 'needs_review') return true;
 
-  const value = (context.value ?? context.field.value).trim();
+  const value = blsQuestionnaireFieldValue(context).trim();
   const validationMessage = validateBlsQuestionnaireField(context);
   if (!validationMessage) return false;
   return value.length > 0 || validationMessage !== 'Обязательное поле';

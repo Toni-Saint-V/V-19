@@ -487,9 +487,15 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                         transition={{ duration: 0.18 }}
                         className="v19-preupload-family-controls space-y-3"
                       >
-                        <button type="button" className="v19-preupload-family-add" disabled={actionPending} onClick={() => setFamilyApplicantCount((current) => current + 1)} aria-label="Добавить заявителя">
-                          <Plus aria-hidden="true" />
-                        </button>
+                        <div className="v19-preupload-family-summary" aria-live="polite">
+                          <span data-testid="preupload-applicant-count">
+                            Заявителей: <strong>{familyApplicantCount}</strong>
+                          </span>
+                          <span>Паспорта загружайте по порядку: 1, 2, 3…</span>
+                          <button type="button" className="v19-preupload-family-add" disabled={actionPending} onClick={() => setFamilyApplicantCount((current) => current + 1)} aria-label="Добавить заявителя">
+                            <Plus aria-hidden="true" />
+                          </button>
+                        </div>
                         <div className="v19-preupload-applicant-grid" data-testid="preupload-family-grid" role="list">
                           {Array.from({ length: familyApplicantCount }, (_, applicantIndex) => {
                             const file = assignedFiles.get(applicantIndex);
@@ -505,7 +511,12 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                                   onClick={() => openFilePicker(applicantIndex)}
                                   aria-label={`${file ? 'Заменить' : 'Загрузить'} паспорт: ${applicantLabel}`}
                                 >
-                                  {applicantLabel}
+                                  <span aria-hidden="true" className="v19-preupload-applicant-order">
+                                    {applicantIndex + 1}
+                                  </span>
+                                  <span className="v19-preupload-applicant-name">
+                                    {applicantLabel}
+                                  </span>
                                 </button>
                                 <button
                                   type="button"

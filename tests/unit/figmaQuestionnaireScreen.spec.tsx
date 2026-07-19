@@ -374,6 +374,99 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
+  test("keeps the family appointment city and formatted interval synchronized", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON", "VOLKOVA MARIA"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const secondaryApplicantId = submission.applicants[1]?.id;
+    if (!secondaryApplicantId) throw new Error("expected secondary applicant");
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Запись");
+    fireEvent.click(dropdownTrigger(result.container, "Город подачи"));
+    fireEvent.click(screen.getByRole("option", { name: "Самара" }));
+    fireEvent.change(screen.getByLabelText("С какого числа"), {
+      target: { value: "01082027" },
+    });
+    fireEvent.change(screen.getByLabelText("По какое число"), {
+      target: { value: "15082027" },
+    });
+
+    expect(onFieldChange.mock.calls.map(([update]) => update)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          applicantId: secondaryApplicantId,
+          fieldId: "appointment-city",
+          value: "Самара",
+        }),
+        expect.objectContaining({
+          applicantId: secondaryApplicantId,
+          fieldId: "desired-date-1",
+          value: "01.08.2027",
+        }),
+        expect.objectContaining({
+          applicantId: secondaryApplicantId,
+          fieldId: "desired-date-2",
+          value: "15.08.2027",
+        }),
+      ]),
+    );
+
+    const applicantTabs = result.container.querySelectorAll(
+      ".v19-questionnaire-applicant-tab",
+    );
+    fireEvent.click(applicantTabs[1] as HTMLButtonElement);
+    expect(dropdownTrigger(result.container, "Город подачи")).toHaveTextContent(
+      "Самара",
+    );
+    expect(screen.getByLabelText("С какого числа")).toHaveValue("01.08.2027");
+    expect(screen.getByLabelText("По какое число")).toHaveValue("15.08.2027");
+  });
+
+  test("opens personal data when the OCR handoff targets the surname", async () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicantId = submission.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+
+    render(
+      <FigmaQuestionnaireScreen
+        initialFocus={{
+          applicantId,
+          field: "surname",
+          section: "Личные данные заявителя",
+        }}
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Фамилия")).toHaveFocus());
+    expect(
+      screen.getAllByRole("button", { name: /Личные данные/ })[0],
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   test("opens a non-passport issue on its exact bound questionnaire field", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -523,18 +616,92 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     expect(pinnedSectionTitles(result.container)).toEqual([
-      "Адрес и контакты",
-      "Поездка",
-      "Отель / приглашение",
-      "Запись",
       "Личные данные",
       "Паспорт",
+      "Адрес и контакты",
       "Работа / учеба",
+      "Поездка",
+      "Запись",
+      "Отель / приглашение",
     ]);
     expect(pinnedSectionTitles(result.container)).not.toContain("Файлы");
     expect(pinnedSectionTitles(result.container)).not.toContain("Родственник ЕС");
     expect(pinnedSectionTitles(result.container)).not.toContain("Оплата поездки");
     expect(pinnedSectionTitles(result.container)).not.toContain("Кто заполнил");
+  });
+
+  test("shows family copy only in contact, appointment, and hotel sections", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON", "VOLKOVA MARIA"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    for (const title of ["Личные данные", "Паспорт", "Работа / учеба", "Поездка"]) {
+      clickPinnedSection(result.container, title);
+      expect(
+        screen.queryByRole("button", { name: "Копировать для всех" }),
+      ).not.toBeInTheDocument();
+    }
+
+    for (const title of ["Адрес и контакты", "Запись", "Отель / приглашение"]) {
+      clickPinnedSection(result.container, title);
+      expect(
+        screen.getByRole("button", { name: "Копировать для всех" }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  test("shows section issues as an icon without duplicate progress copy", () => {
+    const submission = setFieldReview(
+      createDraftSubmission({
+        applicantNames: ["VOLKOV ANTON"],
+        city: "Москва",
+        familyCount: 1,
+        idScheme: "local",
+        submissions: [],
+        type: "single",
+      }),
+      "passport-no",
+      "123456789",
+      {
+        reviewSource: "passport_ocr",
+        reviewState: "needs_review",
+      },
+    );
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    const passportTab = result.container.querySelector(
+      '.v19-questionnaire-section-list--pinned .v19-questionnaire-section-tab[aria-label="Паспорт: есть замечание"]',
+    );
+    expect(passportTab).toBeInTheDocument();
+    expect(passportTab).toHaveTextContent("Паспорт");
+    expect(passportTab).not.toHaveTextContent(/\d+ из \d+/);
+    expect(
+      passportTab?.querySelector(
+        ".v19-questionnaire-progress-badge.status-issue svg",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      passportTab?.querySelector(".v19-questionnaire-section-meta"),
+    ).not.toBeInTheDocument();
   });
 
   test("renders BLS field order and labels inside questionnaire sections", () => {
@@ -815,7 +982,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(hotelPhone).toHaveAttribute("placeholder", "Номер с кодом страны");
   });
 
-  test("keeps stay duration as a manual field when travel dates change", () => {
+  test("calculates and saves stay duration from the travel dates", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -824,6 +991,51 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "single",
     });
+    const onSaveDraft = vi.fn().mockResolvedValue(undefined);
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onSaveDraft={onSaveDraft}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Поездка");
+    const duration = screen.getByLabelText("Длительность пребывания");
+    expect(duration).toHaveAttribute("readonly");
+    expect(duration).toHaveValue(null);
+
+    fireEvent.change(screen.getByLabelText("Дата въезда"), {
+      target: { value: "15012027" },
+    });
+    fireEvent.change(screen.getByLabelText("Дата выезда"), {
+      target: { value: "22012027" },
+    });
+    expect(duration).toHaveValue(8);
+
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
+    expect(onSaveDraft.mock.calls[0]?.[0].fieldUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fieldId: "stay-duration",
+          value: "8",
+        }),
+      ]),
+    );
+  });
+
+  test("deletes the previous date digit with one Backspace at a separator", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const submission = setField(draft, "arrival-date", "12.03.2027");
     const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
@@ -833,22 +1045,12 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Поездка");
-    const duration = screen.getByLabelText("Длительность пребывания");
-    expect(duration).not.toHaveAttribute("readonly");
-    expect(duration).toHaveValue(null);
+    const arrivalDate = screen.getByLabelText("Дата въезда");
+    arrivalDate.focus();
+    arrivalDate.setSelectionRange(3, 3);
+    fireEvent.keyDown(arrivalDate, { key: "Backspace" });
 
-    fireEvent.change(screen.getByLabelText("Дата въезда"), {
-      target: { value: "15012027" },
-    });
-    fireEvent.change(screen.getByLabelText("Дата выезда"), {
-      target: { value: "22012027" },
-    });
-    expect(duration).toHaveValue(null);
-
-    fireEvent.change(duration, {
-      target: { value: "8" },
-    });
-    expect(duration).toHaveValue(8);
+    expect(arrivalDate).toHaveValue("1.03.2027");
   });
 
   test("defaults Russia-related fields and derives USSR for a pre-1991 birth date", async () => {
@@ -1308,6 +1510,21 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     const street = screen.getByLabelText("Улица / проспект / переулок");
+    expect(screen.getByLabelText("Город проживания")).toHaveAttribute(
+      "placeholder",
+      "Санкт-Петербург",
+    );
+    expect(street).toHaveAttribute("placeholder", "Улица Ленина");
+    expect(street.getAttribute("placeholder")).not.toMatch(/\d/u);
+    expect(screen.getByLabelText("Дом")).toHaveAttribute("placeholder", "15");
+    expect(screen.getByLabelText("Корпус / строение")).toHaveAttribute(
+      "placeholder",
+      "Корпус 2",
+    );
+    expect(screen.getByLabelText("Квартира / офис / помещение")).toHaveAttribute(
+      "placeholder",
+      "Квартира 12",
+    );
     fireEvent.focus(street);
     fireEvent.change(street, { target: { value: "ул" } });
     fireEvent.click(screen.getByRole("option", { name: "улица" }));
@@ -1345,6 +1562,98 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(city).toHaveValue("Санкт-Петербург");
     fireEvent.change(city, { target: { value: "с" } });
     expect(screen.getByRole("option", { name: "Самара" })).toBeInTheDocument();
+
+    clickPinnedSection(result.container, "Работа / учеба");
+    expect(
+      screen.getByLabelText("Адрес работодателя / учебного заведения"),
+    ).toHaveAttribute("placeholder", "Проспект Мира, 10, офис 4");
+  });
+
+  test("keeps questionnaire placeholders sentence-cased and the idle search status hidden", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    expect(screen.queryByText("Поиск по полям и значениям")).not.toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "Поиск поля анкеты" });
+    fireEvent.change(search, { target: { value: "паспорт" } });
+    expect(screen.getByText(/\d+ совпадений/u)).toBeInTheDocument();
+
+    clickPinnedSection(result.container, "Личные данные");
+    expect(screen.getByLabelText("Фамилия")).toHaveAttribute(
+      "placeholder",
+      "Volkov",
+    );
+    expect(screen.getByLabelText("Предыдущие фамилии")).toHaveAttribute(
+      "placeholder",
+      "Petrova или нет",
+    );
+    expect(screen.getByLabelText("Имя")).toHaveAttribute("placeholder", "Anton");
+    expect(screen.getByLabelText("Место рождения")).toHaveAttribute(
+      "placeholder",
+      "Moscow",
+    );
+  });
+
+  test("suggests building and unit types while keeping their values editable", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Адрес и контакты");
+    const building = screen.getByLabelText("Корпус / строение");
+    fireEvent.focus(building);
+    expect(screen.getByRole("option", { name: "корпус" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "строение" }));
+    fireEvent.change(building, { target: { value: "строение 2" } });
+    expect(building).toHaveValue("строение 2");
+
+    const unit = screen.getByLabelText("Квартира / офис / помещение");
+    fireEvent.focus(unit);
+    expect(screen.getByRole("option", { name: "квартира" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "офис" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "помещение" }));
+    fireEvent.change(unit, { target: { value: "помещение 12" } });
+    expect(unit).toHaveValue("помещение 12");
+
+    expect(onFieldChange.mock.calls.map(([update]) => update)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fieldId: "home-building",
+          value: "строение 2",
+        }),
+        expect.objectContaining({
+          fieldId: "home-unit",
+          value: "помещение 12",
+        }),
+      ]),
+    );
   });
 
   test.skip("shows actionable file slots and uploads a passport in one selection", async () => {
@@ -1721,6 +2030,9 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
 
     clickPinnedSection(result.container, "Отель / приглашение");
+    expect(
+      screen.getByRole("group", { name: /^Тип принимающей стороны/ }),
+    ).toHaveAttribute("data-wrap-options", "true");
     expect(visibleFieldLabels(result.container)).not.toContain(
       "Контактное лицо компании",
     );
@@ -2359,6 +2671,8 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    clickPinnedSection(result.container, "Адрес и контакты");
+
     const copyButton = screen.getByRole("button", {
       name: "Копировать для всех",
     });
@@ -2471,7 +2785,7 @@ describe("FigmaQuestionnaireScreen", () => {
       ),
     };
     const onFieldChange = vi.fn();
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -2479,6 +2793,8 @@ describe("FigmaQuestionnaireScreen", () => {
         submission={submission}
       />,
     );
+
+    clickPinnedSection(result.container, "Адрес и контакты");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Копировать для всех" }),
@@ -2773,6 +3089,13 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Личные данные");
     const birthDate = screen.getByLabelText("Дата рождения");
     expect(birthDate).toHaveClass("is-review");
+    const reviewShell = birthDate.closest(".v19-questionnaire-control-shell");
+    expect(reviewShell).toHaveClass("has-confirmation");
+    expect(
+      within(reviewShell as HTMLElement).getByRole("button", {
+        name: "Подтвердить поле: Дата рождения",
+      }),
+    ).toBeInTheDocument();
     fireEvent.focus(birthDate);
     expect(birthDate).toHaveClass("is-review");
 
@@ -2780,6 +3103,7 @@ describe("FigmaQuestionnaireScreen", () => {
       screen.getByRole("button", { name: "Подтвердить поле: Дата рождения" }),
     );
     expect(birthDate).not.toHaveClass("is-review");
+    expect(reviewShell).not.toHaveClass("has-confirmation");
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
 
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));

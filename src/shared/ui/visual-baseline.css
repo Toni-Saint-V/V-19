@@ -4518,7 +4518,7 @@
 }
 
 .v19-admin-list-header > button {
-  width: var(--v19b-size-80);
+  width: calc(var(--v19b-size-80) - var(--v19b-size-10));
   min-height: var(--v19b-size-22);
   height: var(--v19b-size-22);
   padding: var(--v19b-size-0);
@@ -27535,12 +27535,19 @@ body,
   flex: 0 0 auto;
   min-height: var(--v19b-size-32);
   padding-inline: var(--v19b-size-10);
-  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-bright);
   border-radius: var(--v19-control-radius);
   color: var(--v19b-color-text-strong);
-  background: var(--v19b-color-control-hover);
+  background: var(--v19b-color-primary-bright);
   font-size: var(--v19b-size-11);
   font-weight: var(--v19b-weight-control);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-review-confirmation
+  button:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-primary-hover);
+  background: var(--v19b-color-primary-hover);
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-next-blocker {
@@ -30615,7 +30622,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   }
 
   section[data-testid="agent-actions-screen"] .v19-admin-list-header > button {
-    width: var(--v19b-size-60);
+    width: var(--v19b-size-50);
   }
 
   section[data-testid="agent-actions-screen"] .v19-legacy-action-main {
@@ -35559,6 +35566,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
 .v19-metric-strip .v19-metric-card strong {
   position: static;
+  width: 2ch;
   min-width: 2ch;
   flex: none;
   color: var(--v19b-color-text-strong);
@@ -35566,6 +35574,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   font-weight: var(--v19b-weight-title);
   font-variant-numeric: tabular-nums;
   line-height: var(--v19b-line-height-title);
+  text-align: left;
 }
 
 .v19-metric-strip .v19-metric-card small {
@@ -35975,7 +35984,8 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   height: var(--v19b-field-height);
   border: var(--v19b-size-0);
   border-radius: inherit;
-  background: var(--v19b-color-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-primary-bright);
   white-space: nowrap;
 }
 

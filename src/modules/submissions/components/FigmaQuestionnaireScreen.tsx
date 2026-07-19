@@ -31,6 +31,7 @@ import {
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
 import {
+  blsStayDurationFromDates,
   isBlsQuestionnaireFieldBlockingIssue,
   isBlsQuestionnaireFieldReady,
   isBlsQuestionnaireFieldRequired,
@@ -89,34 +90,6 @@ type SectionId =
 
 const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionId }> = [
   {
-    canonicalId: "contacts",
-    id: "contact",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Адрес и контакты",
-  },
-  {
-    canonicalId: "trip",
-    id: "trip",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Поездка",
-  },
-  {
-    canonicalId: "hotel",
-    id: "hotel",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Отель / приглашение",
-  },
-  {
-    canonicalId: "appointment",
-    id: "appointment",
-    meta: "0 из 0",
-    status: "pending",
-    title: "Запись",
-  },
-  {
     canonicalId: "personal",
     id: "personal",
     meta: "0 из 0",
@@ -131,13 +104,47 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
     title: "Паспорт",
   },
   {
+    canonicalId: "contacts",
+    id: "contact",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Адрес и контакты",
+  },
+  {
     canonicalId: "employment",
     id: "employment",
     meta: "0 из 0",
     status: "pending",
     title: "Работа / учеба",
   },
+  {
+    canonicalId: "trip",
+    id: "trip",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Поездка",
+  },
+  {
+    canonicalId: "appointment",
+    id: "appointment",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Запись",
+  },
+  {
+    canonicalId: "hotel",
+    id: "hotel",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Отель / приглашение",
+  },
 ];
+
+const familyCopySectionIds = new Set<SectionId>([
+  "appointment",
+  "contact",
+  "hotel",
+]);
 
 const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
   appointment: ["appointment-city", "desired-date-1", "desired-date-2"],
@@ -434,6 +441,14 @@ const RUSSIAN_STREET_TYPE_SUGGESTIONS = [
   "проезд ",
   "площадь ",
   "бульвар ",
+];
+
+const RUSSIAN_BUILDING_TYPE_SUGGESTIONS = ["корпус ", "строение "];
+
+const RUSSIAN_UNIT_TYPE_SUGGESTIONS = [
+  "квартира ",
+  "офис ",
+  "помещение ",
 ];
 
 const BLS_OCCUPATION_OPTIONS = [
@@ -877,7 +892,17 @@ function FormField({
         value[caret - 1] === "."
       ) {
         event.preventDefault();
-        event.currentTarget.setSelectionRange(caret - 1, caret - 1);
+        const input = event.currentTarget;
+        const deleteIndex = caret - 2;
+        const nextValue =
+          deleteIndex >= 0
+            ? `${value.slice(0, deleteIndex)}${value.slice(deleteIndex + 1)}`
+            : value.slice(caret);
+        onChange?.(formatDateInput(nextValue, "deleteContentBackward"));
+        window.requestAnimationFrame(() => {
+          const nextCaret = Math.max(0, caret - 2);
+          input.setSelectionRange(nextCaret, nextCaret);
+        });
         return;
       }
       if (
@@ -886,7 +911,12 @@ function FormField({
         value[caret] === "."
       ) {
         event.preventDefault();
-        event.currentTarget.setSelectionRange(caret + 1, caret + 1);
+        const input = event.currentTarget;
+        const nextValue = `${value.slice(0, caret + 1)}${value.slice(caret + 2)}`;
+        onChange?.(formatDateInput(nextValue, "deleteContentForward"));
+        window.requestAnimationFrame(() =>
+          input.setSelectionRange(caret + 1, caret + 1),
+        );
         return;
       }
     }
@@ -919,6 +949,11 @@ function FormField({
         </span>
       </label>
 
+      <div
+        className={`v19-questionnaire-control-shell${
+          canonicalState === "needs_review" ? " has-confirmation" : ""
+        }`}
+      >
       {options && usesQuickOptions ? (
         <div
           aria-describedby={shouldShowError ? fieldErrorId : undefined}
@@ -933,6 +968,9 @@ function FormField({
               : ""
           }`}
           data-option-count={visibleQuickOptions?.length}
+          data-wrap-options={
+            label === "Тип принимающей стороны" ? "true" : undefined
+          }
           role="group"
         >
           {visibleQuickOptions?.map((option) => (
@@ -1195,6 +1233,7 @@ function FormField({
           </button>
         </div>
       ) : null}
+      </div>
 
       {addressSuggestion && onChange ? (
         <div className="v19-questionnaire-address-suggestion" role="status">
@@ -2430,7 +2469,7 @@ function sectionForFocus(
   if (section.includes("работ")) return "employment";
   if (section.includes("отел") || section.includes("приглаш")) return "hotel";
   if (section.includes("оплат")) return "trip";
-  return "contact";
+  return "personal";
 }
 
 function questionnaireTargetForPassportIssue(issue: PassportGateIssue): {
@@ -2973,7 +3012,7 @@ export function FigmaQuestionnaireScreen({
     draftSubmission.type === "family" &&
     Boolean(primaryApplicant) &&
     draftSubmission.applicants.length > 1;
-  const canCopyCurrentSection = Boolean(familySharedFieldIds[activeSection]?.length);
+  const canCopyCurrentSection = familyCopySectionIds.has(activeSection);
   const showFamilyCopyControl =
     isEditable && canCopyFamilyWide && canCopyCurrentSection;
 
@@ -3114,6 +3153,19 @@ export function FigmaQuestionnaireScreen({
       if (update.value !== baseFormData[binding.formKey]) onFieldChange?.(update);
     }
     for (const update of familyAppointmentUpdates) onFieldChange?.(update);
+  }
+
+  function updateTravelDate(
+    key: "travelStart" | "travelEnd",
+    value: string,
+  ) {
+    const travelStart = key === "travelStart" ? value : formData.travelStart;
+    const travelEnd = key === "travelEnd" ? value : formData.travelEnd;
+    updateField(key, value);
+    updateField(
+      "stayDuration",
+      blsStayDurationFromDates(travelStart, travelEnd),
+    );
   }
 
   function updateStructuredAddressField(
@@ -3438,6 +3490,38 @@ export function FigmaQuestionnaireScreen({
       ...conditionalClears,
     ]) {
       updates.set(questionnaireUpdateKey(update), update);
+    }
+
+    const automaticStayDuration = blsStayDurationFromDates(
+      formData.travelStart,
+      formData.travelEnd,
+    );
+    const stayDurationBinding = questionnaireFieldBindingForApplicant(
+      activeApplicantModel,
+      "stayDuration",
+    );
+    const stayDurationField = stayDurationBinding
+      ? questionnaireField(activeApplicantModel, stayDurationBinding.fieldId)
+      : undefined;
+    if (
+      stayDurationBinding &&
+      stayDurationField &&
+      stayDurationField.value !== automaticStayDuration
+    ) {
+      const automaticStayDurationUpdate = {
+        applicantId: activeApplicant,
+        error: validationMessageForQuestionnaireField(
+          stayDurationField,
+          automaticStayDuration,
+        ),
+        fieldId: stayDurationBinding.fieldId,
+        sectionId: stayDurationBinding.sectionId,
+        value: automaticStayDuration,
+      } satisfies QuestionnaireFieldUpdate;
+      updates.set(
+        questionnaireUpdateKey(automaticStayDurationUpdate),
+        automaticStayDurationUpdate,
+      );
     }
 
     const fieldUpdates = [...updates.values()];
@@ -4159,7 +4243,7 @@ export function FigmaQuestionnaireScreen({
             modelFieldId="home-street"
             number="3"
             onAddressSuggestionAccept={applyHomeAddressSuggestion}
-            placeholder="ул ленина д 5 кв 12"
+            placeholder="Улица Ленина"
             compact
             suggestions={RUSSIAN_STREET_TYPE_SUGGESTIONS}
             value={formData.homeStreet}
@@ -4177,7 +4261,8 @@ export function FigmaQuestionnaireScreen({
             label="Корпус / строение"
             modelFieldId="home-building"
             number="5"
-            placeholder="Например, корпус 2"
+            placeholder="Например, Корпус 2"
+            suggestions={RUSSIAN_BUILDING_TYPE_SUGGESTIONS}
             value={formData.homeBuilding}
             onChange={(value) => updateStructuredAddressField("homeBuilding", value)}
           />
@@ -4185,7 +4270,8 @@ export function FigmaQuestionnaireScreen({
             label="Квартира / офис / помещение"
             modelFieldId="home-unit"
             number="6"
-            placeholder="Например, квартира 12"
+            placeholder="Например, Квартира 12"
+            suggestions={RUSSIAN_UNIT_TYPE_SUGGESTIONS}
             value={formData.homeUnit}
             onChange={(value) => updateStructuredAddressField("homeUnit", value)}
           />
@@ -4233,7 +4319,7 @@ export function FigmaQuestionnaireScreen({
                 label="Вид на жительство / документ"
                 modelFieldId="residence-permit-type"
                 number="11"
-                placeholder="Например, вид на жительство"
+                placeholder="Например, Вид на жительство"
                 value={formData.residencePermitType}
                 onChange={(value) => updateField("residencePermitType", value)}
               />
@@ -4269,7 +4355,7 @@ export function FigmaQuestionnaireScreen({
             label="Должность"
             modelFieldId="occupation"
             number="1"
-            placeholder="Например, менеджер"
+            placeholder="Например, Менеджер"
             reviewSource={fieldReviewSource("occupation", "Должность")}
             state={fieldReviewState("occupation", "Должность")}
             value={formData.occupation}
@@ -4303,7 +4389,7 @@ export function FigmaQuestionnaireScreen({
             label="Адрес работодателя / учебного заведения"
             modelFieldId="employer-address"
             number="4"
-            placeholder="пр мира д 10 оф 4"
+            placeholder="Проспект Мира, 10, офис 4"
             compact
             value={formData.employerAddress}
             onChange={(value) => updateField("employerAddress", value)}
@@ -4333,7 +4419,7 @@ export function FigmaQuestionnaireScreen({
               label="Дополнительные сведения о цели"
               modelFieldId="stay-purpose-details"
               number={nextTripQuestionNumber()}
-              placeholder="Например, участие в конференции"
+              placeholder="Например, Участие в конференции"
               type="textarea"
               value={formData.stayPurposeDetails}
               onChange={(value) => updateField("stayPurposeDetails", value)}
@@ -4376,7 +4462,7 @@ export function FigmaQuestionnaireScreen({
             reviewSource={fieldReviewSource("arrival-date", "Дата въезда")}
             state={fieldReviewState("arrival-date", "Дата въезда")}
             value={formData.travelStart}
-            onChange={(value) => updateField("travelStart", value)}
+            onChange={(value) => updateTravelDate("travelStart", value)}
           />
           <FormField
             excelMap="Cell: F4"
@@ -4390,16 +4476,19 @@ export function FigmaQuestionnaireScreen({
             reviewSource={fieldReviewSource("departure-date", "Дата выезда")}
             state={fieldReviewState("departure-date", "Дата выезда")}
             value={formData.travelEnd}
-            onChange={(value) => updateField("travelEnd", value)}
+            onChange={(value) => updateTravelDate("travelEnd", value)}
           />
           <FormField
             excelMap="Анкета: stay-duration"
             label="Длительность пребывания"
             modelFieldId="stay-duration"
             number={nextTripQuestionNumber()}
+            readOnly
             type="number"
-            value={formData.stayDuration}
-            onChange={(value) => updateField("stayDuration", value)}
+            value={blsStayDurationFromDates(
+              formData.travelStart,
+              formData.travelEnd,
+            )}
           />
           <FormField
             excelMap="Анкета: previous-biometrics"
@@ -4557,7 +4646,7 @@ export function FigmaQuestionnaireScreen({
             label="Фамилия"
             modelFieldId="surname"
             number="1"
-            placeholder="Например, VOLKOV"
+            placeholder="Например, Volkov"
             value={formData.surname}
             onChange={(value) => updateField("surname", value)}
           />
@@ -4566,7 +4655,7 @@ export function FigmaQuestionnaireScreen({
             label="Предыдущие фамилии"
             modelFieldId="previous-surname"
             number="1.1"
-            placeholder="Например, PETROVA или НЕТ"
+            placeholder="Например, Petrova или нет"
             value={formData.previousSurname}
             onChange={(value) => updateField("previousSurname", value)}
           />
@@ -4575,7 +4664,7 @@ export function FigmaQuestionnaireScreen({
             label="Имя"
             modelFieldId="first-name"
             number="2"
-            placeholder="Например, ANTON"
+            placeholder="Например, Anton"
             value={formData.firstName}
             onChange={(value) => updateField("firstName", value)}
           />
@@ -4597,7 +4686,7 @@ export function FigmaQuestionnaireScreen({
             modelFieldId="birth-place"
             number="4"
             onBlur={normalizeBirthPlaceField}
-            placeholder="Например, MOSCOW"
+            placeholder="Например, Moscow"
             reviewSource={fieldReviewSource("birth-place", "Место рождения")}
             state={fieldReviewState("birth-place", "Место рождения")}
             value={formData.birthPlace}
@@ -4638,7 +4727,7 @@ export function FigmaQuestionnaireScreen({
               label="Родитель/опекун несовершеннолетнего"
               modelFieldId="guardian-info"
               number="8"
-              placeholder="Например, IVAN VOLKOV, отец"
+              placeholder="Например, Ivan Volkov, отец"
               type="textarea"
               value={formData.guardianInfo}
               onChange={(value) => updateField("guardianInfo", value)}
@@ -4886,6 +4975,11 @@ export function FigmaQuestionnaireScreen({
           >
             {sections.map((section) => (
               <button
+                aria-label={
+                  section.status === "issue"
+                    ? `${section.title}: есть замечание`
+                    : undefined
+                }
                 aria-pressed={activeSection === section.id}
                 className={`v19-questionnaire-section-tab status-${section.status} ${
                   activeSection === section.id ? "is-active" : ""
@@ -4901,9 +4995,11 @@ export function FigmaQuestionnaireScreen({
                   <div className="v19-questionnaire-section-title text-[var(--v19b-size-12)] font-semibold truncate">
                     {section.title}
                   </div>
-                  <div className="v19-questionnaire-section-meta text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
-                    {section.meta}
-                  </div>
+                  {section.status !== "issue" ? (
+                    <div className="v19-questionnaire-section-meta text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
+                      {section.meta}
+                    </div>
+                  ) : null}
                 </div>
                 <QuestionnaireProgressBadge
                   className={`v19-questionnaire-progress-badge status-${section.status}`}
@@ -4943,17 +5039,17 @@ export function FigmaQuestionnaireScreen({
                     focusFirstSearchMatch();
                   }}
                 />
-                <div
-                  aria-live="polite"
-                  className="v19-questionnaire-sidebar-status"
-                  role="status"
-                >
-                  {fieldSearchQuery.trim()
-                    ? `${searchMatches.length} совпадений`
-                    : saveStatus === "error"
-                      ? saveMessage
-                      : "Поиск по полям и значениям"}
-                </div>
+                {fieldSearchQuery.trim() || saveStatus === "error" ? (
+                  <div
+                    aria-live="polite"
+                    className="v19-questionnaire-sidebar-status"
+                    role="status"
+                  >
+                    {fieldSearchQuery.trim()
+                      ? `${searchMatches.length} совпадений`
+                      : saveMessage}
+                  </div>
+                ) : null}
                 {isEditable ? (
                   <div className="v19-questionnaire-sidebar-actions">
                     <button
@@ -4982,6 +5078,11 @@ export function FigmaQuestionnaireScreen({
               >
                 {sections.map((section) => (
                   <button
+                    aria-label={
+                      section.status === "issue"
+                        ? `${section.title}: есть замечание`
+                        : undefined
+                    }
                     aria-pressed={activeSection === section.id}
                     className={`v19-questionnaire-section-tab status-${section.status} ${
                       activeSection === section.id ? "is-active" : ""
@@ -4999,9 +5100,11 @@ export function FigmaQuestionnaireScreen({
                       <div className="v19-questionnaire-section-title text-[var(--v19b-size-12)] font-semibold truncate">
                         {section.title}
                       </div>
-                      <div className="v19-questionnaire-section-meta text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
-                        {section.meta}
-                      </div>
+                      {section.status !== "issue" ? (
+                        <div className="v19-questionnaire-section-meta text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
+                          {section.meta}
+                        </div>
+                      ) : null}
                     </div>
 
                     <QuestionnaireProgressBadge
