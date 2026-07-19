@@ -12,6 +12,10 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
     "content",
     "#101011",
   );
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    "content",
+    "noindex, nofollow, noarchive, nosnippet",
+  );
 
   const icon = page.locator('link[rel="icon"]');
   await expect(icon).toHaveAttribute("type", "image/svg+xml");
@@ -21,4 +25,8 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
   expect(iconResponse.status()).toBe(200);
   expect(iconResponse.headers()["content-type"]).toContain("image/svg+xml");
   expect(await iconResponse.text()).toContain('aria-label="VisaFlow V-19"');
+
+  const robotsResponse = await page.request.get("/robots.txt");
+  expect(robotsResponse.status()).toBe(200);
+  expect(await robotsResponse.text()).toBe("User-agent: *\nDisallow: /\n");
 });

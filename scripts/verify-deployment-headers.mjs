@@ -20,6 +20,7 @@ verifyRule("/(.*)", {
   "referrer-policy": "strict-origin-when-cross-origin",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
+  "x-robots-tag": "noindex, nofollow, noarchive, nosnippet",
 });
 verifyRule("/", {
   "cache-control": "public, max-age=0, must-revalidate",
@@ -40,7 +41,7 @@ if (failures.length > 0) {
 }
 
 console.log(
-  "Deployment header guard passed: security baseline, revalidated HTML, immutable hashed assets, refreshable app icon.",
+  "Deployment header guard passed: security baseline, no-index policy, revalidated HTML, immutable hashed assets, refreshable app icon.",
 );
 
 function verifyRule(source, expectedHeaders) {
