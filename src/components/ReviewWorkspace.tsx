@@ -547,7 +547,7 @@ export function ReviewWorkspace({
       className="fixed inset-0 z-[60] bg-[#101011] text-white flex flex-col overflow-hidden"
       exit={{ opacity: 0, scale: 0.985 }}
       inert={nestedDialogOpen ? true : undefined}
-      initial={{ opacity: 0, scale: 0.985 }}
+      initial={false}
       ref={workspaceRef}
       role="dialog"
       tabIndex={-1}
