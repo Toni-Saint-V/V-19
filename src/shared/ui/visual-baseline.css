@@ -36036,7 +36036,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
 .v19-preupload-family-summary {
   display: flex;
-  min-height: var(--v19b-size-28);
+  min-height: var(--v19b-size-40);
   align-items: center;
   gap: var(--v19b-size-8);
   color: var(--v19b-color-text-50);
@@ -36171,8 +36171,8 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
 .v19-preupload-family-add {
   display: grid;
-  width: var(--v19b-size-28);
-  height: var(--v19b-size-28);
+  width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
   place-items: center;
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19b-radius-control);

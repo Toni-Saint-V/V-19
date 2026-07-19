@@ -486,11 +486,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                         transition={{ duration: 0.18 }}
                         className="v19-preupload-family-controls space-y-3"
                       >
-                        <div className="v19-preupload-family-summary" aria-live="polite">
-                          <span data-testid="preupload-applicant-count">
-                            Заявителей: <strong>{familyApplicantCount}</strong>
-                          </span>
-                          <span>Паспорта загружайте по порядку: 1, 2, 3…</span>
+                        <div className="v19-preupload-family-summary">
                           <button type="button" className="v19-preupload-family-add" disabled={actionPending} onClick={() => setFamilyApplicantCount((current) => current + 1)} aria-label="Добавить заявителя">
                             <Plus aria-hidden="true" />
                           </button>
