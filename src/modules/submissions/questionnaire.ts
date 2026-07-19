@@ -223,7 +223,7 @@ const questionnaireBlueprint: Array<{
       { id: "occupation", label: "Должность", placeholder: "Например, менеджер" },
       { id: "employer-name", label: "Работодатель / учебное заведение", placeholder: "Например, ООО «Спектр» или МГУ", span: "full" },
       { id: "employer-contact", label: "Телефон работодателя / учебного заведения", placeholder: "+7 900 000-00-00", required: false },
-      { id: "employer-address", label: "Адрес работодателя / учебного заведения", placeholder: "Например, проспект Мира, 10, офис 4", required: false, span: "full" },
+      { id: "employer-address", label: "Адрес работодателя / учебного заведения", placeholder: "пр мира д 10 оф 4", required: false, span: "full" },
     ],
   },
 ];

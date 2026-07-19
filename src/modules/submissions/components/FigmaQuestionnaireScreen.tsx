@@ -52,7 +52,10 @@ import {
   type PassportGateIssue,
 } from "../passportExtractionGuards";
 import { suggestedRussianAddress } from "../russianAddress";
-import { composeQuestionnaireHomeAddress } from "../questionnaireAddressFields";
+import {
+  composeQuestionnaireHomeAddress,
+  structuredQuestionnaireHomeAddressFromText,
+} from "../questionnaireAddressFields";
 import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
@@ -188,6 +191,7 @@ type FormFieldProps = {
   label: string;
   modelFieldId: string;
   number?: string;
+  onAddressSuggestionAccept?: (value: string) => void;
   onBlur?: () => void;
   onChange?: (value: string) => void;
   options?: string[];
@@ -593,6 +597,7 @@ function FormField({
   label,
   modelFieldId,
   number,
+  onAddressSuggestionAccept,
   onBlur,
   onChange,
   options,
@@ -670,6 +675,12 @@ function FormField({
     () => (addressAssist ? suggestedRussianAddress(value) : undefined),
     [addressAssist, value],
   );
+  const inputSuggestionListOpen = Boolean(
+    inputSuggestions.length &&
+      isSuggestionsOpen &&
+      !addressSuggestion &&
+      visibleInputSuggestions.length,
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -730,7 +741,7 @@ function FormField({
       ? `${optionsListboxId}-option-${activeOptionIndex}`
       : undefined;
   const activeSuggestionId =
-    isSuggestionsOpen &&
+    inputSuggestionListOpen &&
     activeSuggestionIndex >= 0 &&
     activeSuggestionIndex < visibleInputSuggestions.length
       ? `${suggestionsId}-option-${activeSuggestionIndex}`
@@ -1076,7 +1087,7 @@ function FormField({
             aria-activedescendant={activeSuggestionId}
             aria-autocomplete={inputSuggestions.length ? "list" : undefined}
             aria-controls={inputSuggestions.length ? suggestionsId : undefined}
-            aria-expanded={inputSuggestions.length ? isSuggestionsOpen : undefined}
+            aria-expanded={inputSuggestions.length ? inputSuggestionListOpen : undefined}
             autoComplete={inputAutocomplete(label, type)}
             className={`${baseClasses} ${compact ? "is-compact-address" : ""} ${stateClasses}`}
             inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
@@ -1136,7 +1147,7 @@ function FormField({
             }}
             onKeyDown={handleInputKeyboard}
           />
-          {inputSuggestions.length && isSuggestionsOpen ? (
+          {inputSuggestionListOpen ? (
             <motion.div
               animate={{ opacity: 1, scale: 1, y: 0 }}
               className="v19-questionnaire-dropdown"
@@ -1194,7 +1205,9 @@ function FormField({
           <button
             aria-label={`Подставить адрес: ${label}`}
             type="button"
-            onClick={() => onChange(addressSuggestion)}
+            onClick={() =>
+              (onAddressSuggestionAccept ?? onChange)(addressSuggestion)
+            }
           >
             Подставить
           </button>
@@ -3112,6 +3125,20 @@ export function FigmaQuestionnaireScreen({
     updateField("contactAddress", composeQuestionnaireHomeAddress(nextAddressData));
   }
 
+  function applyHomeAddressSuggestion(value: string) {
+    const structured = structuredQuestionnaireHomeAddressFromText(value);
+    if (!structured) {
+      updateStructuredAddressField("homeStreet", value);
+      return;
+    }
+
+    updateField("homeStreet", structured.homeStreet);
+    updateField("homeHouse", structured.homeHouse);
+    updateField("homeBuilding", structured.homeBuilding);
+    updateField("homeUnit", structured.homeUnit);
+    updateField("contactAddress", composeQuestionnaireHomeAddress(structured));
+  }
+
   function updatePassportIssueDate(value: string) {
     updateField("passportIssued", value);
 
@@ -4125,12 +4152,14 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("residenceCity", value)}
           />
           <FormField
+            addressAssist
             fullWidth
-            hint="Начните с типа и названия: улица, проспект, переулок, набережная или шоссе."
+            hint="Можно написать коротко — полный адрес появится как предложение после номера дома."
             label="Улица / проспект / переулок"
             modelFieldId="home-street"
             number="3"
-            placeholder="Например, улица Ленина"
+            onAddressSuggestionAccept={applyHomeAddressSuggestion}
+            placeholder="ул ленина д 5 кв 12"
             compact
             suggestions={RUSSIAN_STREET_TYPE_SUGGESTIONS}
             value={formData.homeStreet}
@@ -4274,7 +4303,7 @@ export function FigmaQuestionnaireScreen({
             label="Адрес работодателя / учебного заведения"
             modelFieldId="employer-address"
             number="4"
-            placeholder="Например, проспект Мира, 10, офис 4"
+            placeholder="пр мира д 10 оф 4"
             compact
             value={formData.employerAddress}
             onChange={(value) => updateField("employerAddress", value)}

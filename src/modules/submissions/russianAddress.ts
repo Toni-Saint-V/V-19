@@ -3,8 +3,20 @@ const addressPartLabels = [
   "корпус",
   "строение",
   "квартира",
+  "помещение",
   "подъезд",
   "офис",
+] as const;
+
+const streetTypes = [
+  "улица",
+  "проспект",
+  "переулок",
+  "набережная",
+  "шоссе",
+  "проезд",
+  "площадь",
+  "бульвар",
 ] as const;
 
 type AddressPartLabel = (typeof addressPartLabels)[number];
@@ -15,7 +27,7 @@ function expandAddressAbbreviations(value: string) {
   return value
     .trim()
     .replace(
-      /^(?!(?:просп(?:ект)?\.?|улица|переулок|набережная)(?=\s|,|$))(просп|пр(?:-?т)?|ул|пер|наб)\.?(?=[\p{L}])/iu,
+      /^(?!(?:просп(?:ект)?\.?|улица|переулок|набережная|шоссе|проезд|площадь|бульвар)(?=\s|,|$))(просп|пр(?:-?т)?|ул|пер|наб)\.?(?=[\p{L}])/iu,
       "$1 ",
     )
     .replace(/([\p{L}])(?=\d)/gu, "$1 ")
@@ -33,6 +45,7 @@ function expandAddressAbbreviations(value: string) {
     .replace(/(^|[\s,])кв\.?(?=\s|\d|,|$)\s*/giu, "$1квартира ")
     .replace(/(^|[\s,])под\.?(?=\s|\d|,|$)\s*/giu, "$1подъезд ")
     .replace(/(^|[\s,])оф\.?(?=\s|\d|,|$)\s*/giu, "$1офис ")
+    .replace(/(^|[\s,])пом\.?(?=\s|\d|,|$)\s*/giu, "$1помещение ")
     .replace(/[\s,]+/g, " ")
     .trim();
 }
@@ -53,7 +66,7 @@ function capitalized(value: string) {
 export function normalizedRussianAddress(value: string) {
   const expanded = expandAddressAbbreviations(value);
   const streetMatch = expanded.match(
-    /^(улица|проспект|переулок|набережная)\s+(.+)$/iu,
+    new RegExp(`^(${streetTypes.join("|")})\\s+(.+)$`, "iu"),
   );
   if (!streetMatch || !/\d/u.test(expanded)) return expanded;
 
