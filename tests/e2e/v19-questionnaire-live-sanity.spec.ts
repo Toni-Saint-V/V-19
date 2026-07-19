@@ -349,6 +349,10 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect((reviewConfirmationBox?.x ?? 0) + (reviewConfirmationBox?.width ?? 0)).toBeLessThanOrEqual(
       (reviewShellBox?.x ?? 0) + (reviewShellBox?.width ?? 0) + 1,
     );
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("questionnaire-review-mobile.png"),
+    });
 
     const displayedPlaceholders = await page
       .locator(

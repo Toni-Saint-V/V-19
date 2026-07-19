@@ -349,16 +349,13 @@ export function V19OperationalCard<T extends ElementType = "button">({
             <strong className="v19-operational-card-title" title={title}>
               {title}
             </strong>
-            {city ? (
-              <span className="v19-operational-card-location">
-                <MapPin aria-hidden="true" />
-                <span>{city}</span>
-              </span>
-            ) : null}
           </span>
-          <span className="v19-operational-card-open" aria-hidden="true">
-            <ChevronRight />
-          </span>
+          {city ? (
+            <span className="v19-operational-card-location">
+              <MapPin aria-hidden="true" />
+              <span>{city}</span>
+            </span>
+          ) : null}
         </span>
 
         <span className="v19-operational-card-action">
@@ -377,6 +374,9 @@ export function V19OperationalCard<T extends ElementType = "button">({
         {footer ? (
           <span className="v19-operational-card-footer">{footer}</span>
         ) : null}
+        <span className="v19-operational-card-open" aria-hidden="true">
+          <ChevronRight />
+        </span>
       </span>
     </Component>
   );

@@ -4072,6 +4072,7 @@
 }
 
 .v19-operational-card-body {
+  position: relative;
   display: flex;
   min-height: var(--v19b-size-220);
   flex: 1;
@@ -4122,6 +4123,7 @@
 .v19-operational-card-identity {
   display: block;
   min-width: var(--v19b-size-0);
+  flex: 1;
 }
 
 .v19-operational-card-meta {
@@ -4194,12 +4196,21 @@
 .v19-operational-card-location {
   display: flex;
   min-width: var(--v19b-size-0);
+  max-width: 46%;
+  flex: none;
   align-items: center;
   gap: var(--v19b-size-6);
-  margin-top: var(--v19b-size-6);
+  margin-top: var(--v19b-size-0);
   color: var(--v19b-color-text-muted);
   font-size: var(--v19b-size-11);
   line-height: var(--v19b-line-height-title);
+  text-align: right;
+}
+
+.v19-operational-card-location > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .v19-operational-card-location svg {
@@ -4209,6 +4220,9 @@
 }
 
 .v19-operational-card-open {
+  position: absolute;
+  right: var(--v19b-size-16);
+  bottom: var(--v19b-size-16);
   display: grid;
   width: var(--v19b-size-32);
   height: var(--v19b-size-32);
@@ -4314,6 +4328,7 @@
   justify-content: space-between;
   gap: var(--v19b-size-8);
   margin-top: auto;
+  padding-right: calc(var(--v19b-size-32) + var(--v19b-size-8));
   padding-top: var(--v19b-size-12);
   border-top: var(--v19b-size-1) solid var(--v19b-color-border);
 }
