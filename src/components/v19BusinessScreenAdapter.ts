@@ -89,6 +89,30 @@ export function tripDatesForSubmission(submission: Pick<Submission, 'tripDateFro
   return from === to ? from : `${from}–${to}`;
 }
 
+export function compactTripDateForSubmission(
+  submission: Pick<Submission, 'tripDateFrom' | 'tripDateTo'>,
+): string | undefined {
+  const from = submission.tripDateFrom?.trim() ?? '';
+  const to = submission.tripDateTo?.trim() ?? '';
+  const isMissing = (value: string) => !value || /не указано/i.test(value);
+
+  if (isMissing(from) && isMissing(to)) return undefined;
+  const date = isMissing(from) ? to : from;
+  const match = date.match(/^(\d{2})\.(\d{2})\.(?:\d{4})$/);
+  return match ? `${match[1]}.${match[2]}` : date;
+}
+
+export function fullTripDateForSubmission(
+  submission: Pick<Submission, 'tripDateFrom' | 'tripDateTo'>,
+): string {
+  const from = submission.tripDateFrom?.trim() ?? '';
+  const to = submission.tripDateTo?.trim() ?? '';
+  const isMissing = (value: string) => !value || /не указано/i.test(value);
+
+  if (isMissing(from) && isMissing(to)) return 'Дата не указана';
+  return isMissing(from) ? to : from;
+}
+
 export function updatedLabel(iso?: string) {
   if (!iso) return 'нет данных';
   const date = new Date(iso);

@@ -44,6 +44,9 @@ import {
   V19PriorityHero,
   V19QueueCard,
   V19QueueToolbar,
+  V19SubmissionCity,
+  V19SubmissionIdentity,
+  V19SubmissionTripDates,
   V19ToolbarSelect,
 } from "../shared/ui/v19-design-system";
 import { createDraft } from "../modules/submissions/domainEngine";
@@ -58,6 +61,8 @@ import type {
 } from "../modules/submissions/types";
 import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
 import {
+  compactTripDateForSubmission,
+  fullTripDateForSubmission,
   listItemsFromSubmissions,
   type LegacyAgentNavSection,
   type LegacySubmissionListItem,
@@ -88,6 +93,7 @@ import {
   mediaSlotTypeForSubmissionFileType,
   uploadRequiredFile,
 } from "../modules/submissions/submissionActions";
+import "../shared/ui/agent-actions-cell.css";
 import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
   buildMediaStoragePath,
@@ -1113,16 +1119,8 @@ export function CommandCenter({
     >
       <V19PriorityHero
         actionAriaLabel={`Открыть приоритетные действия: ${blockerActionCount} требуют решения`}
-        actionLabel="К блокерам"
-        actionDisabled={blockerActionCount === 0}
-        eyebrow="Контроль действий"
-        eyebrowIcon={Clock}
+        actionCount={blockerActionCount}
         hasBlockers={blockerActionCount > 0}
-        summary={
-          blockerActionCount
-            ? "Сначала разберите действия, которые удерживают подачу от следующего шага."
-            : "Критичных действий нет. Продолжайте работу с ближайшими сроками."
-        }
         title={
           blockerActionCount
             ? `${blockerActionCount} ${blockerActionCount === 1 ? "действие требует" : "действия требуют"} решения`
@@ -1131,7 +1129,7 @@ export function CommandCenter({
         onAction={() => setActionSummaryFilter("blockers")}
       />
 
-      <V19MetricStrip className="v19-admin-review-metrics">
+      <V19MetricStrip>
         <V19MetricCard
           active={actionSummaryFilter === "open"}
           detail="в работе"
@@ -1166,7 +1164,7 @@ export function CommandCenter({
           actionDisabled={actionSummaryFilter === "open" && actionCityFilter === "Все города" && !searchQuery && actionSort === "tripDate"}
           actionLabel="Все"
           className="v19-admin-review-list-head"
-          countLabel={`${visibleActions.length} ${visibleActions.length === 1 ? "действие" : "действий"}`}
+          countLabel={`${visibleActions.length}`}
           onAction={() => {
             setActionSummaryFilter("open");
             setActionCityFilter("Все города");
@@ -1258,37 +1256,18 @@ export function CommandCenter({
                       handleActionOpen(action);
                     }
                   }}
-                  className={`v19-legacy-action-row severity-${action.severity}`}
+                  className={`v19-legacy-action-row severity-${action.severity}${shouldShowActionContext(action) ? " has-context" : ""}`}
                   data-agent-action-id={action.id}
                   data-testid="agent-action-row"
                 >
                   <div className="v19-legacy-action-main">
-                    <div className="v19-legacy-action-title-line">
-                      <span className="v19-legacy-action-labels">
-                        <span className="v19-legacy-action-id">
-                          {submissionPublicId(action.submission)}
-                        </span>
-                        <span
-                          aria-hidden="true"
-                          className="v19-legacy-action-label-separator"
-                        >
-                          ·
-                        </span>
-                        <span
-                          aria-label={`Количество человек: ${actionPeopleCount(action)}`}
-                          className="v19-legacy-action-family-tag"
-                        >
-                          <Users aria-hidden="true" />
-                          <span>{actionPeopleCount(action)}</span>
-                        </span>
-                      </span>
-                      <strong className="v19-legacy-action-title">
-                        {action.title}
-                      </strong>
-                    </div>
-                    {shouldShowActionContext(action) ? (
-                      <span className="v19-legacy-action-context">{action.context}</span>
-                    ) : null}
+                    <V19SubmissionIdentity
+                      city={action.submission.city}
+                      peopleCount={actionPeopleCount(action)}
+                      publicId={submissionPublicId(action.submission)}
+                      title={action.title}
+                      tripDates={compactTripDateForSubmission(action.submission)}
+                    />
                   </div>
                   <div className="v19-legacy-action-meta">
                     <span
@@ -1303,12 +1282,12 @@ export function CommandCenter({
                     </span>
                   </div>
                   <div className="v19-legacy-action-city-column">
-                    <span className="v19-legacy-action-city">
-                      <span aria-hidden="true" />
-                      <span className="v19-legacy-action-city-label">
-                        {action.submission.city}
-                      </span>
-                    </span>
+                    <V19SubmissionCity city={action.submission.city} />
+                  </div>
+                  <div className="v19-legacy-action-date-column">
+                    <V19SubmissionTripDates
+                      dates={fullTripDateForSubmission(action.submission)}
+                    />
                   </div>
                   <div className="v19-legacy-action-badges">
                     {action.badges.slice(0, 2).map((badge) => (
@@ -1320,6 +1299,11 @@ export function CommandCenter({
                       </span>
                     ))}
                   </div>
+                  {shouldShowActionContext(action) ? (
+                    <span className="v19-legacy-action-context-tag">
+                      {action.context}
+                    </span>
+                  ) : null}
                   <div className="v19-legacy-action-cta-wrap">
                     <button
                       aria-label={`${action.cta}: ${action.title}`}

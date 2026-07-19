@@ -14,6 +14,7 @@ import {
 } from "react";
 import {
   AlertCircle,
+  CalendarRange,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -226,28 +227,121 @@ export type V19SurfaceIcon = ElementType;
 type V19QueueCardProps<T extends ElementType> = {
   as?: T;
   className?: string;
-} & Omit<ComponentPropsWithoutRef<T>, 'as' | 'className'>;
+} & Omit<ComponentPropsWithoutRef<T>, "as" | "className">;
 
 /**
  * Shared interactive surface for operational queue items. Layout and content
  * stay screen-specific; border, radius, focus and interaction state stay here.
  */
-export function V19QueueCard<T extends ElementType = 'div'>(
-  { as, className, ...props }: V19QueueCardProps<T>,
-) {
-  const Component = as ?? 'div';
+export function V19QueueCard<T extends ElementType = "div">({
+  as,
+  className,
+  ...props
+}: V19QueueCardProps<T>) {
+  const Component = as ?? "div";
 
-  return <Component {...props} className={cn('v19-queue-card', className)} />;
+  return <Component {...props} className={cn("v19-queue-card", className)} />;
+}
+
+export function V19SubmissionIdentity({
+  city,
+  className,
+  peopleCount,
+  publicId,
+  title,
+  tripDates,
+}: {
+  city?: string;
+  className?: string;
+  peopleCount: number;
+  publicId: string;
+  title: string;
+  tripDates?: string;
+}) {
+  return (
+    <span
+      className={cn("v19-submission-identity", className)}
+      data-v19-component="submission-identity"
+    >
+      <span className="v19-submission-identity-tags">
+        <span className="v19-submission-identity-id">{publicId}</span>
+        {peopleCount > 1 ? (
+          <>
+            <span aria-hidden="true" className="v19-submission-identity-separator">
+              ·
+            </span>
+            <span
+              aria-label={`Количество человек: ${peopleCount}`}
+              className="v19-submission-identity-people"
+            >
+              <Users aria-hidden="true" />
+              <span>{peopleCount}</span>
+            </span>
+          </>
+        ) : null}
+      </span>
+      <strong className="v19-submission-identity-title" title={title}>
+        {title}
+      </strong>
+      {city || tripDates ? (
+        <span className="v19-submission-identity-route">
+          <V19SubmissionCity city={city} />
+          <V19SubmissionTripDates dates={tripDates} />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+export function V19SubmissionCity({
+  city,
+  className,
+}: {
+  city?: string;
+  className?: string;
+}) {
+  if (!city) return null;
+
+  return (
+    <span className={cn("v19-submission-identity-city", className)}>
+      <MapPin aria-hidden="true" />
+      <span>{city}</span>
+    </span>
+  );
+}
+
+export function V19SubmissionTripDates({
+  className,
+  dates,
+}: {
+  className?: string;
+  dates?: string;
+}) {
+  if (!dates) return null;
+
+  return (
+    <span className={cn("v19-submission-trip-dates", className)}>
+      <CalendarRange aria-hidden="true" />
+      <span>{dates}</span>
+    </span>
+  );
 }
 
 export function V19MetricStrip({
   children,
-  className = '',
+  className,
 }: {
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={`v19-admin-metric-strip ${className}`}>{children}</div>;
+  return (
+    <div
+      className={cn("v19-admin-metric-strip", "v19-operational-metrics", className)}
+      data-v19-component="operational-metrics"
+    >
+      {children}
+    </div>
+  );
 }
 
 export function V19MetricCard({
@@ -328,6 +422,7 @@ export function V19ContextToggle({
 
 export function V19PriorityHero({
   actionAriaLabel,
+  actionCount,
   actionDisabled = false,
   actionIcon: ActionIcon = Flame,
   actionLabel,
@@ -339,43 +434,71 @@ export function V19PriorityHero({
   title,
 }: {
   actionAriaLabel: string;
+  actionCount?: number;
   actionDisabled?: boolean;
   actionIcon?: V19SurfaceIcon;
   actionLabel?: string;
-  eyebrow: string;
-  eyebrowIcon: V19SurfaceIcon;
+  eyebrow?: string;
+  eyebrowIcon?: V19SurfaceIcon;
   hasBlockers: boolean;
   onAction: () => void;
-  summary: string;
+  summary?: string;
   title: string;
 }) {
+  if (actionCount === undefined) {
+    return (
+      <section
+        aria-label={eyebrow ?? title}
+        className={`v19-admin-review-hero ${hasBlockers ? "has-blockers" : "is-clear"} ${actionLabel ? "has-action-label" : ""}`}
+      >
+        <div className="v19-admin-review-hero-copy">
+          {eyebrow ? (
+            <span className="v19-admin-review-eyebrow">
+              {EyebrowIcon ? <EyebrowIcon aria-hidden="true" /> : null} {eyebrow}
+            </span>
+          ) : null}
+          <h2>{title}</h2>
+          {summary ? <p>{summary}</p> : null}
+        </div>
+        <button
+          aria-label={actionAriaLabel}
+          className={`v19-admin-review-priority-card ${hasBlockers ? "has-blockers" : "is-empty"} ${actionLabel ? "has-action-label" : ""}`}
+          disabled={actionDisabled}
+          type="button"
+          onClick={onAction}
+        >
+          <span className="v19-admin-review-priority-icon">
+            <ActionIcon aria-hidden="true" />
+          </span>
+          {actionLabel ? (
+            <span className="v19-admin-review-priority-action-label">{actionLabel}</span>
+          ) : null}
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section
-      aria-label={eyebrow}
-      className={`v19-admin-review-hero ${hasBlockers ? 'has-blockers' : 'is-clear'} ${actionLabel ? 'has-action-label' : ''}`}
+      aria-label={title}
+      className={`v19-admin-review-hero ${hasBlockers ? "has-blockers" : "is-clear"}`}
+      data-v19-component="priority-hero"
     >
-      <div className="v19-admin-review-hero-copy">
-        <span className="v19-admin-review-eyebrow">
-          <EyebrowIcon aria-hidden="true" /> {eyebrow}
-        </span>
-        <h2>{title}</h2>
-        <p>{summary}</p>
-      </div>
-      <button
-        aria-label={actionAriaLabel}
-        className={`v19-admin-review-priority-card ${hasBlockers ? 'has-blockers' : 'is-empty'} ${actionLabel ? 'has-action-label' : ''}`}
-        disabled={actionDisabled}
-        type="button"
-        onClick={onAction}
-      >
-        <span className="v19-admin-review-priority-icon">
+      <h2>{title}</h2>
+      <div className="v19-priority-hero-action">
+        <button
+          aria-label={actionAriaLabel}
+          className={`v19-priority-hero-trigger ${hasBlockers ? "has-blockers" : "is-empty"}`}
+          type="button"
+          onClick={onAction}
+        >
           <ActionIcon aria-hidden="true" />
-        </span>
-        {actionLabel ? (
-          <span className="v19-admin-review-priority-action-label">{actionLabel}</span>
-        ) : null}
-        <ChevronRight aria-hidden="true" />
-      </button>
+          <span className="v19-priority-hero-count" aria-hidden="true">
+            {actionCount}
+          </span>
+        </button>
+      </div>
     </section>
   );
 }
