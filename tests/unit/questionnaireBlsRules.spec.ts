@@ -5,6 +5,8 @@ import {
   blsStayDurationFromDates,
   blsQuestionnaireReadiness,
   isBlsQuestionnaireFieldRequired,
+  isBlsQuestionnaireFieldReady,
+  validateBlsQuestionnaireField,
   type BlsFormData,
 } from "../../src/modules/submissions/questionnaireBlsRules";
 import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
@@ -70,6 +72,26 @@ describe("canonical BLS questionnaire readiness", () => {
     expect(blsStayDurationFromDates("15.01.2027", "15.01.2027")).toBe("1");
     expect(blsStayDurationFromDates("22.01.2027", "15.01.2027")).toBe("");
     expect(blsStayDurationFromDates("15.01", "22.01.2027")).toBe("");
+  });
+
+  test("treats the automatically calculated stay duration as ready", () => {
+    const field = {
+      error: undefined,
+      id: "stay-duration",
+      label: "Длительность пребывания",
+      required: true,
+      reviewState: "confirmed" as const,
+      value: "",
+    };
+    const formData = {
+      travelEnd: "02.09.2026",
+      travelStart: "18.08.2026",
+    };
+
+    expect(isBlsQuestionnaireFieldReady({ field, formData })).toBe(true);
+    expect(
+      validateBlsQuestionnaireField({ field, formData }),
+    ).toBeUndefined();
   });
 
   test("keeps adult working-applicant readiness aligned with submit policy", () => {

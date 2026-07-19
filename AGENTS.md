@@ -10,6 +10,16 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Before repo edits, inspect branch/status, relevant files, and current diff when risk or dirty work matters.
 - Do not expand scope silently.
 
+## Canonical Workspace Lock
+
+- The only authorized V-19 working directory is `/Users/user/Documents/V-19`.
+- Every task must begin by proving `pwd`, `git rev-parse --show-toplevel`, `git branch --show-current`, and `git status --short` before any read that could determine implementation scope, any edit, test, build, or Git action.
+- If either `pwd` or the Git top-level directory is not exactly `/Users/user/Documents/V-19`, stop immediately and return `BLOCKED`. Do not continue from another location.
+- Do not create, select, or use another Git worktree, clone, extracted archive, temporary checkout, `/tmp` copy, release tree, or replacement workspace for V-19.
+- Run implementation, verification, commit, push, and deploy commands only from the canonical working directory.
+- Treat the existing canonical checkout, including its dirty and untracked files, as shared source truth. Preserve unrelated work and never use `stash`, `reset`, `clean`, branch switching, or checkout replacement without explicit user approval for that exact action.
+- A request to work on V-19 does not authorize an alternative location. Only an explicit user instruction that names a different absolute path may override this lock for that one task.
+
 ## Codex Skill Context Budget
 
 - Default preset for ordinary repo work:

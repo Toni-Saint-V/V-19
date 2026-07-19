@@ -767,7 +767,7 @@ export function DraftsScreen({
           active={draftSummaryFilter === 'missing'}
           detail={`ожидают · ${summary.submissions}`}
           icon={UploadCloud}
-          label="Ждут загрузки"
+          label="Загрузки"
           tone="neutral"
           value={summary.missing}
           onClick={() => setDraftSummaryFilter('missing')}

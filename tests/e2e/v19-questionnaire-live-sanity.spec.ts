@@ -297,7 +297,8 @@ test.describe("V-19 questionnaire live sanity", () => {
     ]);
     expect(countryBox).not.toBeNull();
     expect(cityBox).not.toBeNull();
-    expect(Math.abs((countryBox?.y ?? 0) - (cityBox?.y ?? 0))).toBeLessThanOrEqual(2);
+    expect(cityBox?.y ?? 0).toBeGreaterThan((countryBox?.y ?? 0) + 2);
+    expect(Math.abs((countryBox?.width ?? 0) - (cityBox?.width ?? 0))).toBeLessThanOrEqual(2);
 
     const [houseBox, buildingBox] = await Promise.all([
       page.locator('[data-field-label="Дом"]').boundingBox(),
@@ -305,7 +306,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     ]);
     expect(houseBox).not.toBeNull();
     expect(buildingBox).not.toBeNull();
-    expect(Math.abs((houseBox?.y ?? 0) - (buildingBox?.y ?? 0))).toBeLessThanOrEqual(2);
+    expect(buildingBox?.y ?? 0).toBeGreaterThan((houseBox?.y ?? 0) + 2);
 
     const [unitBox, postalBox] = await Promise.all([
       page.locator('[data-field-label="Квартира / офис / помещение"]').boundingBox(),
@@ -313,7 +314,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     ]);
     expect(unitBox).not.toBeNull();
     expect(postalBox).not.toBeNull();
-    expect(Math.abs((unitBox?.y ?? 0) - (postalBox?.y ?? 0))).toBeLessThanOrEqual(2);
+    expect(postalBox?.y ?? 0).toBeGreaterThan((unitBox?.y ?? 0) + 2);
 
     await page.getByRole("button", { name: /Личные данные/ }).first().click();
     const [surnameBox, previousSurnameBox] = await Promise.all([
@@ -322,8 +323,32 @@ test.describe("V-19 questionnaire live sanity", () => {
     ]);
     expect(surnameBox).not.toBeNull();
     expect(previousSurnameBox).not.toBeNull();
-    expect(Math.abs((surnameBox?.y ?? 0) - (previousSurnameBox?.y ?? 0))).toBeLessThanOrEqual(2);
+    expect(previousSurnameBox?.y ?? 0).toBeGreaterThan((surnameBox?.y ?? 0) + 2);
     await expect(page.locator('[data-field-label="Предыдущие фамилии"]')).toBeVisible();
+
+    const reviewControl = page.locator(
+      '[data-field-label="Дата рождения"] .v19-questionnaire-control-shell.has-confirmation',
+    );
+    const reviewInput = reviewControl.locator(".v19-questionnaire-field-control");
+    const reviewConfirmation = reviewControl.getByRole("button", {
+      name: "Подтвердить поле: Дата рождения",
+    });
+    await expect(reviewControl).toBeVisible();
+    await expect(reviewConfirmation).toBeVisible();
+    const [reviewShellBox, reviewInputBox, reviewConfirmationBox] = await Promise.all([
+      reviewControl.boundingBox(),
+      reviewInput.boundingBox(),
+      reviewConfirmation.boundingBox(),
+    ]);
+    expect(reviewShellBox).not.toBeNull();
+    expect(reviewInputBox).not.toBeNull();
+    expect(reviewConfirmationBox).not.toBeNull();
+    expect(Math.abs((reviewInputBox?.y ?? 0) - (reviewConfirmationBox?.y ?? 0))).toBeLessThanOrEqual(
+      1,
+    );
+    expect((reviewConfirmationBox?.x ?? 0) + (reviewConfirmationBox?.width ?? 0)).toBeLessThanOrEqual(
+      (reviewShellBox?.x ?? 0) + (reviewShellBox?.width ?? 0) + 1,
+    );
 
     const displayedPlaceholders = await page
       .locator(
@@ -385,11 +410,12 @@ test.describe("V-19 questionnaire live sanity", () => {
 
   for (const viewport of [
     { height: 740, width: 320 },
+    { height: 812, width: 375 },
     { height: 932, width: 430 },
   ]) {
     test(`mobile ${viewport.width} keeps a fullscreen shell and a 75dvh work area`, async ({
       page,
-    }) => {
+    }, testInfo) => {
       const browserProblems = collectBrowserProblems(page);
       await page.setViewportSize(viewport);
       await openQuestionnaire(page);
@@ -401,12 +427,17 @@ test.describe("V-19 questionnaire live sanity", () => {
       ]);
       expect(countryBox).not.toBeNull();
       expect(cityBox).not.toBeNull();
-      expect(Math.abs((countryBox?.y ?? 0) - (cityBox?.y ?? 0))).toBeLessThanOrEqual(2);
+      expect(cityBox?.y ?? 0).toBeGreaterThan((countryBox?.y ?? 0) + 2);
+      expect(Math.abs((countryBox?.width ?? 0) - (cityBox?.width ?? 0))).toBeLessThanOrEqual(2);
+      await page.screenshot({
+        fullPage: true,
+        path: testInfo.outputPath(`questionnaire-mobile-${viewport.width}.png`),
+      });
       expect(browserProblems).toEqual([]);
     });
   }
 
-  test("tablet keeps the existing fullscreen desktop composition", async ({ page }) => {
+  test("tablet keeps the existing fullscreen desktop composition", async ({ page }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
     const viewport = { height: 1024, width: 768 };
     await page.setViewportSize(viewport);
@@ -415,6 +446,10 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expectFullscreenQuestionnaireShell(page, viewport);
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
     await expectNoDocumentOverflow(page);
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("questionnaire-tablet-768.png"),
+    });
     expect(browserProblems).toEqual([]);
   });
 });
