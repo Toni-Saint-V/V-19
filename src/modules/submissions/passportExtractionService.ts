@@ -23,7 +23,7 @@ const supportedPassportMimeTypes = new Set<PassportDocumentRef["mimeType"]>([
 const allowPaidFallbackWithoutLocalPassportSignal = false;
 
 const localTesseractOptions = {
-  cacheMethod: "none",
+  cacheMethod: "write",
   corePath: "/tesseract/core",
   gzip: true,
   langPath: "/tesseract/lang",
@@ -83,6 +83,27 @@ type PassportOcrResponse = {
   };
 };
 
+type LocalPassportOcrWorker = {
+  recognize(image: BrowserCanvas): Promise<PassportOcrResponse>;
+};
+
+type LocalTesseractModule = {
+  createWorker?: (
+    languages: string,
+    oem: number,
+    options: typeof localTesseractOptions,
+  ) => Promise<LocalPassportOcrWorker>;
+  default?: {
+    createWorker?: (
+      languages: string,
+      oem: number,
+      options: typeof localTesseractOptions,
+    ) => Promise<LocalPassportOcrWorker>;
+  };
+};
+
+let localPassportOcrWorkerPromise: Promise<LocalPassportOcrWorker> | null = null;
+
 type PassportOcrCandidate = {
   canvas: BrowserCanvas;
   cropped: boolean;
@@ -93,6 +114,21 @@ function passportMimeType(value: string | undefined) {
   return supportedPassportMimeTypes.has(value as PassportDocumentRef["mimeType"])
     ? (value as PassportDocumentRef["mimeType"])
     : null;
+}
+
+function localPassportFileKind(file: File): "image" | "pdf" | null {
+  const name = file.name.toLowerCase();
+  if (file.type === "application/pdf" || name.endsWith(".pdf")) {
+    return "pdf";
+  }
+  if (
+    ["image/jpeg", "image/png"].includes(file.type) ||
+    /\.(jpe?g|png)$/.test(name)
+  ) {
+    return "image";
+  }
+
+  return null;
 }
 
 function normalizeOcrText(value: string) {
@@ -932,26 +968,22 @@ async function invokeLocalPassportExtraction(input: {
   applicantIndex?: number;
   localFile: File;
 }): Promise<PassportExtractionResult> {
-  if (!["image/jpeg", "image/png"].includes(input.localFile.type)) {
+  const fileKind = localPassportFileKind(input.localFile);
+  if (fileKind === "pdf") {
+    return invokeLocalPassportPdfExtraction(input);
+  }
+
+  if (fileKind !== "image") {
     return safeUnavailablePassportExtractionResult(input.applicantIndex);
   }
 
   const quality = await safePassportImageQualityFromFile(input.localFile);
-
-  // tesseract.js does not publish declarations for this recognize-only subpath.
-  // Keep the narrow import to avoid bundling scheduler/language tables into V-19.
-  // @ts-expect-error see note above
-  const tesseract = await import("tesseract.js/src/Tesseract.js");
-  const recognize = tesseract.recognize ?? tesseract.default.recognize;
+  const worker = await localPassportOcrWorker();
   const recognizedTexts: string[] = [];
   let bestResult: PassportExtractionResult | null = null;
   for (const candidate of await passportOcrCandidatesFromFile(input.localFile)) {
     const response = await withPassportOcrTimeout<PassportOcrResponse>(
-      recognize(
-        candidate.canvas as Parameters<typeof recognize>[0],
-        "eng",
-        localTesseractOptions,
-      ),
+      worker.recognize(candidate.canvas),
     );
     recognizedTexts.push(response.data.text);
     const mrzFields = parsePassportMrzText(response.data.text);
@@ -1001,6 +1033,70 @@ async function invokeLocalPassportExtraction(input: {
   if (bestResult) return bestResult;
 
   return unavailableWithQuality(input.applicantIndex, quality);
+}
+
+async function localPassportOcrWorker(): Promise<LocalPassportOcrWorker> {
+  if (!localPassportOcrWorkerPromise) {
+    localPassportOcrWorkerPromise = (async () => {
+      const tesseract = (await import(
+        "tesseract.js/src/index.js"
+      )) as unknown as LocalTesseractModule;
+      const createWorker = tesseract.createWorker ?? tesseract.default?.createWorker;
+      if (!createWorker) {
+        throw new Error("Local passport OCR worker is unavailable.");
+      }
+      return createWorker("eng", 1, localTesseractOptions);
+    })();
+    void localPassportOcrWorkerPromise.catch(() => {
+      localPassportOcrWorkerPromise = null;
+    });
+  }
+  return localPassportOcrWorkerPromise;
+}
+
+export async function prewarmLocalPassportOcr(): Promise<void> {
+  try {
+    await localPassportOcrWorker();
+  } catch {
+    // Extraction remains fail-closed and retries worker bootstrap on upload.
+  }
+}
+
+async function invokeLocalPassportPdfExtraction(input: {
+  applicantIndex?: number;
+  localFile: File;
+}): Promise<PassportExtractionResult> {
+  const { extractPdfTextFromFile } = await import("./pdfTextExtraction");
+  const pdf = await extractPdfTextFromFile(input.localFile);
+  const mrzFields = parsePassportMrzText(pdf.text);
+  const fields = mergePassportFields(
+    mrzFields,
+    parsePassportVisualText(pdf.text, mrzFields),
+  );
+
+  if (!mrzFields.length && !hasUsableVisualPassportFields(fields)) {
+    return {
+      ...safeUnavailablePassportExtractionResult(input.applicantIndex),
+      summary:
+        "В PDF не найдена читаемая машиночитаемая зона паспорта. Загрузите разворот паспорта целиком или проверьте данные вручную.",
+    };
+  }
+
+  const result: PassportExtractionResult = {
+    applicantIndex: input.applicantIndex,
+    fields,
+    guardrails: [
+      "Данные из паспорта нужно проверить вручную.",
+      "Распознавание не является официальной проверкой.",
+      "Пустые или сомнительные поля остаются незаполненными.",
+    ],
+    source: "local-ocr",
+    status: "extracted",
+    summary: `Локальный OCR обработал PDF паспорта и нашёл ${fields.length} полей. Проверьте их вручную перед отправкой.`,
+  };
+  const parsed = parsePassportExtractionResult(result);
+  if (!parsed.ok) throw new Error(parsed.safeMessage);
+  return parsed.data;
 }
 
 function localOcrSummary(fields: number, quality: PassportImageQualityReport | null) {
