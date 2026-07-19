@@ -103,8 +103,8 @@ export function CommandPalette({
               value="create-submission"
             >
               <Plus aria-hidden="true" focusable="false" size={16} />
-              <span>Создать пакет</span>
-              <em>Новая подача</em>
+              <span>Новая подача</span>
+              <em>Создать</em>
             </Command.Item>
           </Command.Group>
         ) : null}
