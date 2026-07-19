@@ -79,7 +79,7 @@ All business actions should map to domain commands:
 |---|---|---|---|
 | `createDraft` | agent | create input | `draft` submission with Spain metadata |
 | `updateSubmission` | agent | editable draft/in-progress/returned fields | derived state refreshed |
-| `submitForReview` | agent | complete `in_progress` | `submitted_for_review` |
+| `submitForReview` | agent | complete `in_progress` or explicit re-review from `ready_for_export` | `submitted_for_review` |
 | `returnWithIssues` | admin | reviewable submission + issue input | `returned` with open issues |
 | `markIssueFixed` | agent | returned issue | issue `fixed_by_agent` |
 | `resubmitCorrections` | agent | no open issues | `corrections_received` |

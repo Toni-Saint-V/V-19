@@ -211,7 +211,7 @@ describe("V-19 submission status rules", () => {
     const expected = {
       save_progress: { from: ["draft"], to: "in_progress", role: "agent" },
       submit_for_review: {
-        from: ["in_progress"],
+        from: ["in_progress", "ready_for_export"],
         to: "submitted_for_review",
         role: "agent",
       },

@@ -249,6 +249,12 @@ describe("Package 1 canonical domain contract", () => {
 
   test("keeps exported terminal and rejects forbidden status transitions", () => {
     expect(isExportedTerminal("exported")).toBe(true);
+    expect(
+      isStatusTransitionAllowed("ready_for_export", "submitted_for_review"),
+    ).toBe(true);
+    expect(
+      isForbiddenStatusTransition("ready_for_export", "submitted_for_review"),
+    ).toBe(false);
     expect(isStatusTransitionAllowed("exported", "ready_for_export")).toBe(false);
     expect(isForbiddenStatusTransition("draft", "submitted_for_review")).toBe(true);
     expect(isForbiddenStatusTransition("in_progress", "ready_for_export")).toBe(true);

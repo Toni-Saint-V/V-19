@@ -73,7 +73,10 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     productionLogic: "src/modules/submissions/status.applySubmissionActionResult",
     submissionAction: "submit_for_review",
     surfaces: ["agent-actions", "agent-submissions", "submission-drawer"],
-    transition: { from: ["in_progress"], to: "submitted_for_review" },
+    transition: {
+      from: ["in_progress", "ready_for_export"],
+      to: "submitted_for_review",
+    },
   },
   add_admin_issue: {
     executionPath: "addPreciseAdminIssue",

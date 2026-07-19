@@ -77,6 +77,7 @@ export type StatusTransition = {
 export const ALLOWED_STATUS_TRANSITIONS = [
   { from: "draft", to: "in_progress" },
   { from: "in_progress", to: "submitted_for_review" },
+  { from: "ready_for_export", to: "submitted_for_review" },
   { from: "submitted_for_review", to: "returned" },
   { from: "submitted_for_review", to: "ready_for_export" },
   { from: "returned", to: "corrections_received" },
@@ -113,7 +114,6 @@ export const FORBIDDEN_STATUS_TRANSITIONS = {
   ready_for_export: [
     "draft",
     "in_progress",
-    "submitted_for_review",
     "returned",
     "corrections_received",
   ],

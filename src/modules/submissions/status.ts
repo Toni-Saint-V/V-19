@@ -334,7 +334,7 @@ export const transitionMatrix: Record<
 > = {
   save_progress: { from: ["draft"], to: "in_progress", role: "agent" },
   submit_for_review: {
-    from: ["in_progress"],
+    from: ["in_progress", "ready_for_export"],
     to: "submitted_for_review",
     role: "agent",
   },
@@ -1356,8 +1356,11 @@ export function applySubmissionActionResult(
   if (action === "submit_for_review") {
     const prepared: Submission = {
       ...submission,
+      exportState: "not_ready",
       files: submission.files.map((file) =>
-        file.status === "uploaded" ? { ...file, status: "pending_review" } : file,
+        file.status === "uploaded" || file.status === "accepted"
+          ? { ...file, status: "pending_review" }
+          : file,
       ),
     };
 

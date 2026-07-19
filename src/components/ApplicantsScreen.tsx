@@ -387,11 +387,16 @@ function SubmissionStatusAction({
   const completionDecision = agentQuestionnaireCompletionDecision(submission);
   const canSubmit =
     canSubmitForReview &&
-    completionDecision.action === "submit_for_review" &&
-    completionDecision.ok;
+    (submission.status === "ready_for_export" ||
+      (completionDecision.action === "submit_for_review" &&
+        completionDecision.ok));
 
   if (canSubmit) {
-    const actionLabel = submitting ? "Отправляем…" : "Отправить на проверку";
+    const actionLabel = submitting
+      ? "Отправляем…"
+      : submission.status === "ready_for_export"
+        ? "К выгрузке"
+        : "Отправить на проверку";
     return (
       <button
         aria-label={`${actionLabel}: ${label}`}
@@ -776,14 +781,23 @@ export function ApplicantsScreen({
 
   const handlePrimaryAction = async (submission: Submission) => {
     const completionDecision = agentQuestionnaireCompletionDecision(submission);
+    const canSendToReview =
+      submission.status === "ready_for_export" ||
+      (completionDecision.action === "submit_for_review" &&
+        completionDecision.ok);
+
     if (
-      completionDecision.action !== "submit_for_review" ||
-      !completionDecision.ok ||
+      !canSendToReview ||
       !onSubmitForReview
     ) {
       onOpenDrawer(submission.id);
       return;
     }
+
+    if (!window.confirm("Отправить на проверку администратору?")) {
+      return;
+    }
+
     setSubmissionError(null);
     setSubmittingId(submission.id);
     try {

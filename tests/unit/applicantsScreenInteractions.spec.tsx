@@ -14,6 +14,7 @@ import {
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import {
+  applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
   canPerformAction,
 } from "../../src/modules/submissions/status";
@@ -312,6 +313,7 @@ describe("ApplicantsScreen interactions", () => {
     const family = readySubmission("family");
     expect(canPerformAction(single, "submit_for_review", "agent").ok).toBe(true);
     expect(canPerformAction(family, "submit_for_review", "agent").ok).toBe(true);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
     const view = render(
       <ApplicantsScreen
@@ -327,6 +329,9 @@ describe("ApplicantsScreen interactions", () => {
     });
     expect(submitButtons).toHaveLength(2);
     fireEvent.click(submitButtons[0]!);
+    expect(confirm).toHaveBeenCalledWith(
+      "Отправить на проверку администратору?",
+    );
     await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledTimes(1));
 
     const transition = applySubmissionActionResult(
@@ -352,6 +357,84 @@ describe("ApplicantsScreen interactions", () => {
     expect(
       screen.queryByRole("button", { name: /Отправить на проверку:/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("sends an export-ready package back to admin review", async () => {
+    const ready = readySubmission("single");
+    const accepted: Submission = {
+      ...ready,
+      exportState: "ready",
+      files: ready.files.map((file) => ({ ...file, status: "accepted" })),
+      status: "ready_for_export",
+    };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const onOpenDrawer = vi.fn();
+    const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={onOpenDrawer}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[accepted]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /К выгрузке:/ }),
+    );
+
+    expect(confirm).toHaveBeenCalledWith(
+      "Отправить на проверку администратору?",
+    );
+    await waitFor(() =>
+      expect(onSubmitForReview).toHaveBeenCalledWith(accepted.id),
+    );
+    expect(onOpenDrawer).not.toHaveBeenCalled();
+
+    const transition = applyAgentSubmitForReviewResult(
+      accepted,
+      accepted.agentId,
+    );
+    expect(transition.ok).toBe(true);
+    if (!transition.ok) return;
+    expect(transition.data.status).toBe("submitted_for_review");
+    expect(transition.data.exportState).toBe("not_ready");
+    expect(
+      transition.data.files.every((file) => file.status === "pending_review"),
+    ).toBe(true);
+  });
+
+  it("does not send an export-ready package when confirmation is declined", () => {
+    const ready = readySubmission("single");
+    const accepted: Submission = {
+      ...ready,
+      exportState: "ready",
+      files: ready.files.map((file) => ({ ...file, status: "accepted" })),
+      status: "ready_for_export",
+    };
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const onOpenDrawer = vi.fn();
+    const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={onOpenDrawer}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[accepted]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /К выгрузке:/ }),
+    );
+
+    expect(confirm).toHaveBeenCalledWith(
+      "Отправить на проверку администратору?",
+    );
+    expect(onSubmitForReview).not.toHaveBeenCalled();
+    expect(onOpenDrawer).not.toHaveBeenCalled();
   });
 
   it("resets filters and ordering, then scrolls the saved card into view", async () => {

@@ -331,7 +331,7 @@ The following table is the complete Package 1 status transition matrix.
 |---|---|---|---|---|---|
 | T0 | Create submission draft | `agent` | none | `draft` | Agent is known; ownership is assigned; initial status is canonical; no legacy status/media value is written. |
 | T1 | Save/start progress | `agent` | `draft` | `in_progress` | Agent owns the submission; at least one applicant exists; questionnaire/media may be incomplete; no admin issue exists yet. |
-| T2 | Submit for review | `agent` | `in_progress` | `submitted_for_review` | Agent owns the submission; every applicant has a complete questionnaire and `passport_scan`; only a single/primary family applicant additionally requires `selfie` + `selfie_2`; no required media is missing/rejected; no `photo`, `photo_white`, `video`, or unknown media value exists in the canonical package; no unresolved issue exists; passport extraction/review gates pass if active. |
+| T2 | Submit for review | `agent` | `in_progress`, `ready_for_export` | `submitted_for_review` | Agent owns the submission; every applicant has a complete questionnaire and `passport_scan`; only a single/primary family applicant additionally requires `selfie` + `selfie_2`; no required media is missing/rejected; no `photo`, `photo_white`, `video`, or unknown media value exists in the canonical package; no unresolved issue exists; passport extraction/review gates pass if active. Re-submitting an export-ready package clears export readiness and returns accepted media to admin review. |
 | T3 | Return with issues | `admin` | `submitted_for_review` | `returned` | Admin is known; at least one valid `open` issue exists; each issue target points to an applicant/questionnaire field/section/media slot in the canonical package; no issue is closed directly from `open`; no export metadata is committed. |
 | T4 | Accept first review | `admin` | `submitted_for_review` | `ready_for_export` | Admin is known; no `open` issue exists; no `fixed_by_agent` issue exists; every applicant package is complete; required media has passed admin acceptance/export-readiness validation; export readiness is initialized but export is not yet completed. |
 | T5 | Submit corrections | `agent` | `returned` | `corrections_received` | Agent owns the submission; at least one `open` issue exists; every `open` issue has a concrete correction; corrected issues move to `fixed_by_agent`; questionnaire/media package remains complete; no closed issue is reopened; no forbidden media value is introduced. |
@@ -355,7 +355,7 @@ All transitions not listed in Section 8 are forbidden. The following forbidden m
 | `submitted_for_review` | `draft`, `in_progress`, `corrections_received`, `exported` |
 | `returned` | `draft`, `in_progress`, `submitted_for_review`, `ready_for_export`, `exported` |
 | `corrections_received` | `draft`, `in_progress`, `submitted_for_review`, `exported` |
-| `ready_for_export` | `draft`, `in_progress`, `submitted_for_review`, `returned`, `corrections_received` |
+| `ready_for_export` | `draft`, `in_progress`, `returned`, `corrections_received` |
 | `exported` | `draft`, `in_progress`, `submitted_for_review`, `returned`, `corrections_received`, `ready_for_export`, and any state-mutating self-update |
 
 ### 9.1 Explicitly forbidden shortcuts
@@ -427,7 +427,7 @@ All issue transitions not listed as allowed are forbidden.
 | Upload/reupload `selfie` | `draft`, `in_progress`, `returned` | Mutates straight/front selfie slot. |
 | Upload/reupload `selfie_2` | `draft`, `in_progress`, `returned` | Mutates side/profile selfie slot. |
 | Save/start progress | `draft` | `draft -> in_progress`. |
-| Submit for review | `in_progress` | `in_progress -> submitted_for_review`. |
+| Submit for review | `in_progress`, `ready_for_export` | Moves the submission to `submitted_for_review`; re-submission clears export readiness. |
 | Submit corrections | `returned` | `returned -> corrections_received`; open issues become `fixed_by_agent` when corrected. |
 | View status/history | Any owned status | Read-only. |
 
@@ -490,6 +490,8 @@ System must not:
 ## 12. Export domain rules
 
 `ready_for_export` means the submission is accepted and eligible for export. It does not mean the submission has been exported.
+
+An agent may explicitly return a `ready_for_export` submission to `submitted_for_review`; this clears export readiness and requires admin review again.
 
 `exported` means export was durably completed and `exported_at` exists as a valid persisted timestamp.
 
