@@ -4868,7 +4868,7 @@ export function FigmaQuestionnaireScreen({
                 {saveStatus === "saving" ? "Сохраняем" : "Сохранить и выйти"}
               </span>
               <span className="sm:hidden">
-                {saveStatus === "saving" ? "Сохраняем" : "Сохранить"}
+                {saveStatus === "saving" ? "Сохраняем" : "Сохранить и выйти"}
               </span>
             </button>
           ) : questionnaireStatus.readOnly ? (

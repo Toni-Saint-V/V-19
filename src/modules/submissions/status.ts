@@ -1395,6 +1395,32 @@ export function applySubmissionActionResult(
   });
 }
 
+export function applyAgentSubmitForReviewResult(
+  submission: Submission,
+  actorId?: string,
+): CommandResult<Submission> {
+  const preparedResult =
+    submission.status === "draft"
+      ? applySubmissionActionResult(
+          submission,
+          "save_progress",
+          "agent",
+          actorId,
+        )
+      : { ok: true as const, data: submission };
+
+  if (!preparedResult.ok) {
+    return preparedResult;
+  }
+
+  return applySubmissionActionResult(
+    preparedResult.data,
+    "submit_for_review",
+    "agent",
+    actorId,
+  );
+}
+
 function submissionActionFailure(
   action: SubmissionAction,
   reason = "Действие заблокировано доменными правилами.",

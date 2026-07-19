@@ -96,6 +96,7 @@ import {
   uploadMediaToStorage,
 } from "../modules/submissions/mediaStorage";
 import {
+  applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
   canReplaceDocument,
   markSubmissionIssueFixedResult,
@@ -923,12 +924,16 @@ export function CommandCenter({
     if (!currentSubmission) throw new Error("Подача больше не доступна.");
 
     const applyAction = (latestSubmission: Submission) => {
-      const result = applySubmissionActionResult(
-        latestSubmission,
-        action,
-        "agent",
-        agentId ?? latestSubmission.agentId,
-      );
+      const actorId = agentId ?? latestSubmission.agentId;
+      const result =
+        action === "submit_for_review"
+          ? applyAgentSubmitForReviewResult(latestSubmission, actorId)
+          : applySubmissionActionResult(
+              latestSubmission,
+              action,
+              "agent",
+              actorId,
+            );
       if (!result.ok) throw new Error(result.error.message);
       return result.data;
     };

@@ -44,8 +44,8 @@ import {
   submissionPublicNumber,
 } from "../modules/submissions/submissionIdentity";
 import {
+  agentQuestionnaireCompletionDecision,
   canAgentEditSubmission,
-  canPerformAction,
   statusLabelFor,
 } from "../modules/submissions/status";
 import type {
@@ -383,9 +383,11 @@ function SubmissionStatusAction({
   submission: Submission;
   submitting: boolean;
 }) {
+  const completionDecision = agentQuestionnaireCompletionDecision(submission);
   const canSubmit =
     canSubmitForReview &&
-    canPerformAction(submission, "submit_for_review", "agent").ok;
+    completionDecision.action === "submit_for_review" &&
+    completionDecision.ok;
 
   if (canSubmit) {
     const actionLabel = submitting ? "Отправляем…" : "Отправить на проверку";
@@ -752,8 +754,10 @@ export function ApplicantsScreen({
   };
 
   const handlePrimaryAction = async (submission: Submission) => {
+    const completionDecision = agentQuestionnaireCompletionDecision(submission);
     if (
-      !canPerformAction(submission, "submit_for_review", "agent").ok ||
+      completionDecision.action !== "submit_for_review" ||
+      !completionDecision.ok ||
       !onSubmitForReview
     ) {
       onOpenDrawer(submission.id);
