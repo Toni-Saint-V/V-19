@@ -25,7 +25,7 @@ import {
 import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
 import { PreUploadScreen } from "./PreUploadScreen";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
-import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from "../modules/submissions/components/adminAiAssistance";
+import { Drawer } from "./Drawer";
 import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import {
   emitVisaflowUiEvent,
@@ -452,6 +452,10 @@ export function CommandCenter({
         field: target.field,
         section: target.section,
       });
+      return;
+    }
+    if (target.tab === "files") {
+      focusSubmissionInList(submissionId);
       return;
     }
     bridge.onSubmissionOpen?.(submissionId);
@@ -1507,25 +1511,21 @@ export function CommandCenter({
       </main>
 
       {selectedCanonicalSubmission ? (
-        <OperationalSubmissionDrawer
+        <Drawer
           activeTab={drawerActiveTab}
           focusTarget={drawerFocusTarget}
           isOpen={drawerOpen}
-          onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
+          submission={selectedCanonicalSubmission}
           onAction={executeAgentSubmissionAction}
+          onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
           onClose={() => setDrawerOpen(false)}
-          onMarkIssueFixed={async (issueId) => {
-            await markAgentIssueFixed(issueId);
-          }}
-          onOpenQuestionnaireWorkspace={(target) =>
+          onOpenQuestionnaire={(target) =>
             handleOpenQuestionnaire(selectedCanonicalSubmission.id, target)
           }
-          onUploadFile={async (fileId, file) => {
-            await uploadCanonicalFile(selectedCanonicalSubmission.id, fileId, file);
-          }}
-          role="agent"
-          submission={selectedCanonicalSubmission}
-          surface="agent"
+          onOpenWorkspaceTarget={(target) =>
+            handleOpenWorkspaceTarget(selectedCanonicalSubmission.id, target)
+          }
+          onUploadApplicantFile={uploadCanonicalApplicantFile}
         />
       ) : null}
 

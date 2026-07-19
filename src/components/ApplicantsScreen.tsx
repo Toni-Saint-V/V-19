@@ -353,6 +353,7 @@ function SubmissionCreatedAt({
 
 type CardCallbacks = Pick<
   ApplicantsScreenProps,
+  | "onOpenDrawer"
   | "onOpenQuestionnaire"
   | "onOpenWorkspaceTarget"
   | "onUploadApplicantFile"
@@ -417,6 +418,7 @@ function FamilySubmissionCard({
   canSubmitForReview,
   error,
   now,
+  onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
   onPrimaryAction,
@@ -437,6 +439,15 @@ function FamilySubmissionCard({
       aria-label={`Подача ${title}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      onClick={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest("button, a, input, select, textarea, label")
+        ) {
+          return;
+        }
+        onOpenDrawer(submission.id);
+      }}
     >
       <div className="v19-applicant-family-header">
         <div className="v19-applicant-family-main">
@@ -507,6 +518,7 @@ function IndividualSubmissionCard({
   canSubmitForReview,
   error,
   now,
+  onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
   onPrimaryAction,
@@ -524,6 +536,15 @@ function IndividualSubmissionCard({
       aria-label={`Подача ${name}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      onClick={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest("button, a, input, select, textarea, label")
+        ) {
+          return;
+        }
+        onOpenDrawer(submission.id);
+      }}
     >
       <div className="v19-applicant-individual-header">
         <div className="v19-applicant-individual-main">
@@ -783,6 +804,7 @@ export function ApplicantsScreen({
   const cardCallbacks = {
     canSubmitForReview: Boolean(onSubmitForReview),
     now,
+    onOpenDrawer,
     onOpenQuestionnaire,
     onOpenWorkspaceTarget,
     onPrimaryAction: (submission: Submission) => void handlePrimaryAction(submission),
