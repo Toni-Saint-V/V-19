@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
+import "../shared/ui/review-workspace.css";
 import {
   AlertCircle,
   ArrowLeft,
@@ -19,6 +20,7 @@ import {
   mediaStorageBucket,
 } from "../modules/submissions/mediaStorage";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
+import { getAdminReviewActions } from "../modules/submissions/status";
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
   hasAdminPassportReviewValue,
@@ -29,11 +31,18 @@ import {
   type AdminPassportReviewFieldId,
 } from "../modules/submissions/passportReviewContract";
 import type {
+  ActionDecision,
   Applicant,
   Submission,
+  SubmissionAction,
   SubmissionFile,
   SubmissionFileType,
 } from "../modules/submissions/types";
+import { ReviewMediaPreview, type ReviewMediaPreviewState } from "./ReviewMediaPreview";
+import {
+  ReviewPassportFieldRow,
+  type PassportReviewField,
+} from "./ReviewPassportFieldRow";
 
 interface ReviewWorkspaceProps {
   applicantId?: string;
@@ -45,9 +54,8 @@ interface ReviewWorkspaceProps {
     applicantId?: string,
   ) => void;
   onApplicantChange?: (applicantId: string) => void;
-  onApproveSection?: (input: {
-    applicantId: string;
-  }) => boolean | Promise<boolean>;
+  onApproveSection?: (input: { applicantId: string }) => boolean | Promise<boolean>;
+  onReviewAction?: (action: SubmissionAction) => boolean | Promise<boolean>;
   onBack: () => void;
   submission?: Submission | null;
   submissionId: string;
@@ -62,22 +70,7 @@ type ReviewMediaTarget = {
   type: ReviewMediaType;
 };
 
-type ReviewField = {
-  alreadyApproved: boolean;
-  hasError: boolean;
-  id: AdminPassportReviewFieldId;
-  label: string;
-  sectionId: string;
-  sourceLabel: string;
-  value: string;
-};
-
-type PreviewState = {
-  status: "loading" | "ready" | "unavailable";
-  url?: string;
-};
-
-type PreviewStateMap = Partial<Record<ReviewMediaType, PreviewState>>;
+type PreviewStateMap = Partial<Record<ReviewMediaType, ReviewMediaPreviewState>>;
 
 const passportFieldLabels: Record<AdminPassportReviewFieldId, string> = {
   "first-name": "Имя",
@@ -111,9 +104,9 @@ const mediaTargetsByType: Record<ReviewMediaType, ReviewMediaTarget> = {
   },
 };
 
-const unavailablePreview: PreviewState = { status: "unavailable" };
+const unavailablePreview: ReviewMediaPreviewState = { status: "unavailable" };
 
-function reviewFieldsForApplicant(applicant?: Applicant): ReviewField[] {
+function reviewFieldsForApplicant(applicant?: Applicant): PassportReviewField[] {
   if (!applicant) return [];
 
   const fieldsById = new Map(
@@ -129,8 +122,7 @@ function reviewFieldsForApplicant(applicant?: Applicant): ReviewField[] {
     const sourceLabel = entry?.field.label ?? passportFieldLabels[id];
     return {
       alreadyApproved: Boolean(
-        entry?.field.adminReviewApprovedAtIso &&
-          entry.field.adminReviewApprovedBy,
+        entry?.field.adminReviewApprovedAtIso && entry.field.adminReviewApprovedBy,
       ),
       hasError: Boolean(entry?.field.error),
       id,
@@ -148,98 +140,20 @@ function reviewFileName(target: ReviewMediaTarget, file?: SubmissionFile) {
   );
 }
 
-function isPdfFile(file?: SubmissionFile) {
-  const fileName = file?.originalFileName ?? file?.generatedFileName ?? "";
-  return (
-    file?.mimeType === "application/pdf" ||
-    fileName.toLocaleLowerCase().endsWith(".pdf")
-  );
+function sectionActionLabel(accepted: boolean, pending: boolean) {
+  if (accepted) return "Секция подтверждена";
+  if (pending) return "Сохраняем…";
+  return "Подтвердить паспортную секцию";
 }
 
-function needsExternalViewer(file?: SubmissionFile) {
-  const fileName = file?.originalFileName ?? file?.generatedFileName ?? "";
-  const normalizedName = fileName.toLocaleLowerCase();
-  return (
-    file?.mimeType === "image/heic" ||
-    file?.mimeType === "image/heif" ||
-    normalizedName.endsWith(".heic") ||
-    normalizedName.endsWith(".heif")
-  );
-}
-
-function FieldReviewRow({
-  applicant,
-  field,
-  onAddRemark,
-}: {
-  applicant?: Applicant;
-  field: ReviewField;
-  onAddRemark: ReviewWorkspaceProps["onAddRemark"];
-}) {
-  const valid = hasAdminPassportReviewValue(field.value) && !field.hasError;
-  const statusLabel = field.alreadyApproved
-    ? "Подтверждено"
-    : valid
-      ? "Проверить"
-      : "Нужно замечание";
-  const statusClassName = field.alreadyApproved
-    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-    : valid
-      ? "bg-[#3a45b4]/10 border-[#3a45b4]/20 text-[#8fa3ff]"
-      : "bg-orange-500/10 border-orange-500/20 text-orange-400";
-
-  return (
-    <article
-      className={`p-4 rounded-2xl border transition-colors ${valid ? "bg-[#161617] border-[#242529] hover:border-[#2e2f34]" : "bg-orange-500/5 border-orange-500/30"}`}
-      data-passport-field-id={field.id}
-    >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-[11px] text-white/40 uppercase tracking-wider font-medium">
-              {field.label}
-            </span>
-            <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium ${statusClassName}`}
-            >
-              {field.alreadyApproved ? (
-                <CheckCircle2 className="w-3.5 h-3.5" />
-              ) : (
-                <AlertCircle className="w-3.5 h-3.5" />
-              )}
-              {statusLabel}
-            </span>
-          </div>
-          <div className="text-[15px] font-semibold text-white break-words">
-            {hasAdminPassportReviewValue(field.value) ? field.value : "Не заполнено"}
-          </div>
-          <div
-            className={`text-[11px] mt-1 ${valid ? "text-white/35" : "text-orange-300/75"}`}
-          >
-            {valid
-              ? "Сверьте значение с оригиналом паспорта"
-              : "Поле отсутствует или содержит ошибку"}
-          </div>
-        </div>
-        <button
-          aria-label={`Добавить замечание: ${field.label}`}
-          className="v19-admin-passport-field-remark h-10 px-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 text-orange-400 text-[12px] font-medium flex items-center justify-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-          onClick={() =>
-            onAddRemark(
-              field.sourceLabel,
-              applicant?.fullName,
-              undefined,
-              applicant?.id,
-            )
-          }
-          type="button"
-        >
-          <MessageSquarePlus className="w-4 h-4" />
-          Замечание
-        </button>
-      </div>
-    </article>
-  );
+function reviewActionLabel(
+  decision: ActionDecision | undefined,
+  pendingAction: SubmissionAction | null,
+  fallback: string,
+  pendingLabel: string,
+) {
+  if (decision && pendingAction === decision.action) return pendingLabel;
+  return decision?.label ?? fallback;
 }
 
 export function ReviewWorkspace({
@@ -248,6 +162,7 @@ export function ReviewWorkspace({
   onAddRemark,
   onApplicantChange,
   onApproveSection,
+  onReviewAction,
   onBack,
   submission,
   submissionId,
@@ -255,6 +170,7 @@ export function ReviewWorkspace({
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const previewPaneRef = useRef<HTMLDivElement | null>(null);
   const onBackRef = useRef(onBack);
+  const mountedRef = useRef(true);
   const wasNestedDialogOpenRef = useRef(nestedDialogOpen);
   onBackRef.current = onBack;
 
@@ -274,10 +190,7 @@ export function ReviewWorkspace({
   }, [selectedApplicantId, submission]);
   const requiredMediaTypes =
     submission && selectedApplicantId
-      ? requiredPassportReviewMediaTypesForApplicant(
-          submission,
-          selectedApplicantId,
-        )
+      ? requiredPassportReviewMediaTypesForApplicant(submission, selectedApplicantId)
       : (["passport_scan"] as const);
   const [activeMediaType, setActiveMediaType] =
     useState<ReviewMediaType>("passport_scan");
@@ -287,19 +200,72 @@ export function ReviewWorkspace({
   const [sectionApprovalPending, setSectionApprovalPending] = useState(false);
   const [sectionApprovedLocally, setSectionApprovedLocally] = useState(false);
   const [acceptanceError, setAcceptanceError] = useState("");
+  const [reviewActionPending, setReviewActionPending] =
+    useState<SubmissionAction | null>(null);
+  const [reviewActionError, setReviewActionError] = useState("");
 
   const activeMediaTarget =
-    mediaTargets.find((target) => target.type === activeMediaType) ??
-    mediaTargets[0];
+    mediaTargets.find((target) => target.type === activeMediaType) ?? mediaTargets[0];
   const activeMediaFile = submission?.files.find(
     (file) =>
-      file.applicantId === selectedApplicantId &&
-      file.type === activeMediaTarget.type,
+      file.applicantId === selectedApplicantId && file.type === activeMediaTarget.type,
   );
-  const activePreview =
-    mediaPreviews[activeMediaTarget.type] ?? unavailablePreview;
+  const activePreview = mediaPreviews[activeMediaTarget.type] ?? unavailablePreview;
   const activePreviewUrl =
     activePreview.status === "ready" ? activePreview.url : undefined;
+  const passportMediaTarget = mediaTargetsByType.passport_scan;
+  const passportMediaFile = submission?.files.find(
+    (file) => file.applicantId === selectedApplicantId && file.type === "passport_scan",
+  );
+  const passportPreview = mediaPreviews.passport_scan ?? unavailablePreview;
+  const isIdentityComparison = activeMediaTarget.type !== "passport_scan";
+  const activeMediaTransform = `scale(${zoom / 100}) rotate(${rotation}deg)`;
+  const adminReviewActions = submission
+    ? getAdminReviewActions(submission, "admin")
+    : null;
+  const applicantReviewStates = useMemo(() => {
+    if (!submission) return [];
+
+    return submission.applicants.map((applicant) => {
+      const fields = reviewFieldsForApplicant(applicant);
+      const mediaTypes = requiredPassportReviewMediaTypesForApplicant(
+        submission,
+        applicant.id,
+      );
+      const completed =
+        fields.length === ADMIN_PASSPORT_REVIEW_FIELD_IDS.length &&
+        fields.every(
+          (field) =>
+            field.alreadyApproved &&
+            hasAdminPassportReviewValue(field.value) &&
+            !field.hasError,
+        ) &&
+        mediaTypes.every((type) =>
+          submission.files.some(
+            (file) =>
+              file.applicantId === applicant.id &&
+              file.type === type &&
+              file.status === "accepted",
+          ),
+        );
+
+      return {
+        completed,
+        id: applicant.id,
+        name: applicant.fullName,
+      };
+    });
+  }, [submission]);
+  const approvedApplicantCount = applicantReviewStates.filter(
+    (state) => state.completed,
+  ).length;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (mediaTargets.some((target) => target.type === activeMediaType)) return;
@@ -311,6 +277,7 @@ export function ReviewWorkspace({
     setRotation(0);
     setSectionApprovedLocally(false);
     setAcceptanceError("");
+    setReviewActionError("");
   }, [selectedApplicantId, submissionId]);
 
   useEffect(() => {
@@ -321,7 +288,7 @@ export function ReviewWorkspace({
       ? undefined
       : window.requestAnimationFrame(() => {
           workspaceRef.current
-            ?.querySelector<HTMLButtonElement>('button:not([disabled])')
+            ?.querySelector<HTMLButtonElement>("button:not([disabled])")
             ?.focus({ preventScroll: true });
         });
 
@@ -402,7 +369,7 @@ export function ReviewWorkspace({
             return [
               target.type,
               url
-                ? ({ status: "ready", url } satisfies PreviewState)
+                ? ({ status: "ready", url } satisfies ReviewMediaPreviewState)
                 : unavailablePreview,
             ] as const;
           } catch {
@@ -424,20 +391,20 @@ export function ReviewWorkspace({
   const passportIssueInScope = (issue: Submission["issues"][number]) =>
     Boolean(
       selectedApplicantId &&
-        isAdminPassportReviewIssueInScope(issue, {
-          applicantId: selectedApplicantId,
-          fields: reviewFields.map((field) => ({
-            id: field.id,
-            label: field.sourceLabel,
-          })),
-          mediaTypes: mediaTargets.map((target) => target.type),
-        }),
+      isAdminPassportReviewIssueInScope(issue, {
+        applicantId: selectedApplicantId,
+        fields: reviewFields.map((field) => ({
+          id: field.id,
+          label: field.sourceLabel,
+        })),
+        mediaTypes: mediaTargets.map((target) => target.type),
+      }),
     );
-  const hasOpenPassportIssue = Boolean(
-    submission?.issues.some(
+  const openPassportIssueCount =
+    submission?.issues.filter(
       (issue) => issue.status === "open" && passportIssueInScope(issue),
-    ),
-  );
+    ).length ?? 0;
+  const hasOpenPassportIssue = openPassportIssueCount > 0;
   const hasUnambiguousPrimaryApplicant = Boolean(
     submission && hasUnambiguousPrimaryApplicantForPassportReview(submission),
   );
@@ -469,14 +436,14 @@ export function ReviewWorkspace({
       !hasFixedPassportIssue);
   const canConfirmSection = Boolean(
     selectedApplicantId &&
-      submission &&
-      hasUnambiguousPrimaryApplicant &&
-      onApproveSection &&
-      allFieldsFilled &&
-      allProtectedMediaReady &&
-      !hasOpenPassportIssue &&
-      !sectionAlreadyAccepted &&
-      !sectionApprovalPending,
+    submission &&
+    hasUnambiguousPrimaryApplicant &&
+    onApproveSection &&
+    allFieldsFilled &&
+    allProtectedMediaReady &&
+    !hasOpenPassportIssue &&
+    !sectionAlreadyAccepted &&
+    !sectionApprovalPending,
   );
   const filledFieldCount = reviewFields.filter(
     (field) => hasAdminPassportReviewValue(field.value) && !field.hasError,
@@ -484,9 +451,13 @@ export function ReviewWorkspace({
   const unavailableMediaCount = requiredMediaTypes.filter(
     (type) => mediaPreviews[type]?.status !== "ready",
   ).length;
+  const readyMediaCount = requiredMediaTypes.length - unavailableMediaCount;
+  const detailsTitle = isIdentityComparison ? "Паспорт и лицо" : "Паспортные данные";
+  const detailsHint = isIdentityComparison
+    ? `Сопоставьте ${activeMediaTarget.label.toLocaleLowerCase()} с фото в паспорте.`
+    : "Сверьте восемь значений с оригиналом.";
 
-  let completionReason =
-    "Сверьте все восемь полей с паспортом и подтвердите секцию.";
+  let completionReason = "Сверьте все восемь полей с паспортом и подтвердите секцию.";
   if (!selectedApplicantId) {
     completionReason = "Не выбран заявитель. Подтверждение недоступно.";
   } else if (!hasUnambiguousPrimaryApplicant) {
@@ -510,6 +481,17 @@ export function ReviewWorkspace({
     completionReason = "Сохраняем подтверждение паспортной секции…";
   }
 
+  const returnDecision = adminReviewActions?.returnForCorrection;
+  const acceptDecision = adminReviewActions?.acceptForExport;
+  let reviewDecisionReason = "Проверка готова к решению.";
+  if (!onReviewAction) {
+    reviewDecisionReason = "Сохранение решения не подключено.";
+  } else if (acceptDecision?.reason) {
+    reviewDecisionReason = acceptDecision.reason;
+  } else if (returnDecision?.reason) {
+    reviewDecisionReason = returnDecision.reason;
+  }
+
   const handleConfirmSection = async () => {
     if (!canConfirmSection || !selectedApplicantId || !onApproveSection) return;
     setAcceptanceError("");
@@ -527,10 +509,33 @@ export function ReviewWorkspace({
     }
   };
 
-  const handlePreviewError = () => {
+  const handleReviewDecision = async (decision?: ActionDecision) => {
+    if (!decision || decision.disabled || reviewActionPending || !onReviewAction) {
+      return;
+    }
+
+    setReviewActionError("");
+    setReviewActionPending(decision.action);
+    try {
+      const persisted = await onReviewAction(decision.action);
+      if (persisted === false) throw new Error("Review action rejected");
+    } catch {
+      if (mountedRef.current) {
+        setReviewActionError(
+          decision.action === "accept" || decision.action === "close_issues_accept"
+            ? "Не удалось принять подачу. Состояние не изменено."
+            : "Не удалось вернуть подачу. Состояние не изменено.",
+        );
+      }
+    } finally {
+      if (mountedRef.current) setReviewActionPending(null);
+    }
+  };
+
+  const handlePreviewError = (mediaType: ReviewMediaType) => {
     setMediaPreviews((current) => ({
       ...current,
-      [activeMediaTarget.type]: unavailablePreview,
+      [mediaType]: unavailablePreview,
     }));
   };
 
@@ -544,7 +549,7 @@ export function ReviewWorkspace({
       aria-hidden={nestedDialogOpen ? "true" : undefined}
       aria-label="Сверка паспорта"
       aria-modal="true"
-      className="fixed inset-0 z-[60] bg-[#101011] text-white flex flex-col overflow-hidden"
+      className="v19-review-workspace"
       exit={{ opacity: 0, scale: 0.985 }}
       inert={nestedDialogOpen ? true : undefined}
       initial={false}
@@ -552,49 +557,52 @@ export function ReviewWorkspace({
       role="dialog"
       tabIndex={-1}
     >
-      <header className="h-[64px] shrink-0 border-b border-[#202124] bg-[#141416]/95 backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
+      <header className="v19-review-header">
         <button
           aria-label="Вернуться к очереди"
-          className="w-10 h-10 rounded-xl bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] flex items-center justify-center text-white/70 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+          className="v19-review-back"
           onClick={onBack}
           type="button"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft aria-hidden="true" />
         </button>
-        <div className="min-w-0">
-          <div className="text-[11px] text-orange-400 uppercase tracking-wider font-medium">
-            Проверка документов
+        <div className="v19-review-heading">
+          <span>{selectedApplicant?.fullName ?? "Проверка документов"}</span>
+          <div>
+            <h1 aria-label={`Сверка паспорта · ${submissionId}`}>Сверка паспорта</h1>
+            <code title={submissionId}>{submissionId}</code>
           </div>
-          <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight leading-none mt-1 truncate">
-            Сверка паспорта · {submissionId}
-          </h1>
         </div>
-        <div className="ml-auto hidden md:flex items-center gap-2">
-          <a
-            aria-disabled={!activePreviewUrl}
-            className={`h-10 px-4 rounded-xl border border-[#242529] text-[13px] font-medium flex items-center gap-2 transition-colors ${activePreviewUrl ? "bg-[#1e1e21] hover:bg-[#27272b] text-white/80" : "bg-[#1e1e21] text-white/30 pointer-events-none"}`}
-            download={activeMediaFile ? reviewFileName(activeMediaTarget, activeMediaFile) : undefined}
-            href={activePreviewUrl}
-          >
-            <Download className="w-4 h-4" />
-            Скачать оригинал
-          </a>
-        </div>
+        <a
+          aria-disabled={!activePreviewUrl}
+          className={`v19-review-download${activePreviewUrl ? "" : " is-disabled"}`}
+          download={
+            activeMediaFile
+              ? reviewFileName(activeMediaTarget, activeMediaFile)
+              : undefined
+          }
+          href={activePreviewUrl}
+        >
+          <Download aria-hidden="true" />
+          <span>Скачать</span>
+        </a>
       </header>
 
-      <main className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[minmax(420px,1fr)_minmax(480px,0.9fr)] overflow-y-auto xl:overflow-hidden">
-        <section className="min-h-[420px] xl:min-h-0 bg-[#0e0e10] border-b xl:border-b-0 xl:border-r border-[#202124] flex flex-col">
-          <div className="shrink-0 border-b border-[#202124] bg-[#141416] px-3 py-2.5 sm:px-4">
-            <div className="flex flex-wrap items-center gap-2">
+      <main className="v19-review-main">
+        <section aria-label="Оригиналы документов" className="v19-review-media-pane">
+          <div className="v19-review-media-toolbar">
+            <div className="v19-review-media-actions">
               <div
                 aria-label="Выбор файла для проверки"
-                className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-xl border border-[#242529] bg-[#101011] p-1"
+                className="v19-review-media-tabs"
                 role="tablist"
               >
                 {mediaTargets.map((target) => (
                   <button
                     aria-selected={activeMediaTarget.type === target.type}
-                    className={`h-9 shrink-0 rounded-lg px-3 text-[12px] font-medium transition-colors ${activeMediaTarget.type === target.type ? "bg-[#27272b] text-white border border-[#2e2f34]" : "text-white/55 hover:text-white hover:bg-white/5 border border-transparent"}`}
+                    className={
+                      activeMediaTarget.type === target.type ? "is-active" : undefined
+                    }
                     key={target.type}
                     data-review-media={target.type}
                     onClick={() => {
@@ -611,7 +619,7 @@ export function ReviewWorkspace({
               </div>
               <button
                 aria-label={`Добавить замечание: ${activeMediaTarget.label}`}
-                className="h-9 px-3 rounded-xl bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 text-orange-400 text-[12px] font-medium flex items-center gap-1.5 transition-colors"
+                className="v19-review-file-remark"
                 onClick={() =>
                   onAddRemark(
                     `${activeMediaTarget.label}: требуется проверка`,
@@ -622,198 +630,147 @@ export function ReviewWorkspace({
                 }
                 type="button"
               >
-                <MessageSquarePlus className="w-4 h-4" />
-                Замечание
+                <MessageSquarePlus aria-hidden="true" />
+                <span>Замечание</span>
               </button>
             </div>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="v19-review-filebar">
               {activeMediaTarget.type === "passport_scan" ? (
-                <FileText className="w-4 h-4 shrink-0 text-white/40" />
+                <FileText aria-hidden="true" />
               ) : (
-                <UserRound className="w-4 h-4 shrink-0 text-white/40" />
+                <UserRound aria-hidden="true" />
               )}
-              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white">
-                {reviewFileName(activeMediaTarget, activeMediaFile)}
-              </span>
-              <div className="flex shrink-0 items-center gap-1">
+              <span>{reviewFileName(activeMediaTarget, activeMediaFile)}</span>
+              <div className="v19-review-media-controls">
                 <button
                   aria-label="Уменьшить изображение"
-                  className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"
                   onClick={() => setZoom((value) => Math.max(60, value - 10))}
                   type="button"
                 >
-                  <ZoomOut className="w-4 h-4" />
+                  <ZoomOut aria-hidden="true" />
                 </button>
-                <div className="h-9 px-2 rounded-lg bg-white/5 border border-white/5 flex items-center text-[12px] font-mono text-white/60 min-w-[54px] justify-center">
-                  {zoom}%
-                </div>
+                <output aria-label="Масштаб изображения">{zoom}%</output>
                 <button
                   aria-label="Увеличить изображение"
-                  className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"
                   onClick={() => setZoom((value) => Math.min(180, value + 10))}
                   type="button"
                 >
-                  <ZoomIn className="w-4 h-4" />
+                  <ZoomIn aria-hidden="true" />
                 </button>
                 <button
                   aria-label="Повернуть изображение"
-                  className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"
                   onClick={() => setRotation((value) => (value + 90) % 360)}
                   type="button"
                 >
-                  <RotateCw className="w-4 h-4" />
+                  <RotateCw aria-hidden="true" />
                 </button>
                 <button
                   aria-label="Открыть на весь экран"
-                  className="hidden sm:flex w-9 h-9 rounded-lg hover:bg-white/5 items-center justify-center text-white/55 hover:text-white transition-colors"
+                  className="v19-review-fullscreen"
                   onClick={handleFullscreen}
                   type="button"
                 >
-                  <Maximize2 className="w-4 h-4" />
+                  <Maximize2 aria-hidden="true" />
                 </button>
               </div>
             </div>
           </div>
 
           <div
-            className="flex-1 min-h-[320px] p-5 lg:p-8 overflow-auto scrollbar-thin scrollbar-thumb-white/10 flex items-center justify-center"
+            className={`v19-review-media-stage${isIdentityComparison ? " is-comparison" : ""}`}
             ref={previewPaneRef}
           >
-            {activePreview.status === "loading" ? (
-              <div className="max-w-sm text-center">
-                <ShieldCheck className="mx-auto h-8 w-8 text-[#8fa3ff]" />
-                <h2 className="mt-4 text-[15px] font-semibold">
-                  Загружаем защищённый оригинал
-                </h2>
-                <p className="mt-2 text-[12px] text-white/50">
-                  Получаем временный доступ к файлу подачи.
-                </p>
-              </div>
-            ) : activePreviewUrl ? (
+            {isIdentityComparison ? (
               <div
-                className="flex h-full min-h-[280px] w-full items-center justify-center"
-                style={{
-                  transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-                  transition: "transform 160ms ease",
-                }}
+                aria-label={`Сравнение паспорта и ${activeMediaTarget.shortLabel.toLocaleLowerCase()}`}
+                className="v19-review-compare"
+                role="group"
               >
-                {isPdfFile(activeMediaFile) ? (
-                  <object
-                    aria-label={activeMediaTarget.alt}
-                    className="h-[min(70vh,720px)] w-full max-w-[760px] rounded-2xl bg-white"
-                    data={activePreviewUrl}
-                    type="application/pdf"
-                  >
-                    <a href={activePreviewUrl} rel="noreferrer" target="_blank">
-                      Открыть защищённый оригинал
-                    </a>
-                  </object>
-                ) : needsExternalViewer(activeMediaFile) ? (
-                  <div className="max-w-sm rounded-2xl border border-[#242529] bg-[#161617] p-6 text-center">
-                    <p className="text-sm font-semibold">Оригинал готов</p>
-                    <p className="mt-2 text-[12px] text-white/50">
-                      Этот формат открывается во внешнем просмотрщике.
-                    </p>
-                    <a
-                      className="mt-4 inline-flex h-10 items-center rounded-xl border border-[#242529] bg-[#1e1e21] px-4 text-[12px] font-medium"
-                      href={activePreviewUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Открыть оригинал
-                    </a>
-                  </div>
-                ) : (
-                  <img
-                    alt={activeMediaTarget.alt}
-                    className="block max-h-[min(70vh,720px)] max-w-full rounded-2xl object-contain shadow-[0_32px_120px_rgba(0,0,0,0.5)]"
-                    data-testid={`protected-media-preview-${activeMediaTarget.type}`}
-                    onError={handlePreviewError}
-                    src={activePreviewUrl}
-                  />
-                )}
+                <ReviewMediaPreview
+                  alt={passportMediaTarget.alt}
+                  file={passportMediaFile}
+                  label="Паспорт"
+                  preview={passportPreview}
+                  testId="protected-media-preview-passport_scan"
+                  variant="reference"
+                  onError={() => handlePreviewError("passport_scan")}
+                />
+                <ReviewMediaPreview
+                  alt={activeMediaTarget.alt}
+                  file={activeMediaFile}
+                  label={activeMediaTarget.shortLabel}
+                  preview={activePreview}
+                  testId={`protected-media-preview-${activeMediaTarget.type}`}
+                  transform={activeMediaTransform}
+                  variant="active"
+                  onError={() => handlePreviewError(activeMediaTarget.type)}
+                />
               </div>
             ) : (
-              <div className="max-w-sm rounded-2xl border border-orange-500/25 bg-orange-500/5 p-6 text-center">
-                <AlertCircle className="mx-auto h-8 w-8 text-orange-400" />
-                <h2 className="mt-4 text-[15px] font-semibold">
-                  {activeMediaFile
-                    ? "Защищённый оригинал недоступен"
-                    : `${activeMediaTarget.label} не загружен`}
-                </h2>
-                <p className="mt-2 text-[12px] leading-5 text-white/50">
-                  Подтверждение заблокировано. Добавьте замечание к этому файлу.
-                </p>
-              </div>
+              <ReviewMediaPreview
+                alt={activeMediaTarget.alt}
+                file={activeMediaFile}
+                label={activeMediaTarget.shortLabel}
+                preview={activePreview}
+                testId={`protected-media-preview-${activeMediaTarget.type}`}
+                transform={activeMediaTransform}
+                variant="single"
+                onError={() => handlePreviewError(activeMediaTarget.type)}
+              />
             )}
           </div>
         </section>
 
-        <section className="min-w-0 flex flex-col bg-[#141416] xl:overflow-hidden">
-          <div className="p-5 lg:p-6 border-b border-[#202124] shrink-0">
-            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-              <div>
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[11px] font-medium uppercase tracking-wide mb-3">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Только паспорт
-                </div>
-                <h2 className="text-[24px] lg:text-[30px] font-semibold tracking-tight text-white leading-tight">
-                  Проверка паспортных полей
-                </h2>
-                <p className="text-[13px] text-white/50 leading-relaxed mt-2 max-w-2xl">
-                  Сверьте восемь значений с оригиналом. Другие поля анкеты здесь не показываются.
-                </p>
-              </div>
-              {submission && submission.applicants.length > 1 ? (
-                <label className="grid gap-1.5 text-[11px] font-medium uppercase tracking-wide text-white/40">
-                  Заявитель
-                  <select
-                    aria-label="Заявитель для проверки"
-                    className="h-10 min-w-[220px] rounded-xl border border-[#242529] bg-[#1e1e21] px-3 text-[13px] normal-case tracking-normal text-white"
-                    onChange={(event) => onApplicantChange?.(event.target.value)}
-                    value={selectedApplicantId}
-                  >
-                    {submission.applicants.map((applicant) => (
-                      <option key={applicant.id} value={applicant.id}>
-                        {applicant.fullName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
+        <section className="v19-review-details-pane">
+          <header className="v19-review-details-header">
+            <div>
+              <h2>{detailsTitle}</h2>
+              <p>{detailsHint}</p>
             </div>
-          </div>
+            {submission && submission.applicants.length > 1 ? (
+              <label className="v19-review-applicant-select">
+                <span>Заявитель</span>
+                <select
+                  aria-label="Заявитель для проверки"
+                  onChange={(event) => onApplicantChange?.(event.target.value)}
+                  value={selectedApplicantId}
+                >
+                  {submission.applicants.map((applicant) => (
+                    <option key={applicant.id} value={applicant.id}>
+                      {applicant.fullName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </header>
 
-          <div className="flex-1 xl:overflow-y-auto p-5 lg:p-6 scrollbar-thin scrollbar-thumb-white/10">
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              <div className="p-4 rounded-2xl bg-[#161617] border border-[#242529]">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 mb-3" />
-                <div className="text-2xl font-semibold text-white">
-                  {filledFieldCount}/8
-                </div>
-                <div className="text-[11px] text-white/40 mt-1">заполнено</div>
-              </div>
-              <div className="p-4 rounded-2xl bg-[#161617] border border-orange-500/25">
-                <AlertCircle className="w-5 h-5 text-orange-400 mb-3" />
-                <div className="text-2xl font-semibold text-white">
-                  {submission?.issues.filter(
-                    (issue) => issue.status === "open" && passportIssueInScope(issue),
-                  ).length ?? 0}
-                </div>
-                <div className="text-[11px] text-white/40 mt-1">замечаний</div>
-              </div>
-              <div className="p-4 rounded-2xl bg-[#161617] border border-[#242529]">
-                <ShieldCheck className="w-5 h-5 text-[#8fa3ff] mb-3" />
-                <div className="text-2xl font-semibold text-white">
-                  {unavailableMediaCount}
-                </div>
-                <div className="text-[11px] text-white/40 mt-1">файлов недоступно</div>
-              </div>
+          <div className="v19-review-details-scroll">
+            <div
+              aria-label="Состояние проверки"
+              className="v19-review-status-strip"
+              role="status"
+            >
+              <span>
+                <CheckCircle2 aria-hidden="true" />
+                Поля <strong>{filledFieldCount}/8</strong>
+              </span>
+              <span className={openPassportIssueCount ? "has-warning" : undefined}>
+                <AlertCircle aria-hidden="true" />
+                Замечания <strong>{openPassportIssueCount}</strong>
+              </span>
+              <span className={unavailableMediaCount ? "has-warning" : undefined}>
+                <ShieldCheck aria-hidden="true" />
+                Файлы{" "}
+                <strong>
+                  {readyMediaCount}/{requiredMediaTypes.length}
+                </strong>
+              </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="v19-review-field-grid">
               {reviewFields.map((field) => (
-                <FieldReviewRow
+                <ReviewPassportFieldRow
                   applicant={selectedApplicant}
                   field={field}
                   key={field.id}
@@ -822,38 +779,114 @@ export function ReviewWorkspace({
               ))}
             </div>
 
-            <section
-              aria-live="polite"
-              className="mt-5 rounded-2xl border border-[#242529] bg-[#161617] p-4"
-            >
-              <p className="text-[13px] font-semibold text-white">Итог проверки</p>
-              <p
-                className="mt-1 text-[12px] leading-5 text-white/50"
-                id="passport-review-completion-reason"
-              >
-                {completionReason}
-              </p>
+            <section aria-live="polite" className="v19-review-confirmation">
+              <div>
+                <strong>Паспортная секция</strong>
+                <p id="passport-review-completion-reason">{completionReason}</p>
+              </div>
               <button
                 aria-describedby="passport-review-completion-reason"
-                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-emerald-600 disabled:border disabled:border-[#242529] disabled:bg-[#1e1e21] disabled:text-white/35"
                 disabled={!canConfirmSection}
                 onClick={() => void handleConfirmSection()}
                 type="button"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                {sectionAlreadyAccepted
-                  ? "Секция подтверждена"
-                  : sectionApprovalPending
-                    ? "Сохраняем…"
-                    : "Подтвердить паспортную секцию"}
+                <CheckCircle2 aria-hidden="true" />
+                {sectionActionLabel(sectionAlreadyAccepted, sectionApprovalPending)}
               </button>
               {acceptanceError ? (
-                <p className="mt-2 text-[12px] text-red-300" role="alert">
+                <p className="v19-review-inline-error" role="alert">
                   {acceptanceError}
                 </p>
               ) : null}
             </section>
           </div>
+
+          <footer className="v19-review-decision">
+            <div className="v19-review-decision-context">
+              <div className="v19-review-decision-title">
+                <strong>Решение</strong>
+                <span>
+                  {approvedApplicantCount}/{applicantReviewStates.length} секций
+                </span>
+              </div>
+              {applicantReviewStates.length > 1 ? (
+                <div
+                  aria-label="Готовность паспортных секций заявителей"
+                  className="v19-review-applicant-progress"
+                  role="group"
+                >
+                  {applicantReviewStates.map((state) => (
+                    <button
+                      aria-label={`Открыть проверку: ${state.name}`}
+                      className={
+                        state.id === selectedApplicantId ? "is-active" : undefined
+                      }
+                      key={state.id}
+                      onClick={() => onApplicantChange?.(state.id)}
+                      type="button"
+                    >
+                      {state.completed ? (
+                        <CheckCircle2 aria-hidden="true" />
+                      ) : (
+                        <UserRound aria-hidden="true" />
+                      )}
+                      <span>{state.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <p id="admin-review-decision-reason">{reviewDecisionReason}</p>
+            </div>
+
+            <div className="v19-review-decision-actions">
+              <button
+                aria-describedby="admin-review-decision-reason"
+                className="v19-review-return"
+                disabled={Boolean(
+                  !returnDecision ||
+                  returnDecision.disabled ||
+                  !onReviewAction ||
+                  reviewActionPending,
+                )}
+                onClick={() => void handleReviewDecision(returnDecision)}
+                type="button"
+              >
+                <MessageSquarePlus aria-hidden="true" />
+                {reviewActionLabel(
+                  returnDecision,
+                  reviewActionPending,
+                  "На исправление",
+                  "Возвращаем…",
+                )}
+              </button>
+              <button
+                aria-describedby="admin-review-decision-reason"
+                className="v19-review-accept"
+                disabled={Boolean(
+                  !acceptDecision ||
+                  acceptDecision.disabled ||
+                  !onReviewAction ||
+                  reviewActionPending,
+                )}
+                onClick={() => void handleReviewDecision(acceptDecision)}
+                type="button"
+              >
+                <CheckCircle2 aria-hidden="true" />
+                {reviewActionLabel(
+                  acceptDecision,
+                  reviewActionPending,
+                  "Принять",
+                  "Принимаем…",
+                )}
+              </button>
+            </div>
+
+            {reviewActionError ? (
+              <p className="v19-review-decision-error" role="alert">
+                {reviewActionError}
+              </p>
+            ) : null}
+          </footer>
         </section>
       </main>
     </motion.div>

@@ -18,6 +18,7 @@ import type { AccessRequest } from "../shared/authContract";
 import type {
   IssueInput,
   Submission,
+  SubmissionAction,
   SubmissionFileType,
 } from "../modules/submissions/types";
 import { primaryApplicantIdForPassportReview } from "../modules/submissions/passportReviewContract";
@@ -70,6 +71,7 @@ export function AdminWorkspace({
   const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null);
   const adminIssuePendingRef = useRef(false);
   const adminPassportApprovalPendingRef = useRef(false);
+  const adminReviewActionPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
 
   const selectedSubmission =
@@ -301,6 +303,51 @@ export function AdminWorkspace({
     setMobileNavOpen(false);
   };
 
+  const handleReviewAction = async (
+    action: SubmissionAction,
+  ): Promise<boolean> => {
+    if (!selectedRow || adminReviewActionPendingRef.current) return false;
+    if (!bridge.onSubmissionAction) {
+      setAdminAsyncError(
+        "Решение по подаче недоступно: сохранение не подключено.",
+      );
+      return false;
+    }
+
+    const payload = {
+      action,
+      source: "admin" as const,
+      submissionId: selectedRow,
+    };
+    setAdminAsyncError("");
+    adminReviewActionPendingRef.current = true;
+    try {
+      await bridge.onSubmissionAction(payload);
+      emitVisaflowUiEvent(bridge, {
+        type: "submission.action",
+        payload,
+      });
+
+      const acceptedForExport =
+        action === "accept" || action === "close_issues_accept";
+      setRemarkFormOpen(false);
+      setCurrentView("main");
+      setSelectedRow(null);
+      setReviewApplicantId(undefined);
+      navigateTo(acceptedForExport ? "export" : "review");
+      return true;
+    } catch {
+      setAdminAsyncError(
+        action === "accept" || action === "close_issues_accept"
+          ? "Не удалось принять подачу. Состояние не изменено."
+          : "Не удалось вернуть подачу. Состояние не изменено.",
+      );
+      return false;
+    } finally {
+      adminReviewActionPendingRef.current = false;
+    }
+  };
+
   const renderNavContent = () => (
     <>
       <div className="flex items-center gap-2.5 px-2 pb-4 mb-2 border-b border-[#242529]">
@@ -432,6 +479,7 @@ export function AdminWorkspace({
           onAddRemark={handleOpenRemark}
           onApplicantChange={setReviewApplicantId}
           onApproveSection={handlePassportSectionApprove}
+          onReviewAction={handleReviewAction}
           onBack={handleBackToQueue}
           submission={selectedSubmission}
           submissionId={selectedRow}
