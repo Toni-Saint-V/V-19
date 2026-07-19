@@ -30200,7 +30200,7 @@ button.v19-summary-tile:not(:disabled):active {
 }
 
 .access-shell {
-  background: #000 !important;
+  background: var(--v19b-color-app) !important;
 }
 
 .access-card,
@@ -30217,8 +30217,18 @@ button.v19-summary-tile:not(:disabled):active {
 }
 
 .access-brand-panel {
-  border-color: #000 !important;
-  background: #000 !important;
+  border-color: var(--v19b-color-app) !important;
+  background: var(--v19b-color-app) !important;
+}
+
+.access-card {
+  border-radius: var(--v19b-radius-panel) !important;
+}
+
+.access-card-header {
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-0), 1fr) auto !important;
+  align-items: start !important;
 }
 
 .access-brand-logo {
@@ -30240,8 +30250,8 @@ button.v19-summary-tile:not(:disabled):active {
 }
 
 .access-card input {
-  min-height: var(--v19-control-height-large) !important;
-  height: var(--v19-control-height-large) !important;
+  min-height: var(--v19b-size-40) !important;
+  height: var(--v19b-size-40) !important;
   border-color: var(--v19-control-border) !important;
   border-radius: var(--v19-control-radius) !important;
   background: var(--v19-control-bg) !important;
@@ -30269,8 +30279,8 @@ button.v19-summary-tile:not(:disabled):active {
   ),
 .workspace-empty-state .primary-button,
 .dialog-actions :is(.primary-button, .secondary-button, .ghost-button) {
-  min-height: var(--v19-control-height-large) !important;
-  height: var(--v19-control-height-large) !important;
+  min-height: var(--v19b-size-40) !important;
+  height: var(--v19b-size-40) !important;
   padding-inline: var(--v19-control-padding-x) !important;
   border: var(--vf-ref-size-1px) solid var(--v19-control-border) !important;
   border-radius: var(--v19-control-radius) !important;
@@ -30415,18 +30425,18 @@ button.v19-summary-tile:not(:disabled):active {
 
 .access-card .access-password-control input {
   padding-right: calc(
-    var(--v19-control-height-large) + var(--vf-ref-size-14px)
+    var(--v19b-size-40) + var(--v19b-size-12)
   ) !important;
 }
 
 .access-card .access-password-control .access-password-toggle {
   position: absolute !important;
   top: 50% !important;
-  right: var(--vf-ref-size-4px) !important;
-  width: calc(var(--v19-control-height-large) - var(--vf-ref-size-6px)) !important;
-  min-width: calc(var(--v19-control-height-large) - var(--vf-ref-size-6px)) !important;
-  height: calc(var(--v19-control-height-large) - var(--vf-ref-size-6px)) !important;
-  min-height: calc(var(--v19-control-height-large) - var(--vf-ref-size-6px)) !important;
+  right: var(--v19b-size-0) !important;
+  width: var(--v19b-size-40) !important;
+  min-width: var(--v19b-size-40) !important;
+  height: var(--v19b-size-40) !important;
+  min-height: var(--v19b-size-40) !important;
   padding: 0 !important;
   border-color: transparent !important;
   border-radius: var(--v19-control-radius-compact) !important;
@@ -30462,48 +30472,51 @@ button.v19-summary-tile:not(:disabled):active {
 }
 
 .access-card input {
-  padding-right: 8px !important;
-  padding-left: 8px !important;
+  padding-right: var(--v19b-size-12) !important;
+  padding-left: var(--v19b-size-12) !important;
 }
 
 .access-card .access-password-control input {
-  padding-right: 34px !important;
-  padding-left: 8px !important;
+  padding-right: calc(var(--v19b-size-40) + var(--v19b-size-12)) !important;
+  padding-left: var(--v19b-size-12) !important;
 }
 
 .access-card .access-password-control .access-password-toggle {
-  width: 30px !important;
-  min-width: 30px !important;
-  height: 30px !important;
-  min-height: 30px !important;
-  border-radius: 0 !important;
-  font-size: 6px !important;
-  font-weight: 400 !important;
+  width: var(--v19b-size-40) !important;
+  min-width: var(--v19b-size-40) !important;
+  height: var(--v19b-size-40) !important;
+  min-height: var(--v19b-size-40) !important;
+  border-radius: var(--v19b-radius-control) !important;
 }
 
 .access-card .access-password-control .access-password-toggle svg {
-  width: 14px !important;
-  height: 14px !important;
+  width: var(--v19b-size-18) !important;
+  height: var(--v19b-size-18) !important;
 }
 
-.access-card .primary-button.access-submit,
+.access-card .primary-button.access-submit {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  background: var(--v19b-color-primary) !important;
+  color: var(--vf-selected-text) !important;
+}
+
 .access-card .primary-button.access-submit:not(:disabled):hover {
-  border-color: #000000 !important;
-  background: #000000 !important;
-  color: rgb(126, 126, 211) !important;
+  border-color: var(--v19b-color-primary-bright) !important;
+  background: var(--v19b-color-primary-hover) !important;
+  color: var(--vf-selected-text) !important;
 }
 
 .access-card .access-secondary-actions .access-secondary-link,
 .access-card .access-secondary-actions .access-secondary-link:not(:disabled):hover {
-  min-height: 40px !important;
-  height: 40px !important;
-  border-width: 0 !important;
-  border-color: #6767d0 !important;
-  border-radius: 8px !important;
-  background: #000000 !important;
-  color: #b6b6ec !important;
-  font-size: 10px !important;
-  font-weight: 400 !important;
+  min-height: var(--v19b-size-40) !important;
+  height: var(--v19b-size-40) !important;
+  border-width: var(--v19b-size-1) !important;
+  border-color: var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--vf-text-secondary) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
 }
 
 @media (max-width: 760px) {
@@ -30531,11 +30544,13 @@ button.v19-summary-tile:not(:disabled):active {
     overflow-y: auto !important;
     scrollbar-width: none;
     overscroll-behavior-y: contain;
+    padding: var(--v19b-size-16) !important;
     -webkit-overflow-scrolling: touch;
   }
 
   .access-layout {
     align-self: center !important;
+    gap: var(--v19b-size-12) !important;
     width: min(100%, var(--vf-ref-size-430px)) !important;
   }
 
@@ -30560,6 +30575,8 @@ button.v19-summary-tile:not(:disabled):active {
   }
 
   .access-brand-panel {
+    min-height: var(--v19b-size-96) !important;
+    align-content: center !important;
     justify-items: center !important;
     text-align: center !important;
   }
@@ -30573,7 +30590,8 @@ button.v19-summary-tile:not(:disabled):active {
 
   .access-brand-logo {
     display: block !important;
-    width: min(100%, 282px) !important;
+    width: var(--v19b-size-96) !important;
+    max-width: var(--v19b-size-full) !important;
     height: auto !important;
     margin-bottom: 0 !important;
     margin-inline: auto !important;
@@ -30582,7 +30600,9 @@ button.v19-summary-tile:not(:disabled):active {
   }
 
   .access-card {
+    padding: var(--v19b-size-20) !important;
     overflow-anchor: none;
+    border-radius: var(--v19b-radius-panel) !important;
     scrollbar-width: none;
   }
 
@@ -30598,19 +30618,15 @@ button.v19-summary-tile:not(:disabled):active {
 
   .access-card .access-password-control input {
     padding-right: calc(
-      var(--v19-control-height-touch) + var(--vf-ref-size-12px)
+      var(--v19b-size-40) + var(--v19b-size-12)
     ) !important;
   }
 
   .access-card .access-password-control .access-password-toggle {
-    width: calc(var(--v19-control-height-touch) - var(--vf-ref-size-8px)) !important;
-    min-width: calc(
-      var(--v19-control-height-touch) - var(--vf-ref-size-8px)
-    ) !important;
-    height: calc(var(--v19-control-height-touch) - var(--vf-ref-size-8px)) !important;
-    min-height: calc(
-      var(--v19-control-height-touch) - var(--vf-ref-size-8px)
-    ) !important;
+    width: var(--v19b-size-40) !important;
+    min-width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
   }
 
   .access-card
@@ -30634,6 +30650,8 @@ button.v19-summary-tile:not(:disabled):active {
   }
 
   .access-card .access-secondary-actions .access-secondary-link {
+    min-height: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
     padding-inline: var(--vf-ref-size-6px) !important;
     font-size: var(--vf-ref-size-11px) !important;
   }
