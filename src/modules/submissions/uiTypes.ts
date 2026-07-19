@@ -55,7 +55,6 @@ export function matchesReviewTab(tab: ReviewTab) {
 
 export function surfaceTitle(surface: Surface) {
   if (surface === "agent-actions") return "Мои действия";
-  if (surface === "agent-documents") return "Сбор документов";
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка";
   if (surface === "settings") return "Настройки";
@@ -65,10 +64,6 @@ export function surfaceTitle(surface: Surface) {
 export function surfaceDescription(surface: Surface) {
   if (surface === "agent-actions") {
     return "Очередь задач по подачам: блокеры, приоритет и следующий шаг.";
-  }
-
-  if (surface === "agent-documents") {
-    return "Документы по каждой подаче: что собрано, что заменить и где открыт блокер.";
   }
 
   if (surface === "agent-submissions") {
@@ -100,11 +95,11 @@ export function resolveLegacySurfaceRoute(
     normalized === "media" ||
     normalized === "files"
   ) {
-    return { drawerTab: "files", surface: "agent-documents" };
+    return { drawerTab: "files", surface: "agent-submissions" };
   }
 
   if (normalized === "agent-drafts") {
-    return { drawerTab: "files", surface: "agent-documents" };
+    return { drawerTab: "files", surface: "agent-submissions" };
   }
 
   if (normalized === "drafts") {

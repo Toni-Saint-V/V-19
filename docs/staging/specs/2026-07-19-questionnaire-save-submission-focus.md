@@ -227,7 +227,12 @@ accessibility contract: the native alert contains the public number; every actio
 - Dependencies: T-4, T-6
 - Acceptance: spouses, children, and other secondary members expose only questionnaire and passport; desktop aligns actions at the right edge of each tourist row, while narrow mobile widths wrap only when required to preserve names and touch targets.
 
-deferred: removing the top-level `Сбор документов` route and migrating every upload/replacement entry point into `Мои подачи`; this requires a separate interaction inventory and regression pass
+### T-8: Remove the top-level document collection workspace
+
+- Status: complete
+- Wired: yes
+- Verified: legacy file routes resolve to `agent-submissions`; targeted unit tests, typecheck, production build, and desktop/mobile Playwright prove that file-correction actions focus the exact submission in `Мои подачи` and the removed navigation item is absent.
+- Acceptance: document upload/replacement actions stay on the submission cards or submission drawer; received admin packages are visible in `Мои подачи`; no separate `Сбор документов` route or screen remains.
 
 ## Working notes
 

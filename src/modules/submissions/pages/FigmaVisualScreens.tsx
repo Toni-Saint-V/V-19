@@ -189,7 +189,7 @@ export function FigmaActionQueueVisual({
   const columns: VisualColumn[] = [
     {
       id: "docs",
-      label: "Сбор документов",
+      label: "В работе",
       matches: (item) => item.status === "draft" || item.status === "in_progress",
       tone: "warning",
     },

@@ -5,7 +5,6 @@ import {
   ArrowUpDown,
   CheckCircle2,
   Clock,
-  Files,
   FileStack,
   ListChecks,
   Menu,
@@ -18,21 +17,13 @@ import {
 } from "lucide-react";
 import { Drawer } from "./Drawer";
 import { QuestionnaireScreen } from "./QuestionnaireScreen";
-import type {
-  QuestionnaireDocumentsFilter,
-  QuestionnaireInitialFocus,
-} from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import {
   ApplicantsScreen,
   type ApplicantFocusRequest,
   type SubmissionTypeFilter,
 } from "./ApplicantsScreen";
 import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
-import {
-  DraftsScreen,
-  type DocumentIssueTarget,
-  type DraftSummaryFilter,
-} from "./DraftsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from "../modules/submissions/components/adminAiAssistance";
@@ -117,19 +108,10 @@ export type SubmissionListItem = LegacySubmissionListItem;
 type ViewState = "main" | "questionnaire" | "upload";
 type AgentShellNavSection = Extract<
   LegacyAgentNavSection,
-  "actions" | "documents" | "submissions" | "settings"
+  "actions" | "submissions" | "settings"
 >;
 type ActionSummaryFilter = "blockers" | "open" | "today" | "week" | "completed";
 type ActionSort = "tripDate" | "createdAt";
-
-function submissionFileTypeForDocumentIssue(
-  docType: DocumentIssueTarget["docType"],
-): SubmissionFileType | undefined {
-  if (docType === "passport") return "passport_scan";
-  if (docType === "selfie") return "selfie";
-  if (docType === "selfie2") return "selfie_2";
-  return undefined;
-}
 
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
@@ -306,7 +288,6 @@ function intakeDraftToListItem(draft: ProductIntakeDraft): SubmissionListItem {
 function canonicalBridgeNav(section: LegacyAgentNavSection): AgentNavSection | null {
   if (
     section === "actions" ||
-    section === "documents" ||
     section === "submissions" ||
     section === "settings"
   )
@@ -318,8 +299,6 @@ function navLabel(section: AgentShellNavSection) {
   switch (section) {
     case "actions":
       return "Мои действия";
-    case "documents":
-      return "Сбор документов";
     case "submissions":
       return "Мои подачи";
     case "settings":
@@ -330,7 +309,9 @@ function navLabel(section: AgentShellNavSection) {
 function normalizeAgentNav(section: LegacyAgentNavSection): AgentShellNavSection {
   if (section === "applicants") return "submissions";
   if (section === "drafts") return "submissions";
-  if (section === "files" || section === "media") return "documents";
+  if (section === "documents" || section === "files" || section === "media") {
+    return "submissions";
+  }
   if (section === "issues") return "actions";
   return section;
 }
@@ -364,8 +345,6 @@ export function CommandCenter({
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
     useState<ActionSummaryFilter>("open");
-  const [documentsFilter, setDocumentsFilter] =
-    useState<DraftSummaryFilter>("missing");
   const [actionCityFilter, setActionCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
@@ -592,31 +571,6 @@ export function CommandCenter({
     setDrawerOpen(true);
   };
 
-  const handleOpenDocumentIssue = (target: DocumentIssueTarget) => {
-    const submission = effectiveCanonicalSubmissions.find(
-      (candidate) => candidate.id === target.submissionId,
-    );
-    const fileType = submissionFileTypeForDocumentIssue(target.docType);
-    const issue = submission?.issues.find(
-      (candidate) =>
-        candidate.status !== "closed_by_admin" &&
-        candidate.target.applicantId === target.applicantId &&
-        candidate.target.fileType === fileType,
-    );
-
-    bridge.onSubmissionOpen?.(target.submissionId);
-    emitVisaflowUiEvent(bridge, {
-      type: "submission.open",
-      submissionId: target.submissionId,
-    });
-    setDrawerActiveTab("issues");
-    setDrawerFocusTarget(
-      issue ? { issueId: issue.id, tab: "issues" } : undefined,
-    );
-    setSelectedRow(target.submissionId);
-    setDrawerOpen(true);
-  };
-
   const handleOpenWorkspaceTarget = (submissionId: string, target: WorkspaceTarget) => {
     if (target.tab === "questionnaire") {
       handleOpenQuestionnaire(submissionId, {
@@ -634,19 +588,29 @@ export function CommandCenter({
     setDrawerOpen(true);
   };
 
+  const focusSubmissionInList = (submissionId: string) => {
+    const submission = rows.find((candidate) => candidate.id === submissionId);
+    setQuestionnaireInitialFocus(undefined);
+    setDrawerOpen(false);
+    setMobileNavOpen(false);
+    setActiveNav("submissions");
+    if (submission) {
+      setSubmissionTypeFilter(submission.type);
+      setSubmissionFocusRequest((current) => ({
+        revision: (current?.revision ?? 0) + 1,
+        submissionId,
+        type: submission.type,
+      }));
+    }
+    setCurrentView("main");
+  };
+
   const handleOpenQuestionnaire = (
     id: string,
     initialFocus?: QuestionnaireInitialFocus,
   ) => {
     if (initialFocus?.fileId || initialFocus?.section === "Файлы") {
-      const targetFile = effectiveCanonicalSubmissions
-        .find((submission) => submission.id === id)
-        ?.files.find((file) => file.id === initialFocus?.fileId);
-      const isReplacement =
-        targetFile?.status === "needs_replacement" ||
-        targetFile?.reviewStatus === "replace_required" ||
-        targetFile?.reviewStatus === "poor_quality";
-      openDocumentsForIssue(isReplacement ? "error" : "missing");
+      focusSubmissionInList(id);
       return;
     }
     questionnaireOriginFocusRef.current =
@@ -693,18 +657,9 @@ export function CommandCenter({
     setCurrentView("main");
   };
 
-  const openDocumentsForIssue = (filter: QuestionnaireDocumentsFilter = "missing") => {
-    setQuestionnaireInitialFocus(undefined);
-    setDrawerOpen(false);
-    setDocumentsFilter(filter);
-    setActiveNav("documents");
-    setMobileNavOpen(false);
-    setCurrentView("main");
-  };
-
   const handleActionOpen = (action: AgentActionItem) => {
     if (action.tab === "files") {
-      openDocumentsForIssue(action.id.startsWith("replace-") ? "error" : "missing");
+      focusSubmissionInList(action.submission.id);
       return;
     }
     if (isDirectAgentAction(action)) {
@@ -1181,12 +1136,6 @@ export function CommandCenter({
             <ListChecks className="w-4 h-4" />,
             actionQueue.summary.open,
           )}
-          {renderNavButton(
-            "documents",
-            <Files className="w-4 h-4" />,
-            rows.filter((item) => item.completeness < 100 || item.status === "returned")
-              .length,
-          )}
           {renderNavButton("submissions", <FileStack className="w-4 h-4" />, rows.length)}
           {renderNavButton("settings", <SlidersHorizontal className="w-4 h-4" />)}
         </nav>
@@ -1534,7 +1483,7 @@ export function CommandCenter({
             onAssignPublicNumber={onAssignPublicNumber}
             onBack={handleQuestionnaireBack}
             onSavedAndExit={showSavedSubmissionInList}
-            onOpenDocuments={openDocumentsForIssue}
+            onOpenDocuments={() => focusSubmissionInList(selectedRow)}
             onSubmissionUpdate={
               onSubmissionUpdate && !selectedIntakeDraft
                 ? (update) => onSubmissionUpdate(selectedRow, update)
@@ -1643,39 +1592,29 @@ export function CommandCenter({
 
         <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           <div className="max-w-[1460px] mx-auto h-full">
-            {activeNav === "documents" && (
-              <div>
-                <AgentReturnPackagesPanel enabled={usesSupabase} />
-                <DraftsScreen
-                  initialFilter={documentsFilter}
-                  onOpenDrawer={handleRowClick}
-                  onOpenIssue={handleOpenDocumentIssue}
-                  onSubmissionsChange={onSubmissionsChange}
-                  onUploadFile={usesSupabase ? uploadCanonicalFile : undefined}
-                  submissions={canonicalSubmissions}
-                />
-              </div>
-            )}
             {activeNav === "settings" && renderSettings()}
             {activeNav === "actions" && renderActionsList()}
             {activeNav === "submissions" && (
-              <ApplicantsScreen
-                focusRequest={submissionFocusRequest}
-                onOpenDrawer={handleRowClick}
-                onOpenQuestionnaire={handleOpenQuestionnaire}
-                onOpenWorkspaceTarget={handleOpenWorkspaceTarget}
-                onSubmitForReview={(submissionId) =>
-                  executeAgentSubmissionActionFor(submissionId, "submit_for_review").then(
-                    () => undefined,
-                  )
-                }
-                onTypeFilterChange={setSubmissionTypeFilter}
-                onUploadApplicantFile={async (...args) => {
-                  await uploadCanonicalApplicantFile(...args);
-                }}
-                submissions={submissionCards}
-                typeFilter={submissionTypeFilter}
-              />
+              <div>
+                <AgentReturnPackagesPanel enabled={usesSupabase} />
+                <ApplicantsScreen
+                  focusRequest={submissionFocusRequest}
+                  onOpenDrawer={handleRowClick}
+                  onOpenQuestionnaire={handleOpenQuestionnaire}
+                  onOpenWorkspaceTarget={handleOpenWorkspaceTarget}
+                  onSubmitForReview={(submissionId) =>
+                    executeAgentSubmissionActionFor(submissionId, "submit_for_review").then(
+                      () => undefined,
+                    )
+                  }
+                  onTypeFilterChange={setSubmissionTypeFilter}
+                  onUploadApplicantFile={async (...args) => {
+                    await uploadCanonicalApplicantFile(...args);
+                  }}
+                  submissions={submissionCards}
+                  typeFilter={submissionTypeFilter}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -1720,8 +1659,7 @@ export function CommandCenter({
             selectedRow && handleOpenQuestionnaire(selectedRow)
           }
           onOpenDocuments={() => {
-            setDrawerOpen(false);
-            navigateTo("documents");
+            if (selectedRow) focusSubmissionInList(selectedRow);
           }}
           onSubmissionAction={(_, action) => executeAgentSubmissionAction(action)}
         />

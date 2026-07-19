@@ -361,7 +361,7 @@ const FilesTab = ({ data, onOpenDocuments }: { data: SubmissionDetail; onOpenDoc
       </div>
       {hasPendingDocuments && onOpenDocuments ? (
         <button className="v19-submission-drawer-secondary" onClick={onOpenDocuments} type="button">
-          Перейти к сбору документов
+          Открыть в «Моих подачах»
         </button>
       ) : null}
       {data.documents.length > 0 ? (
@@ -380,10 +380,10 @@ const FilesTab = ({ data, onOpenDocuments }: { data: SubmissionDetail; onOpenDoc
         <div className="v19-submission-drawer-empty">
           <FileDigit aria-hidden="true" />
           <strong>Файлы ещё не добавлены</strong>
-          <p>Состав пакета появится здесь после загрузки документов в разделе «Сбор документов».</p>
+          <p>Состав пакета появится здесь после загрузки документов в «Моих подачах».</p>
           {onOpenDocuments ? (
             <button className="v19-submission-drawer-secondary" onClick={onOpenDocuments} type="button">
-              Перейти к сбору документов
+              Открыть в «Моих подачах»
             </button>
           ) : null}
         </div>

@@ -10,7 +10,6 @@ import type { SubmissionStatus } from '../components/Drawer';
 export type VisaflowWorkspace = 'agent' | 'admin';
 export type AgentNavSection =
   | 'actions'
-  | 'documents'
   | 'submissions'
   | 'settings'
   | 'drafts'

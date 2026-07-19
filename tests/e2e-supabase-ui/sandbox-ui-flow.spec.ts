@@ -418,22 +418,6 @@ async function assertHistoryIsUserFacing(page: Page, historySelector: string) {
   ).toHaveCount(0);
 }
 
-async function assertDocumentsSummaryIsReadable(page: Page) {
-  if ((page.viewportSize()?.width ?? 0) > 360) return;
-
-  const summary = page.locator(".v19-documents-summary-grid").first();
-  await expect(summary).toBeVisible();
-  const icons = summary.locator(".v19-summary-tile-icon");
-  await expect(icons).toHaveCount(3);
-
-  for (let index = 0; index < (await icons.count()); index += 1) {
-    await expect(
-      icons.nth(index),
-      "Decorative document-summary icons must not overlap labels on the narrowest phone viewport",
-    ).toHaveCSS("display", "none");
-  }
-}
-
 async function waitForAdminReturnScreenToSettle(page: Page) {
   await expect(
     page.getByText("Загрузка выгруженных пакетов из Supabase…", { exact: true }),
@@ -543,14 +527,6 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
         `Вкладка «${tabName}» на экране «Мои действия» открыта реальным кликом.`,
       );
     }
-
-    await clickWorkspaceButton(page, /Сбор документов/);
-    await assertDocumentsSummaryIsReadable(page);
-    await captureTour(
-      "agent",
-      "agent-documents",
-      "Agent screen «Сбор документов» с матрицей/полученными пакетами открыт через навигацию.",
-    );
 
     await clickWorkspaceButton(page, /Мои подачи/);
     await captureTour(
@@ -1569,7 +1545,7 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
 
     await signOut(page);
     await signIn(page, "agent");
-    await clickWorkspaceButton(page, /Сбор документов|Документы/);
+    await clickWorkspaceButton(page, /Мои подачи/);
     const received = page.getByTestId("agent-return-packages-panel");
     await expect(received).toBeVisible();
     await expect(received).toContainText("PDF-список");

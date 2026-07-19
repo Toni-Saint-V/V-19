@@ -15,7 +15,6 @@ export type UserRole = Role;
 
 export type Surface =
   | "agent-actions"
-  | "agent-documents"
   | "agent-submissions"
   | "admin-review"
   | "export"

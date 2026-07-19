@@ -4,7 +4,7 @@ import type { Issue, Submission, SubmissionAction, SubmissionFile, SubmissionSta
 import { canPerformAction, fixedIssueCount, nextProblem, openIssueCount, statusLabelFor } from '../modules/submissions/status';
 import { submissionPublicId } from '../modules/submissions/submissionIdentity';
 
-export type LegacyAgentNavSection = AgentNavSection | 'applicants' | 'files' | 'media' | 'issues';
+export type LegacyAgentNavSection = AgentNavSection | 'documents' | 'applicants' | 'files' | 'media' | 'issues';
 
 export type LegacySubmissionListItem = {
   id: string;
@@ -59,7 +59,7 @@ export type LegacyIssueRow = {
 };
 
 export function canonicalAgentNav(section: LegacyAgentNavSection): AgentNavSection | null {
-  if (section === 'actions' || section === 'documents' || section === 'submissions' || section === 'settings') {
+  if (section === 'actions' || section === 'submissions' || section === 'settings') {
     return section;
   }
   return null;
@@ -70,7 +70,7 @@ export function legacySectionLabel(section: LegacyAgentNavSection) {
     case 'actions':
       return 'Мои действия';
     case 'documents':
-      return 'Сбор документов';
+      return 'Мои подачи';
     case 'submissions':
       return 'Мои подачи';
     case 'settings':

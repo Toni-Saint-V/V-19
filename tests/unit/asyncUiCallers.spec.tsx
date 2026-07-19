@@ -207,7 +207,7 @@ describe("async UI callers", () => {
     expect(screen.queryByText("storage-token-should-not-be-visible")).not.toBeInTheDocument();
   });
 
-  test("legacy Drawer routes incomplete files and file issues to document collection", async () => {
+  test("legacy Drawer routes incomplete files and file issues to My submissions", async () => {
     const submission = initialSubmissions.find((item) => item.id === "ПД-1048");
     if (!submission) throw new Error("Missing returned fixture ПД-1048.");
     const onOpenDocuments = vi.fn();
@@ -224,7 +224,7 @@ describe("async UI callers", () => {
 
     fireEvent.click(await screen.findByRole("tab", { name: /Файлы/ }));
     fireEvent.click(
-      await screen.findByRole("button", { name: "Перейти к сбору документов" }),
+      await screen.findByRole("button", { name: "Открыть в «Моих подачах»" }),
     );
     expect(onOpenDocuments).toHaveBeenCalledTimes(1);
 

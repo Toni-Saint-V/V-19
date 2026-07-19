@@ -2312,7 +2312,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
-  test("routes file blockers to document collection when that workspace is available", () => {
+  test("routes file blockers through the host recovery callback", () => {
     const submission = withQuestionnaireFileIssue(
       withReadyQuestionnaireFiles(
         fillEveryQuestionnaireField(

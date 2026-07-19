@@ -20,7 +20,7 @@ async function assertNoHorizontalOverflow(page: Page) {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 }
 
-async function openReturnedFileCollection(page: Page) {
+async function openReturnedSubmission(page: Page) {
   await openFreshWorkspace(page, { heading: "Мои действия" });
 
   const action = page
@@ -29,19 +29,15 @@ async function openReturnedFileCollection(page: Page) {
     )
     .first();
   await expect(action).toBeVisible();
-  const cta = action.getByTestId("agent-action-cta");
-  await expect(cta).toHaveText("Исправить");
-  await cta.click();
+  await expect(action).toHaveAccessibleName(/^Исправить:/);
+  await action.click();
 
-  const documents = page
-    .getByRole("heading", { name: "Сбор документов", exact: true })
+  const submissions = page
+    .getByRole("heading", { name: "Мои подачи", exact: true })
     .first();
-  await expect(documents).toBeVisible();
-  await expect(page.getByTestId("document-collection-matrix")).toBeVisible();
+  await expect(submissions).toBeVisible();
   await expect(
-    page
-      .locator(`[data-document-submission-id="${returnedSubmissionId}"]:visible`)
-      .first(),
+    page.locator(`[data-submission-id="${returnedSubmissionId}"]:visible`).first(),
   ).toBeVisible();
   await expect(
     page.locator(
@@ -50,7 +46,11 @@ async function openReturnedFileCollection(page: Page) {
   ).toHaveCount(0);
   await expect(page.locator('[role="dialog"]:visible')).toHaveCount(0);
 
-  return documents;
+  await expect(
+    page.getByRole("button", { name: "Сбор документов", exact: true }),
+  ).toHaveCount(0);
+
+  return submissions;
 }
 
 test.describe("V-19 P0 agent action routing", () => {
@@ -59,7 +59,7 @@ test.describe("V-19 P0 agent action routing", () => {
   }) => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 900, width: 1440 });
-    await openReturnedFileCollection(page);
+    await openReturnedSubmission(page);
     await page.screenshot({
       animations: "disabled",
       fullPage: false,
@@ -79,7 +79,7 @@ test.describe("V-19 P0 agent action routing", () => {
   }) => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 844, width: 390 });
-    await openReturnedFileCollection(page);
+    await openReturnedSubmission(page);
     await page.screenshot({
       animations: "disabled",
       fullPage: false,

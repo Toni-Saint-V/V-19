@@ -105,16 +105,10 @@ test.describe("V-19 My Actions immediate queue", () => {
         )
         .first();
       await expect(action).toBeVisible();
-      await expect(action.locator(".v19-legacy-action-city-label")).toHaveText(/\S+/);
-      await expect(action.locator(".v19-legacy-action-context")).toHaveText(
+      await expect(action.locator(".v19-operational-card-location")).toHaveText(/\S+/);
+      await expect(action.locator(".v19-operational-card-action strong")).toHaveText(
         "Заменить селфи 1",
       );
-      await expect(
-        page
-          .getByTestId("agent-action-row")
-          .filter({ hasText: "Добавить селфи 2" })
-          .first(),
-      ).toBeVisible();
       const actionId = await action.getAttribute("data-agent-action-id");
       expect(actionId).toBeTruthy();
       await page.screenshot({
@@ -129,7 +123,7 @@ test.describe("V-19 My Actions immediate queue", () => {
       const priorityAction = page.getByRole("button", {
         name: /Открыть приоритетные действия/,
       });
-      await expect(priorityAction).toContainText("К блокерам");
+      await expect(priorityAction).toHaveAccessibleName(/требуют решения/);
 
       if (viewport.width === 1440) {
         await expect(page.getByText("Кабинет агента", { exact: true })).toBeVisible();
@@ -151,7 +145,7 @@ test.describe("V-19 My Actions immediate queue", () => {
         ).toBeVisible();
         await expect(
           page
-            .getByRole("button", { name: /Фильтр городов: Все города/ })
+            .getByRole("button", { name: /Фильтр городов: Города/ })
             .locator(".v19-admin-toolbar-select-value"),
         ).toBeVisible();
       }
@@ -163,15 +157,17 @@ test.describe("V-19 My Actions immediate queue", () => {
         ).toBeVisible();
       }
 
-      await action.getByTestId("agent-action-cta").click();
-      const documents = page
-        .getByRole("heading", { name: "Сбор документов", exact: true })
+      await action.click();
+      const submissions = page
+        .getByRole("heading", { name: "Мои подачи", exact: true })
         .first();
-      await expect(documents).toBeVisible();
-      await expect(page.getByTestId("document-collection-matrix")).toBeVisible();
+      await expect(submissions).toBeVisible();
       await expect(
-        page.locator('[data-document-submission-id="ПД-1048"]:visible').first(),
+        page.locator('[data-submission-id="ПД-1048"]:visible').first(),
       ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Сбор документов", exact: true }),
+      ).toHaveCount(0);
       await expect(
         page.locator('.vf-figma-questionnaire-screen[data-submission-id="ПД-1048"]'),
       ).toHaveCount(0);
@@ -182,7 +178,7 @@ test.describe("V-19 My Actions immediate queue", () => {
           fullPage: false,
           path: join(
             evidenceDirectory,
-            `${viewport.label}-document-collection-after.png`,
+            `${viewport.label}-submission-files-after.png`,
           ),
         });
       }
@@ -194,59 +190,6 @@ test.describe("V-19 My Actions immediate queue", () => {
       expect(metrics.rowOpacity).toEqual(Array(metrics.rowCount).fill("1"));
       expect(metrics.animationRecords.filter((record) => record.delay > 0)).toEqual([]);
 
-      if (viewport.width === 320) {
-        const cityLayout = await action
-          .locator(".v19-legacy-action-city-label")
-          .evaluate((node) => {
-            const element = node as HTMLElement;
-            return {
-              clientWidth: element.clientWidth,
-              scrollWidth: element.scrollWidth,
-            };
-          });
-        expect(cityLayout.scrollWidth).toBeLessThanOrEqual(cityLayout.clientWidth + 1);
-
-        const selfieOneContext = page
-          .getByTestId("agent-action-row")
-          .filter({ hasText: "Добавить селфи 1" })
-          .first()
-          .locator(".v19-legacy-action-context");
-        const selfieTwoContext = page
-          .getByTestId("agent-action-row")
-          .filter({ hasText: "Добавить селфи 2" })
-          .first()
-          .locator(".v19-legacy-action-context");
-        await expect(selfieOneContext).toHaveText("Добавить селфи 1");
-        await expect(selfieTwoContext).toHaveText("Добавить селфи 2");
-        for (const context of [selfieOneContext, selfieTwoContext]) {
-          const layout = await context.evaluate((node) => {
-            const element = node as HTMLElement;
-            return {
-              clientWidth: element.clientWidth,
-              scrollWidth: element.scrollWidth,
-              textOverflow: getComputedStyle(element).textOverflow,
-              whiteSpace: getComputedStyle(element).whiteSpace,
-            };
-          });
-          expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
-          expect(layout.textOverflow).toBe("clip");
-          expect(layout.whiteSpace).toBe("normal");
-        }
-
-        const compactFilterValues = page.locator(".v19-admin-toolbar-select-value");
-        const filterLayouts = await compactFilterValues.evaluateAll((nodes) =>
-          nodes.map((node) => {
-            const element = node as HTMLElement;
-            return {
-              clientWidth: element.clientWidth,
-              scrollWidth: element.scrollWidth,
-            };
-          }),
-        );
-        for (const filter of filterLayouts) {
-          expect(filter.scrollWidth).toBeLessThanOrEqual(filter.clientWidth + 1);
-        }
-      }
     }
 
     writeFileSync(

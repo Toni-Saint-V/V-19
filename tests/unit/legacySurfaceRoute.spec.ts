@@ -3,11 +3,11 @@ import { resolveLegacySurfaceRoute } from "../../src/modules/submissions/uiTypes
 
 describe("legacy surface route compatibility", () => {
   test.each([
-    ["agent-media", "agent-documents", "files"],
-    ["media", "agent-documents", "files"],
-    ["files", "agent-documents", "files"],
-    ["agent-drafts", "agent-documents", "files"],
-  ] as const)("redirects %s to document collection", (route, surface, drawerTab) => {
+    ["agent-media", "agent-submissions", "files"],
+    ["media", "agent-submissions", "files"],
+    ["files", "agent-submissions", "files"],
+    ["agent-drafts", "agent-submissions", "files"],
+  ] as const)("redirects %s to submission files", (route, surface, drawerTab) => {
     expect(resolveLegacySurfaceRoute(route, "agent")).toEqual({
       drawerTab,
       surface,
