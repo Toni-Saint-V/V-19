@@ -19,7 +19,10 @@ import {
   exportPackageIdentityMatches,
   exportSummary,
 } from "./exportRules";
-import { familyListTitleFromMainApplicantName } from "./listFormatters";
+import {
+  familyDisplayTitleFromMainApplicantName,
+  familyListTitleFromMainApplicantName,
+} from "./listFormatters";
 import { defaultLocalAgentOwnerId } from "./ownership";
 import {
   CANONICAL_FRONTEND_MEDIA_TYPES,
@@ -1142,9 +1145,10 @@ function draftTitle(
   }
   if (type === "single") return firstApplicantName;
 
-  const firstToken = (familySurname || firstApplicantName).split(/\s+/)[0];
-  if (!firstToken || firstToken === "Основной") return "Новая семейная подача";
-  return `Семья ${firstToken.replace(/а$/i, "")}ых`;
+  return (
+    familyDisplayTitleFromMainApplicantName(familySurname || firstApplicantName) ??
+    "Новая семейная подача"
+  );
 }
 
 function mergeUploadedStorageFields(
@@ -1273,24 +1277,9 @@ function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {
     draftIdTokenFromSubmissionId(submission.id),
     submission.id.startsWith("VF-") ? "supabase" : "local",
   );
-  const templatesByKey = new Map(
-    templates.map((file) => [`${file.applicantId}:${file.type}`, file]),
-  );
-
-  return submission.applicants.flatMap((applicant) =>
-    CANONICAL_FRONTEND_MEDIA_TYPES.map((type) => {
-      const key = `${applicant.id}:${type}`;
-      const existing = canonicalFiles.get(key);
-      if (existing) return existing;
-      const template = templatesByKey.get(key);
-      if (template) return template;
-      return {
-        id: `ф-${submission.id}-${applicant.id}-${type}`,
-        applicantId: applicant.id,
-        type,
-        status: "missing" as const,
-      };
-    }),
+  return templates.map(
+    (template) =>
+      canonicalFiles.get(`${template.applicantId}:${template.type}`) ?? template,
   );
 }
 
@@ -1353,7 +1342,10 @@ function requiredFilesForApplicants(
   idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
-    CANONICAL_FRONTEND_MEDIA_TYPES.map(
+    (applicantIndex === 0
+      ? CANONICAL_FRONTEND_MEDIA_TYPES
+      : (["passport_scan"] as const)
+    ).map(
       (type, fileIndex) => ({
         id:
           idScheme === "supabase"

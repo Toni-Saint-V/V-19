@@ -14,10 +14,8 @@ import {
 } from "lucide-react";
 import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
-import { ReviewWorkspace } from "./ReviewWorkspace";
 import { AdminReviewDrawer } from "../modules/submissions/components/AdminReviewDrawer";
 import { AdminReturnPackagesScreen } from "./AdminReturnPackagesScreen";
-import { RemarkForm } from "./RemarkForm";
 import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import type { AccessRequest } from "../shared/authContract";
 import type {
@@ -35,7 +33,6 @@ import {
 } from "../integration/visaflowBusinessBridge";
 
 type AdminNavSection = BridgeAdminNavSection | "users" | "returns";
-type AdminViewState = "main" | "review_workspace";
 const SettingsScreen = lazy(
   () => import("../modules/submissions/pages/SettingsScreen"),
 );
@@ -246,14 +243,12 @@ export function AdminWorkspace({
 }) {
   const bridge = useVisaflowBusinessBridge();
   const [activeNav, setActiveNav] = useState<AdminNavSection>("review");
-  const [currentView, setCurrentView] = useState<AdminViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [bottomProfileMenuOpen, setBottomProfileMenuOpen] = useState(false);
   const [adminAsyncError, setAdminAsyncError] = useState("");
   const mobileNavPanelRef = useRef<HTMLElement | null>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const reviewDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const adminPrimaryActionPendingRef = useRef(false);
   const adminIssuePendingRef = useRef(false);
   const adminFileAcceptPendingRef = useRef(false);
@@ -277,15 +272,7 @@ export function AdminWorkspace({
   const adminInitials = adminIdentityToken || "АД";
 
   const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
-  const [adminDrawerTab, setAdminDrawerTab] = useState<DrawerTab>("questionnaire");
-  const [remarkFormOpen, setRemarkFormOpen] = useState(false);
-  const [reviewApplicantId, setReviewApplicantId] = useState<string>();
-  const [remarkContext, setRemarkContext] = useState<{
-    applicantId?: string;
-    field?: string;
-    fileType?: SubmissionFileType;
-    applicant?: string;
-  }>({});
+  const [adminDrawerTab, setAdminDrawerTab] = useState<DrawerTab>("overview");
   const selectedSubmission =
     submissions?.find((submission) => submission.id === selectedRow) ?? null;
 
@@ -322,47 +309,14 @@ export function AdminWorkspace({
   }, [mobileNavOpen]);
 
   const handleOpenReviewDrawer = (id: string) => {
-    reviewDrawerReturnFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     bridge.onAdminReviewOpen?.(id);
     emitVisaflowUiEvent(bridge, {
       type: "admin.review.open",
       submissionId: id,
     });
     setSelectedRow(id);
-    setAdminDrawerTab("questionnaire");
+    setAdminDrawerTab("overview");
     setAdminDrawerOpen(true);
-  };
-
-  const handleVerifyDocument = (applicantId?: string) => {
-    bridge.onVerifyDocument?.(selectedRow);
-    emitVisaflowUiEvent(bridge, {
-      type: "admin.document.verify",
-      submissionId: selectedRow,
-    });
-    setReviewApplicantId(
-      applicantId ?? selectedSubmission?.applicants[0]?.id,
-    );
-    setAdminDrawerOpen(false);
-    setCurrentView("review_workspace");
-  };
-
-  const handleBackToDrawer = () => {
-    setCurrentView("main");
-    setAdminDrawerOpen(true);
-  };
-
-  const handleOpenRemark = (
-    field?: string,
-    applicant?: string,
-    fileType?: SubmissionFileType,
-    applicantId?: string,
-  ) => {
-    const payload = { submissionId: selectedRow, applicantId, field, fileType, applicant };
-    bridge.onRemarkOpen?.(payload);
-    emitVisaflowUiEvent(bridge, { type: "remark.open", payload });
-    setRemarkContext({ applicantId, field, fileType, applicant });
-    setRemarkFormOpen(true);
   };
 
   const handleAdminPrimaryAction = async (
@@ -525,40 +479,6 @@ export function AdminWorkspace({
     };
 
     void signOut();
-  };
-
-  const handleRemarkSubmit = async (input: {
-    applicantId?: string;
-    field?: string;
-    fileType?: SubmissionFileType;
-    applicant?: string;
-    message: string;
-    severity: "warning" | "critical";
-  }): Promise<boolean> => {
-    if (!selectedSubmission) return false;
-    const applicant = input.applicantId
-      ? selectedSubmission.applicants.find((item) => item.id === input.applicantId)
-      : input.applicant
-        ? selectedSubmission.applicants.find((item) => item.fullName === input.applicant)
-        : selectedSubmission.applicants.length === 1
-          ? selectedSubmission.applicants[0]
-          : undefined;
-    if (!applicant) return false;
-
-    return handleAddIssue({
-      type: input.fileType ? "file" : input.field ? "field" : "section",
-      applicantId: applicant.id,
-      field: input.fileType ? undefined : input.field,
-      fileType: input.fileType,
-      section: input.fileType ? "Файлы" : undefined,
-      reason: input.fileType
-        ? `Требуется заменить файл «${input.field ?? input.fileType}»`
-        : input.field
-          ? `Требуется исправить поле «${input.field}»`
-          : "Требуется исправить данные",
-      comment: input.message,
-      severity: input.severity === "critical" ? "blocker" : "warning",
-    });
   };
 
   const navigateTo = (nav: AdminNavSection) => {
@@ -770,23 +690,11 @@ export function AdminWorkspace({
           </button>
         </div>
       ) : null}
-      {currentView === "review_workspace" && selectedRow && (
-        <ReviewWorkspace
-          applicantId={reviewApplicantId}
-          submissionId={selectedRow}
-          submission={selectedSubmission}
-          onBack={handleBackToDrawer}
-          onAcceptFile={handleReviewFileAccept}
-          onAddRemark={(field, applicant, fileType, applicantId) =>
-            handleOpenRemark(field, applicant, fileType, applicantId)
-          }
-        />
-      )}
-
-      {adminDrawerOpen && selectedSubmission ? (
+      {selectedSubmission ? (
         <AdminReviewDrawer
           actionError=""
           activeTab={adminDrawerTab}
+          isOpen={adminDrawerOpen}
           submission={selectedSubmission}
           onAcceptAiSuggestion={(suggestionId) =>
             void handleAdminAiSuggestion("accept", suggestionId)
@@ -794,33 +702,16 @@ export function AdminWorkspace({
           onAction={(action) =>
             void handleAdminPrimaryAction(selectedSubmission.id, action)
           }
-          onAddIssue={(input) => void handleAddIssue(input)}
-          onClose={() => {
-            setAdminDrawerOpen(false);
-            window.requestAnimationFrame(() =>
-              reviewDrawerReturnFocusRef.current?.focus(),
-            );
-          }}
+          onAddIssue={handleAddIssue}
+          onClose={() => setAdminDrawerOpen(false)}
           onDismissAiSuggestion={(suggestionId) =>
             void handleAdminAiSuggestion("dismiss", suggestionId)
           }
-          onReviewFileAccept={(input) => void handleReviewFileAccept(input)}
+          onReviewFileAccept={handleReviewFileAccept}
           onRunAiReview={() => void handleAdminAiReview()}
           onTab={setAdminDrawerTab}
-          onVerifyDocument={(applicantId) => handleVerifyDocument(applicantId)}
         />
       ) : null}
-
-      <RemarkForm
-        isOpen={remarkFormOpen}
-        onClose={() => setRemarkFormOpen(false)}
-        submissionId={selectedRow || ""}
-        defaultField={remarkContext.field}
-        defaultFileType={remarkContext.fileType}
-        defaultApplicant={remarkContext.applicant}
-        defaultApplicantId={remarkContext.applicantId}
-        onSubmit={handleRemarkSubmit}
-      />
 
       {/* Mobile Nav Overlay */}
       <AnimatePresence>

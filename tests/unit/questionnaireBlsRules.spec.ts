@@ -7,6 +7,7 @@ import {
   isBlsQuestionnaireFieldRequired,
   type BlsFormData,
 } from "../../src/modules/submissions/questionnaireBlsRules";
+import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
 import { submitForReview } from "../../src/modules/submissions/domainEngine";
 import {
   createDraftSubmission,
@@ -91,6 +92,47 @@ describe("canonical BLS questionnaire readiness", () => {
     submission = setApplicantField(submission, 0, "guardian-info", "");
 
     expectReadyParity(submission);
+  });
+
+  test("keeps surname at birth optional when it is empty", () => {
+    let submission = readySingleSubmission();
+    submission = setApplicantField(submission, 0, "previous-surname", "");
+
+    expect(
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: "main",
+        field: {
+          id: "previous-surname",
+          label: "Фамилия при рождении / предыдущие фамилии",
+          required: true,
+          value: "",
+        },
+        formData: {},
+      }),
+    ).toBe(false);
+
+    const legacySubmission = {
+      ...submission,
+      applicants: submission.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "previous-surname"
+              ? { ...field, error: "Обязательное поле", required: true }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const normalized = normalizeSubmissionQuestionnaire(legacySubmission);
+    const normalizedField = normalized.applicants
+      .flatMap((applicant) => applicant.sections)
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "previous-surname");
+
+    expect(normalizedField).toMatchObject({ error: undefined, required: false, value: "" });
+    expectReadyParity(normalized);
   });
 
   test("keeps guardian data optional for the canonical child role", () => {

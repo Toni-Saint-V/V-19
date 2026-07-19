@@ -4,28 +4,29 @@ import {
   ArrowUpDown,
   Bot,
   CheckCircle2,
-  ChevronRight,
   Clock,
   FileCheck2,
-  Flame,
   MessageSquareWarning,
   RotateCcw,
   ShieldCheck,
   Shapes,
   Sparkles,
   User,
-  Users,
   X,
 } from "lucide-react";
 import {
   AdminContextToggle,
   AdminListHeader,
-  AdminMetricCard,
-  AdminMetricStrip,
   AdminQueueToolbar,
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
-import { V19PriorityHero, V19QueueCard } from "../shared/ui/v19-design-system";
+import {
+  V19MetricCard,
+  V19MetricStrip,
+  V19OperationalCard,
+  V19OperationalCardGrid,
+  V19PriorityHero,
+} from "../shared/ui/v19-design-system";
 import {
   buildAdminTriageRadar,
   type AdminTriageRadarItem,
@@ -36,6 +37,7 @@ import {
   questionnaireCityForSubmission,
 } from "../modules/submissions/selectors";
 import { getPrimaryAction } from "../modules/submissions/status";
+import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import type { Submission } from "../modules/submissions/types";
 import { isAdminReviewQueueSubmission } from "../modules/submissions/uiTypes";
 
@@ -51,6 +53,7 @@ type AdminReviewTypeFilter = "all" | "family" | "single";
 
 interface ReviewCard {
   id: string;
+  publicId: string;
   title: string;
   type: "family" | "single";
   applicants: number;
@@ -131,13 +134,17 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
 
   return {
     id: submission.id,
+    publicId: submissionPublicId(submission),
     title: submission.listTitle ?? submission.title,
     type: submission.type,
     applicants: submission.applicants.length,
     country: submission.country,
     city: questionnaireCityForSubmission(submission),
     lane: reviewLaneForSubmission(submission),
-    agent: agentOwnerDisplayName(submission.agentId),
+    agent: agentOwnerDisplayName(
+      submission.agentId,
+      submission.agentDisplayName || "Агент VisaFlow",
+    ),
     timeInQueue: submission.updatedAt,
     questionnaire: submission.completeness.questionnaire,
     files: submission.completeness.files,
@@ -159,36 +166,6 @@ function reviewCardsFromSubmissions(submissions: Submission[]): ReviewCard[] {
     .filter(isAdminReviewQueueSubmission)
     .map(reviewCardFromSubmission);
 }
-
-const lanes: {
-  id: Lane;
-  title: string;
-  subtitle: string;
-  tone: string;
-  icon: React.ElementType;
-}[] = [
-  {
-    id: "urgent",
-    title: "Критичные",
-    subtitle: "сначала сюда",
-    tone: "red",
-    icon: Flame,
-  },
-  {
-    id: "review",
-    title: "На проверке",
-    subtitle: "ручная сверка",
-    tone: "orange",
-    icon: ShieldCheck,
-  },
-  {
-    id: "returned",
-    title: "Правки",
-    subtitle: "у агента / на сверке",
-    tone: "blue",
-    icon: MessageSquareWarning,
-  },
-];
 
 function reviewCountLabel(count: number) {
   const lastTwoDigits = count % 100;
@@ -230,90 +207,49 @@ function ReviewQueueCard({
   onOpenDrawer: (id: string) => void;
 }) {
   const hasBlocker = item.blockers > 0;
-  const shortQueueTime = item.timeInQueue.replace(/\s+\d+\s+мин$/, "");
 
   return (
-    <V19QueueCard
+    <V19OperationalCard
+      actionIcon={item.aiFlags > 0 ? Sparkles : FileCheck2}
+      actionText={reviewActionLabel(item)}
+      city={item.city}
+      footer={
+        <>
+          <span className="v19-operational-card-signals">
+            {item.blockers > 0 ? (
+              <span className="tone-danger">{item.blockers} критичных</span>
+            ) : null}
+            {item.warnings > 0 ? (
+              <span className="tone-warning">{item.warnings} проверить</span>
+            ) : null}
+            {item.aiFlags > 0 ? (
+              <span className="tone-info">ИИ {item.aiFlags}</span>
+            ) : null}
+            {item.blockers === 0 && item.warnings === 0 ? (
+              <span className="tone-ready">без замечаний</span>
+            ) : null}
+          </span>
+          <span className="v19-operational-card-agent">
+            <User aria-hidden="true" /> {item.agent}
+          </span>
+        </>
+      }
+      peopleCount={item.applicants}
+      progress={
+        <>
+          <ProgressLine label="Анкета" value={item.questionnaire} />
+          <ProgressLine label="Файлы" value={item.files} />
+        </>
+      }
+      publicId={item.publicId}
+      title={item.title}
       as="button"
       aria-label={`Ручная проверка заявки ${item.title}`}
       data-submission-card=""
       data-submission-id={item.id}
       onClick={() => onOpenDrawer(item.id)}
-      className={`v19-admin-review-card group ${hasBlocker ? "has-blocker" : ""}`}
-    >
-      <div className="v19-admin-review-card-header">
-        <div className="min-w-0">
-          <div className="v19-admin-review-card-meta">
-            <span className="v19-admin-review-card-id">{item.id}</span>
-            <i />
-            <span className="shrink-0">{item.city}</span>
-            <i />
-            <span className="shrink-0">{shortQueueTime}</span>
-          </div>
-          <h3>
-            {item.title}
-          </h3>
-          <div className="v19-admin-review-card-people">
-            {item.type === "family" ? (
-              <Users />
-            ) : (
-              <User />
-            )}
-            <span>{item.applicants} чел.</span>
-          </div>
-        </div>
-        <span className="v19-admin-review-card-open">
-          <ChevronRight />
-        </span>
-      </div>
-
-      <div className="v19-admin-review-card-action">
-        <span>
-          {item.aiFlags > 0 ? (
-            <Sparkles />
-          ) : (
-            <FileCheck2 />
-          )}
-        </span>
-        <div>
-          <small>Следующий шаг</small>
-          <strong>{reviewActionLabel(item)}</strong>
-        </div>
-      </div>
-
-      <div className="v19-admin-review-card-progress">
-        <ProgressLine label="Анкета" value={item.questionnaire} />
-        <ProgressLine label="Файлы" value={item.files} />
-      </div>
-
-      <div className="v19-admin-review-card-footer">
-        <div className="v19-admin-review-card-signals">
-        {item.blockers > 0 && (
-          <span className="tone-danger">
-            {item.blockers} критичных
-          </span>
-        )}
-        {item.warnings > 0 && (
-          <span className="tone-warning">
-            {item.warnings} проверить
-          </span>
-        )}
-        {item.aiFlags > 0 && (
-          <span className="tone-info">
-            ИИ {item.aiFlags}
-          </span>
-        )}
-        {item.blockers === 0 && item.warnings === 0 && (
-          <span className="tone-ready">
-            без замечаний
-          </span>
-        )}
-        </div>
-        <span className="v19-admin-review-card-agent">
-          <User aria-hidden="true" /> {item.agent}
-        </span>
-      </div>
-    </V19QueueCard>
+      className={`group ${hasBlocker ? "has-blocker" : ""}`}
+    />
   );
 }
 
@@ -321,6 +257,7 @@ type ReviewAiWatchItem =
   | {
       agent?: string;
       id: string;
+      publicId: string;
       reason: string;
       title: string;
       tone: AdminTriageRadarItem["band"];
@@ -329,6 +266,7 @@ type ReviewAiWatchItem =
   | {
       agent: string;
       id: string;
+      publicId: string;
       reason: string;
       title: string;
       tone: "attention" | "critical";
@@ -342,11 +280,14 @@ function watchToneClass(tone: ReviewAiWatchItem["tone"]) {
   if (tone === "ready") {
     return "border-[#244238]/40 bg-[#14251f]/35";
   }
-  return "border-[#6f64ff]/25 bg-[#6f64ff]/10";
+  return "border-[var(--v19b-color-primary-soft-30)] bg-[var(--v19b-color-primary-soft-10)]";
 }
 
 function buildReviewAiWatchlist(submissions: Submission[]): ReviewAiWatchItem[] {
   if (submissions.length === 0) return [];
+  const submissionsById = new Map(
+    submissions.map((submission) => [submission.id, submission]),
+  );
   const radarItems = buildAdminTriageRadar(submissions).items;
   const signalItems = radarItems.filter(
     (item) => item.band === "critical" || item.band === "attention",
@@ -355,6 +296,11 @@ function buildReviewAiWatchlist(submissions: Submission[]): ReviewAiWatchItem[] 
 
   return visibleItems.slice(0, 3).map((item) => ({
     id: item.submissionId,
+    publicId: submissionPublicId(
+      submissionsById.get(item.submissionId) ?? {
+        id: item.submissionId,
+      },
+    ),
     reason: item.reasons[0] ?? item.nextAction,
     score: item.score,
     title: item.title,
@@ -443,21 +389,16 @@ export function ReviewScreen({
       <section className="v19-admin-review-main min-w-0 space-y-5">
         <V19PriorityHero
           actionAriaLabel={`Открыть критические пакеты: ${totalBlockers} требуют решения`}
-          actionDisabled={totalBlockers === 0}
-          eyebrow="Контроль проверки"
-          eyebrowIcon={ShieldCheck}
+          actionCount={totalBlockers}
           hasBlockers={totalBlockers > 0}
-          summary={totalBlockers
-            ? "Сначала разберите пакеты с критичными замечаниями — они удерживают заявки от принятия и выгрузки."
-            : "Критичных препятствий нет. Продолжайте ручную проверку по ближайшей дате поездки."}
           title={totalBlockers
             ? `${totalBlockers} ${totalBlockers === 1 ? "критичное замечание требует" : "критичных замечания требуют"} решения`
             : "Очередь готова к проверке"}
           onAction={() => setActiveLane("urgent")}
         />
 
-        <AdminMetricStrip className="v19-admin-review-metrics">
-          <AdminMetricCard
+        <V19MetricStrip>
+          <V19MetricCard
             active={activeLane === "review"}
             detail={reviewCountLabel(laneCounts.review)}
             icon={ShieldCheck}
@@ -466,7 +407,7 @@ export function ReviewScreen({
             tone="orange"
             onClick={() => setActiveLane((current) => current === "review" ? "all" : "review")}
           />
-          <AdminMetricCard
+          <V19MetricCard
             active={activeLane === "returned"}
             detail={reviewCountLabel(laneCounts.returned)}
             icon={MessageSquareWarning}
@@ -475,7 +416,7 @@ export function ReviewScreen({
             tone="blue"
             onClick={() => setActiveLane((current) => current === "returned" ? "all" : "returned")}
           />
-          <AdminMetricCard
+          <V19MetricCard
             active={false}
             detail={reviewCountLabel(exportQueueCount)}
             icon={CheckCircle2}
@@ -484,7 +425,7 @@ export function ReviewScreen({
             tone="green"
             onClick={onOpenExport}
           />
-        </AdminMetricStrip>
+        </V19MetricStrip>
 
         <AdminContextToggle
           badge={aiWatchlist.length}
@@ -555,58 +496,15 @@ export function ReviewScreen({
             searchValue={searchQuery}
           />
 
-          <div className="v19-admin-review-lanes">
-            {lanes.map((lane) => {
-              const Icon = lane.icon;
-              const laneItems = visibleReviews.filter(
-                (item) => item.lane === lane.id,
-              );
-              const laneApplicantCount = laneItems.reduce(
-                (sum, item) => sum + item.applicants,
-                0,
-              );
-              if (
-                (activeLane !== "all" && activeLane !== lane.id) ||
-                laneItems.length === 0
-              ) {
-                return null;
-              }
-
-              return (
-                <div
-                  key={lane.id}
-                  className="v19-admin-review-lane"
-                >
-                  <div className="v19-admin-review-lane-header">
-                    <div>
-                      <div
-                        className={`v19-admin-review-lane-icon tone-${lane.tone}`}
-                      >
-                        <Icon />
-                      </div>
-                      <div>
-                        <strong>{lane.title}</strong>
-                        <small>{lane.subtitle}</small>
-                      </div>
-                    </div>
-                    <span>
-                      {laneApplicantCount} чел.
-                    </span>
-                  </div>
-
-                  <div className="v19-admin-review-lane-list">
-                    {laneItems.map((item) => (
-                      <ReviewQueueCard
-                        key={item.id}
-                        item={item}
-                        onOpenDrawer={onOpenDrawer}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <V19OperationalCardGrid>
+            {visibleReviews.map((item) => (
+              <ReviewQueueCard
+                key={item.id}
+                item={item}
+                onOpenDrawer={onOpenDrawer}
+              />
+            ))}
+          </V19OperationalCardGrid>
         </div>
       </section>
 
@@ -629,7 +527,7 @@ export function ReviewScreen({
         </div>
         <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
           <div className="mb-4 flex items-center gap-2">
-            <Bot className="h-4 w-4 text-[#b8baff]" />
+            <Bot className="h-4 w-4 text-[var(--v19b-color-primary-text)]" />
             <h3 className="text-[15px] font-semibold text-white">
               Тихая AI-помощь
             </h3>
@@ -638,7 +536,7 @@ export function ReviewScreen({
             {aiWatchlist.length ? (
               aiWatchlist.map((item) => (
                 <button
-                  className={`w-full rounded-[10px] border p-3 text-left transition-colors hover:border-[#6f64ff]/45 ${watchToneClass(item.tone)}`}
+                  className={`w-full rounded-[10px] border p-3 text-left transition-colors hover:border-[var(--v19b-color-primary)] ${watchToneClass(item.tone)}`}
                   data-submission-card=""
                   data-submission-id={item.id}
                   key={item.id}
@@ -647,7 +545,7 @@ export function ReviewScreen({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="min-w-0 whitespace-normal text-[12px] font-semibold text-white">
-                      {item.id} · {item.title}
+                      {item.publicId} · {item.title}
                     </span>
                     {typeof item.score === "number" ? (
                       <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--v19b-color-text-muted)]">
@@ -703,7 +601,7 @@ export function ReviewScreen({
             </div>
             <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
               <span className="text-[12px] text-[var(--v19b-color-text-muted)]">К выгрузке</span>
-              <span className="text-[13px] font-semibold text-[#b8baff]">
+              <span className="text-[13px] font-semibold text-[var(--v19b-color-primary-text)]">
                 {exportQueueCount}
               </span>
             </div>
@@ -716,15 +614,15 @@ export function ReviewScreen({
           </h3>
           <div className="space-y-3 text-[12px] leading-relaxed text-white/45">
             <div className="flex gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#b8baff]" />{" "}
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--v19b-color-primary-text)]" />{" "}
               Не принимать пакет с открытыми blocker-замечаниями.
             </div>
             <div className="flex gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#b8baff]" />{" "}
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--v19b-color-primary-text)]" />{" "}
               AI-флаг не является решением, только подсказка для проверки.
             </div>
             <div className="flex gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#b8baff]" />{" "}
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--v19b-color-primary-text)]" />{" "}
               После принятия пакет получает status ready_for_export и попадает в
               Excel-выгрузку с audit trail.
             </div>

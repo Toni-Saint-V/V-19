@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, FileText, X } from "lucide-react";
 
 import { getPrimaryAction, statusLabelFor } from "../status";
+import { submissionPublicId } from "../submissionIdentity";
 import type { DrawerTab, Role, Submission, SubmissionAction } from "../types";
 
 type FigmaSubmissionDrawerProps = {
@@ -74,7 +75,7 @@ export function FigmaSubmissionDrawer({
 
   return (
     <aside
-      aria-label={`Подача ${submission.id}`}
+      aria-label={`Подача ${submissionPublicId(submission)}`}
       aria-modal="true"
       className="vf-figma-surface v19-submission-drawer-frame v19-figma-drawer-shell"
       role="dialog"
@@ -82,7 +83,7 @@ export function FigmaSubmissionDrawer({
       <header className="v19-figma-drawer-title-row">
         <div className="v19-figma-drawer-title-block">
           <div className="v19-figma-drawer-meta">
-            <span>{submission.id}</span>
+            <span>{submissionPublicId(submission)}</span>
             <span>{submission.city}</span>
             <span>{submission.country}</span>
           </div>

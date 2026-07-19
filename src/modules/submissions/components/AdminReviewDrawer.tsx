@@ -1,25 +1,22 @@
 import {
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
-  ArrowLeft,
-  ArrowRight,
   CheckCircle2,
   FileText,
   FileWarning,
   History,
   Hash,
   Image as ImageIcon,
-  Info,
   MessageSquarePlus,
+  Maximize2,
+  RotateCw,
   Send,
   ScanText,
   ShieldAlert,
@@ -29,17 +26,16 @@ import {
   User,
   Users,
   X,
+  ZoomIn,
+  ZoomOut,
   type LucideIcon,
 } from "lucide-react";
 import { invokeAiHelperEdge } from "../../../services/aiEdgeClient";
+import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../fileAsset";
+import { createMediaSignedUrl, mediaStorageBucket } from "../mediaStorage";
 import {
   adminAiActor,
-  buildAdminAiContext,
   buildAdminIssueDraftContext,
-  failedAdminAiState,
-  nextActionCopy,
-  unavailableAdminAiState,
-  type AdminAiDrawerState,
   type AdminAiRemarkDraftState,
 } from "../adminAiAssistance";
 import {
@@ -48,6 +44,7 @@ import {
   getPrimaryAction,
   openIssueCount,
   statusLabels,
+  statusTone,
 } from "../status";
 import {
   fileLabel,
@@ -55,6 +52,7 @@ import {
   targetForIssue,
   type WorkspaceTarget,
 } from "../workspaceModel";
+import { submissionPublicId } from "../submissionIdentity";
 import type {
   Applicant,
   DrawerTab,
@@ -65,16 +63,25 @@ import type {
   SubmissionFile,
 } from "../types";
 import {
-  buildIdentityConsistencyReport,
-  type IdentityConsistencyFinding,
-} from "../identityConsistency";
-import {
-  IdentityConsistencyPanel,
-  IdentityConsistencyStatusStrip,
-} from "./IdentityConsistencyPanel";
-import { BbAiPanel } from "./BbAiPanel";
+  drawerMotion,
+  drawerPanelExit,
+  drawerPanelInitial,
+  drawerPanelTransition,
+  drawerTabExit,
+  drawerTabInitial,
+  useDrawerDesktopQuery,
+} from "../../../shared/ui/drawer/drawerMotion";
 
 type AdminReviewFileTarget = "passport_scan" | "selfie" | "selfie_2";
+
+type ProtectedMediaPreviewState =
+  | { status: "loading" }
+  | { status: "ready"; url: string }
+  | { status: "unavailable" };
+
+const unavailableProtectedMediaPreview: ProtectedMediaPreviewState = {
+  status: "unavailable",
+};
 
 type AdminReviewTab =
   | "overview"
@@ -82,14 +89,13 @@ type AdminReviewTab =
   | "files"
   | "passport"
   | "selfie"
-  | "questionnaire"
   | "issues"
   | "history";
 
 type RemarkTargetType =
   | "checklistItem"
   | "document"
-  | "questionnaire"
+  | "field"
   | "section"
   | AdminReviewFileTarget;
 
@@ -110,7 +116,6 @@ type FieldStatus = "error" | "ok" | "pending";
 
 type ReviewFieldRow = {
   field?: QuestionnaireField;
-  hasDocument?: boolean;
   label: string;
   section: string;
   sectionId: string;
@@ -124,13 +129,6 @@ type ReviewSection = {
   title: string;
 };
 
-type ChecklistItem = {
-  helper: string;
-  id: string;
-  label: string;
-  reason: string;
-};
-
 const adminReferenceTabs: Array<{
   count?: (submission: Submission) => number;
   icon: LucideIcon;
@@ -138,18 +136,12 @@ const adminReferenceTabs: Array<{
   label: string;
   warning?: boolean;
 }> = [
-  { icon: Info, id: "overview", label: "Обзор" },
+  { icon: ScanText, id: "overview", label: "Сверка" },
   {
     count: (submission) => submission.applicants.length,
     icon: Users,
     id: "applicants",
     label: "Заявители",
-  },
-  {
-    count: (submission) => questionnaireFieldCount(submission),
-    icon: FileText,
-    id: "questionnaire",
-    label: "Анкета",
   },
   { icon: ImageIcon, id: "files", label: "Файлы" },
   {
@@ -178,7 +170,7 @@ const mediaTargets: Array<{
 ];
 
 const remarkTemplates = [
-  "Значение в анкете не совпадает со сканом паспорта или селфи. Проверьте и исправьте поле.",
+  "Значение в данных подачи не совпадает со сканом паспорта или селфи. Проверьте и исправьте поле.",
   "Скан паспорта или селфи читается не полностью. Загрузите файл в лучшем качестве.",
   "Нужно добавить актуальный скан паспорта или селфи для этого поля.",
 ];
@@ -195,61 +187,55 @@ export function AdminReviewDrawer({
   actionError = "",
   activeTab,
   focusTarget,
+  isOpen = true,
   onClearFocusTarget,
   onAction,
   onAddIssue,
-  onAcceptAiSuggestion,
   onClose,
-  onDismissAiSuggestion,
   onReviewFileAccept,
-  onRunAiReview,
   onTab,
-  onVerifyDocument,
   submission,
 }: {
   actionError?: string;
   activeTab: DrawerTab;
   focusTarget?: WorkspaceTarget;
+  isOpen?: boolean;
   onClearFocusTarget?: () => void;
   onAction: (action: SubmissionAction) => void;
-  onAddIssue: (input: IssueInput) => void;
+  onAddIssue: (input: IssueInput) => Promise<boolean>;
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onClose: () => void;
   onDismissAiSuggestion: (suggestionId: string) => void;
   onReviewFileAccept: (input: {
     applicantId: string;
     fileType: AdminReviewFileTarget;
-  }) => void;
+  }) => Promise<boolean>;
   onRunAiReview: () => void;
   onTab: (tab: DrawerTab) => void;
-  onVerifyDocument: (applicantId: string) => void;
+  onVerifyDocument?: (applicantId: string) => void;
   submission: Submission;
 }) {
   const [selectedApplicantId, setSelectedApplicantId] = useState(
     submission.applicants[0]?.id ?? "",
   );
-  const [reviewTarget, setReviewTarget] =
-    useState<AdminReviewFileTarget>("passport_scan");
   const [activeReviewTab, setActiveReviewTab] = useState<AdminReviewTab>(() =>
     drawerTabToReviewTab(activeTab),
   );
+  const [activeIdentityReference, setActiveIdentityReference] =
+    useState<AdminReviewFileTarget>("passport_scan");
   const [remarkContext, setRemarkContext] = useState<RemarkContext | null>(null);
-  const [passportWorkspaceOpen, setPassportWorkspaceOpen] = useState(false);
-  const [adminAiState, setAdminAiState] = useState<AdminAiDrawerState>({
-    status: "idle",
-  });
-  const [questionnaireFocusTarget, setQuestionnaireFocusTarget] =
-    useState<WorkspaceTarget | undefined>(undefined);
+  const [passportFocusTarget, setPassportFocusTarget] = useState<
+    Extract<WorkspaceTarget, { tab: "questionnaire" }> | undefined
+  >(undefined);
   const drawerRef = useRef<HTMLElement | null>(null);
   const reviewTabsRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   const remarkContextRef = useRef(remarkContext);
-  const passportWorkspaceOpenRef = useRef(passportWorkspaceOpen);
   const prefersReducedMotion = useReducedMotion();
+  const isDesktopDrawer = useDrawerDesktopQuery();
 
   onCloseRef.current = onClose;
   remarkContextRef.current = remarkContext;
-  passportWorkspaceOpenRef.current = passportWorkspaceOpen;
 
   useEffect(() => {
     if (submission.applicants.some((applicant) => applicant.id === selectedApplicantId)) {
@@ -262,12 +248,6 @@ export function AdminReviewDrawer({
     const mappedTab = drawerTabToReviewTab(activeTab);
     setActiveReviewTab((current) => {
       if (
-        activeTab === "questionnaire" &&
-        (current === "passport" || current === "selfie" || current === "questionnaire")
-      ) {
-        return current;
-      }
-      if (
         activeTab === "files" &&
         (current === "passport" || current === "selfie" || current === "files")
       ) {
@@ -278,6 +258,8 @@ export function AdminReviewDrawer({
   }, [activeTab]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const previouslyFocusedElement =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusFrame = window.requestAnimationFrame(() => {
@@ -289,10 +271,6 @@ export function AdminReviewDrawer({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (passportWorkspaceOpenRef.current) {
-          setPassportWorkspaceOpen(false);
-          return;
-        }
         if (remarkContextRef.current) {
           setRemarkContext(null);
           return;
@@ -302,9 +280,7 @@ export function AdminReviewDrawer({
       }
 
       if (
-        event.key !== "Tab" ||
-        passportWorkspaceOpenRef.current ||
-        remarkContextRef.current
+        event.key !== "Tab" || remarkContextRef.current
       ) {
         return;
       }
@@ -346,49 +322,48 @@ export function AdminReviewDrawer({
         previouslyFocusedElement.focus({ preventScroll: true });
       }
     };
-  }, [submission.id]);
+  }, [isOpen, submission.id]);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setRemarkContext(null);
+    setPassportFocusTarget(undefined);
+  }, [isOpen]);
 
   const selectedApplicant =
     submission.applicants.find((applicant) => applicant.id === selectedApplicantId) ??
     submission.applicants[0];
   const primaryAction = getPrimaryAction(submission, "admin", "review");
-  const adminNextAction = nextActionCopy(adminAiState, primaryAction.label);
+  const adminNextAction = primaryAction.reason
+    ? `${primaryAction.label}: ${primaryAction.reason}`
+    : `Следующее действие: ${primaryAction.label}.`;
+  const submissionTone = statusTone[submission.status];
   const issueGuard = adminIssueGuard(submission, "admin");
   const issueGuardReason = "reason" in issueGuard ? issueGuard.reason : "";
-  const identityReport = useMemo(
-    () => buildIdentityConsistencyReport(submission),
-    [submission],
-  );
-  const selectedApplicantIdentityFindings = useMemo(
-    () =>
-      selectedApplicant
-        ? identityReport.findings.filter(
-            (finding) => finding.applicantId === selectedApplicant.id,
-          )
-        : [],
-    [identityReport, selectedApplicant],
-  );
-
   const selectReviewTab = useCallback(
     (tab: AdminReviewTab) => {
       setActiveReviewTab(tab);
       onTab(reviewTabToDrawerTab(tab));
-      if (tab === "passport") setReviewTarget("passport_scan");
-      if (tab === "selfie" && reviewTarget === "passport_scan") {
-        setReviewTarget("selfie");
-      }
     },
-    [onTab, reviewTarget],
+    [onTab],
   );
 
+  const selectApplicant = useCallback((applicantId: string) => {
+    setSelectedApplicantId(applicantId);
+    setActiveIdentityReference("passport_scan");
+  }, []);
+
   function isReferenceTabSelected(tab: DrawerTab) {
-    if (tab === "overview") return activeReviewTab === "overview";
+    if (tab === "overview")
+      return (
+        activeReviewTab === "overview" ||
+        activeReviewTab === "passport" ||
+        activeReviewTab === "selfie"
+      );
     if (tab === "applicants") return activeReviewTab === "applicants";
     if (tab === "issues") return activeReviewTab === "issues";
     if (tab === "history") return activeReviewTab === "history";
-    if (tab === "files")
-      return activeReviewTab === "files" || activeReviewTab === "passport" || activeReviewTab === "selfie";
-    if (tab === "questionnaire") return activeReviewTab === "questionnaire";
+    if (tab === "files") return activeReviewTab === "files";
     return false;
   }
 
@@ -418,14 +393,22 @@ export function AdminReviewDrawer({
       return;
     }
 
-    selectReviewTab("questionnaire");
+    selectReviewTab("passport");
   }
 
   function focusReferenceTab(tab: DrawerTab) {
     window.requestAnimationFrame(() => {
-      reviewTabsRef.current
-        ?.querySelector<HTMLElement>(`#${adminReviewTabId(tab)}`)
-        ?.focus({ preventScroll: true });
+      const tabButton = reviewTabsRef.current?.querySelector<HTMLElement>(
+        `#${adminReviewTabId(tab)}`,
+      );
+      if (typeof tabButton?.scrollIntoView === "function") {
+        tabButton.scrollIntoView({
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "nearest",
+          inline: "nearest",
+        });
+      }
+      tabButton?.focus({ preventScroll: true });
     });
   }
 
@@ -458,59 +441,16 @@ export function AdminReviewDrawer({
 
   function openApplicantSubscreen(
     applicantId: string,
-    tab: Extract<AdminReviewTab, "passport" | "selfie" | "questionnaire" | "files">,
+    tab: Extract<AdminReviewTab, "passport" | "selfie" | "files">,
   ) {
     setSelectedApplicantId(applicantId);
     if (tab === "passport") {
-      onVerifyDocument(applicantId);
-      return;
+      setActiveIdentityReference("passport_scan");
+    } else if (tab === "selfie") {
+      setActiveIdentityReference("selfie");
     }
-    if (tab === "selfie") setReviewTarget("selfie");
     selectReviewTab(tab);
   }
-
-  useEffect(() => {
-    setAdminAiState({ status: "idle" });
-    setPassportWorkspaceOpen(false);
-  }, [submission.id]);
-
-  const runAdminAiReview = useCallback(async () => {
-    setAdminAiState({ status: "loading" });
-
-    try {
-      const [review, nextAction, readiness] = await Promise.all([
-        invokeAiHelperEdge(
-          "admin_review",
-          buildAdminAiContext(submission, "review"),
-          adminAiActor,
-        ),
-        invokeAiHelperEdge(
-          "admin_next_action",
-          buildAdminAiContext(submission, "nextAction"),
-          adminAiActor,
-        ),
-        invokeAiHelperEdge(
-          "admin_readiness_explanation",
-          buildAdminAiContext(submission, "readiness"),
-          adminAiActor,
-        ),
-      ]);
-
-      if (!review && !nextAction && !readiness) {
-        setAdminAiState(unavailableAdminAiState());
-        return;
-      }
-
-      setAdminAiState({
-        status: "ready",
-        review: review ?? undefined,
-        nextAction: nextAction ?? undefined,
-        readiness: readiness ?? undefined,
-      });
-    } catch {
-      setAdminAiState(failedAdminAiState());
-    }
-  }, [submission]);
 
   const draftAdminRemark = useCallback(
     async (input: {
@@ -546,18 +486,34 @@ export function AdminReviewDrawer({
     if (target.tab !== "issues") setSelectedApplicantId(target.applicantId);
 
     if (target.tab === "questionnaire") {
-      setQuestionnaireFocusTarget(target);
-      selectReviewTab("questionnaire");
+      const applicant = submission.applicants.find(
+        (candidate) => candidate.id === target.applicantId,
+      );
+      const isPassportField = Boolean(
+        applicant &&
+          buildReviewSections(applicant)
+            .find((section) => section.isPassport)
+            ?.rows.some(
+              (row) =>
+                target.field === row.field?.id ||
+                target.field === row.label ||
+                target.field === row.field?.label ||
+                target.section === row.section,
+            ),
+      );
+      if (isPassportField) {
+        setPassportFocusTarget(target);
+        setActiveIdentityReference("passport_scan");
+        selectReviewTab("passport");
+      } else {
+        selectReviewTab("issues");
+      }
       return;
     }
 
     if (target.tab === "files" && isAdminReviewFileTarget(target.fileType)) {
-      setReviewTarget(target.fileType);
-      if (target.fileType === "passport_scan") {
-        onVerifyDocument(target.applicantId);
-        return;
-      }
-      selectReviewTab("selfie");
+      setActiveIdentityReference(target.fileType);
+      selectReviewTab(target.fileType === "passport_scan" ? "passport" : "selfie");
       return;
     }
 
@@ -567,42 +523,15 @@ export function AdminReviewDrawer({
     }
 
     selectReviewTab("issues");
-  }, [onVerifyDocument, selectReviewTab]);
-
-  function handleIdentityFindingRemark(finding: IdentityConsistencyFinding) {
-    const target = finding.target;
-    const applicantId = target.tab !== "issues" ? target.applicantId : finding.applicantId;
-
-    if (target.tab === "files" && isAdminReviewFileTarget(target.fileType)) {
-      setRemarkContext({
-        applicantId,
-        field: finding.label,
-        fileType: target.fileType,
-        reason: finding.message,
-        sectionLabel: fileLabel(target.fileType),
-        targetLabel: finding.label,
-        targetType: target.fileType,
-      });
-      return;
-    }
-
-    setRemarkContext({
-      applicantId,
-      field: finding.label,
-      reason: finding.message,
-      sectionLabel: target.tab === "questionnaire" ? target.section ?? "Анкета" : "AI-сверка",
-      targetLabel: finding.label,
-      targetType: "questionnaire",
-    });
-  }
+  }, [selectReviewTab, submission.applicants]);
 
   useEffect(() => {
-    if (!focusTarget) return;
+    if (!isOpen || !focusTarget) return;
     jumpToWorkspaceTarget(focusTarget);
     onClearFocusTarget?.();
-  }, [focusTarget, jumpToWorkspaceTarget, onClearFocusTarget, submission.id]);
+  }, [focusTarget, isOpen, jumpToWorkspaceTarget, onClearFocusTarget, submission.id]);
 
-  function openQuestionnaireRemark(row: ReviewFieldRow) {
+  function openPassportFieldRemark(row: ReviewFieldRow) {
     if (!selectedApplicant) return;
     setRemarkContext({
       applicantId: selectedApplicant.id,
@@ -611,7 +540,7 @@ export function AdminReviewDrawer({
       sectionId: row.sectionId,
       sectionLabel: row.section,
       targetLabel: row.label,
-      targetType: "questionnaire",
+      targetType: "field",
     });
   }
 
@@ -631,26 +560,14 @@ export function AdminReviewDrawer({
     });
   }
 
-  function openSectionRemark(section: ReviewSection) {
-    if (!selectedApplicant) return;
-    setRemarkContext({
-      applicantId: selectedApplicant.id,
-      reason: `${section.title}: требуется уточнение`,
-      sectionId: section.id,
-      sectionLabel: section.title,
-      targetLabel: section.title,
-      targetType: "section",
-    });
-  }
-
-  function openGeneralRemark() {
+  function openPassportRemark() {
     if (!selectedApplicant) return;
     setRemarkContext({
       applicantId: selectedApplicant.id,
       reason: "Требуется уточнение",
-      sectionLabel: "Анкета",
-      targetLabel: "Анкета",
-      targetType: "questionnaire",
+      sectionLabel: "Паспорт",
+      targetLabel: "Паспорт",
+      targetType: "section",
     });
   }
 
@@ -658,80 +575,106 @@ export function AdminReviewDrawer({
     jumpToWorkspaceTarget(targetForIssue(issue));
   }
 
-  function submitRemark(input: IssueInput) {
-    onAddIssue(input);
-    setRemarkContext(null);
+  async function submitRemark(input: IssueInput) {
+    const saved = await onAddIssue(input);
+    if (saved) {
+      setRemarkContext(null);
+    }
+    return saved;
   }
 
   const activeReferenceTab =
     adminReferenceTabs.find((tab) => isReferenceTabSelected(tab.id))?.id ??
     "overview";
+  const isIdentityReview =
+    activeReviewTab === "overview" ||
+    activeReviewTab === "passport" ||
+    activeReviewTab === "selfie";
+
+  const primaryApplicant =
+    submission.applicants.find((applicant) => applicant.role === "main") ??
+    submission.applicants[0];
+  const identityReferenceFiles = mediaTargets.map((target) => {
+    const applicant =
+      target.id === "passport_scan" ? selectedApplicant : primaryApplicant;
+    return {
+      applicant,
+      file: applicant
+        ? findApplicantFile(submission, applicant.id, target.id)
+        : undefined,
+      target,
+    };
+  });
+  const hasPendingIdentityReferences = identityReferenceFiles.some(
+    (item) => item.file?.status !== "accepted",
+  );
 
   return (
     <AnimatePresence>
-      <motion.div
+      {isOpen ? <motion.div
         className="admin-review-backdrop"
         key="admin-review-backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.25, ease: "easeInOut" }}
+        transition={prefersReducedMotion ? drawerMotion.reduced : drawerMotion.overlay}
         onClick={onClose}
-      />
+      /> : null}
 
-      <motion.aside
+      {isOpen ? <motion.aside
         aria-labelledby="admin-review-heading"
         aria-modal="true"
         className="admin-review-drawer"
         data-admin-review-drawer-surface="workspace"
+        data-review-mode={isIdentityReview ? "identity" : "standard"}
+        id="admin-review-drawer"
         key="admin-review-drawer"
         ref={drawerRef}
         role="dialog"
-        initial={
-          prefersReducedMotion
-            ? { filter: "blur(var(--v19b-size-0))", opacity: 1, x: 0 }
-            : { filter: "blur(var(--v19b-size-8))", opacity: 0.5, x: "100%" }
-        }
-        animate={{ filter: "blur(var(--v19b-size-0))", opacity: 1, x: 0 }}
-        exit={
-          prefersReducedMotion
-            ? { filter: "blur(var(--v19b-size-0))", opacity: 0, x: 0 }
-            : { filter: "blur(var(--v19b-size-4))", opacity: 0, x: "100%" }
-        }
-        transition={
-          prefersReducedMotion
-            ? { duration: 0.01 }
-            : { damping: 26, mass: 1, stiffness: 220, type: "spring" }
-        }
+        initial={drawerPanelInitial(isDesktopDrawer, Boolean(prefersReducedMotion))}
+        animate={{ opacity: 1, x: 0, y: 0 }}
+        exit={drawerPanelExit(isDesktopDrawer, Boolean(prefersReducedMotion))}
+        transition={drawerPanelTransition(Boolean(prefersReducedMotion))}
       >
         <header className="admin-review-drawer-header">
           <div className="admin-review-titlebar">
             <div className="admin-review-titlecopy">
-              <p>
-                <strong>{submission.id}</strong>
-                <span className="admin-review-title-separator" aria-hidden="true" />
-                <span>{submission.title}</span>
-              </p>
+              <div className="admin-review-titleidentity">
+                <p>
+                  <strong>{submissionPublicId(submission)}</strong>
+                  <span className="admin-review-title-separator" aria-hidden="true" />
+                  <span className="admin-review-title-submission">{submission.title}</span>
+                </p>
+              </div>
               <p className="admin-review-meta">
                 {submission.city}
                 <span aria-hidden="true"> · </span>
                 {openIssueCount(submission)} замечаний
               </p>
               <h2 id="admin-review-heading">
-                Проверка пакета
-                <span className={`admin-review-status-pill is-${submission.status}`}>
+                <span className="admin-review-drawer-heading">Проверка пакета</span>
+                <span
+                  aria-label={`Статус заявки: ${statusLabels[submission.status]}`}
+                  className={`admin-review-status-pill is-${submissionTone} is-${submission.status}`}
+                >
+                  <i
+                    aria-hidden="true"
+                    className={`admin-review-status-dot is-${submissionTone}`}
+                  />
                   {statusLabels[submission.status]}
                 </span>
               </h2>
             </div>
-            <button
-              aria-label="Закрыть проверку"
-              className="admin-review-close"
-              type="button"
-              onClick={onClose}
-            >
-              <X aria-hidden="true" size={20} />
-            </button>
+            <div className="admin-review-header-actions">
+              <button
+                aria-label="Закрыть проверку"
+                className="admin-review-close"
+                type="button"
+                onClick={onClose}
+              >
+                <X aria-hidden="true" size={20} />
+              </button>
+            </div>
           </div>
 
           <nav
@@ -743,6 +686,7 @@ export function AdminReviewDrawer({
             {adminReferenceTabs.map((tab) => {
               const count = tab.count?.(submission);
               const selected = isReferenceTabSelected(tab.id);
+              const Icon = tab.icon;
 
               return (
                 <button
@@ -757,6 +701,7 @@ export function AdminReviewDrawer({
                   onClick={() => selectReferenceTab(tab.id)}
                   onKeyDown={(event) => handleReferenceTabKeyDown(event, tab.id)}
                 >
+                  <Icon aria-hidden="true" size={16} />
                   <span>{tab.label}</span>
                   {typeof count === "number" ? (
                     <em className={tab.warning && count > 0 ? "is-warning" : ""}>
@@ -767,7 +712,7 @@ export function AdminReviewDrawer({
                     <motion.i
                       aria-hidden="true"
                       layoutId="adminReviewActiveTab"
-                      transition={{ bounce: 0.2, duration: 0.5, type: "spring" }}
+                      transition={drawerMotion.tabIndicator}
                     />
                   ) : null}
                 </button>
@@ -783,18 +728,11 @@ export function AdminReviewDrawer({
         ) : null}
 
         <div className="admin-review-content">
-          <div className="admin-review-drawer-assist">
-            <IdentityConsistencyStatusStrip compact report={identityReport} />
-            <AdminAiAssistancePanel state={adminAiState} onRun={runAdminAiReview} />
-          </div>
-
-          {activeReviewTab === "passport" ||
-          activeReviewTab === "selfie" ||
-          activeReviewTab === "questionnaire" ? (
+          {isIdentityReview ? (
             <ApplicantChips
               selectedApplicantId={selectedApplicantId}
               submission={submission}
-              onApplicant={setSelectedApplicantId}
+              onApplicant={selectApplicant}
             />
           ) : null}
 
@@ -803,33 +741,35 @@ export function AdminReviewDrawer({
               aria-labelledby={adminReviewTabId(activeReferenceTab)}
               animate={{ opacity: 1, y: 0 }}
               className="admin-review-tab-panel"
-              exit={
-                prefersReducedMotion
-                  ? { opacity: 0, y: 0 }
-                  : { opacity: 0, y: -8 }
-              }
-              initial={
-                prefersReducedMotion
-                  ? { opacity: 0, y: 0 }
-                  : { opacity: 0, y: 8 }
-              }
+              exit={drawerTabExit(Boolean(prefersReducedMotion))}
+              initial={drawerTabInitial(Boolean(prefersReducedMotion))}
               id={adminReviewPanelId(activeReferenceTab)}
               key={activeReviewTab}
               role="tabpanel"
-              transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
+              transition={prefersReducedMotion ? drawerMotion.reduced : drawerMotion.tab}
             >
-              {activeReviewTab === "overview" ? (
-                <AdminOverviewTab
-                  primaryActionLabel={primaryAction.label}
+              {isIdentityReview ? (
+                <AdminIdentityReviewWorkspace
+                  activeReference={activeIdentityReference}
+                  focusTarget={passportFocusTarget}
+                  issueGuardReason={issueGuardReason}
+                  selectedApplicant={selectedApplicant}
                   submission={submission}
-                  onOpenTab={selectReviewTab}
+                  onAcceptFile={(applicantId, fileType) =>
+                    onReviewFileAccept({ applicantId, fileType })
+                  }
+                  onFieldRemark={openPassportFieldRemark}
+                  onFileRemark={(applicantId, fileType, reason) =>
+                    openFileRemark(fileType, reason, undefined, applicantId)
+                  }
+                  onReference={setActiveIdentityReference}
                 />
               ) : activeReviewTab === "applicants" ? (
                 <ApplicantsReviewTab
                   selectedApplicantId={selectedApplicant?.id}
                   submission={submission}
                   onOpenSubscreen={openApplicantSubscreen}
-                  onSelectApplicant={setSelectedApplicantId}
+                  onSelectApplicant={selectApplicant}
                 />
               ) : activeReviewTab === "files" ? (
                 <AdminFilesTab
@@ -840,91 +780,10 @@ export function AdminReviewDrawer({
                   }}
                   onOpenReview={(file) => {
                     setSelectedApplicantId(file.applicantId);
-                    if (file.type === "passport_scan") {
-                      onVerifyDocument(file.applicantId);
-                      return;
-                    }
-                    setReviewTarget(file.type as AdminReviewFileTarget);
-                    selectReviewTab("selfie");
-                  }}
-                />
-              ) : activeReviewTab === "passport" ? (
-                <PassportReviewTab
-                  identityPanel={
-                    <IdentityConsistencyPanel
-                      compact
-                      findings={selectedApplicantIdentityFindings}
-                      report={identityReport}
-                      selectedApplicantId={selectedApplicant?.id}
-                      onCreateRemark={handleIdentityFindingRemark}
-                      onJumpToFinding={(finding) => jumpToWorkspaceTarget(finding.target)}
-                    />
-                  }
-                  issueGuardReason={issueGuardReason}
-                  selectedApplicant={selectedApplicant}
-                  submission={submission}
-                  onAcceptFile={() => {
-                    if (!selectedApplicant) return;
-                    onReviewFileAccept({
-                      applicantId: selectedApplicant.id,
-                      fileType: "passport_scan",
-                    });
-                  }}
-                  onChecklistRemark={(item) =>
-                    openFileRemark("passport_scan", item.reason, {
-                      checklistItemId: item.id,
-                      checklistItemLabel: item.label,
-                      field: item.label,
-                      sectionId: "passport",
-                      sectionLabel: "Паспорт",
-                      targetLabel: item.label,
-                      targetType: "checklistItem",
-                    })
-                  }
-                  onFieldRemark={openQuestionnaireRemark}
-                  onOpenWorkspace={() => {
-                    if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
-                  }}
-                  onNext={() => selectReviewTab("questionnaire")}
-                  onRemark={() => openFileRemark("passport_scan", "Скан паспорта требует замены")}
-                />
-              ) : activeReviewTab === "selfie" ? (
-                <SelfieReviewTab
-                  issueGuardReason={issueGuardReason}
-                  reviewTarget={reviewTarget === "passport_scan" ? "selfie" : reviewTarget}
-                  selectedApplicant={selectedApplicant}
-                  submission={submission}
-                  onAcceptFile={(fileType) => {
-                    if (!selectedApplicant) return;
-                    onReviewFileAccept({
-                      applicantId: selectedApplicant.id,
-                      fileType,
-                    });
-                  }}
-                  onChecklistRemark={(fileType, item) =>
-                    openFileRemark(fileType, `${fileLabel(fileType)}: ${item.reason}`, {
-                      checklistItemId: item.id,
-                      checklistItemLabel: item.label,
-                      field: item.label,
-                      sectionId: "selfie",
-                      sectionLabel: "Селфи",
-                      targetLabel: item.label,
-                      targetType: "checklistItem",
-                    })
-                  }
-                  onFileRemark={openFileRemark}
-                  onReviewTarget={setReviewTarget}
-                />
-              ) : activeReviewTab === "questionnaire" ? (
-                <QuestionnaireReviewTab
-                  focusTarget={questionnaireFocusTarget}
-                  issueGuardReason={issueGuardReason}
-                  selectedApplicant={selectedApplicant}
-                  submission={submission}
-                  onFieldRemark={openQuestionnaireRemark}
-                  onSectionRemark={openSectionRemark}
-                  onVerifyPassport={() => {
-                    if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
+                    setActiveIdentityReference(file.type);
+                    selectReviewTab(
+                      file.type === "passport_scan" ? "passport" : "selfie",
+                    );
                   }}
                 />
               ) : activeReviewTab === "issues" ? (
@@ -932,15 +791,9 @@ export function AdminReviewDrawer({
                   addRemarkDisabled={!selectedApplicant || Boolean(issueGuardReason)}
                   emptyStateReady={!primaryAction.disabled}
                   emptyStateReason={primaryAction.reason}
-                  identityFindings={identityReport.findings}
                   submission={submission}
-                  onAcceptAiSuggestion={onAcceptAiSuggestion}
-                  onAddRemark={openGeneralRemark}
-                  onDismissAiSuggestion={onDismissAiSuggestion}
-                  onIdentityJump={(finding) => jumpToWorkspaceTarget(finding.target)}
-                  onIdentityRemark={handleIdentityFindingRemark}
+                  onAddRemark={openPassportRemark}
                   onJump={handleIssueJump}
-                  onRunAiReview={onRunAiReview}
                 />
               ) : activeReviewTab === "history" ? (
                 <HistoryReviewTab submission={submission} />
@@ -950,32 +803,38 @@ export function AdminReviewDrawer({
         </div>
 
         <footer className="admin-review-footer">
-          <div>
+          <p className="admin-review-primary-reason">
             <span className="admin-review-footer-dot" aria-hidden="true" />
-            {adminNextAction}
+            {isIdentityReview && hasPendingIdentityReferences
+              ? "Подтвердите паспорт и два селфи по очереди. Одновременно доступна одна кнопка принятия."
+              : adminNextAction}
+          </p>
+          <div className="admin-review-footer-actions">
+            <button className="admin-review-secondary" type="button" onClick={onClose}>
+              Отложить
+            </button>
+            {!isIdentityReview || !hasPendingIdentityReferences ? (
+              <button
+                className={`admin-review-primary ${
+                  primaryAction.action === "return_with_issues" ||
+                  primaryAction.action === "return_again"
+                    ? "is-return"
+                    : ""
+                }`}
+                disabled={primaryAction.disabled}
+                type="button"
+                onClick={() => onAction(primaryAction.action)}
+              >
+                <ShieldCheck aria-hidden="true" size={16} />
+                {primaryAction.label}
+              </button>
+            ) : null}
           </div>
-          <button className="admin-review-secondary" type="button" onClick={onClose}>
-            Отложить
-          </button>
-          <button
-            className={`admin-review-primary ${
-              primaryAction.action === "return_with_issues" ||
-              primaryAction.action === "return_again"
-                ? "is-return"
-                : ""
-            }`}
-            disabled={primaryAction.disabled}
-            type="button"
-            onClick={() => onAction(primaryAction.action)}
-          >
-            <ShieldCheck aria-hidden="true" size={16} />
-            {primaryAction.label}
-          </button>
         </footer>
 
-      </motion.aside>
+      </motion.aside> : null}
 
-      {remarkContext ? (
+      {isOpen && remarkContext ? (
         <AdminRemarkForm
           context={remarkContext}
           issueGuardReason={issueGuardReason}
@@ -986,235 +845,299 @@ export function AdminReviewDrawer({
         />
       ) : null}
 
-      {passportWorkspaceOpen ? (
-        <AdminPassportReviewWorkspace
-          issueGuardReason={issueGuardReason}
-          key="admin-passport-review-workspace"
-          selectedApplicant={selectedApplicant}
-          submission={submission}
-          onAcceptFile={() => {
-            if (!selectedApplicant) return;
-            onReviewFileAccept({
-              applicantId: selectedApplicant.id,
-              fileType: "passport_scan",
-            });
-          }}
-          onChecklistRemark={(item) =>
-            openFileRemark("passport_scan", item.reason, {
-              checklistItemId: item.id,
-              checklistItemLabel: item.label,
-              field: item.label,
-              sectionId: "passport",
-              sectionLabel: "Паспорт",
-              targetLabel: item.label,
-              targetType: "checklistItem",
-            })
-          }
-          onClose={() => setPassportWorkspaceOpen(false)}
-          onFieldRemark={openQuestionnaireRemark}
-          onNext={() => {
-            setPassportWorkspaceOpen(false);
-            selectReviewTab("questionnaire");
-          }}
-          onRemark={() => openFileRemark("passport_scan", "Скан паспорта требует замены")}
-        />
-      ) : null}
-
     </AnimatePresence>
   );
 }
 
-function AdminAiAssistancePanel({
-  onRun,
-  state,
-}: {
-  onRun: () => void;
-  state: AdminAiDrawerState;
-}) {
-  const disabled = state.status === "loading";
-  const reviewItems =
-    state.review?.adminReviewChecklist?.length
-      ? state.review.adminReviewChecklist
-      : state.review?.suggestions;
-  const blockerItems = [
-    ...(state.review?.blockers ?? []),
-    ...(state.readiness?.blockers ?? []),
-  ].slice(0, 5);
-  const readinessCopy =
-    state.readiness?.readinessExplanation ||
-    state.readiness?.summary ||
-    "Готовность объясняется deterministic статусами, файлами и открытыми замечаниями.";
-
-  return (
-    <section className="admin-ai-assist" aria-label="AI-помощник администратора">
-      <div className="admin-ai-assist-head">
-        <div>
-          <span>
-            <Sparkles aria-hidden="true" size={14} />
-            AI-помощник
-          </span>
-          <strong>Предварительная проверка</strong>
-        </div>
-        <button disabled={disabled} type="button" onClick={onRun}>
-          <Sparkles aria-hidden="true" size={15} />
-          {disabled ? "Проверяем" : "Проверить AI"}
-        </button>
-      </div>
-
-      {state.status === "idle" ? (
-        <p>
-          Запустите локальную подсказку, чтобы собрать список проверки, возможные
-          замечания и объяснение готовности.
-        </p>
-      ) : null}
-
-      {state.status === "loading" ? (
-        <p role="status">Запрос идет через серверный ai-helper. Действия не выполняются.</p>
-      ) : null}
-
-      {state.status === "unavailable" || state.status === "failed" ? (
-        <p className="is-warning" role="status">
-          {state.error}. Продолжайте ручную проверку; решения и отправка не выполняются
-          автоматически.
-        </p>
-      ) : null}
-
-      {state.status === "ready" ? (
-        <div className="admin-ai-assist-grid">
-          <section>
-            <h3>Что проверить</h3>
-            <ul>
-              {(reviewItems?.length
-                ? reviewItems
-                : ["Сверьте файлы, анкету и открытые замечания вручную."]
-              ).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h3>Блокеры и недостающие данные</h3>
-            <ul>
-              {(blockerItems.length
-                ? blockerItems
-                : ["Явные блокеры не найдены в безопасном AI-ответе."]
-              ).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h3>Готовность</h3>
-            <p>{readinessCopy}</p>
-          </section>
-          <section>
-            <h3>Ограничение</h3>
-            <p>Требует проверки администратором. Принятие и выгрузка остаются ручными действиями.</p>
-          </section>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function AdminOverviewTab({
-  primaryActionLabel,
+function AdminIdentityReviewWorkspace({
+  activeReference,
+  focusTarget,
+  issueGuardReason,
+  selectedApplicant,
   submission,
-  onOpenTab,
+  onAcceptFile,
+  onFieldRemark,
+  onFileRemark,
+  onReference,
 }: {
-  primaryActionLabel: string;
+  activeReference: AdminReviewFileTarget;
+  focusTarget?: Extract<WorkspaceTarget, { tab: "questionnaire" }>;
+  issueGuardReason: string;
+  selectedApplicant?: Applicant;
   submission: Submission;
-  onOpenTab: (tab: AdminReviewTab) => void;
+  onAcceptFile: (
+    applicantId: string,
+    fileType: AdminReviewFileTarget,
+  ) => Promise<boolean>;
+  onFieldRemark: (row: ReviewFieldRow) => void;
+  onFileRemark: (
+    applicantId: string,
+    fileType: AdminReviewFileTarget,
+    reason: string,
+  ) => void;
+  onReference: (target: AdminReviewFileTarget) => void;
 }) {
-  const fileCount = submission.files.length;
-  const readyFileCount = submission.files.filter(
-    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  const referenceTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const prefersReducedMotion = useReducedMotion();
+  const primaryApplicant =
+    submission.applicants.find((applicant) => applicant.role === "main") ??
+    submission.applicants[0];
+  const passportFile = selectedApplicant
+    ? findApplicantFile(submission, selectedApplicant.id, "passport_scan")
+    : undefined;
+  const firstSelfie = primaryApplicant
+    ? findApplicantFile(submission, primaryApplicant.id, "selfie")
+    : undefined;
+  const secondSelfie = primaryApplicant
+    ? findApplicantFile(submission, primaryApplicant.id, "selfie_2")
+    : undefined;
+  const passportPreview = useProtectedMediaPreview({
+    applicantId: selectedApplicant?.id,
+    file: passportFile,
+    fileType: "passport_scan",
+    submissionId: submission.id,
+  });
+  const firstSelfiePreview = useProtectedMediaPreview({
+    applicantId: primaryApplicant?.id,
+    file: firstSelfie,
+    fileType: "selfie",
+    submissionId: submission.id,
+  });
+  const secondSelfiePreview = useProtectedMediaPreview({
+    applicantId: primaryApplicant?.id,
+    file: secondSelfie,
+    fileType: "selfie_2",
+    submissionId: submission.id,
+  });
+  const passportRows = selectedApplicant
+    ? buildReviewSections(selectedApplicant).find((section) => section.isPassport)?.rows ?? []
+    : [];
+  const reviewedPassportFields = passportRows.filter(
+    (row) => row.field?.reviewState === "confirmed" || row.field?.reviewConfirmedAtIso,
   ).length;
-  const fieldCount = questionnaireFieldCount(submission);
-  const openIssues = openIssueCount(submission);
-  const nextChecks: Array<{
-    count: string;
-    id: Extract<AdminReviewTab, "passport" | "selfie" | "questionnaire" | "issues" | "files">;
-    label: string;
-    tone?: "warning";
-  }> = [
-    { count: `${readyFileCount}/${fileCount}`, id: "files", label: "Файлы" },
-    { count: String(fieldCount), id: "questionnaire", label: "Поля анкеты" },
-    {
-      count: String(openIssues),
-      id: "issues",
-      label: "Замечания",
-      tone: openIssues > 0 ? "warning" : undefined,
-    },
-  ];
+
+  const activeFile =
+    activeReference === "passport_scan"
+      ? passportFile
+      : activeReference === "selfie"
+        ? firstSelfie
+        : secondSelfie;
+  const activePreview =
+    activeReference === "passport_scan"
+      ? passportPreview
+      : activeReference === "selfie"
+        ? firstSelfiePreview
+        : secondSelfiePreview;
+
+  function selectReference(target: AdminReviewFileTarget, focusTab = false) {
+    onReference(target);
+    if (focusTab) {
+      const nextIndex = mediaTargets.findIndex((item) => item.id === target);
+      referenceTabRefs.current[nextIndex]?.focus();
+    }
+  }
+
+  function fileForReference(target: AdminReviewFileTarget) {
+    if (target === "passport_scan") return passportFile;
+    if (target === "selfie") return firstSelfie;
+    return secondSelfie;
+  }
+
+  async function acceptReference(target: AdminReviewFileTarget) {
+    const applicant = target === "passport_scan" ? selectedApplicant : primaryApplicant;
+    if (!applicant) return false;
+    const accepted = await onAcceptFile(applicant.id, target);
+    if (!accepted) return false;
+
+    const currentIndex = mediaTargets.findIndex((item) => item.id === target);
+    const followingTargets = [
+      ...mediaTargets.slice(currentIndex + 1),
+      ...mediaTargets.slice(0, currentIndex),
+    ];
+    const nextTarget = followingTargets.find(
+      (item) => fileForReference(item.id)?.status !== "accepted",
+    );
+    if (nextTarget) onReference(nextTarget.id);
+    return true;
+  }
+
+  function handleReferenceKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) {
+    let nextIndex = currentIndex;
+
+    if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % mediaTargets.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + mediaTargets.length) % mediaTargets.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = mediaTargets.length - 1;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    selectReference(mediaTargets[nextIndex].id, true);
+  }
+
+  if (!selectedApplicant || !primaryApplicant) {
+    return (
+      <div className="admin-review-empty-card" role="status">
+        <Users aria-hidden="true" size={18} />
+        <strong>Нет заявителя для сверки</strong>
+        <span>Паспортные данные и селфи появятся после добавления заявителя.</span>
+      </div>
+    );
+  }
+
+  const activeApplicant =
+    activeReference === "passport_scan" ? selectedApplicant : primaryApplicant;
 
   return (
-    <div className="admin-review-overview-tab" data-admin-review-overview>
-      <section className="admin-review-overview-hero" aria-label="Сводка пакета">
-        <div>
-          <span>{submission.type === "family" ? "Семейная подача" : "Один заявитель"}</span>
-          <h3>{submission.title}</h3>
-          <p>
-            {submission.city} · {submission.tripDateFrom}-{submission.tripDateTo} ·{" "}
-            {submission.applicants.length} заявителей
-          </p>
-        </div>
-        <strong>{primaryActionLabel}</strong>
-      </section>
+    <section
+      aria-label="Паспортные данные и два селфи"
+      className="admin-review-identity-workspace"
+      data-admin-identity-review
+      id="admin-review-identity-workspace"
+    >
+      <div className="admin-review-identity-evidence">
+        <header className="admin-review-identity-section-header">
+          <div>
+            <span>Защищённые оригиналы</span>
+            <h3>Паспорт и два селфи</h3>
+            <p>
+              Паспорт: {selectedApplicant.fullName}. Селфи: {primaryApplicant.fullName}, основной
+              заявитель.
+            </p>
+          </div>
+          <strong>3 референса</strong>
+        </header>
 
-      <div className="admin-review-overview-metrics" aria-label="Метрики проверки">
-        <MetricTile label="Анкета" value={`${submission.completeness.questionnaire}%`} />
-        <MetricTile label="Файлы" value={`${submission.completeness.files}%`} />
-        <MetricTile label="Всего" value={`${submission.completeness.total}%`} />
-        <MetricTile label="Открыто" tone={openIssues > 0 ? "warning" : undefined} value={openIssues} />
+        <div className="admin-review-identity-reference-stack">
+          <div
+            aria-label="Референс для сверки"
+            className="admin-review-identity-reference-tabs"
+            role="tablist"
+          >
+            {mediaTargets.map((target, index) => {
+              const selected = activeReference === target.id;
+
+              return (
+                <button
+                  aria-controls={`admin-identity-reference-panel-${target.id}`}
+                  aria-selected={selected}
+                  className={selected ? "is-active" : ""}
+                  id={`admin-identity-reference-tab-${target.id}`}
+                  key={target.id}
+                  ref={(node) => {
+                    referenceTabRefs.current[index] = node;
+                  }}
+                  role="tab"
+                  tabIndex={selected ? 0 : -1}
+                  type="button"
+                  onClick={() => selectReference(target.id)}
+                  onKeyDown={(event) => handleReferenceKeyDown(event, index)}
+                >
+                  {target.shortLabel}
+                </button>
+              );
+            })}
+          </div>
+
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              aria-labelledby={`admin-identity-reference-tab-${activeReference}`}
+              animate={{ opacity: 1 }}
+              className="admin-review-identity-reference-panel"
+              data-reference-target={activeReference}
+              exit={{ opacity: 0 }}
+              id={`admin-identity-reference-panel-${activeReference}`}
+              initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
+              key={`${selectedApplicant.id}-${activeReference}`}
+              role="tabpanel"
+              transition={
+                prefersReducedMotion ? drawerMotion.reduced : drawerMotion.reference
+              }
+            >
+              <MediaReviewPane
+                documentApplicant={activeApplicant}
+                file={activeFile}
+                issueGuardReason={issueGuardReason}
+                preview={activePreview.preview}
+                reviewTarget={activeReference}
+                showChecklist={false}
+                submission={submission}
+                onAccept={acceptReference}
+                onPreviewError={activePreview.markUnavailable}
+                onReject={(fileType, reason) =>
+                  onFileRemark(
+                    activeApplicant.id,
+                    fileType,
+                    reason ??
+                      (fileType === "passport_scan"
+                        ? "Скан паспорта требует замены"
+                        : `${fileLabel(fileType)} не проходит визуальную проверку`),
+                  )
+                }
+                onReviewTarget={selectReference}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
 
-      <section className="admin-review-overview-route" aria-label="Маршрут проверки">
-        {nextChecks.map((item) => (
-          <button
-            className={item.tone ? "is-warning" : ""}
-            key={item.id}
-            type="button"
-            onClick={() => onOpenTab(item.id)}
-          >
-            <span>{item.label}</span>
-            <strong>{item.count}</strong>
-          </button>
-        ))}
-      </section>
+      <aside className="admin-review-identity-fields" aria-label="Паспортные поля для сверки">
+        <header className="admin-review-identity-section-header">
+          <div>
+            <span>Данные подачи</span>
+            <h3>Только паспортные поля</h3>
+            <p>Сравните значения с оригиналом слева. Остальные разделы анкеты не показаны.</p>
+          </div>
+          <strong>{reviewedPassportFields}/{passportRows.length}</strong>
+        </header>
 
-      <section className="admin-review-overview-next" aria-label="Быстрые проверки">
-        <button type="button" onClick={() => onOpenTab("passport")}>
-          <ScanText aria-hidden="true" size={15} />
-          Паспорт
-        </button>
-        <button type="button" onClick={() => onOpenTab("selfie")}>
-          <User aria-hidden="true" size={15} />
-          Селфи
-        </button>
-        <button type="button" onClick={() => onOpenTab("history")}>
-          <History aria-hidden="true" size={15} />
-          История
-        </button>
-      </section>
-    </div>
-  );
-}
-
-function MetricTile({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone?: "warning";
-  value: number | string;
-}) {
-  return (
-    <article className={tone ? "is-warning" : ""}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
+        <div
+          aria-label="Сверка паспортных полей"
+          className="admin-review-identity-field-list"
+          role="table"
+        >
+          {passportRows.length ? (
+            <>
+              <div className="admin-review-identity-column-head" role="row">
+                <span role="columnheader">Свойство</span>
+                <span role="columnheader">Значение</span>
+                <span role="columnheader">Действие</span>
+              </div>
+              {passportRows.map((row) => (
+                <FieldReviewRow
+                  focused={Boolean(
+                    focusTarget &&
+                      focusTarget.applicantId === selectedApplicant.id &&
+                      (focusTarget.field === row.field?.id ||
+                        focusTarget.field === row.label ||
+                        focusTarget.field === row.field?.label ||
+                        focusTarget.section === row.section),
+                  )}
+                  key={`identity-${row.field?.id ?? row.label}`}
+                  row={row}
+                  status={fieldStatus(submission, selectedApplicant.id, row)}
+                  onRemark={() => onFieldRemark(row)}
+                />
+              ))}
+            </>
+          ) : (
+            <div className="admin-review-empty-card" role="status">
+              <FileWarning aria-hidden="true" size={18} />
+              <strong>Паспортные поля не заполнены</strong>
+              <span>Создайте точное замечание к отсутствующим данным.</span>
+            </div>
+          )}
+        </div>
+      </aside>
+    </section>
   );
 }
 
@@ -1228,7 +1151,7 @@ function ApplicantsReviewTab({
   submission: Submission;
   onOpenSubscreen: (
     applicantId: string,
-    tab: Extract<AdminReviewTab, "passport" | "selfie" | "questionnaire" | "files">,
+    tab: Extract<AdminReviewTab, "passport" | "selfie" | "files">,
   ) => void;
   onSelectApplicant: (applicantId: string) => void;
 }) {
@@ -1245,27 +1168,24 @@ function ApplicantsReviewTab({
   return (
     <div className="admin-review-applicants-tab">
       {submission.applicants.map((applicant, index) => {
+        const primaryApplicant =
+          submission.applicants.find((candidate) => candidate.role === "main") ??
+          submission.applicants[0];
+        const isPrimaryApplicant = applicant.id === primaryApplicant?.id;
         const applicantFiles = submission.files.filter(
           (file) => file.applicantId === applicant.id,
         );
-        const readyFiles = applicantFiles.filter(
-          (file) => file.status !== "missing" && file.status !== "needs_replacement",
+        const acceptedSelfies = (["selfie", "selfie_2"] as const).filter((fileType) =>
+          applicantFiles.some((file) => file.type === fileType && file.status === "accepted"),
         ).length;
         const applicantIssues = submission.issues.filter(
           (issue) => issue.status === "open" && issue.target.applicantId === applicant.id,
         ).length;
-        const fieldCount = applicant.sections.reduce(
-          (count, section) => count + section.fields.length,
-          0,
-        );
-        const checkedFields = applicant.sections.reduce(
-          (count, section) =>
-            count +
-            section.fields.filter(
-              (field) => field.reviewState === "confirmed" || field.reviewConfirmedAtIso,
-            ).length,
-          0,
-        );
+        const passportRows =
+          buildReviewSections(applicant).find((section) => section.isPassport)?.rows ?? [];
+        const checkedFields = passportRows.filter(
+          (row) => row.field?.reviewState === "confirmed" || row.field?.reviewConfirmedAtIso,
+        ).length;
         const selected = selectedApplicantId === applicant.id;
 
         return (
@@ -1285,30 +1205,21 @@ function ApplicantsReviewTab({
             </header>
             <dl>
               <div>
-                <dt>Анкета</dt>
-                <dd>{checkedFields}/{fieldCount}</dd>
+                <dt>Паспорт</dt>
+                <dd>{checkedFields}/{passportRows.length}</dd>
               </div>
               <div>
-                <dt>Файлы</dt>
-                <dd>{readyFiles}/{applicantFiles.length}</dd>
+                <dt>Селфи</dt>
+                <dd>{isPrimaryApplicant ? `${acceptedSelfies}/2` : "Не нужны"}</dd>
               </div>
               <div>
-                <dt>Статус</dt>
-                <dd>{applicant.questionnaireStatus === "complete" ? "Готово" : "Проверить"}</dd>
+                <dt>Замечания</dt>
+                <dd>{applicantIssues}</dd>
               </div>
             </dl>
             <footer>
               <button type="button" onClick={() => onOpenSubscreen(applicant.id, "passport")}>
-                Паспорт
-              </button>
-              <button type="button" onClick={() => onOpenSubscreen(applicant.id, "selfie")}>
-                Селфи
-              </button>
-              <button
-                type="button"
-                onClick={() => onOpenSubscreen(applicant.id, "questionnaire")}
-              >
-                Анкета
+                Открыть сверку
               </button>
             </footer>
           </article>
@@ -1364,20 +1275,25 @@ function AdminFilesTab({
   onOpenReview: (file: SubmissionFile & { type: AdminReviewFileTarget }) => void;
   submission: Submission;
 }) {
+  const primaryApplicant =
+    submission.applicants.find((applicant) => applicant.role === "main") ??
+    submission.applicants[0];
   const reviewFiles = submission.files.filter(
     (file): file is SubmissionFile & { type: AdminReviewFileTarget } =>
-      isAdminReviewFileTarget(file.type),
+      isAdminReviewFileTarget(file.type) &&
+      (file.type === "passport_scan" || file.applicantId === primaryApplicant?.id),
   );
-  const readyCount = reviewFiles.filter(
-    (file) => file.status !== "missing" && file.status !== "needs_replacement",
-  ).length;
+  const acceptedCount = reviewFiles.filter((file) => file.status === "accepted").length;
+  const expectedReviewFileCount = submission.applicants.length
+    ? submission.applicants.length + 2
+    : 0;
 
   return (
     <div className="admin-review-files-tab v19-drawer-files">
       <div className="v19-drawer-files-head">
         <h3 className="v19-drawer-files-title">Файлы подачи</h3>
         <span className="v19-drawer-files-count">
-          {readyCount}/{reviewFiles.length}
+          {expectedReviewFileCount > 0 ? `${acceptedCount}/${expectedReviewFileCount}` : "—"}
         </span>
       </div>
 
@@ -1396,9 +1312,11 @@ function AdminFilesTab({
           );
           if (!applicantFiles.length) return null;
 
-          const applicantReadyCount = applicantFiles.filter(
-            (file) => file.status !== "missing" && file.status !== "needs_replacement",
+          const applicantAcceptedCount = applicantFiles.filter(
+            (file) => file.status === "accepted",
           ).length;
+          const applicantExpectedFileCount =
+            applicant.id === primaryApplicant?.id ? 3 : 1;
 
           return (
             <section className="v19-drawer-file-section" key={applicant.id}>
@@ -1408,7 +1326,7 @@ function AdminFilesTab({
                     {applicant.fullName}
                   </span>
                   <span className="v19-drawer-file-section-meta">
-                    {applicantReadyCount}/{applicantFiles.length} файлов готово
+                    {applicantAcceptedCount}/{applicantExpectedFileCount} файлов принято
                   </span>
                 </span>
                 <span className="v19-drawer-file-section-toggle">
@@ -1496,13 +1414,13 @@ function ApplicantChips({
   const selectedApplicant =
     submission.applicants.find((applicant) => applicant.id === selectedApplicantId) ??
     submission.applicants[0];
-  const selectedFields = selectedApplicant
-    ? selectedApplicant.sections.flatMap((section) => section.fields)
+  const passportRows = selectedApplicant
+    ? buildReviewSections(selectedApplicant).find((section) => section.isPassport)?.rows ?? []
     : [];
-  const reviewedFields = selectedFields.filter(
-    (field) => field.reviewState === "confirmed" || field.reviewConfirmedAtIso,
+  const reviewedFields = passportRows.filter(
+    (row) => row.field?.reviewState === "confirmed" || row.field?.reviewConfirmedAtIso,
   ).length;
-  const remainingFields = Math.max(selectedFields.length - reviewedFields, 0);
+  const remainingFields = Math.max(passportRows.length - reviewedFields, 0);
   const openIssues = selectedApplicant
     ? submission.issues.filter(
         (issue) =>
@@ -1529,11 +1447,11 @@ function ApplicantChips({
       <div className="admin-review-applicant-stats" aria-label="Статус проверки заявителя">
         <span className="is-ok">
           <CheckCircle2 aria-hidden="true" size={16} />
-          {reviewedFields} проверено
+          {reviewedFields} полей паспорта проверено
         </span>
         <span>
           <i aria-hidden="true" />
-          {remainingFields} осталось
+          {remainingFields} полей паспорта осталось
         </span>
         <span className={openIssues ? "is-warning" : ""}>
           <AlertCircle aria-hidden="true" size={16} />
@@ -1544,532 +1462,205 @@ function ApplicantChips({
   );
 }
 
-function PassportReviewTab({
-  identityPanel,
-  issueGuardReason,
-  selectedApplicant,
-  submission,
-  onAcceptFile,
-  onChecklistRemark,
-  onFieldRemark,
-  onOpenWorkspace,
-  onNext,
-  onRemark,
+function useProtectedMediaPreview({
+  applicantId,
+  file,
+  fileType,
+  submissionId,
 }: {
-  identityPanel?: ReactNode;
-  issueGuardReason: string;
-  selectedApplicant?: Applicant;
-  submission: Submission;
-  onAcceptFile: () => void;
-  onChecklistRemark: (item: ChecklistItem) => void;
-  onFieldRemark: (row: ReviewFieldRow) => void;
-  onOpenWorkspace: () => void;
-  onNext: () => void;
-  onRemark: () => void;
+  applicantId?: string;
+  file?: SubmissionFile;
+  fileType: AdminReviewFileTarget;
+  submissionId: string;
 }) {
-  const passportFile = selectedApplicant
-    ? findApplicantFile(submission, selectedApplicant.id, "passport_scan")
-    : undefined;
-  const passportSection = selectedApplicant
-    ? buildReviewSections(selectedApplicant).find((section) => section.isPassport)
-    : undefined;
-  const passportRows = passportSection?.rows ?? [];
-  const canAcceptPassport = Boolean(
-    passportFile &&
-      passportFile.status !== "missing" &&
-      passportFile.status !== "needs_replacement",
-  );
-
-  return (
-    <div className="admin-review-decision-workspace">
-      <MediaReviewPane
-        documentApplicant={selectedApplicant}
-        file={passportFile}
-        issueGuardReason={issueGuardReason}
-        reviewTarget="passport_scan"
-        showActions={false}
-        showChecklist={false}
-        submission={submission}
-        onAccept={() => onAcceptFile()}
-        onReject={() => onRemark()}
-        onReviewTarget={() => undefined}
-      />
-
-      <section className="admin-review-check-pane" aria-label="Сверка паспорта">
-        <header>
-          <div>
-            <span>Паспортная проверка</span>
-            <h3>Паспорт + ключевые поля</h3>
-          </div>
-          <div className="admin-review-check-actions">
-            <button type="button" onClick={onOpenWorkspace}>
-              <ScanText aria-hidden="true" size={15} />
-              Сверить
-            </button>
-            <button disabled={!canAcceptPassport} type="button" onClick={onAcceptFile}>
-              <CheckCircle2 aria-hidden="true" size={15} />
-              Принять
-            </button>
-          </div>
-        </header>
-
-        {identityPanel}
-
-        <div className="admin-review-check-card">
-          {passportChecklist().map((item) => (
-            <article key={item.id}>
-              <CheckCircle2 aria-hidden="true" size={15} />
-              <div>
-                <strong>{item.label}</strong>
-                <span>{item.helper}</span>
-              </div>
-              <button type="button" onClick={() => onChecklistRemark(item)}>
-                <MessageSquarePlus aria-hidden="true" size={14} />
-                Замечание
-              </button>
-            </article>
-          ))}
-        </div>
-
-        <div className="admin-review-passport-fields">
-          <h4>Поля, сверяемые с паспортом</h4>
-          {passportRows.map((row) => (
-            <FieldReviewRow
-              key={`passport-${row.field?.id ?? row.label}`}
-              row={row}
-              status={fieldStatus(submission, selectedApplicant?.id ?? "", row)}
-              onRemark={() => onFieldRemark(row)}
-            />
-          ))}
-        </div>
-
-        <footer className="admin-review-inline-footer">
-          <button type="button" onClick={onRemark}>
-            <MessageSquarePlus aria-hidden="true" size={15} />
-            Замечание
-          </button>
-          <button type="button" onClick={onNext}>
-            К анкете
-            <ArrowRight aria-hidden="true" size={15} />
-          </button>
-        </footer>
-      </section>
-    </div>
-  );
-}
-
-function AdminPassportReviewWorkspace({
-  issueGuardReason,
-  selectedApplicant,
-  submission,
-  onAcceptFile,
-  onChecklistRemark,
-  onClose,
-  onFieldRemark,
-  onNext,
-  onRemark,
-}: {
-  issueGuardReason: string;
-  selectedApplicant?: Applicant;
-  submission: Submission;
-  onAcceptFile: () => void;
-  onChecklistRemark: (item: ChecklistItem) => void;
-  onClose: () => void;
-  onFieldRemark: (row: ReviewFieldRow) => void;
-  onNext: () => void;
-  onRemark: () => void;
-}) {
-  const workspaceMainRef = useRef<HTMLElement | null>(null);
-  const passportFile = selectedApplicant
-    ? findApplicantFile(submission, selectedApplicant.id, "passport_scan")
-    : undefined;
-  const passportSection = selectedApplicant
-    ? buildReviewSections(selectedApplicant).find((section) => section.isPassport)
-    : undefined;
-  const passportRows = passportSection?.rows ?? [];
-  const completedRows = passportRows.filter(
-    (row) => fieldStatus(submission, selectedApplicant?.id ?? "", row) === "ok",
-  ).length;
-  const warningRows = passportRows.filter(
-    (row) => fieldStatus(submission, selectedApplicant?.id ?? "", row) === "error",
-  ).length;
-  const confidence = passportRows.length
-    ? Math.round((completedRows / passportRows.length) * 100)
-    : 0;
-  const canAcceptPassport = Boolean(
-    passportFile &&
-      passportFile.status !== "missing" &&
-      passportFile.status !== "needs_replacement",
-  );
+  const protectedFile =
+    file &&
+    applicantId &&
+    isPersistablePrivateFileAssetAtSubmissionTarget(file, {
+      applicantId,
+      fileType,
+      submissionId,
+    })
+      ? file
+      : undefined;
+  const protectedStoragePath = protectedFile?.storagePath;
+  const previewKey = protectedFile
+    ? [
+        submissionId,
+        applicantId,
+        fileType,
+        protectedFile.id,
+        protectedStoragePath,
+      ].join("\u0000")
+    : "";
+  const [previewState, setPreviewState] = useState<{
+    key: string;
+    preview: ProtectedMediaPreviewState;
+  }>({
+    key: "",
+    preview: unavailableProtectedMediaPreview,
+  });
+  const preview =
+    previewState.key === previewKey
+      ? previewState.preview
+      : unavailableProtectedMediaPreview;
 
   useEffect(() => {
-    workspaceMainRef.current?.scrollTo?.({ top: 0, left: 0 });
-  }, [submission.id, selectedApplicant?.id]);
+    let cancelled = false;
 
+    if (!protectedStoragePath) {
+      setPreviewState({
+        key: previewKey,
+        preview: unavailableProtectedMediaPreview,
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPreviewState({
+      key: previewKey,
+      preview: { status: "loading" },
+    });
+    void createMediaSignedUrl({
+      bucket: mediaStorageBucket,
+      path: protectedStoragePath,
+    })
+      .then((url) => {
+        if (cancelled) return;
+        setPreviewState({
+          key: previewKey,
+          preview: url
+            ? { status: "ready", url }
+            : unavailableProtectedMediaPreview,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPreviewState({
+            key: previewKey,
+            preview: unavailableProtectedMediaPreview,
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewKey, protectedStoragePath]);
+
+  return {
+    preview,
+    markUnavailable: () =>
+      setPreviewState({
+        key: previewKey,
+        preview: unavailableProtectedMediaPreview,
+      }),
+  };
+}
+
+function isPdfReviewFile(file?: SubmissionFile) {
+  const fileName = file?.originalFileName ?? file?.generatedFileName ?? "";
   return (
-    <motion.div
-      animate={{ opacity: 1, scale: 1 }}
-      aria-label="Сверка паспорта"
-      aria-modal="true"
-      className="admin-passport-workspace"
-      exit={{ opacity: 0, scale: 0.985 }}
-      initial={{ opacity: 0, scale: 0.985 }}
-      role="dialog"
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape") return;
-        event.stopPropagation();
-        onClose();
-      }}
-    >
-      <header className="admin-passport-workspace-header">
-        <button aria-label="Назад к проверке" type="button" onClick={onClose}>
-          <ArrowLeft aria-hidden="true" size={18} />
-        </button>
-        <div>
-          <span>Admin document review</span>
-          <h2>Сверка паспорта · {submission.id}</h2>
-          <p>{selectedApplicant?.fullName ?? submission.title}</p>
-        </div>
-        <div className="admin-passport-workspace-actions">
-          <button disabled={!canAcceptPassport} type="button" onClick={onAcceptFile}>
-            <CheckCircle2 aria-hidden="true" size={16} />
-            Завершить сверку
-          </button>
-        </div>
-      </header>
-
-      <main ref={workspaceMainRef} className="admin-passport-workspace-main">
-        <section className="admin-passport-document-zone" aria-label="Скан паспорта">
-          <MediaReviewPane
-            documentApplicant={selectedApplicant}
-            file={passportFile}
-            issueGuardReason={issueGuardReason}
-            reviewTarget="passport_scan"
-            showActions={false}
-            showChecklist={false}
-            submission={submission}
-            onAccept={() => onAcceptFile()}
-            onReject={() => onRemark()}
-            onReviewTarget={() => undefined}
-          />
-        </section>
-
-        <section className="admin-passport-compare-zone" aria-label="Поля паспорта">
-          <div className="admin-passport-compare-head">
-            <span>
-              <Sparkles aria-hidden="true" size={14} />
-              Smart compare
-            </span>
-            <h3>Сверка полей</h3>
-            <p>
-              Проверьте совпадения между анкетой и сканом паспорта. Замечания создаются
-              как точные задачи для агента.
-            </p>
-          </div>
-
-          <div className="admin-passport-stats" aria-label="Статистика сверки">
-            <article>
-              <CheckCircle2 aria-hidden="true" size={18} />
-              <strong>{completedRows}</strong>
-              <span>совпало</span>
-            </article>
-            <article className={warningRows ? "is-warning" : ""}>
-              <AlertCircle aria-hidden="true" size={18} />
-              <strong>{warningRows}</strong>
-              <span>риски</span>
-            </article>
-            <article>
-              <ShieldCheck aria-hidden="true" size={18} />
-              <strong>{confidence}%</strong>
-              <span>готовность</span>
-            </article>
-          </div>
-
-          <div className="admin-passport-checklist">
-            {passportChecklist().map((item) => (
-              <article key={item.id}>
-                <CheckCircle2 aria-hidden="true" size={15} />
-                <div>
-                  <strong>{item.label}</strong>
-                  <span>{item.helper}</span>
-                </div>
-                <button type="button" onClick={() => onChecklistRemark(item)}>
-                  <MessageSquarePlus aria-hidden="true" size={14} />
-                  Замечание
-                </button>
-              </article>
-            ))}
-          </div>
-
-          <div className="admin-passport-fields">
-            {passportRows.map((row) => (
-              <FieldReviewRow
-                key={`workspace-${row.field?.id ?? row.label}`}
-                row={row}
-                status={fieldStatus(submission, selectedApplicant?.id ?? "", row)}
-                onRemark={() => onFieldRemark(row)}
-              />
-            ))}
-          </div>
-        </section>
-      </main>
-
-      <footer className="admin-passport-workspace-footer">
-        <button type="button" onClick={onRemark}>
-          <MessageSquarePlus aria-hidden="true" size={15} />
-          Замечание
-        </button>
-        <button disabled={!canAcceptPassport} type="button" onClick={onAcceptFile}>
-          <CheckCircle2 aria-hidden="true" size={15} />
-          Завершить сверку
-        </button>
-        <button type="button" onClick={onNext}>
-          К анкете
-          <ArrowRight aria-hidden="true" size={15} />
-        </button>
-      </footer>
-    </motion.div>
+    file?.mimeType === "application/pdf" ||
+    fileName.toLocaleLowerCase().endsWith(".pdf")
   );
 }
 
-function SelfieReviewTab({
-  issueGuardReason,
+function needsExternalMediaViewer(file?: SubmissionFile) {
+  const fileName = file?.originalFileName ?? file?.generatedFileName ?? "";
+  const normalizedName = fileName.toLocaleLowerCase();
+  return (
+    file?.mimeType === "image/heic" ||
+    file?.mimeType === "image/heif" ||
+    normalizedName.endsWith(".heic") ||
+    normalizedName.endsWith(".heif")
+  );
+}
+
+function ProtectedMediaPreview({
+  applicantName,
+  file,
+  preview,
   reviewTarget,
-  selectedApplicant,
-  submission,
-  onAcceptFile,
-  onChecklistRemark,
-  onFileRemark,
-  onReviewTarget,
+  onPreviewError,
 }: {
-  identityPanel?: ReactNode;
-  issueGuardReason: string;
-  reviewTarget: Extract<AdminReviewFileTarget, "selfie" | "selfie_2">;
-  selectedApplicant?: Applicant;
-  submission: Submission;
-  onAcceptFile: (fileType: AdminReviewFileTarget) => void;
-  onChecklistRemark: (fileType: AdminReviewFileTarget, item: ChecklistItem) => void;
-  onFileRemark: (fileType: AdminReviewFileTarget, reason?: string) => void;
-  onReviewTarget: (target: AdminReviewFileTarget) => void;
+  applicantName?: string;
+  file?: SubmissionFile;
+  preview: ProtectedMediaPreviewState;
+  reviewTarget: AdminReviewFileTarget;
+  onPreviewError: () => void;
 }) {
-  const file = selectedApplicant
-    ? findApplicantFile(submission, selectedApplicant.id, reviewTarget)
-    : undefined;
+  const readyUrl = preview.status === "ready" ? preview.url : undefined;
+  const label = fileLabel(reviewTarget);
+  const alt = `${label}: ${applicantName ?? "заявитель"}`;
 
-  return (
-    <div className="admin-review-decision-workspace is-selfie">
-      <MediaReviewPane
-        file={file}
-        issueGuardReason={issueGuardReason}
-        reviewTarget={reviewTarget}
-        showActions={false}
-        showChecklist={false}
-        submission={submission}
-        targets={["selfie", "selfie_2"]}
-        onAccept={onAcceptFile}
-        onReject={onFileRemark}
-        onReviewTarget={onReviewTarget}
-      />
-
-      <section className="admin-review-check-pane" aria-label="Проверка селфи">
-        <header>
-          <div>
-            <span>Визуальная проверка</span>
-            <h3>{fileLabel(reviewTarget)}</h3>
-          </div>
-          <button
-            disabled={!file || file.status === "missing" || file.status === "needs_replacement"}
-            type="button"
-            onClick={() => onAcceptFile(reviewTarget)}
-          >
-            <CheckCircle2 aria-hidden="true" size={15} />
-            Принять селфи
-          </button>
-        </header>
-
-        <div className="admin-review-check-card">
-          {selfieChecklist().map((item) => (
-            <article key={item.id}>
-              <CheckCircle2 aria-hidden="true" size={15} />
-              <div>
-                <strong>{item.label}</strong>
-                <span>{item.helper}</span>
-              </div>
-              <button type="button" onClick={() => onChecklistRemark(reviewTarget, item)}>
-                <MessageSquarePlus aria-hidden="true" size={14} />
-                Замечание
-              </button>
-            </article>
-          ))}
-        </div>
-
-        {!file || file.status === "missing" ? (
-          <div className="admin-review-empty-card">
-            <FileWarning aria-hidden="true" size={18} />
-            <strong>Селфи не загружено</strong>
-            <span>Создайте точное замечание, чтобы агент провалился прямо в этот файл.</span>
-            <button
-              type="button"
-              onClick={() => onFileRemark(reviewTarget, `${fileLabel(reviewTarget)} отсутствует`)}
-            >
-              Создать замечание
-            </button>
-          </div>
-        ) : null}
-
-        <footer className="admin-review-inline-footer">
-          <button
-            type="button"
-            onClick={() =>
-              onFileRemark(reviewTarget, `${fileLabel(reviewTarget)} не проходит визуальную проверку`)
-            }
-          >
-            <MessageSquarePlus aria-hidden="true" size={15} />
-            Замечание
-          </button>
-        </footer>
-      </section>
-    </div>
-  );
-}
-
-function QuestionnaireReviewTab({
-  focusTarget,
-  issueGuardReason,
-  selectedApplicant,
-  submission,
-  onFieldRemark,
-  onSectionRemark,
-  onVerifyPassport,
-}: {
-  focusTarget?: WorkspaceTarget;
-  issueGuardReason: string;
-  selectedApplicant?: Applicant;
-  submission: Submission;
-  onFieldRemark: (row: ReviewFieldRow) => void;
-  onSectionRemark: (section: ReviewSection) => void;
-  onVerifyPassport: () => void;
-}) {
-  const reviewSections = useMemo(
-    () => (selectedApplicant ? buildReviewSections(selectedApplicant) : []),
-    [selectedApplicant],
-  );
-
-  useEffect(() => {
-    if (!focusTarget || focusTarget.tab !== "questionnaire" || !selectedApplicant) return;
-    if (focusTarget.applicantId !== selectedApplicant.id) return;
-
-    const timer = window.setTimeout(() => {
-      const element = document.getElementById(targetElementId(focusTarget));
-      if (!element) return;
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
-      element.classList.add("is-ai-focus");
-      window.setTimeout(() => element.classList.remove("is-ai-focus"), 1800);
-    }, 100);
-
-    return () => window.clearTimeout(timer);
-  }, [focusTarget, selectedApplicant]);
-
-  const reviewedCount = selectedApplicant
-    ? selectedApplicant.sections
-        .flatMap((section) => section.fields)
-        .filter(
-          (field) => field.reviewState === "confirmed" || field.reviewConfirmedAtIso,
-        ).length
-    : 0;
-  const issueCount = selectedApplicant
-    ? submission.issues.filter(
-        (issue) =>
-          issue.status === "open" && issue.target.applicantId === selectedApplicant.id,
-      ).length
-    : 0;
-  const totalFields = selectedApplicant
-    ? selectedApplicant.sections.flatMap((section) => section.fields).length
-    : 0;
-
-  return (
-    <div className="admin-review-questionnaire">
-      <div className="admin-review-commandbar">
-        <div>
-          <span>Анкета</span>
-          <strong>{selectedApplicant?.fullName ?? "Заявитель"}</strong>
-        </div>
-        <div className="admin-review-stats" aria-label="Статус проверки заявителя">
-          <span className="is-ok">{reviewedCount} / {totalFields} ok</span>
-          <span className={issueCount ? "is-warning" : ""}>
-            <AlertCircle aria-hidden="true" size={13} />
-            {issueCount} замечаний
-          </span>
-        </div>
+  if (preview.status === "loading") {
+    return (
+      <div
+        className="admin-review-protected-placeholder grid min-h-72 place-items-center gap-3 p-6 text-center"
+        role="status"
+      >
+        <strong>Загружаем защищённый оригинал</strong>
+        <span>Получаем временный доступ к файлу подачи.</span>
       </div>
+    );
+  }
 
-      <section className="admin-review-field-pane" aria-label="Поля анкеты">
-        {reviewSections.map((section, index) => (
-          <div className="admin-review-field-section" key={section.id}>
-            <h3
-              id={
-                selectedApplicant
-                  ? targetElementId({
-                      applicantId: selectedApplicant.id,
-                      section: section.title,
-                      tab: "questionnaire",
-                    })
-                  : undefined
-              }
-            >
-              <span className="admin-review-section-number">{index + 1}</span>
-              {section.title}
-              {section.isPassport ? (
-                <button type="button" onClick={onVerifyPassport}>
-                  Сверить с паспортом
-                </button>
-              ) : null}
-            </h3>
-            <div className="admin-review-field-table">
-              {section.rows.map((row) => (
-                <FieldReviewRow
-                  domId={
-                    selectedApplicant
-                      ? targetElementId({
-                          applicantId: selectedApplicant.id,
-                          field: row.field?.id ?? row.label,
-                          section: section.title,
-                          tab: "questionnaire",
-                        })
-                      : undefined
-                  }
-                  focused={Boolean(
-                    focusTarget &&
-                      selectedApplicant &&
-                      focusTarget.tab === "questionnaire" &&
-                      focusTarget.applicantId === selectedApplicant.id &&
-                      (focusTarget.field === row.field?.id ||
-                        focusTarget.field === row.label ||
-                        focusTarget.field === row.field?.label),
-                  )}
-                  key={`${section.id}-${row.field?.id ?? row.label}`}
-                  row={row}
-                  status={fieldStatus(submission, selectedApplicant?.id ?? "", row)}
-                  onRemark={() => onFieldRemark(row)}
-                  onVerifyPassport={row.hasDocument ? onVerifyPassport : undefined}
-                />
-              ))}
-            </div>
-            <div className="admin-review-section-actions">
-              <button
-                disabled={Boolean(issueGuardReason)}
-                type="button"
-                onClick={() => onSectionRemark(section)}
-              >
-                <MessageSquarePlus aria-hidden="true" size={15} />
-                Есть замечание
-              </button>
-            </div>
-          </div>
-        ))}
-      </section>
-    </div>
+  if (!readyUrl) {
+    return (
+      <div
+        className="admin-review-protected-placeholder grid min-h-72 place-items-center gap-3 p-6 text-center"
+        data-testid={`protected-media-unavailable-${reviewTarget}`}
+      >
+        <AlertCircle aria-hidden="true" size={24} />
+        <strong>{file ? "Защищённый оригинал недоступен" : "Файл не загружен"}</strong>
+        <span>Принятие файла заблокировано. Создайте точное замечание.</span>
+      </div>
+    );
+  }
+
+  if (isPdfReviewFile(file)) {
+    return (
+      <object
+        aria-label={alt}
+        className="block h-96 w-full"
+        data={readyUrl}
+        data-testid={`protected-media-preview-${reviewTarget}`}
+        type="application/pdf"
+      >
+        <a href={readyUrl} rel="noreferrer" target="_blank">
+          Открыть защищённый оригинал
+        </a>
+      </object>
+    );
+  }
+
+  if (needsExternalMediaViewer(file)) {
+    return (
+      <div className="admin-review-protected-placeholder grid min-h-72 place-items-center gap-3 p-6 text-center">
+        <strong>Оригинал готов к просмотру</strong>
+        <span>Этот формат открывается во внешнем просмотрщике.</span>
+        <a
+          data-testid={`protected-media-preview-${reviewTarget}`}
+          href={readyUrl}
+          rel="noreferrer"
+          target="_blank"
+        >
+          Открыть оригинал
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      alt={alt}
+      className="block max-h-96 w-full object-contain"
+      data-testid={`protected-media-preview-${reviewTarget}`}
+      onError={onPreviewError}
+      src={readyUrl}
+    />
   );
 }
 
@@ -2077,35 +1668,46 @@ function MediaReviewPane({
   documentApplicant,
   file,
   issueGuardReason,
+  preview,
   reviewTarget,
   showActions = true,
   showChecklist = true,
   submission,
   targets = ["passport_scan"],
   onAccept,
+  onPreviewError,
   onReject,
   onReviewTarget,
 }: {
   documentApplicant?: Applicant;
   file?: SubmissionFile;
   issueGuardReason: string;
+  preview: ProtectedMediaPreviewState;
   reviewTarget: AdminReviewFileTarget;
   showActions?: boolean;
   showChecklist?: boolean;
   submission: Submission;
   targets?: AdminReviewFileTarget[];
-  onAccept: (fileType: AdminReviewFileTarget) => void;
+  onAccept: (fileType: AdminReviewFileTarget) => Promise<boolean>;
+  onPreviewError: () => void;
   onReject: (fileType: AdminReviewFileTarget, reason?: string) => void;
   onReviewTarget: (target: AdminReviewFileTarget) => void;
 }) {
+  const [acceptPending, setAcceptPending] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [rotation, setRotation] = useState(0);
+  const [fitPreview, setFitPreview] = useState(true);
   const targetCopy = mediaTargets.find((target) => target.id === reviewTarget) ?? mediaTargets[0];
-  const canAccept = Boolean(file && file.status !== "missing" && file.status !== "needs_replacement");
+  const canAccept = Boolean(
+    file &&
+      file.status !== "accepted" &&
+      file.status !== "missing" &&
+      file.status !== "needs_replacement" &&
+      preview.status === "ready",
+  );
   const previewApplicant =
     documentApplicant ??
     (file ? submission.applicants.find((applicant) => applicant.id === file.applicantId) : undefined);
-  const previewRows = previewApplicant
-    ? buildReviewSections(previewApplicant).flatMap((section) => section.rows)
-    : [];
   const issue = file
     ? submission.issues.find(
         (item) =>
@@ -2114,6 +1716,16 @@ function MediaReviewPane({
           item.target.fileType === file.type,
       )
     : undefined;
+
+  async function acceptCurrentReference() {
+    if (!canAccept || acceptPending) return;
+    setAcceptPending(true);
+    try {
+      await onAccept(reviewTarget);
+    } finally {
+      setAcceptPending(false);
+    }
+  }
 
   return (
     <section
@@ -2155,32 +1767,74 @@ function MediaReviewPane({
               <ImageIcon aria-hidden="true" size={17} />
             )}
             {targetCopy.label}
+            {previewApplicant ? (
+              <small className="admin-review-preview-owner">
+                · {previewApplicant.fullName}
+              </small>
+            ) : null}
           </span>
           <em className={fileStatusClass(file)}>{file ? fileStatusLabels[file.status] : "Нет файла"}</em>
         </div>
-        <div className={`admin-review-document-frame is-${reviewTarget}`}>
-          <div className="admin-review-document-sheet">
-            {reviewTarget === "passport_scan" && previewApplicant ? (
-              <PassportDocumentSheet
-                applicant={previewApplicant}
-                file={file}
-                rows={previewRows}
-              />
-            ) : reviewTarget !== "passport_scan" && previewApplicant ? (
-              <PhotoDocumentSheet
-                applicant={previewApplicant}
-                file={file}
-                reviewTarget={reviewTarget}
-              />
-            ) : (
-              <>
-                <strong>{file?.originalFileName ?? file?.generatedFileName ?? fileLabel(reviewTarget)}</strong>
-                <span>{file?.storagePath ?? "Приватный storage preview не доступен локально"}</span>
-                <small>
-                  {file?.mimeType ?? "media slot"} · {file?.sizeBytes ? formatBytes(file.sizeBytes) : "без размера"}
-                </small>
-              </>
-            )}
+        <div className="admin-review-preview-toolbar" aria-label="Управление предпросмотром">
+          <button
+            aria-label="Уменьшить масштаб"
+            disabled={zoom <= 50}
+            type="button"
+            onClick={() => {
+              setFitPreview(false);
+              setZoom((value) => Math.max(50, value - 10));
+            }}
+          >
+            <ZoomOut aria-hidden="true" size={16} />
+          </button>
+          <span>{fitPreview ? "По размеру" : `${zoom}%`}</span>
+          <button
+            aria-label="Увеличить масштаб"
+            disabled={zoom >= 200}
+            type="button"
+            onClick={() => {
+              setFitPreview(false);
+              setZoom((value) => Math.min(200, value + 10));
+            }}
+          >
+            <ZoomIn aria-hidden="true" size={16} />
+          </button>
+          <i aria-hidden="true" />
+          <button
+            aria-label="Повернуть документ"
+            type="button"
+            onClick={() => setRotation((value) => (value + 90) % 360)}
+          >
+            <RotateCw aria-hidden="true" size={16} />
+          </button>
+          <button
+            aria-label="Вписать документ"
+            aria-pressed={fitPreview}
+            type="button"
+            onClick={() => {
+              setFitPreview(true);
+              setZoom(100);
+            }}
+          >
+            <Maximize2 aria-hidden="true" size={16} />
+          </button>
+        </div>
+        <div
+          className={`admin-review-document-frame admin-review-identity-document-frame is-${reviewTarget}`}
+        >
+          <div
+            className={`admin-review-document-sheet ${fitPreview ? "is-fit" : ""}`}
+            style={{
+              transform: `rotate(${rotation}deg) scale(${fitPreview ? 1 : zoom / 100})`,
+            }}
+          >
+            <ProtectedMediaPreview
+              applicantName={previewApplicant?.fullName}
+              file={file}
+              preview={preview}
+              reviewTarget={reviewTarget}
+              onPreviewError={onPreviewError}
+            />
           </div>
         </div>
         {issue ? (
@@ -2205,12 +1859,16 @@ function MediaReviewPane({
       {showActions ? (
         <div className="admin-review-media-actions">
           <button
-            disabled={!canAccept}
+            disabled={!canAccept || acceptPending}
             type="button"
-            onClick={() => onAccept(reviewTarget)}
+            onClick={() => void acceptCurrentReference()}
           >
             <CheckCircle2 aria-hidden="true" size={15} />
-            Принять
+            {file?.status === "accepted"
+              ? "Принято"
+              : acceptPending
+                ? "Подтверждаем…"
+                : "Принять"}
           </button>
           <button
             disabled={Boolean(issueGuardReason)}
@@ -2236,169 +1894,40 @@ function MediaReviewPane({
   );
 }
 
-function PassportDocumentSheet({
-  applicant,
-  file,
-  rows,
-}: {
-  applicant: Applicant;
-  file?: SubmissionFile;
-  rows: ReviewFieldRow[];
-}) {
-  const nameParts = applicant.fullName.trim().split(/\\s+/).filter(Boolean);
-  const givenName = nameParts[0] ?? applicant.fullName;
-  const surname = nameParts.length > 1 ? nameParts.slice(1).join(" ") : applicant.fullName;
-  const rowValue = (needles: string[], fallback = "Не заполнено") => {
-    const found = rows.find((row) => {
-      const label = `${row.label} ${row.field?.id ?? ""}`.toLowerCase();
-      return needles.some((needle) => label.includes(needle));
-    });
-    return found?.value || fallback;
-  };
-  const passportNumber = rowValue(["номер", "number"], "—");
-  const birthDate = rowValue(["дата рождения", "birth"], "—");
-  const expiryDate = rowValue(["окончания", "expires", "expiry"], "—");
-  const birthPlace = rowValue(["место рождения", "birthplace", "birth_place"], "—");
-  const issueCountry = rowValue(["страна выдачи", "country"], "Russian Federation");
-  const mrzName = `${surname.toUpperCase().replace(/\\s+/g, "<")}<<${givenName.toUpperCase()}`;
-  const mrzNumber = passportNumber.replace(/\\s+/g, "");
-
-  return (
-    <div className="admin-review-passport-sheet">
-      <div className="admin-review-passport-file">
-        <FileText aria-hidden="true" size={13} />
-        <span>{file?.originalFileName ?? file?.generatedFileName ?? fileLabel("passport_scan")}</span>
-      </div>
-      <div className="admin-review-passport-cover">
-        <span>PASSPORT</span>
-        <strong>{issueCountry}</strong>
-        <em>RF</em>
-      </div>
-      <div className="admin-review-passport-body">
-        <div className="admin-review-passport-photo" aria-hidden="true">
-          <User size={42} />
-        </div>
-        <div className="admin-review-passport-data">
-          <span>SURNAME</span>
-          <strong>{surname}</strong>
-          <span>GIVEN NAMES</span>
-          <strong>{givenName}</strong>
-          <div>
-            <span>DOB</span>
-            <strong>{birthDate}</strong>
-          </div>
-          <div>
-            <span>EXPIRY</span>
-            <strong>{expiryDate}</strong>
-          </div>
-          <div className="is-highlighted">
-            <span>BIRTH PLACE</span>
-            <strong>{birthPlace}</strong>
-          </div>
-        </div>
-      </div>
-      <div className="admin-review-passport-mrz">
-        <span>{`P<RUS${mrzName}<<<<<<<<<<<<<<<<<<`}</span>
-        <span>{`${mrzNumber || "000000000"}RUS${birthDate.replace(/\\D/g, "").slice(0, 6)}M${expiryDate.replace(/\\D/g, "").slice(0, 6)}7<<<<<<<<<<04`}</span>
-      </div>
-    </div>
-  );
-}
-
-function PhotoDocumentSheet({
-  applicant,
-  file,
-  reviewTarget,
-}: {
-  applicant: Applicant;
-  file?: SubmissionFile;
-  reviewTarget: Extract<AdminReviewFileTarget, "selfie" | "selfie_2">;
-}) {
-  const fileName = file?.originalFileName ?? file?.generatedFileName ?? fileLabel(reviewTarget);
-  const fileMeta = `${file?.mimeType ?? "image slot"} · ${
-    file?.sizeBytes ? formatBytes(file.sizeBytes) : "без размера"
-  }`;
-  const requirements =
-    reviewTarget === "selfie"
-      ? ["Лицо видно", "Свет ровный", "Совпадает с анкетой"]
-      : ["Доп. фото видно", "Без бликов", "Подходит центру"];
-
-  return (
-    <div className="admin-review-photo-sheet">
-      <div className="admin-review-passport-file">
-        <ImageIcon aria-hidden="true" size={13} />
-        <span>{fileName}</span>
-      </div>
-      <div className="admin-review-photo-frame">
-        <div className="admin-review-photo-person" aria-hidden="true">
-          <User size={54} />
-        </div>
-        <div className="admin-review-photo-meta">
-          <span>{fileLabel(reviewTarget)}</span>
-          <strong>{applicant.fullName}</strong>
-          <small>{file?.storagePath ?? "Приватный storage preview не доступен локально"}</small>
-        </div>
-      </div>
-      <div className="admin-review-photo-requirements" aria-label="Требования к фото">
-        {requirements.map((item) => (
-          <span key={item} className="admin-review-photo-chip">
-            <CheckCircle2 aria-hidden="true" size={12} />
-            {item}
-          </span>
-        ))}
-      </div>
-      <small className="admin-review-photo-file-meta">{fileMeta}</small>
-    </div>
-  );
-}
-
 function FieldReviewRow({
   domId,
   focused = false,
   row,
   status,
   onRemark,
-  onVerifyPassport,
 }: {
   domId?: string;
   focused?: boolean;
   row: ReviewFieldRow;
   status: FieldStatus;
   onRemark: () => void;
-  onVerifyPassport?: () => void;
 }) {
   return (
     <div
       id={domId}
-      className={`admin-review-field-row is-${status} ${focused ? "is-ai-target" : ""}`}
+      className={`admin-review-identity-field-row is-${status} ${focused ? "is-ai-target" : ""}`}
+      role="row"
     >
-      <span aria-hidden="true" className="admin-review-row-dot" />
-      <span className="admin-review-row-main">
-        <span className="admin-review-row-kicker">
-          <span className="admin-review-row-label" title={row.label}>
-            {row.label}
-          </span>
-          <span className={`admin-review-row-status is-${status}`}>
-            {status === "ok" ? "Проверено" : status === "error" ? "Есть замечание" : "Проверить"}
-          </span>
+      <span className="admin-review-identity-field-property" role="cell">
+        <span className="admin-review-identity-field-label" title={row.label}>
+          {row.label}
         </span>
-        <strong title={row.value || "Не заполнено"}>{row.value || "Не заполнено"}</strong>
       </span>
-      <span className="admin-review-row-actions">
-        {onVerifyPassport ? (
-          <button
-            aria-label={`Сверить с паспортом: ${row.label}`}
-            className="admin-review-row-verify"
-            type="button"
-            onClick={onVerifyPassport}
-          >
-            <ScanText aria-hidden="true" size={13} />
-            <span>Сверить с паспортом</span>
-          </button>
-        ) : null}
+      <span className="admin-review-identity-field-value" role="cell">
+        <strong title={row.value || "Не заполнено"}>{row.value || "Не заполнено"}</strong>
+        <span className={`admin-review-identity-field-status is-${status}`}>
+          {status === "ok" ? "Проверено" : status === "error" ? "Есть замечание" : "Проверить"}
+        </span>
+      </span>
+      <span className="admin-review-identity-field-action" role="cell">
         <button
-          aria-label={`Создать замечание: ${row.label}`}
-          className="admin-review-row-remark"
+          aria-label={`Добавить замечание к полю ${row.label}`}
+          className="admin-review-identity-remark"
           title="Добавить замечание"
           type="button"
           onClick={onRemark}
@@ -2428,9 +1957,11 @@ function AdminRemarkForm({
     reason: string;
     targetType: string;
   }) => Promise<string | null>;
-  onSubmit: (input: IssueInput) => void;
+  onSubmit: (input: IssueInput) => Promise<boolean>;
   submission: Submission;
 }) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const defaultApplicant = submission.applicants[0]?.id ?? "";
   const [targetType, setTargetType] = useState<RemarkTargetType>(context.targetType);
   const [applicantId, setApplicantId] = useState(context.applicantId || defaultApplicant);
@@ -2440,12 +1971,32 @@ function AdminRemarkForm({
   const [comment, setComment] = useState(
     context.fileType
       ? "Загрузите новый файл и отправьте исправление на повторную проверку."
-      : "Проверьте значение в анкете и отправьте исправление.",
+      : "Проверьте значение в данных подачи и отправьте исправление.",
   );
   const [internalComment, setInternalComment] = useState("");
   const [draftState, setDraftState] = useState<AdminAiRemarkDraftState>({
     status: "idle",
   });
+  const [submitPending, setSubmitPending] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  useEffect(() => {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrame = window.requestAnimationFrame(() => {
+      dialogRef.current
+        ?.querySelector<HTMLButtonElement>('[aria-label="Закрыть форму замечания"]')
+        ?.focus({ preventScroll: true });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      const opener = openerRef.current;
+      if (opener && document.contains(opener)) {
+        opener.focus({ preventScroll: true });
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setTargetType(context.targetType);
@@ -2455,33 +2006,103 @@ function AdminRemarkForm({
     setComment(
       context.fileType
         ? "Загрузите новый файл и отправьте исправление на повторную проверку."
-        : "Проверьте значение в анкете и отправьте исправление.",
+        : "Проверьте значение в данных подачи и отправьте исправление.",
     );
     setInternalComment("");
     setDraftState({ status: "idle" });
+    setSubmitPending(false);
+    setSubmitError("");
   }, [context, defaultApplicant]);
 
   const selectedFileType = remarkTargetFileType(targetType) ?? context.fileType;
   const fieldReference =
     context.checklistItemLabel || field.trim() || context.targetLabel || "раздел";
   const canSubmit = Boolean(
-    applicantId && reason.trim() && comment.trim() && !issueGuardReason,
+    applicantId &&
+      reason.trim() &&
+      comment.trim() &&
+      !issueGuardReason &&
+      !submitPending,
   );
+  const targetOptions: Array<{
+    icon: LucideIcon;
+    id: RemarkTargetType;
+    label: string;
+  }> = [
+    ...(context.targetType === "field" || targetType === "field"
+      ? [{ id: "field" as const, icon: FileText, label: "Поле паспорта" }]
+      : []),
+    ...(context.targetType === "section" || targetType === "section"
+      ? [{ id: "section" as const, icon: ScanText, label: "Раздел паспорта" }]
+      : []),
+    { id: "passport_scan", icon: ImageIcon, label: "Скан паспорта" },
+    { id: "selfie", icon: User, label: "Селфи 1" },
+    { id: "selfie_2", icon: User, label: "Селфи 2" },
+  ];
 
-  function submit() {
+  function handleDialogKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+    const focusableElements = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter(
+      (element) =>
+        element.getAttribute("aria-hidden") !== "true" &&
+        !element.hasAttribute("hidden"),
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements.at(-1);
+    if (!firstElement || !lastElement) return;
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus({ preventScroll: true });
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus({ preventScroll: true });
+    } else if (!dialogRef.current?.contains(document.activeElement)) {
+      event.preventDefault();
+      firstElement.focus({ preventScroll: true });
+    }
+  }
+
+  async function submit() {
     if (!canSubmit) return;
-    onSubmit({
-      applicantId,
-      comment: internalComment.trim()
-        ? `${comment.trim()}\n\nВнутренне: ${internalComment.trim()}`
-        : comment.trim(),
-      field: field.trim() || context.checklistItemLabel || undefined,
-      fileType: selectedFileType,
-      reason: reason.trim(),
-      section: selectedFileType ? "Файлы" : (context.sectionLabel ?? "Анкета"),
-      severity: severity === "high" ? "blocker" : "warning",
-      type: selectedFileType ? "file" : targetType === "section" ? "section" : "field",
-    });
+    setSubmitPending(true);
+    setSubmitError("");
+    let saved = false;
+    try {
+      saved = await onSubmit({
+        applicantId,
+        comment: internalComment.trim()
+          ? `${comment.trim()}\n\nВнутренне: ${internalComment.trim()}`
+          : comment.trim(),
+        field: field.trim() || context.checklistItemLabel || undefined,
+        fileType: selectedFileType,
+        reason: reason.trim(),
+        section: selectedFileType ? "Файлы" : (context.sectionLabel ?? "Паспорт"),
+        severity: severity === "high" ? "blocker" : "warning",
+        type: selectedFileType
+          ? "file"
+          : targetType === "section"
+            ? "section"
+            : "field",
+      });
+    } catch {
+      saved = false;
+    }
+    if (!saved) {
+      setSubmitError("Замечание не сохранено. Проверьте соединение и повторите попытку.");
+      setSubmitPending(false);
+    }
   }
 
   async function draftRemark() {
@@ -2530,17 +2151,19 @@ function AdminRemarkForm({
         exit={{ opacity: 0, scale: 0.98, y: 22 }}
         initial={{ opacity: 0, scale: 0.98, y: 22 }}
         role="dialog"
+        ref={dialogRef}
+        onKeyDown={handleDialogKeyDown}
         transition={{ damping: 24, stiffness: 260, type: "spring" }}
       >
         <header>
-          <div>
+          <div role={submitError ? "alert" : undefined}>
             <span>
               <MessageSquarePlus aria-hidden="true" size={20} />
             </span>
             <div>
               <h3>Добавить замечание</h3>
               <p>
-                <strong>{submission.id}</strong>
+                <strong>{submissionPublicId(submission)}</strong>
                 <i aria-hidden="true" />
                 Новая проблема
               </p>
@@ -2572,17 +2195,11 @@ function AdminRemarkForm({
               Где найдена ошибка?
             </label>
             <div className="admin-remark-targets">
-              {[
-                { id: "questionnaire" as const, icon: FileText, label: "Анкета" },
-                { id: "passport_scan" as const, icon: ImageIcon, label: "Скан паспорта" },
-                { id: "selfie" as const, icon: User, label: "Селфи 1" },
-                { id: "selfie_2" as const, icon: User, label: "Селфи 2" },
-              ].map((target) => {
+              {targetOptions.map((target) => {
                 const TargetIcon = target.icon;
                 const selected =
                   targetType === target.id ||
-                  (targetType === "checklistItem" && context.fileType === target.id) ||
-                  (targetType === "section" && target.id === "questionnaire");
+                  (targetType === "checklistItem" && context.fileType === target.id);
                 return (
                   <button
                     className={selected ? "is-active" : ""}
@@ -2718,14 +2335,14 @@ function AdminRemarkForm({
         <footer>
           <div>
             <span aria-hidden="true" />
-            {issueGuardReason || "Статус: Открыто"}
+            {submitError || issueGuardReason || "Статус: Открыто"}
           </div>
-          <button type="button" onClick={onClose}>
+          <button disabled={submitPending} type="button" onClick={onClose}>
             Отмена
           </button>
           <button disabled={!canSubmit} type="button" onClick={submit}>
             <Send aria-hidden="true" size={16} />
-            Отправить замечание
+            {submitPending ? "Сохраняем…" : "Отправить замечание"}
           </button>
         </footer>
       </motion.div>
@@ -2737,32 +2354,20 @@ function IssuesTab({
   addRemarkDisabled = false,
   emptyStateReady = false,
   emptyStateReason,
-  identityFindings = [],
-  onAcceptAiSuggestion,
   onAddRemark,
-  onDismissAiSuggestion,
-  onIdentityJump,
-  onIdentityRemark,
-  onRunAiReview,
   submission,
   onJump,
 }: {
   addRemarkDisabled?: boolean;
   emptyStateReady?: boolean;
   emptyStateReason?: string;
-  identityFindings?: IdentityConsistencyFinding[];
-  onAcceptAiSuggestion: (suggestionId: string) => void;
   onAddRemark: () => void;
-  onDismissAiSuggestion: (suggestionId: string) => void;
-  onIdentityJump?: (finding: IdentityConsistencyFinding) => void;
-  onIdentityRemark?: (finding: IdentityConsistencyFinding) => void;
-  onRunAiReview: () => void;
   submission: Submission;
   onJump: (issue: Submission["issues"][number]) => void;
 }) {
-  const unresolvedIssueCount =
-    submission.issues.filter((issue) => issue.status !== "closed_by_admin").length +
-    identityFindings.length;
+  const unresolvedIssueCount = submission.issues.filter(
+    (issue) => issue.status !== "closed_by_admin",
+  ).length;
   const issuesSummary = (
     <header className="admin-review-issues-summary">
       <div>
@@ -2777,7 +2382,7 @@ function IssuesTab({
     </header>
   );
 
-  if (!submission.issues.length && !identityFindings.length) {
+  if (!submission.issues.length) {
     return (
       <div className="admin-review-issues-list">
         {issuesSummary}
@@ -2790,7 +2395,7 @@ function IssuesTab({
           <strong>{emptyStateReady ? "Замечаний пока нет" : "Открытых замечаний нет"}</strong>
           <span>
             {emptyStateReady
-              ? "Паспорт, селфи и анкета не содержат открытых замечаний. Пакет можно принимать."
+              ? "Паспорт и все селфи не содержат открытых замечаний. Пакет можно принимать."
               : emptyStateReason ||
                 "Пакет ещё не готов к принятию. Проверьте обязательные данные и файлы."}
           </span>
@@ -2798,16 +2403,6 @@ function IssuesTab({
             <MessageSquarePlus aria-hidden="true" size={15} />
             Добавить замечание
           </button>
-        </div>
-        <div className="admin-review-issues-assist">
-          <BbAiPanel
-            role="admin"
-            submission={submission}
-            surface="review"
-            onAccept={onAcceptAiSuggestion}
-            onDismiss={onDismissAiSuggestion}
-            onRun={onRunAiReview}
-          />
         </div>
       </div>
     );
@@ -2826,38 +2421,6 @@ function IssuesTab({
         <MessageSquarePlus aria-hidden="true" size={15} />
         Добавить замечание
       </button>
-
-      {identityFindings.length ? (
-        <section className="admin-review-ai-conflicts" aria-label="AI-конфликты личности">
-          <header>
-            <span>AI-конфликты личности</span>
-            <em>{identityFindings.length}</em>
-          </header>
-          {identityFindings.map((finding) => (
-            <article className={`is-${finding.severity}`} key={finding.id}>
-              <header>
-                <span>{finding.severity}</span>
-                <em>{finding.applicantName}</em>
-              </header>
-              <strong>{finding.label}</strong>
-              <p>{finding.message}</p>
-              <small>{finding.evidence.map((item) => item.label).join(" · ")}</small>
-              <footer>
-                {onIdentityJump ? (
-                  <button type="button" onClick={() => onIdentityJump(finding)}>
-                    Открыть
-                  </button>
-                ) : null}
-                {onIdentityRemark ? (
-                  <button type="button" onClick={() => onIdentityRemark(finding)}>
-                    Замечание
-                  </button>
-                ) : null}
-              </footer>
-            </article>
-          ))}
-        </section>
-      ) : null}
 
       {submission.issues.map((issue) => (
         <article
@@ -2878,16 +2441,6 @@ function IssuesTab({
         </article>
       ))}
 
-      <div className="admin-review-issues-assist">
-        <BbAiPanel
-          role="admin"
-          submission={submission}
-          surface="review"
-          onAccept={onAcceptAiSuggestion}
-          onDismiss={onDismissAiSuggestion}
-          onRun={onRunAiReview}
-        />
-      </div>
     </div>
   );
 }
@@ -2907,10 +2460,6 @@ function buildReviewSections(applicant: Applicant): ReviewSection[] {
       title: isPassport ? "Идентификация" : section.title,
       rows: section.fields.map((field) => ({
         field,
-        hasDocument:
-          isPassport ||
-          field.id.toLowerCase().includes("passport") ||
-          field.label.toLowerCase().includes("паспорт"),
         label: field.label,
         section: isPassport ? "Паспорт" : section.title,
         sectionId: section.id,
@@ -2940,11 +2489,11 @@ function drawerTabToReviewTab(tab: DrawerTab): AdminReviewTab {
   if (tab === "issues") return "issues";
   if (tab === "files") return "files";
   if (tab === "history") return "history";
-  return "questionnaire";
+  return "overview";
 }
 
 function reviewTabToDrawerTab(tab: AdminReviewTab): DrawerTab {
-  if (tab === "passport" || tab === "selfie") return "files";
+  if (tab === "passport" || tab === "selfie") return "overview";
   return tab;
 }
 
@@ -2969,21 +2518,13 @@ function fieldStatus(
   return "pending";
 }
 
-function questionnaireFieldCount(submission: Submission) {
-  return submission.applicants.reduce(
-    (count, applicant) =>
-      count + applicant.sections.reduce((sectionCount, section) => sectionCount + section.fields.length, 0),
-    0,
-  );
-}
-
 function issueTargetPath(issue: Submission["issues"][number]) {
   if (issue.target.fileType && issue.target.field) {
     return `${fileLabel(issue.target.fileType)} / ${issue.target.field}`;
   }
   if (issue.target.fileType) return fileLabel(issue.target.fileType);
-  if (issue.target.field) return `Анкета · ${issue.target.field}`;
-  return issue.target.section ? `Анкета · ${issue.target.section}` : "Анкета";
+  if (issue.target.field) return `Паспорт · ${issue.target.field}`;
+  return issue.target.section ? `Паспорт · ${issue.target.section}` : "Паспорт";
 }
 
 function findApplicantFile(
@@ -3023,58 +2564,6 @@ function mediaChecklist(target: AdminReviewFileTarget) {
     return ["Лицо заявителя видно", "Селфи соответствует заявителю", "Нет бликов и сильного размытия"];
   }
   return ["Дополнительное селфи читаемо", "Лицо совпадает с заявителем", "Файл соответствует требованиям центра"];
-}
-
-function passportChecklist(): ChecklistItem[] {
-  return [
-    {
-      helper: "Имя, фамилия и дата рождения читаются и совпадают с анкетой.",
-      id: "passport-identity",
-      label: "Имя/фамилия/дата рождения совпадают",
-      reason: "Паспортные личные данные не совпадают с анкетой",
-    },
-    {
-      helper: "Номер паспорта виден, формат не повреждён, поле анкеты совпадает.",
-      id: "passport-number",
-      label: "Номер паспорта виден и совпадает",
-      reason: "Номер паспорта не читается или не совпадает",
-    },
-    {
-      helper: "Срок действия виден и не истёк на период поездки.",
-      id: "passport-expiry",
-      label: "Срок действия паспорта валиден",
-      reason: "Срок действия паспорта требует проверки",
-    },
-    {
-      helper: "MRZ, фото и края страницы не обрезаны.",
-      id: "passport-readable",
-      label: "Страница читаемая и не обрезана",
-      reason: "Скан паспорта нечитаемый или обрезан",
-    },
-  ];
-}
-
-function selfieChecklist(): ChecklistItem[] {
-  return [
-    {
-      helper: "Лицо полностью видно, нет сильного размытия или бликов.",
-      id: "selfie-face-visible",
-      label: "Лицо видно и фото читаемое",
-      reason: "Селфи нечитаемое или лицо плохо видно",
-    },
-    {
-      helper: "Заявитель на селфи соответствует выбранному профилю.",
-      id: "selfie-matches-applicant",
-      label: "Заявитель соответствует анкете",
-      reason: "Селфи не соответствует выбранному заявителю",
-    },
-    {
-      helper: "Файл доступен и подходит для визуальной проверки центра.",
-      id: "selfie-requirements",
-      label: "Файл соответствует требованиям",
-      reason: "Селфи не соответствует требованиям",
-    },
-  ];
 }
 
 function applicantRoleLabel(role: Applicant["role"] | undefined) {

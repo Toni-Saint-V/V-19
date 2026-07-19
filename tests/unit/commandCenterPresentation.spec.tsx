@@ -1,38 +1,35 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  compactTripDateForSubmission,
-  fullTripDateForSubmission,
-} from "../../src/components/v19BusinessScreenAdapter";
+import { tripDateRangeForSubmission } from "../../src/components/v19BusinessScreenAdapter";
 
 describe("CommandCenter presentation helpers", () => {
   test("omits a trip date when neither boundary is specified", () => {
     expect(
-      compactTripDateForSubmission({ tripDateFrom: "", tripDateTo: "не указано" }),
+      tripDateRangeForSubmission({ tripDateFrom: "", tripDateTo: "не указано" }),
     ).toBeUndefined();
   });
 
-  test("keeps a real compact trip date", () => {
+  test("keeps a real compact trip date range", () => {
     expect(
-      compactTripDateForSubmission({
+      tripDateRangeForSubmission({
         tripDateFrom: "22.07.2026",
         tripDateTo: "31.07.2026",
+      }),
+    ).toBe("22.07–31.07");
+  });
+
+  test("keeps one compact boundary when only one date is specified", () => {
+    expect(
+      tripDateRangeForSubmission({
+        tripDateFrom: "22.07.2026",
+        tripDateTo: "не указана",
       }),
     ).toBe("22.07");
   });
 
-  test("keeps one full trip date for the widest desktop layout", () => {
+  test("omits a missing desktop date", () => {
     expect(
-      fullTripDateForSubmission({
-        tripDateFrom: "22.07.2026",
-        tripDateTo: "31.07.2026",
-      }),
-    ).toBe("22.07.2026");
-  });
-
-  test("labels a missing full desktop date", () => {
-    expect(
-      fullTripDateForSubmission({ tripDateFrom: "", tripDateTo: "не указано" }),
-    ).toBe("Дата не указана");
+      tripDateRangeForSubmission({ tripDateFrom: "", tripDateTo: "не указано" }),
+    ).toBeUndefined();
   });
 });

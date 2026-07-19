@@ -1,8 +1,14 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AdminReviewDrawer } from "../../src/modules/submissions/components/AdminReviewDrawer";
+import * as mediaStorage from "../../src/modules/submissions/mediaStorage";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
-import type { DrawerTab, IssueInput, Submission } from "../../src/modules/submissions/types";
+import type {
+  DrawerTab,
+  IssueInput,
+  Submission,
+  SubmissionFile,
+} from "../../src/modules/submissions/types";
 
 const aiMocks = vi.hoisted(() => ({
   invokeAiHelperEdge: vi.fn(),
@@ -14,6 +20,7 @@ vi.mock("../../src/services/aiEdgeClient", () => ({
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 beforeEach(() => {
@@ -30,6 +37,99 @@ function adminReviewSubmission(): Submission {
   const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
   if (!submission) throw new Error("Expected admin review fixture.");
   return submission;
+}
+
+function submissionWithProtectedPassport({
+  extension = "jpg",
+  mimeType = "image/jpeg",
+  pathApplicantId,
+}: {
+  extension?: "jpg" | "pdf";
+  mimeType?: "application/pdf" | "image/jpeg";
+  pathApplicantId?: string;
+} = {}) {
+  const submission = adminReviewSubmission();
+  const applicant = submission.applicants[0];
+  const passport = submission.files.find(
+    (file) => file.applicantId === applicant?.id && file.type === "passport_scan",
+  );
+  if (!applicant || !passport) throw new Error("Expected passport review fixture.");
+
+  const generatedFileName = `${applicant.id.replace(/\D/g, "")}_passport_scan.${extension}`;
+  const target = mediaStorage.buildMediaStoragePath(
+    submission.id,
+    pathApplicantId ?? applicant.id,
+    "passport_scan",
+    generatedFileName,
+  );
+  const protectedPassport: SubmissionFile = {
+    ...passport,
+    generatedFileName,
+    mimeType,
+    originalFileName: `passport.${extension}`,
+    status: "pending_review",
+    storageAdapter: "supabase-private",
+    storageBucket: target.bucket,
+    storagePath: target.path,
+    uploadStatus: "uploaded",
+  };
+
+  return {
+    ...submission,
+    files: submission.files.map((file) =>
+      file.id === passport.id ? protectedPassport : file,
+    ),
+  };
+}
+
+function submissionWithProtectedMedia() {
+  const submission = adminReviewSubmission();
+  return {
+    ...submission,
+    files: submission.files.map((file): SubmissionFile => {
+      if (
+        file.type !== "passport_scan" &&
+        file.type !== "selfie" &&
+        file.type !== "selfie_2"
+      ) {
+        return file;
+      }
+      const generatedFileName = `${file.applicantId.replace(/\D/g, "")}_${file.type}.jpg`;
+      const target = mediaStorage.buildMediaStoragePath(
+        submission.id,
+        file.applicantId,
+        file.type,
+        generatedFileName,
+      );
+      return {
+        ...file,
+        generatedFileName,
+        mimeType: "image/jpeg",
+        originalFileName: `${file.type}.jpg`,
+        status: "pending_review",
+        storageAdapter: "supabase-private",
+        storageBucket: target.bucket,
+        storagePath: target.path,
+        uploadStatus: "uploaded",
+      };
+    }),
+  };
+}
+
+async function openPassportReview(submission: Submission) {
+  const applicant = submission.applicants[0];
+  if (!applicant) throw new Error("Expected applicant.");
+  renderDrawer({ activeTab: "files", submission });
+  const passportFile = document.getElementById(
+    `workspace-media-${applicant.id}-passport_scan`,
+  );
+  if (!passportFile) throw new Error("Expected passport file row.");
+  fireEvent.click(within(passportFile).getByRole("button", { name: "Проверить" }));
+  const reviewPane = await screen.findByLabelText("Сверка паспорта");
+  return {
+    acceptButton: within(reviewPane).getByRole("button", { name: "Принять" }),
+    applicant,
+  };
 }
 
 function renderDrawer({
@@ -99,7 +199,6 @@ describe("AdminReviewDrawer", () => {
     for (const tab of [
       /^Обзор$/,
       /^Заявители/,
-      /^Анкета/,
       /^Файлы$/,
       /^Замечания/,
       /^История/,
@@ -206,12 +305,14 @@ describe("AdminReviewDrawer", () => {
     );
   });
 
-  test("jumps from an issue to its exact questionnaire field", async () => {
+  test("jumps from a passport field issue to its visible passport comparison row", async () => {
     const source = adminReviewSubmission();
     const applicant = source.applicants[0];
-    const section = applicant?.sections[0];
+    const section = applicant?.sections.find((candidate) =>
+      `${candidate.id} ${candidate.title}`.toLowerCase().includes("passport"),
+    );
     const field = section?.fields[0];
-    if (!applicant || !section || !field) throw new Error("Expected questionnaire fixture.");
+    if (!applicant || !section || !field) throw new Error("Expected passport fixture.");
     const submission: Submission = {
       ...source,
       issues: [
@@ -237,7 +338,7 @@ describe("AdminReviewDrawer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Перейти к месту" }));
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: /^Анкета/ })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: /^Файлы$/ })).toHaveAttribute(
         "aria-selected",
         "true",
       );
@@ -261,7 +362,7 @@ describe("AdminReviewDrawer", () => {
     renderDrawer({ activeTab: "files", submission });
 
     expect(screen.getByText("Файлы для проверки не загружены")).toBeInTheDocument();
-    expect(screen.getByText("0/0")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: /^Заявители/ }));
     expect(await screen.findByText("Заявители не добавлены")).toBeInTheDocument();
@@ -301,7 +402,7 @@ describe("AdminReviewDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Добавить замечание" }));
 
     expect(screen.getByLabelText("Новое замечание")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Анкета" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Анкета" })).toBeNull();
     expect(
       screen.getByRole("button", { name: "Скан паспорта" }),
     ).toBeInTheDocument();
@@ -324,80 +425,238 @@ describe("AdminReviewDrawer", () => {
     );
   });
 
-  test("routes the selected passport into the protected review workspace", () => {
+  test("keeps a passport field remark attached to the exact field", async () => {
+    const source = adminReviewSubmission();
+    const applicant = source.applicants[0];
+    const passportSection = applicant?.sections.find((section) =>
+      `${section.id} ${section.title}`.toLowerCase().includes("passport"),
+    );
+    const passportField = passportSection?.fields[0];
+    if (!applicant || !passportSection || !passportField) {
+      throw new Error("Expected passport field fixture.");
+    }
+    const onAddIssue = vi.fn();
+    renderDrawer({
+      activeTab: "files",
+      onAddIssue,
+      submission: { ...source, issues: [] },
+    });
+
+    const passportFile = document.getElementById(
+      `workspace-media-${applicant.id}-passport_scan`,
+    );
+    if (!passportFile) throw new Error("Expected passport file.");
+    fireEvent.click(within(passportFile).getByRole("button", { name: "Проверить" }));
+
+    const fieldRow = await screen.findByText(passportField.label);
+    const fieldCard = fieldRow.closest(".admin-review-field-row");
+    if (!fieldCard) throw new Error("Expected passport field row.");
+    fireEvent.click(
+      within(fieldCard).getByRole("button", {
+        name: `Создать замечание: ${passportField.label}`,
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Поле паспорта" })).toHaveClass(
+      "is-active",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Отправить замечание" }));
+
+    expect(onAddIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        applicantId: applicant.id,
+        field: passportField.label,
+        fileType: undefined,
+        section: "Паспорт",
+        type: "field",
+      }),
+    );
+  });
+
+  test("counts only accepted selfies and confirmed passport fields as reviewed", () => {
+    const source = adminReviewSubmission();
+    const submission: Submission = {
+      ...source,
+      applicants: source.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) => ({
+            ...field,
+            adminReviewApprovedAtIso: undefined,
+            adminReviewApprovedBy: undefined,
+            reviewConfirmedAtIso: undefined,
+            reviewConfirmedBy: undefined,
+            reviewState: "needs_review",
+          })),
+        })),
+      })),
+      files: source.files.map((file) =>
+        file.type === "selfie" || file.type === "selfie_2"
+          ? { ...file, status: "pending_review" as const }
+          : file,
+      ),
+    };
+    renderDrawer({ submission });
+
+    const metrics = screen.getByLabelText("Метрики проверки");
+    expect(within(metrics).getByText("0/2")).toBeInTheDocument();
+    expect(within(metrics).getByText("0%")).toBeInTheDocument();
+    expect(within(metrics).queryByText(`${submission.completeness.total}%`)).toBeNull();
+  });
+
+  test("opens selected passport in the persistent comparison surface", async () => {
     const submission = adminReviewSubmission();
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Expected applicant.");
     const onVerifyDocument = vi.fn();
     renderDrawer({ activeTab: "files", onVerifyDocument, submission });
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Проверить" }).at(-1)!);
+    const passportFile = document.getElementById(
+      `workspace-media-${applicant.id}-passport_scan`,
+    );
+    if (!passportFile) throw new Error("Expected passport file.");
+    fireEvent.click(within(passportFile).getByRole("button", { name: "Проверить" }));
 
-    expect(onVerifyDocument).toHaveBeenCalledWith(applicant.id);
+    expect(onVerifyDocument).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /^Файлы$/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getByRole("heading", { name: "Паспорт + ключевые поля" })).toBeVisible();
+    });
   });
 
-  test("runs admin drawer AI through the edge helper and fails closed when unavailable", async () => {
-    const onAction = vi.fn();
-    renderDrawer({ activeTab: "files", onAction });
+  test("loads an exact protected passport image and keeps Accept fail-closed until ready", async () => {
+    const submission = submissionWithProtectedPassport();
+    const passport = submission.files.find((file) => file.type === "passport_scan");
+    if (!passport?.storagePath) throw new Error("Expected protected passport path.");
+    let resolveSignedUrl: (url: string | null) => void = () => undefined;
+    const signedUrlPromise = new Promise<string | null>((resolve) => {
+      resolveSignedUrl = resolve;
+    });
+    const createSignedUrl = vi
+      .spyOn(mediaStorage, "createMediaSignedUrl")
+      .mockReturnValue(signedUrlPromise);
 
-    fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
+    const { acceptButton } = await openPassportReview(submission);
 
+    expect(acceptButton).toBeDisabled();
     await waitFor(() =>
-      expect(screen.getAllByText(/локальный AI не настроен/).length).toBeGreaterThan(0),
+      expect(createSignedUrl).toHaveBeenCalledWith({
+        bucket: mediaStorage.mediaStorageBucket,
+        path: passport.storagePath,
+      }),
     );
-    expect(aiMocks.invokeAiHelperEdge).toHaveBeenCalledTimes(3);
-    expect(aiMocks.invokeAiHelperEdge.mock.calls.map((call) => call[0])).toEqual([
-      "admin_review",
-      "admin_next_action",
-      "admin_readiness_explanation",
-    ]);
-    expect(JSON.stringify(aiMocks.invokeAiHelperEdge.mock.calls)).not.toContain(
-      "Нина Волкова",
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Загружаем защищённый оригинал",
     );
-    expect(onAction).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSignedUrl("https://example.test/protected-passport.jpg");
+      await signedUrlPromise;
+    });
+
+    const image = await screen.findByTestId(
+      "protected-media-preview-passport_scan",
+    );
+    expect(image.tagName).toBe("IMG");
+    expect(image).toHaveAttribute(
+      "src",
+      "https://example.test/protected-passport.jpg",
+    );
+    expect(acceptButton).toBeEnabled();
+    expect(screen.queryByText("PASSPORT")).not.toBeInTheDocument();
+
+    fireEvent.error(image);
+    expect(
+      await screen.findByTestId("protected-media-unavailable-passport_scan"),
+    ).toBeInTheDocument();
+    expect(acceptButton).toBeDisabled();
   });
 
-  test("renders safe admin AI review output without autonomous accept or export", async () => {
-    const onAction = vi.fn();
-    aiMocks.invokeAiHelperEdge
-      .mockResolvedValueOnce({
-        intent: "admin_review",
-        title: "Предварительная проверка",
-        summary: "Проверьте комплект вручную.",
-        suggestions: ["Проверьте паспорт и селфи."],
-        blockers: ["Есть открытое замечание."],
-        guardrails: ["Подсказка не является решением."],
-        source: "edge-provider",
-        adminReviewChecklist: ["Сверить анкету с файлами."],
-      })
-      .mockResolvedValueOnce({
-        intent: "admin_next_action",
-        title: "Следующее действие",
-        summary: "Верните точечное замечание.",
-        suggestions: ["Добавьте одно точное замечание и проверьте текст."],
-        blockers: [],
-        guardrails: ["Администратор подтверждает вручную."],
-        source: "edge-provider",
-        nextAction: "Добавьте одно точное замечание и проверьте текст.",
-      })
-      .mockResolvedValueOnce({
-        intent: "admin_readiness_explanation",
-        title: "Готовность",
-        summary: "Пакет не готов из-за открытого замечания.",
-        suggestions: ["Закройте замечание после проверки."],
-        blockers: ["Открытое замечание блокирует движение дальше."],
-        guardrails: ["Действия остаются ручными."],
-        source: "edge-provider",
-        readinessExplanation: "Пакет не готов из-за открытого замечания.",
-      });
-    renderDrawer({ activeTab: "files", onAction });
+  test("renders a protected passport PDF through the signed URL", async () => {
+    const submission = submissionWithProtectedPassport({
+      extension: "pdf",
+      mimeType: "application/pdf",
+    });
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://example.test/protected-passport.pdf",
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
+    const { acceptButton } = await openPassportReview(submission);
+    const preview = await screen.findByTestId(
+      "protected-media-preview-passport_scan",
+    );
 
-    await screen.findByText("Сверить анкету с файлами.");
-    expect(screen.getByText("Пакет не готов из-за открытого замечания.")).toBeVisible();
-    expect(screen.getByText(/Принятие и выгрузка остаются ручными/)).toBeVisible();
-    expect(onAction).not.toHaveBeenCalled();
+    expect(preview.tagName).toBe("OBJECT");
+    expect(preview).toHaveAttribute(
+      "data",
+      "https://example.test/protected-passport.pdf",
+    );
+    expect(preview).toHaveAttribute("type", "application/pdf");
+    expect(acceptButton).toBeEnabled();
+  });
+
+  test("shows both protected selfie targets together", async () => {
+    const submission = submissionWithProtectedMedia();
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+    const createSignedUrl = vi
+      .spyOn(mediaStorage, "createMediaSignedUrl")
+      .mockImplementation(async ({ path }) => `https://example.test/${encodeURIComponent(path)}`);
+    renderDrawer({ activeTab: "files", submission });
+    const selfieFile = document.getElementById(
+      `workspace-media-${applicant.id}-selfie`,
+    );
+    if (!selfieFile) throw new Error("Expected selfie file row.");
+
+    fireEvent.click(within(selfieFile).getByRole("button", { name: "Проверить" }));
+
+    const firstSelfiePane = await screen.findByLabelText("Проверка Селфи 1");
+    const secondSelfiePane = await screen.findByLabelText("Проверка Селфи 2");
+    expect(
+      await screen.findByTestId("protected-media-preview-selfie"),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("protected-media-preview-selfie_2"),
+    ).toBeInTheDocument();
+    expect(
+      within(firstSelfiePane).getByRole("button", { name: "Принять" }),
+    ).toBeEnabled();
+    expect(
+      within(secondSelfiePane).getByRole("button", { name: "Принять" }),
+    ).toBeEnabled();
+    expect(createSignedUrl).toHaveBeenCalledTimes(2);
+  });
+
+  test("rejects a private path from another applicant before requesting a signed URL", async () => {
+    const submission = submissionWithProtectedPassport({
+      pathApplicantId: "foreign-applicant",
+    });
+    const createSignedUrl = vi
+      .spyOn(mediaStorage, "createMediaSignedUrl")
+      .mockResolvedValue("https://example.test/must-not-render.jpg");
+
+    const { acceptButton } = await openPassportReview(submission);
+
+    expect(
+      await screen.findByTestId("protected-media-unavailable-passport_scan"),
+    ).toBeInTheDocument();
+    expect(createSignedUrl).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId("protected-media-preview-passport_scan"),
+    ).not.toBeInTheDocument();
+    expect(acceptButton).toBeDisabled();
+  });
+
+  test("keeps the manual review surface limited to passport fields and both selfies", () => {
+    renderDrawer({ activeTab: "files" });
+
+    expect(screen.queryByRole("button", { name: "Проверить AI" })).toBeNull();
+    expect(screen.queryByText("AI-конфликты личности")).toBeNull();
+    expect(aiMocks.invokeAiHelperEdge).not.toHaveBeenCalled();
   });
 
   test("drafts an agent-facing remark for admin review without sending it", async () => {

@@ -41,12 +41,10 @@ import {
   V19ListHeader,
   V19MetricCard,
   V19MetricStrip,
+  V19OperationalCard,
+  V19OperationalCardGrid,
   V19PriorityHero,
-  V19QueueCard,
   V19QueueToolbar,
-  V19SubmissionCity,
-  V19SubmissionIdentity,
-  V19SubmissionTripDates,
   V19ToolbarSelect,
 } from "../shared/ui/v19-design-system";
 import { createDraft } from "../modules/submissions/domainEngine";
@@ -61,9 +59,8 @@ import type {
 } from "../modules/submissions/types";
 import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
 import {
-  compactTripDateForSubmission,
-  fullTripDateForSubmission,
   listItemsFromSubmissions,
+  tripDateRangeForSubmission,
   type LegacyAgentNavSection,
   type LegacySubmissionListItem,
 } from "./v19BusinessScreenAdapter";
@@ -87,13 +84,14 @@ import {
   agentDisplayName,
   agentInitials,
 } from "../modules/submissions/agentDirectory";
-import { cityFilterValuesForSubmissions } from "../modules/submissions/selectors";
+import {
+  cityFilterValuesForSubmissions,
+} from "../modules/submissions/selectors";
 import {
   generatedCockpitMediaFileName,
   mediaSlotTypeForSubmissionFileType,
   uploadRequiredFile,
 } from "../modules/submissions/submissionActions";
-import "../shared/ui/agent-actions-cell.css";
 import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
   buildMediaStoragePath,
@@ -747,6 +745,11 @@ export function CommandCenter({
     setSearchQuery("");
     if (options?.openQuestionnaire) {
       setSelectedRow(nextSubmission.id);
+      setQuestionnaireInitialFocus({
+        applicantId: nextSubmission.applicants[0]?.id,
+        field: "surname",
+        section: "Личные данные заявителя",
+      });
       setDrawerOpen(false);
       setCurrentView("questionnaire");
     }
@@ -777,9 +780,13 @@ export function CommandCenter({
     return promise;
   };
 
-  const uploadCanonicalFile = async (fileId: string, file: File) => {
+  const uploadCanonicalFile = async (
+    submissionId: string,
+    fileId: string,
+    file: File,
+  ) => {
     const submission = effectiveCanonicalSubmissions.find(
-      (candidate) => candidate.id === selectedRow,
+      (candidate) => candidate.id === submissionId,
     );
     const targetFile = submission?.files.find((candidate) => candidate.id === fileId);
     if (!submission || !targetFile) {
@@ -863,21 +870,42 @@ export function CommandCenter({
       ...current,
       [nextSubmission.id]: nextSubmission,
     }));
+    return nextSubmission;
+  };
+
+  const executeAgentSubmissionActionFor = async (
+    submissionId: string,
+    action: SubmissionAction,
+  ) => {
+    const currentSubmission = effectiveCanonicalSubmissions.find(
+      (submission) => submission.id === submissionId,
+    );
+    if (!currentSubmission) throw new Error("Подача больше не доступна.");
+
+    const applyAction = (latestSubmission: Submission) => {
+      const result = applySubmissionActionResult(
+        latestSubmission,
+        action,
+        "agent",
+        agentId ?? latestSubmission.agentId,
+      );
+      if (!result.ok) throw new Error(result.error.message);
+      return result.data;
+    };
+    const nextSubmission = onSubmissionUpdate
+      ? await onSubmissionUpdate(submissionId, applyAction)
+      : applyAction(currentSubmission);
+    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
+    setCanonicalOverrides((current) => ({
+      ...current,
+      [nextSubmission.id]: nextSubmission,
+    }));
+    return nextSubmission;
   };
 
   const executeAgentSubmissionAction = async (action: SubmissionAction) => {
     if (!selectedCanonicalSubmission) return;
-
-    const result = applySubmissionActionResult(
-      selectedCanonicalSubmission,
-      action,
-      "agent",
-      agentId ?? selectedCanonicalSubmission.agentId,
-    );
-    if (!result.ok) throw new Error(result.error.message);
-
-    await onSubmissionsChange?.([result.data]);
-    setCanonicalOverrides((current) => ({ ...current, [result.data.id]: result.data }));
+    await executeAgentSubmissionActionFor(selectedCanonicalSubmission.id, action);
   };
 
   const markAgentIssueFixed = async (issueId: string) => {
@@ -912,6 +940,11 @@ export function CommandCenter({
       [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8),
     );
     setSelectedRow(draft.id);
+    setQuestionnaireInitialFocus({
+      applicantId: draft.applicants[0]?.id,
+      field: "surname",
+      section: "Личные данные заявителя",
+    });
     setDrawerOpen(false);
     setActiveNav("submissions");
     setSearchQuery("");
@@ -980,23 +1013,29 @@ export function CommandCenter({
         <span className="flex-1 text-left">{navLabel(normalizeAgentNav(section))}</span>
         {typeof count === "number" ? (
           <span
-            className={`v19-agent-sidebar-nav-count px-1.5 py-0.5 rounded-full border text-[11px] font-medium ${active ? "is-active" : "border-white/5 bg-[#18181b] text-white/80"}`}
+            className={`v19-agent-sidebar-nav-count px-1.5 py-0.5 rounded-full border text-[11px] font-medium ${active ? "is-active" : "border-white/5 bg-[var(--v19b-color-tag)] text-white/80"}`}
           >
             {count}
           </span>
         ) : null}
-        {warning ? <span className="w-2 h-2 rounded-full bg-[#a35f69]" /> : null}
+        {warning ? (
+          <span className="h-2 w-2 rounded-full bg-[var(--v19b-dot-warning)]" />
+        ) : null}
       </button>
     );
   };
 
-  const actionStatusTagClass = (action: AgentActionItem) => `tone-${action.severity}`;
+  const actionStatusTagClass = (action: AgentActionItem) =>
+    action.severity === "blocker"
+      ? "tone-danger"
+      : action.severity === "warning"
+        ? "tone-warning"
+        : action.severity === "ready"
+          ? "tone-ready"
+          : "tone-info";
 
   const actionPeopleCount = (action: AgentActionItem) =>
     action.submission.applicants.length;
-
-  const shouldShowActionContext = (action: AgentActionItem) =>
-    !action.context.startsWith("Заполнить анкету");
 
   const renderNavContent = () => (
     <>
@@ -1221,7 +1260,7 @@ export function CommandCenter({
           searchPlaceholder="ID, семья или город"
           searchValue={searchQuery}
         />
-        <div className="v19-admin-review-lane-list v19-legacy-actions-list">
+        <V19OperationalCardGrid className="v19-agent-actions-card-grid">
           <AnimatePresence mode="popLayout">
             {visibleActions.length === 0 ? (
               <motion.div
@@ -1236,9 +1275,40 @@ export function CommandCenter({
               </motion.div>
             ) : (
               visibleActions.map((action) => (
-                <V19QueueCard
-                  as={motion.div}
+                <V19OperationalCard
+                  actionIcon={FileText}
+                  actionText={action.context}
+                  as={motion.button}
+                  city={action.submission.city}
+                  footer={
+                    <>
+                      <span className="v19-operational-card-signals">
+                        <span
+                          className={actionStatusTagClass(action)}
+                          data-testid="agent-action-status"
+                        >
+                          {action.dueLabel}
+                        </span>
+                        {action.badges.slice(0, 1).map((badge) => (
+                          <span key={`${action.id}-${badge.label}`}>
+                            {badge.label}
+                          </span>
+                        ))}
+                      </span>
+                      <span
+                        className="v19-operational-card-cta"
+                        data-testid="agent-action-cta"
+                      >
+                        {action.cta}
+                      </span>
+                    </>
+                  }
                   layout
+                  peopleCount={actionPeopleCount(action)}
+                  publicId={submissionPublicId(action.submission)}
+                  title={action.title}
+                  tripDates={tripDateRangeForSubmission(action.submission)}
+                  type="button"
                   key={action.id}
                   initial={false}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1256,73 +1326,15 @@ export function CommandCenter({
                       handleActionOpen(action);
                     }
                   }}
-                  className={`v19-legacy-action-row severity-${action.severity}${shouldShowActionContext(action) ? " has-context" : ""}`}
+                  className={`severity-${action.severity}${action.severity === "blocker" ? " has-blocker" : ""}`}
                   data-agent-action-id={action.id}
                   data-testid="agent-action-row"
-                >
-                  <div className="v19-legacy-action-main">
-                    <V19SubmissionIdentity
-                      city={action.submission.city}
-                      peopleCount={actionPeopleCount(action)}
-                      publicId={submissionPublicId(action.submission)}
-                      title={action.title}
-                      tripDates={compactTripDateForSubmission(action.submission)}
-                    />
-                  </div>
-                  <div className="v19-legacy-action-meta">
-                    <span
-                      className={`v19-legacy-action-status ${actionStatusTagClass(action)}`}
-                      data-testid="agent-action-status"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="v19-legacy-action-status-dot"
-                      />
-                      <span className="truncate">{action.dueLabel}</span>
-                    </span>
-                  </div>
-                  <div className="v19-legacy-action-city-column">
-                    <V19SubmissionCity city={action.submission.city} />
-                  </div>
-                  <div className="v19-legacy-action-date-column">
-                    <V19SubmissionTripDates
-                      dates={fullTripDateForSubmission(action.submission)}
-                    />
-                  </div>
-                  <div className="v19-legacy-action-badges">
-                    {action.badges.slice(0, 2).map((badge) => (
-                      <span
-                        key={`${action.id}-${badge.label}`}
-                        className="v19-legacy-action-badge is-desktop-badge"
-                      >
-                        {badge.label}
-                      </span>
-                    ))}
-                  </div>
-                  {shouldShowActionContext(action) ? (
-                    <span className="v19-legacy-action-context-tag">
-                      {action.context}
-                    </span>
-                  ) : null}
-                  <div className="v19-legacy-action-cta-wrap">
-                    <button
-                      aria-label={`${action.cta}: ${action.title}`}
-                      className="v19-legacy-action-cta"
-                      data-testid="agent-action-cta"
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleActionOpen(action);
-                      }}
-                    >
-                      {action.cta}
-                    </button>
-                  </div>
-                </V19QueueCard>
+                  aria-label={`${action.cta}: ${action.title}`}
+                />
               ))
             )}
           </AnimatePresence>
-        </div>
+        </V19OperationalCardGrid>
       </div>
     </section>
   );
@@ -1425,7 +1437,13 @@ export function CommandCenter({
             }
             onSubmissionChange={persistQuestionnaireSubmission}
             onMarkIssueFixed={markAgentIssueFixed}
-            onUploadFile={usesSupabase ? uploadCanonicalFile : undefined}
+            onUploadFile={
+              usesSupabase && selectedRow
+                ? async (fileId, file) => {
+                    await uploadCanonicalFile(selectedRow, fileId, file);
+                  }
+                : undefined
+            }
           />
         )}
         {currentView === "upload" && (
@@ -1528,6 +1546,7 @@ export function CommandCenter({
                   onOpenDrawer={handleRowClick}
                   onOpenIssue={handleOpenDocumentIssue}
                   onSubmissionsChange={onSubmissionsChange}
+                  onUploadFile={usesSupabase ? uploadCanonicalFile : undefined}
                   submissions={canonicalSubmissions}
                 />
               </div>
@@ -1537,6 +1556,11 @@ export function CommandCenter({
             {activeNav === "submissions" && (
               <ApplicantsScreen
                 onOpenDrawer={handleRowClick}
+                onSubmitForReview={(submissionId) =>
+                  executeAgentSubmissionActionFor(submissionId, "submit_for_review").then(
+                    () => undefined,
+                  )
+                }
                 submissions={submissionCards}
               />
             )}
@@ -1545,10 +1569,11 @@ export function CommandCenter({
       </main>
 
       {usesSupabase ? (
-        drawerOpen && selectedCanonicalSubmission ? (
+        selectedCanonicalSubmission ? (
           <OperationalSubmissionDrawer
             activeTab={drawerActiveTab}
             focusTarget={drawerFocusTarget}
+            isOpen={drawerOpen}
             onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
             onAction={executeAgentSubmissionAction}
             onClose={() => setDrawerOpen(false)}
@@ -1558,7 +1583,13 @@ export function CommandCenter({
             onOpenQuestionnaireWorkspace={(target) =>
               handleOpenQuestionnaire(selectedCanonicalSubmission.id, target)
             }
-            onUploadFile={uploadCanonicalFile}
+            onUploadFile={
+              selectedCanonicalSubmission
+                ? async (fileId, file) => {
+                    await uploadCanonicalFile(selectedCanonicalSubmission.id, fileId, file);
+                  }
+                : undefined
+            }
             role="agent"
             submission={selectedCanonicalSubmission}
             surface="agent"

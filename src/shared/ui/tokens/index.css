@@ -1041,6 +1041,11 @@
   --v19b-color-primary-soft-10: rgb(58 69 180 / 0.1);
   --v19b-color-primary-soft-20: rgb(58 69 180 / 0.2);
   --v19b-color-primary-soft-30: rgb(58 69 180 / 0.3);
+  --v19b-color-remark: rgb(251 146 60);
+  --v19b-color-remark-bg: rgb(248 113 113 / 0.1);
+  --v19b-color-remark-border: rgb(248 113 113 / 0.2);
+  --v19b-color-remark-hover-bg: rgb(248 113 113 / 0.16);
+  --v19b-color-remark-hover-border: rgb(248 113 113 / 0.36);
   --v19b-shadow-color-15: rgb(0 0 0 / 0.15);
   --v19b-shadow-color-16: rgb(0 0 0 / 0.16);
   --v19b-shadow-color-34: rgb(0 0 0 / 0.34);
@@ -1213,6 +1218,7 @@
   --v19b-opacity-full: 1;
   --v19b-opacity-disabled: 0.46;
   --v19b-z-base: 1;
+  --v19b-z-sticky: 10;
 
   --v19b-weight-body: 400;
   --v19b-weight-regular: var(--v19b-weight-body);
@@ -1290,6 +1296,8 @@
   --v19b-transform-rest: translateY(0);
   --v19b-transform-press: translateY(1px);
   --v19b-transform-raise: translateY(-1px);
+  --v19b-transform-flame-flicker-left: scaleX(0.94) scaleY(1.08) rotate(-2deg);
+  --v19b-transform-flame-flicker-right: scaleX(1.04) scaleY(0.97) rotate(2deg);
   --v19b-transform-center-y: translateY(-50%);
   --v19b-translate-center: -50% -50%;
   --v19b-shadow-none: none;
@@ -1326,8 +1334,8 @@
   --v19b-admin-green-soft: rgb(16 185 129 / 0.1);
   --v19b-admin-green-border: rgb(16 185 129 / 0.25);
   --v19b-admin-error-surface: rgba(29, 23, 25, 0.8);
-  --v19b-admin-unified-surface: rgba(111, 100, 255, 0.15);
-  --v19b-admin-unified-text: rgb(184, 186, 255);
+  --v19b-admin-unified-surface: var(--v19b-color-primary-soft-20);
+  --v19b-admin-unified-text: var(--v19b-color-primary-text);
   --v19b-admin-export-selected-bg: rgb(58 69 180 / 0.1);
   --v19b-admin-export-selected-border: rgb(58 69 180 / 0.35);
   --v19b-admin-export-active-bg: rgb(255 255 255 / 0.035);
@@ -1433,25 +1441,38 @@
 
 :root {
   --v19b-size-860: 860px;
-  --v19b-admin-drawer-bg: #111113;
-  --v19b-admin-drawer-field-bg: #1a1a1d;
-  --v19b-admin-drawer-border: rgb(255 255 255 / 0.1);
-  --v19b-admin-drawer-border-faint: rgb(255 255 255 / 0.05);
-  --v19b-admin-drawer-text-70: rgb(255 255 255 / 0.7);
-  --v19b-admin-drawer-text-50: rgb(255 255 255 / 0.5);
-  --v19b-admin-drawer-text-40: rgb(255 255 255 / 0.4);
-  --v19b-admin-drawer-control-bg: rgb(255 255 255 / 0.05);
-  --v19b-admin-drawer-control-hover: rgb(255 255 255 / 0.1);
-  --v19b-admin-drawer-count-bg: rgb(255 255 255 / 0.1);
-  --v19b-admin-drawer-surface: rgb(255 255 255 / 0.02);
+  --v19b-drawer-canvas: #0a0a0b;
+  --v19b-drawer-paper: #ffffff;
+  --v19b-drawer-paper-ink: #101011;
+  --v19b-drawer-mobile-top: var(--v19b-size-48);
+  --v19b-drawer-mobile-radius: var(--v19b-size-28);
+  --v19b-questionnaire-mobile-height: 100dvh;
+  --v19b-questionnaire-mobile-work-min-height: 75dvh;
+  --v19b-drawer-agent-width: var(--v19b-size-840);
+  --v19b-drawer-admin-width: var(--v19b-size-860);
+  --v19b-drawer-admin-compare-width: var(--v19b-size-1140);
+  --v19b-drawer-review-rail-width: var(--v19b-size-420);
+  --v19b-drawer-remark-width: 640px;
+  --v19b-drawer-remark-max-height: 90svh;
+  --v19b-admin-drawer-bg: var(--v19b-color-page);
+  --v19b-admin-drawer-field-bg: var(--v19b-color-panel-strong);
+  --v19b-admin-drawer-border: var(--v19b-color-border-soft);
+  --v19b-admin-drawer-border-faint: var(--v19b-color-border-faint);
+  --v19b-admin-drawer-text-70: var(--v19b-color-text-70);
+  --v19b-admin-drawer-text-50: var(--v19b-color-text-50);
+  --v19b-admin-drawer-text-40: var(--v19b-color-text-40);
+  --v19b-admin-drawer-control-bg: var(--v19b-color-tag);
+  --v19b-admin-drawer-control-hover: var(--v19b-color-tag-selected);
+  --v19b-admin-drawer-count-bg: var(--v19b-color-tag-selected);
+  --v19b-admin-drawer-surface: var(--v19b-color-panel);
   --v19b-admin-drawer-backdrop: rgb(0 0 0 / 0.6);
   --v19b-admin-drawer-shadow: 0 var(--v19b-size-24) var(--v19b-size-80)
     rgb(0 0 0 / 0.6);
   --v19b-admin-drawer-primary-shadow: 0 0 var(--v19b-size-20)
     rgb(16 185 129 / 0.2);
-  --v19b-admin-drawer-orange-bg: rgb(248 113 113 / 0.1);
-  --v19b-admin-drawer-orange-border: rgb(248 113 113 / 0.2);
-  --v19b-admin-drawer-orange-text: #fb923c;
+  --v19b-admin-drawer-orange-bg: var(--v19b-color-remark-bg);
+  --v19b-admin-drawer-orange-border: var(--v19b-color-remark-border);
+  --v19b-admin-drawer-orange-text: var(--v19b-color-remark);
   --v19b-admin-drawer-green-bg: rgb(16 185 129 / 0.2);
   --v19b-admin-drawer-green-border: rgb(16 185 129 / 0.3);
   --v19b-admin-drawer-green-text: #34d399;

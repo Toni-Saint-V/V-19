@@ -1,4 +1,7 @@
-import { isCompletedFileAsset } from "./fileAsset";
+import {
+  isCompletedFileAsset,
+  isFileAssetUploadMissing,
+} from "./fileAsset";
 import { updateQuestionnaireField } from "./submissionActions";
 import type {
   Applicant,
@@ -377,11 +380,18 @@ export function confirmApplicantPassportReview(
     (item) => item.applicantId === applicantId && item.type === "passport_scan",
   );
   const state = applicant?.passportExtraction;
+  const hasDurableUploadedPassport = Boolean(
+    file &&
+      !isFileAssetUploadMissing(file) &&
+      file.generatedFileName &&
+      file.storageBucket &&
+      file.storagePath,
+  );
 
   if (
     !applicant ||
     !file ||
-    !isCompletedFileAsset(file) ||
+    (!isCompletedFileAsset(file) && !hasDurableUploadedPassport) ||
     state?.status === "extracting"
   ) {
     return submission;

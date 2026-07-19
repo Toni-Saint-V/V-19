@@ -190,6 +190,7 @@ export interface StatusHistoryItem {
 
 export interface Submission {
   id: string;
+  publicNumber?: number;
   title: string;
   type: "single" | "family";
   agentId: string;

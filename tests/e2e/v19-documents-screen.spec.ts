@@ -83,7 +83,7 @@ test.describe("V-19 document collection screen", () => {
         page.getByRole("heading", { level: 1, name: "Сбор документов" }),
       ).toBeVisible();
       await expect(
-        page.getByRole("heading", { name: "Документы заявителей" }),
+        page.getByRole("heading", { name: "Загрузка документов" }),
       ).toBeVisible();
       await expect(page.locator(".v19-documents-summary-grid")).toBeVisible();
       await expect(page.getByRole("button", { name: /^Анкета:/ })).toHaveCount(0);

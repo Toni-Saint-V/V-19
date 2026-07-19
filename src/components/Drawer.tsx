@@ -8,12 +8,22 @@ import {
 } from '../modules/submissions/status';
 import { agentDisplayName } from '../modules/submissions/agentDirectory';
 import { questionnaireCityForSubmission } from '../modules/submissions/selectors';
+import { submissionPublicId } from '../modules/submissions/submissionIdentity';
 import { actionGate } from './v19BusinessScreenAdapter';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import {
+  drawerMotion,
+  drawerPanelExit,
+  drawerPanelInitial,
+  drawerPanelTransition,
+  drawerTabExit,
+  drawerTabInitial,
+  useDrawerDesktopQuery,
+} from '../shared/ui/drawer/drawerMotion';
 import { 
   X, CheckCircle2, AlertCircle, Clock, FileText, User,
   Calendar, MapPin, FileDigit, UploadCloud,
-  ShieldAlert, Edit3, Image as ImageIcon, History
+  ShieldAlert, Edit3, Image as ImageIcon, History, ChevronDown
 } from 'lucide-react';
 
 // --- Types & Interfaces ---
@@ -101,23 +111,13 @@ const drawerFocusableSelector = [
 ].join(',');
 
 const drawerTabId = (tab: TabId) => `submission-drawer-tab-${tab}`;
+const drawerMobileTabId = (tab: TabId) => `submission-drawer-mobile-tab-${tab}`;
 const drawerPanelId = (tab: TabId) => `submission-drawer-panel-${tab}`;
-
-// --- Utility Hooks ---
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(
-    typeof window !== 'undefined' ? window.matchMedia(query).matches : true
-  );
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const listener = (e: MediaQueryListEvent) => setMatches(e.matches);
-    media.addEventListener('change', listener);
-    return () => media.removeEventListener('change', listener);
-  }, [query]);
-
-  return matches;
-}
+const drawerPanelLabelId = (tab: TabId) => `submission-drawer-panel-label-${tab}`;
+// The mobile rail deliberately exposes only two work-starting sections. The
+// remaining sections remain one tap away in «Ещё» instead of forcing Russian
+// labels to collide in a 320px viewport.
+const mobilePrimaryTabIds: readonly TabId[] = ['overview', 'applicants'];
 
 // --- Helper Components ---
 const Skeleton = ({ className }: { className?: string }) => (
@@ -146,8 +146,74 @@ const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
 };
 
 // --- Sub-components for Tabs ---
-const OverviewTab = ({ data }: { data: SubmissionDetail }) => (
-  <div className="v19-submission-drawer-overview">
+const OverviewTab = ({
+  data,
+  onOpenDocuments,
+  onOpenIssues,
+  onOpenQuestionnaire,
+}: {
+  data: SubmissionDetail;
+  onOpenDocuments?: () => void;
+  onOpenIssues: () => void;
+  onOpenQuestionnaire?: () => void;
+}) => {
+  const hasPendingDocuments = data.documents.some((document) => document.status !== "done");
+  const needsCorrections = data.status === "returned";
+  const nextStep = needsCorrections
+    ? {
+        action: onOpenIssues,
+        actionLabel: "Открыть замечания",
+        description: "Исправьте отмеченные поля и файлы, затем отправьте пакет повторно.",
+        label: "Требует действий",
+        title: "Исправьте замечания",
+      }
+    : data.status === "corrections_received"
+      ? {
+          action: undefined,
+          actionLabel: "",
+          description: "Исправления отправлены. Администратор повторно проверяет пакет.",
+          label: "Статус пакета",
+          title: "Исправления на проверке",
+        }
+    : hasPendingDocuments
+      ? {
+          action: onOpenDocuments,
+          actionLabel: "Открыть файлы",
+          description: "Добавьте недостающие документы, чтобы продолжить подачу.",
+          label: "Следующий шаг",
+          title: "Соберите документы",
+        }
+      : data.completeness < 100
+        ? {
+            action: onOpenQuestionnaire,
+            actionLabel: "Открыть анкету",
+            description: "Заполните оставшиеся поля каждого заявителя.",
+            label: "Следующий шаг",
+            title: "Завершите анкету",
+          }
+        : {
+            action: undefined,
+            actionLabel: "",
+            description: "Пакет собран. Перед отправкой проверьте состав и данные.",
+            label: "Статус пакета",
+            title: "Готово к отправке",
+          };
+
+  return (
+    <div className="v19-submission-drawer-overview">
+      <section className={`v19-submission-drawer-next-action${needsCorrections ? " is-warning" : ""}`} aria-labelledby="drawer-next-action-title">
+        <div className="v19-submission-drawer-next-action-mark" aria-hidden="true"><ShieldAlert /></div>
+        <div>
+          <span>{nextStep.label}</span>
+          <h3 id="drawer-next-action-title">{nextStep.title}</h3>
+          <p>{nextStep.description}</p>
+        </div>
+        {nextStep.action ? (
+          <button className="v19-submission-drawer-next-action-cta" onClick={nextStep.action} type="button">
+            {nextStep.actionLabel}
+          </button>
+        ) : null}
+      </section>
     <div className="v19-submission-drawer-overview-grid">
       <section className="v19-submission-drawer-card v19-submission-drawer-overview-card" aria-labelledby="drawer-route-title">
         <h3 id="drawer-route-title">Маршрут и подача</h3>
@@ -189,13 +255,29 @@ const OverviewTab = ({ data }: { data: SubmissionDetail }) => (
       </section>
     </div>
 
-    <section className="v19-submission-drawer-summary" aria-label="Сводка по подаче">
-      <div><span>Заявителей</span><strong>{data.applicantsCount}</strong></div>
-      <div className="v19-submission-drawer-completeness"><span>Общая готовность</span><strong>{data.completeness}%</strong><i aria-hidden="true"><b style={{ width: `${data.completeness}%` }} /></i></div>
-      <div><span>Ответственный</span><strong>{data.owner}</strong></div>
+    <section className="v19-submission-drawer-participants" aria-labelledby="drawer-participants-title">
+      <div className="v19-submission-drawer-participants-head">
+        <h3 id="drawer-participants-title">Участники ({data.applicantsCount})</h3>
+        <span>Ответственный: <strong>{data.owner}</strong></span>
+      </div>
+      <div className="v19-submission-drawer-participant-grid">
+        {data.applicants.map((applicant) => (
+          <article className="v19-submission-drawer-participant" key={applicant.name}>
+            <span className="v19-submission-drawer-avatar" aria-hidden="true">
+              {applicant.name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('') || '—'}
+            </span>
+            <span className="v19-submission-drawer-participant-copy">
+              <strong>{applicant.name}</strong>
+              <small>{applicant.role}</small>
+            </span>
+            <span className="v19-submission-drawer-participant-progress">{applicant.completeness}%</span>
+          </article>
+        ))}
+      </div>
     </section>
   </div>
-);
+  );
+};
 
 const ApplicantsTab = ({ data }: { data: SubmissionDetail }) => (
   <section className="v19-submission-drawer-stack" aria-labelledby="drawer-applicants-title">
@@ -425,7 +507,7 @@ const IssuesTab = ({
 
 function detailFromCanonicalSubmission(submission: CanonicalSubmission): SubmissionDetail {
   return {
-    id: submission.id,
+    id: submissionPublicId(submission),
     title: submission.listTitle ?? submission.title,
     type: submission.type,
     applicantsCount: submission.applicants.length,
@@ -505,22 +587,27 @@ export function Drawer({
   const [data, setData] = useState<SubmissionDetail | null>(null);
   const [actionError, setActionError] = useState('');
   const [actionPending, setActionPending] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const actionPendingRef = useRef(false);
   const actionRequestIdRef = useRef(0);
   const drawerRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
-  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const isDesktop = useDrawerDesktopQuery();
+  const prefersReducedMotion = Boolean(useReducedMotion());
 
   useEffect(() => {
     if (!isOpen) return;
     previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const frame = window.requestAnimationFrame(() => drawerRef.current?.focus());
     return () => {
       window.cancelAnimationFrame(frame);
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
       if (previouslyFocusedRef.current?.isConnected) previouslyFocusedRef.current.focus();
     };
   }, [isOpen]);
@@ -534,22 +621,22 @@ export function Drawer({
       setActiveTab(initialTab);
       setActionError('');
       setActionPending(false);
+      setIsMoreMenuOpen(false);
       actionPendingRef.current = false;
 
-      const timer = setTimeout(() => {
-        if (submission) {
-          setData(detailFromCanonicalSubmission(submission));
-          setStatus('success');
-          return;
-        }
+      if (submission) {
+        setData(detailFromCanonicalSubmission(submission));
+        setStatus('success');
+        return;
+      }
 
-        if (!allowDemoFallback) {
-          setData(null);
-          setStatus('error');
-          return;
-        }
+      if (!allowDemoFallback) {
+        setData(null);
+        setStatus('error');
+        return;
+      }
 
-        setData({
+      setData({
           id: submissionId,
           title: submissionId === 'SUB-1042' || submissionId.startsWith('SUB-FAM') || submissionId.startsWith('FAM') || submissionId === 'SUB-1088' ? "Семья Петровых" : "Алина Смирнова",
           type: submissionId === 'SUB-1042' || submissionId.startsWith('SUB-FAM') || submissionId.startsWith('FAM') || submissionId === 'SUB-1088' ? 'family' : 'single',
@@ -573,16 +660,12 @@ export function Drawer({
           issues: [],
           history: [],
           isDemo: true,
-        });
-        setStatus('success');
-      }, submission ? 80 : 400);
-
-      return () => clearTimeout(timer);
+      });
+      setStatus('success');
     } else if (!isOpen) {
       actionRequestIdRef.current += 1;
       actionPendingRef.current = false;
-      const resetTimer = setTimeout(() => setStatus('idle'), 300);
-      return () => clearTimeout(resetTimer);
+      setStatus('idle');
     }
   }, [allowDemoFallback, initialTab, isOpen, submission, submissionId]);
 
@@ -594,14 +677,74 @@ export function Drawer({
     { id: 'issues', label: 'Замечания', getCount: (d) => d.issuesCount, isWarning: true, tone: 'issues' },
     { id: 'history', label: 'История', tone: 'history' }
   ];
+  const primaryTabs = tabs.filter((tab) => mobilePrimaryTabIds.includes(tab.id));
+  const additionalTabs = tabs.filter((tab) => !mobilePrimaryTabIds.includes(tab.id));
+  const activeTabDefinition = tabs.find((tab) => tab.id === activeTab);
+  const activeAdditionalTab = additionalTabs.find((tab) => tab.id === activeTab);
 
   useEffect(() => {
-    if (!isOpen) return;
-    document.getElementById(drawerTabId(activeTab))?.scrollIntoView({ block: 'nearest', inline: 'center' });
-  }, [activeTab, isOpen]);
+    if (!isOpen || status !== 'success') return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(drawerTabId(activeTab))?.scrollIntoView?.({
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, isOpen, status]);
+
+  useEffect(() => {
+    if (!isOpen || isDesktop) setIsMoreMenuOpen(false);
+  }, [isDesktop, isOpen]);
+
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (moreMenuRef.current?.contains(target) || moreMenuButtonRef.current?.contains(target)) return;
+      setIsMoreMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
+  }, [isMoreMenuOpen]);
+
+  const focusMoreMenuButton = () => {
+    window.requestAnimationFrame(() => moreMenuButtonRef.current?.focus());
+  };
+
+  const closeMoreMenu = (restoreFocus = false) => {
+    setIsMoreMenuOpen(false);
+    if (restoreFocus) focusMoreMenuButton();
+  };
+
+  const openMoreMenu = (moveFocus = false) => {
+    setIsMoreMenuOpen(true);
+    if (!moveFocus) return;
+    const firstTab = activeAdditionalTab ?? additionalTabs[0];
+    window.requestAnimationFrame(() => document.getElementById(drawerMobileTabId(firstTab.id))?.focus());
+  };
+
+  const selectMobileTab = (tabId: TabId, restoreMoreMenuFocus = false) => {
+    setActiveTab(tabId);
+    setIsMoreMenuOpen(false);
+    window.requestAnimationFrame(() => {
+      if (restoreMoreMenuFocus) {
+        moreMenuButtonRef.current?.focus();
+        return;
+      }
+      document.getElementById(drawerMobileTabId(tabId))?.focus();
+    });
+  };
 
   const handleDrawerKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
+      if (isMoreMenuOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeMoreMenu(true);
+        return;
+      }
       event.stopPropagation();
       onClose();
       return;
@@ -640,6 +783,38 @@ export function Drawer({
     window.requestAnimationFrame(() => document.getElementById(drawerTabId(nextTab))?.focus());
   };
 
+  const handleMobilePrimaryTabsKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const focusedIndex = primaryTabs.findIndex(
+      (tab) => drawerMobileTabId(tab.id) === document.activeElement?.id,
+    );
+    if (focusedIndex < 0) return;
+    let nextIndex = focusedIndex;
+    if (event.key === 'ArrowRight') nextIndex = (focusedIndex + 1) % primaryTabs.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (focusedIndex - 1 + primaryTabs.length) % primaryTabs.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = primaryTabs.length - 1;
+    else return;
+    event.preventDefault();
+    selectMobileTab(primaryTabs[nextIndex].id);
+  };
+
+  const handleAdditionalTabsKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const focusedIndex = additionalTabs.findIndex(
+      (tab) => drawerMobileTabId(tab.id) === document.activeElement?.id,
+    );
+    if (focusedIndex < 0) return;
+    let nextIndex = focusedIndex;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextIndex = (focusedIndex + 1) % additionalTabs.length;
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') nextIndex = (focusedIndex - 1 + additionalTabs.length) % additionalTabs.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = additionalTabs.length - 1;
+    else return;
+    event.preventDefault();
+    const nextTab = additionalTabs[nextIndex].id;
+    setActiveTab(nextTab);
+    window.requestAnimationFrame(() => document.getElementById(drawerMobileTabId(nextTab))?.focus());
+  };
+
   const handleAction = async (action: SubmissionAction) => {
     if (!submissionId || !submission || data?.isDemo || actionPendingRef.current) return;
     const payload = { submissionId, action, source: 'agent' as const };
@@ -660,10 +835,12 @@ export function Drawer({
         return;
       }
       emitVisaflowUiEvent(bridge, { type: 'submission.action', payload });
-    } catch {
+    } catch (error) {
       if (requestId !== actionRequestIdRef.current) return;
       setActionError(
-        'Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.',
+        error instanceof Error && error.message
+          ? error.message
+          : 'Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.',
       );
     } finally {
       if (requestId === actionRequestIdRef.current) {
@@ -757,7 +934,7 @@ export function Drawer({
         <>
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={prefersReducedMotion ? drawerMotion.reduced : drawerMotion.overlay}
           className="v19-submission-drawer-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
             onClick={onClose}
           />
@@ -769,13 +946,14 @@ export function Drawer({
             aria-modal="true"
             tabIndex={-1}
             onKeyDown={handleDrawerKeyDown}
-            initial={{ x: isDesktop ? '100%' : 0, y: isDesktop ? 0 : '100%', opacity: 0.5 }}
+            initial={drawerPanelInitial(isDesktop, prefersReducedMotion)}
             animate={{ x: 0, y: 0, opacity: 1 }}
-            exit={{ x: isDesktop ? '100%' : 0, y: isDesktop ? 0 : '100%', opacity: 0 }}
-            transition={{ type: "spring", damping: 28, stiffness: 240, mass: 0.8 }}
+            exit={drawerPanelExit(isDesktop, prefersReducedMotion)}
+            transition={drawerPanelTransition(prefersReducedMotion)}
             className="v19-submission-drawer fixed z-50 flex flex-col bg-[#111113] border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.6)]
               lg:inset-y-2 lg:right-2 lg:w-[840px] lg:rounded-2xl lg:border lg:overflow-hidden
               inset-x-0 bottom-0 top-12 rounded-t-[28px] border-t border-x overflow-y-auto"
+            data-v19-agent-drawer="fallback"
           >
             {/* Mobile Header Drag */}
             <div className="lg:hidden sticky top-0 z-30 w-full flex items-center justify-center py-3 bg-[#111113]/90 backdrop-blur-md">
@@ -805,18 +983,18 @@ export function Drawer({
             {status === 'success' && data && (
               <>
                 <header className="v19-submission-drawer-header px-5 lg:px-8 pt-4 pb-0 bg-[#111113]/95 backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-white/5">
-                  <div className="flex items-start justify-between gap-4 mb-6">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-[11px] lg:text-xs text-white/50 mb-2">
+                  <div className="v19-submission-drawer-titlebar flex items-start justify-between gap-4 mb-6">
+                    <div className="v19-submission-drawer-titlecopy min-w-0">
+                      <div className="v19-submission-drawer-identity flex items-center gap-2 text-[11px] lg:text-xs text-white/50 mb-2">
                         <span className="font-mono font-medium tracking-wider text-white/70">{data.id}</span>
                         <span className="w-1 h-1 rounded-full bg-white/20" />
                         <span className="uppercase tracking-wider">{data.type === 'family' ? 'Семейная' : 'Индивидуальная'}</span>
                         {data.isDemo ? <span aria-label="Демо-данные" className="v19-submission-drawer-demo-badge">Демо</span> : null}
                       </div>
-                      <h2 className="text-[24px] font-semibold text-white leading-tight tracking-tight mb-4">
+                      <h2 className="v19-submission-drawer-title text-[24px] font-semibold text-white leading-tight tracking-tight mb-4">
                         {data.title}
                       </h2>
-                      <div className="flex flex-wrap items-center gap-2.5">
+                      <div className="v19-submission-drawer-meta flex flex-wrap items-center gap-2.5">
                         <StatusBadge status={data.status} />
                         <span className="v19-submission-drawer-updated text-[12px] text-white/40 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Обновлено {data.updated}</span>
                       </div>
@@ -825,7 +1003,7 @@ export function Drawer({
                     <button 
                       aria-label="Закрыть подачу"
                       onClick={onClose}
-                      className="flex w-10 h-10 shrink-0 items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10"
+                      className="v19-submission-drawer-close flex w-10 h-10 shrink-0 items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10"
                       type="button"
                     >
                       <X className="w-5 h-5" />
@@ -833,8 +1011,110 @@ export function Drawer({
                   </div>
 
                   {/* Tabs */}
-                  <div className="v19-submission-drawer-tabs-scroll w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
-                    <div aria-label="Разделы подачи" className="v19-submission-drawer-tabs flex items-center gap-1.5 w-max mb-[-1px]" onKeyDown={handleTabsKeyDown} role="tablist">
+                  <div className="v19-submission-drawer-tabs-scroll w-full -mx-5 px-5 lg:mx-0 lg:px-0">
+                    <div className="v19-submission-drawer-mobile-tabs grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 pb-1 lg:hidden">
+                      <div aria-label="Основные разделы подачи" className="grid min-w-0 grid-cols-3 items-center gap-1" onKeyDown={handleMobilePrimaryTabsKeyDown} role="tablist">
+                        {primaryTabs.map((tab) => {
+                          const count = tab.getCount ? tab.getCount(data) : 0;
+                          const isActive = activeTab === tab.id;
+                          return (
+                            <button
+                              aria-controls={drawerPanelId(tab.id)}
+                              aria-selected={isActive}
+                              data-testid={`submission-drawer-mobile-tab-${tab.id}`}
+                              id={drawerMobileTabId(tab.id)}
+                              key={tab.id}
+                              onClick={() => selectMobileTab(tab.id)}
+                              role="tab"
+                              tabIndex={isActive ? 0 : -1}
+                              type="button"
+                              className={`v19-submission-drawer-tab v19-submission-drawer-mobile-tab is-${tab.tone} ${isActive ? 'is-active' : ''}`}
+                            >
+                              <span>{tab.label}</span>
+                              {count > 0 && (
+                                <span className={`v19-submission-drawer-tab-count ${tab.isWarning ? 'is-warning' : ''} shrink-0 rounded-md px-1.5 py-0.5 text-[10px] leading-none`}>
+                                  {count}
+                                </span>
+                              )}
+                              {isActive && (
+                                <motion.div
+                                  layoutId="drawerAgentMobileActiveTab"
+                                  className="v19-submission-drawer-tab-indicator absolute bottom-0 inset-x-0 h-0.5 bg-white"
+                                  initial={false}
+                                  transition={drawerMotion.tabIndicator}
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="relative">
+                        <button
+                          aria-controls="submission-drawer-mobile-more-tabs"
+                          aria-expanded={isMoreMenuOpen}
+                          aria-label={activeAdditionalTab
+                            ? `Дополнительные разделы подачи. Выбран раздел: ${activeAdditionalTab.label}`
+                            : 'Открыть дополнительные разделы подачи'}
+                          className={`v19-submission-drawer-mobile-more ${activeAdditionalTab ? 'is-active' : ''}`}
+                          data-active-tab={activeAdditionalTab?.id}
+                          data-testid="submission-drawer-mobile-more"
+                          onClick={() => {
+                            if (isMoreMenuOpen) closeMoreMenu();
+                            else openMoreMenu();
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'ArrowDown' && event.key !== 'Enter' && event.key !== ' ') return;
+                            event.preventDefault();
+                            openMoreMenu(true);
+                          }}
+                          ref={moreMenuButtonRef}
+                          type="button"
+                        >
+                          Ещё <ChevronDown aria-hidden="true" className={`h-3.5 w-3.5 transition-transform ${isMoreMenuOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isMoreMenuOpen && (
+                          <div
+                            aria-label="Дополнительные разделы подачи"
+                            className="v19-submission-drawer-mobile-more-menu"
+                            data-testid="submission-drawer-mobile-more-menu"
+                            id="submission-drawer-mobile-more-tabs"
+                            onKeyDown={handleAdditionalTabsKeyDown}
+                            ref={moreMenuRef}
+                            role="tablist"
+                          >
+                            {additionalTabs.map((tab) => {
+                              const count = tab.getCount ? tab.getCount(data) : 0;
+                              const isActive = activeTab === tab.id;
+                              return (
+                                <button
+                                  aria-controls={drawerPanelId(tab.id)}
+                                  aria-selected={isActive}
+                                  data-testid={`submission-drawer-mobile-tab-${tab.id}`}
+                                  id={drawerMobileTabId(tab.id)}
+                                  key={tab.id}
+                                  onClick={() => selectMobileTab(tab.id, true)}
+                                  role="tab"
+                                  tabIndex={isActive ? 0 : -1}
+                                  type="button"
+                                  className={`v19-submission-drawer-tab v19-submission-drawer-mobile-more-tab is-${tab.tone} ${isActive ? 'is-active' : ''}`}
+                                >
+                                  <span>{tab.label}</span>
+                                  {count > 0 && (
+                                    <span className={`v19-submission-drawer-tab-count ${tab.isWarning ? 'is-warning' : ''} shrink-0 rounded-md px-1.5 py-0.5 text-[10px] leading-none`}>
+                                      {count}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div aria-label="Разделы подачи" className="v19-submission-drawer-tabs hidden w-max items-center gap-1.5 mb-[-1px] lg:flex" onKeyDown={handleTabsKeyDown} role="tablist">
                       {tabs.map(tab => {
                         const count = tab.getCount ? tab.getCount(data) : 0;
                         const isActive = activeTab === tab.id;
@@ -863,7 +1143,7 @@ export function Drawer({
                                 layoutId="drawerAgentActiveTab"
                                 className="v19-submission-drawer-tab-indicator absolute bottom-0 inset-x-0 h-0.5 bg-white"
                                 initial={false}
-                                transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                                transition={drawerMotion.tabIndicator}
                               />
                             )}
                           </button>
@@ -876,17 +1156,24 @@ export function Drawer({
                   <div className={`v19-submission-drawer-body is-${activeTab} lg:flex-1 lg:overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10`}>
                   <AnimatePresence mode="wait">
                     <motion.div
-                      aria-label={tabs.find((tab) => tab.id === activeTab)?.label}
-                      aria-labelledby={drawerTabId(activeTab)}
+                      aria-labelledby={drawerPanelLabelId(activeTab)}
                       id={drawerPanelId(activeTab)}
                       key={activeTab}
                       role="tabpanel"
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={drawerTabInitial(prefersReducedMotion)}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.2 }}
+                      exit={drawerTabExit(prefersReducedMotion)}
+                      transition={prefersReducedMotion ? drawerMotion.reduced : drawerMotion.tab}
                     >
-                      {activeTab === 'overview' && <OverviewTab data={data} />}
+                      <span className="sr-only" id={drawerPanelLabelId(activeTab)}>{activeTabDefinition?.label}</span>
+                      {activeTab === 'overview' && (
+                        <OverviewTab
+                          data={data}
+                          onOpenDocuments={onOpenDocuments}
+                          onOpenIssues={() => setActiveTab('issues')}
+                          onOpenQuestionnaire={onOpenQuestionnaire}
+                        />
+                      )}
                       {activeTab === 'applicants' && <ApplicantsTab data={data} />}
                       {activeTab === 'questionnaire' && <QuestionnaireTab data={data} onOpenQuestionnaire={onOpenQuestionnaire} />}
                       {activeTab === 'files' && <FilesTab data={data} onOpenDocuments={onOpenDocuments} />}
@@ -915,7 +1202,7 @@ export function Drawer({
                         ? 'Исправьте замечания перед повторной отправкой.'
                         : 'Проверьте все данные перед отправкой администратору.')}
                   </div>
-                  <div className="flex gap-3 w-full sm:w-auto">
+                  <div className="v19-submission-drawer-footer-actions flex gap-3 w-full sm:w-auto">
                     <button onClick={onClose} className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors">
                       Отмена
                     </button>

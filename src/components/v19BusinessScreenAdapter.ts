@@ -1,11 +1,13 @@
 import type { AgentNavSection } from '../integration/visaflowBusinessBridge';
 import type { Issue, Submission, SubmissionAction, SubmissionFile, SubmissionStatus } from '../modules/submissions/types';
 import { canPerformAction, fixedIssueCount, nextProblem, openIssueCount, statusLabelFor } from '../modules/submissions/status';
+import { submissionPublicId } from '../modules/submissions/submissionIdentity';
 
 export type LegacyAgentNavSection = AgentNavSection | 'applicants' | 'files' | 'media' | 'issues';
 
 export type LegacySubmissionListItem = {
   id: string;
+  publicId?: string;
   title: string;
   type: 'single' | 'family';
   applicantsCount: number;
@@ -88,28 +90,21 @@ export function tripDatesForSubmission(submission: Pick<Submission, 'tripDateFro
   return from === to ? from : `${from}–${to}`;
 }
 
-export function compactTripDateForSubmission(
+export function tripDateRangeForSubmission(
   submission: Pick<Submission, 'tripDateFrom' | 'tripDateTo'>,
 ): string | undefined {
   const from = submission.tripDateFrom?.trim() ?? '';
   const to = submission.tripDateTo?.trim() ?? '';
-  const isMissing = (value: string) => !value || /не указано/i.test(value);
+  const isMissing = (value: string) => !value || /не указан[ао]?/i.test(value);
+  const compact = (value: string) => {
+    const match = value.match(/^(\d{2})\.(\d{2})\.(?:\d{4})$/);
+    return match ? `${match[1]}.${match[2]}` : value;
+  };
 
   if (isMissing(from) && isMissing(to)) return undefined;
-  const date = isMissing(from) ? to : from;
-  const match = date.match(/^(\d{2})\.(\d{2})\.(?:\d{4})$/);
-  return match ? `${match[1]}.${match[2]}` : date;
-}
-
-export function fullTripDateForSubmission(
-  submission: Pick<Submission, 'tripDateFrom' | 'tripDateTo'>,
-): string {
-  const from = submission.tripDateFrom?.trim() ?? '';
-  const to = submission.tripDateTo?.trim() ?? '';
-  const isMissing = (value: string) => !value || /не указано/i.test(value);
-
-  if (isMissing(from) && isMissing(to)) return 'Дата не указана';
-  return isMissing(from) ? to : from;
+  if (isMissing(from)) return compact(to);
+  if (isMissing(to) || from === to) return compact(from);
+  return `${compact(from)}–${compact(to)}`;
 }
 
 export function updatedLabel(iso?: string) {
@@ -122,6 +117,7 @@ export function updatedLabel(iso?: string) {
 export function listItemFromSubmission(submission: Submission): LegacySubmissionListItem {
   return {
     id: submission.id,
+    publicId: submissionPublicId(submission),
     title: submission.listTitle ?? submission.title,
     type: submission.type,
     applicantsCount: submission.applicants.length,

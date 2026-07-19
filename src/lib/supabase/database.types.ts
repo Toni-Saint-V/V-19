@@ -255,6 +255,7 @@ export type AccessRequestInsert = Omit<
 
 export interface SubmissionRow extends DbRecord {
   id: string;
+  public_number: number | null;
   agent_id: string;
   type: "single" | "family";
   title: string;
@@ -279,6 +280,7 @@ export interface SubmissionRow extends DbRecord {
 export type SubmissionInsert = Omit<
   SubmissionRow,
   | "created_at"
+  | "public_number"
   | "submitted_at"
   | "review_started_at"
   | "accepted_at"

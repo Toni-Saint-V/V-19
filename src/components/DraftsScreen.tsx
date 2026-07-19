@@ -26,7 +26,7 @@ import {
   safeUnavailablePassportExtractionResult,
   type PassportExtractionResult,
 } from '../modules/submissions/passportExtractionContract';
-import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
+import { V19MetricCard, V19MetricStrip } from '../shared/ui/v19-design-system';
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
 import {
   canonicalCollectionDocTypes,
@@ -44,6 +44,11 @@ interface DraftsScreenProps {
   onOpenDrawer: (id: string) => void;
   onOpenIssue: (target: DocumentIssueTarget) => void;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
+  onUploadFile?: (
+    submissionId: string,
+    fileId: string,
+    file: File,
+  ) => Submission | Promise<Submission>;
   submissions?: Submission[];
 }
 
@@ -122,6 +127,18 @@ function applicantRoleLabel(applicant: Submission['applicants'][number]) {
   return 'Заявитель';
 }
 
+function applicantDisplayName(applicant: Submission['applicants'][number]) {
+  const identityFields = new Map(
+    applicant.sections.flatMap((section) =>
+      section.fields.map((field) => [field.id, field.value.trim()] as const),
+    ),
+  );
+  const nameFromFields = [identityFields.get('first-name'), identityFields.get('surname')]
+    .filter(Boolean)
+    .join(' ');
+  return nameFromFields || applicant.fullName;
+}
+
 function docStatusClass(status: DocStatus) {
   if (status === 'verified') return 'bg-white/[0.045] border-white/10 text-[#b8baff]';
   if (status === 'processing') return 'bg-white/[0.045] border-white/10 text-[#b8baff]';
@@ -172,7 +189,7 @@ function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
       docs: applicantDocs(submission, applicant),
       id: applicant.id,
       isPrimary: applicant.role === 'main',
-      name: applicant.fullName,
+      name: applicantDisplayName(applicant),
       passportNumber: normalizeCollectionPassportNumber(passportNumberFromApplicant(applicant)),
       role: applicantRoleLabel(applicant),
     }));
@@ -446,6 +463,7 @@ export function DraftsScreen({
   onOpenDrawer,
   onOpenIssue,
   onSubmissionsChange,
+  onUploadFile,
   submissions = [],
 }: DraftsScreenProps) {
   const [unmatchedUploads, setUnmatchedUploads] = useState<UnmatchedUpload[]>([]);
@@ -509,6 +527,32 @@ export function DraftsScreen({
     target: PendingCellTarget,
     file: File,
   ) => {
+    const submission = submissions.find(
+      (candidate) => candidate.id === target.submissionId,
+    );
+    const targetFile = submission && findFreeCanonicalTarget(
+      submission,
+      target.applicantId,
+      target.docType,
+    );
+    if (!submission || !targetFile || !targetRequiresDocType(submissions, target)) {
+      return false;
+    }
+
+    if (onUploadFile) {
+      const uploadedSubmission = await onUploadFile(submission.id, targetFile.id, file);
+      if (target.docType !== 'passport') return true;
+
+      const extractedSubmissions = await attachPassportExtractionForUpload(
+        [uploadedSubmission],
+        target,
+        file,
+      );
+      const extractedSubmission = extractedSubmissions[0];
+      if (!extractedSubmission || extractedSubmission === uploadedSubmission) return true;
+      return commitSubmissions([extractedSubmission]);
+    }
+
     if (targetRequiresDocType(submissions, target)) {
       const result = applyCanonicalUpload(submissions, target, file);
       if (result.applied) {
@@ -718,8 +762,8 @@ export function DraftsScreen({
         onChange={handleBulkFileInput}
       />
 
-      <V19SummaryTileGrid className="v19-documents-summary-grid v19-admin-review-metrics grid-cols-3">
-        <V19SummaryTile
+      <V19MetricStrip>
+        <V19MetricCard
           active={draftSummaryFilter === 'missing'}
           detail={`ожидают · ${summary.submissions}`}
           icon={UploadCloud}
@@ -728,7 +772,7 @@ export function DraftsScreen({
           value={summary.missing}
           onClick={() => setDraftSummaryFilter('missing')}
         />
-        <V19SummaryTile
+        <V19MetricCard
           active={draftSummaryFilter === 'processing'}
           detail="OCR"
           icon={ScanLine}
@@ -737,16 +781,16 @@ export function DraftsScreen({
           value={summary.processing}
           onClick={() => setDraftSummaryFilter('processing')}
         />
-        <V19SummaryTile
+        <V19MetricCard
           active={draftSummaryFilter === 'error'}
           detail="ревью"
           icon={FileWarning}
           label="Ошибки"
-          tone="danger"
+          tone="red"
           value={summary.error}
           onClick={() => setDraftSummaryFilter('error')}
         />
-      </V19SummaryTileGrid>
+      </V19MetricStrip>
 
       <div
         className="v19-documents-board flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]"
@@ -754,9 +798,9 @@ export function DraftsScreen({
       >
         <div className="v19-documents-board-header flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
           <div className="v19-documents-board-heading">
-            <h2>Документы заявителей</h2>
+            <h2>Загрузка документов</h2>
             <p className="mt-1 text-[11px] text-white/50 sm:text-[12px]">
-              Скан загранпаспорта — для каждого. Два селфи — только для заявителя подачи.
+              Загрузите сканы загранпаспортов для всех заявителей и два селфи заявителя.
             </p>
           </div>
           <button
@@ -821,7 +865,7 @@ export function DraftsScreen({
                               </div>
                               <div className="min-w-0">
                                 <div
-                                  className="v19-document-applicant-name truncate"
+                                  className="v19-document-applicant-name"
                                   data-testid="document-applicant-name"
                                 >
                                   {app.name}
@@ -920,7 +964,7 @@ export function DraftsScreen({
                           </div>
                           <div className="min-w-0">
                             <div
-                              className="v19-document-applicant-name truncate"
+                              className="v19-document-applicant-name"
                               data-testid="document-applicant-name"
                             >
                               {app.name}

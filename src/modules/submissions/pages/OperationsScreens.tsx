@@ -63,6 +63,7 @@ import {
 } from "../exportRules";
 import { agentOwnerDisplayName } from "../ownership";
 import { formatSubmissionListTitle } from "../listFormatters";
+import { submissionPublicId } from "../submissionIdentity";
 import {
   adminTriageRadarItem,
   buildAdminTriageRadar,
@@ -956,7 +957,7 @@ export function AgentSubmissionsScreen({
         <V19FamilyProfileCard
           ariaLabel={`Открыть семейную подачу: ${formatApplicantProfileTitle(
             submission,
-          )}, ${safeSubmissionId(submission.id)}`}
+          )}, ${submissionPublicId(submission)}`}
           dataSubmissionId={submission.id}
           footerLabel={footerLabel}
           key={submission.id}
@@ -981,7 +982,7 @@ export function AgentSubmissionsScreen({
       <V19IndividualProfileCard
         ariaLabel={`Открыть заявителя: ${
           applicant?.fullName ?? formatSubmissionListTitle(submission)
-        }, ${safeSubmissionId(submission.id)}`}
+        }, ${submissionPublicId(submission)}`}
         dataSubmissionId={submission.id}
         footerLabel={footerLabel}
         initials={applicantInitials(applicant?.fullName ?? submission.title)}
@@ -1567,10 +1568,6 @@ function canonicalMediaTypeLabel(type: CanonicalMediaType) {
   return "Селфи 2";
 }
 
-function safeSubmissionId(id: string) {
-  return id.trim() || "ID не указан";
-}
-
 function safeSubmissionCity(city: string) {
   return city.trim() || "Город не указан";
 }
@@ -1857,7 +1854,7 @@ function AdminReviewQueueCard({
       <div className="v19-admin-cockpit-card-head">
         <div className="v19-admin-cockpit-card-title">
           <span>
-            <strong className="mono">{submission.id}</strong>
+            <strong className="mono">{submissionPublicId(submission)}</strong>
             <i className="v19-admin-cockpit-card-date-dot" aria-hidden="true" />
             <strong>{submission.city}</strong>
             <i aria-hidden="true" />
@@ -1980,7 +1977,7 @@ function AdminReviewCockpitRail({
             watchlist.map(({ submission, triage }) => (
               <article key={submission.id} className={`tone-${triage.band}`}>
                 <strong>
-                  {submission.id} · {formatSubmissionListTitle(submission)}
+                  {submissionPublicId(submission)} · {formatSubmissionListTitle(submission)}
                 </strong>
                 <p>{triage.reasons[0] ?? nextProblem(submission)}</p>
               </article>
@@ -3015,7 +3012,7 @@ export function LegacyExportScreen({
                               }}
                             >
                               <span className="cell-title">{submission.title}</span>
-                              <span className="subtle mono">{submission.id}</span>
+                              <span className="subtle mono">{submissionPublicId(submission)}</span>
                               <span className="export-row-note">
                                 Ответственный: администратор · Дальше: сформировать Excel
                               </span>
@@ -3091,7 +3088,7 @@ export function LegacyExportScreen({
                               }}
                             >
                               <span className="cell-title">{submission.title}</span>
-                              <span className="subtle mono">{submission.id}</span>
+                              <span className="subtle mono">{submissionPublicId(submission)}</span>
                               <span className="export-row-note" id={reasonId}>
                                 Причина: {blockedReason}
                               </span>
@@ -3179,7 +3176,7 @@ export function LegacyExportScreen({
                               onClick={() => onOpen(submission, "files")}
                             >
                               <span className="cell-title">{submission.title}</span>
-                              <span className="subtle mono">{submission.id}</span>
+                              <span className="subtle mono">{submissionPublicId(submission)}</span>
                             </button>
                           </td>
                           <td>{submission.city}</td>
@@ -4107,7 +4104,7 @@ function AdminExportRow({
       </button>
 
       <button
-        aria-label={`${submission.title}${submission.id}`}
+        aria-label={`${submission.title} ${submissionPublicId(submission)}`}
         className="v19-admin-export-row-main"
         type="button"
         onClick={onOpen}
@@ -4121,7 +4118,7 @@ function AdminExportRow({
             )}
           </span>
           <strong>{submission.title}</strong>
-          <small>{submission.id}</small>
+          <small>{submissionPublicId(submission)}</small>
         </span>
         <span className="v19-admin-export-row-meta">
           <FileText aria-hidden="true" focusable="false" size={14} />
@@ -4210,7 +4207,7 @@ function AdminExportCompositionItem({
       </span>
       <strong>{submission.title}</strong>
       <small>
-        {submission.id} · {submission.applicants.length} чел.
+        {submissionPublicId(submission)} · {submission.applicants.length} чел.
       </small>
       <ChevronRight aria-hidden="true" focusable="false" size={16} />
     </button>
