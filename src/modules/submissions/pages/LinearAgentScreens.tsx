@@ -10,6 +10,7 @@ import {
 import { Button } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
 import { formatSubmissionListTitle } from "../listFormatters";
+import { submissionPublicId } from "../submissionIdentity";
 import { applicantCountLabel, tripDates } from "../selectors";
 import {
   blockerCount,
@@ -221,7 +222,7 @@ export function AgentDocumentCollectionScreen({
                     {submission.type === "family" ? <Users size={16} /> : <User size={16} />}
                   </span>
                   <div>
-                    <small>{submission.id}</small>
+                    <small>{submissionPublicId(submission)}</small>
                     <h3>{formatSubmissionListTitle(submission)}</h3>
                   </div>
                 </div>

@@ -190,7 +190,7 @@ const questionnaireBlueprint: Array<{
     stepLabel: "5 из 7",
     fields: [
       { id: "surname", label: "Фамилия", placeholder: "Например, VOLKOV" },
-      { id: "previous-surname", label: "Фамилия при рождении / предыдущая", placeholder: "Например, PETROVA", required: false },
+      { id: "previous-surname", label: "Фамилия при рождении / предыдущие фамилии", placeholder: "Например, PETROVA или НЕТ", required: false },
       { id: "first-name", label: "Имя", placeholder: "Например, ANTON" },
       { id: "birth-date", label: "Дата рождения", placeholder: "ДД.ММ.ГГГГ" },
       { id: "birth-place", label: "Место рождения", placeholder: "Например, MOSCOW" },
@@ -254,7 +254,7 @@ function parseQuestionnaireDateValue(value: string) {
   return date;
 }
 
-function questionnaireFieldLooksLikeDate(
+export function isQuestionnaireDateField(
   field: Pick<QuestionnaireField, "id" | "label">,
 ) {
   const label = field.label.toLocaleLowerCase("ru-RU");
@@ -295,7 +295,7 @@ export function validateQuestionnaireFieldValue(
       : "Проверьте номер телефона";
   }
 
-  if (questionnaireFieldLooksLikeDate(field)) {
+  if (isQuestionnaireDateField(field)) {
     return parseQuestionnaireDateValue(trimmed)
       ? undefined
       : "Дата должна быть в формате ДД.ММ.ГГГГ";
@@ -321,6 +321,63 @@ export type QuestionnaireFieldUpdate = {
   reviewSource?: QuestionnaireReviewSource;
   reviewState?: QuestionnaireReviewState;
 };
+
+const familyAppointmentFieldIds = new Set([
+  "appointment-city",
+  "desired-date-1",
+  "desired-date-2",
+]);
+
+export function familyAppointmentUpdatesForPrimary(
+  submission: Submission,
+  sourceApplicantId: string,
+  sourceUpdate: QuestionnaireFieldUpdate,
+): QuestionnaireFieldUpdate[] {
+  const primaryApplicant = submission.applicants[0];
+  if (
+    submission.type !== "family" ||
+    !primaryApplicant ||
+    primaryApplicant.id !== sourceApplicantId ||
+    !familyAppointmentFieldIds.has(sourceUpdate.fieldId)
+  ) {
+    return [];
+  }
+
+  return submission.applicants.slice(1).flatMap((applicant) => {
+    const targetSection = applicant.sections.find(
+      (section) =>
+        section.id === sourceUpdate.sectionId ||
+        section.id.endsWith(`-${sourceUpdate.sectionId}`),
+    );
+    const targetField = targetSection?.fields.find(
+      (field) => field.id === sourceUpdate.fieldId,
+    );
+    if (!targetField) return [];
+
+    const wasFamilyShared =
+      targetField.reviewSource === "family_shared" ||
+      targetField.reviewOriginSource === "family_shared";
+    const isDefaultAppointmentCity =
+      sourceUpdate.fieldId === "appointment-city" &&
+      targetField.value === submission.city;
+    if (targetField.value.trim() && !wasFamilyShared && !isDefaultAppointmentCity) {
+      return [];
+    }
+
+    return [
+      {
+        applicantId: applicant.id,
+        error: validateQuestionnaireFieldValue(targetField, sourceUpdate.value),
+        fieldId: sourceUpdate.fieldId,
+        reviewOriginSource: "family_shared",
+        reviewSource: "family_shared",
+        reviewState: "confirmed",
+        sectionId: sourceUpdate.sectionId,
+        value: sourceUpdate.value,
+      },
+    ];
+  });
+}
 
 export function questionnaireSectionPreviews(): QuestionnaireSectionPreview[] {
   return questionnaireBlueprint.map((section) => ({
@@ -358,9 +415,14 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
     ...submission,
     applicants: submission.applicants.map((applicant) => {
       const sections = normalizeApplicantSections(applicant);
-      const birthCountry = sections
-        .flatMap((section) => section.fields)
+      const fields = sections.flatMap((section) => section.fields);
+      const birthCountry = fields
         .find((field) => field.id === "birth-country")?.value.trim();
+      const passportIssueCountry = fields
+        .find((field) => field.id === "passport-issue-country")?.value.trim();
+      const passportIssueCountryField = fields.find(
+        (field) => field.id === "passport-issue-country",
+      );
 
       return {
         ...applicant,
@@ -373,7 +435,19 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
             if (field.id === "visa-type") return { ...field, value: "Шенгенская" };
             if (field.id === "category") return { ...field, value: "Normal" };
             if (field.id === "nationality") {
-              return { ...field, value: "Russian Federation" };
+              return {
+                ...field,
+                error: undefined,
+                reviewOriginSource:
+                  field.reviewOriginSource ??
+                  field.reviewSource ??
+                  passportIssueCountryField?.reviewOriginSource ??
+                  passportIssueCountryField?.reviewSource,
+                reviewSource:
+                  passportIssueCountryField?.reviewSource ?? field.reviewSource,
+                reviewState: "confirmed",
+                value: passportIssueCountry || field.value || "Russian Federation",
+              };
             }
             if (field.id === "birth-citizenship") {
               return {
@@ -735,12 +809,17 @@ function mergeSeedField(
 
   if (!existing) return seeded;
 
+  const obsoleteRequiredError =
+    !seeded.required &&
+    !existing.value.trim() &&
+    existing.error === "Обязательное поле";
+
   return {
     ...seeded,
     adminReviewApprovedAtIso: existing.adminReviewApprovedAtIso,
     adminReviewApprovedBy: existing.adminReviewApprovedBy,
     value: existing.value,
-    error: existing.error,
+    error: obsoleteRequiredError ? undefined : existing.error,
     reviewConfirmedAtIso: existing.reviewConfirmedAtIso,
     reviewConfirmedBy: existing.reviewConfirmedBy,
     reviewOriginSource: existing.reviewOriginSource,

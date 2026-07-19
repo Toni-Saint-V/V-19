@@ -1,4 +1,5 @@
 import type { DrawerTab, Issue, Submission, SubmissionHistoryItem } from "../types";
+import { submissionPublicId } from "../submissionIdentity";
 import { Button } from "../../../shared/ui/primitives";
 import { ContextRail, SvgIcon } from "./CollectionPrimitives";
 import {
@@ -70,7 +71,7 @@ export function AgentSubmissionContextRail({
           <p>Подача</p>
           <h3>{submission.title}</h3>
           <span>
-            {statusLabel} · {submission.id.trim() || "ID не указан"}
+            {statusLabel} · {submissionPublicId(submission)}
           </span>
           <span>Ответственный: {ownerLabel}</span>
         </section>

@@ -1,5 +1,6 @@
 import { Command } from "cmdk";
 import { FileText, ListTodo, Plus, Search, Settings, UserRound } from "lucide-react";
+import { submissionPublicId } from "../submissionIdentity";
 import type { Submission } from "../types";
 
 type CommandPaletteProps = {
@@ -129,7 +130,7 @@ export function CommandPalette({
                   <UserRound aria-hidden="true" focusable="false" size={16} />
                   <span>{submission.title}</span>
                   <em>
-                    {submission.id} · {meta}
+                    {submissionPublicId(submission)} · {meta}
                   </em>
                 </Command.Item>
               );

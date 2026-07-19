@@ -437,6 +437,7 @@ export type Submission = {
   id: string;
   publicNumber?: number;
   agentId: AgentOwnerId;
+  agentDisplayName?: string;
   title: string;
   listTitle?: string;
   type: SubmissionType;

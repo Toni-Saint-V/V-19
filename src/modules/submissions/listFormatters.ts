@@ -37,16 +37,92 @@ export function formatSubmissionListTitle(submission: Submission) {
   return submission.listTitle?.trim() || submission.title;
 }
 
-export function familyListTitleFromMainApplicantName(applicantName?: string) {
-  const surname = applicantName?.trim().split(/\s+/)[0];
-  if (!surname || surname === "Основной" || surname === "Новый") return undefined;
+function transliterateRussianSurname(value: string) {
+  const pairs: Array<[RegExp, string]> = [
+    [/shch/gi, "щ"],
+    [/yo/gi, "ё"],
+    [/zh/gi, "ж"],
+    [/kh/gi, "х"],
+    [/ts/gi, "ц"],
+    [/ch/gi, "ч"],
+    [/sh/gi, "ш"],
+    [/yu/gi, "ю"],
+    [/ya/gi, "я"],
+    [/ye/gi, "е"],
+  ];
+  const letters: Record<string, string> = {
+    a: "а", b: "б", c: "к", d: "д", e: "е", f: "ф", g: "г", h: "х",
+    i: "и", j: "й", k: "к", l: "л", m: "м", n: "н", o: "о", p: "п",
+    q: "к", r: "р", s: "с", t: "т", u: "у", v: "в", w: "в", x: "кс",
+    y: "ы", z: "з",
+  };
 
-  if (surname.endsWith("ова") || surname.endsWith("ева") || surname.endsWith("ина")) {
+  const transliterated = pairs.reduce(
+    (result, [pattern, replacement]) => result.replace(pattern, replacement),
+    value,
+  ).replace(/[a-z]/gi, (letter) => letters[letter.toLowerCase()] ?? letter);
+
+  return `${transliterated.charAt(0).toLocaleUpperCase("ru-RU")}${transliterated
+    .slice(1)
+    .toLocaleLowerCase("ru-RU")}`;
+}
+
+function mainApplicantSurname(applicantName?: string) {
+  const tokens = applicantName?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (!tokens.length) return undefined;
+
+  const surnamePattern = /(?:ов|ова|ев|ева|ин|ина|ын|ына|ский|ская|цкий|цкая|ov|ova|ev|eva|in|ina|yn|yna|sky|skiy|skaya|tsky|tskiy|tskaya)$/i;
+  const candidate = tokens.find((token) => surnamePattern.test(token)) ?? tokens[0];
+  if (/^(основной|новый)$/i.test(candidate)) return undefined;
+
+  return /[a-z]/i.test(candidate)
+    ? transliterateRussianSurname(candidate)
+    : `${candidate.charAt(0).toLocaleUpperCase("ru-RU")}${candidate
+        .slice(1)
+        .toLocaleLowerCase("ru-RU")}`;
+}
+
+export function familyListTitleFromMainApplicantName(applicantName?: string) {
+  const surname = mainApplicantSurname(applicantName);
+  if (!surname) return undefined;
+
+  if (/я$/i.test(surname) && /(?:ская|цкая)$/i.test(surname)) {
+    return `${surname.slice(0, -2)}ие`;
+  }
+
+  if (/(?:ский|цкий)$/i.test(surname)) {
+    return `${surname.slice(0, -2)}ие`;
+  }
+
+  if (/(?:ова|ева|ина|ына)$/i.test(surname)) {
     return `${surname.slice(0, -1)}ы`;
   }
 
-  if (surname.endsWith("ов") || surname.endsWith("ев") || surname.endsWith("ин")) {
+  if (/(?:ов|ев|ин|ын)$/i.test(surname)) {
     return `${surname}ы`;
+  }
+
+  return undefined;
+}
+
+export function familyDisplayTitleFromMainApplicantName(applicantName?: string) {
+  const surname = mainApplicantSurname(applicantName);
+  if (!surname) return undefined;
+
+  if (/(?:ская|цкая)$/i.test(surname)) {
+    return `Семья ${surname.slice(0, -2)}их`;
+  }
+
+  if (/(?:ский|цкий)$/i.test(surname)) {
+    return `Семья ${surname.slice(0, -2)}их`;
+  }
+
+  if (/(?:ова|ева|ина|ына)$/i.test(surname)) {
+    return `Семья ${surname.slice(0, -1)}ых`;
+  }
+
+  if (/(?:ов|ев|ин|ын)$/i.test(surname)) {
+    return `Семья ${surname}ых`;
   }
 
   return undefined;

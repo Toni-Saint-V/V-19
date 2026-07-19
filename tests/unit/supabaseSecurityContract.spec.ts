@@ -1609,4 +1609,33 @@ describe("Supabase security contract", () => {
       "20260717050000_admin_passport_review_media_policy.sql",
     );
   });
+
+  test("assigns immutable global submission numbers on the database", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260718190000_global_submission_public_numbers.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+
+    expectSqlStatement(
+      migration,
+      "create sequence if not exists public.submission_public_number_seq as bigint minvalue 1 maxvalue 9999 start with 1001 no cycle",
+    );
+    expectSqlStatement(
+      migration,
+      "create unique index submissions_public_number_uidx on public.submissions (public_number)",
+    );
+    expect(migration).toContain("Submission public number is immutable");
+    expect(migration).toContain(
+      "nextval('public.submission_public_number_seq')",
+    );
+    expectSqlStatement(
+      migration,
+      "revoke all on function app_private.assign_submission_public_number() from public",
+    );
+    expect(migrationContract).toContain(
+      "20260718190000_global_submission_public_numbers.sql",
+    );
+  });
 });

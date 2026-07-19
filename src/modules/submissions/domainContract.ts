@@ -298,6 +298,26 @@ export type MediaReadinessSubmission = {
   files: MediaReadinessFile[];
 };
 
+export function canonicalRequiredMediaTypesForApplicant(
+  submission: Pick<MediaReadinessSubmission, "applicants">,
+  applicantId: string,
+): readonly CanonicalFrontendMediaType[] {
+  const applicantIndex = submission.applicants.findIndex(
+    (applicant) => applicant.id === applicantId,
+  );
+  if (applicantIndex < 0) return [];
+
+  const applicant = submission.applicants[applicantIndex];
+  const isPrimaryApplicant =
+    applicant.role === "main" ||
+    (!submission.applicants.some((candidate) => candidate.role === "main") &&
+      applicantIndex === 0);
+
+  return isPrimaryApplicant
+    ? CANONICAL_FRONTEND_MEDIA_TYPES
+    : (["passport_scan"] as const);
+}
+
 export function canonicalRequiredMediaReadiness(
   submission: MediaReadinessSubmission,
   options: { requireAccepted?: boolean; requireStorageIdentity?: boolean } = {},

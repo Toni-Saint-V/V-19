@@ -10,6 +10,7 @@ const mockState = vi.hoisted(() => ({
   exportBatchRows: [] as unknown[],
   fromCalls: [] as string[],
   mediaAssetRows: [] as unknown[],
+  profileRows: [] as unknown[],
   questionnaireRows: [] as unknown[],
   rpcCalls: [] as Array<{
     args: { answers?: unknown; payload?: unknown };
@@ -79,9 +80,11 @@ vi.mock("../../src/lib/supabase/client", () => {
                     ? mockState.questionnaireRows
                     : table === "media_assets"
                       ? mockState.mediaAssetRows
-                      : table === "status_history"
-                        ? mockState.statusHistoryRows
-                        : mockState.exportBatchRows,
+                    : table === "status_history"
+                      ? mockState.statusHistoryRows
+                      : table === "profiles"
+                        ? mockState.profileRows
+                      : mockState.exportBatchRows,
             ),
         };
       },
@@ -157,6 +160,7 @@ beforeEach(() => {
   mockState.exportBatchRows = [];
   mockState.fromCalls = [];
   mockState.mediaAssetRows = [];
+  mockState.profileRows = [];
   mockState.questionnaireRows = [];
   mockState.rpcCalls = [];
   mockState.rpcResults = [];
@@ -183,6 +187,23 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(changedCockpitSubmissions([first, changedSecond], baseline)).toEqual([
       changedSecond,
     ]);
+  });
+
+  it("keeps profile display names out of the persisted cockpit snapshot", () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      agentDisplayName: "Антон Волков",
+    };
+
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      submission.agentId,
+    );
+
+    expect(JSON.stringify(payload.submission.family_intelligence)).not.toContain(
+      "agentDisplayName",
+    );
   });
 
   it("saves only the dirty submissions passed by the cockpit effect", async () => {
@@ -1632,6 +1653,12 @@ describe("V-19 Supabase cockpit persistence", () => {
         submission_ids: identity.submissionIds,
       },
     ];
+    mockState.profileRows = [
+      {
+        id: agentProfile.id,
+        display_name: "Антон Волков",
+      },
+    ];
 
     const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
     const plan = exportSummaryForSelectedIds(loaded.submissions, [submission.id]);
@@ -1643,8 +1670,10 @@ describe("V-19 Supabase cockpit persistence", () => {
       "media_assets",
       "status_history",
       "export_batches",
+      "profiles",
     ]);
     expect(loaded.submissions[0]).toMatchObject({
+      agentDisplayName: "Антон Волков",
       id: submission.id,
       exportPackage: identity,
       exportState: "file_generated",

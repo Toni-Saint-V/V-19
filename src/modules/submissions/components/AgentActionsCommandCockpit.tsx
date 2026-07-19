@@ -14,6 +14,7 @@ import type {
   AgentActionTaskStatus,
 } from "../agentActions";
 import { formatSubmissionListTitle } from "../listFormatters";
+import { submissionPublicId } from "../submissionIdentity";
 import { applicantCountLabel, tripDates } from "../selectors";
 import type { DrawerTab, Issue } from "../types";
 
@@ -386,7 +387,7 @@ function ActionTaskCard({
         <span className="v19-actions-queue-facts">
           <span>{dateLabel}</span>
           <span>{safeCity(task.submission.city)}</span>
-          <span>{safeSubmissionId(task.submission.id)}</span>
+          <span>{submissionPublicId(task.submission)}</span>
         </span>
       </span>
     </button>
@@ -457,7 +458,7 @@ function ActionSummaryPanel({
 
       <div className="v19-actions-active-meta" aria-label="Информация по подаче">
         <MetaItem label="ФИО" value={task.applicantName} />
-        <MetaItem label="ID" value={safeSubmissionId(task.submission.id)} />
+        <MetaItem label="ID" value={submissionPublicId(task.submission)} />
         <MetaItem label="Направление" value={task.destination} />
         <MetaItem label="Даты поездки" value={tripDates(task.submission)} />
         <MetaItem
@@ -600,7 +601,7 @@ function TimelineEvent({
 }) {
   const owner = actionOwnerLabel(task);
   const readiness = readinessPercentLabel(task);
-  const submissionId = safeSubmissionId(task.submission.id);
+  const submissionId = submissionPublicId(task.submission);
 
   return (
     <article
@@ -731,10 +732,6 @@ function primaryActionDisabledReason(task: AgentActionTask) {
 
 function readinessPercentLabel(task: AgentActionTask) {
   return `Готовность ${task.readiness.overallPercent}%`;
-}
-
-function safeSubmissionId(id: string) {
-  return id.trim() || "ID не указан";
 }
 
 function safeCity(city: string) {

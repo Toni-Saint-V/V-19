@@ -37,6 +37,8 @@ import { mapSupabasePersistenceError } from "./persistenceObservability";
 import { storageTargetForSlot } from "./storagePathPolicy";
 
 const submissionSelect =
+  "id,public_number,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
+const legacySubmissionSelect =
   "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const applicantSelect =
   "id,submission_id,full_name,role,suggested_role,role_confirmed,birth_date,patronymic,citizenship,address,phone,email,passport_number,passport_issued_at,passport_expires_at,country,city,trip_dates,hotel_name,hotel_address,questionnaire_percent,media_percent,created_at,updated_at" as const;
@@ -82,6 +84,7 @@ function mapSubmissionRow(
 ): Submission {
   return normalizeSubmission({
     id: row.id,
+    publicNumber: row.public_number ?? undefined,
     title: row.title,
     type: row.type,
     agentId: row.agent_id,
@@ -555,15 +558,32 @@ export async function listSubmissionsForRole(role: "agent" | "admin", agentId: s
   const client = getSupabaseClient();
   if (!client) return null;
 
-  const query = client
-    .from("submissions")
-    .select(submissionSelect)
-    .order("updated_at", {
-      ascending: false,
-    })
-    .limit(submissionListLimit);
-  const { data: submissionRows, error } =
-    role === "agent" ? await query.eq("agent_id", agentId) : await query;
+  const runCurrentQuery = () => {
+    const query = client
+      .from("submissions")
+      .select(submissionSelect)
+      .order("updated_at", { ascending: false })
+      .limit(submissionListLimit);
+    return role === "agent" ? query.eq("agent_id", agentId) : query;
+  };
+  const runLegacyQuery = () => {
+    const query = client
+      .from("submissions")
+      .select(legacySubmissionSelect)
+      .order("updated_at", { ascending: false })
+      .limit(submissionListLimit);
+    return role === "agent" ? query.eq("agent_id", agentId) : query;
+  };
+  let { data: submissionRows, error } = await runCurrentQuery();
+
+  if (isMissingPublicNumberColumn(error)) {
+    const legacyResult = await runLegacyQuery();
+    error = legacyResult.error;
+    submissionRows = (legacyResult.data ?? []).map((row) => ({
+      ...row,
+      public_number: null,
+    })) as typeof submissionRows;
+  }
 
   if (error) {
     throw mapSupabasePersistenceError(error, {
@@ -702,6 +722,15 @@ export async function listSubmissionsForRole(role: "agent" | "admin", agentId: s
       timeline,
     });
   });
+}
+
+function isMissingPublicNumberColumn(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown; message?: unknown };
+  return (
+    record.code === "42703" ||
+    (typeof record.message === "string" && record.message.includes("public_number"))
+  );
 }
 
 export async function saveSubmissionDraft(

@@ -154,6 +154,7 @@ export function submissionSearchText(submission: Submission): string {
 
   return [
     submission.id,
+    submission.publicNumber ? `VF-${submission.publicNumber}` : "",
     submission.title,
     submission.listTitle ?? "",
     submission.city,

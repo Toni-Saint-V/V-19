@@ -297,7 +297,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     );
   });
 
-  test("renders queue ids as tags and lane totals as applicant counts", () => {
+  test("renders queue cards as one flat ordered grid without lane divisions", () => {
     const review = initialSubmissions.find((item) => item.id === "ПД-1053");
     const returned = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!review || !returned) throw new Error("Expected review queue fixtures.");
@@ -314,12 +314,40 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       container.querySelector(
         '[data-submission-id="ПД-1053"] .v19-admin-review-card-id',
       ),
-    ).toHaveTextContent("ПД-1053");
+    ).toHaveTextContent("VF-1053");
+    expect(container.querySelectorAll(".v19-admin-review-card-grid")).toHaveLength(1);
     expect(
-      Array.from(
-        container.querySelectorAll(".v19-admin-review-lane-header > span"),
-      ).map((element) => element.textContent?.trim()),
-    ).toEqual(["1 чел.", "2 чел."]);
+      container.querySelectorAll(".v19-admin-review-card-grid > [data-submission-card]"),
+    ).toHaveLength(2);
+    expect(container.querySelector(".v19-admin-review-lane")).toBeNull();
+    expect(container.querySelector(".v19-admin-review-lane-header")).toBeNull();
+  });
+
+  test("renders the agent display name and compact card identity", () => {
+    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
+    if (!source) throw new Error("Expected review queue fixture.");
+
+    const submission: Submission = {
+      ...source,
+      agentDisplayName: "Антон Волков",
+      updatedAt: "2026-07-17T12:26:26.214Z",
+    };
+    const { container } = render(
+      <ReviewScreen onOpenDrawer={vi.fn()} submissions={[submission]} />,
+    );
+
+    expect(container.querySelector(".v19-admin-review-card-agent")).toHaveTextContent(
+      "Антон Волков",
+    );
+    expect(container.querySelector(".v19-admin-review-card-meta")).toHaveTextContent(
+      "1 чел.",
+    );
+    expect(container.querySelector(".v19-admin-review-card-location")).toHaveTextContent(
+      "Казань",
+    );
+    expect(container).not.toHaveTextContent("17 июл., 15:26");
+    expect(container).not.toHaveTextContent(source.agentId);
+    expect(container).not.toHaveTextContent("2026-07-17T12:26:26.214Z");
   });
 
   test("does not expose internal questionnaire status values", async () => {

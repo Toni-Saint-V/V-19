@@ -66,6 +66,8 @@ export const cockpitSnapshotStorageField =
 export const cockpitSnapshotStatus = "unreviewed";
 const submissionListLimit = 100;
 const submissionSelect =
+  "id,public_number,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
+const legacySubmissionSelect =
   "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const applicantSelect =
   "id,submission_id,full_name,questionnaire_percent,media_percent,created_at,updated_at" as const;
@@ -77,6 +79,7 @@ const exportBatchSelect =
   "id,created_at,file_name,format,content_fingerprint,idempotency_key,row_count,submission_ids" as const;
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,source,note,changed_by,changed_at" as const;
+const agentProfileSelect = "id,display_name" as const;
 
 export interface CockpitLoadResult {
   ownerIdsBySubmissionId: Map<string, string>;
@@ -530,26 +533,32 @@ function attachExportPackageRow(
 }
 
 function reconcileCockpitSnapshotWithSubmissionRow(
-  row: Pick<SubmissionRow, "agent_id" | "exported_at" | "status" | "updated_at">,
+  row: Pick<
+    SubmissionRow,
+    "agent_id" | "exported_at" | "public_number" | "status" | "updated_at"
+  >,
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
   questionnaireAnswers: CockpitQuestionnaireAnswerRow[],
   exportBatches: CockpitExportBatchRow[],
 ): Submission {
   const rowStatus = fromSupabaseSubmissionRowStatus(row);
-  const normalizedSnapshot = normalizeSubmissionForCanonicalRuntime(
-    attachQuestionnaireAnswerRows(
-      attachNormalizedApplicantRows(
-        ensureSubmissionOwner(snapshot, row.agent_id),
-        applicants,
+  const normalizedSnapshot = {
+    ...normalizeSubmissionForCanonicalRuntime(
+      attachQuestionnaireAnswerRows(
+        attachNormalizedApplicantRows(
+          ensureSubmissionOwner(snapshot, row.agent_id),
+          applicants,
+        ),
+        questionnaireAnswers,
       ),
-      questionnaireAnswers,
+      {
+        exportedAt: row.exported_at,
+        statusFallback: rowStatus,
+      },
     ),
-    {
-      exportedAt: row.exported_at,
-      statusFallback: rowStatus,
-    },
-  );
+    publicNumber: row.public_number ?? undefined,
+  };
 
   if (rowStatus !== "exported") {
     return attachExportPackageRow(normalizedSnapshot, rowStatus, exportBatches, {
@@ -595,11 +604,13 @@ function reconcileCockpitSnapshotWithSubmissionRow(
 
 function cockpitSnapshotFamilyIntelligence(submission: Submission): Json {
   // The normalized tables are a query projection; this snapshot owns the full cockpit UI model.
+  const snapshotSubmission = { ...submission };
+  delete snapshotSubmission.agentDisplayName;
   return {
     status: cockpitSnapshotStatus,
     [cockpitSnapshotKey]: {
       version: cockpitSnapshotVersion,
-      submission: submission as unknown as Json,
+      submission: snapshotSubmission as unknown as Json,
     },
   };
 }
@@ -1190,6 +1201,7 @@ function fallbackSubmissionFromRows(
 
   return normalizeSubmissionQuestionnaire({
     id: row.id,
+    publicNumber: row.public_number ?? undefined,
     agentId: row.agent_id,
     title: row.title,
     listTitle:
@@ -1357,13 +1369,32 @@ export async function loadCockpitSubmissionsForProfile(
     };
   }
 
-  const query = client
-    .from("submissions")
-    .select(submissionSelect)
-    .order("updated_at", { ascending: false })
-    .limit(submissionListLimit);
-  const { data: rows, error } =
-    profile.role === "agent" ? await query.eq("agent_id", profile.id) : await query;
+  const runCurrentQuery = () => {
+    const query = client
+      .from("submissions")
+      .select(submissionSelect)
+      .order("updated_at", { ascending: false })
+      .limit(submissionListLimit);
+    return profile.role === "agent" ? query.eq("agent_id", profile.id) : query;
+  };
+  const runLegacyQuery = () => {
+    const query = client
+      .from("submissions")
+      .select(legacySubmissionSelect)
+      .order("updated_at", { ascending: false })
+      .limit(submissionListLimit);
+    return profile.role === "agent" ? query.eq("agent_id", profile.id) : query;
+  };
+  let { data: rows, error } = await runCurrentQuery();
+
+  if (isMissingPublicNumberColumn(error)) {
+    const legacyResult = await runLegacyQuery();
+    error = legacyResult.error;
+    rows = (legacyResult.data ?? []).map((row) => ({
+      ...row,
+      public_number: null,
+    })) as typeof rows;
+  }
 
   if (error) {
     throw mapSupabasePersistenceError(error, {
@@ -1380,12 +1411,14 @@ export async function loadCockpitSubmissionsForProfile(
   }
 
   const submissionIds = rows.map((row) => row.id);
+  const agentIds = [...new Set(rows.map((row) => row.agent_id))];
   const [
     { data: applicantRows, error: applicantError },
     { data: questionnaireRows, error: questionnaireError },
     { data: mediaRows, error: mediaError },
     { data: statusHistoryRows, error: statusHistoryError },
     exportBatchRows,
+    agentProfilesResult,
   ] = await Promise.all([
     client
       .from("applicants")
@@ -1406,6 +1439,12 @@ export async function loadCockpitSubmissionsForProfile(
     profile.role === "admin"
       ? loadExportBatchRowsForSubmissions(submissionIds)
       : Promise.resolve([]),
+    profile.role === "admin"
+      ? client.from("profiles").select(agentProfileSelect).in("id", agentIds)
+      : Promise.resolve({
+          data: [{ id: profile.id, display_name: profile.displayName }],
+          error: null,
+        }),
   ]);
 
   if (applicantError) {
@@ -1436,6 +1475,12 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
+  const agentDisplayNamesById = new Map(
+    (agentProfilesResult.data ?? []).map((agentProfile) => [
+      agentProfile.id,
+      agentProfile.display_name.trim(),
+    ]),
+  );
   const ownerIdsBySubmissionId = new Map<string, string>();
   const submissions = rows.map((row) => {
     ownerIdsBySubmissionId.set(row.id, row.agent_id);
@@ -1455,8 +1500,8 @@ export async function loadCockpitSubmissionsForProfile(
       (history) => history.entity_type === "submission" && history.entity_id === row.id,
     );
     const snapshot = readCockpitSnapshot(row.family_intelligence);
-    if (snapshot) {
-      return attachDurableStatusHistoryRows(
+    const submission = snapshot
+      ? attachDurableStatusHistoryRows(
         attachDurableMediaAssetRows(
           reconcileCockpitSnapshotWithSubmissionRow(
             row,
@@ -1468,31 +1513,41 @@ export async function loadCockpitSubmissionsForProfile(
           submissionMediaRows,
         ),
         submissionStatusHistoryRows,
-      );
-    }
-
-    return attachDurableStatusHistoryRows(
-      attachDurableMediaAssetRows(
-        attachExportPackageRow(
-          fallbackSubmissionFromRows(
-            row,
-            submissionApplicants,
-            submissionQuestionnaireAnswers,
-            latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
+      )
+      : attachDurableStatusHistoryRows(
+          attachDurableMediaAssetRows(
+            attachExportPackageRow(
+              fallbackSubmissionFromRows(
+                row,
+                submissionApplicants,
+                submissionQuestionnaireAnswers,
+                latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
+              ),
+              fromSupabaseSubmissionRowStatus(row),
+              submissionExportBatches,
+            ),
+            submissionMediaRows,
           ),
-          fromSupabaseSubmissionRowStatus(row),
-          submissionExportBatches,
-        ),
-        submissionMediaRows,
-      ),
-      submissionStatusHistoryRows,
-    );
+          submissionStatusHistoryRows,
+        );
+
+    const agentDisplayName = agentDisplayNamesById.get(row.agent_id);
+    return agentDisplayName ? { ...submission, agentDisplayName } : submission;
   });
 
   return {
     ownerIdsBySubmissionId,
     submissions,
   };
+}
+
+function isMissingPublicNumberColumn(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown; message?: unknown };
+  return (
+    record.code === "42703" ||
+    (typeof record.message === "string" && record.message.includes("public_number"))
+  );
 }
 
 async function loadExportBatchRowsForSubmissions(

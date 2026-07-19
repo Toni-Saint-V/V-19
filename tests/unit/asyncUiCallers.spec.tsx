@@ -99,7 +99,7 @@ describe("async UI callers", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
-  test("legacy Drawer moves focus into the modal and exposes roving tabs", async () => {
+  test("legacy Drawer exposes complete desktop and mobile tab navigation with roving focus", async () => {
     const trigger = document.createElement("button");
     document.body.appendChild(trigger);
     trigger.focus();
@@ -117,13 +117,67 @@ describe("async UI callers", () => {
 
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog).toHaveFocus());
-    const tabs = await screen.findAllByRole("tab");
-    expect(tabs).toHaveLength(6);
-    expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
-    expect(tabs[0]).toHaveAttribute("aria-controls", "submission-drawer-panel-overview");
+    const desktopTablist = await screen.findByRole("tablist", { name: "Разделы подачи" });
+    const desktopTabs = Array.from(desktopTablist.querySelectorAll<HTMLElement>('[role="tab"]'));
+    const desktopTabIds = ["overview", "applicants", "questionnaire", "files", "issues", "history"];
+    const desktopTabLabels = ["Обзор", "Заявители", "Анкета", "Файлы", "Замечания", "История"];
 
-    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
-    await waitFor(() => expect(tabs[1]).toHaveAttribute("aria-selected", "true"));
+    expect(desktopTabs).toHaveLength(desktopTabIds.length);
+    desktopTabs.forEach((tab, index) => {
+      const tabId = desktopTabIds[index];
+      if (!tabId) throw new Error("Missing expected legacy Drawer tab id.");
+      expect(tab).toHaveAccessibleName(new RegExp(`^${desktopTabLabels[index]}(?:\\d+)?$`));
+      expect(tab).toHaveAttribute("aria-controls", `submission-drawer-panel-${tabId}`);
+    });
+    expect(desktopTabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
+
+    fireEvent.click(desktopTabs[0]!);
+    fireEvent.keyDown(desktopTabs[0]!, { key: "ArrowRight" });
+    await waitFor(() => expect(desktopTabs[1]).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        "submission-drawer-panel-label-applicants",
+      ),
+    );
+
+    const mobilePrimaryTablist = screen.getByRole("tablist", {
+      name: "Основные разделы подачи",
+    });
+    const mobilePrimaryTabs = Array.from(
+      mobilePrimaryTablist.querySelectorAll<HTMLElement>('[role="tab"]'),
+    );
+    expect(mobilePrimaryTabs).toHaveLength(2);
+    ["Обзор", "Заявители"].forEach((label, index) => {
+      expect(mobilePrimaryTabs[index]).toHaveAccessibleName(new RegExp(`^${label}(?:\\d+)?$`));
+    });
+
+    const mobileMoreButton = screen.getByTestId("submission-drawer-mobile-more");
+    fireEvent.click(mobileMoreButton);
+    const mobileMoreTablist = await screen.findByRole("tablist", {
+      hidden: true,
+      name: "Дополнительные разделы подачи",
+    });
+    const mobileAdditionalTabs = Array.from(
+      mobileMoreTablist.querySelectorAll<HTMLElement>('[role="tab"]'),
+    );
+    expect(mobileAdditionalTabs).toHaveLength(4);
+    ["Анкета", "Файлы", "Замечания", "История"].forEach((label, index) => {
+      expect(mobileAdditionalTabs[index]).toHaveAccessibleName(new RegExp(`^${label}(?:\\d+)?$`));
+    });
+
+    const mobileFilesTab = mobileAdditionalTabs.find((tab) =>
+      /^Файлы(?:\d+)?$/.test(tab.getAttribute("aria-label") ?? tab.textContent ?? ""),
+    );
+    if (!mobileFilesTab) throw new Error("Missing mobile Files tab.");
+    fireEvent.click(mobileFilesTab);
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        "submission-drawer-panel-label-files",
+      ),
+    );
+
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -195,6 +249,9 @@ describe("async UI callers", () => {
 
     expect(await screen.findByText("Исправления получены")).toBeInTheDocument();
     expect(screen.queryByText("Черновик")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Исправления на проверке")).toHaveLength(2);
+    expect(screen.queryByText("Исправьте замечания")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Открыть замечания" })).not.toBeInTheDocument();
     expect(screen.getByText("Агент Тони")).toBeInTheDocument();
     expect(screen.queryByText("local-agent-tony")).not.toBeInTheDocument();
   });
@@ -351,7 +408,7 @@ describe("async UI callers", () => {
     await waitFor(() => expect(primaryButton).not.toBeDisabled());
   });
 
-  test("operational drawer keeps the four canonical reference tabs with roving focus", async () => {
+  test("operational drawer keeps all desktop tabs and reaches mobile secondary sections", async () => {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -364,7 +421,7 @@ describe("async UI callers", () => {
       })),
     });
     const submission = draftSubmission();
-    render(
+    const { container } = render(
       <FigmaSubmissionDrawer
         activeTab="overview"
         onAction={vi.fn()}
@@ -381,7 +438,16 @@ describe("async UI callers", () => {
 
     const tablist = await screen.findByRole("tablist", { name: "Разделы подачи" });
     const tabs = Array.from(tablist.querySelectorAll<HTMLElement>('[role="tab"]'));
-    expect(tabs).toHaveLength(4);
+    const tabIds = ["overview", "questionnaire", "files", "issues", "history"];
+    const tabLabels = ["Обзор", "Анкета", "Файлы", "Замечания", "История"];
+
+    expect(tabs).toHaveLength(tabIds.length);
+    tabs.forEach((tab, index) => {
+      const tabId = tabIds[index];
+      if (!tabId) throw new Error("Missing expected operational Drawer tab id.");
+      expect(tab).toHaveAccessibleName(new RegExp(`^${tabLabels[index]}(?:\\d+)?$`));
+      expect(tab).toHaveAttribute("aria-controls", `v20-submission-drawer-panel-${tabId}`);
+    });
     expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
     expect(tabs[0]).toHaveAttribute(
       "aria-controls",
@@ -398,7 +464,31 @@ describe("async UI callers", () => {
       "v20-submission-drawer-tab-questionnaire",
     );
 
-    expect(screen.queryByRole("button", { name: "Ещё" })).not.toBeInTheDocument();
+    const mobileMoreButton = container.querySelector<HTMLButtonElement>(
+      ".v20-tabbar-more-trigger",
+    );
+    if (!mobileMoreButton) throw new Error("Missing operational Drawer mobile tabs trigger.");
+    fireEvent.click(mobileMoreButton);
+
+    const mobileMenu = await screen.findByRole("menu", {
+      hidden: true,
+      name: "Дополнительные разделы подачи",
+    });
+    const mobileMenuItems = Array.from(
+      mobileMenu.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    );
+    expect(mobileMenuItems).toHaveLength(3);
+    ["Файлы", "Замечания", "История"].forEach((label, index) => {
+      expect(mobileMenuItems[index]).toHaveAccessibleName(new RegExp(`^${label}(?:\\d+)?$`));
+    });
+
+    fireEvent.click(mobileMenuItems[0]!);
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        "v20-submission-drawer-tab-files",
+      ),
+    );
   });
 
   test("operational drawer derives questionnaire preview from the real submission", async () => {
@@ -464,7 +554,7 @@ describe("async UI callers", () => {
     await waitFor(() =>
       expect(screen.getByRole("tabpanel")).toHaveAttribute(
         "aria-labelledby",
-        "v20-submission-drawer-heading",
+        "v20-submission-drawer-tab-files",
       ),
     );
     expect(onOpenQuestionnaireWorkspace).not.toHaveBeenCalled();

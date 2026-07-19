@@ -9,6 +9,7 @@ import {
   typeLabels,
 } from "../status";
 import { applicantCountLabel, tripDates } from "../selectors";
+import { submissionPublicId } from "../submissionIdentity";
 import type { DrawerTab, Issue, Role, Submission } from "../types";
 import { EmptyState, StatusChip } from "./Primitives";
 import { ProgressMeter } from "./CollectionPrimitives";
@@ -140,7 +141,7 @@ function SubmissionCard({
     <CardComponent
       as="article"
       aria-current={active ? "true" : undefined}
-      aria-label={`Выбрать подачу ${submission.id}: ${submission.title}`}
+      aria-label={`Выбрать подачу ${submissionPublicId(submission)}: ${submission.title}`}
       className={`submission-card tone-${statusTone[submission.status]} ${
         active ? "is-selected" : ""
       } ${
@@ -154,7 +155,7 @@ function SubmissionCard({
       <div className="card-main">
         <div className="card-identity">
           <div className="card-topline">
-            <strong>{submission.id}</strong>
+            <strong>{submissionPublicId(submission)}</strong>
             <StatusChip submission={submission} />
             {blockers > 0 ? (
               <Badge className="blocker-count">{blockers} блокера</Badge>

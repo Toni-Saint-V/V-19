@@ -24,6 +24,8 @@ import type { Submission } from "../types";
 import {
   BLS_CITY_OPTIONS,
   POPULAR_RUSSIAN_CITY_OPTIONS,
+  familyAppointmentUpdatesForPrimary,
+  isQuestionnaireDateField,
   updateQuestionnaireField,
   validateQuestionnaireFieldValue,
   type QuestionnaireFieldUpdate,
@@ -38,6 +40,10 @@ import {
   validateBlsQuestionnaireField,
   type BlsFormData,
 } from "../questionnaireBlsRules";
+import {
+  canonicalRequiredMediaTypesForApplicant,
+  type CanonicalFrontendMediaType,
+} from "../domainContract";
 import {
   agentQuestionnaireCompletionDecision,
   agentQuestionnaireStatusPresentation,
@@ -138,6 +144,7 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
 ];
 
 const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
+  appointment: ["appointment-city", "desired-date-1", "desired-date-2"],
   contact: [
     "home-address",
     "home-country",
@@ -509,16 +516,18 @@ const optionSearchAliases: Record<string, string[]> = {
   "United States": ["сша", "америка"],
 };
 
-function isDateFieldLabel(label: string) {
-  const normalized = label.toLocaleLowerCase("ru-RU");
-  return normalized.includes("дата") || normalized.includes("действител");
-}
-
-function formatDateInput(value: string) {
+function formatDateInput(value: string, inputType?: string) {
+  if (inputType?.startsWith("delete")) {
+    return value.replace(/[^\d.]/g, "").slice(0, 10);
+  }
   const digits = value.replace(/\D/g, "").slice(0, 8);
   if (digits.length <= 1) return digits;
   if (digits.length <= 3) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2, 4)}`;
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 4)}${
+      digits.length === 4 ? "." : ""
+    }`;
+  }
   return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
 }
 
@@ -634,6 +643,7 @@ function FormField({
     options && options.length === 3 && label !== "Тип принимающей стороны",
   );
   const usesOptionSearch = Boolean(options && options.length > 8);
+  const visiblePlaceholder = placeholder?.replace(/^Например,\s*/iu, "");
   const filteredOptions = useMemo(() => {
     if (!options) return [];
     const query = optionQuery.trim().toLocaleLowerCase("ru-RU");
@@ -641,7 +651,7 @@ function FormField({
       ? options.filter((option) => optionMatchesSearch(option, query))
       : options;
   }, [optionQuery, options]);
-  const dateField = isDateFieldLabel(label);
+  const dateField = isQuestionnaireDateField({ id: modelFieldId, label });
   const emailField =
     type === "email" || label.toLocaleLowerCase("ru-RU").includes("email");
   const fieldId = `questionnaire-${generatedFieldId.replace(/:/g, "")}`;
@@ -732,7 +742,6 @@ function FormField({
     activeSuggestionIndex < visibleInputSuggestions.length
       ? `${suggestionsId}-option-${activeSuggestionIndex}`
       : undefined;
-
   function closeOptions({ returnFocus = false } = {}) {
     setIsOpen(false);
     setActiveOptionIndex(-1);
@@ -851,11 +860,43 @@ function FormField({
     }
   }
 
+  function handleInputKeyboard(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (
+      dateField &&
+      event.currentTarget.selectionStart === event.currentTarget.selectionEnd
+    ) {
+      const caret = event.currentTarget.selectionStart;
+      if (
+        caret !== null &&
+        event.key === "Backspace" &&
+        caret > 0 &&
+        value[caret - 1] === "."
+      ) {
+        event.preventDefault();
+        event.currentTarget.setSelectionRange(caret - 1, caret - 1);
+        return;
+      }
+      if (
+        caret !== null &&
+        event.key === "Delete" &&
+        value[caret] === "."
+      ) {
+        event.preventDefault();
+        event.currentTarget.setSelectionRange(caret + 1, caret + 1);
+        return;
+      }
+    }
+
+    handleSuggestionKeyboard(event);
+  }
+
   return (
     <div
       data-field-focused={canonicalFocused ? "true" : undefined}
       data-field-label={label}
       className={`v19-questionnaire-field v19-questionnaire-field-cell flex flex-col ${
+        canonicalState === "needs_review" ? "has-review-confirmation " : ""
+      }${
         fullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
       }`}
     >
@@ -1023,7 +1064,7 @@ function FormField({
           id={fieldId}
           name={modelFieldId}
           onBlur={onBlur}
-          placeholder={placeholder}
+          placeholder={visiblePlaceholder}
           readOnly={readOnly ?? !onChange}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
@@ -1046,10 +1087,18 @@ function FormField({
             className={`${baseClasses} ${compact ? "is-compact-address" : ""} ${stateClasses}`}
             inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
             id={fieldId}
-            maxLength={phonePrefix ? (phonePrefix === "+7" ? 17 : 15) : undefined}
+            maxLength={
+              dateField
+                ? 10
+                : phonePrefix
+                  ? phonePrefix === "+7"
+                    ? 17
+                    : 15
+                  : undefined
+            }
             name={modelFieldId}
             placeholder={
-              placeholder ??
+              visiblePlaceholder ??
               (dateField
                 ? "ДД.ММ.ГГГГ"
                 : phonePrefix
@@ -1072,10 +1121,11 @@ function FormField({
               setActiveSuggestionIndex(-1);
             }}
             onChange={(event) => {
+              const inputType = (event.nativeEvent as InputEvent).inputType;
               const nextValue = phonePrefix
                 ? formatPhoneInput(event.target.value, phonePrefix)
                 : dateField
-                  ? formatDateInput(event.target.value)
+                  ? formatDateInput(event.target.value, inputType)
                   : event.target.value;
               onChange?.(nextValue);
               if (inputSuggestions.length) {
@@ -1090,7 +1140,7 @@ function FormField({
                 setActiveSuggestionIndex(0);
               }
             }}
-            onKeyDown={handleSuggestionKeyboard}
+            onKeyDown={handleInputKeyboard}
           />
           {inputSuggestions.length && isSuggestionsOpen ? (
             <motion.div
@@ -2403,7 +2453,6 @@ export function FigmaQuestionnaireScreen({
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
-  const [showPreviousSurname, setShowPreviousSurname] = useState(false);
   const [showGuardianDetails, setShowGuardianDetails] = useState(false);
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [familyCopyMessage, setFamilyCopyMessage] = useState<string>();
@@ -2473,7 +2522,6 @@ export function FigmaQuestionnaireScreen({
   }, [activeApplicant, applicants]);
 
   useEffect(() => {
-    setShowPreviousSurname(false);
     setShowGuardianDetails(false);
   }, [activeApplicant]);
 
@@ -2859,8 +2907,6 @@ export function FigmaQuestionnaireScreen({
   const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
   const showPurposeDetails = formData.stayPurpose === "OTHER";
   const showPreviousBiometricsDetails = formData.previousBiometrics === "Да";
-  const previousSurnameIsVisible =
-    Boolean(formData.previousSurname.trim()) || showPreviousSurname;
   const applicantIsMinor = isBlsQuestionnaireMinorApplicant(
     activeApplicantModel?.role,
     formData as unknown as BlsFormData,
@@ -2966,6 +3012,9 @@ export function FigmaQuestionnaireScreen({
       buildUpdate(key, value),
       ...dependentKeys.map((dependentKey) => buildUpdate(dependentKey, "")),
     ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+    const familyAppointmentUpdates = updates.flatMap(({ update }) =>
+      familyAppointmentUpdatesForPrimary(draftSubmission, activeApplicant, update),
+    );
 
     setFormData((current) => {
       const next = { ...current, [key]: value };
@@ -2973,7 +3022,7 @@ export function FigmaQuestionnaireScreen({
       return next;
     });
 
-    if (updates.length) {
+    if (updates.length || familyAppointmentUpdates.length) {
       const next = { ...pendingFieldUpdatesRef.current };
       for (const { binding, update } of updates) {
         const updateKey = questionnaireUpdateKey(update);
@@ -2989,6 +3038,18 @@ export function FigmaQuestionnaireScreen({
           next[updateKey] = update;
         }
       }
+      for (const update of familyAppointmentUpdates) {
+        const updateKey = questionnaireUpdateKey(update);
+        const baseApplicant = submission.applicants.find(
+          (applicant) => applicant.id === update.applicantId,
+        );
+        const baseField = questionnaireField(baseApplicant, update.fieldId);
+        if (baseField?.value === update.value && baseField.reviewState !== "needs_review") {
+          delete next[updateKey];
+        } else {
+          next[updateKey] = update;
+        }
+      }
       replacePendingFieldUpdates(next);
       updateDirtyState(next);
     }
@@ -2996,6 +3057,7 @@ export function FigmaQuestionnaireScreen({
     for (const { binding, update } of updates) {
       if (update.value !== baseFormData[binding.formKey]) onFieldChange?.(update);
     }
+    for (const update of familyAppointmentUpdates) onFieldChange?.(update);
   }
 
   updateFieldRef.current = updateField;
@@ -3040,11 +3102,15 @@ export function FigmaQuestionnaireScreen({
 
   function updateBirthCountry(value: string) {
     updateField("birthCountry", value);
-    updateField("citizenship", "Russian Federation");
     updateField(
       "birthCitizenship",
       value.trim().toUpperCase() === "USSR" ? "USSR" : "Russian Federation",
     );
+  }
+
+  function updatePassportIssueCountry(value: string) {
+    updateField("passportIssueCountry", value);
+    updateField("citizenship", value);
   }
 
   function normalizeBirthPlaceField() {
@@ -4050,7 +4116,7 @@ export function FigmaQuestionnaireScreen({
             number="5"
             options={selectOptions.passportIssueCountry}
             value={formData.passportIssueCountry}
-            onChange={(value) => updateField("passportIssueCountry", value)}
+            onChange={updatePassportIssueCountry}
           />
           <FormField
             excelMap="Cell: C6"
@@ -4470,7 +4536,8 @@ export function FigmaQuestionnaireScreen({
             label="Телефон"
             modelFieldId="hotel-contact"
             number="8"
-            phonePrefix="+34"
+            placeholder="Номер с кодом страны"
+            type="tel"
             value={formData.hotelContact}
             onChange={(value) => updateField("hotelContact", value)}
           />
@@ -4503,7 +4570,8 @@ export function FigmaQuestionnaireScreen({
                 label="Телефон компании"
                 modelFieldId="company-phone"
                 number="11"
-                phonePrefix="+34"
+                placeholder="Номер с кодом страны"
+                type="tel"
                 value={formData.companyPhone}
                 onChange={(value) => updateField("companyPhone", value)}
               />
@@ -4525,26 +4593,15 @@ export function FigmaQuestionnaireScreen({
             value={formData.surname}
             onChange={(value) => updateField("surname", value)}
           />
-          {previousSurnameIsVisible ? (
-            <FormField
-              excelMap="Анкета: previous-surname"
-              label="Фамилия при рождении / предыдущая"
-              modelFieldId="previous-surname"
-              number="1.1"
-              placeholder="Например, PETROVA"
-              value={formData.previousSurname}
-              onChange={(value) => updateField("previousSurname", value)}
-            />
-          ) : (
-            <button
-              className="v19-questionnaire-optional-reveal"
-              type="button"
-              onClick={() => setShowPreviousSurname(true)}
-            >
-              <Plus aria-hidden="true" className="h-4 w-4" />
-              Добавить предыдущую фамилию
-            </button>
-          )}
+          <FormField
+            excelMap="Анкета: previous-surname"
+            label="Предыдущие фамилии"
+            modelFieldId="previous-surname"
+            number="1.1"
+            placeholder="Например, PETROVA или НЕТ"
+            value={formData.previousSurname}
+            onChange={(value) => updateField("previousSurname", value)}
+          />
           <FormField
             excelMap="Cell: B3"
             label="Имя"
@@ -4686,12 +4743,12 @@ export function FigmaQuestionnaireScreen({
 
         <div className="v19-questionnaire-title-wrap">
           <h1
-            aria-label={`Заявители: ${draftSubmission.title || "Семья Петровых"}`}
+            aria-label={`Анкета: ${draftSubmission.title || "Семья Петровых"}`}
             className="v19-questionnaire-title"
           >
-            <span className="v19-questionnaire-title-mobile">Заявители</span>
+            <span className="v19-questionnaire-title-mobile">Анкета</span>
             <span className="v19-questionnaire-title-desktop">
-              Заявители: {draftSubmission.title || "Семья Петровых"}
+              Анкета: {draftSubmission.title || "Семья Петровых"}
             </span>
           </h1>
         </div>
@@ -5006,7 +5063,7 @@ export function FigmaQuestionnaireScreen({
                 >
                   <CheckCircle2 aria-hidden="true" />
                   <span>
-                    {passportReviewPending ? "Сохраняем…" : "Паспорт проверен"}
+                    {passportReviewPending ? "Сохраняем…" : "Подтвердить паспорт"}
                   </span>
                 </button>
               ) : null}
@@ -5111,7 +5168,9 @@ export function FigmaQuestionnaireScreen({
                       onClick={copySharedDataToFamily}
                     >
                       <Copy aria-hidden="true" />
-                      Копировать для всех
+                      {activeSection === "appointment"
+                        ? "Копировать"
+                        : "Копировать для всех"}
                     </button>
                     {familyCopyPreview ? (
                       <>

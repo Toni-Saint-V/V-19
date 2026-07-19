@@ -16,6 +16,7 @@ import type {
   AgentActionSummary,
 } from "../agentActions";
 import { formatSubmissionListTitle } from "../listFormatters";
+import { submissionPublicId } from "../submissionIdentity";
 import {
   adminTriageRadarItem,
   buildAdminTriageRadar,
@@ -416,7 +417,7 @@ export function FigmaApplicantsVisual({
           {familySubmissions.length ? (
             familySubmissions.map((submission) => (
               <V19FamilyProfileCard
-                ariaLabel={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submission.id}`}
+                ariaLabel={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submissionPublicId(submission)}`}
                 dataSubmissionId={submission.id}
                 footerLabel={`Акт: ${submission.updatedAt}`}
                 key={submission.id}
@@ -456,7 +457,7 @@ export function FigmaApplicantsVisual({
                 : null;
               return (
                 <V19IndividualProfileCard
-                  ariaLabel={`Открыть заявителя: ${member?.name ?? submission.title}, ${submission.id}`}
+                  ariaLabel={`Открыть заявителя: ${member?.name ?? submission.title}, ${submissionPublicId(submission)}`}
                   dataSubmissionId={submission.id}
                   footerLabel={`Акт: ${submission.updatedAt}`}
                   initials={member?.initials ?? initialsForName(submission.title)}
@@ -496,7 +497,7 @@ function toVisualActionRow(action: AgentActionItem): VisualActionRow {
     context: action.context,
     createdAt: submission.createdAt,
     cta: action.cta,
-    id: submission.id,
+    id: submissionPublicId(submission),
     progress: submission.completeness.total,
     severity: action.severity,
     status: submission.status,

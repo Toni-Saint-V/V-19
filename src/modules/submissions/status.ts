@@ -24,6 +24,7 @@ import {
 } from "./passportExtractionGuards";
 import {
   canonicalRequiredMediaReadiness,
+  canonicalRequiredMediaTypesForApplicant,
   isCanonicalSubmissionStatus,
   isIssueTransitionAllowed,
   isKnownContractRole,
@@ -34,7 +35,11 @@ import {
   hasAdminPassportReviewValue,
   requiredPassportReviewMediaSlots,
 } from "./passportReviewContract";
-import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
+import {
+  blsApplicantQuestionnaireStatus,
+  blsQuestionnaireReadiness,
+  isBlsQuestionnaireFileReady,
+} from "./questionnaireBlsRules";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -419,6 +424,62 @@ export function hasBlockingIssues(submission: Submission) {
 
 export function hasRequiredDocuments(submission: Submission) {
   return canonicalRequiredMediaReadiness(submission).ok;
+}
+
+export type ApplicantChecklistStatus =
+  | "ready"
+  | "missing_docs"
+  | "in_progress";
+
+export function applicantChecklistStatus(
+  submission: Submission,
+  applicantId: string,
+): ApplicantChecklistStatus {
+  const applicantIndex = submission.applicants.findIndex(
+    (candidate) => candidate.id === applicantId,
+  );
+  const applicant = submission.applicants[applicantIndex];
+  if (!applicant) return "in_progress";
+
+  const requiredFileTypes = canonicalRequiredMediaTypesForApplicant(
+    submission,
+    applicant.id,
+  );
+  const requiredFiles = requiredFileTypes.map((type) =>
+    submission.files.find(
+      (file) => file.applicantId === applicant.id && file.type === type,
+    ),
+  );
+  const questionnaireStatus = blsApplicantQuestionnaireStatus(applicant);
+  const questionnaireReady = questionnaireStatus === "complete";
+  const filesReady = requiredFiles.every(isBlsQuestionnaireFileReady);
+
+  if (questionnaireReady && filesReady) return "ready";
+  if (
+    questionnaireStatus === "needs_fix" ||
+    requiredFiles.some(
+      (file) =>
+        !file ||
+        file.status === "missing" ||
+        file.status === "needs_replacement" ||
+        file.uploadStatus === "failed" ||
+        file.reviewStatus === "replace_required" ||
+        file.reviewStatus === "poor_quality",
+    )
+  ) {
+    return "missing_docs";
+  }
+  return "in_progress";
+}
+
+function requiredSubmissionFiles(submission: Submission) {
+  return submission.applicants.flatMap((applicant) =>
+    canonicalRequiredMediaTypesForApplicant(submission, applicant.id).map((type) =>
+      submission.files.find(
+        (file) => file.applicantId === applicant.id && file.type === type,
+      ),
+    ),
+  );
 }
 
 export function calculateSubmissionProgress(

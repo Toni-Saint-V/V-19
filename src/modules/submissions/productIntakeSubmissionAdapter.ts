@@ -444,7 +444,12 @@ function sectionsFromDraftApplicant(
   setValue('stay-duration', applicant.fields.stayDuration, supplementalQuestionnaireSource);
   if (!values.get('passport-type')) setValue('passport-type', 'Ordinary Passport');
   if (!values.get('passport-issue-country')) setValue('passport-issue-country', 'Russian Federation');
-  if (!values.get('nationality')) setValue('nationality', 'Russian Federation');
+  if (!values.get('nationality')) {
+    setValue(
+      'nationality',
+      values.get('passport-issue-country')?.value || 'Russian Federation',
+    );
+  }
   if (!values.get('home-country')) setValue('home-country', 'Russian Federation');
   if (!values.get('lives-outside-citizenship')) setValue('lives-outside-citizenship', 'Нет');
   if (!values.get('purpose')) setValue('purpose', 'TOURISM');

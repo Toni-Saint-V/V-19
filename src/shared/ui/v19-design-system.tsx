@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Clock,
   Columns3,
+  FileCheck2,
   Filter,
   Flame,
   Folder,
@@ -58,12 +59,7 @@ export type V19MemberStatusTone = "issue" | "progress" | "ready";
 
 export type V19BadgeTone = "amber" | "blue" | "danger" | "muted" | "teal";
 
-export type V19AiTriageTone =
-  | "attention"
-  | "critical"
-  | "done"
-  | "ready"
-  | "waiting";
+export type V19AiTriageTone = "attention" | "critical" | "done" | "ready" | "waiting";
 
 export type V19AiTriageSummary = {
   bandLabel: string;
@@ -81,13 +77,7 @@ export type V19SignalButtonTone =
   | "green"
   | "muted";
 
-export type V19SummaryTileTone =
-  | "amber"
-  | "danger"
-  | "green"
-  | "indigo"
-  | "muted"
-  | "neutral";
+export type V19MetricTone = "danger" | "green" | "neutral";
 
 export type V19FamilyMember = {
   initials: string;
@@ -201,7 +191,12 @@ export function V19SignalButton({
       {...props}
       aria-label={ariaLabel}
       aria-pressed={active}
-      className={cn("v19-signal-button", `tone-${tone}`, active && "is-active", className)}
+      className={cn(
+        "v19-signal-button",
+        `tone-${tone}`,
+        active && "is-active",
+        className,
+      )}
       type={props.type ?? "button"}
     >
       <span className="v19-signal-button-label">{label}</span>
@@ -210,16 +205,6 @@ export function V19SignalButton({
       <span className="v19-signal-button-mark" aria-hidden="true" />
     </button>
   );
-}
-
-export function V19SummaryTileGrid({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return <div className={cn("v19-summary-tile-grid", className)}>{children}</div>;
 }
 
 export type V19SurfaceIcon = ElementType;
@@ -241,6 +226,114 @@ export function V19QueueCard<T extends ElementType = "div">({
   const Component = as ?? "div";
 
   return <Component {...props} className={cn("v19-queue-card", className)} />;
+}
+
+export function V19OperationalCardGrid({
+  className,
+  ...props
+}: ComponentPropsWithoutRef<"div">) {
+  return (
+    <div
+      {...props}
+      className={cn("v19-operational-card-grid", className)}
+      data-v19-component="operational-card-grid"
+    />
+  );
+}
+
+type V19OperationalCardProps<T extends ElementType> = V19QueueCardProps<T> & {
+  actionIcon?: ElementType;
+  actionLabel?: string;
+  actionText: string;
+  city?: string;
+  footer?: ReactNode;
+  peopleCount: number;
+  progress?: ReactNode;
+  publicId: string;
+  title: string;
+  tripDates?: string;
+};
+
+/**
+ * Canonical two-surface queue card used by both agent actions and admin review.
+ * The shared layer owns identity, the inset next-action surface and shell;
+ * screen-specific progress and footer signals are supplied as slots.
+ */
+export function V19OperationalCard<T extends ElementType = "button">({
+  actionIcon: ActionIcon = FileCheck2,
+  actionLabel = "Следующий шаг",
+  actionText,
+  as,
+  city,
+  className,
+  footer,
+  peopleCount,
+  progress,
+  publicId,
+  title,
+  tripDates,
+  ...props
+}: V19OperationalCardProps<T>) {
+  const Component = as ?? "button";
+
+  return (
+    <Component
+      {...props}
+      className={cn("v19-queue-card", "v19-operational-card", className)}
+      data-v19-component="operational-card"
+    >
+      <span className="v19-operational-card-header">
+        <span className="v19-operational-card-identity">
+          <span className="v19-operational-card-meta">
+            <span className="v19-operational-card-id">{publicId}</span>
+            <i aria-hidden="true" />
+            <span className="v19-operational-card-people">
+              {peopleCount > 1 ? (
+                <Users aria-hidden="true" />
+              ) : (
+                <User aria-hidden="true" />
+              )}
+              <span>{peopleCount} чел.</span>
+            </span>
+          </span>
+          <strong className="v19-operational-card-title" title={title}>
+            {title}
+          </strong>
+          {city || tripDates ? (
+            <span className="v19-operational-card-route">
+              {city ? (
+                <span className="v19-operational-card-location">
+                  <MapPin aria-hidden="true" />
+                  <span>{city}</span>
+                </span>
+              ) : null}
+              <V19SubmissionTripDates dates={tripDates} />
+            </span>
+          ) : null}
+        </span>
+        <span className="v19-operational-card-open" aria-hidden="true">
+          <ChevronRight />
+        </span>
+      </span>
+
+      <span className="v19-operational-card-action">
+        <span aria-hidden="true">
+          <ActionIcon />
+        </span>
+        <span>
+          <small>{actionLabel}</small>
+          <strong>{actionText}</strong>
+        </span>
+      </span>
+
+      {progress ? (
+        <span className="v19-operational-card-progress">{progress}</span>
+      ) : null}
+      {footer ? (
+        <span className="v19-operational-card-footer">{footer}</span>
+      ) : null}
+    </Component>
+  );
 }
 
 export function V19SubmissionIdentity({
@@ -336,7 +429,7 @@ export function V19MetricStrip({
 }) {
   return (
     <div
-      className={cn("v19-admin-metric-strip", "v19-operational-metrics", className)}
+      className={cn("v19-metric-strip", className)}
       data-v19-component="operational-metrics"
     >
       {children}
@@ -350,7 +443,7 @@ export function V19MetricCard({
   icon,
   label,
   onClick,
-  tone = 'neutral',
+  tone = "neutral",
   value,
 }: {
   active?: boolean;
@@ -361,32 +454,59 @@ export function V19MetricCard({
   tone?: string;
   value: ReactNode;
 }) {
-  const mappedTone: V19SummaryTileTone =
-    tone === 'green'
-      ? 'green'
-      : tone === 'orange'
-        ? 'amber'
-        : tone === 'red'
-          ? 'danger'
-          : 'neutral';
+  const mappedTone: V19MetricTone =
+    tone === "green"
+      ? "green"
+      : tone === "red"
+        ? "danger"
+        : "neutral";
+  const Icon = icon;
+  const content = (
+    <>
+      <span className="v19-metric-card-label">{label}</span>
+      <span className="v19-metric-card-value">
+        <strong>{value}</strong>
+        {detail ? <small>{detail}</small> : null}
+      </span>
+      <span className="v19-metric-card-icon" aria-hidden="true">
+        <Icon />
+      </span>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        aria-label={label}
+        aria-pressed={active}
+        className={cn(
+          "v19-metric-card",
+          `tone-${mappedTone}`,
+          active && "is-active",
+        )}
+        type="button"
+        onClick={onClick}
+      >
+        {content}
+      </button>
+    );
+  }
 
   return (
-    <V19SummaryTile
-      active={active}
-      detail={detail}
-      icon={icon}
-      label={label}
-      tone={mappedTone}
-      value={value}
-      onClick={onClick}
-    />
+    <div
+      aria-label={label}
+      className={cn("v19-metric-card", `tone-${mappedTone}`)}
+      role="group"
+    >
+      {content}
+    </div>
   );
 }
 
 export function V19ContextToggle({
   badge,
-  badgeClassName = '',
-  className = '',
+  badgeClassName = "",
+  className = "",
   detail,
   expanded,
   icon: Icon,
@@ -423,66 +543,22 @@ export function V19ContextToggle({
 export function V19PriorityHero({
   actionAriaLabel,
   actionCount,
-  actionDisabled = false,
   actionIcon: ActionIcon = Flame,
-  actionLabel,
-  eyebrow,
-  eyebrowIcon: EyebrowIcon,
   hasBlockers,
   onAction,
-  summary,
   title,
 }: {
   actionAriaLabel: string;
-  actionCount?: number;
-  actionDisabled?: boolean;
+  actionCount: number;
   actionIcon?: V19SurfaceIcon;
-  actionLabel?: string;
-  eyebrow?: string;
-  eyebrowIcon?: V19SurfaceIcon;
   hasBlockers: boolean;
   onAction: () => void;
-  summary?: string;
   title: string;
 }) {
-  if (actionCount === undefined) {
-    return (
-      <section
-        aria-label={eyebrow ?? title}
-        className={`v19-admin-review-hero ${hasBlockers ? "has-blockers" : "is-clear"} ${actionLabel ? "has-action-label" : ""}`}
-      >
-        <div className="v19-admin-review-hero-copy">
-          {eyebrow ? (
-            <span className="v19-admin-review-eyebrow">
-              {EyebrowIcon ? <EyebrowIcon aria-hidden="true" /> : null} {eyebrow}
-            </span>
-          ) : null}
-          <h2>{title}</h2>
-          {summary ? <p>{summary}</p> : null}
-        </div>
-        <button
-          aria-label={actionAriaLabel}
-          className={`v19-admin-review-priority-card ${hasBlockers ? "has-blockers" : "is-empty"} ${actionLabel ? "has-action-label" : ""}`}
-          disabled={actionDisabled}
-          type="button"
-          onClick={onAction}
-        >
-          <span className="v19-admin-review-priority-icon">
-            <ActionIcon aria-hidden="true" />
-          </span>
-          {actionLabel ? (
-            <span className="v19-admin-review-priority-action-label">{actionLabel}</span>
-          ) : null}
-          <ChevronRight aria-hidden="true" />
-        </button>
-      </section>
-    );
-  }
-
   return (
     <section
       aria-label={title}
-      className={`v19-admin-review-hero ${hasBlockers ? "has-blockers" : "is-clear"}`}
+      className={`v19-priority-hero ${hasBlockers ? "has-blockers" : "is-clear"}`}
       data-v19-component="priority-hero"
     >
       <h2>{title}</h2>
@@ -506,7 +582,7 @@ export function V19PriorityHero({
 export function V19ListHeader({
   actionDisabled = false,
   actionLabel,
-  className = '',
+  className = "",
   countLabel,
   onAction,
   title,
@@ -535,7 +611,7 @@ export function V19ListHeader({
 
 export function V19ToolbarSelect<T extends string>({
   ariaLabel,
-  className = '',
+  className = "",
   icon: Icon,
   label,
   onChange,
@@ -568,14 +644,14 @@ export function V19ToolbarSelect<T extends string>({
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === "Escape") setOpen(false);
     };
 
-    document.addEventListener('pointerdown', closeOnOutsidePress);
-    document.addEventListener('keydown', closeOnEscape);
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePress);
-      document.removeEventListener('keydown', closeOnEscape);
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
     };
   }, [open]);
 
@@ -605,27 +681,27 @@ export function V19ToolbarSelect<T extends string>({
     );
     const currentIndex = focusedIndex >= 0 ? focusedIndex : selectedIndex;
 
-    if (event.key === 'ArrowDown') {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       moveOptionFocus((currentIndex + 1) % options.length);
       return;
     }
-    if (event.key === 'ArrowUp') {
+    if (event.key === "ArrowUp") {
       event.preventDefault();
       moveOptionFocus((currentIndex - 1 + options.length) % options.length);
       return;
     }
-    if (event.key === 'Home') {
+    if (event.key === "Home") {
       event.preventDefault();
       moveOptionFocus(0);
       return;
     }
-    if (event.key === 'End') {
+    if (event.key === "End") {
       event.preventDefault();
       moveOptionFocus(options.length - 1);
       return;
     }
-    if (event.key === 'Escape') {
+    if (event.key === "Escape") {
       event.preventDefault();
       closeAndRestoreTriggerFocus();
     }
@@ -634,20 +710,22 @@ export function V19ToolbarSelect<T extends string>({
   return (
     <div
       ref={rootRef}
-      className={`v19-admin-toolbar-select ${Icon ? 'has-icon' : ''} ${open ? 'is-open' : ''} ${className}`}
+      className={`v19-admin-toolbar-select ${Icon ? "has-icon" : ""} ${open ? "is-open" : ""} ${className}`}
     >
       <button
         ref={triggerRef}
         aria-controls={menuId}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-label={`${ariaLabel ?? label}: ${selectedOption?.label ?? ''}`}
+        aria-label={`${ariaLabel ?? label}: ${selectedOption?.label ?? ""}`}
         className="v19-admin-toolbar-select-trigger"
-        title={Icon ? `${label}: ${selectedOption?.label ?? ''}` : undefined}
+        title={Icon ? `${label}: ${selectedOption?.label ?? ""}` : undefined}
         type="button"
         onClick={() => setOpen((current) => !current)}
       >
-        {Icon ? <Icon aria-hidden="true" className="v19-admin-toolbar-select-icon" /> : null}
+        {Icon ? (
+          <Icon aria-hidden="true" className="v19-admin-toolbar-select-icon" />
+        ) : null}
         <span className="v19-admin-toolbar-select-label">{label}</span>
         <span className="v19-admin-toolbar-select-value">{selectedOption?.label}</span>
         <ChevronDown aria-hidden="true" className="v19-admin-toolbar-select-chevron" />
@@ -667,7 +745,7 @@ export function V19ToolbarSelect<T extends string>({
               }}
               key={option.value}
               aria-selected={option.value === value}
-              className={option.value === value ? 'is-selected' : ''}
+              className={option.value === value ? "is-selected" : ""}
               role="option"
               tabIndex={option.value === value ? 0 : -1}
               type="button"
@@ -692,7 +770,7 @@ export function V19QueueToolbar({
   cityFilter,
   cityOptions,
   controls,
-  filterLabel = 'Фильтры',
+  filterLabel = "Фильтры",
   onCityFilterChange,
   onFilterClick,
   onSearchChange,
@@ -715,22 +793,24 @@ export function V19QueueToolbar({
   searchValue: string;
   showCityFilter?: boolean;
 }) {
-  const cityActive = cityFilter !== 'Все города';
+  const cityActive = cityFilter !== "Все города";
 
   return (
     <V19TwoRowToolbar
       className="v19-admin-queue-toolbar border-b border-[#242529] p-4 lg:p-5"
       filters={
         <>
-          {controls ? <div className="v19-admin-toolbar-controls">{controls}</div> : null}
+          {controls ? (
+            <div className="v19-admin-toolbar-controls">{controls}</div>
+          ) : null}
           {showCityFilter ? (
             <V19ToolbarSelect<string>
               ariaLabel="Фильтр городов"
-              className={`v19-admin-city-filter ${cityActive ? 'is-active' : ''}`}
+              className={`v19-admin-city-filter ${cityActive ? "is-active" : ""}`}
               icon={MapPin}
               label="Город"
               options={cityOptions.map((city) => ({
-                label: city === 'Все города' ? 'Города' : city,
+                label: city === "Все города" ? "Города" : city,
                 value: city,
               }))}
               value={cityFilter}
@@ -767,65 +847,6 @@ export function V19QueueToolbar({
         ) : undefined
       }
     />
-  );
-}
-
-export function V19SummaryTile({
-  active = false,
-  ariaLabel,
-  className,
-  detail,
-  icon: Icon,
-  label,
-  onClick,
-  tone = "neutral",
-  value,
-}: {
-  active?: boolean;
-  ariaLabel?: string;
-  className?: string;
-  detail?: ReactNode;
-  icon: ElementType;
-  label: string;
-  onClick?: () => void;
-  tone?: V19SummaryTileTone;
-  value: ReactNode;
-}) {
-  const content = (
-    <>
-      <span className="v19-summary-tile-label">{label}</span>
-      <span className="v19-summary-tile-main">
-        <strong>{value}</strong>
-        {detail ? <small>{detail}</small> : null}
-      </span>
-      <span className="v19-summary-tile-icon" aria-hidden="true">
-        <Icon />
-      </span>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        aria-label={ariaLabel ?? label}
-        aria-pressed={active}
-        className={cn("v19-summary-tile", `tone-${tone}`, active && "is-active", className)}
-        type="button"
-        onClick={onClick}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div
-      aria-label={ariaLabel ?? label}
-      className={cn("v19-summary-tile", `tone-${tone}`, className)}
-      role="group"
-    >
-      {content}
-    </div>
   );
 }
 
@@ -936,14 +957,18 @@ export function V19ToneIcon({
 
 export function V19MemberStatusIcon({ tone }: { tone: V19MemberStatusTone }) {
   if (tone === "issue") {
-    return <AlertCircle className="vf-figma-member-issue" aria-hidden="true" size={15} />;
+    return (
+      <AlertCircle className="vf-figma-member-issue" aria-hidden="true" size={15} />
+    );
   }
 
   if (tone === "progress") {
     return <span className="vf-figma-member-progress" aria-hidden="true" />;
   }
 
-  return <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />;
+  return (
+    <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />
+  );
 }
 
 export function V19ReadinessCard({
@@ -1063,78 +1088,83 @@ export function V19UnifiedToolbar<T extends string>({
       className="vf-figma-actions-toolbar"
       filters={
         <div className="vf-figma-toolbar-topline">
-        <div className="vf-figma-tabs" aria-label={tabsLabel} role="tablist">
-          {tabs.map((tab) => (
-            <button
-              aria-label={tab.label}
-              aria-selected={value === tab.id}
-              className={value === tab.id ? "is-active" : ""}
-              key={tab.id}
-              role="tab"
-              type="button"
-              onClick={() => onTab(tab.id)}
-            >
-              <span className="vf-figma-tab-label vf-figma-tab-label-full">{tab.label}</span>
-              <span aria-hidden="true" className="vf-figma-tab-label vf-figma-tab-label-compact">
-                {tab.compactLabel ?? tab.label}
-              </span>
-              <span className="vf-figma-tab-badge">{tab.count}</span>
-            </button>
-          ))}
-        </div>
-        <label className="vf-figma-city-filter">
-          <span className="sr-only">Город</span>
-          <select
-            className="vf-figma-city-select"
-            value={cityFilter}
-            onChange={(event) => onCityFilter(event.target.value)}
-          >
-            <option value="all">Все</option>
-            {cityOptions.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
+          <div className="vf-figma-tabs" aria-label={tabsLabel} role="tablist">
+            {tabs.map((tab) => (
+              <button
+                aria-label={tab.label}
+                aria-selected={value === tab.id}
+                className={value === tab.id ? "is-active" : ""}
+                key={tab.id}
+                role="tab"
+                type="button"
+                onClick={() => onTab(tab.id)}
+              >
+                <span className="vf-figma-tab-label vf-figma-tab-label-full">
+                  {tab.label}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="vf-figma-tab-label vf-figma-tab-label-compact"
+                >
+                  {tab.compactLabel ?? tab.label}
+                </span>
+                <span className="vf-figma-tab-badge">{tab.count}</span>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+          <label className="vf-figma-city-filter">
+            <span className="sr-only">Город</span>
+            <select
+              className="vf-figma-city-select"
+              value={cityFilter}
+              onChange={(event) => onCityFilter(event.target.value)}
+            >
+              <option value="all">Все</option>
+              {cityOptions.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       }
       search={
         <div className="vf-figma-tools">
-        <div className="vf-figma-search">
-          <Search aria-hidden="true" size={20} />
-          <input
-            aria-label={searchLabel}
-            placeholder={searchPlaceholder}
-            type="search"
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-          />
-        </div>
-        <div className="vf-figma-view-toggle" aria-label="Вид списка">
-          <button
-            aria-label="Показать списком"
-            aria-pressed={viewMode === "list"}
-            className={viewMode === "list" ? "is-active" : ""}
-            title="Список"
-            type="button"
-            onClick={() => chooseViewMode("list")}
-          >
-            <List aria-hidden="true" size={16} />
-            <span className="vf-figma-view-toggle-label">Список</span>
-          </button>
-          <button
-            aria-label="Показать колонками"
-            aria-pressed={viewMode === "columns"}
-            className={viewMode === "columns" ? "is-active" : ""}
-            title="Колонки"
-            type="button"
-            onClick={() => chooseViewMode("columns")}
-          >
-            <Columns3 aria-hidden="true" size={16} />
-            <span className="vf-figma-view-toggle-label">Колонки</span>
-          </button>
-        </div>
+          <div className="vf-figma-search">
+            <Search aria-hidden="true" size={20} />
+            <input
+              aria-label={searchLabel}
+              placeholder={searchPlaceholder}
+              type="search"
+              value={query}
+              onChange={(event) => onQuery(event.target.value)}
+            />
+          </div>
+          <div className="vf-figma-view-toggle" aria-label="Вид списка">
+            <button
+              aria-label="Показать списком"
+              aria-pressed={viewMode === "list"}
+              className={viewMode === "list" ? "is-active" : ""}
+              title="Список"
+              type="button"
+              onClick={() => chooseViewMode("list")}
+            >
+              <List aria-hidden="true" size={16} />
+              <span className="vf-figma-view-toggle-label">Список</span>
+            </button>
+            <button
+              aria-label="Показать колонками"
+              aria-pressed={viewMode === "columns"}
+              className={viewMode === "columns" ? "is-active" : ""}
+              title="Колонки"
+              type="button"
+              onClick={() => chooseViewMode("columns")}
+            >
+              <Columns3 aria-hidden="true" size={16} />
+              <span className="vf-figma-view-toggle-label">Колонки</span>
+            </button>
+          </div>
         </div>
       }
     />
@@ -1148,13 +1178,11 @@ export function V19LongListCell({
   id,
   onOpen,
   peopleCount,
-  peopleLabel,
   statusLabel,
   statusTone,
   testId,
   title,
   triage,
-  type,
   updated,
 }: {
   city: string;
@@ -1183,35 +1211,20 @@ export function V19LongListCell({
       onClick={onOpen}
     >
       <V19StatusDot tone={statusTone} />
-      <span className="vf-figma-action-title">
-        <strong>{title}</strong>
-        <em>
-          <span className="vf-figma-action-id">{id}</span>
-          <span className="vf-figma-action-updated">Обновлено: {updated}</span>
-        </em>
-      </span>
+      <V19SubmissionIdentity
+        city={city}
+        className="vf-figma-action-title"
+        peopleCount={peopleCount}
+        publicId={id}
+        title={title}
+      />
       <span className="vf-figma-mobile-route">
-        <strong>{city}</strong>
-        <em>{dates}</em>
-      </span>
-      <span className="vf-figma-mobile-people" aria-hidden="true">
-        {type === "family" ? (
-          <Users aria-hidden="true" size={14} />
-        ) : (
-          <User aria-hidden="true" size={14} />
-        )}
-        {peopleLabel}
+        <strong>{dates}</strong>
+        <em>Даты поездки</em>
       </span>
       <span className="vf-figma-action-meta">
-        <strong>{city}</strong>
-        <em>
-          {type === "family" ? (
-            <Users aria-hidden="true" size={14} />
-          ) : (
-            <User aria-hidden="true" size={14} />
-          )}
-          {peopleLabel}
-        </em>
+        <strong>{updated}</strong>
+        <em>Обновлено</em>
       </span>
       <span className="vf-figma-action-dates">
         <strong>{dates}</strong>
@@ -1226,12 +1239,8 @@ export function V19LongListCell({
             <strong>{triage.score}</strong>
             <em>{triage.bandLabel}</em>
           </span>
-          <span className="vf-figma-ai-triage-identity">
-            {triage.identityLabel}
-          </span>
-          <span className="vf-figma-ai-triage-action">
-            {triage.nextAction}
-          </span>
+          <span className="vf-figma-ai-triage-identity">{triage.identityLabel}</span>
+          <span className="vf-figma-ai-triage-action">{triage.nextAction}</span>
         </span>
       ) : null}
       <span className="vf-figma-action-status">
@@ -1254,7 +1263,6 @@ export function V19ActionBoardCard({
   progress,
   title,
   tone,
-  type,
 }: {
   blocker?: string;
   city: string;
@@ -1278,21 +1286,13 @@ export function V19ActionBoardCard({
       onClick={onOpen}
     >
       {showRail ? <span className={`vf-figma-card-rail is-${tone}`} /> : null}
-      <span className="vf-figma-column-card-head">
-        <span>{id}</span>
-        <em>
-          {type === "family" ? (
-            <Users aria-hidden="true" size={12} />
-          ) : (
-            <User aria-hidden="true" size={12} />
-          )}
-          {peopleCount}
-        </em>
-      </span>
-      <strong>{title}</strong>
-      <span className="vf-figma-column-subline">
-        {city} <i aria-hidden="true" /> {dates}
-      </span>
+      <V19SubmissionIdentity
+        city={city}
+        peopleCount={peopleCount}
+        publicId={id}
+        title={title}
+      />
+      <span className="vf-figma-column-subline">{dates}</span>
       <span className="vf-figma-column-footer">
         {blocker ? (
           <span className={`is-${tone}`}>
@@ -1574,9 +1574,7 @@ export function V19ProgressMeter({
   value: number;
 }) {
   const safeMax = Number.isFinite(max) && max > 0 ? max : 100;
-  const safeValue = Number.isFinite(value)
-    ? Math.min(Math.max(value, 0), safeMax)
-    : 0;
+  const safeValue = Number.isFinite(value) ? Math.min(Math.max(value, 0), safeMax) : 0;
 
   return (
     <progress
@@ -1673,7 +1671,11 @@ export function V19DrawerHeader<T extends string>({
       </div>
 
       <div className="v19-figma-drawer-tabs-scroll" ref={tabsRef}>
-        <div className="v19-figma-drawer-tabs" role="tablist" aria-label="Разделы подачи">
+        <div
+          className="v19-figma-drawer-tabs"
+          role="tablist"
+          aria-label="Разделы подачи"
+        >
           {tabs.map((item) => {
             const isActive = activeTab === item.id;
             return (

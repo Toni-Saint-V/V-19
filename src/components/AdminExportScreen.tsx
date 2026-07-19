@@ -32,6 +32,7 @@ import {
 } from "../integration/visaflowBusinessBridge";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { applyExportStateToSelection } from "../modules/submissions/submissionActions";
+import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
   buildExportArchiveInputSignature,
   buildExportPackageIdentity,
@@ -48,12 +49,14 @@ import type { ExportMediaZipArtifact } from "../modules/submissions/exportMediaZ
 import {
   AdminContextToggle,
   AdminListHeader,
-  AdminMetricCard,
-  AdminMetricStrip,
   AdminQueueToolbar,
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
-import { V19QueueCard } from "../shared/ui/v19-design-system";
+import {
+  V19MetricCard,
+  V19MetricStrip,
+  V19QueueCard,
+} from "../shared/ui/v19-design-system";
 import { agentDisplayName } from "../modules/submissions/agentDirectory";
 import {
   cityFilterValuesForSubmissions,
@@ -63,6 +66,7 @@ import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
 
 interface ExportItem {
   id: string;
+  publicId: string;
   title: string;
   type: "single" | "family";
   applicantsCount: number;
@@ -106,9 +110,11 @@ function StatusPill({
   children: React.ReactNode;
 }) {
   const toneClass = {
-    green: "bg-white/[0.045] text-[#b8baff] border-white/10",
+    green:
+      "bg-[var(--v19b-status-success-bg)] text-[var(--v19b-dot-success)] border-[var(--v19b-status-success-border)]",
     orange: "bg-white/[0.045] text-white/62 border-white/10",
-    blue: "bg-[#6f64ff]/15 text-[#b8baff] border-[#6f64ff]/25",
+    blue:
+      "bg-[var(--v19b-color-primary-soft-20)] text-[var(--v19b-color-primary-text)] border-[var(--v19b-color-primary-soft-30)]",
     neutral: "bg-white/5 text-white/55 border-white/10",
   }[tone];
 
@@ -134,7 +140,7 @@ function ManifestRow({
 }) {
   const stateClass =
     state === "ok"
-      ? "text-[#b8baff]"
+      ? "text-[var(--v19b-dot-success)]"
       : state === "warn"
         ? "text-white/62"
         : "text-white/45";
@@ -161,6 +167,7 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
 
       return [{
         id: submission.id,
+        publicId: submissionPublicId(submission),
         title: submission.listTitle ?? submission.title,
         type: submission.type,
         applicantsCount: submission.applicants.length,
@@ -814,8 +821,8 @@ export function AdminExportScreen({
       className="v19-admin-screen v19-admin-export-screen-v2"
     >
       <section className="v19-admin-export-main-v2">
-        <AdminMetricStrip className="v19-admin-export-metrics-v2">
-          <AdminMetricCard
+        <V19MetricStrip>
+          <V19MetricCard
             active={activeQueueTab === "ready"}
             detail={packageCountLabel(availableCount)}
             icon={CheckCircle2}
@@ -824,7 +831,7 @@ export function AdminExportScreen({
             tone="green"
             onClick={() => setActiveQueueTab("ready")}
           />
-          <AdminMetricCard
+          <V19MetricCard
             active={activeQueueTab === "selected"}
             detail={packageCountLabel(selectedCount)}
             icon={PackageCheck}
@@ -833,7 +840,7 @@ export function AdminExportScreen({
             tone="blue"
             onClick={() => setActiveQueueTab("selected")}
           />
-          <AdminMetricCard
+          <V19MetricCard
             active={activeQueueTab === "blocked"}
             detail={packageCountLabel(blockedCount)}
             icon={blockedCount ? XCircle : ShieldCheck}
@@ -842,7 +849,7 @@ export function AdminExportScreen({
             tone={blockedCount ? "red" : "green"}
             onClick={() => setActiveQueueTab("blocked")}
           />
-        </AdminMetricStrip>
+        </V19MetricStrip>
 
         <AdminContextToggle
           badge={hasExportBlockers || (activeItem?.blockers ?? 0) > 0 ? "Стоп" : selectedCount ? "Готов" : "—"}
@@ -935,7 +942,7 @@ export function AdminExportScreen({
               }
               aria-pressed={allDisplaySelected}
               onClick={toggleAll}
-              className={`flex h-5 w-5 items-center justify-center rounded-md border ${allDisplaySelected ? "border-[#6f64ff] bg-[#6f64ff]" : "border-[#242529] bg-[#161617]"}`}
+              className={`flex h-5 w-5 items-center justify-center rounded-md border ${allDisplaySelected ? "border-[var(--v19b-color-primary)] bg-[var(--v19b-color-primary)]" : "border-[#242529] bg-[#161617]"}`}
             >
               {allDisplaySelected && (
                   <CheckSquare className="h-3.5 w-3.5 text-white" />
@@ -980,7 +987,7 @@ export function AdminExportScreen({
 
                     <div className="v19-admin-export-row-submission-v2 flex min-w-0 items-center gap-2 text-[12px] text-white/55">
                       <span className="shrink-0 rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/55">
-                        {item.id}
+                        {item.publicId}
                       </span>
                       <MapPin className="h-3.5 w-3.5 shrink-0 text-white/40" />
                       <span>{item.city}</span>
@@ -1038,7 +1045,7 @@ export function AdminExportScreen({
         <div className="v19-admin-export-rail-head-v2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-[#b8baff]">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--v19b-color-primary-text)]">
                 Выгрузка
               </div>
               <h3 className="mt-1 text-[20px] font-semibold tracking-tight text-white">
@@ -1134,7 +1141,7 @@ export function AdminExportScreen({
           {exportHelper ? (
             <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
               <div className="mb-3 flex items-center gap-2">
-                <Bot className="h-4 w-4 text-[#b8baff]" />
+                <Bot className="h-4 w-4 text-[var(--v19b-color-primary-text)]" />
                 <h4 className="text-[14px] font-semibold text-white">
                   Тихая AI-помощь
                 </h4>
@@ -1305,7 +1312,7 @@ export function AdminExportScreen({
                     key={item.id}
                     className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.025] p-3"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#6f64ff]/15 text-[#b8baff]">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--v19b-color-primary-soft-20)] text-[var(--v19b-color-primary-text)]">
                       {item.type === "family" ? (
                         <Users className="h-4 w-4" />
                       ) : (
@@ -1317,7 +1324,7 @@ export function AdminExportScreen({
                         {item.title}
                       </div>
                       <div className="mt-0.5 text-[11px] text-white/35">
-                        {item.id} · {item.applicantsCount}{" "}
+                        {item.publicId} · {item.applicantsCount}{" "}
                         {applicantCountLabel(item.applicantsCount)}
                       </div>
                     </div>
@@ -1414,7 +1421,7 @@ export function AdminExportScreen({
             </button>
           )}
           <div
-            className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? "text-[#d59aa3]" : exportNotice ? "text-[#b8baff]" : "text-white/35"}`}
+            className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? "text-[#d59aa3]" : exportNotice ? "text-[var(--v19b-color-primary-text)]" : "text-white/35"}`}
             id="export-action-hint"
           >
             <Clock3 className="h-3.5 w-3.5" />{" "}

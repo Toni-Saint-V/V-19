@@ -47,6 +47,12 @@ export interface AdminIssueBridgePayload {
   input: IssueInput;
 }
 
+export interface AdminFileReviewBridgePayload {
+  submissionId: string;
+  applicantId: string;
+  fileType: SubmissionFileType;
+}
+
 export interface AdminPassportSectionApprovalBridgePayload {
   submissionId: string;
   applicantId: string;
@@ -68,6 +74,7 @@ export type VisaflowUiEvent =
   | { type: 'upload.open' }
   | { type: 'admin.review.open'; submissionId: string }
   | { type: 'admin.issue.add'; payload: AdminIssueBridgePayload }
+  | { type: 'admin.file.accept'; payload: AdminFileReviewBridgePayload }
   | { type: 'admin.passport-section.approve'; payload: AdminPassportSectionApprovalBridgePayload }
   | { type: 'admin.ai.run'; submissionId: string }
   | { type: 'admin.ai.accept'; payload: AdminAiSuggestionBridgePayload }
@@ -90,6 +97,9 @@ export interface VisaflowBusinessBridge {
   onUploadOpen?: () => void;
   onAdminReviewOpen?: (submissionId: string) => void;
   onAdminIssueAdd?: (payload: AdminIssueBridgePayload) => void | Promise<void>;
+  onAdminFileAccept?: (
+    payload: AdminFileReviewBridgePayload,
+  ) => void | Promise<void>;
   onAdminPassportSectionApprove?: (
     payload: AdminPassportSectionApprovalBridgePayload,
   ) => void | Promise<void>;

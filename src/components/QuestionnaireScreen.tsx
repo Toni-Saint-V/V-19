@@ -255,6 +255,16 @@ function synchronizePassportExtractionConfirmations(
       const allExtractedFieldsVerified = extractedFields.every(
         (field) => field.verified === true,
       );
+      const hasUpdatedExtractedField = extraction.extractedFields.some((field) => {
+        const questionnaireFieldId =
+          questionnaireFieldIdByPassportExtractionKey[field.key];
+        return updatedKeys.has(
+          questionnaireReviewConfirmationKey({
+            applicantId: applicant.id,
+            fieldId: questionnaireFieldId,
+          }),
+        );
+      });
 
       return {
         ...applicant,
@@ -263,7 +273,9 @@ function synchronizePassportExtractionConfirmations(
           extractedFields,
           verifiedAtIso: allExtractedFieldsVerified
             ? (extraction.verifiedAtIso ?? nowIso)
-            : undefined,
+            : hasUpdatedExtractedField
+              ? undefined
+              : extraction.verifiedAtIso,
         },
       };
     }),

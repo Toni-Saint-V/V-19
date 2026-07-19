@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import type { Submission } from '../modules/submissions/types';
-import { statusLabelFor } from '../modules/submissions/status';
+import {
+  applicantChecklistStatus,
+  canPerformAction,
+  statusLabelFor,
+  type ApplicantChecklistStatus,
+} from '../modules/submissions/status';
+import { familyDisplayTitleFromMainApplicantName } from '../modules/submissions/listFormatters';
 import { updatedLabel } from './v19BusinessScreenAdapter';
 import {
   AlertCircle,
@@ -32,11 +38,12 @@ import {
 
 interface ApplicantsScreenProps {
   onOpenDrawer: (id: string) => void;
+  onSubmitForReview?: (id: string) => Promise<void>;
   submissions?: Submission[];
 }
 
 // View types
-type ApplicantStatus = 'ready' | 'missing_docs' | 'in_progress';
+type ApplicantStatus = ApplicantChecklistStatus;
 type ApplicantMarker = 'male' | 'female' | 'child' | 'person';
 type ApplicantSort = 'tripDate' | 'createdAt';
 
@@ -54,7 +61,7 @@ interface FamilyData {
   lifecycleStatus: Submission['status'];
   title: string;
   members: FamilyMember[];
-  lastActivity: string;
+  canSubmitForReview: boolean;
   readinessPercent: number;
   tripDateFrom: string;
 }
@@ -67,19 +74,12 @@ interface IndividualData {
   marker: ApplicantMarker;
   name: string;
   readinessPercent: number;
+  status: ApplicantStatus;
   lastActivity: string;
   tripDateFrom: string;
 }
 
 const emptySubmissions: Submission[] = [];
-
-function applicantStatusFromSubmission(submission: Submission, applicantId: string): ApplicantStatus {
-  const applicant = submission.applicants.find((item) => item.id === applicantId);
-  if (!applicant) return 'in_progress';
-  if (applicant.questionnaireStatus === 'complete' && applicant.fileStatus === 'complete') return 'ready';
-  if (applicant.questionnaireStatus === 'needs_fix' || applicant.fileStatus === 'needs_fix') return 'missing_docs';
-  return 'in_progress';
-}
 
 function questionnaireValueForApplicant(submission: Submission, applicantId: string, fieldId: string) {
   const applicant = submission.applicants.find((item) => item.id === applicantId);
@@ -120,25 +120,37 @@ function ApplicantMarkerIcon({ marker }: { marker: ApplicantMarker }) {
 function runtimeFamiliesFromSubmissions(submissions: Submission[]): FamilyData[] {
   return submissions
     .filter((submission) => submission.type === 'family')
-    .map((submission) => ({
-      city: questionnaireCityForSubmission(submission),
-      createdAt: submission.createdAt,
-      id: submission.id,
-      lifecycleStatus: submission.status,
-      title: submission.listTitle ?? submission.title,
-      lastActivity: updatedLabel(submission.updatedAt),
-      readinessPercent: submission.completeness.total,
-      tripDateFrom: submission.tripDateFrom,
-      members: submission.applicants.map((applicant) => {
-        const marker = applicantMarker(submission, applicant);
-        return {
-          marker,
-          name: applicant.fullName,
-          roleLabel: applicantRoleLabel(applicant.role, marker),
-          status: applicantStatusFromSubmission(submission, applicant.id),
-        };
-      }),
-    }));
+    .map((submission) => {
+      const mainApplicant =
+        submission.applicants.find((applicant) => applicant.role === 'main') ??
+        submission.applicants[0];
+
+      return {
+        canSubmitForReview:
+          canPerformAction(submission, 'submit_for_review', 'agent').ok &&
+          submission.applicants.every(
+            (applicant) => applicantChecklistStatus(submission, applicant.id) === 'ready',
+          ),
+        city: questionnaireCityForSubmission(submission),
+        createdAt: submission.createdAt,
+        id: submission.id,
+        lifecycleStatus: submission.status,
+        title:
+          familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ??
+          submission.title,
+        readinessPercent: submission.completeness.total,
+        tripDateFrom: submission.tripDateFrom,
+        members: submission.applicants.map((applicant) => {
+          const marker = applicantMarker(submission, applicant);
+          return {
+            marker,
+            name: applicant.fullName,
+            roleLabel: applicantRoleLabel(applicant.role, marker),
+            status: applicantChecklistStatus(submission, applicant.id),
+          };
+        }),
+      };
+    });
 }
 
 function runtimeIndividualsFromSubmissions(submissions: Submission[]): IndividualData[] {
@@ -154,6 +166,9 @@ function runtimeIndividualsFromSubmissions(submissions: Submission[]): Individua
         marker: applicant ? applicantMarker(submission, applicant) : 'person',
         name: applicant?.fullName ?? submission.title,
         readinessPercent: submission.completeness.total,
+        status: applicant
+          ? applicantChecklistStatus(submission, applicant.id)
+          : 'in_progress',
         lastActivity: updatedLabel(submission.updatedAt),
         tripDateFrom: submission.tripDateFrom,
       };
@@ -162,9 +177,9 @@ function runtimeIndividualsFromSubmissions(submissions: Submission[]): Individua
 
 const getStatusDot = (status: ApplicantStatus) => {
   switch (status) {
-    case 'ready': return <CheckCircle2 className="w-[14px] h-[14px] text-[#b8baff]" />;
-    case 'missing_docs': return <AlertCircle className="w-[14px] h-[14px] text-[#d59aa3]" />;
-    case 'in_progress': return <div className="w-2.5 h-2.5 rounded-full bg-[#7c73ff] ring-4 ring-[#161617]" />;
+    case 'ready': return <CheckCircle2 className="w-[14px] h-[14px] text-[var(--v19b-dot-success)]" />;
+    case 'missing_docs': return <AlertCircle className="w-[14px] h-[14px] text-[var(--v19b-color-remark)]" />;
+    case 'in_progress': return <div className="w-2.5 h-2.5 rounded-full bg-[var(--v19b-dot-review)] ring-4 ring-[var(--v19b-color-panel)]" />;
   }
 };
 
@@ -221,11 +236,25 @@ function lifecycleStatusTone(status: Submission['status']) {
   return 'is-progress';
 }
 
-export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreenProps) {
+function familyActionLabel(family: FamilyData, submitting: boolean) {
+  if (submitting) return 'Отправляем…';
+  if (family.canSubmitForReview) return 'На проверку';
+  if (family.lifecycleStatus === 'submitted_for_review') return 'На проверке';
+  return 'Открыть';
+}
+
+export function ApplicantsScreen({
+  onOpenDrawer,
+  onSubmitForReview,
+  submissions,
+}: ApplicantsScreenProps) {
+  const prefersReducedMotion = useReducedMotion();
   const [applicantSummaryFilter, setApplicantSummaryFilter] = useState<AgentSubmissionQueueFilter>('all');
   const [cityFilter, setCityFilter] = useState('Все города');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<ApplicantSort>('tripDate');
+  const [submittingFamilyId, setSubmittingFamilyId] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<{ id: string; message: string } | null>(null);
   const canonicalSubmissions = submissions ?? emptySubmissions;
   const filteredSubmissions = useMemo(
     () =>
@@ -284,15 +313,34 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
     setSearchQuery('');
     setSortBy('tripDate');
   };
+  const handleFamilyAction = async (family: FamilyData) => {
+    if (!family.canSubmitForReview || !onSubmitForReview) {
+      onOpenDrawer(family.id);
+      return;
+    }
+
+    setSubmissionError(null);
+    setSubmittingFamilyId(family.id);
+    try {
+      await onSubmitForReview(family.id);
+    } catch (error) {
+      setSubmissionError({
+        id: family.id,
+        message: error instanceof Error ? error.message : 'Не удалось отправить подачу на проверку.',
+      });
+    } finally {
+      setSubmittingFamilyId(null);
+    }
+  };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }}
+    <motion.div
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className="v19-agent-shared-screen"
     >
-      <V19MetricStrip className="v19-admin-export-metrics-v2">
+      <V19MetricStrip>
         <V19MetricCard
           active={applicantSummaryFilter === 'all'}
           detail={profileNoun(metrics.queue)}
@@ -403,31 +451,31 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           <h2 id="agent-submissions-families">Семьи</h2>
           {displayFamilies.map((family) => (
             <V19QueueCard
-              as="button"
-              aria-label={`Открыть подачу ${family.title}`}
+              as="article"
+              aria-label={`Подача ${family.title}`}
               data-submission-id={family.id}
               key={family.id}
-              onClick={() => onOpenDrawer(family.id)}
               className="v19-agent-shared-card group"
-              type="button"
             >
-              <div className="v19-applicant-family-header flex justify-between items-start gap-3 mb-5">
-                <div className="v19-applicant-family-main flex gap-3.5 items-center">
-                  <div className="v19-agent-submission-family-icon w-11 h-11 bg-white/5 border border-white/5 flex items-center justify-center shadow-inner group-hover:bg-[#6f64ff]/10 group-hover:border-[#6f64ff]/20 transition-colors">
-                    <Users className="w-5 h-5 text-white/70 group-hover:text-[#3a45b4] transition-colors" />
+              <div className="v19-applicant-family-header">
+                <div className="v19-applicant-family-main">
+                  <div className="v19-agent-submission-family-icon w-11 h-11 bg-white/5 border border-white/5 flex items-center justify-center shadow-inner group-hover:bg-[var(--v19b-color-primary-soft-10)] group-hover:border-[var(--v19b-color-primary-soft-20)] transition-colors">
+                    <Users className="w-5 h-5 text-white/70 group-hover:text-[var(--v19b-color-primary)] transition-colors" />
                   </div>
                   <div className="v19-applicant-family-copy">
-                    <h3 className="text-[15px] font-semibold text-white group-hover:text-white transition-colors">{family.title}</h3>
-                    <p className="mt-0.5 text-[12px] text-[var(--v19b-color-text-70)]">{peopleCountLabel(family.members.length)}</p>
+                    <h3>{family.title}</h3>
+                    <p className="v19-applicant-family-meta">
+                      <span>{peopleCountLabel(family.members.length)}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{family.city}</span>
+                    </p>
                   </div>
                 </div>
-                <span className="v19-applicant-card-city">
-                  <span>{family.city}</span>
-                  <span aria-hidden="true">·</span>
+                <div className="v19-applicant-family-summary">
                   <span className={`v19-applicant-card-status ${lifecycleStatusTone(family.lifecycleStatus)}`}>
                     {statusLabelFor(family.lifecycleStatus, 'compact')}
                   </span>
-                </span>
+                </div>
               </div>
 
               {/* Members List */}
@@ -445,16 +493,25 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
               </div>
 
               {/* Footer */}
-              <div className="v19-applicant-card-footer pt-4 border-t border-[#242529] flex justify-between items-center text-[11.5px] text-white/40">
-                <span>{family.lastActivity}</span>
-                <span className="v19-applicant-card-footer-actions">
-                  <span className="v19-applicant-readiness">
-                    {family.readinessPercent}% готово
-                  </span>
-                  <span className="v19-applicant-open-action">
-                    Открыть <ChevronRight aria-hidden="true" />
-                  </span>
+              <div className="v19-applicant-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-[#242529] pt-4 text-[11.5px] text-white/40">
+                <span className="v19-applicant-readiness">
+                  {family.readinessPercent}% готово
                 </span>
+                <button
+                  aria-label={`${familyActionLabel(family, submittingFamilyId === family.id)}: ${family.title}`}
+                  className="v19-applicant-open-action"
+                  disabled={submittingFamilyId === family.id}
+                  type="button"
+                  onClick={() => void handleFamilyAction(family)}
+                >
+                  {familyActionLabel(family, submittingFamilyId === family.id)}
+                  <ChevronRight aria-hidden="true" />
+                </button>
+                {submissionError?.id === family.id ? (
+                  <span className="v19-applicant-submit-error" role="alert">
+                    {submissionError.message}
+                  </span>
+                ) : null}
               </div>
             </V19QueueCard>
           ))}
@@ -485,8 +542,9 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
                   </div>
                   <div className="v19-applicant-individual-copy">
                     <div className="v19-applicant-individual-name-row">
-                      <h3 className="text-[15px] font-semibold text-white group-hover:text-white transition-colors">{ind.name}</h3>
+                      <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-white transition-colors group-hover:text-white">{ind.name}</h3>
                       <span className={`v19-applicant-individual-status ${lifecycleStatusTone(ind.lifecycleStatus)}`}>
+                        {getStatusDot(ind.status)}
                         {statusLabelFor(ind.lifecycleStatus, 'compact')}
                       </span>
                     </div>
@@ -495,12 +553,12 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
               </div>
 
               {/* Footer */}
-              <div className="v19-applicant-card-footer pt-4 border-t border-[#242529] flex justify-between items-center text-[11.5px] text-white/40">
-                <div className="v19-applicant-card-footer-meta">
+              <div className="v19-applicant-card-footer flex flex-wrap items-center justify-between gap-2 border-t border-[#242529] pt-4 text-[11.5px] text-white/40">
+                <div className="v19-applicant-card-footer-meta min-w-0 flex-1">
                   <span>{ind.lastActivity}</span>
                   <span className="v19-applicant-card-footer-city">{ind.city}</span>
                 </div>
-                <span className="v19-applicant-card-footer-actions">
+                <span className="v19-applicant-card-footer-actions flex-wrap justify-end">
                   <span className="v19-applicant-readiness">
                     {ind.readinessPercent}% готово
                   </span>

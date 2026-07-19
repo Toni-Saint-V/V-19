@@ -37,9 +37,12 @@ async function openQuestionnaire(page: Page) {
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Мои действия" })).toBeVisible();
 
-  const continueAction = page.getByRole("button", { exact: true, name: "Продолжить" });
-  await expect(continueAction.first()).toBeVisible();
-  await continueAction.first().click();
+  const continueQuestionnaire = page.getByRole("button", {
+    exact: true,
+    name: "Продолжить: Артём Соколов",
+  });
+  await expect(continueQuestionnaire).toBeVisible();
+  await continueQuestionnaire.click();
 
   await expect(page.locator(".vf-figma-questionnaire-screen")).toBeVisible();
   await expect(
@@ -63,6 +66,95 @@ async function expectNoDocumentOverflow(page: Page) {
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 }
 
+async function expectFullscreenQuestionnaireShell(
+  page: Page,
+  viewport: { height: number; width: number },
+) {
+  const geometry = await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>(
+      ".vf-figma-questionnaire-screen.v19-questionnaire-screen-shell",
+    );
+    const shellBox = shell?.getBoundingClientRect();
+    const shellStyle = shell ? getComputedStyle(shell) : undefined;
+
+    return shellBox && shellStyle
+      ? {
+          borderRadius: shellStyle.borderRadius,
+          height: shellBox.height,
+          width: shellBox.width,
+          x: shellBox.x,
+          y: shellBox.y,
+        }
+      : null;
+  });
+
+  expect(geometry).not.toBeNull();
+  expect(Math.abs(geometry?.x ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual(1);
+  expect(Math.abs(geometry?.y ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual(1);
+  expect(geometry?.width ?? 0).toBeGreaterThanOrEqual(viewport.width - 1);
+  expect(geometry?.height ?? 0).toBeGreaterThanOrEqual(viewport.height - 1);
+}
+
+async function expectMobileQuestionnaireLayout(
+  page: Page,
+  viewport: { height: number; width: number },
+) {
+  await expectFullscreenQuestionnaireShell(page, viewport);
+
+  const geometry = await page.evaluate(() => {
+    const rect = (selector: string) => {
+      const box = document.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+
+      return box
+        ? {
+            height: box.height,
+            width: box.width,
+            x: box.x,
+            y: box.y,
+          }
+        : null;
+    };
+    const scroll = document.querySelector<HTMLElement>(".v19-questionnaire-scroll");
+    const workPanel = document.querySelector<HTMLElement>(
+      ".v19-questionnaire-work-panel",
+    );
+    const shell = document.querySelector<HTMLElement>(
+      ".vf-figma-questionnaire-screen.v19-questionnaire-screen-shell",
+    );
+    const scrollFrame = document.querySelector<HTMLElement>(
+      ".v19-questionnaire-scroll-frame",
+    );
+
+    const shellBox = shell?.getBoundingClientRect();
+    const frameBox = scrollFrame?.getBoundingClientRect();
+
+    return {
+      backButton: rect(".v19-questionnaire-back-button"),
+      borderRadius: shell ? getComputedStyle(shell).borderRadius : null,
+      contentInset:
+        shellBox && frameBox ? frameBox.left - shellBox.left : Number.NEGATIVE_INFINITY,
+      header: rect(".v19-questionnaire-screen-header"),
+      saveButton: rect(".v19-questionnaire-save-button"),
+      scrollOverflowY: scroll ? getComputedStyle(scroll).overflowY : null,
+      workPanel: rect(".v19-questionnaire-work-panel"),
+      workPanelOverflowY: workPanel ? getComputedStyle(workPanel).overflowY : null,
+    };
+  });
+
+  expect(geometry.borderRadius).toBe("0px");
+  expect(geometry.header?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    viewport.height * 0.15,
+  );
+  expect(geometry.contentInset).toBeGreaterThanOrEqual(16);
+  expect(geometry.workPanel?.height ?? 0).toBeGreaterThanOrEqual(viewport.height * 0.75 - 1);
+  expect(geometry.scrollOverflowY).toBe("auto");
+  expect(geometry.workPanelOverflowY).toBe("visible");
+  expect(geometry.backButton?.width ?? 0).toBeGreaterThanOrEqual(40);
+  expect(geometry.backButton?.height ?? 0).toBeGreaterThanOrEqual(40);
+  expect(geometry.saveButton?.height ?? 0).toBeGreaterThanOrEqual(40);
+  await expectNoDocumentOverflow(page);
+}
+
 test.describe("V-19 questionnaire live sanity", () => {
   test("desktop keeps the questionnaire actionable and autosaves a safe draft change", async ({
     page,
@@ -70,6 +162,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 900, width: 1440 });
     await openQuestionnaire(page);
+    await expectFullscreenQuestionnaireShell(page, { height: 900, width: 1440 });
 
     await expect(page.locator(".v19-questionnaire-screen-header")).toBeVisible();
     await expect(page.locator(".v19-questionnaire-applicant-bar")).toBeVisible();
@@ -91,31 +184,42 @@ test.describe("V-19 questionnaire live sanity", () => {
       name: "Подтвердить поле: Дата рождения",
     });
     await expect(confirmReview).toBeVisible();
-    await expect(
-      reviewField.locator("xpath=ancestor::*[@data-field-label='Дата рождения']"),
-    ).toContainText("Подтвердить");
+    const reviewCell = reviewField.locator(
+      "xpath=ancestor::*[@data-field-label='Дата рождения']",
+    );
+    await expect(reviewCell).toContainText("Подтвердить");
+    const [reviewControlBox, confirmReviewBox] = await Promise.all([
+      reviewField.boundingBox(),
+      confirmReview.boundingBox(),
+    ]);
+    expect(reviewControlBox).not.toBeNull();
+    expect(confirmReviewBox).not.toBeNull();
+    expect(
+      Math.abs(
+        (confirmReviewBox?.x ?? 0) -
+          ((reviewControlBox?.x ?? 0) + (reviewControlBox?.width ?? 0)),
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(Math.abs((confirmReviewBox?.y ?? 0) - (reviewControlBox?.y ?? 0))).toBeLessThanOrEqual(
+      1,
+    );
     await page.screenshot({
       fullPage: true,
       path: testInfo.outputPath("questionnaire-review-desktop.png"),
     });
 
     await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
-    const address = page.getByRole("textbox", { name: "Домашний адрес" });
-    await address.fill("прНовочеркаский56 2 34");
-    await expect(address).toHaveValue("прНовочеркаский56 2 34");
-    await expect(
-      page.getByText("проспект Новочеркаский дом 56, корпус 2, квартира 34"),
-    ).toBeVisible();
+    const street = page.getByRole("combobox", {
+      name: "Улица / проспект / переулок",
+    });
+    await street.fill("ул");
+    await expect(page.getByRole("option", { name: "улица" })).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path: testInfo.outputPath("questionnaire-address-desktop.png"),
     });
-    await page
-      .getByRole("button", { name: "Подставить адрес: Домашний адрес" })
-      .click();
-    await expect(address).toHaveValue(
-      "проспект Новочеркаский дом 56, корпус 2, квартира 34",
-    );
+    await page.getByRole("option", { name: "улица" }).click();
+    await expect(street).toHaveValue("улица ");
     await expect(page.locator("[role='status']:visible").filter({ hasText: "Сохранено" })).toBeVisible({
       timeout: 5_000,
     });
@@ -134,6 +238,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 844, width: 390 });
     await openQuestionnaire(page);
+    await expectMobileQuestionnaireLayout(page, { height: 844, width: 390 });
 
     const header = page.locator(".v19-questionnaire-screen-header");
     const headerBox = await header.boundingBox();
@@ -141,16 +246,125 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(headerBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(844 * 0.15);
 
     await expect(page.locator(".v19-questionnaire-header-actions")).toBeVisible();
-    const blocker = page.getByRole("button", { name: /^Перейти к блокеру:/ });
+    const blocker = page.getByRole("button", {
+      name: /^Перейти к следующему обязательному действию:/,
+    });
     await expect(blocker).toBeVisible();
     await blocker.click();
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Сохранить и выйти" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Отправить на проверку" }),
-    ).toBeVisible();
+
+    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
+
+    const applicantNextButtons = page.locator(
+      '[aria-label^="Следующее незаполненное:"]',
+    );
+    expect(await applicantNextButtons.count()).toBeGreaterThan(0);
+    await expect(applicantNextButtons.first()).toBeHidden();
+
+    const pinnedSections = page.locator(
+      ".v19-questionnaire-section-list--pinned",
+    );
+    const pinnedSectionLayout = await pinnedSections.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const firstSection = element.querySelector<HTMLElement>(
+        ".v19-questionnaire-section-tab",
+      );
+      return {
+        display: style.display,
+        firstSectionHeight: firstSection?.getBoundingClientRect().height ?? 0,
+        overflowX: style.overflowX,
+      };
+    });
+    expect(pinnedSectionLayout.display).toBe("flex");
+    expect(pinnedSectionLayout.firstSectionHeight).toBeLessThanOrEqual(48);
+    expect(["auto", "scroll"]).toContain(pinnedSectionLayout.overflowX);
+    const [applicantTabBox, sectionTabBox] = await Promise.all([
+      page.locator(".v19-questionnaire-applicant-tab").first().boundingBox(),
+      page.locator(".v19-questionnaire-section-tab").first().boundingBox(),
+    ]);
+    expect(applicantTabBox).not.toBeNull();
+    expect(sectionTabBox).not.toBeNull();
+    expect(
+      Math.abs((applicantTabBox?.height ?? 0) - (sectionTabBox?.height ?? 0)),
+    ).toBeLessThanOrEqual(1);
+
+    const [countryBox, cityBox] = await Promise.all([
+      page.locator('[data-field-label="Страна проживания"]').boundingBox(),
+      page.locator('[data-field-label="Город проживания"]').boundingBox(),
+    ]);
+    expect(countryBox).not.toBeNull();
+    expect(cityBox).not.toBeNull();
+    expect(Math.abs((countryBox?.y ?? 0) - (cityBox?.y ?? 0))).toBeLessThanOrEqual(2);
+
+    const [houseBox, buildingBox] = await Promise.all([
+      page.locator('[data-field-label="Дом"]').boundingBox(),
+      page.locator('[data-field-label="Корпус / строение"]').boundingBox(),
+    ]);
+    expect(houseBox).not.toBeNull();
+    expect(buildingBox).not.toBeNull();
+    expect(Math.abs((houseBox?.y ?? 0) - (buildingBox?.y ?? 0))).toBeLessThanOrEqual(2);
+
+    const [unitBox, postalBox] = await Promise.all([
+      page.locator('[data-field-label="Квартира / офис / помещение"]').boundingBox(),
+      page.locator('[data-field-label="Почтовый индекс"]').boundingBox(),
+    ]);
+    expect(unitBox).not.toBeNull();
+    expect(postalBox).not.toBeNull();
+    expect(Math.abs((unitBox?.y ?? 0) - (postalBox?.y ?? 0))).toBeLessThanOrEqual(2);
+
+    await page.getByRole("button", { name: /Личные данные/ }).first().click();
+    const [surnameBox, previousSurnameBox] = await Promise.all([
+      page.locator('[data-field-label="Фамилия"]').boundingBox(),
+      page.locator('[data-field-label="Предыдущие фамилии"]').boundingBox(),
+    ]);
+    expect(surnameBox).not.toBeNull();
+    expect(previousSurnameBox).not.toBeNull();
+    expect(Math.abs((surnameBox?.y ?? 0) - (previousSurnameBox?.y ?? 0))).toBeLessThanOrEqual(2);
+    await expect(page.locator('[data-field-label="Предыдущие фамилии"]')).toBeVisible();
+
+    const displayedPlaceholders = await page
+      .locator(
+        ".v19-questionnaire-work-panel input[placeholder], .v19-questionnaire-work-panel textarea[placeholder]",
+      )
+      .evaluateAll((elements) => elements.map((element) => element.getAttribute("placeholder")));
+    expect(displayedPlaceholders.every((placeholder) => !/^Например,/iu.test(placeholder ?? ""))).toBe(
+      true,
+    );
+    const placeholderPresentation = await page
+      .locator(
+        ".v19-questionnaire-work-panel input[placeholder], .v19-questionnaire-work-panel textarea[placeholder]",
+      )
+      .first()
+      .evaluate((element) => {
+        const style = getComputedStyle(element, "::placeholder");
+        return {
+          color: style.color,
+          fontSize: Number.parseFloat(style.fontSize),
+          textTransform: style.textTransform,
+        };
+      });
+    expect(placeholderPresentation.fontSize).toBeLessThanOrEqual(10);
+    expect(placeholderPresentation.textTransform).toBe("lowercase");
+    expect(placeholderPresentation.color).not.toBe("rgb(255, 255, 255)");
+
+    const maleChoice = page.getByRole("button", { exact: true, name: "Мужской" });
+    const femaleChoice = page.getByRole("button", { exact: true, name: "Женский" });
+    await maleChoice.click();
+    const [maleBackground, femaleBackground] = await Promise.all([
+      maleChoice.evaluate((element) => getComputedStyle(element).backgroundColor),
+      femaleChoice.evaluate((element) => getComputedStyle(element).backgroundColor),
+    ]);
+    expect(maleBackground).not.toBe(femaleBackground);
+    await expect(maleChoice).toHaveAttribute("aria-pressed", "true");
+
+    const applicantTabs = page.locator(".v19-questionnaire-applicant-tab");
+    if ((await applicantTabs.count()) > 1) {
+      await applicantTabs.nth(1).click();
+      await expect(applicantTabs.nth(1)).toHaveAttribute("aria-pressed", "true");
+    }
 
     await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
     const street = page.getByRole("combobox", {
@@ -166,6 +380,41 @@ test.describe("V-19 questionnaire live sanity", () => {
       fullPage: true,
       path: testInfo.outputPath("questionnaire-mobile.png"),
     });
+    expect(browserProblems).toEqual([]);
+  });
+
+  for (const viewport of [
+    { height: 740, width: 320 },
+    { height: 932, width: 430 },
+  ]) {
+    test(`mobile ${viewport.width} keeps a fullscreen shell and a 75dvh work area`, async ({
+      page,
+    }) => {
+      const browserProblems = collectBrowserProblems(page);
+      await page.setViewportSize(viewport);
+      await openQuestionnaire(page);
+
+      await expectMobileQuestionnaireLayout(page, viewport);
+      const [countryBox, cityBox] = await Promise.all([
+        page.locator('[data-field-label="Страна проживания"]').boundingBox(),
+        page.locator('[data-field-label="Город проживания"]').boundingBox(),
+      ]);
+      expect(countryBox).not.toBeNull();
+      expect(cityBox).not.toBeNull();
+      expect(Math.abs((countryBox?.y ?? 0) - (cityBox?.y ?? 0))).toBeLessThanOrEqual(2);
+      expect(browserProblems).toEqual([]);
+    });
+  }
+
+  test("tablet keeps the existing fullscreen desktop composition", async ({ page }) => {
+    const browserProblems = collectBrowserProblems(page);
+    const viewport = { height: 1024, width: 768 };
+    await page.setViewportSize(viewport);
+    await openQuestionnaire(page);
+
+    await expectFullscreenQuestionnaireShell(page, viewport);
+    await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
+    await expectNoDocumentOverflow(page);
     expect(browserProblems).toEqual([]);
   });
 });

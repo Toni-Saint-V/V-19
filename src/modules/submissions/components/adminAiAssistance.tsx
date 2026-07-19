@@ -10,6 +10,15 @@ import {
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
+  drawerMotion,
+  drawerPanelExit as getDrawerPanelExit,
+  drawerPanelInitial as getDrawerPanelInitial,
+  drawerPanelTransition as getDrawerPanelTransition,
+  drawerTabExit as getDrawerTabExit,
+  drawerTabInitial as getDrawerTabInitial,
+  useDrawerDesktopQuery,
+} from "../../../shared/ui/drawer/drawerMotion";
+import {
   AlertCircle,
   Briefcase,
   Calendar,
@@ -23,13 +32,14 @@ import {
   Image as ImageIcon,
   Info,
   MapPin,
-  MoreHorizontal,
   Plane,
+  ShieldAlert,
   UploadCloud,
   User,
   X,
 } from "lucide-react";
 import { getPrimaryAction, statusLabels } from "../status";
+import { familyDisplayTitleFromMainApplicantName } from "../listFormatters";
 import { historyDetailForUser, historyTimestampForUser } from "../historyPresentation";
 import {
   targetElementId,
@@ -54,10 +64,14 @@ import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimiti
 
 type SourceStatus = OperationalDrawerSourceStatus;
 
-type TabId = "overview" | "questionnaire" | "files" | "issues" | "history";
+type TabId =
+  | "overview"
+  | "applicants"
+  | "questionnaire"
+  | "files"
+  | "issues"
+  | "history";
 
-const mobileSecondaryDrawerTabs = new Set<TabId>(["files", "issues", "history"]);
-const mobileSecondaryDrawerTabsMenuId = "v20-drawer-secondary-tabs";
 const drawerHeadingId = "v20-submission-drawer-heading";
 
 function drawerTabId(tab: TabId) {
@@ -3394,7 +3408,7 @@ const figmaSubmissionDrawerStyles = `
     padding: var(--v19b-size-8) var(--v19b-size-14);
     border: var(--v19b-size-1) solid var(--v19b-admin-drawer-orange-border);
     border-radius: var(--v19b-radius-control);
-    color: var(--v19b-admin-drawer-orange-text);
+    color: var(--v19b-admin-drawer-orange-text) !important;
     background: var(--v19b-admin-drawer-orange-bg);
     font-size: var(--v19b-size-12);
     font-weight: var(--v19b-weight-control);
@@ -3419,7 +3433,7 @@ const figmaSubmissionDrawerStyles = `
   }
 
   .v20-issue-target {
-    color: var(--v19b-admin-drawer-orange-text);
+    color: var(--v19b-admin-drawer-orange-text) !important;
     font-weight: var(--v19b-weight-control);
     letter-spacing: var(--v19b-letter-spacing-meta);
     text-transform: uppercase;
@@ -3428,7 +3442,7 @@ const figmaSubmissionDrawerStyles = `
   .v20-issue-badge {
     min-height: var(--v19b-size-24);
     border-radius: var(--v19b-radius-control);
-    color: var(--v19b-admin-drawer-orange-text);
+    color: var(--v19b-admin-drawer-orange-text) !important;
     background: var(--v19b-admin-drawer-orange-bg);
   }
 
@@ -3488,13 +3502,14 @@ const figmaSubmissionDrawerStyles = `
 
   @media (max-width: 1023px) {
     .v20-drawer-topbar {
-      min-height: var(--v19b-size-104);
-      padding: var(--v19b-size-10) var(--v19b-size-56) var(--v19b-size-10)
+      min-height: var(--v19b-size-88);
+      padding: var(--v19b-size-8) var(--v19b-size-56) var(--v19b-size-8)
         var(--v19b-size-16);
     }
 
     .v20-title-wrap {
       display: grid;
+      min-width: var(--v19b-size-0);
       gap: var(--v19b-size-4);
     }
 
@@ -3508,7 +3523,17 @@ const figmaSubmissionDrawerStyles = `
     }
 
     .v20-status-row {
+      min-width: var(--v19b-size-0);
       gap: var(--v19b-size-6);
+    }
+
+    .v20-subtitle {
+      display: block;
+      min-width: var(--v19b-size-0);
+      overflow: visible;
+      overflow-wrap: anywhere;
+      text-overflow: clip;
+      white-space: normal;
     }
 
     .v20-status-pill {
@@ -3521,7 +3546,7 @@ const figmaSubmissionDrawerStyles = `
     }
 
     .v20-icon-button.is-close {
-      top: var(--v19b-size-10);
+      top: var(--v19b-size-8);
       right: var(--v19b-size-16);
       width: var(--v19b-size-44);
       height: var(--v19b-size-44);
@@ -3565,6 +3590,92 @@ const figmaSubmissionDrawerStyles = `
 
     .v20-action-button.is-warning {
       min-width: var(--v19b-size-0);
+    }
+
+    .v20-footer {
+      flex: 0 0 auto;
+    }
+
+    .v20-footer-actions,
+    .v20-action-button {
+      min-width: var(--v19b-size-0);
+    }
+
+    .v20-tabbar-wrap {
+      position: relative;
+      z-index: var(--v19b-z-overlay);
+      display: flex;
+      min-width: var(--v19b-size-0);
+      align-items: center;
+      gap: var(--v19b-size-8);
+      overflow: visible;
+    }
+
+    .v20-tabbar {
+      min-width: var(--v19b-size-0);
+      flex: 1 1 auto;
+      overflow: visible;
+    }
+
+    .v20-tabbar .v20-tab-button.is-mobile-secondary {
+      display: none;
+    }
+
+    .v20-tabbar-more {
+      position: relative;
+      z-index: calc(var(--v19b-z-overlay) + 1);
+      display: block;
+      flex: none;
+    }
+
+    .v20-tabbar-more-trigger,
+    .v20-tabbar-more-menu button {
+      min-height: var(--v19b-size-40);
+      border: var(--v19b-size-0);
+      border-radius: var(--v20-radius-md);
+      color: var(--v20-muted);
+      background: transparent;
+      font: inherit;
+      font-size: var(--v19b-size-13);
+      font-weight: var(--v19b-weight-control);
+      cursor: pointer;
+    }
+
+    .v20-tabbar-more-trigger {
+      padding-inline: var(--v19b-size-12);
+    }
+
+    .v20-tabbar-more-menu {
+      position: absolute;
+      z-index: calc(var(--v19b-z-overlay) + 2);
+      top: calc(var(--v19b-size-40) + var(--v19b-size-8));
+      right: var(--v19b-size-0);
+      display: grid;
+      width: max-content;
+      gap: var(--v19b-size-2);
+      padding: var(--v19b-size-4);
+      border: var(--v19b-size-1) solid var(--v20-border-strong);
+      border-radius: var(--v20-radius-md);
+      background: var(--v20-card-bg-strong);
+      box-shadow: var(--v19b-shadow-panel);
+    }
+
+    .v20-tabbar-more-menu button {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: var(--v19b-size-16);
+      padding-inline: var(--v19b-size-12);
+      text-align: left;
+    }
+
+    .v20-tabbar-more-menu .v20-tab-count {
+      margin-left: auto;
+    }
+
+    .v20-drawer-body {
+      position: relative;
+      z-index: var(--v19b-size-0);
     }
   }
 
@@ -3715,6 +3826,747 @@ const figmaSubmissionDrawerStyles = `
       white-space: normal;
     }
   }
+
+  @media (max-width: 460px) {
+    .v20-footer-actions {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    }
+
+    .v20-action-button {
+      width: var(--v19b-size-full);
+    }
+  }
+
+  /* Premium Drawer source transfer: final mounted operational owner. */
+  .v20-submission-drawer {
+    inset: var(--v19b-size-8) var(--v19b-size-8) var(--v19b-size-8) auto;
+    width: min(var(--v19b-drawer-agent-width), calc(var(--v19b-viewport-width) - var(--v19b-size-16)));
+    height: auto;
+    max-height: none;
+    overflow: hidden;
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border);
+    border-radius: var(--v19b-radius-panel);
+    background: var(--v19b-admin-drawer-bg);
+    box-shadow: var(--v19b-admin-drawer-shadow);
+    font-family: var(--v19-font-family);
+  }
+
+  .v20-drawer-topbar {
+    display: grid;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    min-height: var(--v19b-size-0);
+    flex: none;
+    align-items: flex-start;
+    gap: var(--v19b-size-16);
+    padding: var(--v19b-size-16) var(--v19b-size-32) var(--v19b-size-20);
+    border-bottom: var(--v19b-size-0);
+    background: var(--v19b-admin-drawer-bg);
+  }
+
+  .v20-title-wrap {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-subtitle,
+  .v20-title,
+  .v20-applicant-card :is(strong, small),
+  .v20-questionnaire-section-card .v19-drawer-questionnaire-section-title,
+  .v20-file-title,
+  .v20-file-meta {
+    min-width: var(--v19b-size-0);
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .v20-subtitle {
+    margin: var(--v19b-size-0);
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-11);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+    text-transform: uppercase;
+  }
+
+  .v20-title {
+    margin: var(--v19b-size-0);
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-24);
+    font-weight: var(--v19b-weight-title);
+    line-height: var(--v19b-line-height-title);
+    letter-spacing: var(--v19b-letter-spacing-tight);
+  }
+
+  .v20-status-row {
+    display: flex;
+    min-width: var(--v19b-size-0);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--v19b-size-10);
+  }
+
+  .v20-icon-button.is-close {
+    position: static;
+    display: inline-flex;
+    width: var(--v19b-size-40);
+    height: var(--v19b-size-40);
+    min-width: var(--v19b-size-40);
+    min-height: var(--v19b-size-40);
+    flex: none;
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-admin-drawer-control-bg);
+    color: var(--v19b-admin-drawer-text-70);
+  }
+
+  .v20-tabbar-wrap {
+    position: relative;
+    z-index: var(--v19b-z-sticky);
+    display: block;
+    min-width: var(--v19b-size-0);
+    flex: none;
+    overflow-x: auto;
+    padding-inline: var(--v19b-size-32);
+    border-bottom: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    background: var(--v19b-admin-drawer-bg);
+  }
+
+  .v20-tabbar {
+    display: flex;
+    width: max-content;
+    min-width: var(--v19b-size-full);
+    align-items: center;
+    gap: var(--v19b-size-2);
+    overflow: visible;
+  }
+
+  .v20-tabbar .v20-tab-button,
+  .v20-tabbar .v20-tab-button.is-mobile-secondary {
+    position: relative;
+    display: inline-flex;
+    min-height: var(--v19b-size-44);
+    flex: none;
+    align-items: center;
+    gap: var(--v19b-size-8);
+    padding-inline: var(--v19b-size-14);
+    border: var(--v19b-size-0);
+    border-radius: var(--v19b-size-0);
+    background: transparent;
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+    white-space: nowrap;
+  }
+
+  .v20-tabbar .v20-tab-button::after {
+    display: none;
+    content: none;
+  }
+
+  .v20-tabbar .v20-tab-button:is(:hover, :focus-visible, .is-active) {
+    color: var(--v19b-color-text-strong);
+    background: transparent;
+  }
+
+  .v20-tabbar .v20-tab-button.is-active::after {
+    background: transparent;
+  }
+
+  .v20-tab-indicator {
+    position: absolute;
+    right: var(--v19b-size-0);
+    bottom: var(--v19b-size-0);
+    left: var(--v19b-size-0);
+    height: var(--v19b-size-2);
+    border-radius: var(--v19b-radius-pill);
+    background: var(--v19b-color-primary);
+    pointer-events: none;
+  }
+
+  .v20-tab-count {
+    min-width: var(--v19b-size-20);
+    min-height: var(--v19b-size-20);
+    padding-inline: var(--v19b-size-6);
+    border: var(--v19b-size-0);
+    border-radius: calc(var(--v19b-radius-control) - var(--v19b-size-2));
+    background: var(--v19b-admin-drawer-control-bg);
+    color: var(--v19b-admin-drawer-text-70);
+  }
+
+  .v20-tabbar-more {
+    display: none;
+  }
+
+  .v20-drawer-body {
+    min-height: var(--v19b-size-0);
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: var(--v19b-size-20) var(--v19b-size-32);
+    background: var(--v19b-admin-drawer-bg);
+  }
+
+  .v20-next-action {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    grid-template-columns: var(--v19b-size-40) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    align-items: center;
+    gap: var(--v19b-size-16);
+    padding: var(--v19b-size-16);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-left: var(--v19b-size-3) solid var(--v19b-color-primary);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-admin-drawer-surface);
+  }
+
+  .v20-next-action.is-warning {
+    border-left-color: var(--v19b-admin-drawer-orange-text);
+  }
+
+  .v20-next-action-mark {
+    display: grid;
+    width: var(--v19b-size-40);
+    height: var(--v19b-size-40);
+    place-items: center;
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-admin-drawer-blue-bg);
+    color: var(--v19b-admin-drawer-blue-text);
+  }
+
+  .v20-next-action.is-warning .v20-next-action-mark {
+    background: var(--v19b-admin-drawer-orange-bg);
+    color: var(--v19b-admin-drawer-orange-text) !important;
+  }
+
+  .v20-next-action-mark svg {
+    width: var(--v19b-size-18);
+    height: var(--v19b-size-18);
+  }
+
+  .v20-next-action-copy {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    gap: var(--v19b-size-3);
+  }
+
+  .v20-next-action-copy small {
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-10);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+    text-transform: uppercase;
+  }
+
+  .v20-next-action-copy h3 {
+    margin: var(--v19b-size-0);
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-15);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  .v20-next-action-copy > span {
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-12);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .v20-next-action > button {
+    min-height: var(--v19b-size-40);
+    padding-inline: var(--v19b-size-14);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-admin-drawer-control-bg);
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-12);
+    font-weight: var(--v19b-weight-control);
+    white-space: nowrap;
+  }
+
+  .v20-next-action > button:is(:hover, :focus-visible) {
+    border-color: var(--v19b-color-border-selected);
+    background: var(--v19b-color-control-hover);
+    outline: none;
+  }
+
+  .v20-two-col,
+  .v20-applicant-grid {
+    gap: var(--v19b-size-12);
+  }
+
+  .v20-info-card,
+  .v20-applicant-card {
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-admin-drawer-surface);
+  }
+
+  .v20-overview-tab {
+    gap: var(--v19b-size-24);
+  }
+
+  .v20-overview-tab .v20-two-col {
+    gap: var(--v19b-size-16);
+  }
+
+  .v20-overview-tab .v20-info-card {
+    min-height: var(--v19b-size-160);
+    padding: var(--v19b-size-20);
+  }
+
+  .v20-overview-tab .v20-applicant-card {
+    min-height: var(--v19b-size-64);
+    gap: var(--v19b-size-12);
+    padding: var(--v19b-size-12);
+  }
+
+  .v20-applicants-heading {
+    display: flex;
+    min-width: var(--v19b-size-0);
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--v19b-size-16);
+  }
+
+  .v20-applicants-heading > span {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    gap: var(--v19b-size-4);
+  }
+
+  .v20-applicants-heading h3,
+  .v20-applicants-heading p {
+    margin: var(--v19b-size-0);
+  }
+
+  .v20-applicants-heading h3 {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-18);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  .v20-applicants-heading p {
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-12);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .v20-applicants-heading > strong {
+    display: inline-grid;
+    min-width: var(--v19b-size-32);
+    min-height: var(--v19b-size-28);
+    place-items: center;
+    padding-inline: var(--v19b-size-8);
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-admin-drawer-control-bg);
+    color: var(--v19b-admin-drawer-text-70);
+    font-size: var(--v19b-size-12);
+  }
+
+  .v20-applicant-readiness {
+    display: grid;
+    width: var(--v19b-size-96);
+    gap: var(--v19b-size-6);
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-11);
+    font-weight: var(--v19b-weight-control);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .v20-applicant-readiness .v20-progress-track {
+    height: var(--v19b-size-2);
+  }
+
+  .v20-issues-empty {
+    display: grid;
+    min-height: var(--v19b-size-200);
+    place-items: center;
+    gap: var(--v19b-size-8);
+    padding: var(--v19b-size-28);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-admin-drawer-surface);
+    text-align: center;
+  }
+
+  .v20-issues-empty-icon {
+    display: grid;
+    width: var(--v19b-size-44);
+    height: var(--v19b-size-44);
+    place-items: center;
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-admin-drawer-blue-bg);
+    color: var(--v19b-admin-drawer-blue-text);
+  }
+
+  .v20-issues-empty.is-complete .v20-issues-empty-icon {
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-green-border);
+    background: var(--v19b-admin-drawer-green-bg);
+    color: var(--v19b-admin-drawer-green-text);
+  }
+
+  .v20-issues-empty-icon svg {
+    width: var(--v19b-size-20);
+    height: var(--v19b-size-20);
+  }
+
+  .v20-issues-empty-stage {
+    color: var(--v19b-admin-drawer-blue-text);
+    font-size: var(--v19b-size-10);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+    text-transform: uppercase;
+  }
+
+  .v20-issues-empty.is-complete .v20-issues-empty-stage {
+    color: var(--v19b-admin-drawer-green-text);
+  }
+
+  .v20-issues-empty h4,
+  .v20-issues-empty p {
+    margin: var(--v19b-size-0);
+  }
+
+  .v20-issues-empty h4 {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-18);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  .v20-issues-empty p {
+    max-width: var(--v19b-size-520);
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-13);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .v20-history-list {
+    position: relative;
+    display: grid;
+    gap: var(--v19b-size-12);
+    margin: var(--v19b-size-0);
+    padding: var(--v19b-size-0);
+    list-style: none;
+  }
+
+  .v20-history-list::before {
+    position: absolute;
+    top: var(--v19b-size-20);
+    bottom: var(--v19b-size-20);
+    left: var(--v19b-size-20);
+    width: var(--v19b-size-1);
+    background: var(--v19b-admin-drawer-border-faint);
+    content: "";
+  }
+
+  .v20-history-item {
+    position: relative;
+    display: grid;
+    min-width: var(--v19b-size-0);
+    grid-template-columns: var(--v19b-size-40) minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    align-items: start;
+    gap: var(--v19b-size-12);
+    padding: var(--v19b-size-16);
+    border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint);
+    border-radius: var(--v19b-radius-row);
+    background: var(--v19b-admin-drawer-surface);
+  }
+
+  .v20-history-icon {
+    position: relative;
+    z-index: 1;
+    width: var(--v19b-size-40);
+    height: var(--v19b-size-40);
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-admin-drawer-control-bg);
+  }
+
+  .v20-history-copy {
+    display: grid;
+    min-width: var(--v19b-size-0);
+    gap: var(--v19b-size-6);
+  }
+
+  .v20-history-label {
+    width: max-content;
+    padding: var(--v19b-size-3) var(--v19b-size-6);
+    border-radius: calc(var(--v19b-radius-control) - var(--v19b-size-2));
+    background: var(--v19b-admin-drawer-control-bg);
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-10);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: var(--v19b-letter-spacing-wide);
+    text-transform: uppercase;
+  }
+
+  .v20-history-title {
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-14);
+    font-weight: var(--v19b-weight-title);
+    overflow-wrap: anywhere;
+  }
+
+  .v20-history-detail {
+    margin: var(--v19b-size-0);
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-12);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .v20-history-meta {
+    margin: var(--v19b-size-0);
+    color: var(--v19b-admin-drawer-text-50);
+    font-size: var(--v19b-size-11);
+  }
+
+  .v20-footer {
+    position: relative;
+    z-index: var(--v19b-z-sticky);
+    display: flex;
+    min-height: var(--v19b-size-76);
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--v19b-size-16);
+    padding: var(--v19b-size-16) var(--v19b-size-32) max(var(--v19b-size-16), env(safe-area-inset-bottom));
+    border-top: var(--v19b-size-1) solid var(--v19b-admin-drawer-border);
+    background: var(--v19b-admin-drawer-bg);
+  }
+
+  .v20-footer-actions {
+    display: flex;
+    width: auto;
+    flex: none;
+    gap: var(--v19b-size-8);
+  }
+
+  .v20-action-button {
+    min-height: var(--v19b-size-44);
+    border-radius: var(--v19b-radius-control);
+    font-size: var(--v19b-size-13);
+  }
+
+  @media (max-width: 1023px) {
+    .v20-submission-drawer {
+      inset: var(--v19b-drawer-mobile-top) var(--v19b-size-0) var(--v19b-size-0);
+      width: var(--v19b-size-full);
+      height: auto;
+      max-height: calc(100dvh - var(--v19b-drawer-mobile-top));
+      border-right: var(--v19b-size-1) solid var(--v19b-admin-drawer-border);
+      border-bottom: var(--v19b-size-0);
+      border-left: var(--v19b-size-1) solid var(--v19b-admin-drawer-border);
+      border-radius: var(--v19b-drawer-mobile-radius) var(--v19b-drawer-mobile-radius) var(--v19b-size-0) var(--v19b-size-0);
+      overflow: hidden;
+    }
+
+    .v20-drawer-topbar {
+      min-height: var(--v19b-size-0);
+      padding: var(--v19b-size-12) var(--v19b-size-16);
+    }
+
+    .v20-title {
+      font-size: var(--v19b-size-20);
+    }
+
+    .v20-icon-button.is-close {
+      position: static;
+      width: var(--v19b-size-44);
+      height: var(--v19b-size-44);
+      min-width: var(--v19b-size-44);
+      min-height: var(--v19b-size-44);
+    }
+
+    .v20-tabbar-wrap,
+    .v20-drawer-body {
+      padding-inline: var(--v19b-size-16);
+    }
+
+    .v20-tabbar-wrap {
+      display: block;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .v20-tabbar-wrap::-webkit-scrollbar {
+      display: none;
+    }
+
+    .v20-tabbar {
+      width: max-content;
+      min-width: var(--v19b-size-full);
+      overflow: visible;
+    }
+
+    .v20-tabbar .v20-tab-button {
+      min-width: max-content;
+      min-height: var(--v19b-size-52);
+      flex: none;
+      justify-content: center;
+      padding-inline: var(--v19b-size-14);
+      scroll-snap-align: start;
+    }
+
+    .v20-two-col,
+    .v20-applicant-grid {
+      grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    }
+
+    .v20-drawer-body {
+      min-height: var(--v19b-size-0);
+      flex: 1 1 auto;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .v20-footer {
+      min-height: var(--v19b-size-68);
+      padding: var(--v19b-size-12) var(--v19b-size-16) max(var(--v19b-size-12), env(safe-area-inset-bottom));
+    }
+
+    .v20-footer-note:not(.is-error) {
+      display: none;
+    }
+
+    .v20-footer-actions {
+      display: grid;
+      width: var(--v19b-size-full);
+      grid-template-columns: var(--v19b-size-88) minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+      gap: var(--v19b-size-8);
+    }
+
+    .v20-next-action {
+      grid-template-columns: var(--v19b-size-36) minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+      gap: var(--v19b-size-12);
+      padding: var(--v19b-size-12);
+    }
+
+    .v20-next-action-mark {
+      width: var(--v19b-size-36);
+      height: var(--v19b-size-36);
+    }
+
+    .v20-next-action > button {
+      grid-column: 1 / -1;
+      width: var(--v19b-size-full);
+    }
+
+    .v20-applicants-heading {
+      align-items: center;
+    }
+
+    .v20-applicant-readiness {
+      width: var(--v19b-size-88);
+    }
+
+    .v20-action-button,
+    .v20-action-button.is-warning {
+      width: var(--v19b-size-full);
+      min-width: var(--v19b-size-0);
+    }
+  }
+
+  /* My submissions is the visual source of truth for the agent workspace. */
+  .v20-submission-drawer {
+    border-color: var(--v19b-color-border-strong);
+    color: var(--v19b-color-text);
+    background: var(--v19b-color-page);
+  }
+
+  .v20-drawer-topbar,
+  .v20-tabbar-wrap,
+  .v20-footer {
+    border-color: var(--v19b-color-border);
+    background: var(--v19b-color-page);
+  }
+
+  .v20-drawer-body {
+    background: var(--v19b-color-app);
+  }
+
+  .v20-next-action,
+  .v20-info-card,
+  .v20-applicant-card,
+  .v20-questionnaire-section-card,
+  .v20-file-section,
+  .v20-file-item,
+  .v20-issue-card,
+  .v20-history-item,
+  .v20-issues-empty,
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-summary-head {
+    border-color: var(--v19b-color-border-strong) !important;
+    background: var(--v19b-color-panel) !important;
+  }
+
+  .v20-icon-button.is-close,
+  .v20-next-action > button,
+  .v20-drawer-body [aria-labelledby$="questionnaire"]
+    .v19-drawer-questionnaire-open-button,
+  .v20-action-button.is-ghost {
+    border-color: var(--v19b-color-border-strong) !important;
+    background: var(--v19b-color-control) !important;
+  }
+
+  .v20-questionnaire-section-icon {
+    position: relative;
+    display: grid;
+    width: var(--v19b-size-40);
+    height: var(--v19b-size-40);
+    flex: none;
+    place-items: center;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-color-text-muted) !important;
+    background: var(--v19b-color-control);
+  }
+
+  .v20-tab-button:focus-visible {
+    outline: var(--v19b-size-2) solid var(--v19b-color-primary-bright) !important;
+    outline-offset: calc(var(--v19b-size-2) * -1) !important;
+  }
+
+  .v20-questionnaire-section-icon svg {
+    width: var(--v19b-size-18);
+    height: var(--v19b-size-18);
+  }
+
+  .v20-questionnaire-section-icon:is(.is-done, .is-in_progress)::after {
+    position: absolute;
+    right: var(--v19b-size-4);
+    bottom: var(--v19b-size-4);
+    width: var(--v19b-size-6);
+    height: var(--v19b-size-6);
+    border-radius: var(--v19b-radius-pill);
+    background: var(--v19b-color-primary-text);
+    box-shadow: 0 0 0 var(--v19b-size-2) var(--v19b-color-control);
+    content: "";
+  }
+
+  .v20-questionnaire-section-icon.is-done::after {
+    background: var(--v19b-dot-success);
+  }
+
+  @media (max-width: 360px) {
+    .v20-drawer-topbar {
+      padding-block: var(--v19b-size-10);
+    }
+
+    .v20-title-wrap {
+      gap: var(--v19b-size-4);
+    }
+
+    .v20-subtitle {
+      display: block;
+      overflow: hidden;
+      overflow-wrap: normal;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
 `;
 
 function getDrawerFocusableElements(container: HTMLElement | null) {
@@ -3725,27 +4577,6 @@ function getDrawerFocusableElements(container: HTMLElement | null) {
       element.getAttribute("aria-hidden") !== "true" &&
       element.offsetParent !== null,
   );
-}
-
-function useDrawerDesktopQuery() {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window === "undefined"
-      ? true
-      : window.matchMedia("(min-width: 1024px)").matches,
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const media = window.matchMedia("(min-width: 1024px)");
-    const update = () => setIsDesktop(media.matches);
-    update();
-    media.addEventListener("change", update);
-
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return isDesktop;
 }
 
 type QuestionnaireFocusTarget = {
@@ -3780,6 +4611,7 @@ type FigmaSubmissionDrawerProps = {
   activeTab: DrawerTab;
   actionError?: string;
   focusTarget?: WorkspaceTarget;
+  isOpen?: boolean;
   onClearFocusTarget?: () => void;
   onAction: (action: SubmissionAction) => void | Promise<void>;
   onClose: () => void;
@@ -3794,9 +4626,37 @@ type FigmaSubmissionDrawerProps = {
 
 function applicantRoleLabel(role: string) {
   if (role === "main") return "Основной";
-  if (role === "spouse") return "Супруга";
-  if (role === "child") return "Ребенок";
+  if (role === "spouse") return "Супруг(а)";
+  if (role === "child") return "Ребёнок";
   return role;
+}
+
+function drawerDateLabel(value: string) {
+  if (!value) return "не указано";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(date);
+}
+
+function drawerTripDatesLabel(from: string, to: string) {
+  if (!from && !to) return "Даты не указаны";
+  if (!to) return `С ${drawerDateLabel(from)}`;
+  if (!from) return `До ${drawerDateLabel(to)}`;
+  return `${drawerDateLabel(from)} — ${drawerDateLabel(to)}`;
+}
+
+function drawerUpdatedLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || "недавно";
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+  }).format(date);
 }
 
 function applicantQuestionnairePercent(
@@ -3813,6 +4673,10 @@ function applicantQuestionnairePercent(
 }
 
 function buildDetail(submission: Submission): FigmaSubmissionDetail {
+  const mainApplicant =
+    submission.applicants.find((applicant) => applicant.role === "main") ??
+    submission.applicants[0];
+
   return {
     applicants: submission.applicants.map((applicant) => ({
       completeness: applicantQuestionnairePercent(applicant),
@@ -3821,7 +4685,7 @@ function buildDetail(submission: Submission): FigmaSubmissionDetail {
       status: applicant.questionnaireStatus,
     })),
     applicantsCount: submission.applicants.length,
-    city: `${submission.city} (VFS Global)`,
+    city: submission.city,
     completeness: submission.completeness.total,
     id: submission.id,
     issuesCount: submission.issues.filter(
@@ -3829,10 +4693,16 @@ function buildDetail(submission: Submission): FigmaSubmissionDetail {
     ).length,
     owner: "Татьяна Н.",
     status: operationalDrawerSourceStatus(submission),
-    title: submission.title,
-    tripDates: `${submission.tripDateFrom.replace("-", "–")} – ${submission.tripDateTo.replace("-", "–")}`,
+    title:
+      submission.type === "family"
+        ? familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ?? submission.title
+        : submission.title,
+    tripDates: drawerTripDatesLabel(
+      submission.tripDateFrom,
+      submission.tripDateTo,
+    ),
     type: submission.type,
-    updated: submission.updatedAt,
+    updated: drawerUpdatedLabel(submission.updatedAt),
   };
 }
 
@@ -3964,16 +4834,82 @@ function initials(name: string) {
 
 const OverviewTab = ({
   data,
+  onOpenFiles,
+  onOpenIssues,
+  onOpenQuestionnaire,
   submission,
 }: {
   data: FigmaSubmissionDetail;
+  onOpenFiles: () => void;
+  onOpenIssues: () => void;
+  onOpenQuestionnaire: () => void;
   submission: Submission;
 }) => {
   const documentItems = documentPackageItems(submission);
   const readyFilesCount = submission.files.filter(isFileReady).length;
+  const hasPendingDocuments = submission.files.some((file) => !isFileReady(file));
+  const needsCorrections = data.status === "returned";
+  const nextStep = needsCorrections
+    ? {
+        action: onOpenIssues,
+        actionLabel: "Открыть замечания",
+        description: "Исправьте отмеченные поля и файлы, затем отправьте пакет повторно.",
+        label: "Требует действий",
+        title: "Исправьте замечания",
+      }
+    : data.status === "corrections_received"
+      ? {
+          action: undefined,
+          actionLabel: "",
+          description: "Исправления отправлены. Администратор повторно проверяет пакет.",
+          label: "Статус пакета",
+          title: "Исправления на проверке",
+        }
+      : hasPendingDocuments
+        ? {
+            action: onOpenFiles,
+            actionLabel: "Открыть файлы",
+            description: "Добавьте недостающие документы, чтобы продолжить подачу.",
+            label: "Следующий шаг",
+            title: "Соберите документы",
+          }
+        : submission.completeness.questionnaire < 100
+          ? {
+              action: onOpenQuestionnaire,
+              actionLabel: "Открыть анкету",
+              description: "Заполните оставшиеся поля каждого заявителя.",
+              label: "Следующий шаг",
+              title: "Завершите анкету",
+            }
+          : {
+              action: undefined,
+              actionLabel: "",
+              description: "Пакет собран. Перед отправкой проверьте состав и данные.",
+              label: "Статус пакета",
+              title: "Готово к отправке",
+            };
 
   return (
-    <div className="v20-section-stack">
+    <div className="v20-section-stack v20-overview-tab">
+      <section
+        aria-labelledby="v20-next-action-title"
+        className={`v20-next-action ${needsCorrections ? "is-warning" : ""}`}
+      >
+        <span className="v20-next-action-mark" aria-hidden="true">
+          <ShieldAlert />
+        </span>
+        <span className="v20-next-action-copy">
+          <small>{nextStep.label}</small>
+          <h3 id="v20-next-action-title">{nextStep.title}</h3>
+          <span>{nextStep.description}</span>
+        </span>
+        {nextStep.action ? (
+          <button type="button" onClick={nextStep.action}>
+            {nextStep.actionLabel}
+          </button>
+        ) : null}
+      </section>
+
       <section>
         <div className="v20-two-col">
           <div className="v20-card v20-info-card">
@@ -4040,6 +4976,45 @@ const OverviewTab = ({
     </div>
   );
 };
+
+const ApplicantsTab = ({ data }: { data: FigmaSubmissionDetail }) => (
+  <section
+    aria-labelledby="v20-applicants-title"
+    className="v20-section-stack v20-applicants-tab"
+  >
+    <header className="v20-applicants-heading">
+      <span>
+        <h3 id="v20-applicants-title">Заявители</h3>
+        <p>Готовность анкет каждого участника подачи</p>
+      </span>
+      <strong aria-label={`Всего заявителей: ${data.applicantsCount}`}>
+        {data.applicantsCount}
+      </strong>
+    </header>
+    <div className="v20-applicant-grid">
+      {data.applicants.map((applicant, index) => (
+        <article key={`${applicant.name}-${index}`} className="v20-applicant-card">
+          <span className="v20-avatar">{initials(applicant.name)}</span>
+          <span className="v20-applicant-copy">
+            <strong>{applicant.name}</strong>
+            <small>{applicant.role}</small>
+          </span>
+          <span className="v20-applicant-readiness">
+            <span>{applicant.completeness}%</span>
+            <span className="v20-progress-track">
+              <progress
+                aria-label={`Готовность анкеты ${applicant.name}: ${applicant.completeness}%`}
+                className={`v20-progress-fill ${applicant.completeness === 100 ? "is-done" : ""}`}
+                max={100}
+                value={applicant.completeness}
+              />
+            </span>
+          </span>
+        </article>
+      ))}
+    </div>
+  </section>
+);
 
 const QuestionnaireTab = ({
   onOpenQuestionnaire,
@@ -4198,13 +5173,7 @@ const QuestionnaireTab = ({
             }}
           >
             <span
-              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
-                section.status === "done"
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                  : section.status === "in_progress"
-                    ? "bg-[var(--v19b-color-primary-soft-10)] border-[var(--v19b-color-primary-soft-20)] text-[var(--v19b-color-primary-text)]"
-                    : "bg-white/5 border-white/10 text-white/40"
-              }`}
+              className={`v20-questionnaire-section-icon is-${section.status}`}
             >
               <section.Icon aria-hidden="true" />
             </span>
@@ -4221,11 +5190,9 @@ const QuestionnaireTab = ({
                 ariaHidden
                 className="v19-questionnaire-section-progress"
                 tone={
-                  section.status === "done"
-                    ? "success"
-                    : section.status === "in_progress"
-                      ? "accent"
-                      : "muted"
+                  section.status === "done" || section.status === "in_progress"
+                    ? "accent"
+                    : "muted"
                 }
                 value={section.progress}
               />
@@ -4532,6 +5499,7 @@ const IssuesTab = ({
   const issueStateKey = submission.issues
     .map((issue) => `${issue.id}:${issue.status}`)
     .join("|");
+  const emptyPresentation = issueEmptyPresentation(data.status);
 
   useEffect(() => {
     setIssueFixError("");
@@ -4647,11 +5615,50 @@ const IssuesTab = ({
           })}
         </div>
       ) : (
-        <div className="v20-empty-state">Нет открытых действий по текущим подачам.</div>
+        <section
+          aria-labelledby="v20-issues-empty-title"
+          className={`v20-issues-empty is-${emptyPresentation.tone}`}
+        >
+          <span className="v20-issues-empty-icon" aria-hidden="true">
+            {emptyPresentation.tone === "complete" ? <CheckCircle2 /> : <Clock />}
+          </span>
+          <span className="v20-issues-empty-stage" role="status">
+            {emptyPresentation.stage}
+          </span>
+          <h4 id="v20-issues-empty-title">{emptyPresentation.title}</h4>
+          <p>{emptyPresentation.description}</p>
+        </section>
       )}
     </div>
   );
 };
+
+function issueEmptyPresentation(status: SourceStatus) {
+  if (status === "submitted_for_review" || status === "corrections_received") {
+    return {
+      description: "Пакет находится у администратора. Новые задачи появятся здесь, если потребуются исправления.",
+      stage: status === "corrections_received" ? "Повторная проверка" : "Проверка пакета",
+      title: "Сейчас от вас ничего не требуется",
+      tone: "review" as const,
+    };
+  }
+
+  if (status === "ready_for_export" || status === "exported") {
+    return {
+      description: "Все замечания закрыты. Подача прошла проверку и готова к следующему этапу.",
+      stage: status === "exported" ? "Пакет выгружен" : "Проверка завершена",
+      title: "Замечаний нет",
+      tone: "complete" as const,
+    };
+  }
+
+  return {
+    description: "Продолжайте заполнять анкету и собирать документы. Здесь появятся только конкретные задачи по проверке.",
+    stage: status === "draft" ? "Черновик" : "Подготовка пакета",
+    title: "Открытых замечаний нет",
+    tone: "awaiting" as const,
+  };
+}
 
 function issueTargetLine(issue: Submission["issues"][number]) {
   const parts = [
@@ -4682,6 +5689,12 @@ function historyVisualIcon(event: Submission["history"][number]): IconComponent 
   return FileText;
 }
 
+function historyVisualLabel(event: Submission["history"][number]) {
+  if (/файл|паспорт|скан/i.test(event.text)) return "Документ";
+  if (event.fromStatus || event.toStatus) return "Статус";
+  return event.source === "system" ? "Система" : "Действие";
+}
+
 const HistoryTab = ({ submission }: { submission: Submission }) => {
   const events = submission.history;
 
@@ -4690,34 +5703,36 @@ const HistoryTab = ({ submission }: { submission: Submission }) => {
   }
 
   return (
-    <section className="v20-history-list" aria-label="История подачи">
+    <ol className="v20-history-list" aria-label="История подачи">
       {events.map((event) => {
         const detail = historyDetailForUser(event);
         return (
-          <div className="v20-history-item" key={event.id}>
+          <li className="v20-history-item" key={event.id}>
             <span className={`v20-history-icon is-${historyVisualTone(event)}`}>
               {(() => {
                 const Icon = historyVisualIcon(event);
                 return <Icon aria-hidden="true" />;
               })()}
             </span>
-            <span>
-              <span className="v20-history-title">{event.text}</span>
+            <span className="v20-history-copy">
+              <span className="v20-history-label">{historyVisualLabel(event)}</span>
+              <strong className="v20-history-title">{event.text}</strong>
+              {detail ? <p className="v20-history-detail">{detail}</p> : null}
               <span className="v20-history-meta">
                 {historyTimestampForUser(event.at)}
                 <i className="v20-history-dot" aria-hidden="true" />
                 {historyActorLabel(event.source)}
               </span>
-              {detail ? <span className="v20-history-detail">{detail}</span> : null}
             </span>
-          </div>
+          </li>
         );
       })}
-    </section>
+    </ol>
   );
 };
 
 function initialTab(tab: DrawerTab): TabId {
+  if (tab === "applicants") return "applicants";
   if (tab === "files") return "files";
   if (tab === "issues") return "issues";
   if (tab === "history") return "history";
@@ -4749,6 +5764,7 @@ export function FigmaSubmissionDrawer({
   activeTab,
   actionError = "",
   focusTarget,
+  isOpen = true,
   onClearFocusTarget,
   onAction,
   onClose,
@@ -4760,7 +5776,6 @@ export function FigmaSubmissionDrawer({
   surface,
 }: FigmaSubmissionDrawerProps) {
   const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
-  const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
   const [status, setStatus] = useState<"loading" | "success">("loading");
   const [localActionError, setLocalActionError] = useState("");
   const [actionPending, setActionPending] = useState(false);
@@ -4768,8 +5783,6 @@ export function FigmaSubmissionDrawer({
   const actionPendingRef = useRef(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerTabsRef = useRef<HTMLDivElement>(null);
-  const mobileTabsRef = useRef<HTMLDivElement>(null);
-  const mobileTabsTriggerRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const isDesktopDrawer = useDrawerDesktopQuery();
   const prefersReducedMotion = useReducedMotion();
@@ -4777,29 +5790,11 @@ export function FigmaSubmissionDrawer({
   const primaryAction = getPrimaryAction(submission, role, surface);
   const pendingTargetRef = useRef<WorkspaceTarget | null>(null);
   const shouldReduceMotion = Boolean(prefersReducedMotion);
-  const drawerPanelInitial = shouldReduceMotion
-    ? { opacity: 0, x: 0, y: 0 }
-    : {
-        opacity: 0.5,
-        x: isDesktopDrawer ? "100%" : 0,
-        y: isDesktopDrawer ? 0 : "100%",
-      };
-  const drawerPanelExit = shouldReduceMotion
-    ? { opacity: 0, x: 0, y: 0 }
-    : {
-        opacity: 0,
-        x: isDesktopDrawer ? "100%" : 0,
-        y: isDesktopDrawer ? 0 : "100%",
-      };
-  const drawerPanelTransition = shouldReduceMotion
-    ? { duration: 0.01 }
-    : { damping: 28, mass: 0.8, stiffness: 240, type: "spring" as const };
-  const tabContentInitial = shouldReduceMotion
-    ? { opacity: 0, y: 0 }
-    : { opacity: 0, y: 10 };
-  const tabContentExit = shouldReduceMotion
-    ? { opacity: 0, y: 0 }
-    : { opacity: 0, y: -10 };
+  const drawerPanelInitial = getDrawerPanelInitial(isDesktopDrawer, shouldReduceMotion);
+  const drawerPanelExit = getDrawerPanelExit(isDesktopDrawer, shouldReduceMotion);
+  const drawerPanelTransition = getDrawerPanelTransition(shouldReduceMotion);
+  const tabContentInitial = getDrawerTabInitial(shouldReduceMotion);
+  const tabContentExit = getDrawerTabExit(shouldReduceMotion);
 
   const openWorkspaceTarget = useCallback((target: WorkspaceTarget) => {
     pendingTargetRef.current = target;
@@ -4814,44 +5809,51 @@ export function FigmaSubmissionDrawer({
   }, [onOpenQuestionnaireWorkspace, role]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     previouslyFocusedElementRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     return () => {
-      previouslyFocusedElementRef.current?.focus({ preventScroll: true });
+      if (previouslyFocusedElementRef.current?.isConnected) {
+        previouslyFocusedElementRef.current.focus({ preventScroll: true });
+      }
     };
-  }, [submission.id]);
+  }, [isOpen, submission.id]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     actionRequestIdRef.current += 1;
     setStatus("loading");
     setTab(initialTab(activeTab));
-    setMobileTabsOpen(false);
     setLocalActionError("");
     setActionPending(false);
     actionPendingRef.current = false;
-    const timer = window.setTimeout(() => setStatus("success"), 260);
-    return () => window.clearTimeout(timer);
-  }, [activeTab, submission.id]);
+    setStatus("success");
+  }, [activeTab, isOpen, submission.id]);
 
   useEffect(() => {
-    if (!focusTarget) return;
+    if (!isOpen || !focusTarget) return;
     if (initialTab(activeTab) === "issues" && focusTarget.tab !== "issues") {
       pendingTargetRef.current = null;
       onClearFocusTarget?.();
       return;
     }
     openWorkspaceTarget(focusTarget);
-  }, [activeTab, focusTarget, onClearFocusTarget, openWorkspaceTarget, submission.id]);
+  }, [activeTab, focusTarget, isOpen, onClearFocusTarget, openWorkspaceTarget, submission.id]);
 
   useEffect(() => {
-    if (status !== "success") return;
+    if (!isOpen || status !== "success") return;
     const target = pendingTargetRef.current;
     if (!target) return;
 
     const timer = window.setTimeout(() => {
       const element = document.getElementById(targetElementId(target));
       if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.scrollIntoView({
+          behavior: shouldReduceMotion ? "auto" : "smooth",
+          block: "center",
+        });
         element.classList.add("is-ai-focus");
         window.setTimeout(() => element.classList.remove("is-ai-focus"), 1800);
       }
@@ -4860,21 +5862,13 @@ export function FigmaSubmissionDrawer({
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [onClearFocusTarget, status, tab, submission.id]);
+  }, [isOpen, onClearFocusTarget, shouldReduceMotion, status, tab, submission.id]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-
-      if (mobileTabsOpen) {
-        event.preventDefault();
-        setMobileTabsOpen(false);
-        window.requestAnimationFrame(() => {
-          mobileTabsTriggerRef.current?.focus({ preventScroll: true });
-        });
-        return;
-      }
-
       onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -4884,64 +5878,30 @@ export function FigmaSubmissionDrawer({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [mobileTabsOpen, onClose]);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (!mobileTabsOpen) return;
-
-    const closeOnPointerOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !mobileTabsRef.current?.contains(event.target)) {
-        setMobileTabsOpen(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", closeOnPointerOutside, true);
-    return () => document.removeEventListener("pointerdown", closeOnPointerOutside, true);
-  }, [mobileTabsOpen]);
-
-  useEffect(() => {
-    if (!mobileTabsOpen) return;
-    const focusFrame = window.requestAnimationFrame(() => {
-      const activeItem = mobileTabsRef.current?.querySelector<HTMLButtonElement>(
-        `[data-section-menu-tab="${tab}"]`,
-      );
-      const firstItem = mobileTabsRef.current?.querySelector<HTMLButtonElement>(
-        '[role="menuitem"]',
-      );
-      (activeItem ?? firstItem)?.focus({ preventScroll: true });
-    });
-    return () => window.cancelAnimationFrame(focusFrame);
-  }, [mobileTabsOpen, tab]);
-
-  useEffect(() => {
-    if (status !== "success") return;
+    if (!isOpen || status !== "success") return;
     const activeButton = drawerTabsRef.current?.querySelector<HTMLButtonElement>(
       `[data-drawer-tab="${tab}"]`,
     );
     activeButton?.scrollIntoView({
-      behavior: "smooth",
+      behavior: shouldReduceMotion ? "auto" : "smooth",
       block: "nearest",
       inline: "nearest",
     });
-  }, [status, tab]);
+  }, [isOpen, shouldReduceMotion, status, tab]);
 
   useEffect(() => {
-    if (status !== "success") return;
+    if (!isOpen || status !== "success") return;
     window.requestAnimationFrame(() => {
       drawerRef.current?.focus({ preventScroll: true });
     });
-  }, [status, submission.id]);
+  }, [isOpen, status, submission.id]);
 
   function handleDrawerKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.stopPropagation();
-      if (mobileTabsOpen) {
-        setMobileTabsOpen(false);
-        window.requestAnimationFrame(() => {
-          mobileTabsTriggerRef.current?.focus({ preventScroll: true });
-        });
-        return;
-      }
       onClose();
       return;
     }
@@ -4979,7 +5939,19 @@ export function FigmaSubmissionDrawer({
 
   const tabs: DrawerTabConfig[] = [
     { icon: Info, id: "overview", label: "Обзор" },
+    {
+      getCount: (detail) => detail.applicantsCount,
+      icon: User,
+      id: "applicants",
+      label: "Заявители",
+    },
     { icon: FileText, id: "questionnaire", label: "Анкета" },
+    {
+      getCount: () => submission.files.length,
+      icon: FileDigit,
+      id: "files",
+      label: "Файлы",
+    },
     {
       getCount: (detail) => detail.issuesCount,
       icon: AlertCircle,
@@ -4989,53 +5961,9 @@ export function FigmaSubmissionDrawer({
     },
     { icon: History, id: "history", label: "История" },
   ];
-  const activeSecondaryTab = mobileSecondaryDrawerTabs.has(tab);
 
   function selectDrawerTab(nextTab: TabId) {
     setTab(nextTab);
-    setMobileTabsOpen(false);
-  }
-
-  function selectSectionMenuTab(nextTab: TabId) {
-    selectDrawerTab(nextTab);
-    window.requestAnimationFrame(() => {
-      mobileTabsTriggerRef.current?.focus({ preventScroll: true });
-    });
-  }
-
-  function handleSectionMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      setMobileTabsOpen(false);
-      window.requestAnimationFrame(() => {
-        mobileTabsTriggerRef.current?.focus({ preventScroll: true });
-      });
-      return;
-    }
-
-    const items = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
-    );
-    const currentIndex = items.findIndex((item) => item === document.activeElement);
-    let nextIndex = currentIndex < 0 ? 0 : currentIndex;
-
-    if (event.key === "ArrowDown" || event.key === "ArrowRight") {
-      nextIndex = (nextIndex + 1) % items.length;
-    } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
-      nextIndex = (nextIndex - 1 + items.length) % items.length;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = items.length - 1;
-    } else {
-      return;
-    }
-
-    const nextItem = items[nextIndex];
-    if (!nextItem) return;
-    event.preventDefault();
-    nextItem.focus({ preventScroll: true });
   }
 
   function focusDrawerTab(nextTab: TabId) {
@@ -5086,10 +6014,12 @@ export function FigmaSubmissionDrawer({
     actionPendingRef.current = true;
     try {
       await onAction(primaryAction.action);
-    } catch {
+    } catch (error) {
       if (requestId !== actionRequestIdRef.current) return;
       setLocalActionError(
-        "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
+        error instanceof Error && error.message
+          ? error.message
+          : "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
       );
     } finally {
       if (requestId === actionRequestIdRef.current) {
@@ -5103,17 +6033,19 @@ export function FigmaSubmissionDrawer({
     <>
       <style>{figmaSubmissionDrawerStyles}</style>
       <AnimatePresence>
-        <motion.div
+        {isOpen ? (
+          <>
+            <motion.div
           animate={{ opacity: 1 }}
           className="v20-drawer-overlay"
           exit={{ opacity: 0 }}
           initial={{ opacity: 0 }}
           key="figma-drawer-overlay"
           onClick={onClose}
-          transition={{ duration: shouldReduceMotion ? 0.01 : 0.25 }}
+          transition={shouldReduceMotion ? drawerMotion.reduced : drawerMotion.overlay}
         />
 
-        <motion.div
+            <motion.div
           animate={{ opacity: 1, x: 0, y: 0 }}
           className="v20-submission-drawer"
           exit={drawerPanelExit}
@@ -5164,7 +6096,7 @@ export function FigmaSubmissionDrawer({
                   <button
                     aria-controls={drawerPanelId(item.id)}
                     aria-selected={isActive}
-                    className={`v20-tab-button ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""} ${mobileSecondaryDrawerTabs.has(item.id) ? "is-mobile-secondary" : ""}`}
+                    className={`v20-tab-button ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""}`}
                     data-drawer-tab={item.id}
                     id={drawerTabId(item.id)}
                     key={item.id}
@@ -5179,63 +6111,19 @@ export function FigmaSubmissionDrawer({
                     {typeof count === "number" && count > 0 ? (
                       <span className="v20-tab-count">{count}</span>
                     ) : null}
+                    {isActive ? (
+                      <motion.span
+                        aria-hidden="true"
+                        className="v20-tab-indicator"
+                        initial={false}
+                        layoutId="figmaSubmissionDrawerActiveTab"
+                        transition={drawerMotion.tabIndicator}
+                      />
+                    ) : null}
                   </button>
                 );
               })}
             </nav>
-            <div className="v20-tabbar-more" ref={mobileTabsRef}>
-              <button
-                aria-controls={mobileSecondaryDrawerTabsMenuId}
-                aria-expanded={mobileTabsOpen}
-                aria-haspopup="menu"
-                aria-label={activeSecondaryTab ? `Ещё: ${tabs.find((item) => item.id === tab)?.label ?? "раздел"}` : "Ещё"}
-                className={`v20-tabbar-more-trigger ${activeSecondaryTab ? "is-active" : ""}`}
-                ref={mobileTabsTriggerRef}
-                type="button"
-                onClick={() => setMobileTabsOpen((current) => !current)}
-              >
-                <MoreHorizontal aria-hidden="true" />
-                <span>Ещё</span>
-              </button>
-              {mobileTabsOpen ? (
-                <div
-                  aria-label="Дополнительные разделы подачи"
-                  className="v20-tabbar-more-menu"
-                  id={mobileSecondaryDrawerTabsMenuId}
-                  role="menu"
-                  onKeyDown={handleSectionMenuKeyDown}
-                >
-                  {tabs
-                    .filter((item) => mobileSecondaryDrawerTabs.has(item.id))
-                    .map((item) => {
-                      const count = item.getCount ? item.getCount(data) : undefined;
-                      const Icon = item.icon;
-                      return (
-                        <button
-                          aria-current={tab === item.id ? "page" : undefined}
-                          data-section-menu-tab={item.id}
-                          key={item.id}
-                          role="menuitem"
-                          tabIndex={
-                            tab === item.id ||
-                            (!activeSecondaryTab && item.id === "files")
-                              ? 0
-                              : -1
-                          }
-                          type="button"
-                          onClick={() => selectSectionMenuTab(item.id)}
-                        >
-                          <Icon className="v20-tab-icon" aria-hidden="true" />
-                          <span>{item.label}</span>
-                          {typeof count === "number" && count > 0 ? (
-                            <span className="v20-tab-count">{count}</span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                </div>
-              ) : null}
-            </div>
           </div>
 
           {status === "loading" ? (
@@ -5262,11 +6150,18 @@ export function FigmaSubmissionDrawer({
                     key={tab}
                     role="tabpanel"
                     tabIndex={0}
-                    transition={{ duration: shouldReduceMotion ? 0.01 : 0.2 }}
+                    transition={shouldReduceMotion ? drawerMotion.reduced : drawerMotion.tab}
                   >
                     {tab === "overview" ? (
-                      <OverviewTab data={data} submission={submission} />
+                      <OverviewTab
+                        data={data}
+                        onOpenFiles={() => setTab("files")}
+                        onOpenIssues={() => setTab("issues")}
+                        onOpenQuestionnaire={() => onOpenQuestionnaireWorkspace()}
+                        submission={submission}
+                      />
                     ) : null}
+                    {tab === "applicants" ? <ApplicantsTab data={data} /> : null}
                     {tab === "questionnaire" ? (
                       <QuestionnaireTab
                         onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
@@ -5326,7 +6221,9 @@ export function FigmaSubmissionDrawer({
               </footer>
             </>
           )}
-        </motion.div>
+            </motion.div>
+          </>
+        ) : null}
       </AnimatePresence>
     </>
   );
