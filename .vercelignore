@@ -11,11 +11,10 @@ test-results/
 .playwright-cli/
 playwright-report-*/
 test-results-*/
-docs/
-tests/
+/docs/
 config/playwright/
 .agents/
-supabase/
+/supabase/
 supabase/.temp/
 .DS_Store
 /VisaFlow_AI_*.html
