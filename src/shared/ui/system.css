@@ -36295,6 +36295,9 @@ select,
 
 /* Final Admin Review compact rail contract: hidden rail must not reserve a grid track. */
 @media (max-width: 1199px) {
+  .ops-shell.role-admin.surface-admin-review .v19-admin-review-screen,
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-screen:not(.is-panel-closed),
   .ops-shell.role-admin.surface-admin-review .workspace > .v19-admin-review-screen,
   .ops-shell.role-admin.surface-admin-review
     .workspace
@@ -36316,6 +36319,13 @@ select,
   }
 
   .ops-shell.role-admin.surface-admin-review .v19-admin-review-context {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-lane[data-empty="true"]:not([data-active="true"]) {
     display: none !important;
   }
 }

@@ -393,7 +393,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     );
   });
 
-  test("renders queue cards as one flat ordered grid without lane divisions", () => {
+  test("renders queue cards in their colored review lanes", () => {
     const review = initialSubmissions.find((item) => item.id === "ПД-1053");
     const returned = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!review || !returned) throw new Error("Expected review queue fixtures.");
@@ -411,17 +411,23 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         '[data-submission-id="ПД-1053"] .v19-admin-review-card-id',
       ),
     ).toHaveTextContent("VF-1053");
-    expect(container.querySelectorAll(".v19-admin-review-card-grid")).toHaveLength(1);
     expect(
       container.querySelectorAll(
-        ".v19-admin-review-card-grid > [data-submission-card]",
+        '.v19-admin-review-lane[data-lane="review"] > div > [data-submission-card]',
       ),
-    ).toHaveLength(2);
-    expect(container.querySelector(".v19-admin-review-lane")).toBeNull();
-    expect(container.querySelector(".v19-admin-review-lane-header")).toBeNull();
+    ).toHaveLength(1);
+    expect(
+      container.querySelectorAll(
+        '.v19-admin-review-lane[data-lane="returned"] > div > [data-submission-card]',
+      ),
+    ).toHaveLength(1);
+    expect(container.querySelectorAll(".v19-admin-review-lane")).toHaveLength(3);
+    expect(
+      container.querySelectorAll(".v19-admin-review-lane-header"),
+    ).toHaveLength(3);
   });
 
-  test("shows blocker time in the card shell without the former people count", () => {
+  test("keeps blocker styling and applicant metadata on the colored card", () => {
     const source = initialSubmissions.find((item) => item.id === "ПД-1053");
     const applicantId = source?.applicants[0]?.id;
     if (!source || !applicantId) throw new Error("Expected review fixture.");
@@ -444,15 +450,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
 
     const card = container.querySelector('[data-submission-id="ПД-1053"]');
     expect(card).toHaveClass("has-blocker");
-    expect(card?.querySelector(".v19-operational-card-shell-meta")).toHaveTextContent(
-      "1 ч",
-    );
-    expect(
-      card?.querySelector(".v19-operational-card-shell-meta"),
-    ).not.toHaveTextContent("1 чел.");
-    expect(card?.querySelector(".v19-operational-card-people")).toHaveTextContent(
-      "1 чел.",
-    );
+    expect(card).toHaveTextContent("1 чел.");
+    expect(card).toHaveTextContent("1 критичных");
   });
 
   test("does not expose internal questionnaire status values", async () => {

@@ -240,7 +240,9 @@ function ReviewQueueCard({
       data-submission-card=""
       data-submission-id={item.id}
       onClick={() => onOpenDrawer(item.id)}
-      className={`group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${
+      className={`v19-admin-review-card group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${
+        hasBlocker ? "has-blocker " : ""
+      }${
         hasBlocker
           ? "border-[#5b2b32]/45 bg-[#1d1719]/80 hover:border-[#74414a]/55"
           : "border-[#393c7f]/70 bg-[#17192b] hover:border-[#5960a7]"
@@ -249,7 +251,9 @@ function ReviewQueueCard({
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-1.5 flex max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10.5px] font-medium tracking-wide text-white/40">
-            <span className="shrink-0 font-mono text-white/60">{item.publicId}</span>
+            <span className="v19-admin-review-card-id shrink-0 font-mono text-white/60">
+              {item.publicId}
+            </span>
             <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
             <span className="shrink-0">{item.city}</span>
             <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
@@ -572,7 +576,7 @@ export function ReviewScreen({
             searchValue={searchQuery}
           />
 
-          <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
+          <div className="v19-admin-review-lanes grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
             {lanes.map((lane) => {
               const Icon = lane.icon;
               const laneItems = visibleReviews.filter((item) => item.lane === lane.id);
@@ -583,10 +587,13 @@ export function ReviewScreen({
 
               return (
                 <section
-                  className="min-h-[360px] rounded-[10px] border border-[#242529] bg-[#141416] p-3"
+                  className="v19-admin-review-lane min-h-0 rounded-[10px] border border-[#242529] bg-[#141416] p-3 lg:min-h-[360px]"
+                  data-active={activeLane === lane.id ? "true" : undefined}
+                  data-empty={laneItems.length === 0 ? "true" : undefined}
+                  data-lane={lane.id}
                   key={lane.id}
                 >
-                  <header className="mb-3 flex items-center justify-between gap-2 px-1">
+                  <header className="v19-admin-review-lane-header mb-3 flex items-center justify-between gap-2 px-1">
                     <div className="flex items-center gap-2">
                       <span
                         className={`flex h-8 w-8 items-center justify-center rounded-[8px] border ${toneClasses(lane.tone)}`}
@@ -617,7 +624,7 @@ export function ReviewScreen({
                         />
                       ))
                     ) : (
-                      <div className="rounded-[10px] border border-dashed border-white/10 p-5 text-center text-[12px] text-white/30">
+                      <div className="v19-admin-review-lane-empty rounded-[10px] border border-dashed border-white/10 p-5 text-center text-[12px] text-white/30">
                         Пусто
                       </div>
                     )}

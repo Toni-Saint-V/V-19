@@ -41348,6 +41348,14 @@ section[data-testid="agent-actions-screen"]
 
 @media (max-width: 767px) {
   #root
+    .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    > .workspace.workspace {
+    padding-bottom: var(--v19b-size-0) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  #root
     .v19-legacy-actions-screen.surface-agent-actions
     :is(.v19-actions-cockpit, .v19-actions-mobile-stage, .v19-actions-timeline) {
     height: auto !important;
