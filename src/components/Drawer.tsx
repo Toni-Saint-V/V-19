@@ -388,84 +388,109 @@ const OverviewTab = ({
   const readyFilesCount = submission.files.filter(isFileReady).length;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] rounded-xl p-5 hover:border-[var(--v19b-color-border-soft)] transition-colors">
-          <h3 className="text-[11px] font-medium [color:var(--v19b-color-text-40)] uppercase tracking-wider mb-5">
-            Маршрут и подача
-          </h3>
-          <div className="space-y-4 text-sm">
-            <div className="flex gap-4">
-              <Calendar className="w-5 h-5 [color:var(--v19b-color-text-30)] shrink-0" />
-              <div>
-                <div className="[color:var(--v19b-color-text)] font-medium">
-                  {data.tripDates}
-                </div>
-                <div className="[color:var(--v19b-color-text-40)] text-[11px] mt-0.5">
-                  Даты поездки
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <MapPin className="w-5 h-5 [color:var(--v19b-color-text-30)] shrink-0" />
-              <div>
-                <div className="[color:var(--v19b-color-text)] font-medium">
-                  {data.city}
-                </div>
-                <div className="[color:var(--v19b-color-text-40)] text-[11px] mt-0.5">
-                  Визовый центр подачи
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] rounded-xl p-5 hover:border-[var(--v19b-color-border-soft)] transition-colors flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[11px] font-medium [color:var(--v19b-color-text-40)] uppercase tracking-wider">
-              Чеклист документов
+    <div className="space-y-6" data-v19-drawer-overview>
+      <div className="overflow-hidden rounded-xl border border-[var(--v19b-color-border-faint)] bg-[var(--v19b-color-panel)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2">
+          <section
+            aria-labelledby="submission-drawer-route-title"
+            className="flex flex-col p-5 lg:pr-6"
+          >
+            <h3
+              className="mb-4 text-[11px] font-medium uppercase tracking-wider [color:var(--v19b-color-text-40)]"
+              id="submission-drawer-route-title"
+            >
+              Маршрут и подача
             </h3>
-            <span className="v19-submission-drawer-status is-ready inline-flex min-h-6 items-center rounded-[var(--v19b-radius-pill)] border border-[var(--vf-success-border)] bg-[var(--vf-success-soft)] px-2 text-[11px] font-mono font-medium [color:var(--vf-success)]">
-              {readyFilesCount}/{submission.files.length}
-            </span>
-          </div>
-          <div className="space-y-3 flex-1 flex flex-col justify-center">
-            {packageItems.map((doc) => (
-              <div key={doc.label} className="flex items-center gap-3">
-                {doc.status === "done" ? (
-                  <CheckCircle2 className="w-4 h-4 [color:var(--vf-success)]" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full border border-[var(--v19b-color-border-soft)]" />
-                )}
-                <span
-                  className={`text-[13px] ${doc.status === "done" ? "[color:var(--v19b-color-text-70)]" : "[color:var(--v19b-color-text-strong)]"}`}
-                >
-                  {doc.label}
-                </span>
+            <div className="grid flex-1 grid-cols-1 content-center gap-4 text-sm sm:grid-cols-2">
+              <div className="flex min-w-0 gap-4">
+                <Calendar className="h-5 w-5 shrink-0 [color:var(--v19b-color-text-30)]" />
+                <div className="min-w-0">
+                  <div className="font-medium [color:var(--v19b-color-text)]">
+                    {data.tripDates}
+                  </div>
+                  <div className="mt-0.5 text-[11px] [color:var(--v19b-color-text-40)]">
+                    Даты поездки
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
+              <div className="flex min-w-0 gap-4">
+                <MapPin className="h-5 w-5 shrink-0 [color:var(--v19b-color-text-30)]" />
+                <div className="min-w-0">
+                  <div className="font-medium [color:var(--v19b-color-text)]">
+                    {data.city}
+                  </div>
+                  <div className="mt-0.5 text-[11px] [color:var(--v19b-color-text-40)]">
+                    Визовый центр подачи
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            aria-labelledby="submission-drawer-documents-title"
+            className="flex flex-col border-t border-[var(--v19b-color-border-faint)] p-5 lg:border-l lg:border-t-0 lg:pl-6"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3
+                className="text-[11px] font-medium uppercase tracking-wider [color:var(--v19b-color-text-40)]"
+                id="submission-drawer-documents-title"
+              >
+                Чеклист документов
+              </h3>
+              <span className="v19-submission-drawer-status is-ready inline-flex min-h-6 items-center rounded-[var(--v19b-radius-pill)] border border-[var(--vf-success-border)] bg-[var(--vf-success-soft)] px-2 text-[11px] font-mono font-medium [color:var(--vf-success)]">
+                {readyFilesCount}/{submission.files.length}
+              </span>
+            </div>
+            <div className="flex flex-1 flex-col justify-center space-y-3">
+              {packageItems.map((doc) => (
+                <div key={doc.label} className="flex items-center gap-3">
+                  {doc.status === "done" ? (
+                    <CheckCircle2 className="h-4 w-4 [color:var(--vf-success)]" />
+                  ) : (
+                    <div className="h-4 w-4 rounded-full border border-[var(--v19b-color-border-soft)]" />
+                  )}
+                  <span
+                    className={`text-[13px] ${doc.status === "done" ? "[color:var(--v19b-color-text-70)]" : "[color:var(--v19b-color-text-strong)]"}`}
+                  >
+                    {doc.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <h3 className="text-[11px] font-medium [color:var(--v19b-color-text-40)] uppercase tracking-wider pl-1">
-          Участники ({data.applicantsCount})
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <section
+        aria-labelledby="submission-drawer-applicants-title"
+        className="space-y-3"
+      >
+        <div className="flex items-center justify-between px-1">
+          <h3
+            className="text-[11px] font-medium uppercase tracking-wider [color:var(--v19b-color-text-40)]"
+            id="submission-drawer-applicants-title"
+          >
+            Участники
+          </h3>
+          <span className="text-[11px] font-medium [color:var(--v19b-color-text-40)]">
+            {data.applicantsCount}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
           {data.applicants.map((applicant) => (
-            <div
+            <article
               key={applicant.name}
-              className="flex items-center p-3 bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] hover:border-[var(--v19b-color-border-soft)] rounded-xl transition-all group"
+              className="flex items-center rounded-xl border border-[var(--v19b-color-border-faint)] bg-[var(--v19b-color-panel)] p-4"
             >
-              <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[var(--v19b-color-border-selected)] to-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-soft)] flex items-center justify-center text-xs font-semibold [color:var(--v19b-color-text-70)] shadow-inner mr-3">
+              <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--v19b-color-border-soft)] bg-gradient-to-br from-[var(--v19b-color-border-selected)] to-[var(--v19b-color-panel-strong)] text-xs font-semibold shadow-inner [color:var(--v19b-color-text-70)]">
                 {applicantInitials(applicant.name)}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[14px] [color:var(--v19b-color-text-strong)] font-medium truncate group-hover:[color:var(--v19b-color-primary-text)] transition-colors">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] font-medium [color:var(--v19b-color-text-strong)]">
                   {applicant.name}
                 </div>
-                <div className="text-[11px] [color:var(--v19b-color-text-50)] mt-0.5">
+                <div className="mt-0.5 text-[11px] [color:var(--v19b-color-text-50)]">
                   {applicant.role}
                 </div>
               </div>
@@ -474,10 +499,10 @@ const OverviewTab = ({
                   {applicant.completeness}%
                 </div>
               </div>
-            </div>
+            </article>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 };
