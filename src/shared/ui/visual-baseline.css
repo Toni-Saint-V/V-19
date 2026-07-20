@@ -40815,6 +40815,110 @@ section[data-testid="agent-actions-screen"]
   }
 }
 
+/* Shared PageHeader slot recovery: keep the title at the leading edge and the
+   screen action at the opposite edge after the unified side-menu migration. */
+#root
+  .ops-shell.has-unified-side-menu
+  > .workspace
+  > .topbar.v19-page-header
+  > .v19-page-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  min-width: var(--v19b-size-0);
+  margin-left: auto;
+}
+
+@media (max-width: 767px) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-topbar-menu {
+    grid-column: 1 !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading {
+    grid-column: 2 !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions {
+    grid-column: 3 !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header {
+    grid-template-columns:
+      var(--v19-control-row-height)
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-topbar-menu {
+    grid-column: 1 !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading {
+    grid-column: 2 !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions {
+    grid-column: 3 !important;
+  }
+}
+
+@media (min-width: 1025px) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header {
+    grid-template-columns:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading {
+    grid-column: 1 !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions {
+    grid-column: 2 !important;
+  }
+}
+
 /* Shared side-menu finish: one black rail, calm gray labels, and one
    purple-blue active state across agent and admin surfaces. */
 #root .ops-shell.has-unified-side-menu {

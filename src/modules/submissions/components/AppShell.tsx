@@ -92,7 +92,7 @@ export function PageHeader({
         <h1>{title}</h1>
         {description ? <p>{description}</p> : null}
       </div>
-      {actions}
+      {actions ? <div className="v19-page-header-actions">{actions}</div> : null}
     </header>
   );
 }
