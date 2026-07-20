@@ -2755,13 +2755,22 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(copyButton.parentElement).toHaveClass(
       "v19-questionnaire-work-toolbar-copy",
     );
+    expect(screen.getByLabelText("Город проживания")).toHaveAttribute(
+      "autocomplete",
+      "off",
+    );
 
     fireEvent.click(copyButton);
     expect(onFieldChange).not.toHaveBeenCalled();
-    expect(screen.getByText(/Предпросмотр:/)).toHaveAttribute("role", "status");
-    fireEvent.click(
-      screen.getByRole("button", { name: "Подтвердить копирование" }),
-    );
+    expect(screen.queryByText(/Предпросмотр:/)).not.toBeInTheDocument();
+    expect(
+      result.container.querySelectorAll('[data-family-copy-preview="true"]').length,
+    ).toBeGreaterThan(0);
+    const confirmCopyButton = screen.getByRole("button", {
+      name: "Подтвердить копирование",
+    });
+    expect(confirmCopyButton).toHaveClass("v19-questionnaire-family-copy-confirm");
+    fireEvent.click(confirmCopyButton);
 
     const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
     const affectedApplicantCount = new Set(

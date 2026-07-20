@@ -216,6 +216,7 @@ type FormFieldProps = {
 
 type QuestionnaireFieldUiContract = {
   confirmReview: (fieldId: string) => void;
+  copyPreview: (fieldId: string) => boolean;
   errorMessage: (fieldId: string, label: string) => string | undefined;
   focused: (fieldId: string) => boolean;
   revealRequiredErrors: boolean;
@@ -715,6 +716,7 @@ function FormField({
 
   const canonicalRequired = fieldContract?.required(modelFieldId) ?? false;
   const canonicalFocused = fieldContract?.focused(modelFieldId) ?? focused;
+  const copyPreview = fieldContract?.copyPreview(modelFieldId) ?? false;
   const canonicalState = fieldContract?.state(modelFieldId, label) ?? state;
   const canonicalReviewSource =
     fieldContract?.reviewSource(modelFieldId, label) ?? reviewSource;
@@ -931,9 +933,10 @@ function FormField({
     <div
       data-field-focused={canonicalFocused ? "true" : undefined}
       data-field-label={label}
+      data-family-copy-preview={copyPreview ? "true" : undefined}
       className={`v19-questionnaire-field v19-questionnaire-field-cell flex flex-col ${
         canonicalState === "needs_review" ? "has-review-confirmation " : ""
-      }${
+      }${copyPreview ? "is-copy-preview " : ""}${
         fullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
       }`}
     >
@@ -1129,7 +1132,7 @@ function FormField({
             aria-autocomplete={inputSuggestions.length ? "list" : undefined}
             aria-controls={inputSuggestions.length ? suggestionsId : undefined}
             aria-expanded={inputSuggestions.length ? inputSuggestionListOpen : undefined}
-            autoComplete={inputAutocomplete(label, type)}
+            autoComplete={inputSuggestions.length ? "off" : inputAutocomplete(label, type)}
             className={`${baseClasses} ${compact ? "is-compact-address" : ""} ${stateClasses}`}
             inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
             id={fieldId}
@@ -2521,7 +2524,6 @@ function sectionIdMatches(sectionId: string, canonicalId: string) {
 export function FigmaQuestionnaireScreen({
   initialFocus,
   onBack,
-  onConfirmPassportReview,
   onFieldChange,
   onMarkIssueFixed,
   onOpenDocuments,
@@ -2529,7 +2531,6 @@ export function FigmaQuestionnaireScreen({
   onSaveAndExit,
   submission,
 }: FigmaQuestionnaireScreenProps) {
-  const [passportReviewPending, setPassportReviewPending] = useState(false);
   const [pendingFieldUpdates, setPendingFieldUpdates] = useState<
     Record<string, QuestionnaireFieldUpdate>
   >({});
@@ -3327,9 +3328,8 @@ export function FigmaQuestionnaireScreen({
         }
       : undefined;
     setFamilyCopyPreview({ affectedApplicants, firstTarget, updates });
-    setFamilyCopyMessage(
-      `Предпросмотр: ${updates.length} пустых полей у ${affectedApplicants} заявителей. Заполненные значения и личные/паспортные данные не изменятся.`,
-    );
+    setFamilyCopyMessage(undefined);
+    if (firstTarget) focusQuestionnaireTarget(firstTarget);
   }
 
   function confirmFamilyCopy() {
@@ -4043,29 +4043,6 @@ export function FigmaQuestionnaireScreen({
       return;
     }
     onBack();
-  }
-
-  async function confirmPassportReviewFromButton(applicantId: string) {
-    if (!isEditable || !onConfirmPassportReview || passportReviewPending) return;
-
-    setPassportReviewPending(true);
-    setSaveStatus("saving");
-    setSaveMessage("Сохраняем проверку паспорта…");
-    try {
-      await saveDraftFromButton();
-      await onConfirmPassportReview(applicantId);
-      setSaveStatus("saved");
-      setSaveMessage("Паспорт проверен");
-    } catch (error) {
-      setSaveStatus("error");
-      setSaveMessage(
-        error instanceof Error
-          ? error.message
-          : "Не удалось сохранить проверку паспорта.",
-      );
-    } finally {
-      setPassportReviewPending(false);
-    }
   }
 
   async function resolveCurrentIssue() {
@@ -4789,6 +4766,13 @@ export function FigmaQuestionnaireScreen({
 
   const questionnaireFieldUiContract: QuestionnaireFieldUiContract = {
     confirmReview: confirmFieldReview,
+    copyPreview: (fieldId) =>
+      Boolean(
+        familyCopyPreview?.updates.some(
+          (update) =>
+            update.applicantId === activeApplicant && update.fieldId === fieldId,
+        ),
+      ),
     errorMessage: fieldErrorMessage,
     focused: (fieldId) =>
       initialFieldTarget?.fieldId === fieldId &&
@@ -4801,12 +4785,6 @@ export function FigmaQuestionnaireScreen({
   const mobileBlockerTarget = readinessStats.canSubmit
     ? undefined
     : firstQuestionnaireBlockerTarget();
-  const activePassportReviewIssue = passportGateIssues(draftSubmission).find(
-    (issue) =>
-      issue.applicantId === activeApplicant &&
-      (issue.code === "passport_not_confirmed" ||
-        issue.code === "passport_extraction_not_reviewed"),
-  );
   const mobileBlockerLabel =
     mobileBlockerTarget?.label ??
     readinessStats.completionReason ??
@@ -5132,24 +5110,6 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel" ref={workPanelRef}>
-              {isEditable && activePassportReviewIssue && onConfirmPassportReview ? (
-                <button
-                  className="v19-questionnaire-passport-review-button"
-                  data-testid="questionnaire-confirm-passport-review"
-                  disabled={!isEditable || passportReviewPending}
-                  type="button"
-                  onClick={() =>
-                    void confirmPassportReviewFromButton(
-                      activePassportReviewIssue.applicantId,
-                    )
-                  }
-                >
-                  <CheckCircle2 aria-hidden="true" />
-                  <span>
-                    {passportReviewPending ? "Сохраняем…" : "Подтвердить паспорт"}
-                  </span>
-                </button>
-              ) : null}
               {showWorkToolbar ? (
                 <div
                   className={`v19-questionnaire-work-toolbar${
@@ -5258,7 +5218,9 @@ export function FigmaQuestionnaireScreen({
                     <div className="v19-questionnaire-work-toolbar-copy">
                       <button
                         aria-describedby={
-                          familyCopyMessage ? familyCopyStatusId : undefined
+                          !familyCopyPreview && familyCopyMessage
+                            ? familyCopyStatusId
+                            : undefined
                         }
                         className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
                         disabled={!isEditable || Boolean(familyCopyPreview)}
@@ -5280,7 +5242,7 @@ export function FigmaQuestionnaireScreen({
                     {familyCopyPreview ? (
                       <>
                         <button
-                          className="v19-questionnaire-complete-button is-ready"
+                          className="v19-questionnaire-complete-button v19-questionnaire-family-copy-confirm is-ready"
                           type="button"
                           onClick={confirmFamilyCopy}
                         >
@@ -5304,7 +5266,7 @@ export function FigmaQuestionnaireScreen({
                         Проверить скопированные поля
                       </button>
                     ) : null}
-                    {familyCopyMessage ? (
+                    {!familyCopyPreview && familyCopyMessage ? (
                       <p
                         aria-live="polite"
                         className="v19-questionnaire-family-copy-status"

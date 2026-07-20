@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   BookUser,
+  Plus,
   UploadCloud,
   UserRound,
   UsersRound,
@@ -105,6 +106,38 @@ function passportExtractionValues(fields: PassportExtractionField[]) {
   return values;
 }
 
+type PrefillPreviewField = ReturnType<typeof getPrefillPreviewFields>[number];
+
+function PrefillPreviewList({ fields }: { fields: PrefillPreviewField[] }) {
+  return (
+    <div className="v19-preupload-prefill-list">
+      <AnimatePresence mode="popLayout">
+        {fields.map((field, index) => (
+          <motion.div
+            layout
+            key={`${field.key}-${field.sourceFileName ?? index}`}
+            initial={{ opacity: 0, x: 16, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -12, scale: 0.98 }}
+            transition={{ delay: index * 0.025 }}
+            className={`v19-prefill-preview-field rounded-2xl border px-3 py-2 ${field.state === 'warning' ? 'border-[var(--v19-depth-accent-border)] bg-[var(--v19-depth-accent-soft)]' : 'border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel-strong)]'}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10.5px] font-medium uppercase tracking-wider text-white/38">{field.label}</div>
+                <div className="v19-prefill-preview-value mt-1 break-words text-[13px] font-medium">{field.value}</div>
+              </div>
+              <span className="v19-prefill-preview-confidence shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10.5px]">
+                {Math.round(field.confidence * 100)}%
+              </span>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackageType = 'family' }: PreUploadScreenProps) {
   const [packageType, setPackageType] = useState<ProductPackageType>(initialPackageType);
   const [familyApplicantCount, setFamilyApplicantCount] = useState(2);
@@ -116,10 +149,12 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   const [manualUpload, setManualUpload] = useState(false);
   const [actionError, setActionError] = useState('');
   const [actionPending, setActionPending] = useState(false);
+  const [mobilePrefillOpen, setMobilePrefillOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingApplicantIndexRef = useRef<number | null>(null);
   const pipelineRunRef = useRef(0);
   const passportExtractionAbortControllerRef = useRef<AbortController | null>(null);
+  const previousRecognizedCountRef = useRef(0);
   const timersRef = useRef<number[]>([]);
 
   const applicantCount = packageType === 'family' ? familyApplicantCount : 1;
@@ -296,6 +331,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     setDraftSeedIso(new Date().toISOString());
     setFiles([]);
     setActionError('');
+    setMobilePrefillOpen(false);
     setPhase('selecting');
     if (nextType === 'family') setFamilyApplicantCount(2);
   };
@@ -454,6 +490,27 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     setPhase(files.some((file) => file.status === 'recognized') ? 'ready' : 'review');
   }, [files, manualUpload]);
 
+  useEffect(() => {
+    const previousRecognizedCount = previousRecognizedCountRef.current;
+    previousRecognizedCountRef.current = recognizedCount;
+    if (
+      recognizedCount > previousRecognizedCount &&
+      previewFields.length > 0 &&
+      window.matchMedia?.('(max-width: 1279px)').matches
+    ) {
+      setMobilePrefillOpen(true);
+    }
+  }, [previewFields.length, recognizedCount]);
+
+  useEffect(() => {
+    if (!mobilePrefillOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobilePrefillOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [mobilePrefillOpen]);
+
   return (
     <motion.div
       aria-labelledby="create-submission-title"
@@ -532,15 +589,6 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                       );
                     })}
                   </div>
-
-                  {packageType === 'family' ? (
-                    <div className="v19-preupload-family-summary">
-                      <strong data-testid="preupload-applicant-count">
-                        Заявителей: {applicantCount}
-                      </strong>
-                      <span>Паспорта загружайте по порядку: 1, 2, 3…</span>
-                    </div>
-                  ) : null}
 
                   <AnimatePresence initial={false} mode="wait">
                     <motion.div
@@ -621,6 +669,19 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                             </article>
                           );
                         })}
+                        {packageType === 'family' ? (
+                          <article className="v19-preupload-add-applicant" role="listitem">
+                            <button
+                              aria-label="Добавить следующего заявителя"
+                              disabled={actionPending}
+                              type="button"
+                              onClick={() => setFamilyApplicantCount((current) => current + 1)}
+                            >
+                              <Plus aria-hidden="true" />
+                              <span className="sr-only">Добавить заявителя</span>
+                            </button>
+                          </article>
+                        ) : null}
                       </div>
                     </motion.div>
                   </AnimatePresence>
@@ -733,33 +794,67 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   Поля появляются здесь по мере распознавания паспорта.
                 </p>
               </div>
-              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                <AnimatePresence mode="popLayout">
-                  {previewFields.map((field, index) => (
-                    <motion.div
-                      layout
-                      key={`${field.key}-${field.sourceFileName ?? index}`}
-                      initial={{ opacity: 0, x: 16, scale: 0.98 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      exit={{ opacity: 0, x: -12, scale: 0.98 }}
-                      transition={{ delay: index * 0.025 }}
-                      className={`v19-prefill-preview-field rounded-2xl border px-3 py-2 ${field.state === 'warning' ? 'border-[var(--v19-depth-accent-border)] bg-[var(--v19-depth-accent-soft)]' : 'border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel-strong)]'}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-[10.5px] font-medium uppercase tracking-wider text-white/38">{field.label}</div>
-                          <div className="v19-prefill-preview-value mt-1 break-words text-[13px] font-medium">{field.value}</div>
-                        </div>
-                        <span className="v19-prefill-preview-confidence shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10.5px]">
-                          {Math.round(field.confidence * 100)}%
-                        </span>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
+              <PrefillPreviewList fields={previewFields} />
             </div>
           </aside>
+
+          {previewFields.length > 0 && !mobilePrefillOpen ? (
+            <button
+              aria-label="Открыть распознанные OCR-поля"
+              className="v19-preupload-prefill-trigger"
+              type="button"
+              onClick={() => setMobilePrefillOpen(true)}
+            >
+              <Wand2 aria-hidden="true" />
+              <span>OCR</span>
+              <strong>{recognizedCount}</strong>
+            </button>
+          ) : null}
+
+          <AnimatePresence>
+            {mobilePrefillOpen && previewFields.length > 0 ? (
+              <motion.div
+                animate={{ opacity: 1 }}
+                className="v19-preupload-prefill-overlay"
+                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }}
+              >
+                <button
+                  aria-label="Закрыть распознанные OCR-поля"
+                  className="v19-preupload-prefill-backdrop"
+                  type="button"
+                  onClick={() => setMobilePrefillOpen(false)}
+                />
+                <motion.section
+                  aria-label="Распознанные OCR-поля"
+                  aria-modal="true"
+                  className="v19-preupload-prefill-sheet"
+                  role="dialog"
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 24 }}
+                  initial={{ opacity: 0, y: 24 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <div className="v19-preupload-prefill-sheet-handle" aria-hidden="true" />
+                  <header className="v19-preupload-prefill-sheet-header">
+                    <div>
+                      <h3>Prefill-поля</h3>
+                      <p>Распознанные данные паспорта</p>
+                    </div>
+                    <span>{recognizedCount} OCR</span>
+                    <button
+                      aria-label="Закрыть"
+                      type="button"
+                      onClick={() => setMobilePrefillOpen(false)}
+                    >
+                      <X aria-hidden="true" />
+                    </button>
+                  </header>
+                  <PrefillPreviewList fields={previewFields} />
+                </motion.section>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       </main>
     </motion.div>

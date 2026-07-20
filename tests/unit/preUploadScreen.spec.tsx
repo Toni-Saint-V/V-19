@@ -29,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('PreUploadScreen', () => {
@@ -62,15 +63,11 @@ describe('PreUploadScreen', () => {
     expect(draft.applicants).toHaveLength(1);
   });
 
-  test('shows two compact family applicants without an add control', () => {
+  test('shows two compact family applicants with one next-slot add control', () => {
     render(<PreUploadScreen onBack={() => undefined} />);
 
-    expect(screen.getByTestId('preupload-applicant-count')).toHaveTextContent(
-      'Заявителей: 2',
-    );
-    expect(
-      screen.getByText('Паспорта загружайте по порядку: 1, 2, 3…'),
-    ).toBeVisible();
+    expect(screen.queryByTestId('preupload-applicant-count')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Паспорта загружайте по порядку/)).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Загрузить паспорт: Основной заявитель' }),
     ).toHaveTextContent('1Основной заявитель');
@@ -80,11 +77,19 @@ describe('PreUploadScreen', () => {
     expect(screen.getByRole('heading', { name: 'Prefill-поля' })).toBeInTheDocument();
     expect(screen.getByText('Поля появляются здесь по мере распознавания паспорта.')).toBeInTheDocument();
     expect(screen.queryByText(/Критичных расхождений нет/)).not.toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
     expect(screen.queryByText('У вас одинаковый адрес проживания в России?')).not.toBeInTheDocument();
     expect(screen.queryByText('У вас одинаковый адрес проживания в Испании?')).not.toBeInTheDocument();
 
-    expect(screen.queryByRole('button', { name: 'Добавить заявителя' })).not.toBeInTheDocument();
+    const addApplicant = screen.getByRole('button', {
+      name: 'Добавить следующего заявителя',
+    });
+    expect(addApplicant).toBeVisible();
+    fireEvent.click(addApplicant);
+    expect(
+      screen.getByRole('button', { name: 'Загрузить паспорт: Заявитель 3' }),
+    ).toBeVisible();
+    expect(screen.getAllByRole('listitem')).toHaveLength(4);
   });
 
   test('binds a passport chosen from a family cell to that exact applicant', async () => {
@@ -114,6 +119,7 @@ describe('PreUploadScreen', () => {
   });
 
   test('shows the extracted applicant name and a recognized passport state', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
     vi.mocked(invokePassportExtraction).mockResolvedValueOnce({
       fields: [
         {
@@ -182,6 +188,26 @@ describe('PreUploadScreen', () => {
     ).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Заменить паспорт' })).toBeVisible();
     expect(screen.queryByText('volkov.jpeg')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: 'Распознанные OCR-поля' }),
+      ).toBeVisible(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Распознанные OCR-поля' }),
+      ).not.toBeInTheDocument(),
+    );
+    const openPrefill = screen.getByRole('button', {
+      name: 'Открыть распознанные OCR-поля',
+    });
+    fireEvent.click(openPrefill);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: 'Распознанные OCR-поля' }),
+      ).toBeVisible(),
+    );
   });
 
   test('shows numeric progress while passport extraction is running', async () => {

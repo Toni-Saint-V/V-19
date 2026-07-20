@@ -10,7 +10,6 @@ import {
   drawerTabInitial,
   useDrawerDesktopQuery,
 } from "../shared/ui/drawer/drawerMotion";
-import { StatusBadge } from "../shared/ui/primitives";
 import {
   AlertCircle,
   Briefcase,
@@ -34,7 +33,6 @@ import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
   getPrimaryAction,
   statusLabelFor,
-  statusTone,
 } from "../modules/submissions/status";
 import type {
   DrawerTab,
@@ -345,12 +343,12 @@ function drawerTab(activeTab: DrawerTab | undefined): TabId {
 
 function questionnaireSectionIconClass(status: QuestionnaireSectionDetail["status"]) {
   if (status === "done") {
-    return "bg-[var(--vf-success-soft)] border-[var(--vf-success-border)] [color:var(--vf-success)]";
+    return "[color:var(--vf-success)]";
   }
   if (status === "in_progress") {
-    return "bg-[var(--vf-accent-soft)] border-[var(--vf-accent-border)] [color:var(--v19b-color-primary-text)]";
+    return "[color:var(--v19b-color-primary-text)]";
   }
-  return "bg-[var(--v19b-color-control)] border-[var(--v19b-color-border-soft)] [color:var(--v19b-color-text-40)]";
+  return "[color:var(--v19b-color-text-40)]";
 }
 
 function questionnaireSectionProgressClass(
@@ -536,21 +534,21 @@ const QuestionnaireTab = ({
             }}
           >
             <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border
+              className={`flex h-5 w-5 shrink-0 items-center justify-center
               ${questionnaireSectionIconClass(section.status)}`}
             >
               <section.Icon className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[13px] font-medium [color:var(--v19b-color-text-strong)] truncate">
+                <span className="truncate text-[length:var(--v19b-size-11)] font-[var(--v19b-weight-control)] [color:var(--v19b-color-text-strong)]">
                   {section.title}
                 </span>
-                <span className="text-[11px] font-mono [color:var(--v19b-color-text-50)]">
+                <span className="text-[length:var(--v19b-size-11)] font-[var(--v19b-weight-control)] [color:var(--v19b-color-text-50)]">
                   {section.progress}%
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-[var(--v19b-color-control)] rounded-full overflow-hidden">
+              <div className="h-[var(--v19b-size-2)] w-full overflow-hidden rounded-full bg-[var(--v19b-color-control)]">
                 <div
                   aria-hidden="true"
                   className={`h-full rounded-full ${questionnaireSectionProgressClass(section.status)}`}
@@ -855,12 +853,8 @@ export function Drawer({
   const data = buildSubmissionDetail(submission);
   const primaryAction = getPrimaryAction(submission, "agent", "agent");
   const primaryLabel = footerActionLabel(primaryAction.action, primaryAction.label);
-  const footerStatusText =
-    actionError ||
-    primaryAction.reason ||
-    (data.status === "returned"
-      ? "Исправьте замечания перед повторной отправкой."
-      : "Проверьте все данные перед отправкой администратору.");
+  const footerActionNotice =
+    actionError || (primaryAction.disabled ? primaryAction.reason : "");
   const primaryButtonClassName = primaryButtonToneClass(primaryAction.action);
 
   useEffect(() => {
@@ -1026,6 +1020,19 @@ export function Drawer({
                 <X className="w-5 h-5" />
               </button>
 
+              <div
+                className="v19-drawer-lifecycle-context lg:pr-12"
+                data-testid="drawer-lifecycle-context"
+              >
+                <div className="v19-drawer-lifecycle-identity">
+                  <span>{data.id}</span>
+                  <strong>{data.title}</strong>
+                </div>
+                <span className="sr-only">
+                  Статус подачи: {statusLabelFor(data.status, "full")}
+                </span>
+              </div>
+
               <div className="w-full overflow-x-auto scrollbar-hide -mx-4 px-4 lg:mx-0 lg:px-0 lg:pr-12">
                 <div
                   className="flex items-center gap-1.5 w-max mb-[-1px]"
@@ -1119,25 +1126,15 @@ export function Drawer({
               </AnimatePresence>
             </div>
 
-            <footer className="p-4 lg:px-8 lg:py-5 border-t border-[var(--v19b-color-border-soft)] bg-[var(--v19b-color-deep-drawer-95)] backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
-              <div
-                className="v19-drawer-lifecycle-context"
-                data-testid="drawer-lifecycle-context"
-              >
-                <div className="v19-drawer-lifecycle-identity">
-                  <span>{data.id}</span>
-                  <strong>{data.title}</strong>
-                </div>
-                <div className="v19-drawer-lifecycle-status">
-                  <StatusBadge
-                    label={statusLabelFor(data.status, "full")}
-                    tone={statusTone[data.status]}
-                  />
-                  <span role={actionError ? "alert" : undefined}>
-                    {footerStatusText}
-                  </span>
-                </div>
-              </div>
+            <footer className="p-4 lg:px-8 lg:py-5 border-t border-[var(--v19b-color-border-soft)] bg-[var(--v19b-color-deep-drawer-95)] backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-end gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
+              {footerActionNotice ? (
+                <span
+                  className="v19-drawer-action-notice"
+                  role={actionError ? "alert" : undefined}
+                >
+                  {footerActionNotice}
+                </span>
+              ) : null}
               <div className="flex gap-3 w-full sm:w-auto">
                 <button
                   aria-label="Отменить и закрыть подачу"

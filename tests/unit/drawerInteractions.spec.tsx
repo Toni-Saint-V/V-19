@@ -110,18 +110,17 @@ afterEach(() => {
 });
 
 describe("Drawer interactions", () => {
-  test("keeps visible identity and status beside the lifecycle action and switches every tab", async () => {
+  test("keeps the visible identity above the tabs and switches every tab", async () => {
     renderDrawer();
 
     const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
     const lifecycleContext = within(dialog).getByTestId("drawer-lifecycle-context");
-    const lifecycleFooter = lifecycleContext.closest("footer");
-    if (!lifecycleFooter) throw new Error("Expected lifecycle footer.");
+    const lifecycleHeader = lifecycleContext.closest("header");
+    if (!lifecycleHeader) throw new Error("Expected lifecycle header.");
     expect(within(lifecycleContext).getByText("VF-1048")).toBeInTheDocument();
     expect(within(lifecycleContext).getByText("Семья Ивановых")).toBeVisible();
-    expect(within(lifecycleContext).getByText("Возвращено")).toBeVisible();
     expect(
-      within(lifecycleFooter).getByRole("button", { name: "Отправить исправления" }),
+      within(dialog).getByRole("button", { name: "Отправить исправления" }),
     ).toBeInTheDocument();
     expect(within(dialog).getByText("Мария Иванова")).toBeInTheDocument();
     expect(within(dialog).queryByText("Семья Петровых")).not.toBeInTheDocument();

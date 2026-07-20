@@ -559,7 +559,7 @@ export function AdminWorkspace({
           <div className="ml-auto flex items-center gap-2">
             <div
               aria-label={adminIdentity}
-              className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-medium text-white/70 shadow-inner"
+              className="v19-admin-header-identity w-8 h-8 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-medium text-white/70 shadow-inner"
               title={adminIdentity}
             >
               {adminInitials}
