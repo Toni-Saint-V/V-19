@@ -41354,6 +41354,76 @@ section[data-testid="agent-actions-screen"]
   }
 }
 
+/* Shared design-system mobile shell: compact viewport edge and one nav drawer. */
+@media (max-width: 767px) {
+  #root .ops-shell.has-unified-side-menu > .workspace.workspace {
+    padding-inline: var(--v19b-size-8) !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .workspace.workspace
+    > :is(.v19-agent-workspace-scroll, .v19-admin-workspace-scroll) {
+    padding-inline: var(--v19b-size-0) !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+    inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
+    width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
+    min-width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
+    max-width: calc(100vw - var(--v19b-size-16)) !important;
+    height: calc(100svh - var(--v19b-size-16)) !important;
+    max-height: calc(100svh - var(--v19b-size-16)) !important;
+    padding: var(--v19b-size-8) !important;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-panel) !important;
+    background: var(--v19b-color-panel) !important;
+    box-shadow: var(--v19b-shadow-panel) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-brand {
+    min-height: var(--v19b-size-48) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-4) var(--v19b-size-8) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-nav {
+    gap: var(--v19b-size-4) !important;
+    padding-inline: var(--v19b-size-0) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-nav-group-label {
+    padding: var(--v19b-size-8) var(--v19b-size-8) var(--v19b-size-4) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-nav-item {
+    min-height: var(--v19b-size-44) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-10) !important;
+    border: var(--v19b-size-1) solid transparent !important;
+    border-radius: var(--v19b-radius-control) !important;
+    background: transparent !important;
+  }
+
+  #root .v19-ds-side-menu .ops-nav-item:is(.is-active, [aria-current="page"]) {
+    border-color: var(--v19b-color-border-selected) !important;
+    background: var(--v19b-color-control-hover) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-sidebar-footer {
+    gap: var(--v19b-size-4) !important;
+    margin: auto var(--v19b-size-0) var(--v19b-size-0) !important;
+    padding-top: var(--v19b-size-8) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-session {
+    min-height: var(--v19b-size-44) !important;
+    padding: var(--v19b-size-4) var(--v19b-size-8) !important;
+    border-color: transparent !important;
+    background: transparent !important;
+  }
+}
+
 @media (max-width: 767px) {
   #root
     .v19-legacy-actions-screen.surface-agent-actions
@@ -41866,5 +41936,25 @@ section[data-testid="agent-actions-screen"]
     ) {
     left: var(--v19b-size-224) !important;
     width: auto !important;
+  }
+}
+
+/* Final owner: the shared design-system drawer beats legacy sidebar layers. */
+@media (max-width: 767px) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+    inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
+    width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
+    min-width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
+    max-width: calc(100vw - var(--v19b-size-16)) !important;
+    height: auto !important;
+    min-height: var(--v19b-size-0) !important;
+    max-height: none !important;
+    padding: var(--v19b-size-8) !important;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-panel) !important;
+    background: var(--v19b-color-panel) !important;
+    box-shadow: var(--v19b-shadow-panel) !important;
   }
 }

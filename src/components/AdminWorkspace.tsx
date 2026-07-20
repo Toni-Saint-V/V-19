@@ -504,7 +504,7 @@ export function AdminWorkspace({
           surface={surface}
           workspaceInactive={currentView === "review_workspace"}
         >
-          <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+          <div className="v19-admin-workspace-scroll flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
             <div className="max-w-[1460px] mx-auto h-full">
               {activeNav === "review" ? (
                 <ReviewScreen

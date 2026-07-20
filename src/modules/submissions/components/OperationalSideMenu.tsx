@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../../shared/ui/cn";
 import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
+import { V19SideMenuSurface } from "../../../shared/ui/v19-design-system";
 import type { Role } from "../types";
 
 export const operationalSideMenuId = "v19-operational-side-menu";
@@ -114,9 +115,10 @@ export function OperationalSideMenu({
 
   return (
     <>
-      <aside
+      <V19SideMenuSurface
         id={id}
         className={cn("ops-sidebar opsu-sidebar", `is-${displayMode}`)}
+        open={mobileOpen}
         data-side-menu-mode={displayMode}
         aria-label={ariaLabel}
         aria-hidden={inactive ? "true" : undefined}
@@ -223,7 +225,7 @@ export function OperationalSideMenu({
             <Ellipsis className="ops-user-more" aria-hidden="true" />
           </Button>
         </div>
-      </aside>
+      </V19SideMenuSurface>
       {mobileOpen ? (
         <button
           className="ops-mobile-menu-backdrop"

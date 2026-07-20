@@ -228,6 +228,25 @@ export function V19QueueCard<T extends ElementType = "div">({
   return <Component {...props} className={cn("v19-queue-card", className)} />;
 }
 
+/**
+ * Shared application navigation surface. Role-specific navigation stays in the
+ * shell adapter; the responsive drawer surface is owned by the design system.
+ */
+export function V19SideMenuSurface({
+  className,
+  open,
+  ...props
+}: ComponentPropsWithoutRef<"aside"> & { open: boolean }) {
+  return (
+    <aside
+      {...props}
+      className={cn("v19-ds-side-menu", className)}
+      data-open={open ? "true" : "false"}
+      data-v19-component="side-menu"
+    />
+  );
+}
+
 export function V19OperationalCardGrid({
   className,
   ...props
