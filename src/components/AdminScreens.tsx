@@ -4,6 +4,7 @@ import {
   ArrowUpDown,
   Bot,
   CheckCircle2,
+  ChevronRight,
   Clock,
   FileCheck2,
   Flame,
@@ -13,6 +14,7 @@ import {
   Shapes,
   Sparkles,
   User,
+  Users,
   X,
 } from "lucide-react";
 import {
@@ -24,9 +26,6 @@ import {
 import {
   V19MetricCard,
   V19MetricStrip,
-  V19OperationalCard,
-  V19OperationalCardGrid,
-  V19OperationalProgressLine,
   V19PriorityHero,
 } from "../shared/ui/v19-design-system";
 import {
@@ -81,9 +80,7 @@ function openIssues(submission: Submission) {
 }
 
 function unresolvedBlockerCount(submission: Submission) {
-  return openIssues(submission).filter(
-    (issue) => issue.severity === "blocker",
-  ).length;
+  return openIssues(submission).filter((issue) => issue.severity === "blocker").length;
 }
 
 function unresolvedWarningCount(submission: Submission) {
@@ -120,10 +117,7 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
   const primaryAction = getPrimaryAction(submission, "admin", "review");
   const blockers = unresolvedBlockerCount(submission);
   const warnings = unresolvedWarningCount(submission);
-  const updatedIso = dateIsoFromLabel(
-    submission.updatedAt,
-    new Date(0).toISOString(),
-  );
+  const updatedIso = dateIsoFromLabel(submission.updatedAt, new Date(0).toISOString());
   const tripIso = dateIsoFromLabel(submission.tripDateFrom, updatedIso);
   const aiFlags = (submission.aiSuggestions ?? []).filter(
     (suggestion) => suggestion.status === "suggested",
@@ -146,9 +140,8 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
     questionnaire: submission.completeness.questionnaire,
     files: submission.completeness.files,
     blockers,
-    fixedIssues: submission.issues.filter(
-      (issue) => issue.status === "fixed_by_agent",
-    ).length,
+    fixedIssues: submission.issues.filter((issue) => issue.status === "fixed_by_agent")
+      .length,
     warnings,
     aiFlags,
     nextAction:
@@ -162,19 +155,72 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
 }
 
 function reviewCardsFromSubmissions(submissions: Submission[]): ReviewCard[] {
-  return submissions
-    .filter(isAdminReviewQueueSubmission)
-    .map(reviewCardFromSubmission);
+  return submissions.filter(isAdminReviewQueueSubmission).map(reviewCardFromSubmission);
+}
+
+const lanes: Array<{
+  id: Lane;
+  title: string;
+  subtitle: string;
+  tone: "red" | "blue";
+  icon: React.ElementType;
+}> = [
+  {
+    id: "urgent",
+    title: "Блокеры",
+    subtitle: "сначала сюда",
+    tone: "red",
+    icon: Flame,
+  },
+  {
+    id: "review",
+    title: "Проверить",
+    subtitle: "ручная сверка",
+    tone: "blue",
+    icon: ShieldCheck,
+  },
+  {
+    id: "returned",
+    title: "Исправления",
+    subtitle: "ответ агента",
+    tone: "blue",
+    icon: MessageSquareWarning,
+  },
+];
+
+function toneClasses(tone: "red" | "blue") {
+  if (tone === "red") {
+    return "border-[#5b2b32]/45 bg-[#24191b]/60 text-[#d59aa3]";
+  }
+
+  return "border-[#393c7f] bg-[#23264f] text-[#b5caf2]";
 }
 
 function reviewCountLabel(count: number) {
   const lastTwoDigits = count % 100;
   const lastDigit = count % 10;
 
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'заявок';
-  if (lastDigit === 1) return 'заявка';
-  if (lastDigit >= 2 && lastDigit <= 4) return 'заявки';
-  return 'заявок';
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return "заявок";
+  if (lastDigit === 1) return "заявка";
+  if (lastDigit >= 2 && lastDigit <= 4) return "заявки";
+  return "заявок";
+}
+
+function ProgressLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-[10.5px] text-white/40">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+        <div
+          className="h-full rounded-full bg-[#8fa3ff]"
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function ReviewQueueCard({
@@ -186,55 +232,98 @@ function ReviewQueueCard({
 }) {
   const hasBlocker = item.blockers > 0;
   const shortQueueTime = item.timeInQueue.replace(/\s+\d+\s+мин$/, "");
-  const shellMeta = hasBlocker ? "1 ч" : shortQueueTime;
-  const lanePresentation = item.lane === "urgent"
-    ? { detail: "сначала сюда", icon: Flame, label: "Блокеры" }
-    : item.lane === "returned"
-      ? { detail: "ответ агента", icon: MessageSquareWarning, label: "Исправления" }
-      : { detail: "ручная сверка", icon: ShieldCheck, label: "Проверить" };
 
   return (
-    <V19OperationalCard
-      actionIcon={item.aiFlags > 0 ? Sparkles : FileCheck2}
-      actionText={item.nextAction}
-      city={item.city}
-      footer={
-        <>
-          <span className="v19-operational-card-signals">
-            {item.blockers > 0 ? <span className="tone-danger">{item.blockers} критичных</span> : null}
-            {item.fixedIssues > 0 ? <span className="tone-info">{item.fixedIssues} исправлено</span> : null}
-            {item.warnings > 0 ? <span className="tone-warning">{item.warnings} проверить</span> : null}
-            {item.aiFlags > 0 ? <span className="tone-info">ИИ {item.aiFlags}</span> : null}
-            {item.blockers === 0 && item.fixedIssues === 0 && item.warnings === 0 ? (
-              <span className="tone-ready">без замечаний</span>
-            ) : null}
-          </span>
-          <span className="v19-operational-card-agent">
-            <User aria-hidden="true" /> {item.agent}
-          </span>
-        </>
-      }
-      metaDetail={hasBlocker ? undefined : shortQueueTime}
-      peopleCount={item.applicants}
-      progress={
-        <>
-          <V19OperationalProgressLine label="Анкета" value={item.questionnaire} />
-          <V19OperationalProgressLine label="Файлы" value={item.files} />
-        </>
-      }
-      publicId={item.publicId}
-      shellDetail={lanePresentation.detail}
-      shellIcon={lanePresentation.icon}
-      shellLabel={lanePresentation.label}
-      shellMeta={shellMeta}
-      title={item.title}
-      as="button"
+    <button
+      type="button"
       aria-label={`Ручная проверка заявки ${item.title}`}
       data-submission-card=""
       data-submission-id={item.id}
       onClick={() => onOpenDrawer(item.id)}
-      className={`group ${hasBlocker ? "has-blocker" : ""}`}
-    />
+      className={`group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${
+        hasBlocker
+          ? "border-[#5b2b32]/45 bg-[#1d1719]/80 hover:border-[#74414a]/55"
+          : "border-[#393c7f]/70 bg-[#17192b] hover:border-[#5960a7]"
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="mb-1.5 flex max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10.5px] font-medium tracking-wide text-white/40">
+            <span className="shrink-0 font-mono text-white/60">{item.publicId}</span>
+            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
+            <span className="shrink-0">{item.city}</span>
+            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
+            <span className="shrink-0">{shortQueueTime}</span>
+          </div>
+          <h3 className="truncate text-[15px] font-semibold text-white group-hover:text-[#b8baff]">
+            {item.title}
+          </h3>
+          <div className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden text-[11.5px] font-medium text-white/45">
+            {item.type === "family" ? (
+              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : (
+              <User className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            )}
+            <span className="shrink-0">{item.applicants} чел.</span>
+            <span aria-hidden="true">·</span>
+            <span className="truncate">{item.agent}</span>
+          </div>
+        </div>
+        <ChevronRight
+          aria-hidden="true"
+          className="mt-1 h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/55"
+        />
+      </div>
+
+      <div className="mb-3 rounded-[8px] border border-white/5 bg-white/[0.025] p-3">
+        <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-white/75">
+          {item.aiFlags > 0 ? (
+            <Sparkles className="h-3.5 w-3.5 text-[#b8baff]" aria-hidden="true" />
+          ) : (
+            <FileCheck2 className="h-3.5 w-3.5 text-[#b8baff]" aria-hidden="true" />
+          )}
+          Следующее действие
+        </div>
+        <p className="text-[12px] leading-relaxed text-white/50">{item.nextAction}</p>
+      </div>
+
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <ProgressLine label="Анкета" value={item.questionnaire} />
+        <ProgressLine label="Файлы" value={item.files} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {item.blockers > 0 ? (
+          <span className="rounded-full border border-[#5b2b32]/45 bg-[#24191b]/60 px-2 py-1 text-[10.5px] font-medium text-[#d59aa3]">
+            {item.blockers} критичных
+          </span>
+        ) : null}
+        {item.fixedIssues > 0 ? (
+          <span className="rounded-full border border-[#393c7f] bg-[#23264f] px-2 py-1 text-[10.5px] font-medium text-[#b5caf2]">
+            {item.fixedIssues} исправлено
+          </span>
+        ) : null}
+        {item.warnings > 0 ? (
+          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10.5px] font-medium text-white/62">
+            {item.warnings} проверить
+          </span>
+        ) : null}
+        {item.aiFlags > 0 ? (
+          <span className="rounded-full border border-[#393c7f] bg-[#23264f] px-2 py-1 text-[10.5px] font-medium text-[#b5caf2]">
+            ИИ {item.aiFlags}
+          </span>
+        ) : null}
+        {item.blockers === 0 && item.fixedIssues === 0 && item.warnings === 0 ? (
+          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10.5px] font-medium text-[#b5caf2]">
+            без замечаний
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] text-white/35">
+        {item.lastEvent}
+      </div>
+    </button>
   );
 }
 
@@ -319,8 +408,7 @@ export function ReviewScreen({
   const searchNeedle = searchQuery.trim().toLowerCase();
   const filteredReviews = reviewSource
     .filter((item) => {
-      const cityMatches =
-        cityFilter === "Все города" || item.city === cityFilter;
+      const cityMatches = cityFilter === "Все города" || item.city === cityFilter;
       const typeMatches = typeFilter === "all" || item.type === typeFilter;
       const searchMatches =
         !searchNeedle ||
@@ -340,12 +428,7 @@ export function ReviewScreen({
     activeLane === "all"
       ? filteredReviews
       : filteredReviews.filter((item) => item.lane === activeLane);
-  const orderedVisibleReviews = (["urgent", "review", "returned"] as const)
-    .flatMap((lane) => visibleReviews.filter((item) => item.lane === lane));
-  const totalBlockers = filteredReviews.reduce(
-    (sum, item) => sum + item.blockers,
-    0,
-  );
+  const totalBlockers = filteredReviews.reduce((sum, item) => sum + item.blockers, 0);
   const packagesWithBlockers = filteredReviews.filter(
     (item) => item.blockers > 0,
   ).length;
@@ -378,9 +461,11 @@ export function ReviewScreen({
           actionAriaLabel={`Открыть критические пакеты: ${totalBlockers} требуют решения`}
           actionCount={totalBlockers}
           hasBlockers={totalBlockers > 0}
-          title={totalBlockers
-            ? `${totalBlockers} ${totalBlockers === 1 ? "критичное замечание требует" : "критичных замечания требуют"} решения`
-            : "Очередь готова к проверке"}
+          title={
+            totalBlockers
+              ? `${totalBlockers} ${totalBlockers === 1 ? "критичное замечание требует" : "критичных замечания требуют"} решения`
+              : "Очередь готова к проверке"
+          }
           onAction={() => setActiveLane("urgent")}
         />
 
@@ -392,7 +477,9 @@ export function ReviewScreen({
             label="Ревью"
             value={`${laneCounts.review}`}
             tone="orange"
-            onClick={() => setActiveLane((current) => current === "review" ? "all" : "review")}
+            onClick={() =>
+              setActiveLane((current) => (current === "review" ? "all" : "review"))
+            }
           />
           <V19MetricCard
             active={activeLane === "returned"}
@@ -401,7 +488,9 @@ export function ReviewScreen({
             label="Правки"
             value={`${laneCounts.returned}`}
             tone="blue"
-            onClick={() => setActiveLane((current) => current === "returned" ? "all" : "returned")}
+            onClick={() =>
+              setActiveLane((current) => (current === "returned" ? "all" : "returned"))
+            }
           />
           <V19MetricCard
             active={false}
@@ -483,15 +572,60 @@ export function ReviewScreen({
             searchValue={searchQuery}
           />
 
-          <V19OperationalCardGrid>
-            {orderedVisibleReviews.map((item) => (
-              <ReviewQueueCard
-                item={item}
-                key={item.id}
-                onOpenDrawer={onOpenDrawer}
-              />
-            ))}
-          </V19OperationalCardGrid>
+          <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
+            {lanes.map((lane) => {
+              const Icon = lane.icon;
+              const laneItems = visibleReviews.filter((item) => item.lane === lane.id);
+
+              if (activeLane !== "all" && activeLane !== lane.id) {
+                return null;
+              }
+
+              return (
+                <section
+                  className="min-h-[360px] rounded-[10px] border border-[#242529] bg-[#141416] p-3"
+                  key={lane.id}
+                >
+                  <header className="mb-3 flex items-center justify-between gap-2 px-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`flex h-8 w-8 items-center justify-center rounded-[8px] border ${toneClasses(lane.tone)}`}
+                      >
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <span>
+                        <strong className="block text-[13px] font-semibold text-white">
+                          {lane.title}
+                        </strong>
+                        <small className="block text-[10.5px] text-white/35">
+                          {lane.subtitle}
+                        </small>
+                      </span>
+                    </div>
+                    <span className="rounded-[8px] bg-white/5 px-2 py-1 text-[11px] font-medium text-white/45">
+                      {laneItems.length}
+                    </span>
+                  </header>
+
+                  <div className="space-y-3">
+                    {laneItems.length ? (
+                      laneItems.map((item) => (
+                        <ReviewQueueCard
+                          item={item}
+                          key={item.id}
+                          onOpenDrawer={onOpenDrawer}
+                        />
+                      ))
+                    ) : (
+                      <div className="rounded-[10px] border border-dashed border-white/10 p-5 text-center text-[12px] text-white/30">
+                        Пусто
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -515,9 +649,7 @@ export function ReviewScreen({
         <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
           <div className="mb-4 flex items-center gap-2">
             <Bot className="h-4 w-4 text-[var(--v19b-color-primary-text)]" />
-            <h3 className="text-[15px] font-semibold text-white">
-              Тихая AI-помощь
-            </h3>
+            <h3 className="text-[15px] font-semibold text-white">Тихая AI-помощь</h3>
           </div>
           <div className="space-y-2.5">
             {aiWatchlist.length ? (
@@ -569,25 +701,29 @@ export function ReviewScreen({
         <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
           <div className="mb-4 flex items-center gap-2">
             <Clock className="h-4 w-4 text-white/40" />
-            <h3 className="text-[15px] font-semibold text-white">
-              Очередь сейчас
-            </h3>
+            <h3 className="text-[15px] font-semibold text-white">Очередь сейчас</h3>
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">Пакетов</span>
+              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">
+                Пакетов
+              </span>
               <span className="text-[13px] font-semibold text-white">
                 {filteredReviews.length}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">С критичными замечаниями</span>
+              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">
+                С критичными замечаниями
+              </span>
               <span className="text-[13px] font-semibold text-white/62">
                 {packagesWithBlockers}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">К выгрузке</span>
+              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">
+                К выгрузке
+              </span>
               <span className="text-[13px] font-semibold text-[var(--v19b-color-primary-text)]">
                 {exportQueueCount}
               </span>
