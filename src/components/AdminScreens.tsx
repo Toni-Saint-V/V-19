@@ -26,8 +26,6 @@ import {
 import {
   V19MetricCard,
   V19MetricStrip,
-  V19OperationalCardGrid,
-  V19OperationalProgressLine,
   V19PriorityHero,
 } from "../shared/ui/v19-design-system";
 import {
@@ -168,6 +166,24 @@ function reviewCardsFromSubmissions(submissions: Submission[]): ReviewCard[] {
     .map(reviewCardFromSubmission);
 }
 
+const lanes: Array<{
+  id: Lane;
+  title: string;
+  subtitle: string;
+  tone: string;
+  icon: React.ElementType;
+}> = [
+  { id: "urgent", title: "Блокеры", subtitle: "сначала сюда", tone: "red", icon: Flame },
+  { id: "review", title: "Проверить", subtitle: "ручная сверка", tone: "orange", icon: ShieldCheck },
+  { id: "returned", title: "Исправления", subtitle: "ответ агента", tone: "blue", icon: MessageSquareWarning },
+];
+
+function toneClasses(tone: string) {
+  if (tone === "red") return "border-[#5b2b32]/45 bg-[#24191b]/60 text-[#d59aa3]";
+  if (tone === "blue") return "border-[#6f64ff]/25 bg-[#6f64ff]/15 text-[#b8baff]";
+  return "border-white/10 bg-white/[0.045] text-white/62";
+}
+
 function reviewCountLabel(count: number) {
   const lastTwoDigits = count % 100;
   const lastDigit = count % 10;
@@ -176,6 +192,20 @@ function reviewCountLabel(count: number) {
   if (lastDigit === 1) return 'заявка';
   if (lastDigit >= 2 && lastDigit <= 4) return 'заявки';
   return 'заявок';
+}
+
+function ProgressLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-[10.5px] text-white/40">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+        <div className="h-full rounded-full bg-[#8fa3ff]" style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
 }
 
 function ReviewQueueCard({
@@ -243,19 +273,14 @@ function ReviewQueueCard({
       </div>
 
       <div className="mb-3 grid grid-cols-2 gap-2">
-        <V19OperationalProgressLine label="Анкета" value={item.questionnaire} />
-        <V19OperationalProgressLine label="Файлы" value={item.files} />
+        <ProgressLine label="Анкета" value={item.questionnaire} />
+        <ProgressLine label="Файлы" value={item.files} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {item.blockers > 0 ? (
           <span className="rounded-full border border-[#5b2b32]/45 bg-[#24191b]/60 px-2 py-1 text-[10.5px] font-medium text-[#d59aa3]">
             {item.blockers} критичных
-          </span>
-        ) : null}
-        {item.fixedIssues > 0 ? (
-          <span className="rounded-full border border-[#6f64ff]/25 bg-[#6f64ff]/15 px-2 py-1 text-[10.5px] font-medium text-[#b8baff]">
-            {item.fixedIssues} исправлено
           </span>
         ) : null}
         {item.warnings > 0 ? (
@@ -525,15 +550,51 @@ export function ReviewScreen({
             searchValue={searchQuery}
           />
 
-          <V19OperationalCardGrid>
-            {visibleReviews.map((item) => (
-              <ReviewQueueCard
-                key={item.id}
-                item={item}
-                onOpenDrawer={onOpenDrawer}
-              />
-            ))}
-          </V19OperationalCardGrid>
+          <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
+            {lanes.map((lane) => {
+              const Icon = lane.icon;
+              const laneItems = visibleReviews.filter((item) => item.lane === lane.id);
+              if (activeLane !== "all" && activeLane !== lane.id) return null;
+
+              return (
+                <section
+                  className="min-h-[360px] rounded-[10px] border border-[#242529] bg-[#141416] p-3"
+                  key={lane.id}
+                >
+                  <header className="mb-3 flex items-center justify-between gap-2 px-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`flex h-8 w-8 items-center justify-center rounded-[8px] border ${toneClasses(lane.tone)}`}>
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <span>
+                        <strong className="block text-[13px] font-semibold text-white">{lane.title}</strong>
+                        <small className="block text-[10.5px] text-white/35">{lane.subtitle}</small>
+                      </span>
+                    </div>
+                    <span className="rounded-[8px] bg-white/5 px-2 py-1 text-[11px] font-medium text-white/45">
+                      {laneItems.length}
+                    </span>
+                  </header>
+
+                  <div className="space-y-3">
+                    {laneItems.length ? (
+                      laneItems.map((item) => (
+                        <ReviewQueueCard
+                          item={item}
+                          key={item.id}
+                          onOpenDrawer={onOpenDrawer}
+                        />
+                      ))
+                    ) : (
+                      <div className="rounded-[10px] border border-dashed border-white/10 p-5 text-center text-[12px] text-white/30">
+                        Пусто
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
       </section>
 
