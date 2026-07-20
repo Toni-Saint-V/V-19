@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -115,6 +115,21 @@ describe("admin export screen", () => {
       screen.getByRole("button", { name: "Фильтр по городу: Москва" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Дмитрий Орлов").length).toBeGreaterThan(0);
+  });
+
+  test("opens the summary fallback when the context rail is collapsed", () => {
+    renderExportScreen({
+      canDownloadMediaZip: false,
+      selection: [byId("ПД-1056")],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Сводка" }));
+
+    expect(
+      screen
+        .getAllByLabelText("Сводка выгрузки")
+        .some((element) => element.matches("aside.v19-admin-export-mobile-sheet")),
+    ).toBe(true);
   });
 
   test("shows ZIP download action disabled before package generation", () => {

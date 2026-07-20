@@ -17237,7 +17237,9 @@ body,
   .v19-admin-export-row-end {
     justify-content: space-between;
   }
+}
 
+@media (max-width: 1151px) {
   .v19-admin-export-mobile-dock {
     position: fixed;
     right: var(--v19b-size-16);
@@ -17372,6 +17374,32 @@ body,
     color: var(--v19b-color-text-muted);
     font-size: var(--v19b-size-13);
     line-height: var(--v19b-line-height-row);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1151px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-mobile-dock {
+    right: var(--v19b-size-24);
+    left: auto;
+    grid-template-columns: repeat(
+      3,
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    );
+    width: min(
+      var(--v19b-size-420),
+      calc(var(--v19b-viewport-width) - var(--v19b-size-48))
+    );
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-mobile-sheet {
+    right: var(--v19b-size-24);
+    left: auto;
+    width: min(
+      var(--v19b-size-520),
+      calc(var(--v19b-viewport-width) - var(--v19b-size-48))
+    );
   }
 }
 
@@ -26460,6 +26488,20 @@ body,
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-export .v19-admin-export-side {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 1152px) and (max-width: 1279px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(
+        --v19b-size-360
+      ) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-side {
     display: flex !important;
   }
 }
