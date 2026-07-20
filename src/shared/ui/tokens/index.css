@@ -1054,6 +1054,8 @@
   --v19b-color-primary-deep: var(--v19-depth-accent);
   --v19b-color-primary-deep-hover: var(--v19-depth-accent-hover);
   --v19b-color-primary-deep-border: var(--v19-depth-accent-border);
+  --v19b-agent-nav-active-background: #393c7f;
+  --v19b-agent-nav-active-text: #b5caf2;
   --v19b-color-text-strong: var(--v19-depth-text-strong);
   --v19b-color-text: var(--v19-depth-text);
   --v19b-color-text-80: var(--v19-depth-text);

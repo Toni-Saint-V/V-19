@@ -1325,8 +1325,8 @@ export function CommandCenter({
           sideMenuMode="regular"
           surface={surface}
         >
-          <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
-            <div className="max-w-[1460px] mx-auto h-full">
+          <div className="v19-agent-workspace-scroll flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+            <div className="v19-agent-workspace-content max-w-[1460px] mx-auto h-full">
               {activeNav === "settings" && renderSettings()}
               {activeNav === "actions" && renderActionsList()}
               {activeNav === "submissions" && (

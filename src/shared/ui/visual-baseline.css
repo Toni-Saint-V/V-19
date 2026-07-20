@@ -38348,10 +38348,13 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
   .v19-legacy-actions-screen.ops-shell.surface-agent-actions .v19-actions-table-row {
     grid-template-columns:
-      var(--v19b-size-3)
+      var(--v19b-size-2)
       minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      auto !important;
-    grid-template-rows: auto auto !important;
+      minmax(var(--v19b-size-144), 0.42fr) !important;
+    grid-template-rows: auto auto auto !important;
+    gap: var(--v19b-size-4) var(--v19b-size-12) !important;
+    min-height: var(--v19b-size-92) !important;
+    padding: var(--v19b-size-12) var(--v19b-size-14) !important;
   }
 
   .v19-legacy-actions-screen.ops-shell.surface-agent-actions
@@ -38360,19 +38363,118 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
     grid-row: 1;
   }
 
-  .v19-legacy-actions-screen.ops-shell.surface-agent-actions .v19-actions-table-task {
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-submission
+    > span:last-child {
+    display: flex;
+    align-items: center;
+    gap: var(--v19b-size-8);
+  }
+
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-submission
+    strong {
+    display: inline-flex;
+    min-height: var(--v19b-size-18);
+    align-items: center;
+    padding-inline: var(--v19b-size-5);
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-pill);
+    color: var(--v19b-color-text-muted);
+    background: var(--v19b-color-tag);
+    font-family: var(--v19b-font-mono);
+    font-size: var(--v19b-size-9);
+    font-weight: var(--v19b-weight-title);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-submission
+    small {
+    min-width: var(--v19b-size-0);
+    overflow: hidden;
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-11);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions .v19-actions-table-task,
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions .v19-actions-table-status {
+    display: contents !important;
+  }
+
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-task
+    > strong {
     grid-column: 2;
     grid-row: 2;
+    min-width: var(--v19b-size-0);
+    overflow: hidden;
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-14);
+    font-weight: var(--v19b-weight-title);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-task
+    > small {
+    grid-column: 2;
+    grid-row: 3;
+    min-width: var(--v19b-size-0);
+    overflow: hidden;
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-12);
+    font-weight: var(--v19b-weight-body);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .v19-legacy-actions-screen.ops-shell.surface-agent-actions .v19-actions-table-dates {
     grid-column: 3;
-    grid-row: 1;
+    grid-row: 2;
+    justify-self: end;
+    color: var(--v19b-color-text);
+    font-size: var(--v19b-size-12);
+    font-weight: var(--v19b-weight-control);
+    text-align: right;
   }
 
-  .v19-legacy-actions-screen.ops-shell.surface-agent-actions .v19-actions-table-status {
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-status
+    > .v19-actions-status-badge {
     grid-column: 3;
-    grid-row: 2;
+    grid-row: 1;
+    min-height: var(--v19b-size-24) !important;
+    padding-inline: var(--v19b-size-8) !important;
+    justify-self: end;
+    font-size: var(--v19b-size-11) !important;
+  }
+
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-status
+    > small {
+    grid-column: 3;
+    grid-row: 3;
+    max-width: var(--v19b-size-full);
+    min-width: var(--v19b-size-0);
+    justify-self: end;
+    overflow: hidden;
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-11);
+    font-weight: var(--v19b-weight-body);
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-row
+    .v19-actions-queue-strip {
+    grid-row: 1 / 4;
+    width: var(--v19b-size-2) !important;
   }
 
   .v19-legacy-actions-screen.ops-shell.surface-agent-actions .v19-actions-summary-panel {
@@ -38381,13 +38483,13 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   }
 }
 
-/* Keep the My Actions context rail visible in compact desktop windows while
-   preserving the stacked tablet layout and the mobile list contract. */
-@media (min-width: 960px) and (max-width: 1399px) {
+/* Keep the My Actions context rail docked only when the workspace can preserve
+   a readable queue. Compact desktop and tablet widths use the stacked layout. */
+@media (min-width: 1280px) and (max-width: 1399px) {
   .v19-agent-actions-layout-v2 {
     grid-template-columns:
       minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      var(--v19b-size-280);
+      var(--v19b-size-360);
   }
 
   .v19-legacy-actions-screen.ops-shell.surface-agent-actions
@@ -38396,36 +38498,6 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
     max-height: calc(100dvh - var(--v19b-size-88)) !important;
   }
 
-  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
-    .v19-actions-table-row {
-    grid-template-columns:
-      var(--v19b-size-3)
-      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      minmax(var(--v19b-size-96), var(--v19b-size-112)) !important;
-  }
-
-  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
-    .v19-actions-table-status {
-    min-width: var(--v19b-size-0);
-    overflow: hidden;
-  }
-
-  .v19-legacy-actions-screen.ops-shell.surface-agent-actions
-    .v19-actions-table-status
-    > small {
-    max-width: var(--v19b-size-full);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-@media (min-width: 1280px) and (max-width: 1399px) {
-  .v19-agent-actions-layout-v2 {
-    grid-template-columns:
-      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      var(--v19b-size-360);
-  }
 }
 
 @media (max-width: 1023px) {
@@ -39405,11 +39477,20 @@ section[data-testid="agent-actions-screen"]
    Action-cell controls keep their independently owned layout and states. */
 .v19-action-surface-create,
 section[data-testid="agent-actions-screen"] .v19-admin-toolbar-select-trigger {
+  overflow: hidden !important;
   touch-action: manipulation;
   transition:
     background-color var(--v19b-motion-fast) var(--v19b-ease-standard),
     box-shadow var(--v19b-motion-fast) var(--v19b-ease-standard),
     transform var(--v19b-motion-fast) var(--v19b-ease-standard);
+}
+
+section[data-testid="agent-actions-screen"] .v19-admin-toolbar-select-value {
+  min-width: var(--v19b-size-0);
+  max-width: var(--v19b-size-full);
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 .v19-action-surface-create {
@@ -40828,4 +40909,400 @@ section[data-testid="agent-actions-screen"]
   #root .ops-shell.has-unified-side-menu > .ops-sidebar.opsu-sidebar {
     transition: none !important;
   }
+}
+
+/* Agent collection closeout: keep one workspace scroll owner, preserve the
+   compact action hierarchy, and let submission groups meet their container. */
+#root
+  .ops-shell.has-unified-side-menu:is(
+    .surface-agent-actions,
+    .surface-agent-submissions
+  )
+  > .workspace
+  > .v19-agent-workspace-scroll {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  align-self: stretch !important;
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  height: var(--v19b-size-full) !important;
+  min-height: var(--v19b-size-0) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+}
+
+#root
+  .ops-shell.has-unified-side-menu:is(
+    .surface-agent-actions,
+    .surface-agent-submissions
+  )
+  .v19-agent-workspace-content {
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  height: auto !important;
+  min-height: var(--v19b-size-full) !important;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-context-progress
+  progress {
+  accent-color: var(--v19b-color-primary) !important;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-context-progress
+  progress::-webkit-progress-value {
+  background: var(--v19b-color-primary) !important;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-context-progress
+  progress::-moz-progress-bar {
+  background: var(--v19b-color-primary) !important;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-detail-footer {
+  isolation: isolate;
+  opacity: 1 !important;
+  background-color: var(--v19b-color-panel) !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-actions-layout-v2
+    > .v19-actions-summary-panel {
+    position: static !important;
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+    min-height: var(--v19b-size-0) !important;
+    max-height: none !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-table-row
+    .v19-actions-queue-strip {
+    width: var(--v19b-size-3) !important;
+  }
+}
+
+@media (min-width: 1280px) and (max-width: 1399px) {
+  #root
+    .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-row {
+    gap: var(--v19b-size-4) var(--v19b-size-12) !important;
+    padding: var(--v19b-size-12) var(--v19b-size-14) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-row
+    .v19-actions-queue-strip {
+    width: var(--v19b-size-2) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.ops-shell.surface-agent-actions
+    .v19-actions-table-submission
+    strong {
+    color: var(--v19b-color-text-muted) !important;
+    font-size: var(--v19b-size-9) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  #root
+    .ops-shell.has-unified-side-menu.is-v19-collection-surface:is(
+      .surface-agent-actions,
+      .surface-agent-submissions
+    )
+    > .workspace {
+    grid-template-rows: auto minmax(
+        var(--v19b-size-0),
+        var(--v19b-grid-fr)
+      ) !important;
+    height: var(--v19b-viewport-height) !important;
+    max-height: var(--v19b-viewport-height) !important;
+    min-height: var(--v19b-size-0) !important;
+    overflow: hidden !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu:is(
+      .surface-agent-actions,
+      .surface-agent-submissions
+    )
+    > .workspace
+    > .v19-agent-workspace-scroll {
+    padding-bottom: max(
+      var(--v19b-size-24),
+      env(safe-area-inset-bottom)
+    ) !important;
+    scroll-padding-bottom: max(
+      var(--v19b-size-24),
+      env(safe-area-inset-bottom)
+    );
+  }
+}
+
+@media (max-width: 767px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    :is(.v19-actions-cockpit, .v19-actions-mobile-stage, .v19-actions-timeline) {
+    height: auto !important;
+    min-height: var(--v19b-size-0) !important;
+    overflow: visible !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline::before {
+    width: var(--v19b-size-1) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline-hit {
+    gap: var(--v19b-size-4) !important;
+    min-height: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-12) var(--v19b-size-14) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-cell-top {
+    min-height: var(--v19b-size-18);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-cell-top
+    > small {
+    display: inline-flex;
+    min-height: var(--v19b-size-18);
+    align-items: center;
+    padding-inline: var(--v19b-size-5);
+    overflow: hidden;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-pill);
+    background: var(--v19b-color-tag);
+    font-family: var(--v19b-font-mono);
+    font-size: var(--v19b-size-9);
+    font-weight: var(--v19b-weight-title);
+    line-height: var(--v19b-line-height-row);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-cell-title {
+    margin-top: var(--v19b-size-0);
+    font-size: var(--v19b-size-14);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  #root
+    section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    :is(.v19-admin-toolbar-select, .v19-admin-city-filter) {
+    min-width: var(--v19b-size-0) !important;
+    max-width: var(--v19b-size-full) !important;
+    overflow: visible !important;
+  }
+
+  #root
+    section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-trigger {
+    min-width: var(--v19b-size-0) !important;
+    max-width: var(--v19b-size-full) !important;
+    overflow: hidden !important;
+  }
+
+  #root
+    section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-value {
+    display: block !important;
+    min-width: var(--v19b-size-0) !important;
+    max-width: var(--v19b-size-full) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #root
+    section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select.is-open {
+    z-index: var(--v19b-z-overlay) !important;
+  }
+
+  #root
+    section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-menu {
+    overflow-x: hidden !important;
+  }
+
+  #root
+    section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-menu
+    > button {
+    width: var(--v19b-size-full) !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  #root
+    section[data-testid="agent-actions-screen"]
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-menu
+    > button
+    > span {
+    min-width: var(--v19b-size-0) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #root .v19-agent-submissions-board .v19-agent-submissions-list {
+    padding-inline: var(--v19b-size-0) !important;
+  }
+
+  #root .v19-agent-submissions-board .v19-agent-submissions-group {
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+    border-top-left-radius: calc(
+      var(--v19b-radius-panel) + var(--v19b-size-2)
+    );
+    border-top-right-radius: calc(
+      var(--v19b-radius-panel) + var(--v19b-size-2)
+    );
+  }
+
+  #root .v19-agent-submissions-board .v19-agent-submissions-group > h2 {
+    box-sizing: border-box;
+    display: flex;
+    min-height: var(--v19b-size-32);
+    align-items: flex-end;
+    margin: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-12) var(--v19b-size-4) !important;
+    line-height: var(--v19b-line-height-row);
+  }
+
+  #root
+    .v19-agent-submissions-board
+    .v19-applicant-member-list
+    > .v19-applicant-member-cell {
+    grid-template-columns:
+      var(--v19b-size-16)
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto !important;
+    column-gap: var(--v19b-size-8) !important;
+    width: calc(var(--v19b-size-full) + var(--v19b-size-8)) !important;
+    margin-left: calc(var(--v19b-size-8) * -1) !important;
+    background: var(--v19b-color-app) !important;
+  }
+
+  #root
+    .v19-agent-submissions-board
+    .v19-applicant-member-cell
+    .v19-applicant-member-identity {
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  #root
+    .v19-agent-submissions-board
+    .v19-applicant-member-cell
+    .v19-applicant-member-name {
+    display: block !important;
+    min-width: var(--v19b-size-0) !important;
+    max-width: var(--v19b-size-full) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #root .v19-agent-submissions-board .v19-applicant-family-copy h3 {
+    min-width: var(--v19b-size-0) !important;
+    max-width: var(--v19b-size-full) !important;
+    overflow: hidden !important;
+    overflow-wrap: normal !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #root
+    .v19-agent-submissions-board
+    .v19-applicant-member-cell
+    .v19-applicant-workflow-actions {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    flex-wrap: nowrap !important;
+  }
+}
+
+/* Agent navigation and action-panel annotations. Keep these values scoped to
+   the agent shell while the raw palette remains owned by shared tokens. */
+#root
+  .ops-shell.has-unified-side-menu:is(
+    .role-agent,
+    .surface-agent-actions,
+    .surface-agent-submissions
+  )
+  :is(.ops-nav-item.is-active, .ops-nav-item[aria-current="page"]) {
+  background: var(--v19b-agent-nav-active-background) !important;
+  color: var(--v19b-agent-nav-active-text) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu:is(
+    .role-agent,
+    .surface-agent-actions,
+    .surface-agent-submissions
+  )
+  :is(.ops-nav-item.is-active, .ops-nav-item[aria-current="page"])
+  :is(.ops-nav-copy strong, .ops-nav-icon) {
+  color: var(--v19b-agent-nav-active-text) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu:is(
+    .role-agent,
+    .surface-agent-actions,
+    .surface-agent-submissions
+  )
+  .ops-sidebar-create
+  > strong {
+  background: var(--v19b-color-primary) !important;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-summary-cta
+  > .mp-button {
+  height: var(--v19b-size-40) !important;
+  min-height: var(--v19b-size-40) !important;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-summary-cta
+  > .mp-button.secondary-button {
+  font-size: var(--v19b-size-13) !important;
+  font-weight: var(--v19b-weight-control) !important;
 }

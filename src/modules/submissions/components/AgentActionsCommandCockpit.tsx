@@ -460,7 +460,11 @@ export function AgentActionContextPanel({
       <div className="v19-actions-active-meta" aria-label="Информация по подаче">
         <MetaItem label="ФИО" value={task.applicantName} />
         <MetaItem label="ID" value={submissionPublicId(task.submission)} />
-        <MetaItem label="Направление" value={task.destination} />
+        <MetaItem
+          breakAfterSeparator
+          label="Направление"
+          value={task.destination}
+        />
         <MetaItem label="Даты поездки" value={tripDates(task.submission)} />
         <MetaItem
           label="Заявители"
@@ -494,11 +498,31 @@ export function AgentActionContextPanel({
   );
 }
 
-function MetaItem({ label, value }: { label: string; value: string }) {
+function MetaItem({
+  breakAfterSeparator = false,
+  label,
+  value,
+}: {
+  breakAfterSeparator?: boolean;
+  label: string;
+  value: string;
+}) {
+  const [leadingValue, ...trailingValue] = value.split(" · ");
+  const shouldBreak = breakAfterSeparator && trailingValue.length > 0;
+
   return (
     <span>
       <small>{label}</small>
-      <strong>{value}</strong>
+      <strong>
+        {shouldBreak ? (
+          <>
+            {leadingValue} ·<br />
+            {trailingValue.join(" · ")}
+          </>
+        ) : (
+          value
+        )}
+      </strong>
     </span>
   );
 }
@@ -549,7 +573,7 @@ function ReadinessGrid({
         onOpen={onOpenTab}
       />
       <ReadinessLine
-        label={`${readiness.finalResult.label} · ${readiness.overallPercent}%`}
+        label={`Итог: ${readiness.overallPercent}%`}
         state={readiness.finalResult.state}
         tab="overview"
         onOpen={onOpenTab}

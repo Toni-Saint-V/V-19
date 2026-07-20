@@ -115,7 +115,7 @@ export type AgentActionTask = {
   importanceText: string;
   reason: string;
   secondaryAction: {
-    label: "Открыть подачу полностью";
+    label: "Открыть подачу";
     tab: DrawerTab;
     target: "application";
   };
@@ -364,7 +364,7 @@ function toAgentActionTask(
     importanceText: actionImportanceText(action, status),
     reason: actionReason(action),
     secondaryAction: {
-      label: "Открыть подачу полностью",
+      label: "Открыть подачу",
       tab: "overview",
       target: "application",
     },
@@ -404,7 +404,7 @@ function actionTaskStatus(action: AgentActionItem): AgentActionTaskStatus {
 
 function actionTaskStatusLabel(status: AgentActionTaskStatus) {
   if (status === "error") return "Требует исправления";
-  if (status === "action_required") return "Требует действия";
+  if (status === "action_required") return "Действие";
   if (status === "ready") return "Готово";
   if (status === "blocked") return "Заблокировано";
   return "На проверке";
@@ -657,7 +657,7 @@ function actionReadiness(
     files: {
       label: filesReady
         ? "Файлы: готово"
-        : `Файлы: не хватает документов ${files.ready}/${files.required}`,
+        : `Файлы: ${files.ready} из ${files.required}`,
       state: filesReady ? "ready" : "missing_documents",
     },
     finalResult: {
@@ -683,7 +683,7 @@ function actionProgressSummary(
     files:
       readiness.files.state === "ready"
         ? "Файлы готовы"
-        : readiness.files.label.replace("Файлы: не хватает документов ", "Файлы "),
+        : readiness.files.label.replace("Файлы: ", "Файлы "),
     form:
       readiness.form.state === "ready" ? "Анкета готова" : "Анкета с ошибками",
     review:

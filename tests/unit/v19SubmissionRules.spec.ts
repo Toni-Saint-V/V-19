@@ -1085,7 +1085,7 @@ describe("V-19 submission actions", () => {
       problemDetail: "Файл «селфи 1» требует замены.",
       problemScope: "applicant",
       progressSummary: {
-        files: "Файлы 4/6",
+        files: "Файлы 4 из 6",
         form: "Анкета с ошибками",
         review: "Проверка ожидает",
       },
@@ -1106,8 +1106,8 @@ describe("V-19 submission actions", () => {
       priority: { label: "Срочно", reason: "Дедлайн сегодня" },
       problem: "Анкета заполнена не полностью",
       status: "action_required",
-      statusLabel: "Требует действия",
-      statusLine: "Требует действия: анкета неполная",
+      statusLabel: "Действие",
+      statusLine: "Действие: анкета неполная",
     });
 
     const exportReadyTask = tasks.find(
