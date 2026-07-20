@@ -1,43 +1,13 @@
+import { ArrowLeftRight, SlidersHorizontal } from "lucide-react";
+import { Button } from "../../../shared/ui/primitives";
 import {
-  ArrowLeftRight,
-  ContactRound,
-  Ellipsis,
-  FileClock,
-  FileSpreadsheet,
-  FileStack,
-  Files,
-  Images,
-  ListChecks,
-  Plus,
-  ScanSearch,
-  Search,
-  SlidersHorizontal,
-  TriangleAlert,
-  X,
-  type LucideIcon,
-} from "lucide-react";
-import { cn } from "../../../shared/ui/cn";
-import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
-import { V19SideMenuSurface } from "../../../shared/ui/v19-design-system";
+  V19SideMenu,
+  type V19SideMenuItem,
+  type V19SideMenuMode,
+} from "../../../shared/ui/v19-design-system";
 import type { Role } from "../types";
 
 export const operationalSideMenuId = "v19-operational-side-menu";
-
-type OperationalNavTone = "default" | "danger" | "warning" | "success";
-type OperationalSideMenuMode = "regular" | "compact";
-
-type OperationalNavItem = {
-  active?: boolean;
-  count?: number;
-  disabled?: boolean;
-  icon: string;
-  id: string;
-  label: string;
-  meta: string;
-  onClick: () => void;
-  quickAction?: string;
-  tone?: OperationalNavTone;
-};
 
 export function OperationalSideMenu({
   ariaLabel,
@@ -60,13 +30,10 @@ export function OperationalSideMenu({
   showWorkspaceSwitch,
 }: {
   ariaLabel: string;
-  createAction?: {
-    label: string;
-    onClick: () => void;
-  };
-  displayMode: OperationalSideMenuMode;
+  createAction?: { label: string; onClick: () => void };
+  displayMode: V19SideMenuMode;
   inactive?: boolean;
-  items: OperationalNavItem[];
+  items: V19SideMenuItem[];
   mobileOpen: boolean;
   mobileCloseLabel?: string;
   mobileTitle: string;
@@ -97,135 +64,74 @@ export function OperationalSideMenu({
         },
       }
     : undefined;
-  const workspaceSwitchButton = showWorkspaceSwitch ? (
-    <Button
-      className="vf-figma-admin-zone"
-      aria-label={role === "agent" ? "В админскую зону" : "В агентскую зону"}
-      variant="secondary"
-      onClick={() => {
-        onChooseRole(role === "agent" ? "admin" : "agent");
-        onCloseMobile();
-      }}
-    >
-      <ArrowLeftRight aria-hidden="true" />
-      {role === "agent" ? "В админскую зону" : "В агентскую зону"}
-    </Button>
-  ) : null;
   const id = sidebarId ?? operationalSideMenuId;
+  const settingsItem = items.find((item) => item.id.includes("settings"));
+  const footer = (
+    <>
+      {showWorkspaceSwitch ? (
+        <Button
+          className="vf-figma-admin-zone"
+          aria-label={role === "agent" ? "В админскую зону" : "В агентскую зону"}
+          variant="secondary"
+          onClick={() => {
+            onChooseRole(role === "agent" ? "admin" : "agent");
+            onCloseMobile();
+          }}
+        >
+          <ArrowLeftRight aria-hidden="true" />
+          {role === "agent" ? "В админскую зону" : "В агентскую зону"}
+        </Button>
+      ) : null}
+      <Button
+        className="ops-session v19-ds-side-menu-profile v19-agent-sidebar-profile"
+        aria-label="Открыть профиль"
+        variant="ghost"
+        onClick={() => {
+          settingsItem?.onClick();
+          onCloseMobile();
+        }}
+      >
+        <span className="v19-agent-sidebar-avatar">{sessionInitials}</span>
+        <div>
+          <strong>{sessionDisplayName}</strong>
+          <small className="v19-agent-sidebar-profile-meta">{sessionRoleLabel}</small>
+        </div>
+        <SlidersHorizontal
+          className="ops-user-more v19-agent-sidebar-profile-icon"
+          aria-hidden="true"
+        />
+      </Button>
+      <Button
+        className="v19-ds-side-menu-signout"
+        aria-label="Выйти"
+        variant="secondary"
+        onClick={() => {
+          void onResetWorkspace();
+          onCloseMobile();
+        }}
+      >
+        Выйти
+      </Button>
+    </>
+  );
 
   return (
     <>
-      <V19SideMenuSurface
+      <V19SideMenu
+        ariaLabel={ariaLabel}
+        brandSubtitle={role === "agent" ? "Кабинет агента" : "Кабинет администратора"}
+        createAction={sidebarCreateAction}
+        displayMode={displayMode}
+        footer={footer}
         id={id}
-        className={cn("ops-sidebar opsu-sidebar", `is-${displayMode}`)}
-        open={mobileOpen}
-        data-side-menu-mode={displayMode}
-        aria-label={ariaLabel}
-        aria-hidden={inactive ? "true" : undefined}
-        aria-modal={mobileOpen ? "true" : undefined}
-        inert={inactive ? true : undefined}
-        role={mobileOpen ? "dialog" : undefined}
-      >
-        <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
-          <strong>{mobileTitle}</strong>
-          <span aria-hidden="true">VF</span>
-        </div>
-        <div className="ops-brand opsu-brand">
-          <span
-            className="ops-brand-logo ops-brand-mark opsu-brand-mark"
-            aria-hidden="true"
-          >
-            <span className="ops-brand-letter">V</span>
-          </span>
-          <div className="ops-brand-copy opsu-brand-copy">
-            <strong className="opsu-wordmark vf-brand-wordmark">VisaFlow</strong>
-          </div>
-          <IconButton
-            className="ops-mobile-close opsu-mobile-close"
-            icon={
-              <X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />
-            }
-            label={mobileCloseLabel ?? "Закрыть меню"}
-            onClick={onCloseMobile}
-          />
-        </div>
-        {onCommandSearch ? (
-          <button
-            className="ops-sidebar-search"
-            type="button"
-            aria-label="Открыть командную палитру"
-            onClick={onCommandSearch}
-          >
-            <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
-            <span>Поиск...</span>
-            <kbd>⌘K</kbd>
-          </button>
-        ) : null}
-        <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
-          <span className="ops-nav-group-label">Работа</span>
-          {navItems.map((item) => (
-            <Button
-              aria-current={item.active ? "page" : undefined}
-              aria-label={item.label}
-              className={cn(
-                "ops-nav-item opsu-nav-item",
-                item.active && "is-active",
-                item.tone && `tone-${item.tone}`,
-              )}
-              data-nav-id={item.id}
-              disabled={item.disabled}
-              key={item.id}
-              variant="ghost"
-              onClick={item.onClick}
-            >
-              <span className="ops-nav-icon opsu-nav-icon" aria-hidden="true">
-                <OperationalIcon id={item.id} fallback={item.icon} />
-              </span>
-              <span className="ops-nav-copy opsu-nav-copy">
-                <strong>{item.label}</strong>
-              </span>
-              {typeof item.count === "number" ? (
-                <NavCount label={`${item.count}`}>{item.count}</NavCount>
-              ) : null}
-              {item.quickAction ? (
-                <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
-              ) : null}
-            </Button>
-          ))}
-        </nav>
-        {sidebarCreateAction ? (
-          <Button
-            className="ops-sidebar-create opsu-sidebar-create"
-            aria-label={sidebarCreateAction.label}
-            variant="plain"
-            onClick={sidebarCreateAction.onClick}
-          >
-            <span aria-hidden="true">
-              <Plus focusable="false" />
-            </span>
-            <strong>{sidebarCreateAction.label}</strong>
-          </Button>
-        ) : null}
-        <div className="ops-sidebar-footer opsu-sidebar-footer">
-          {workspaceSwitchButton}
-          <Button
-            className="ops-session"
-            aria-label="Выйти"
-            variant="ghost"
-            onClick={() => {
-              void onResetWorkspace();
-              onCloseMobile();
-            }}
-          >
-            <span>{sessionInitials}</span>
-            <div>
-              <strong>{sessionDisplayName}</strong>
-              <small>{sessionRoleLabel}</small>
-            </div>
-            <Ellipsis className="ops-user-more" aria-hidden="true" />
-          </Button>
-        </div>
-      </V19SideMenuSurface>
+        inactive={inactive}
+        items={navItems}
+        mobileCloseLabel={mobileCloseLabel}
+        mobileOpen={mobileOpen}
+        mobileTitle={mobileTitle}
+        onCommandSearch={onCommandSearch}
+        onMobileClose={onCloseMobile}
+      />
       {mobileOpen ? (
         <button
           className="ops-mobile-menu-backdrop"
@@ -237,30 +143,4 @@ export function OperationalSideMenu({
       ) : null}
     </>
   );
-}
-
-const operationalIconMap: Array<[needle: string, Icon: LucideIcon]> = [
-  ["actions", ListChecks],
-  ["documents", Files],
-  ["drafts", FileClock],
-  ["applicants", ContactRound],
-  ["media", Images],
-  ["issues", TriangleAlert],
-  ["submissions", FileStack],
-  ["users", ContactRound],
-  ["review", ScanSearch],
-  ["work", ListChecks],
-  ["export", FileSpreadsheet],
-  ["settings", SlidersHorizontal],
-];
-
-function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {
-  const match = operationalIconMap.find(([needle]) => id.includes(needle));
-
-  if (match) {
-    const Icon = match[1];
-    return <Icon aria-hidden="true" focusable="false" size={17} strokeWidth={1.8} />;
-  }
-
-  return <span>{fallback}</span>;
 }

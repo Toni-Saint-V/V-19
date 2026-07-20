@@ -5200,14 +5200,13 @@
   display: inline-flex;
   min-height: var(--v19b-size-10);
   align-items: center;
-  padding: var(--v19b-size-2);
+  padding: var(--v19b-size-0) var(--v19b-size-2);
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19b-radius-pill);
   color: var(--v19b-color-text-muted);
   background: var(--v19b-color-tag);
   font-family: var(--v19b-font-mono);
-  font-size: var(--v19b-size-12);
-  font-weight: var(--v19b-weight-control);
+  font-size: var(--v19b-size-7);
   line-height: var(--v19b-line-height-control);
 }
 
@@ -5216,13 +5215,12 @@
   min-height: var(--v19b-size-10);
   align-items: center;
   gap: var(--v19b-size-2);
-  padding: var(--v19b-size-2);
+  padding: var(--v19b-size-0) var(--v19b-size-2);
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19b-radius-pill);
   color: var(--v19b-color-text-muted);
   background: var(--v19b-color-tag);
-  font-size: var(--v19b-size-12);
-  font-weight: var(--v19b-weight-control);
+  font-size: var(--v19b-size-7);
   line-height: var(--v19b-line-height-control);
 }
 
@@ -41958,5 +41956,119 @@ section[data-testid="agent-actions-screen"]
     border-radius: var(--v19b-radius-panel) !important;
     background: var(--v19b-color-panel) !important;
     box-shadow: var(--v19b-shadow-panel) !important;
+  }
+}
+
+/* Historical My Actions menu is the single visual owner for every role. */
+.ops-shell.has-unified-side-menu .v19-ds-side-menu-subtitle {
+  display: block !important;
+  overflow: hidden;
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-11) !important;
+  font-weight: var(--v19b-weight-regular) !important;
+  line-height: var(--v19b-size-16) !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-shell.has-unified-side-menu .v19-ds-side-menu-signout {
+  width: var(--v19b-size-full) !important;
+  min-height: var(--v19b-size-40) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text) !important;
+}
+
+@media (max-width: 767px) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+    inset: var(--v19b-size-0) auto var(--v19b-size-0) var(--v19b-size-0) !important;
+    width: var(--v19b-size-280) !important;
+    min-width: var(--v19b-size-280) !important;
+    max-width: calc(100vw - var(--v19b-size-40)) !important;
+    height: 100svh !important;
+    min-height: 100svh !important;
+    max-height: 100svh !important;
+    padding: var(--v19b-size-12) var(--v19b-size-8) !important;
+    border: var(--v19b-size-0) !important;
+    border-right: var(--v19b-size-1) solid var(--v19b-color-border) !important;
+    border-radius: var(--v19b-size-0) !important;
+    background: var(--v19b-color-panel) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-brand {
+    grid-template-columns: var(--v19b-size-32) minmax(var(--v19b-size-0), 1fr) auto !important;
+    min-height: var(--v19b-size-48) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-4) var(--v19b-size-12) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-brand-copy {
+    display: flex !important;
+    flex-direction: column !important;
+    align-content: center !important;
+    gap: var(--v19b-size-0) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-sidebar-search {
+    display: grid !important;
+    margin: var(--v19b-size-4) var(--v19b-size-4) var(--v19b-size-16) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-nav {
+    gap: var(--v19b-size-2) !important;
+    padding-inline: var(--v19b-size-4) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-nav-item {
+    min-height: var(--v19b-size-44) !important;
+    border-radius: var(--v19b-size-8) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-sidebar-footer {
+    gap: var(--v19b-size-8) !important;
+    margin: auto var(--v19b-size-4) var(--v19b-size-0) !important;
+    padding-top: var(--v19b-size-12) !important;
+  }
+
+  #root .v19-ds-side-menu .v19-ds-side-menu-profile {
+    min-height: var(--v19b-size-60) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-10) !important;
+    border-color: var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-control) !important;
+    background: var(--v19b-color-control) !important;
+  }
+
+  #root .v19-ds-side-menu .ops-user-more {
+    display: block !important;
+  }
+}
+
+/* Exact visual contract reused from yesterday's My Actions menu (ac4fc3ff). */
+.ops-shell.has-unified-side-menu .v19-ds-side-menu .v19-agent-sidebar-nav-item.is-active {
+  border-color: var(--vf-accent-border) !important;
+  background: var(--vf-accent-soft) !important;
+  box-shadow: inset var(--v19b-size-3) var(--v19b-size-0) var(--v19b-size-0)
+    var(--vf-info) !important;
+}
+
+.ops-shell.has-unified-side-menu .v19-ds-side-menu .v19-agent-sidebar-profile {
+  border-color: var(--vf-accent-border) !important;
+  background: var(--vf-accent-soft) !important;
+}
+
+.ops-shell.has-unified-side-menu .v19-ds-side-menu .v19-agent-sidebar-avatar {
+  border-color: var(--vf-accent-border) !important;
+  background: var(--vf-accent) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+}
+
+@media (max-width: 767px) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+    background: var(--v19b-color-page) !important;
+    box-shadow: 0 0 var(--v19b-size-40) rgb(0 0 0 / 0.5) !important;
   }
 }

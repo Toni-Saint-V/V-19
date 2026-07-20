@@ -21,21 +21,34 @@ import {
   ChevronRight,
   Clock,
   Columns3,
+  ContactRound,
   FileCheck2,
+  FileClock,
+  FileSpreadsheet,
+  FileStack,
+  Files,
   Filter,
   Flame,
   Folder,
+  Images,
   List,
+  ListChecks,
   MapPin,
+  Plus,
+  ScanSearch,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
+  TriangleAlert,
   UserRound,
   UsersRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { motion } from "motion/react";
+import visaflowLogo from "../../assets/v-logo-premium-black-style.webp";
 import { cn } from "./cn";
-import { Badge } from "./primitives";
+import { Badge, Button, IconButton, NavCount } from "./primitives";
 
 export type V19VisualTone = "blue" | "danger" | "green" | "indigo" | "warning";
 
@@ -232,19 +245,178 @@ export function V19QueueCard<T extends ElementType = "div">({
  * Shared application navigation surface. Role-specific navigation stays in the
  * shell adapter; the responsive drawer surface is owned by the design system.
  */
-export function V19SideMenuSurface({
+export type V19SideMenuMode = "regular" | "compact";
+export type V19SideMenuTone = "default" | "danger" | "warning" | "success";
+export type V19SideMenuItem = {
+  active?: boolean;
+  count?: number;
+  disabled?: boolean;
+  icon: string;
+  id: string;
+  label: string;
+  meta: string;
+  onClick: () => void;
+  quickAction?: string;
+  tone?: V19SideMenuTone;
+};
+
+export function V19SideMenu({
+  ariaLabel,
+  brandSubtitle,
   className,
-  open,
+  createAction,
+  displayMode,
+  footer,
+  inactive = false,
+  items,
+  mobileCloseLabel = "Закрыть меню",
+  mobileOpen,
+  mobileTitle,
+  onCommandSearch,
+  onMobileClose,
   ...props
-}: ComponentPropsWithoutRef<"aside"> & { open: boolean }) {
+}: Omit<ComponentPropsWithoutRef<"aside">, "aria-label"> & {
+  ariaLabel: string;
+  brandSubtitle: string;
+  createAction?: { label: string; onClick: () => void };
+  displayMode: V19SideMenuMode;
+  footer: ReactNode;
+  inactive?: boolean;
+  items: V19SideMenuItem[];
+  mobileCloseLabel?: string;
+  mobileOpen: boolean;
+  mobileTitle: string;
+  onCommandSearch?: () => void;
+  onMobileClose: () => void;
+}) {
   return (
     <aside
       {...props}
-      className={cn("v19-ds-side-menu", className)}
-      data-open={open ? "true" : "false"}
+      aria-hidden={inactive ? "true" : undefined}
+      aria-label={ariaLabel}
+      aria-modal={mobileOpen ? "true" : undefined}
+      className={cn(
+        "v19-ds-side-menu ops-sidebar opsu-sidebar",
+        `is-${displayMode}`,
+        className,
+      )}
+      data-open={mobileOpen ? "true" : "false"}
+      data-side-menu-mode={displayMode}
       data-v19-component="side-menu"
-    />
+      inert={inactive ? true : undefined}
+      role={mobileOpen ? "dialog" : undefined}
+    >
+      <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
+        <strong>{mobileTitle}</strong>
+        <span aria-hidden="true">VF</span>
+      </div>
+      <div className="ops-brand opsu-brand flex items-center gap-2.5 px-2 pb-4 mb-2">
+        <img
+          src={visaflowLogo}
+          alt="VisaFlow"
+          className="ops-brand-logo h-8 w-8 shrink-0 rounded-lg object-cover"
+        />
+        <div className="ops-brand-copy opsu-brand-copy flex-1 min-w-0">
+          <strong className="opsu-wordmark vf-brand-wordmark text-sm font-semibold tracking-tight">VisaFlow V-19</strong>
+          <small className="v19-ds-side-menu-subtitle text-[11px] text-white/50">{brandSubtitle}</small>
+        </div>
+        <IconButton
+          className="ops-mobile-close opsu-mobile-close"
+          icon={<X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />}
+          label={mobileCloseLabel}
+          onClick={onMobileClose}
+        />
+      </div>
+      <button
+        className="ops-sidebar-search"
+        type="button"
+        aria-label="Открыть командную палитру"
+        disabled={!onCommandSearch}
+        onClick={onCommandSearch}
+      >
+        <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
+        <span>Поиск...</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
+        <span className="ops-nav-group-label">Работа</span>
+        {items.map((item) => (
+          <Button
+            aria-current={item.active ? "page" : undefined}
+            aria-label={item.label}
+            className={cn(
+              "ops-nav-item opsu-nav-item v19-agent-sidebar-nav-item",
+              item.active && "is-active",
+              item.tone && `tone-${item.tone}`,
+            )}
+            data-nav-id={item.id}
+            disabled={item.disabled}
+            key={item.id}
+            variant="ghost"
+            onClick={item.onClick}
+          >
+            <span
+              className={cn(
+                "ops-nav-icon opsu-nav-icon v19-agent-sidebar-nav-icon",
+                item.active && "is-active",
+              )}
+              aria-hidden="true"
+            >
+              <V19SideMenuIcon id={item.id} fallback={item.icon} />
+            </span>
+            <span className="ops-nav-copy opsu-nav-copy">
+              <strong>{item.label}</strong>
+            </span>
+            {typeof item.count === "number" ? (
+              <NavCount
+                className={cn("v19-agent-sidebar-nav-count", item.active && "is-active")}
+                label={`${item.count}`}
+              >
+                {item.count}
+              </NavCount>
+            ) : null}
+            {item.quickAction ? (
+              <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
+            ) : null}
+          </Button>
+        ))}
+      </nav>
+      {createAction ? (
+        <Button
+          className="ops-sidebar-create opsu-sidebar-create"
+          aria-label={createAction.label}
+          variant="plain"
+          onClick={createAction.onClick}
+        >
+          <span aria-hidden="true"><Plus focusable="false" /></span>
+          <strong>{createAction.label}</strong>
+        </Button>
+      ) : null}
+      <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
+    </aside>
   );
+}
+
+const v19SideMenuIconMap: Array<[needle: string, Icon: LucideIcon]> = [
+  ["actions", ListChecks],
+  ["documents", Files],
+  ["drafts", FileClock],
+  ["applicants", ContactRound],
+  ["media", Images],
+  ["issues", TriangleAlert],
+  ["submissions", FileStack],
+  ["users", ContactRound],
+  ["review", ScanSearch],
+  ["work", ListChecks],
+  ["export", FileSpreadsheet],
+  ["settings", SlidersHorizontal],
+];
+
+function V19SideMenuIcon({ fallback, id }: { fallback: string; id: string }) {
+  const match = v19SideMenuIconMap.find(([needle]) => id.includes(needle));
+  if (!match) return <span>{fallback}</span>;
+  const Icon = match[1];
+  return <Icon aria-hidden="true" focusable="false" size={17} strokeWidth={1.8} />;
 }
 
 export function V19OperationalCardGrid({
