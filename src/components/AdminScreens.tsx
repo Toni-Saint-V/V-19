@@ -483,7 +483,7 @@ export function ReviewScreen({
             searchValue={searchQuery}
           />
 
-          <V19OperationalCardGrid className="v19-admin-review-card-grid">
+          <V19OperationalCardGrid>
             {orderedVisibleReviews.map((item) => (
               <ReviewQueueCard
                 item={item}
