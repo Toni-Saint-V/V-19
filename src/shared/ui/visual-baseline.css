@@ -4626,6 +4626,16 @@
   background: var(--v19b-color-app);
 }
 
+/* Review blockers keep the burgundy protective shell while the nested action
+   surface stays optically black, matching the approved historical cell. */
+#root
+  .v19-admin-review-screen
+  .v19-admin-review-card-grid
+  > .v19-operational-card.has-blocker
+  .v19-operational-card-action {
+  background: var(--v19b-color-black-30);
+}
+
 .v19-operational-card-action > span:first-child {
   display: grid;
   width: var(--v19b-size-36);

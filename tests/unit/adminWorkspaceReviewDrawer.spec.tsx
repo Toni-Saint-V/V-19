@@ -421,6 +421,40 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(container.querySelector(".v19-admin-review-lane-header")).toBeNull();
   });
 
+  test("shows blocker time in the card shell without the former people count", () => {
+    const source = initialSubmissions.find((item) => item.id === "ПД-1053");
+    const applicantId = source?.applicants[0]?.id;
+    if (!source || !applicantId) throw new Error("Expected review fixture.");
+    const blocker = addPreciseAdminIssue(source, {
+      applicantId,
+      comment: "Нужно исправить значение перед проверкой.",
+      field: "Адрес отеля",
+      reason: "Адрес отеля требует исправления",
+      severity: "blocker",
+      type: "field",
+    });
+
+    const { container } = render(
+      <ReviewScreen
+        onOpenDrawer={vi.fn()}
+        onOpenExport={vi.fn()}
+        submissions={[blocker]}
+      />,
+    );
+
+    const card = container.querySelector('[data-submission-id="ПД-1053"]');
+    expect(card).toHaveClass("has-blocker");
+    expect(card?.querySelector(".v19-operational-card-shell-meta")).toHaveTextContent(
+      "1 ч",
+    );
+    expect(
+      card?.querySelector(".v19-operational-card-shell-meta"),
+    ).not.toHaveTextContent("1 чел.");
+    expect(card?.querySelector(".v19-operational-card-people")).toHaveTextContent(
+      "1 чел.",
+    );
+  });
+
   test("does not expose internal questionnaire status values", async () => {
     const source = initialSubmissions.find((item) => item.id === "ПД-1053");
     const applicant = source?.applicants[0];

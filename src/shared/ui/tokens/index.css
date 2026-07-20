@@ -1037,6 +1037,7 @@
 
   --v19b-color-clear: transparent;
   --v19b-color-black: rgb(0 0 0);
+  --v19b-color-black-30: rgb(0 0 0 / 0.3);
   --v19b-color-app: var(--v19-depth-canvas);
   --v19b-color-page: var(--v19-depth-page);
   --v19b-color-panel: var(--v19-depth-panel);

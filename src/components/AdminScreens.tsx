@@ -192,6 +192,7 @@ function ReviewQueueCard({
 }) {
   const hasBlocker = item.blockers > 0;
   const shortQueueTime = item.timeInQueue.replace(/\s+\d+\s+мин$/, "");
+  const shellMeta = hasBlocker ? "1 ч" : `${item.applicants} чел.`;
   const lanePresentation = item.lane === "urgent"
     ? { detail: "сначала сюда", icon: Flame, label: "Критичные" }
     : item.lane === "returned"
@@ -227,7 +228,7 @@ function ReviewQueueCard({
           </span>
         </>
       }
-      metaDetail={shortQueueTime}
+      metaDetail={hasBlocker ? undefined : shortQueueTime}
       peopleCount={item.applicants}
       progress={
         <>
@@ -239,7 +240,7 @@ function ReviewQueueCard({
       shellDetail={lanePresentation.detail}
       shellIcon={lanePresentation.icon}
       shellLabel={lanePresentation.label}
-      shellMeta={`${item.applicants} чел.`}
+      shellMeta={shellMeta}
       title={item.title}
       as="button"
       aria-label={`Ручная проверка заявки ${item.title}`}
