@@ -190,7 +190,7 @@ async function expectUnifiedSideMenuFinish(
       };
     })
     .toEqual({
-      activeBackground: "rgb(91, 96, 201)",
+      activeBackground: "rgb(57, 60, 127)",
       activeBorder: "rgb(96, 165, 250)",
       inactiveText: "rgba(242, 243, 245, 0.62)",
       menuBackground: "rgb(16, 16, 17)",
@@ -204,6 +204,15 @@ async function expectUnifiedSideMenuFinish(
   expect(sessionTextBox).not.toBeNull();
   expect(sessionTextBox?.x).toBeGreaterThanOrEqual(
     (avatarBox?.x ?? 0) + (avatarBox?.width ?? 0),
+  );
+}
+
+async function expectMyActionsActiveMenuState(sideMenu: Locator): Promise<void> {
+  const activeItem = sideMenu.locator('.ops-nav-item[aria-current="page"]');
+  await expect(activeItem).toHaveCSS("background-color", "rgb(57, 60, 127)");
+  await expect(activeItem.locator(".ops-nav-copy strong")).toHaveCSS(
+    "color",
+    "rgb(181, 202, 242)",
   );
 }
 
@@ -229,6 +238,7 @@ test.describe("V-19 local-demo smoke", () => {
     await expect(sideMenu).toHaveCount(1);
     await expect(sideMenu).toBeVisible();
     await expect(sideMenu).toHaveAttribute("data-side-menu-mode", "regular");
+    await expectMyActionsActiveMenuState(sideMenu);
     const desktopMenuTrigger = page.getByRole("button", {
       exact: true,
       name: "Меню",
@@ -299,6 +309,11 @@ test.describe("V-19 local-demo smoke", () => {
     await expect(sideMenu).toHaveCount(1);
     await expect(sideMenu).toBeVisible();
     await expect(sideMenu).toHaveAttribute("data-side-menu-mode", "regular");
+    await expectMyActionsActiveMenuState(sideMenu);
+    await page.screenshot({
+      fullPage: false,
+      path: testInfo.outputPath("admin-desktop-menu.png"),
+    });
     await expect(
       page.getByRole("button", { name: "Открыть меню администратора" }),
     ).toBeHidden();

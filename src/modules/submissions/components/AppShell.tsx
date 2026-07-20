@@ -1,8 +1,9 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
 import { Menu, X } from "lucide-react";
 
 import { cn } from "../../../shared/ui/cn";
 import { IconButton } from "../../../shared/ui/primitives";
+import { OperationalSideMenu } from "./OperationalSideMenu";
 
 type AppShellProps = {
   children: ReactNode;
@@ -11,7 +12,7 @@ type AppShellProps = {
   inactive?: boolean;
   mobileNavOpen: boolean;
   role: string;
-  sidebar: ReactNode;
+  sideMenu: ComponentProps<typeof OperationalSideMenu>;
   sideMenuMode: "regular" | "compact";
   surface: string;
   collectionSurface?: boolean;
@@ -32,7 +33,7 @@ export function AppShell({
   mobileNavOpen,
   overlays = null,
   role,
-  sidebar,
+  sideMenu,
   sideMenuMode,
   surface,
   workspaceInactive = false,
@@ -42,6 +43,7 @@ export function AppShell({
       className={cn(
         "ops-shell",
         "has-unified-side-menu",
+        "is-operational-shell-source-actions",
         `surface-${surface}`,
         collectionSurface && "is-v19-collection-surface",
         `role-${role}`,
@@ -54,7 +56,7 @@ export function AppShell({
       aria-hidden={inactive ? "true" : undefined}
       inert={inactive ? true : undefined}
     >
-      {sidebar}
+      <OperationalSideMenu {...sideMenu} />
       <section
         className="workspace"
         aria-hidden={workspaceInactive ? "true" : undefined}

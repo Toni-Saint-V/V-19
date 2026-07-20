@@ -9,10 +9,7 @@ import {
   PageHeader,
   PageHeaderMenuButton,
 } from "../modules/submissions/components/AppShell";
-import {
-  OperationalSideMenu,
-  operationalSideMenuId,
-} from "../modules/submissions/components/OperationalSideMenu";
+import { operationalSideMenuId } from "../modules/submissions/components/OperationalSideMenu";
 import type { AccessRequest } from "../shared/authContract";
 import type {
   IssueInput,
@@ -486,24 +483,23 @@ export function AdminWorkspace({
           label="Рабочая область администратора"
           mobileNavOpen={mobileNavOpen}
           role="admin"
-          sidebar={
-            <OperationalSideMenu
-              ariaLabel="Меню администратора"
-              displayMode="regular"
-              items={sideMenuItems}
-              mobileCloseLabel="Закрыть меню администратора"
-              mobileOpen={mobileNavOpen}
-              mobileTitle={pageTitle}
-              onChooseRole={() => onSwitchWorkspace?.()}
-              onCloseMobile={() => setMobileNavOpen(false)}
-              onResetWorkspace={handleSignOut}
-              role="admin"
-              sessionDisplayName={adminIdentity}
-              sessionInitials={adminInitials}
-              sessionRoleLabel="Администратор"
-              showWorkspaceSwitch={Boolean(onSwitchWorkspace)}
-            />
-          }
+          sideMenu={{
+            ariaLabel: "Меню администратора",
+            displayMode: "regular",
+            inactive: currentView === "review_workspace",
+            items: sideMenuItems,
+            mobileCloseLabel: "Закрыть меню администратора",
+            mobileOpen: mobileNavOpen,
+            mobileTitle: pageTitle,
+            onChooseRole: () => onSwitchWorkspace?.(),
+            onCloseMobile: () => setMobileNavOpen(false),
+            onResetWorkspace: handleSignOut,
+            role: "admin",
+            sessionDisplayName: adminIdentity,
+            sessionInitials: adminInitials,
+            sessionRoleLabel: "Администратор",
+            showWorkspaceSwitch: Boolean(onSwitchWorkspace),
+          }}
           sideMenuMode="regular"
           surface={surface}
           workspaceInactive={currentView === "review_workspace"}

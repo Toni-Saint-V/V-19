@@ -25,10 +25,7 @@ import {
   PageHeader,
   PageHeaderMenuButton,
 } from "../modules/submissions/components/AppShell";
-import {
-  OperationalSideMenu,
-  operationalSideMenuId,
-} from "../modules/submissions/components/OperationalSideMenu";
+import { operationalSideMenuId } from "../modules/submissions/components/OperationalSideMenu";
 import { Drawer } from "./Drawer";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
 import {
@@ -1303,25 +1300,23 @@ export function CommandCenter({
           label="Рабочая область агента"
           mobileNavOpen={mobileNavOpen}
           role="agent"
-          sidebar={
-            <OperationalSideMenu
-              ariaLabel="Меню агента"
-              createAction={{ label: "Новая подача", onClick: createPackage }}
-              displayMode="regular"
-              items={sideMenuItems}
-              mobileOpen={mobileNavOpen}
-              mobileTitle={title}
-              onChooseRole={() => onSwitchWorkspace?.()}
-              onCloseMobile={() => setMobileNavOpen(false)}
-              onCommandSearch={openCommandPalette}
-              onResetWorkspace={() => onSignOut?.()}
-              role="agent"
-              sessionDisplayName={agentName}
-              sessionInitials={agentAvatar}
-              sessionRoleLabel={agentAgency}
-              showWorkspaceSwitch={Boolean(onSwitchWorkspace)}
-            />
-          }
+          sideMenu={{
+            ariaLabel: "Меню агента",
+            createAction: { label: "Новая подача", onClick: createPackage },
+            displayMode: "regular",
+            items: sideMenuItems,
+            mobileOpen: mobileNavOpen,
+            mobileTitle: title,
+            onChooseRole: () => onSwitchWorkspace?.(),
+            onCloseMobile: () => setMobileNavOpen(false),
+            onCommandSearch: openCommandPalette,
+            onResetWorkspace: () => onSignOut?.(),
+            role: "agent",
+            sessionDisplayName: agentName,
+            sessionInitials: agentAvatar,
+            sessionRoleLabel: agentAgency,
+            showWorkspaceSwitch: Boolean(onSwitchWorkspace),
+          }}
           sideMenuMode="regular"
           surface={surface}
           workspaceInactive={currentView !== "main"}

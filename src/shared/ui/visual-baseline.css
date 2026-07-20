@@ -41432,25 +41432,17 @@ section[data-testid="agent-actions-screen"]
   }
 }
 
-/* Agent navigation and action-panel annotations. Keep these values scoped to
-   the agent shell while the raw palette remains owned by shared tokens. */
+/* My Actions navigation is the single visual source for every operational
+   shell. Role-specific labels and permissions remain component-owned. */
 #root
-  .ops-shell.has-unified-side-menu:is(
-    .role-agent,
-    .surface-agent-actions,
-    .surface-agent-submissions
-  )
+  .ops-shell.has-unified-side-menu.is-operational-shell-source-actions
   :is(.ops-nav-item.is-active, .ops-nav-item[aria-current="page"]) {
   background: var(--v19b-agent-nav-active-background) !important;
   color: var(--v19b-agent-nav-active-text) !important;
 }
 
 #root
-  .ops-shell.has-unified-side-menu:is(
-    .role-agent,
-    .surface-agent-actions,
-    .surface-agent-submissions
-  )
+  .ops-shell.has-unified-side-menu.is-operational-shell-source-actions
   :is(.ops-nav-item.is-active, .ops-nav-item[aria-current="page"])
   :is(.ops-nav-copy strong, .ops-nav-icon) {
   color: var(--v19b-agent-nav-active-text) !important;
