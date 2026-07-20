@@ -630,7 +630,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(pinnedSectionTitles(result.container)).not.toContain("Кто заполнил");
   });
 
-  test("shows family copy only in contact, appointment, and hotel sections", () => {
+  test("shows family copy only in shared contact, trip, appointment, and hotel sections", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON", "VOLKOVA MARIA"],
       city: "Москва",
@@ -647,14 +647,19 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    for (const title of ["Личные данные", "Паспорт", "Работа / учеба", "Поездка"]) {
+    for (const title of ["Личные данные", "Паспорт", "Работа / учеба"]) {
       clickPinnedSection(result.container, title);
       expect(
         screen.queryByRole("button", { name: "Копировать для всех" }),
       ).not.toBeInTheDocument();
     }
 
-    for (const title of ["Адрес и контакты", "Запись", "Отель / приглашение"]) {
+    for (const title of [
+      "Адрес и контакты",
+      "Поездка",
+      "Запись",
+      "Отель / приглашение",
+    ]) {
       clickPinnedSection(result.container, title);
       expect(
         screen.getByRole("button", { name: "Копировать для всех" }),
@@ -2685,7 +2690,7 @@ describe("FigmaQuestionnaireScreen", () => {
     }
   });
 
-  test("copies allowlisted shared data to every secondary applicant without overwriting", async () => {
+  test("copies every field in the active shared section and overwrites existing values", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["IVANOVA MARIA", "IVANOV ANTON", "IVANOVA ANNA"],
       city: "Москва",
@@ -2793,6 +2798,11 @@ describe("FigmaQuestionnaireScreen", () => {
           value: "Москва",
         }),
         expect.objectContaining({
+          applicantId: secondApplicantId,
+          fieldId: "home-street",
+          value: "Арбат",
+        }),
+        expect.objectContaining({
           applicantId: thirdApplicantId,
           fieldId: "home-street",
           value: "Арбат",
@@ -2802,13 +2812,15 @@ describe("FigmaQuestionnaireScreen", () => {
           fieldId: "home-house",
           value: "1",
         }),
-      ]),
-    );
-    expect(copiedUpdates).not.toEqual(
-      expect.arrayContaining([
         expect.objectContaining({
-          applicantId: secondApplicantId,
-          fieldId: "home-street",
+          applicantId: thirdApplicantId,
+          fieldId: "email",
+          value: "family@example.com",
+        }),
+        expect.objectContaining({
+          applicantId: thirdApplicantId,
+          fieldId: "contact-number",
+          value: "79000000000",
         }),
       ]),
     );
@@ -2825,7 +2837,7 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.click(applicantTabs[1] as HTMLButtonElement);
     clickPinnedSection(result.container, "Адрес и контакты");
     expect(screen.getByLabelText("Улица / проспект / переулок")).toHaveValue(
-      "Собственная улица",
+      "Арбат",
     );
     expect(screen.getByLabelText("Город проживания")).toHaveValue("Москва");
 
@@ -2836,7 +2848,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("reports when family-wide copy has no eligible empty targets", () => {
+  test("copies every trip field, including fields outside the former shared subset", () => {
     const draft = createDraftSubmission({
       applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
       city: "Москва",
@@ -2845,23 +2857,95 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "family",
     });
-    const submission: Submission = {
-      ...draft,
-      applicants: draft.applicants.map((applicant, index) =>
-        index === 1
-          ? {
-              ...applicant,
-              sections: applicant.sections.map((section) => ({
-                ...section,
-                fields: section.fields.map((field) => ({
-                  ...field,
-                  value: "EXISTING",
-                })),
-              })),
-            }
-          : applicant,
-      ),
-    };
+    const primary = [
+      ["purpose", "TOURISM"],
+      ["entry-count", "Многократная"],
+      ["previous-biometrics", "Нет"],
+      ["previous-biometrics-date", "01.02.2024"],
+      ["previous-visa-number", "VISA-123"],
+    ].reduce(
+      (current, [fieldId, value]) => setField(current, fieldId, value),
+      draft,
+    );
+    const submission = setApplicantField(
+      setApplicantField(primary, 1, "entry-count", "Однократная"),
+      1,
+      "previous-biometrics",
+      "Да",
+    );
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Поездка");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Копировать для всех" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердить копирование" }),
+    );
+
+    const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
+    expect(copiedUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fieldId: "entry-count",
+          sectionId: "trip",
+          value: "Многократная",
+        }),
+        expect.objectContaining({
+          fieldId: "previous-biometrics",
+          sectionId: "trip",
+          value: "Нет",
+        }),
+        expect.objectContaining({
+          fieldId: "previous-biometrics-date",
+          sectionId: "trip",
+          value: "01.02.2024",
+        }),
+        expect.objectContaining({
+          fieldId: "previous-visa-number",
+          sectionId: "trip",
+          value: "VISA-123",
+        }),
+      ]),
+    );
+
+    const applicantTabs = result.container.querySelectorAll(
+      ".v19-questionnaire-applicant-tab",
+    );
+    fireEvent.click(applicantTabs[1] as HTMLButtonElement);
+    clickPinnedSection(result.container, "Поездка");
+    expect(screen.getByRole("button", { name: "Многократная" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Нет" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  test("reports when the primary applicant has no values to copy", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const submission = setField(
+      setField(draft, "home-country", ""),
+      "lives-outside-citizenship",
+      "",
+    );
     const onFieldChange = vi.fn();
     const result = render(
       <FigmaQuestionnaireScreen
@@ -2879,11 +2963,11 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     expect(onFieldChange).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(
-        "В этом разделе данные уже заполнены или у первого заявителя нет значений для копирования.",
-      ),
-    ).toHaveAttribute("role", "status");
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveClass("v19-questionnaire-family-copy-alert");
+    expect(alert).toHaveTextContent(
+      "У первого заявителя нет значений для копирования в этом разделе.",
+    );
   });
 
   test("shows applicant completion and blocker cues without duplicate next-field buttons", () => {

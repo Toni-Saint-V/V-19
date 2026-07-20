@@ -28771,6 +28771,64 @@ section[data-testid="agent-actions-screen"]
     var(--vf-ref-color-rgb-0-0-0-0neg-2);
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-family-copy-alert {
+  display: grid;
+  width: var(--v19b-size-full);
+  min-width: var(--v19b-size-0);
+  grid-template-columns: var(--v19b-size-32) minmax(
+      var(--v19b-size-0),
+      var(--v19b-grid-fr)
+    );
+  align-items: center;
+  gap: var(--v19b-size-12);
+  padding: var(--v19b-size-14);
+  border: var(--v19b-size-1) solid var(--v19b-admin-orange-border);
+  border-left-color: var(--v19b-dot-warning);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text);
+  background: var(--v19b-admin-orange-soft);
+  box-shadow: var(--v19b-shadow-row-inner);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-family-copy-alert-icon {
+  display: grid;
+  width: var(--v19b-size-32);
+  height: var(--v19b-size-32);
+  place-items: center;
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-dot-warning);
+  background: var(--v19b-color-app);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-family-copy-alert-icon svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-family-copy-alert p {
+  min-width: var(--v19b-size-0);
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-13);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-copy);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-toolbar.has-copy {
+  gap: var(--v19b-size-12) !important;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-toolbar-copy
+  .v19-questionnaire-copy-button {
+  border-radius: var(--v19b-radius-control) !important;
+  box-shadow:
+    inset var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-0)
+      var(--v19b-size-1) var(--v19b-color-primary-soft-20),
+    var(--v19b-shadow-row-inner) !important;
+}
+
 .v19-questionnaire-review-strip {
   position: absolute;
   top: 0;

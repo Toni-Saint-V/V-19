@@ -142,52 +142,15 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
   },
 ];
 
+const familyCopyUnavailableMessage =
+  "У первого заявителя нет значений для копирования в этом разделе.";
+
 const familyCopySectionIds = new Set<SectionId>([
   "appointment",
   "contact",
   "hotel",
+  "trip",
 ]);
-
-const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
-  appointment: ["appointment-city", "desired-date-1", "desired-date-2"],
-  contact: [
-    "home-address",
-    "home-country",
-    "home-city",
-    "home-street",
-    "home-house",
-    "home-building",
-    "home-unit",
-    "postal-code",
-    "lives-outside-citizenship",
-    "residence-permit-type",
-    "residence-permit-number",
-    "residence-permit-valid-until",
-  ],
-  hotel: [
-    "inviting-party-type",
-    "hotel-name",
-    "hotel-address",
-    "hotel-country",
-    "hotel-city",
-    "hotel-postal-code",
-    "hotel-email",
-    "hotel-contact",
-    "company-org-details",
-    "company-contact-person",
-    "company-phone",
-  ],
-  trip: [
-    "purpose",
-    "stay-purpose-details",
-    "main-destination",
-    "first-entry-country",
-    "entry-count",
-    "arrival-date",
-    "departure-date",
-    "stay-duration",
-  ],
-};
 
 type FormFieldProps = {
   addressAssist?: boolean;
@@ -2565,8 +2528,6 @@ export function FigmaQuestionnaireScreen({
   const [familyCopyMessage, setFamilyCopyMessage] = useState<string>();
   const [familyCopyPreview, setFamilyCopyPreview] =
     useState<FamilyCopyPreview>();
-  const [lastFamilyCopyTarget, setLastFamilyCopyTarget] =
-    useState<FamilyCopyPreview["firstTarget"]>();
   const [revealRequiredErrors, setRevealRequiredErrors] = useState(false);
   const [issueResolutionError, setIssueResolutionError] = useState("");
   const [pendingIssueResolutionId, setPendingIssueResolutionId] = useState<
@@ -2610,7 +2571,6 @@ export function FigmaQuestionnaireScreen({
     setPendingFieldUpdates({});
     setFamilyCopyMessage(undefined);
     setFamilyCopyPreview(undefined);
-    setLastFamilyCopyTarget(undefined);
     setRevealRequiredErrors(false);
     setSaveStatus("idle");
     setSaveMessage("Изменений нет");
@@ -3266,23 +3226,15 @@ export function FigmaQuestionnaireScreen({
       (definition) => definition.id === activeSection,
     )?.canonicalId;
     if (!canonicalSectionId) return;
-    const allowlistedFields = (familySharedFieldIds[activeSection] ?? []).map(
-      (fieldId) => ({ canonicalSectionId, fieldId }),
+    const sectionBindings = questionnaireFieldBindings.filter(
+      (binding) => binding.sectionId === canonicalSectionId,
     );
     const updates = draftSubmission.applicants.slice(1).flatMap((applicant) =>
-      allowlistedFields.flatMap(({ canonicalSectionId, fieldId }) => {
+      sectionBindings.flatMap((binding) => {
+        const { fieldId } = binding;
         const sourceField = questionnaireField(primaryApplicant, fieldId);
         const targetField = questionnaireField(applicant, fieldId);
-        const binding = questionnaireFieldBindings.find(
-          (item) => item.fieldId === fieldId,
-        );
-        if (
-          !sourceField?.value.trim() ||
-          !targetField ||
-          targetField.value.trim() ||
-          !binding ||
-          binding.sectionId !== canonicalSectionId
-        ) {
+        if (!sourceField?.value.trim() || !targetField) {
           return [];
         }
 
@@ -3304,9 +3256,7 @@ export function FigmaQuestionnaireScreen({
       }),
     );
     if (!updates.length) {
-      setFamilyCopyMessage(
-        "В этом разделе данные уже заполнены или у первого заявителя нет значений для копирования.",
-      );
+      setFamilyCopyMessage(familyCopyUnavailableMessage);
       return;
     }
 
@@ -3341,7 +3291,6 @@ export function FigmaQuestionnaireScreen({
     }
     replacePendingFieldUpdates(next);
     updateDirtyState(next);
-    setLastFamilyCopyTarget(familyCopyPreview.firstTarget);
     setFamilyCopyMessage(
       `Скопировано и подтверждено после предпросмотра: ${familyCopyPreview.updates.length} полей · заявителей: ${familyCopyPreview.affectedApplicants}.`,
     );
@@ -3351,10 +3300,6 @@ export function FigmaQuestionnaireScreen({
   function cancelFamilyCopy() {
     setFamilyCopyPreview(undefined);
     setFamilyCopyMessage("Копирование отменено; данные не изменены.");
-  }
-
-  function reviewLastFamilyCopy() {
-    if (lastFamilyCopyTarget) focusQuestionnaireTarget(lastFamilyCopyTarget);
   }
 
   function fieldIssue(fieldId: string, label: string) {
@@ -5237,7 +5182,7 @@ export function FigmaQuestionnaireScreen({
 
               <div className="v19-questionnaire-work-grid">
                 {showFamilyCopyControl &&
-                (familyCopyPreview || lastFamilyCopyTarget || familyCopyMessage) ? (
+                (familyCopyPreview || familyCopyMessage) ? (
                   <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
                     {familyCopyPreview ? (
                       <>
@@ -5257,16 +5202,26 @@ export function FigmaQuestionnaireScreen({
                         </button>
                       </>
                     ) : null}
-                    {!familyCopyPreview && lastFamilyCopyTarget ? (
-                      <button
-                        className="v19-questionnaire-draft-button"
-                        type="button"
-                        onClick={reviewLastFamilyCopy}
+                    {!familyCopyPreview &&
+                    familyCopyMessage === familyCopyUnavailableMessage ? (
+                      <div
+                        aria-atomic="true"
+                        className="v19-questionnaire-family-copy-alert"
+                        id={familyCopyStatusId}
+                        role="alert"
                       >
-                        Проверить скопированные поля
-                      </button>
+                        <span
+                          aria-hidden="true"
+                          className="v19-questionnaire-family-copy-alert-icon"
+                        >
+                          <AlertCircle />
+                        </span>
+                        <p>{familyCopyMessage}</p>
+                      </div>
                     ) : null}
-                    {!familyCopyPreview && familyCopyMessage ? (
+                    {!familyCopyPreview &&
+                    familyCopyMessage &&
+                    familyCopyMessage !== familyCopyUnavailableMessage ? (
                       <p
                         aria-live="polite"
                         className="v19-questionnaire-family-copy-status"
