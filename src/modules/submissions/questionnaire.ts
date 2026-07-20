@@ -1,5 +1,6 @@
 import type {
   Applicant,
+  Issue,
   QuestionnaireField,
   QuestionnaireReviewSource,
   QuestionnaireReviewState,
@@ -608,6 +609,55 @@ export function clearOpenQuestionnaireIssueErrors(submission: Submission): Submi
   });
 }
 
+export function clearQuestionnaireIssueError(
+  submission: Submission,
+  issueId: string,
+): Submission {
+  const targetIssue = submission.issues.find(
+    (issue) => issue.id === issueId && issue.status === "open",
+  );
+  if (!targetIssue) return submission;
+
+  return recalculateQuestionnaire({
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: normalizeApplicantSections({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: normalizeFields(section).map((field) => {
+            if (
+              !questionnaireIssueMatchesField(
+                targetIssue,
+                applicant.id,
+                section.title,
+                field,
+              )
+            ) {
+              return field;
+            }
+
+            const remainingOpenIssue = submission.issues.find(
+              (issue) =>
+                issue.id !== issueId &&
+                issue.status === "open" &&
+                questionnaireIssueMatchesField(
+                  issue,
+                  applicant.id,
+                  section.title,
+                  field,
+                ),
+            );
+
+            return { ...field, error: remainingOpenIssue?.reason };
+          }),
+        })),
+      }),
+    })),
+  });
+}
+
 export function questionnaireProgressForApplicant(applicant: Applicant) {
   const fields = applicant.sections.flatMap((section) => normalizeFields(section));
   if (!fields.length) return 0;
@@ -657,11 +707,22 @@ function hasOpenQuestionnaireFieldIssue(
   return submission.issues.some(
     (issue) =>
       issue.status === "open" &&
-      issue.target.applicantId === applicantId &&
-      questionnaireFieldMatchesTarget(field, issue.target.field) &&
-      (issue.target.section === sectionTitle ||
-        issue.target.section === "Анкета" ||
-        issue.target.section === "Данные"),
+      questionnaireIssueMatchesField(issue, applicantId, sectionTitle, field),
+  );
+}
+
+function questionnaireIssueMatchesField(
+  issue: Issue,
+  applicantId: string,
+  sectionTitle: string,
+  field: QuestionnaireField,
+) {
+  return (
+    issue.target.applicantId === applicantId &&
+    questionnaireFieldMatchesTarget(field, issue.target.field) &&
+    (issue.target.section === sectionTitle ||
+      issue.target.section === "Анкета" ||
+      issue.target.section === "Данные")
   );
 }
 

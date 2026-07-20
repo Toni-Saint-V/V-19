@@ -1207,6 +1207,49 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(secondSelfieTab).toHaveAttribute("aria-selected", "true");
   });
 
+  test("falls back to the first current applicant when the selected applicant disappears", async () => {
+    const submission = singleSubmission();
+    const selectedApplicant = submission.applicants[0];
+    if (!selectedApplicant) throw new Error("Expected selected applicant.");
+    const replacementApplicant: Applicant = {
+      ...selectedApplicant,
+      fullName: "Replacement Applicant",
+      id: "replacement-applicant",
+    };
+    const refreshedSubmission: Submission = {
+      ...submission,
+      applicants: [replacementApplicant],
+      files: [],
+    };
+    const onApplicantChange = vi.fn();
+    const view = render(
+      <ReviewWorkspace
+        applicantId={selectedApplicant.id}
+        onAddRemark={() => undefined}
+        onApplicantChange={onApplicantChange}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    view.rerender(
+      <ReviewWorkspace
+        applicantId={selectedApplicant.id}
+        onAddRemark={() => undefined}
+        onApplicantChange={onApplicantChange}
+        onBack={() => undefined}
+        submission={refreshedSubmission}
+        submissionId={refreshedSubmission.id}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(onApplicantChange).toHaveBeenLastCalledWith(replacementApplicant.id),
+    );
+    expect(screen.getByText(replacementApplicant.fullName)).toBeVisible();
+  });
+
   test("uses canonical review guards for final production decisions", async () => {
     const readySubmission = reviewReadySubmission();
     const submission: Submission = {
@@ -1256,6 +1299,10 @@ describe("ReviewWorkspace passport section contract", () => {
       name: "Принять на выгрузку",
     });
     expect(acceptButton).toBeEnabled();
+    expect(screen.getByText("Проверка готова к решению.")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Нужно добавить точное замечание"),
+    ).not.toBeInTheDocument();
     fireEvent.click(acceptButton);
     await waitFor(() => expect(onReviewAction).toHaveBeenCalledWith("accept"));
   });

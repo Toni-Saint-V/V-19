@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -21,6 +22,16 @@ import type {
 } from "../../src/modules/submissions/types";
 import type { WorkspaceTarget } from "../../src/modules/submissions/workspaceModel";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+
+function deferred<T>() {
+  let reject!: (reason?: unknown) => void;
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
 
 type RenderDrawerOptions = {
   activeTab?: DrawerTab;
@@ -202,6 +213,56 @@ describe("Drawer interactions", () => {
     expect(
       screen.getByText("Сначала отметьте замечания исправленными"),
     ).toBeInTheDocument();
+  });
+
+  test("keeps submission B pending when submission A settles after the drawer switches", async () => {
+    const actionA = deferred<void>();
+    const actionB = deferred<void>();
+    const onAction = vi
+      .fn()
+      .mockImplementationOnce(() => actionA.promise)
+      .mockImplementationOnce(() => actionB.promise);
+    const submissionA = { ...readySubmission(), id: "submission-a" };
+    const submissionB = { ...readySubmission(), id: "submission-b" };
+    const drawerProps = {
+      activeTab: "overview" as const,
+      isOpen: true,
+      onAction,
+      onClose: vi.fn(),
+      onOpenQuestionnaire: vi.fn(),
+      onOpenWorkspaceTarget: vi.fn(),
+    };
+    const { rerender } = render(<Drawer {...drawerProps} submission={submissionA} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Отправить на проверку" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+
+    rerender(<Drawer {...drawerProps} submission={submissionB} />);
+    const submissionBAction = await screen.findByRole("button", {
+      name: "Отправить на проверку",
+    });
+    await waitFor(() => expect(submissionBAction).toBeEnabled());
+    fireEvent.click(submissionBAction);
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+    expect(submissionBAction).toBeDisabled();
+    expect(submissionBAction).toHaveAttribute("aria-busy", "true");
+
+    await act(async () => {
+      actionA.reject(new Error("Submission A failed late."));
+      await actionA.promise.catch(() => undefined);
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(submissionBAction).toBeDisabled();
+    expect(submissionBAction).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(submissionBAction);
+    expect(onAction).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      actionB.resolve();
+      await actionB.promise;
+    });
+    await waitFor(() => expect(submissionBAction).toBeEnabled());
   });
 
   test("opens history for read-only status without sending a mutation", async () => {

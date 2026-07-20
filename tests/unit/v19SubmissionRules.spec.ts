@@ -2195,6 +2195,91 @@ describe("V-19 submission actions", () => {
     expect(corrected.applicants[0]?.questionnaireStatus).toBe("partial");
   });
 
+  it("keeps unrelated open questionnaire issue guidance visible when one issue is fixed", () => {
+    const submission = byId("ПД-1053");
+    const withRouteIssue = addPreciseAdminIssue(
+      submission,
+      routeIssueInput(submission),
+    );
+    const applicant = withRouteIssue.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const withTwoIssues = addPreciseAdminIssue(withRouteIssue, {
+      applicantId: applicant.id,
+      comment: "Проверьте основную страну назначения.",
+      field: "Основная страна назначения",
+      reason: "Нужно подтвердить основную страну назначения",
+      section: "Анкета",
+      severity: "blocker",
+      type: "field",
+    });
+    const tripSection = withTwoIssues.applicants[0]?.sections.find(
+      (section) => section.title === "Поездка",
+    );
+    const routeField = tripSection?.fields.find(
+      (field) => field.label === "Страна первого въезда",
+    );
+    if (!tripSection || !routeField) throw new Error("Missing route field");
+
+    const edited = updateQuestionnaireField(withTwoIssues, {
+      applicantId: applicant.id,
+      sectionId: tripSection.id,
+      fieldId: routeField.id,
+      value: "France",
+    });
+    const returned = applySubmissionAction(edited, "return_with_issues", "admin");
+    const routeIssue = returned.issues.find(
+      (issue) => issue.target.field === "Маршрут поездки",
+    );
+    if (!routeIssue) throw new Error("Missing route issue");
+
+    const fixed = markSubmissionIssueFixedResult(returned, routeIssue.id, "agent");
+    if (!fixed.ok) throw new Error(fixed.error.code);
+
+    expect(
+      fixed.data.issues.find(
+        (issue) => issue.target.field === "Основная страна назначения",
+      ),
+    ).toMatchObject({ status: "open" });
+    expect(
+      fixed.data.applicants[0]?.sections
+        .find((section) => section.title === "Поездка")
+        ?.fields.find((field) => field.label === "Основная страна назначения")
+        ?.error,
+    ).toBe("Нужно подтвердить основную страну назначения");
+  });
+
+  it("captures the fallback target snapshot for a general admin issue", () => {
+    const submission = byId("ПД-1053");
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+
+    const withIssue = addPreciseAdminIssue(submission, {
+      applicantId: applicant.id,
+      comment: "Уточните данные анкеты.",
+      reason: "Требуется уточнение",
+      section: "Анкета",
+      severity: "blocker",
+      type: "field",
+    });
+    const issue = withIssue.issues[0];
+    if (!issue) throw new Error("Missing issue");
+    const routeValue = submission.applicants[0]?.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "first-entry-country")?.value;
+
+    expect(issue.target.field).toBe("Маршрут поездки");
+    expect(issue.snapshot).toBe(routeValue);
+
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
+    expect(markSubmissionIssueFixedResult(returned, issue.id, "agent")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target must be corrected before it can be marked fixed.",
+      },
+    });
+  });
+
   it("blocks marking a returned issue fixed until its target changes", () => {
     const submission = byId("ПД-1053");
     const withIssue = addPreciseAdminIssue(submission, routeIssueInput(submission));

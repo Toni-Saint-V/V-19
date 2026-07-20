@@ -77,6 +77,24 @@ function firstIssueInput(submission: Submission): IssueInput {
   };
 }
 
+function changeRouteIssueTarget(
+  submission: Submission,
+  value = "Madrid, Barcelona, Madrid",
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === "first-entry-country" ? { ...field, value } : field,
+        ),
+      })),
+    })),
+  };
+}
+
 function completeInProgressSubmission(): Submission {
   return adminAcceptRequiredMediaForTest(
     adminApprovePassportFieldsForTest({
@@ -194,6 +212,50 @@ describe("V-19 domain engine", () => {
     });
   });
 
+  it("fails closed outside the canonical issue correction and review stages", () => {
+    const submitted = {
+      ...completeInProgressSubmission(),
+      status: "submitted_for_review" as const,
+    };
+    const returned = unwrap(
+      returnWithIssues(submitted, "admin", [firstIssueInput(submitted)]),
+    );
+    const issueId = returned.issues[0]?.id;
+    if (!issueId) throw new Error("Missing issue");
+
+    expect(markIssueFixed(returned, "agent", issueId)).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target must be corrected before it can be marked fixed.",
+      },
+    });
+
+    const corrected = changeRouteIssueTarget(returned);
+    expect(
+      markIssueFixed(
+        { ...corrected, status: "submitted_for_review" },
+        "agent",
+        issueId,
+      ),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Issues can be marked fixed only after admin return.",
+      },
+    });
+
+    const fixed = unwrap(markIssueFixed(corrected, "agent", issueId));
+    expect(closeIssue(fixed, "admin", issueId)).toEqual({
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Issues can be closed only during corrections review.",
+      },
+    });
+  });
+
   it("runs issue lifecycle open to fixed_by_agent to closed_by_admin", () => {
     const submitted = {
       ...completeInProgressSubmission(),
@@ -215,7 +277,9 @@ describe("V-19 domain engine", () => {
       },
     });
 
-    const fixed = unwrap(markIssueFixed(returned, "agent", issueId));
+    const fixed = unwrap(
+      markIssueFixed(changeRouteIssueTarget(returned), "agent", issueId),
+    );
     expect(fixed.issues[0]?.status).toBe("fixed_by_agent");
 
     const resubmitted = unwrap(resubmitCorrections(fixed, "agent"));
@@ -242,6 +306,34 @@ describe("V-19 domain engine", () => {
     expect(
       returnWithIssues(submitted, "admin", [
         { ...firstIssueInput(submitted), applicantId: "missing-applicant" },
+      ]),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target, reason, and comment must be valid.",
+      },
+    });
+    expect(
+      returnWithIssues(submitted, "admin", [
+        { ...firstIssueInput(submitted), field: "Несуществующее поле" },
+      ]),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target, reason, and comment must be valid.",
+      },
+    });
+    expect(
+      returnWithIssues(submitted, "admin", [
+        {
+          ...firstIssueInput(submitted),
+          field: undefined,
+          fileType: "video",
+          section: "Файлы",
+          type: "file",
+        },
       ]),
     ).toEqual({
       ok: false,
@@ -279,7 +371,9 @@ describe("V-19 domain engine", () => {
       reason: "Сначала отметьте замечания исправленными",
     });
 
-    const fixed = unwrap(markIssueFixed(returned, "agent", issueId));
+    const fixed = unwrap(
+      markIssueFixed(changeRouteIssueTarget(returned), "agent", issueId),
+    );
     const corrected = applySubmissionAction(fixed, "submit_corrections", "agent");
 
     expect(corrected.status).toBe("corrections_received");

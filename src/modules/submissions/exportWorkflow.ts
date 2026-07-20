@@ -9,6 +9,7 @@ import {
 } from "./exportPackagePersistence";
 import {
   exportPackageDocumentCommitMatches,
+  exportPackageDocumentCommitMatchesIdentity,
   type ExportPackageDocumentCommit,
 } from "./exportPackageDocumentCommit";
 import {
@@ -115,6 +116,18 @@ export async function completeExportPackage(
     return {
       status: "blocked",
       blockers: ["Пакет выгрузки пуст."],
+      submissions,
+    };
+  }
+  if (
+    !exportPackageDocumentCommitMatchesIdentity(
+      options.documentExport,
+      packageIdentity,
+    )
+  ) {
+    return {
+      status: "blocked",
+      blockers: ["Скачанный пакет не соответствует текущей выборке выгрузки."],
       submissions,
     };
   }

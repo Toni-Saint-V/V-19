@@ -8,6 +8,7 @@ import type { ExportPackageIdentity } from "./types";
 export interface ExportPackageDocumentCommit {
   applicantCount: number;
   assetIds: string[];
+  /** Number of unique required media assets in the ZIP; generated files are excluded. */
   fileCount: number;
   workbookFileName: string;
   zipFileName: string;
@@ -24,7 +25,16 @@ export function exportPackageDocumentCommitMatchesIdentity(
   documentExport: ExportPackageDocumentCommit,
   packageIdentity: ExportPackageIdentity,
 ): boolean {
+  const uniqueAssetIds = new Set(documentExport.assetIds);
+  const expectedMediaCount =
+    packageIdentity.rowCount + packageIdentity.submissionIds.length * 2;
+
   return (
+    documentExport.applicantCount === packageIdentity.rowCount &&
+    documentExport.assetIds.every((assetId) => assetId.trim().length > 0) &&
+    documentExport.assetIds.length === uniqueAssetIds.size &&
+    uniqueAssetIds.size === expectedMediaCount &&
+    documentExport.fileCount === uniqueAssetIds.size &&
     documentExport.workbookFileName === packageIdentity.fileName &&
     documentExport.zipFileName ===
       `visaflow-export-${packageIdentity.idempotencyKey}_documents.zip`

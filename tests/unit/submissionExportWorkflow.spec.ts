@@ -7,6 +7,7 @@ import {
 } from "../../src/modules/submissions/exportWorkflow";
 import { mapSupabasePersistenceError } from "../../src/services/persistenceObservability";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type { ExportPackageDocumentCommit } from "../../src/modules/submissions/exportPackageDocumentCommit";
 import type { Submission } from "../../src/modules/submissions/types";
@@ -16,14 +17,6 @@ const createdAt = "2026-06-16T09:00:00.000Z";
 const createdBy = "00000000-0000-4000-8000-000000000010";
 const serverCreatedAt = "2026-06-16T09:01:00.000Z";
 const serverCreatedBy = "00000000-0000-4000-8000-000000000020";
-const documentExport: ExportPackageDocumentCommit = {
-  applicantCount: 1,
-  assetIds: ["00000000-0000-4000-8000-000000000601"],
-  fileCount: 4,
-  workbookFileName: "visaflow-export-export-content-1.xlsx",
-  zipFileName: "visaflow-export-export-content-1_documents.zip",
-};
-
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
   if (!submission) throw new Error(`Missing fixture ${id}`);
@@ -57,6 +50,27 @@ function downloadedSelection(): Submission[] {
 
   return applyExportStateToSelection(generated, ["ПД-1056"], "file_downloaded");
 }
+
+function matchingDocumentExport(
+  submissions: Submission[] = downloadedSelection(),
+): ExportPackageDocumentCommit {
+  const packageIdentity = buildExportPackageIdentity(submissions, "xlsx");
+  if (!packageIdentity) throw new Error("Missing export package identity.");
+
+  return {
+    applicantCount: 1,
+    assetIds: [
+      "00000000-0000-4000-8000-000000000601",
+      "00000000-0000-4000-8000-000000000602",
+      "00000000-0000-4000-8000-000000000603",
+    ],
+    fileCount: 3,
+    workbookFileName: packageIdentity.fileName,
+    zipFileName: `visaflow-export-${packageIdentity.idempotencyKey}_documents.zip`,
+  };
+}
+
+const documentExport = matchingDocumentExport();
 
 function options(
   commitPackage: ExportPackageCommitter,
@@ -128,6 +142,87 @@ describe("submission export workflow", () => {
     expect(result.status).toBe("blocked");
     expect(commitPackage).not.toHaveBeenCalled();
     expect(result.submissions[0]?.status).toBe("ready_for_export");
+  });
+
+  test("blocks a downloaded document proof that does not match the package identity", async () => {
+    const commitPackage = vi.fn<ExportPackageCommitter>();
+    const selection = downloadedSelection();
+
+    const result = await completeExportPackage(selection, {
+      ...options(commitPackage),
+      documentExport: {
+        ...documentExport,
+        workbookFileName: "stale-export.xlsx",
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      blockers: ["Скачанный пакет не соответствует текущей выборке выгрузки."],
+    });
+    expect(commitPackage).not.toHaveBeenCalled();
+    expect(selection[0]).toMatchObject({
+      exportState: "file_downloaded",
+      status: "ready_for_export",
+    });
+  });
+
+  test("blocks the legacy PDF-inclusive file count before durable completion", async () => {
+    const commitPackage = vi.fn<ExportPackageCommitter>();
+    const selection = downloadedSelection();
+
+    const result = await completeExportPackage(selection, {
+      ...options(commitPackage),
+      documentExport: {
+        ...documentExport,
+        fileCount: documentExport.assetIds.length + documentExport.applicantCount,
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      blockers: ["Скачанный пакет не соответствует текущей выборке выгрузки."],
+    });
+    expect(commitPackage).not.toHaveBeenCalled();
+  });
+
+  test("blocks an incomplete media-only asset selection before durable completion", async () => {
+    const commitPackage = vi.fn<ExportPackageCommitter>();
+    const selection = downloadedSelection();
+
+    const result = await completeExportPackage(selection, {
+      ...options(commitPackage),
+      documentExport: {
+        ...documentExport,
+        assetIds: documentExport.assetIds.slice(0, 2),
+        fileCount: 2,
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      blockers: ["Скачанный пакет не соответствует текущей выборке выгрузки."],
+    });
+    expect(commitPackage).not.toHaveBeenCalled();
+  });
+
+  test("blocks a media-only proof with a blank asset id before durable completion", async () => {
+    const commitPackage = vi.fn<ExportPackageCommitter>();
+    const selection = downloadedSelection();
+
+    const result = await completeExportPackage(selection, {
+      ...options(commitPackage),
+      documentExport: {
+        ...documentExport,
+        assetIds: ["  ", ...documentExport.assetIds.slice(1)],
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      blockers: ["Скачанный пакет не соответствует текущей выборке выгрузки."],
+    });
+    expect(commitPackage).not.toHaveBeenCalled();
   });
 
   test("does not mark exported when durable recording fails", async () => {

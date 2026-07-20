@@ -15,6 +15,7 @@ import {
   hasMissingRequiredWork,
   hasUsableTripDateRange,
   isFixedIssueStatus,
+  isSubmissionIssueResolved,
   transitionSubmissionStatus,
 } from "./status";
 import {
@@ -24,6 +25,8 @@ import {
   isIssueTransitionAllowed,
 } from "./domainContract";
 import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
+import { questionnaireFieldMatchesTarget } from "./questionnaire";
+import { requiredPassportReviewMediaTypesForApplicant } from "./passportReviewContract";
 import type {
   ActionDecision,
   CommandResult,
@@ -188,10 +191,22 @@ export function markIssueFixed(
   if (role !== "agent") {
     return failure("PERMISSION_DENIED", "Only agent can mark issue fixed.");
   }
+  if (submission.status !== "returned") {
+    return failure(
+      "INVALID_TRANSITION",
+      "Issues can be marked fixed only after admin return.",
+    );
+  }
   const issue = submission.issues.find((item) => item.id === issueId);
   if (!issue) return failure("ISSUE_NOT_FOUND", "Issue not found.");
   if (issue.status !== "open") {
     return failure("ISSUE_NOT_FIXABLE", "Only open issues can be marked fixed.");
+  }
+  if (!isSubmissionIssueResolved(submission, issue)) {
+    return failure(
+      "VALIDATION_ERROR",
+      "Issue target must be corrected before it can be marked fixed.",
+    );
   }
 
   return success(
@@ -254,6 +269,12 @@ export function closeIssue(
   if (terminal) return terminal;
   if (role !== "admin") {
     return failure("PERMISSION_DENIED", "Only admin can close issues.");
+  }
+  if (submission.status !== "corrections_received") {
+    return failure(
+      "INVALID_TRANSITION",
+      "Issues can be closed only during corrections review.",
+    );
   }
   const issue = submission.issues.find((item) => item.id === issueId);
   if (!issue) return failure("ISSUE_NOT_FOUND", "Issue not found.");
@@ -567,14 +588,61 @@ function createIssueFromInput(
     status: "open",
     createdBy: "admin",
     createdAt: "сейчас",
+    snapshot: issueTargetSnapshot(submission, input),
   };
 }
 
 function isValidIssueInput(submission: Submission, input: IssueInput) {
-  return (
-    submission.applicants.some((applicant) => applicant.id === input.applicantId) &&
+  const applicant = submission.applicants.find((item) => item.id === input.applicantId);
+  return Boolean(
+    applicant &&
     input.reason.trim().length > 0 &&
-    input.comment.trim().length > 0
+    input.comment.trim().length > 0 &&
+    isValidIssueTarget(submission, applicant, input),
+  );
+}
+
+function issueTargetSnapshot(submission: Submission, input: IssueInput) {
+  if (input.fileType) {
+    return submission.files.find(
+      (file) => file.applicantId === input.applicantId && file.type === input.fileType,
+    )?.status;
+  }
+
+  const applicant = submission.applicants.find((item) => item.id === input.applicantId);
+  return applicant?.sections
+    .flatMap((section) => section.fields)
+    .find((field) => questionnaireFieldMatchesTarget(field, input.field))?.value;
+}
+
+function isValidIssueTarget(
+  submission: Submission,
+  applicant: Submission["applicants"][number],
+  input: IssueInput,
+) {
+  if (input.type === "file" || input.type === "media") {
+    return Boolean(
+      input.fileType &&
+      requiredPassportReviewMediaTypesForApplicant(submission, applicant.id).some(
+        (type) => type === input.fileType,
+      ),
+    );
+  }
+
+  if (input.fileType) return false;
+  if (input.type === "section") {
+    const target = (input.section ?? input.field ?? "").trim();
+    return Boolean(
+      target && applicant.sections.some((section) => section.title === target),
+    );
+  }
+
+  return Boolean(
+    input.type === "field" &&
+    input.field &&
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .some((field) => questionnaireFieldMatchesTarget(field, input.field)),
   );
 }
 

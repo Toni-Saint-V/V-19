@@ -238,6 +238,44 @@ describe("AdminWorkspace production navigation", () => {
     expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
   });
 
+  test("returns to the review queue when the selected submission disappears on refresh", async () => {
+    const submission = acceptableReviewSubmission();
+    const onSignOut = vi.fn();
+    const view = render(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={onSignOut}
+        submissions={[submission]}
+        usesSupabase
+      />,
+    );
+
+    const card = view.container.querySelector<HTMLButtonElement>(
+      '[data-submission-id="review-async-failure"]',
+    );
+    if (!card) throw new Error("Review card was not rendered.");
+    fireEvent.click(card);
+    expect(
+      await screen.findByRole("dialog", { name: "Сверка паспорта" }),
+    ).toBeVisible();
+
+    view.rerender(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={onSignOut}
+        submissions={[]}
+        usesSupabase
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", { name: "Сверка паспорта" }),
+      ).not.toBeInTheDocument();
+      expect(view.container.querySelector('main[aria-hidden="true"]')).toBeNull();
+    });
+  });
+
   test("keeps the drawer to two screens and restores the queue focus on back", async () => {
     const submission = acceptableReviewSubmission();
     const { container } = render(

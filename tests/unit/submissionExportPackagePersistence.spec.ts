@@ -36,7 +36,7 @@ const documentExport: ExportPackageDocumentCommit = {
     "00000000-0000-4000-8000-000000000615",
     "00000000-0000-4000-8000-000000000616",
   ],
-  fileCount: 8,
+  fileCount: 6,
   workbookFileName: batch.fileName,
   zipFileName: "visaflow-export-export-content-1_documents.zip",
 };
@@ -133,7 +133,7 @@ describe("V-19 submission export package persistence", () => {
           document_export: {
             applicant_count: 2,
             asset_ids: documentExport.assetIds,
-            file_count: 8,
+            file_count: documentExport.fileCount,
             workbook_file_name: batch.fileName,
             zip_file_name: documentExport.zipFileName,
           },

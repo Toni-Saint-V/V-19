@@ -74,6 +74,8 @@ Apply migrations only in the repository order declared by
 - `20260715000000_document_assets_source_media_id_update_cascade.sql`
 - `20260717050000_admin_passport_review_media_policy.sql`
 - `20260718190000_global_submission_public_numbers.sql`
+- `20260719160000_assign_public_number_after_questionnaire.sql`
+- `20260720000000_export_package_media_only_file_count.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

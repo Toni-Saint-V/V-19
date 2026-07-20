@@ -378,6 +378,7 @@
 }
 
 .v19-review-preview-canvas {
+  position: relative;
   display: grid;
   min-width: var(--v19b-size-0);
   min-height: var(--v19b-size-0);
@@ -388,10 +389,17 @@
 }
 
 .v19-review-preview-canvas :is(img, object) {
+  position: absolute;
+  inset: var(--v19b-size-0);
   display: block;
   width: var(--v19b-size-full);
   height: var(--v19b-size-full);
   object-fit: contain;
+}
+
+.v19-remark-form-close {
+  min-width: var(--v19b-size-44);
+  min-height: var(--v19b-size-44);
 }
 
 .v19-review-preview-canvas img {
@@ -934,16 +942,16 @@
   }
 
   .v19-review-file-remark {
-    min-width: var(--v19b-size-40);
-    padding: var(--v19b-size-0);
+    min-width: var(--v19b-size-44);
+    padding: var(--v19b-size-0) var(--v19b-size-8);
   }
 
   .v19-review-file-remark span {
-    position: absolute;
-    width: var(--v19b-size-1);
-    height: var(--v19b-size-1);
-    overflow: hidden;
-    clip-path: inset(var(--v19b-size-half));
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
     white-space: nowrap;
   }
 
@@ -995,7 +1003,11 @@
   }
 
   .v19-review-details-scroll {
-    padding: var(--v19b-size-10) var(--v19b-size-16) var(--v19b-size-12);
+    padding: var(--v19b-size-10) var(--v19b-size-16)
+      calc(var(--v19b-size-144) + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(
+      var(--v19b-size-144) + env(safe-area-inset-bottom)
+    );
   }
 
   .v19-review-status-strip {
@@ -1043,6 +1055,9 @@
   }
 
   .v19-review-decision {
+    position: sticky;
+    z-index: var(--v19b-z-sticky);
+    bottom: var(--v19b-size-0);
     grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
     gap: var(--v19b-size-8);
     padding: var(--v19b-size-12) var(--v19b-size-16)

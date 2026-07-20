@@ -864,6 +864,7 @@ export function Drawer({
   const [activeTab, setActiveTab] = useState<TabId>(() => drawerTab(requestedTab));
   const [actionError, setActionError] = useState("");
   const [actionPending, setActionPending] = useState(false);
+  const actionRequestIdRef = useRef(0);
   const actionPendingRef = useRef(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
@@ -883,11 +884,16 @@ export function Drawer({
   const primaryButtonClassName = primaryButtonToneClass(primaryAction.action);
 
   useEffect(() => {
-    if (!isOpen) return;
-    setActiveTab(drawerTab(requestedTab));
+    actionRequestIdRef.current += 1;
+    actionPendingRef.current = false;
     setActionError("");
     setActionPending(false);
-    actionPendingRef.current = false;
+    if (isOpen) setActiveTab(drawerTab(requestedTab));
+
+    return () => {
+      actionRequestIdRef.current += 1;
+      actionPendingRef.current = false;
+    };
   }, [isOpen, requestedTab, submission.id]);
 
   useEffect(() => {
@@ -980,18 +986,22 @@ export function Drawer({
       return;
     }
 
-    actionPendingRef.current = true;
+    const requestId = ++actionRequestIdRef.current;
     setActionPending(true);
+    actionPendingRef.current = true;
     setActionError("");
     try {
       await onAction(primaryAction.action);
     } catch {
+      if (requestId !== actionRequestIdRef.current) return;
       setActionError(
         "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
       );
     } finally {
-      actionPendingRef.current = false;
-      setActionPending(false);
+      if (requestId === actionRequestIdRef.current) {
+        actionPendingRef.current = false;
+        setActionPending(false);
+      }
     }
   }
 

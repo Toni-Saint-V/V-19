@@ -6,6 +6,7 @@ import { IconButton } from "../../../shared/ui/primitives";
 
 type AppShellProps = {
   children: ReactNode;
+  className?: string;
   header: ReactNode;
   inactive?: boolean;
   mobileNavOpen: boolean;
@@ -17,10 +18,12 @@ type AppShellProps = {
   drawerOpen?: boolean;
   label?: string;
   overlays?: ReactNode;
+  workspaceInactive?: boolean;
 };
 
 export function AppShell({
   children,
+  className,
   collectionSurface = false,
   drawerOpen = false,
   header,
@@ -32,6 +35,7 @@ export function AppShell({
   sidebar,
   sideMenuMode,
   surface,
+  workspaceInactive = false,
 }: AppShellProps) {
   return (
     <main
@@ -44,13 +48,18 @@ export function AppShell({
         `is-side-menu-${sideMenuMode}`,
         drawerOpen && "has-open-drawer",
         mobileNavOpen && "is-mobile-nav-open",
+        className,
       )}
       aria-label={label}
       aria-hidden={inactive ? "true" : undefined}
       inert={inactive ? true : undefined}
     >
       {sidebar}
-      <section className="workspace">
+      <section
+        className="workspace"
+        aria-hidden={workspaceInactive ? "true" : undefined}
+        inert={workspaceInactive ? true : undefined}
+      >
         {header}
         {children}
       </section>

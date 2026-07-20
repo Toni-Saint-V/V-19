@@ -224,12 +224,18 @@ describe("V-19 business click contract", () => {
     );
     expect(downloaded[0]).toMatchObject({ exportState: "file_downloaded" });
 
+    const packageIdentity = buildExportPackageIdentity(downloaded, "xlsx");
+    if (!packageIdentity) throw new Error("Missing export package identity.");
     const documentExport = {
       applicantCount: 1,
-      assetIds: ["00000000-0000-4000-8000-000000000911"],
-      fileCount: 2,
-      workbookFileName: "business-click.xlsx",
-      zipFileName: "business-click.zip",
+      assetIds: [
+        "00000000-0000-4000-8000-000000000911",
+        "00000000-0000-4000-8000-000000000912",
+        "00000000-0000-4000-8000-000000000913",
+      ],
+      fileCount: 3,
+      workbookFileName: packageIdentity.fileName,
+      zipFileName: `visaflow-export-${packageIdentity.idempotencyKey}_documents.zip`,
     };
     const commitPackage = vi.fn(async (batch, committedDocumentExport) => ({
       batch,

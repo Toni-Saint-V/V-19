@@ -24,7 +24,6 @@ import type { Submission } from "../types";
 import {
   BLS_CITY_OPTIONS,
   POPULAR_RUSSIAN_CITY_OPTIONS,
-  familyAppointmentUpdatesForPrimary,
   isQuestionnaireDateField,
   updateQuestionnaireField,
   validateQuestionnaireFieldValue,
@@ -143,7 +142,7 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
 ];
 
 const familyCopyUnavailableMessage =
-  "У первого заявителя нет значений для копирования в этом разделе.";
+  "У основного заявителя нет введённых пользователем значений для копирования в этом разделе.";
 
 const familyCopySectionIds = new Set<SectionId>([
   "appointment",
@@ -236,11 +235,6 @@ type QuestionnaireSaveRequest = {
 
 type FamilyCopyPreview = {
   affectedApplicants: number;
-  firstTarget?: {
-    applicantId: string;
-    label?: string;
-    sectionId: SectionId;
-  };
   updates: QuestionnaireFieldUpdate[];
 };
 
@@ -2590,6 +2584,11 @@ export function FigmaQuestionnaireScreen({
   }, [activeApplicant]);
 
   useEffect(() => {
+    setFamilyCopyMessage(undefined);
+    setFamilyCopyPreview(undefined);
+  }, [activeApplicant, activeSection]);
+
+  useEffect(() => {
     setFormData(sourceFormData);
   }, [sourceFormData]);
 
@@ -2978,14 +2977,24 @@ export function FigmaQuestionnaireScreen({
   const guardianDetailsAreVisible =
     applicantIsMinor && (Boolean(formData.guardianInfo.trim()) || showGuardianDetails);
   const showCompanyInviteFields = isBlsQuestionnaireInvitingCompanySelected(formData);
-  const primaryApplicant = draftSubmission.applicants[0];
+  const primaryApplicant =
+    draftSubmission.applicants.find((applicant) => applicant.role === "main") ??
+    draftSubmission.applicants[0];
+  const familyCopyRecipients = primaryApplicant
+    ? draftSubmission.applicants.filter(
+        (applicant) => applicant.id !== primaryApplicant.id,
+      )
+    : [];
   const canCopyFamilyWide =
     draftSubmission.type === "family" &&
     Boolean(primaryApplicant) &&
-    draftSubmission.applicants.length > 1;
+    familyCopyRecipients.length > 0;
   const canCopyCurrentSection = familyCopySectionIds.has(activeSection);
   const showFamilyCopyControl =
-    isEditable && canCopyFamilyWide && canCopyCurrentSection;
+    isEditable &&
+    canCopyFamilyWide &&
+    canCopyCurrentSection &&
+    activeApplicant === primaryApplicant?.id;
 
   const currentSectionIssue = useMemo(() => {
     const currentSection = sections.find((section) => section.id === activeSection);
@@ -3063,9 +3072,8 @@ export function FigmaQuestionnaireScreen({
             : undefined,
           fieldId: binding.fieldId,
           reviewOriginSource:
-            modelField?.reviewOriginSource ?? modelField?.reviewSource,
-          reviewSource:
-            modelField?.reviewState === "needs_review" ? "manual" : undefined,
+            modelField?.reviewOriginSource ?? modelField?.reviewSource ?? "manual",
+          reviewSource: "manual",
           reviewState:
             modelField?.reviewState === "needs_review" ? "confirmed" : undefined,
           sectionId: binding.sectionId,
@@ -3078,17 +3086,13 @@ export function FigmaQuestionnaireScreen({
       buildUpdate(key, value),
       ...dependentKeys.map((dependentKey) => buildUpdate(dependentKey, "")),
     ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
-    const familyAppointmentUpdates = updates.flatMap(({ update }) =>
-      familyAppointmentUpdatesForPrimary(draftSubmission, activeApplicant, update),
-    );
-
     setFormData((current) => {
       const next = { ...current, [key]: value };
       for (const dependentKey of dependentKeys) next[dependentKey] = "";
       return next;
     });
 
-    if (updates.length || familyAppointmentUpdates.length) {
+    if (updates.length) {
       const next = { ...pendingFieldUpdatesRef.current };
       for (const { binding, update } of updates) {
         const updateKey = questionnaireUpdateKey(update);
@@ -3104,18 +3108,6 @@ export function FigmaQuestionnaireScreen({
           next[updateKey] = update;
         }
       }
-      for (const update of familyAppointmentUpdates) {
-        const updateKey = questionnaireUpdateKey(update);
-        const baseApplicant = submission.applicants.find(
-          (applicant) => applicant.id === update.applicantId,
-        );
-        const baseField = questionnaireField(baseApplicant, update.fieldId);
-        if (baseField?.value === update.value && baseField.reviewState !== "needs_review") {
-          delete next[updateKey];
-        } else {
-          next[updateKey] = update;
-        }
-      }
       replacePendingFieldUpdates(next);
       updateDirtyState(next);
     }
@@ -3123,7 +3115,6 @@ export function FigmaQuestionnaireScreen({
     for (const { binding, update } of updates) {
       if (update.value !== baseFormData[binding.formKey]) onFieldChange?.(update);
     }
-    for (const update of familyAppointmentUpdates) onFieldChange?.(update);
   }
 
   function updateTravelDate(
@@ -3217,7 +3208,9 @@ export function FigmaQuestionnaireScreen({
       !isEditable ||
       completionInFlightRef.current ||
       !primaryApplicant ||
-      !canCopyFamilyWide
+      !canCopyFamilyWide ||
+      activeApplicant !== primaryApplicant.id ||
+      !familyCopySectionIds.has(activeSection)
     ) {
       return;
     }
@@ -3229,12 +3222,16 @@ export function FigmaQuestionnaireScreen({
     const sectionBindings = questionnaireFieldBindings.filter(
       (binding) => binding.sectionId === canonicalSectionId,
     );
-    const updates = draftSubmission.applicants.slice(1).flatMap((applicant) =>
+    const updates = familyCopyRecipients.flatMap((applicant) =>
       sectionBindings.flatMap((binding) => {
         const { fieldId } = binding;
         const sourceField = questionnaireField(primaryApplicant, fieldId);
         const targetField = questionnaireField(applicant, fieldId);
-        if (!sourceField?.value.trim() || !targetField) {
+        if (
+          !sourceField?.value.trim() ||
+          sourceField.reviewSource !== "manual" ||
+          !targetField
+        ) {
           return [];
         }
 
@@ -3261,25 +3258,8 @@ export function FigmaQuestionnaireScreen({
     }
 
     const affectedApplicants = new Set(updates.map((update) => update.applicantId)).size;
-    const firstUpdate = updates[0];
-    const firstTarget = firstUpdate
-      ? {
-          applicantId: firstUpdate.applicantId,
-          label: questionnaireField(
-            draftSubmission.applicants.find(
-              (applicant) => applicant.id === firstUpdate.applicantId,
-            ),
-            firstUpdate.fieldId,
-          )?.label,
-          sectionId: sectionIdForQuestionnaireField(
-            firstUpdate.sectionId,
-            firstUpdate.fieldId,
-          ),
-        }
-      : undefined;
-    setFamilyCopyPreview({ affectedApplicants, firstTarget, updates });
+    setFamilyCopyPreview({ affectedApplicants, updates });
     setFamilyCopyMessage(undefined);
-    if (firstTarget) focusQuestionnaireTarget(firstTarget);
   }
 
   function confirmFamilyCopy() {
@@ -5186,6 +5166,14 @@ export function FigmaQuestionnaireScreen({
                   <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
                     {familyCopyPreview ? (
                       <>
+                        <p
+                          aria-live="polite"
+                          className="v19-questionnaire-family-copy-status"
+                          role="status"
+                        >
+                          Будет скопировано заполненных пользователем полей: {familyCopyPreview.updates.length}
+                          {" · "}членов семьи: {familyCopyPreview.affectedApplicants}.
+                        </p>
                         <button
                           className="v19-questionnaire-complete-button v19-questionnaire-family-copy-confirm is-ready"
                           type="button"

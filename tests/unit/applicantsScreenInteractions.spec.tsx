@@ -419,13 +419,17 @@ describe("ApplicantsScreen interactions", () => {
     expect(visibleSubmissionIds()).toEqual([matched.id]);
   });
 
-  it("sends ready single and family cards to admin review through the К выгрузке action", async () => {
+  it("uses one system confirmation request for the review handoff", async () => {
     const single = readySubmission("single");
     const family = readySubmission("family");
     expect(canPerformAction(single, "submit_for_review", "agent").ok).toBe(true);
     expect(canPerformAction(family, "submit_for_review", "agent").ok).toBe(true);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
+    const nativeConfirm = vi.spyOn(window, "confirm");
+    let resolveSubmission: (() => void) | undefined;
+    const submissionPromise = new Promise<void>((resolve) => {
+      resolveSubmission = resolve;
+    });
+    const onSubmitForReview = vi.fn().mockReturnValue(submissionPromise);
     const view = render(
       <ApplicantsScreen
         onOpenDrawer={vi.fn()}
@@ -444,11 +448,42 @@ describe("ApplicantsScreen interactions", () => {
       within(familyCard).getAllByRole("group", { name: /^Документы:/ }),
     ).toHaveLength(2);
     expect(screen.getAllByText("В работе")).toHaveLength(2);
-    fireEvent.click(submitButtons[0]!);
-    expect(confirm).toHaveBeenCalledWith(
-      "Отправить на проверку администратору?",
+    const singleCard = document.querySelector<HTMLElement>(
+      `[data-submission-id="${single.id}"]`,
     );
-    await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledTimes(1));
+    expect(singleCard).not.toBeNull();
+    fireEvent.click(
+      within(singleCard as HTMLElement).getByRole("button", {
+        name: /К выгрузке:/,
+      }),
+    );
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("dialog", {
+      name: "Отправить на проверку администратору?",
+    });
+    expect(dialog).toHaveTextContent(
+      "После отправки подача перейдёт в очередь проверки администратора.",
+    );
+    expect(within(dialog).getByRole("button", { name: "Отмена" })).toHaveFocus();
+
+    const submitButton = within(dialog).getByRole("button", { name: "Отправить" });
+    fireEvent.click(submitButton);
+    fireEvent.click(submitButton);
+
+    expect(onSubmitForReview).toHaveBeenCalledTimes(1);
+    expect(onSubmitForReview).toHaveBeenCalledWith(single.id);
+    expect(submitButton).toBeDisabled();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(dialog).toBeInTheDocument();
+
+    resolveSubmission?.();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", {
+          name: "Отправить на проверку администратору?",
+        }),
+      ).not.toBeInTheDocument(),
+    );
 
     const transition = applySubmissionActionResult(
       single,
@@ -480,9 +515,9 @@ describe("ApplicantsScreen interactions", () => {
     ).toBeInTheDocument();
   });
 
-  it("cancels the review handoff when the agent answers no", () => {
+  it("keeps review confirmation cancel and focus behavior keyboard-safe", () => {
     const submission = readySubmission("single");
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const nativeConfirm = vi.spyOn(window, "confirm");
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
@@ -499,11 +534,60 @@ describe("ApplicantsScreen interactions", () => {
       screen.getByRole("button", { name: /К выгрузке:/ }),
     );
 
-    expect(confirm).toHaveBeenCalledWith(
-      "Отправить на проверку администратору?",
-    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Отправить на проверку администратору?",
+    });
+    const cancelButton = within(dialog).getByRole("button", { name: "Отмена" });
+    const submitButton = within(dialog).getByRole("button", { name: "Отправить" });
+    expect(cancelButton).toHaveFocus();
+
+    fireEvent.keyDown(cancelButton, { key: "Tab", shiftKey: true });
+    expect(submitButton).toHaveFocus();
+    fireEvent.keyDown(submitButton, { key: "Tab" });
+    expect(cancelButton).toHaveFocus();
+
+    fireEvent.click(dialog.parentElement!);
+    expect(dialog).toBeInTheDocument();
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Отправить на проверку администратору?",
+      }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /К выгрузке:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+
+    expect(nativeConfirm).not.toHaveBeenCalled();
     expect(onSubmitForReview).not.toHaveBeenCalled();
     expect(onOpenDrawer).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed review handoff visible and retryable in the dialog", async () => {
+    const submission = readySubmission("single");
+    const onSubmitForReview = vi.fn().mockRejectedValue(new Error("Сервис недоступен"));
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /К выгрузке:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Сервис недоступен");
+    expect(
+      screen.getByRole("dialog", {
+        name: "Отправить на проверку администратору?",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Отправить" })).toBeEnabled();
   });
 
   it("sends an export-ready package back to admin review from the card action", async () => {
@@ -514,7 +598,6 @@ describe("ApplicantsScreen interactions", () => {
       files: ready.files.map((file) => ({ ...file, status: "accepted" })),
       status: "ready_for_export",
     };
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
@@ -530,10 +613,7 @@ describe("ApplicantsScreen interactions", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /К выгрузке:/ }),
     );
-
-    expect(confirm).toHaveBeenCalledWith(
-      "Отправить на проверку администратору?",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
     await waitFor(() =>
       expect(onSubmitForReview).toHaveBeenCalledWith(accepted.id),
     );
@@ -558,7 +638,6 @@ describe("ApplicantsScreen interactions", () => {
       ...readySubmission("single"),
       status: "draft" as const,
     };
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -573,6 +652,7 @@ describe("ApplicantsScreen interactions", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /К выгрузке:/ }),
     );
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
     await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(readyDraft.id));
 
     const transition = applyAgentSubmitForReviewResult(

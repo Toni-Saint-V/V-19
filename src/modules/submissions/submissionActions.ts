@@ -1101,7 +1101,7 @@ export function addPreciseAdminIssue(
     status: "open",
     createdBy: "admin",
     createdAt: "сейчас",
-    snapshot: hasExplicitIssueTarget ? issueSnapshot(submission, issueInput) : undefined,
+    snapshot: issueSnapshot(submission, issueInput),
   };
 
   const withTargetFlag =

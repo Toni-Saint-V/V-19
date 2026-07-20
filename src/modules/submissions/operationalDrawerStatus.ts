@@ -13,7 +13,9 @@ export function operationalDrawerSourceStatus(
   submission: Submission,
 ): OperationalDrawerSourceStatus {
   if (submission.status === "draft") return "draft";
-  if (submission.status === "returned") return "returned";
+  if (submission.status === "returned" || submission.status === "requires_action") {
+    return "returned";
+  }
   if (submission.status === "submitted_for_review") return "submitted_for_review";
   if (submission.status === "corrections_received") return "corrections_received";
   if (submission.status === "ready_for_export") return "ready_for_export";

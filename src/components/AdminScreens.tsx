@@ -4,6 +4,7 @@ import {
   ArrowUpDown,
   Bot,
   CheckCircle2,
+  ChevronRight,
   Clock,
   FileCheck2,
   Flame,
@@ -13,6 +14,7 @@ import {
   Shapes,
   Sparkles,
   User,
+  Users,
   X,
 } from "lucide-react";
 import {
@@ -24,7 +26,6 @@ import {
 import {
   V19MetricCard,
   V19MetricStrip,
-  V19OperationalCard,
   V19OperationalCardGrid,
   V19OperationalProgressLine,
   V19PriorityHero,
@@ -177,12 +178,6 @@ function reviewCountLabel(count: number) {
   return 'заявок';
 }
 
-function reviewActionLabel(item: ReviewCard) {
-  if (item.lane === "urgent") return "Разобрать критические замечания";
-  if (item.lane === "returned") return "Проверить исправления агента";
-  return "Открыть файлы для сверки";
-}
-
 function ReviewQueueCard({
   item,
   onOpenDrawer,
@@ -192,63 +187,98 @@ function ReviewQueueCard({
 }) {
   const hasBlocker = item.blockers > 0;
   const shortQueueTime = item.timeInQueue.replace(/\s+\d+\s+мин$/, "");
-  const shellMeta = hasBlocker ? "1 ч" : `${item.applicants} чел.`;
-  const lanePresentation = item.lane === "urgent"
-    ? { detail: "сначала сюда", icon: Flame, label: "Критичные" }
-    : item.lane === "returned"
-      ? { detail: "у агента / на сверке", icon: MessageSquareWarning, label: "Правки" }
-      : { detail: "ручная сверка", icon: ShieldCheck, label: "На проверке" };
 
   return (
-    <V19OperationalCard
-      actionIcon={item.aiFlags > 0 ? Sparkles : FileCheck2}
-      actionText={reviewActionLabel(item)}
-      city={item.city}
-      footer={
-        <>
-          <span className="v19-operational-card-signals">
-            {item.blockers > 0 ? (
-              <span className="tone-danger">{item.blockers} критичных</span>
-            ) : null}
-            {item.fixedIssues > 0 ? (
-              <span className="tone-info">{item.fixedIssues} исправлено</span>
-            ) : null}
-            {item.warnings > 0 ? (
-              <span className="tone-warning">{item.warnings} проверить</span>
-            ) : null}
-            {item.aiFlags > 0 ? (
-              <span className="tone-info">ИИ {item.aiFlags}</span>
-            ) : null}
-            {item.blockers === 0 && item.fixedIssues === 0 && item.warnings === 0 ? (
-              <span className="tone-ready">без замечаний</span>
-            ) : null}
-          </span>
-          <span className="v19-operational-card-agent">
-            <User aria-hidden="true" /> {item.agent}
-          </span>
-        </>
-      }
-      metaDetail={hasBlocker ? undefined : shortQueueTime}
-      peopleCount={item.applicants}
-      progress={
-        <>
-          <V19OperationalProgressLine label="Анкета" value={item.questionnaire} />
-          <V19OperationalProgressLine label="Файлы" value={item.files} />
-        </>
-      }
-      publicId={item.publicId}
-      shellDetail={lanePresentation.detail}
-      shellIcon={lanePresentation.icon}
-      shellLabel={lanePresentation.label}
-      shellMeta={shellMeta}
-      title={item.title}
-      as="button"
+    <button
+      type="button"
       aria-label={`Ручная проверка заявки ${item.title}`}
       data-submission-card=""
       data-submission-id={item.id}
       onClick={() => onOpenDrawer(item.id)}
-      className={`group ${hasBlocker ? "has-blocker" : ""}`}
-    />
+      className={`group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${
+        hasBlocker
+          ? "border-[#5b2b32]/45 bg-[#1d1719]/80 hover:border-[#74414a]/55"
+          : "border-[#242529] bg-[#161617] hover:border-[#6f64ff]/40"
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="mb-1.5 flex max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10.5px] font-medium tracking-wide text-white/40">
+            <span className="shrink-0 font-mono text-white/60">{item.publicId}</span>
+            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
+            <span className="shrink-0">{item.city}</span>
+            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
+            <span className="shrink-0">{shortQueueTime}</span>
+          </div>
+          <h3 className="truncate text-[15px] font-semibold text-white group-hover:text-[#b8baff]">
+            {item.title}
+          </h3>
+          <div className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden text-[11.5px] font-medium text-white/45">
+            {item.type === "family" ? (
+              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : (
+              <User className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            )}
+            <span className="shrink-0">{item.applicants} чел.</span>
+            <span aria-hidden="true">·</span>
+            <span className="truncate">{item.agent}</span>
+          </div>
+        </div>
+        <ChevronRight
+          aria-hidden="true"
+          className="mt-1 h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/55"
+        />
+      </div>
+
+      <div className="mb-3 rounded-[8px] border border-white/5 bg-white/[0.025] p-3">
+        <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-white/75">
+          {item.aiFlags > 0 ? (
+            <Sparkles className="h-3.5 w-3.5 text-[#b8baff]" aria-hidden="true" />
+          ) : (
+            <FileCheck2 className="h-3.5 w-3.5 text-[#b8baff]" aria-hidden="true" />
+          )}
+          Следующее действие
+        </div>
+        <p className="text-[12px] leading-relaxed text-white/50">{item.nextAction}</p>
+      </div>
+
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <V19OperationalProgressLine label="Анкета" value={item.questionnaire} />
+        <V19OperationalProgressLine label="Файлы" value={item.files} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {item.blockers > 0 ? (
+          <span className="rounded-full border border-[#5b2b32]/45 bg-[#24191b]/60 px-2 py-1 text-[10.5px] font-medium text-[#d59aa3]">
+            {item.blockers} критичных
+          </span>
+        ) : null}
+        {item.fixedIssues > 0 ? (
+          <span className="rounded-full border border-[#6f64ff]/25 bg-[#6f64ff]/15 px-2 py-1 text-[10.5px] font-medium text-[#b8baff]">
+            {item.fixedIssues} исправлено
+          </span>
+        ) : null}
+        {item.warnings > 0 ? (
+          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10.5px] font-medium text-white/62">
+            {item.warnings} проверить
+          </span>
+        ) : null}
+        {item.aiFlags > 0 ? (
+          <span className="rounded-full border border-[#6f64ff]/25 bg-[#6f64ff]/15 px-2 py-1 text-[10.5px] font-medium text-[#b8baff]">
+            ИИ {item.aiFlags}
+          </span>
+        ) : null}
+        {item.blockers === 0 && item.fixedIssues === 0 && item.warnings === 0 ? (
+          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10.5px] font-medium text-[#b8baff]">
+            без замечаний
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] text-white/35">
+        {item.lastEvent}
+      </div>
+    </button>
   );
 }
 
@@ -495,7 +525,7 @@ export function ReviewScreen({
             searchValue={searchQuery}
           />
 
-          <V19OperationalCardGrid className="v19-admin-review-card-grid">
+          <V19OperationalCardGrid>
             {visibleReviews.map((item) => (
               <ReviewQueueCard
                 key={item.id}

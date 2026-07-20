@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import {
   Badge,
   Button,
@@ -99,40 +99,144 @@ export function EmptyState({ text }: { text: string }) {
 }
 
 export function ConfirmationDialog({
+  busy = false,
+  cancelLabel = "Остаться",
+  confirmDanger = true,
+  confirmLabel = "Закрыть без сохранения",
+  description = "Черновик изменён. Закрытие без сохранения потребует подтверждения.",
+  error,
+  kicker = "Несохранённые изменения",
   onCancel,
   onConfirm,
+  title = "Закрыть панель?",
 }: {
+  busy?: boolean;
+  cancelLabel?: string;
+  confirmDanger?: boolean;
+  confirmLabel?: string;
+  description?: ReactNode;
+  error?: ReactNode;
+  kicker?: string;
   onCancel: () => void;
   onConfirm: () => void;
+  title?: string;
 }) {
+  const dialogRef = useRef<HTMLElement | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const busyRef = useRef(busy);
+  const onCancelRef = useRef(onCancel);
+  const onConfirmRef = useRef(onConfirm);
+  const titleId = useId();
+  const descriptionId = useId();
+  const errorId = useId();
+
+  busyRef.current = busy;
+  onCancelRef.current = onCancel;
+  onConfirmRef.current = onConfirm;
 
   useEffect(() => {
+    const previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     cancelButtonRef.current?.focus({ preventScroll: true });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (busyRef.current) return;
+        onCancelRef.current();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusableElements = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter(
+        (element) =>
+          element.getAttribute("aria-hidden") !== "true" &&
+          !element.hasAttribute("hidden"),
+      );
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements.at(-1);
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        dialog.focus({ preventScroll: true });
+        return;
+      }
+
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastElement : firstElement).focus({ preventScroll: true });
+      } else if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus({ preventScroll: true });
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus({ preventScroll: true });
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      window.requestAnimationFrame(() => {
+        if (
+          previouslyFocusedElement?.isConnected &&
+          !previouslyFocusedElement.matches(":disabled") &&
+          !previouslyFocusedElement.closest("[inert]")
+        ) {
+          previouslyFocusedElement.focus({ preventScroll: true });
+        }
+      });
+    };
   }, []);
 
   return (
     <div className="modal-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="confirmation-dialog"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="confirm-title"
-        onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          event.stopPropagation();
-          onCancel();
-        }}
+        aria-busy={busy || undefined}
+        aria-describedby={`${descriptionId}${error ? ` ${errorId}` : ""}`}
+        aria-labelledby={titleId}
+        tabIndex={-1}
       >
-        <p className="kicker">Несохранённые изменения</p>
-        <h2 id="confirm-title">Закрыть панель?</h2>
-        <p>Черновик изменён. Закрытие без сохранения потребует подтверждения.</p>
+        <p className="kicker">{kicker}</p>
+        <h2 id={titleId}>{title}</h2>
+        <p id={descriptionId}>{description}</p>
+        {error ? (
+          <div id={errorId} role="alert">
+            {error}
+          </div>
+        ) : null}
         <div className="dialog-actions">
-          <Button variant="secondary" ref={cancelButtonRef} onClick={onCancel}>
-            Остаться
+          <Button
+            ref={cancelButtonRef}
+            disabled={busy}
+            variant="secondary"
+            onClick={() => {
+              if (!busyRef.current) onCancelRef.current();
+            }}
+          >
+            {cancelLabel}
           </Button>
-          <Button danger onClick={onConfirm}>
-            Закрыть без сохранения
+          <Button
+            danger={confirmDanger}
+            loading={busy}
+            onClick={() => {
+              if (!busyRef.current) onConfirmRef.current();
+            }}
+          >
+            {confirmLabel}
           </Button>
         </div>
       </section>

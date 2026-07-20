@@ -188,9 +188,9 @@ export function ReviewWorkspace({
   const wasNestedDialogOpenRef = useRef(nestedDialogOpen);
   onBackRef.current = onBack;
 
-  const selectedApplicant = applicantId
-    ? submission?.applicants.find((applicant) => applicant.id === applicantId)
-    : submission?.applicants[0];
+  const selectedApplicant =
+    submission?.applicants.find((applicant) => applicant.id === applicantId) ??
+    submission?.applicants[0];
   const selectedApplicantId = selectedApplicant?.id;
   const reviewFields = reviewFieldsForApplicant(selectedApplicant);
   const mediaTargets = useMemo(() => {
@@ -280,6 +280,17 @@ export function ReviewWorkspace({
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!submission) return;
+    if (!selectedApplicantId) {
+      onBackRef.current();
+      return;
+    }
+    if (applicantId !== selectedApplicantId) {
+      onApplicantChange?.(selectedApplicantId);
+    }
+  }, [applicantId, onApplicantChange, selectedApplicantId, submission]);
 
   useEffect(() => {
     if (mediaTargets.some((target) => target.type === activeMediaType)) return;
@@ -495,10 +506,16 @@ export function ReviewWorkspace({
   let reviewDecisionReason = "Проверка готова к решению.";
   if (!onReviewAction) {
     reviewDecisionReason = "Сохранение решения не подключено.";
-  } else if (acceptDecision?.reason) {
-    reviewDecisionReason = acceptDecision.reason;
-  } else if (returnDecision?.reason) {
-    reviewDecisionReason = returnDecision.reason;
+  } else {
+    const availableDecision =
+      acceptDecision && !acceptDecision.disabled
+        ? acceptDecision
+        : returnDecision && !returnDecision.disabled
+          ? returnDecision
+          : undefined;
+    reviewDecisionReason = availableDecision
+      ? (availableDecision.reason ?? reviewDecisionReason)
+      : (acceptDecision?.reason ?? returnDecision?.reason ?? reviewDecisionReason);
   }
 
   const handleConfirmSection = async () => {

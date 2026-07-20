@@ -217,7 +217,7 @@ export function RemarkForm({
               </div>
               <button
                 aria-label="Закрыть форму замечания"
-                className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors disabled:opacity-40"
+                className="v19-remark-form-close w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors disabled:opacity-40"
                 disabled={isSubmitting}
                 onClick={onClose}
                 type="button"

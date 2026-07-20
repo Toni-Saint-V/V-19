@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowUpDown,
   CheckCircle2,
@@ -30,6 +30,7 @@ import {
   operationalSideMenuId,
 } from "../modules/submissions/components/OperationalSideMenu";
 import { Drawer } from "./Drawer";
+import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
@@ -193,6 +194,8 @@ export function CommandCenter({
   usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
+  const prefersReducedMotion = useReducedMotion();
+  const activeNavMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
   const [activeNav, setActiveNav] = useState<AgentShellNavSection>("actions");
   const [currentView, setCurrentView] = useState<ViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
@@ -220,6 +223,7 @@ export function CommandCenter({
     usesSupabase ? [] : loadProductIntakeDrafts(),
   );
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
+  const questionnaireSubmissionSnapshotRef = useRef<Submission | undefined>(undefined);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
   const createCity: City = "Москва";
   const createFamilyCount = 2;
@@ -344,27 +348,21 @@ export function CommandCenter({
       effectiveCanonicalSubmissions.find((submission) => submission.id === selectedRow),
     [effectiveCanonicalSubmissions, selectedRow],
   );
+  useEffect(() => {
+    if (selectedCanonicalSubmission) {
+      questionnaireSubmissionSnapshotRef.current = selectedCanonicalSubmission;
+    }
+  }, [selectedCanonicalSubmission]);
+  const selectedQuestionnaireSubmission =
+    selectedCanonicalSubmission ??
+    (questionnaireSubmissionSnapshotRef.current?.id === selectedRow
+      ? questionnaireSubmissionSnapshotRef.current
+      : undefined);
   const selectedIntakeDraft = useMemo(
     () => intakeDrafts.find((draft) => draft.id === selectedRow),
     [intakeDrafts, selectedRow],
   );
 
-  useEffect(() => {
-    if (
-      !usesSupabase ||
-      currentView !== "questionnaire" ||
-      !selectedRow ||
-      selectedCanonicalSubmission
-    ) {
-      return;
-    }
-
-    // A refresh can remove a submission from the current agent's visible scope
-    // while its questionnaire is still mounted. Do not leave the user on a
-    // screen where every persistence action is guaranteed to be rejected.
-    setQuestionnaireInitialFocus(undefined);
-    setCurrentView("main");
-  }, [currentView, selectedCanonicalSubmission, selectedRow, usesSupabase]);
   const intakeSubmissionsForCards = useMemo(
     () =>
       intakeDrafts.map((draft) =>
@@ -419,6 +417,9 @@ export function CommandCenter({
       emitVisaflowUiEvent(bridge, { type: "agent.nav", section: canonicalNav });
       if (canonicalNav === "settings") onNavigateSettings?.();
     }
+    setQuestionnaireInitialFocus(undefined);
+    setDrawerOpen(false);
+    setCurrentView("main");
     setActiveNav(normalizedNav);
     setMobileNavOpen(false);
   };
@@ -1220,7 +1221,7 @@ export function CommandCenter({
         : "settings";
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#101011]">
+    <div className="has-persistent-operational-sidebar relative h-full w-full overflow-hidden bg-[#101011]">
       <AnimatePresence mode="wait">
         {currentView === "questionnaire" && selectedRow && (
           <QuestionnaireScreen
@@ -1229,7 +1230,7 @@ export function CommandCenter({
             initialFocus={questionnaireInitialFocus}
             submissionId={selectedRow}
             draft={selectedIntakeDraft}
-            submission={selectedCanonicalSubmission}
+            submission={selectedQuestionnaireSubmission}
             onAssignPublicNumber={onAssignPublicNumber}
             onBack={handleQuestionnaireBack}
             onSavedAndExit={showSavedSubmissionInList}
@@ -1272,6 +1273,7 @@ export function CommandCenter({
 
       <div className="contents">
         <AppShell
+          className="is-agent-shell-source-actions"
           collectionSurface={activeNav !== "settings"}
           drawerOpen={drawerOpen}
           header={
@@ -1298,7 +1300,6 @@ export function CommandCenter({
               title={title}
             />
           }
-          inactive={currentView !== "main"}
           label="Рабочая область агента"
           mobileNavOpen={mobileNavOpen}
           role="agent"
@@ -1307,7 +1308,6 @@ export function CommandCenter({
               ariaLabel="Меню агента"
               createAction={{ label: "Новая подача", onClick: createPackage }}
               displayMode="regular"
-              inactive={currentView !== "main"}
               items={sideMenuItems}
               mobileOpen={mobileNavOpen}
               mobileTitle={title}
@@ -1324,35 +1324,44 @@ export function CommandCenter({
           }
           sideMenuMode="regular"
           surface={surface}
+          workspaceInactive={currentView !== "main"}
         >
           <div className="v19-agent-workspace-scroll flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
-            <div className="v19-agent-workspace-content max-w-[1460px] mx-auto h-full">
-              {activeNav === "settings" && renderSettings()}
-              {activeNav === "actions" && renderActionsList()}
-              {activeNav === "submissions" && (
-                <div>
-                  <AgentReturnPackagesPanel enabled={usesSupabase} />
-                  <ApplicantsScreen
-                    focusRequest={submissionFocusRequest}
-                    onOpenDrawer={handleRowClick}
-                    onOpenQuestionnaire={handleOpenQuestionnaire}
-                    onOpenWorkspaceTarget={handleOpenWorkspaceTarget}
-                    onSubmitForReview={(submissionId) =>
-                      executeAgentSubmissionActionFor(
-                        submissionId,
-                        "submit_for_review",
-                      ).then(() => undefined)
-                    }
-                    onTypeFilterChange={setSubmissionTypeFilter}
-                    onUploadApplicantFile={async (...args) => {
-                      await uploadCanonicalApplicantFile(...args);
-                    }}
-                    submissions={submissionCards}
-                    typeFilter={submissionTypeFilter}
-                  />
-                </div>
-              )}
-            </div>
+            <AnimatePresence initial={false} mode="wait">
+              <motion.div
+                key={activeNav}
+                {...activeNavMotion}
+                className="v19-agent-workspace-content max-w-[1460px] mx-auto h-full"
+                data-agent-screen={activeNav}
+                data-testid="agent-screen-transition"
+              >
+                {activeNav === "settings" && renderSettings()}
+                {activeNav === "actions" && renderActionsList()}
+                {activeNav === "submissions" && (
+                  <div>
+                    <AgentReturnPackagesPanel enabled={usesSupabase} />
+                    <ApplicantsScreen
+                      focusRequest={submissionFocusRequest}
+                      onOpenDrawer={handleRowClick}
+                      onOpenQuestionnaire={handleOpenQuestionnaire}
+                      onOpenWorkspaceTarget={handleOpenWorkspaceTarget}
+                      onSubmitForReview={(submissionId) =>
+                        executeAgentSubmissionActionFor(
+                          submissionId,
+                          "submit_for_review",
+                        ).then(() => undefined)
+                      }
+                      onTypeFilterChange={setSubmissionTypeFilter}
+                      onUploadApplicantFile={async (...args) => {
+                        await uploadCanonicalApplicantFile(...args);
+                      }}
+                      submissions={submissionCards}
+                      typeFilter={submissionTypeFilter}
+                    />
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </AppShell>
 

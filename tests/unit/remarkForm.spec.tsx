@@ -7,6 +7,20 @@ import { RemarkForm } from "../../src/components/RemarkForm";
 afterEach(cleanup);
 
 describe("RemarkForm", () => {
+  test("exposes a semantic close control with the tokenized touch-target hook", () => {
+    render(
+      <RemarkForm
+        isOpen
+        onClose={() => undefined}
+        submissionId="ПД-1053"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Закрыть форму замечания" }),
+    ).toHaveClass("v19-remark-form-close");
+  });
+
   test("returns focus to the exact remark trigger after the exit animation", async () => {
     function FocusFixture() {
       const [isOpen, setIsOpen] = useState(false);

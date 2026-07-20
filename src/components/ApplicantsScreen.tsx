@@ -25,11 +25,16 @@ import {
 import type {
   QuestionnaireInitialFocus,
 } from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import { ConfirmationDialog } from "../modules/submissions/components/Primitives";
 import {
   applicantWorkflowActions,
   type ApplicantWorkflowAction,
 } from "../modules/submissions/applicantWorkflow";
 import { familyDisplayTitleFromMainApplicantName } from "../modules/submissions/listFormatters";
+import {
+  passportScanUploadAccept,
+  selfieUploadAccept,
+} from "../modules/submissions/mediaStoragePolicy";
 import {
   relativeSubmissionCreatedAt,
   resolveSubmissionCreatedAt,
@@ -279,8 +284,8 @@ function ApplicantWorkflowActionButton({
           ref={inputRef}
           accept={
             action.kind === "passport_scan"
-              ? "image/jpeg,image/png,image/webp,application/pdf"
-              : "image/jpeg,image/png,image/webp"
+              ? passportScanUploadAccept
+              : selfieUploadAccept
           }
           aria-hidden="true"
           aria-label={`Выбрать файл: ${label}, ${applicant.fullName}`}
@@ -743,11 +748,17 @@ export function ApplicantsScreen({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<ApplicantSort>("createdDesc");
   const [relativeNow, setRelativeNow] = useState(() => Date.now());
+  const [pendingReviewSubmission, setPendingReviewSubmission] =
+    useState<Submission | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<{
     id: string;
     message: string;
   } | null>(null);
+  const [submissionDialogError, setSubmissionDialogError] = useState<string | null>(
+    null,
+  );
+  const submissionRequestRef = useRef<string | null>(null);
   const canonicalSubmissions = submissions ?? emptySubmissions;
   const focusSubmissionId = focusRequest?.submissionId;
   const focusRevision = focusRequest?.revision;
@@ -811,6 +822,34 @@ export function ApplicantsScreen({
     () => sortedSubmissions(filteredSubmissions, sortBy, now),
     [filteredSubmissions, now, sortBy],
   );
+  const displayedSubmissionGroups = useMemo(() => {
+    if (typeFilter !== "all") {
+      return [
+        {
+          id: typeFilter,
+          label: typeFilter === "family" ? "Семьи" : "Заявители",
+          submissions: displayedSubmissions,
+        },
+      ];
+    }
+
+    return [
+      {
+        id: "family" as const,
+        label: "Семьи",
+        submissions: displayedSubmissions.filter(
+          (submission) => submission.type === "family",
+        ),
+      },
+      {
+        id: "single" as const,
+        label: "Заявители",
+        submissions: displayedSubmissions.filter(
+          (submission) => submission.type === "single",
+        ),
+      },
+    ].filter((group) => group.submissions.length > 0);
+  }, [displayedSubmissions, typeFilter]);
   const cityOptions = useMemo(
     () => cityFilterValuesForSubmissions(canonicalSubmissions),
     [canonicalSubmissions],
@@ -834,7 +873,7 @@ export function ApplicantsScreen({
     setSortBy("createdDesc");
   };
 
-  const handlePrimaryAction = async (submission: Submission) => {
+  const handlePrimaryAction = (submission: Submission) => {
     const completionDecision = agentQuestionnaireCompletionDecision(submission);
     const canSendToReview =
       submission.status === "ready_for_export" ||
@@ -849,23 +888,36 @@ export function ApplicantsScreen({
       return;
     }
 
-    if (!window.confirm("Отправить на проверку администратору?")) {
+    setSubmissionDialogError(null);
+    setPendingReviewSubmission(submission);
+  };
+
+  const confirmSubmissionForReview = async () => {
+    const submission = pendingReviewSubmission;
+    if (
+      !submission ||
+      !onSubmitForReview ||
+      submissionRequestRef.current !== null
+    ) {
       return;
     }
 
+    submissionRequestRef.current = submission.id;
     setSubmissionError(null);
+    setSubmissionDialogError(null);
     setSubmittingId(submission.id);
     try {
       await onSubmitForReview(submission.id);
+      setPendingReviewSubmission(null);
     } catch (error) {
-      setSubmissionError({
-        id: submission.id,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Не удалось отправить подачу на проверку.",
-      });
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Не удалось отправить подачу на проверку.";
+      setSubmissionError({ id: submission.id, message });
+      setSubmissionDialogError(message);
     } finally {
+      submissionRequestRef.current = null;
       setSubmittingId(null);
     }
   };
@@ -876,9 +928,37 @@ export function ApplicantsScreen({
     onOpenDrawer,
     onOpenQuestionnaire,
     onOpenWorkspaceTarget,
-    onPrimaryAction: (submission: Submission) => void handlePrimaryAction(submission),
+    onPrimaryAction: handlePrimaryAction,
     onUploadApplicantFile,
   };
+  const renderSubmissionCard = (submission: Submission) =>
+    submission.type === "family" ? (
+      <FamilySubmissionCard
+        {...cardCallbacks}
+        error={
+          submissionError?.id === submission.id &&
+          pendingReviewSubmission?.id !== submission.id
+            ? submissionError.message
+            : undefined
+        }
+        key={submission.id}
+        submission={submission}
+        submitting={submittingId === submission.id}
+      />
+    ) : (
+      <IndividualSubmissionCard
+        {...cardCallbacks}
+        error={
+          submissionError?.id === submission.id &&
+          pendingReviewSubmission?.id !== submission.id
+            ? submissionError.message
+            : undefined
+        }
+        key={submission.id}
+        submission={submission}
+        submitting={submittingId === submission.id}
+      />
+    );
 
   return (
     <motion.div
@@ -983,7 +1063,13 @@ export function ApplicantsScreen({
           searchValue={searchQuery}
         />
 
-        <div className="v19-agent-submissions-list">
+        <div
+          className={`v19-agent-submissions-list${
+            typeFilter === "all" && displayedSubmissionGroups.length > 1
+              ? " is-type-columns"
+              : ""
+          }`}
+        >
           {!displayedSubmissions.length ? (
             <div className="v19-applicant-empty-state" role="status">
               <h2>Ничего не найдено</h2>
@@ -993,47 +1079,45 @@ export function ApplicantsScreen({
               </button>
             </div>
           ) : (
-            <section
-              aria-labelledby="agent-submissions-visible"
-              className="v19-agent-submissions-group"
-            >
-              <h2 id="agent-submissions-visible">
-                {typeFilter === "family"
-                  ? "Семьи"
-                  : typeFilter === "single"
-                    ? "Заявители"
-                    : "Все подачи"}
-              </h2>
-              {displayedSubmissions.map((submission) =>
-                submission.type === "family" ? (
-                  <FamilySubmissionCard
-                    {...cardCallbacks}
-                    error={
-                      submissionError?.id === submission.id
-                        ? submissionError.message
-                        : undefined
-                    }
-                    key={submission.id}
-                    submission={submission}
-                    submitting={submittingId === submission.id}
-                  />
-                ) : (
-                  <IndividualSubmissionCard
-                    {...cardCallbacks}
-                    error={
-                      submissionError?.id === submission.id
-                        ? submissionError.message
-                        : undefined
-                    }
-                    key={submission.id}
-                    submission={submission}
-                    submitting={submittingId === submission.id}
-                  />
-                ),
-              )}
-            </section>
+            displayedSubmissionGroups.map((group) => (
+              <section
+                aria-labelledby={`agent-submissions-${group.id}`}
+                className="v19-agent-submissions-group"
+                data-submission-type-group={group.id}
+                key={group.id}
+              >
+                <h2 id={`agent-submissions-${group.id}`}>{group.label}</h2>
+                {group.submissions.map(renderSubmissionCard)}
+              </section>
+            ))
           )}
         </div>
+
+        {pendingReviewSubmission ? (
+          <ConfirmationDialog
+            busy={submittingId === pendingReviewSubmission.id}
+            cancelLabel="Отмена"
+            confirmDanger={false}
+            confirmLabel="Отправить"
+            description="После отправки подача перейдёт в очередь проверки администратора."
+            error={
+              submissionDialogError ? (
+                <span className="v19-applicant-submit-error">
+                  {submissionDialogError}
+                </span>
+              ) : undefined
+            }
+            kicker="Подтверждение отправки"
+            title="Отправить на проверку администратору?"
+            onCancel={() => {
+              if (submittingId !== pendingReviewSubmission.id) {
+                setPendingReviewSubmission(null);
+                setSubmissionDialogError(null);
+              }
+            }}
+            onConfirm={() => void confirmSubmissionForReview()}
+          />
+        ) : null}
       </div>
     </motion.div>
   );

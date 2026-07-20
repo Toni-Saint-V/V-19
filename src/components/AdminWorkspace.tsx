@@ -90,6 +90,21 @@ export function AdminWorkspace({
       .toUpperCase() || "АД";
 
   useEffect(() => {
+    if (
+      currentView !== "review_workspace" ||
+      !selectedRow ||
+      selectedSubmission
+    ) {
+      return;
+    }
+
+    setCurrentView("main");
+    setSelectedRow(null);
+    setReviewApplicantId(undefined);
+    setRemarkFormOpen(false);
+  }, [currentView, selectedRow, selectedSubmission]);
+
+  useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) setMobileNavOpen(false);
     };
@@ -292,6 +307,10 @@ export function AdminWorkspace({
       bridge.onAdminNavChange?.(nav);
       emitVisaflowUiEvent(bridge, { type: "admin.nav", section: nav });
     }
+    setRemarkFormOpen(false);
+    setCurrentView("main");
+    setSelectedRow(null);
+    setReviewApplicantId(undefined);
     setActiveNav(nav);
     setMobileNavOpen(false);
   };
@@ -390,7 +409,7 @@ export function AdminWorkspace({
           : "settings";
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#101011]">
+    <div className="has-persistent-operational-sidebar relative h-full w-full overflow-hidden bg-[#101011]">
       {adminAsyncError ? (
         <div
           className="fixed left-1/2 top-3 z-[90] flex w-[min(92vw,560px)] -translate-x-1/2 items-center gap-3 rounded-xl border border-red-500/30 bg-[#211416] px-4 py-3 text-[13px] text-white shadow-2xl"
@@ -407,7 +426,7 @@ export function AdminWorkspace({
         </div>
       ) : null}
 
-      {currentView === "review_workspace" && selectedRow ? (
+      {currentView === "review_workspace" && selectedRow && selectedSubmission ? (
         <ReviewWorkspace
           applicantId={reviewApplicantId}
           nestedDialogOpen={remarkFormOpen}
@@ -464,7 +483,6 @@ export function AdminWorkspace({
               title={pageTitle}
             />
           }
-          inactive={currentView === "review_workspace"}
           label="Рабочая область администратора"
           mobileNavOpen={mobileNavOpen}
           role="admin"
@@ -472,7 +490,6 @@ export function AdminWorkspace({
             <OperationalSideMenu
               ariaLabel="Меню администратора"
               displayMode="regular"
-              inactive={currentView === "review_workspace"}
               items={sideMenuItems}
               mobileCloseLabel="Закрыть меню администратора"
               mobileOpen={mobileNavOpen}
@@ -489,6 +506,7 @@ export function AdminWorkspace({
           }
           sideMenuMode="regular"
           surface={surface}
+          workspaceInactive={currentView === "review_workspace"}
         >
           <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
             <div className="max-w-[1460px] mx-auto h-full">

@@ -84,6 +84,24 @@ function fieldIssueInput(submission: Submission): IssueInput {
   };
 }
 
+function changeRouteIssueTarget(
+  submission: Submission,
+  value = "Madrid, Barcelona, Madrid",
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === "first-entry-country" ? { ...field, value } : field,
+        ),
+      })),
+    })),
+  };
+}
+
 describe("V-19 pilot click logic state machine", () => {
   it("keeps local draft creation locked to Spain single/family submissions", () => {
     const draft = unwrap(
@@ -179,7 +197,9 @@ describe("V-19 pilot click logic state machine", () => {
       },
     });
 
-    const fixed = unwrap(markIssueFixed(returned, "agent", issueId));
+    const fixed = unwrap(
+      markIssueFixed(changeRouteIssueTarget(returned), "agent", issueId),
+    );
     expect(fixed.issues[0]?.status).toBe("fixed_by_agent");
     const resubmitted = unwrap(resubmitCorrections(fixed, "agent"));
     expect(resubmitted.status).toBe("corrections_received");

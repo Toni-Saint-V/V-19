@@ -3023,7 +3023,10 @@ body {
   overflow-x: hidden;
 }
 
-body:has(.ops-shell.has-open-drawer .submission-drawer) {
+body:has(.ops-shell.has-open-drawer .submission-drawer),
+body:has(.v20-submission-drawer),
+body:has([data-admin-review-drawer-surface="workspace"].admin-review-drawer),
+body:has(.mp-bottom-sheet) {
   overflow: hidden;
 }
 
@@ -34322,7 +34325,7 @@ section[data-testid="agent-actions-screen"]
 .mp-bottom-sheet-backdrop {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 260 !important;
+  z-index: var(--v19b-z-modal-backdrop) !important;
   border: 0 !important;
   background: var(--v19-dialog-backdrop) !important;
 }
@@ -34332,7 +34335,7 @@ section[data-testid="agent-actions-screen"]
   right: var(--v19-mobile-page-padding) !important;
   bottom: 0 !important;
   left: var(--v19-mobile-page-padding) !important;
-  z-index: 270 !important;
+  z-index: var(--v19b-z-modal) !important;
   display: grid !important;
   grid-template-rows: auto auto minmax(0, 1fr) auto !important;
   max-height: min(84svh, var(--vf-ref-size-720px)) !important;
@@ -34340,9 +34343,11 @@ section[data-testid="agent-actions-screen"]
   border: var(--vf-ref-size-1px) solid var(--v19-line-strong) !important;
   border-bottom: 0 !important;
   border-radius: var(--v19-radius-sheet) var(--v19-radius-sheet) 0 0 !important;
-  background: var(--v19-panel) !important;
+  background: var(--v19b-color-panel-strong) !important;
   box-shadow: var(--v19b-shadow-panel) !important;
+  isolation: isolate !important;
   overflow: hidden !important;
+  overscroll-behavior: contain !important;
 }
 
 .mp-bottom-sheet-grabber {
@@ -34368,6 +34373,8 @@ section[data-testid="agent-actions-screen"]
   min-width: 0 !important;
   color: var(--v19-fg) !important;
   font-size: var(--vf-ref-size-18px) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  line-height: var(--v19b-line-height-title) !important;
   overflow-wrap: anywhere !important;
 }
 
@@ -34390,6 +34397,8 @@ section[data-testid="agent-actions-screen"]
   padding: var(--v19-space-lg) !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  scrollbar-gutter: stable !important;
   scroll-padding-bottom: calc(
     var(--v19-sticky-cta-height) + env(safe-area-inset-bottom)
   ) !important;
@@ -34401,7 +34410,7 @@ section[data-testid="agent-actions-screen"]
   padding: var(--v19-space-md) var(--v19-space-lg)
     max(var(--v19-space-md), env(safe-area-inset-bottom)) !important;
   border-top: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
-  background: var(--v19-panel) !important;
+  background: var(--v19b-color-panel-strong) !important;
 }
 
 .v19-mobile-filter-sheet {

@@ -8,10 +8,13 @@ import {
   markSubmissionIssueFixedResult,
 } from "../src/modules/submissions/status";
 import { canonicalRequiredMediaReadiness } from "../src/modules/submissions/domainContract";
+import { ADMIN_PASSPORT_REVIEW_FIELD_IDS } from "../src/modules/submissions/passportReviewContract";
 import { blsQuestionnaireReadiness } from "../src/modules/submissions/questionnaireBlsRules";
 import {
+  approvePassportReviewSectionForAdmin,
   applyExportStateToSelection,
 } from "../src/modules/submissions/submissionActions";
+import { buildMediaStoragePath } from "../src/modules/submissions/mediaStoragePolicy";
 import {
   buildExportPackageIdentity,
   buildExportRows,
@@ -47,6 +50,9 @@ type SubmissionSeed = {
 const defaultCity: City = "Санкт-Петербург";
 const defaultTripFrom = "20.05.2026";
 const defaultTripTo = "28.05.2026";
+const adminPassportReviewFieldIds = new Set<string>(
+  ADMIN_PASSPORT_REVIEW_FIELD_IDS,
+);
 
 function makeApplicant(index: number, passportNo: string, familyName: string): Applicant {
   const firstName = `Applicant${index}`;
@@ -100,6 +106,7 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
           field("visa-sub-type", "Tourism"),
           field("category", "Normal"),
           field("desired-date-1", defaultTripFrom),
+          field("desired-date-2", defaultTripTo),
         ],
       },
       {
@@ -121,7 +128,9 @@ function makeApplicant(index: number, passportNo: string, familyName: string): A
         status: "complete",
         fields: [
           field("home-address", "BELGRADSKAYA STR 26"),
-          field("email", `${passportNo}@example.test`),
+          field("home-street", "BELGRADSKAYA STR"),
+          field("home-house", "26"),
+          field("email", `${surname.toLowerCase()}@example.test`),
           field("contact-number", "9119900886"),
           field("home-country", "Russian Federation"),
           field("home-city", "ST PETERSBURG"),
@@ -203,10 +212,28 @@ function field(id: string, value: string) {
 }
 
 function makeSubmission(seed: SubmissionSeed): Submission {
-  const applicants = seed.applicantPassports.map((passport, index) =>
-    makeApplicant(index + 1, passport, seed.title),
-  );
   const status = seed.status ?? "ready_for_export";
+  const applicants = seed.applicantPassports
+    .map((passport, index) => makeApplicant(index + 1, passport, seed.title))
+    .map((applicant) =>
+      status === "ready_for_export"
+        ? {
+            ...applicant,
+            sections: applicant.sections.map((section) => ({
+              ...section,
+              fields: section.fields.map((questionnaireField) =>
+                adminPassportReviewFieldIds.has(questionnaireField.id)
+                  ? {
+                      ...questionnaireField,
+                      adminReviewApprovedAtIso: "2026-05-12T00:00:00.000Z",
+                      adminReviewApprovedBy: "admin-prod-test",
+                    }
+                  : questionnaireField,
+              ),
+            })),
+          }
+        : applicant,
+    );
   const files = applicants.flatMap((applicant) =>
     makeFilesForApplicant(seed.id, applicant.id, applicant.sections[2]?.fields.find((item) => item.id === "passport-no")?.value ?? applicant.id, status),
   );
@@ -258,16 +285,30 @@ function makeFile(
   mimeType: string,
   extension: string,
 ): SubmissionFile {
+  const generatedFileName = `${passportNo}_${type}.${extension}`;
+  const storageTarget = buildMediaStoragePath(
+    submissionId,
+    applicantId,
+    type,
+    generatedFileName,
+  );
+
   return {
     id: `${submissionId}-${applicantId}-${type}`,
     applicantId,
     type,
     status,
-    generatedFileName: `${passportNo}_${type}.${extension}`,
-    originalFileName: `${passportNo}_${type}.${extension}`,
+    generatedFileName,
+    originalFileName: generatedFileName,
     mimeType,
+    reviewedAtIso:
+      reviewStatus === "accepted" ? "2026-05-12T00:00:00.000Z" : undefined,
+    reviewedBy: reviewStatus === "accepted" ? "admin-prod-test" : undefined,
     reviewStatus,
     sizeBytes: 256,
+    storageAdapter: "supabase-private",
+    storageBucket: storageTarget.bucket,
+    storagePath: storageTarget.path,
     uploadStatus: "uploaded",
     uploadedAtIso: "2026-05-12T00:00:00.000Z",
   };
@@ -322,7 +363,21 @@ test("admin review cycle: return with issue, agent correction, admin acceptance 
   expect(corrections.ok).toBe(true);
   expect(corrections.data.status).toBe("corrections_received");
 
-  const accepted = applySubmissionActionResult(corrections.data, "close_issues_accept", "admin", "admin-prod-test");
+  const reviewed = approvePassportReviewSectionForAdmin(
+    corrections.data,
+    { applicantId: corrections.data.applicants[0]!.id },
+    "admin-prod-test",
+    "2026-05-12T01:00:00.000Z",
+  );
+  expect(reviewed.ok).toBe(true);
+  if (!reviewed.ok) throw new Error(reviewed.error.message);
+
+  const accepted = applySubmissionActionResult(
+    reviewed.data,
+    "close_issues_accept",
+    "admin",
+    "admin-prod-test",
+  );
   expect(
     accepted.ok,
     accepted.ok
@@ -387,7 +442,7 @@ test("export rules: same-city mixed trip dates are warnings, mixed cities stay b
   );
 });
 
-test("admin export package: same-city sorting, Excel state, ZIP folders, passport-number file names, visa form PDF, marked exported", async () => {
+test("admin export package: same-city sorting, Excel state, media-only ZIP without visa form PDF, marked exported", async () => {
   const submissions: Submission[] = [
     makeSubmission({
       applicantPassports: ["669308601", "669308602", "669308603"],
@@ -413,7 +468,10 @@ test("admin export package: same-city sorting, Excel state, ZIP folders, passpor
   expect(rows.slice(0, 3).every((row) => row.familySubmissionId === "FAM-ALPHA")).toBe(true);
   expect(rows.slice(3, 7).every((row) => row.familySubmissionId === "FAM-BETA")).toBe(true);
   expect(rows.slice(7).every((row) => !row.familySubmissionId)).toBe(true);
-  expect(exportSummary(submissions).canGenerate).toBe(true);
+  const initialSummary = exportSummary(submissions);
+  expect(initialSummary.canGenerate, JSON.stringify(initialSummary.blockers)).toBe(
+    true,
+  );
 
   const mixedCityBlockers = exportSummary([
     ...submissions,

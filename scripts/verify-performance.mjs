@@ -27,8 +27,6 @@ const totalJsGzipKbBaseline = 302;
 const totalJsGzipKbAllowance = 1;
 const lazyWorkbookRawKbLimit = 18;
 const lazyWorkbookGzipKbLimit = 6.5;
-const lazySettingsRawKbLimit = 11;
-const lazySettingsGzipKbLimit = 3.7;
 const lazyPassportOcrRawKbLimit = 8.2;
 const lazyPassportOcrGzipKbLimit = 3.7;
 const lazyPdfRawKbLimit = 380;
@@ -119,6 +117,10 @@ const initialJsAssetFiles = collectStaticJsFiles(manifest, entryManifestKeys);
 const workspaceRoleManifestKeys = workspaceManifestKey
   ? (manifest[workspaceManifestKey]?.dynamicImports ?? [])
   : [];
+const activeSettingsOwnerManifestKeys = [
+  "src/components/CommandCenter.tsx",
+  "src/components/AdminWorkspace.tsx",
+];
 const workspaceJsAssetFiles = workspaceManifestKey
   ? collectStaticJsFiles(manifest, [workspaceManifestKey, ...workspaceRoleManifestKeys])
   : new Set();
@@ -129,9 +131,6 @@ for (const initialFile of initialJsAssetFiles) {
 
 const lazyWorkbookAssets = jsAssets.filter((asset) =>
   asset.file.startsWith("exportWorkbook-"),
-);
-const lazySettingsAssets = jsAssets.filter((asset) =>
-  asset.file.startsWith("SettingsScreen-"),
 );
 const lazyPassportOcrAssets = jsAssets.filter((asset) =>
   asset.file.startsWith("Tesseract-"),
@@ -153,10 +152,6 @@ const lazyWorkbookRawKb =
   lazyWorkbookAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const lazyWorkbookGzipKb =
   lazyWorkbookAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
-const lazySettingsRawKb =
-  lazySettingsAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
-const lazySettingsGzipKb =
-  lazySettingsAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
 const lazyPassportOcrRawKb =
   lazyPassportOcrAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const lazyPassportOcrGzipKb =
@@ -202,14 +197,6 @@ if (lazyWorkbookAssets.length > 1) {
   failures.push("export workbook must stay in one lazy JS chunk");
 }
 
-if (lazySettingsAssets.length > 1) {
-  failures.push("settings screen must stay in one lazy JS chunk");
-}
-
-if (lazySettingsAssets.length === 0) {
-  failures.push("settings screen must stay lazy and emit one SettingsScreen-* JS chunk");
-}
-
 if (lazyPassportOcrAssets.length > 1) {
   failures.push("passport OCR must stay in one lazy JS chunk");
 }
@@ -224,6 +211,25 @@ if (!workspaceManifestKey) {
 
 if (entryManifestKeys.length !== 1) {
   failures.push("production manifest must expose exactly one initial entry");
+}
+
+const activeSettingsOwnersStayLazy = activeSettingsOwnerManifestKeys.every(
+  (key) => {
+    const entry = manifest[key];
+    const assetFile = entry?.file?.replace(/^assets\//, "");
+    return (
+      workspaceRoleManifestKeys.includes(key) &&
+      entry?.isDynamicEntry === true &&
+      assetFile?.endsWith(".js") &&
+      !initialJsAssetFiles.has(assetFile)
+    );
+  },
+);
+
+if (!activeSettingsOwnersStayLazy) {
+  failures.push(
+    "active settings routes must stay behind lazy CommandCenter/AdminWorkspace workspace boundaries",
+  );
 }
 
 if (
@@ -257,22 +263,6 @@ if (lazyWorkbookGzipKb > lazyWorkbookGzipKbLimit) {
     `export workbook lazy JS: ${lazyWorkbookGzipKb.toFixed(
       1,
     )} KB gzip exceeds ${lazyWorkbookGzipKbLimit} KB`,
-  );
-}
-
-if (lazySettingsRawKb > lazySettingsRawKbLimit) {
-  failures.push(
-    `settings lazy JS: ${lazySettingsRawKb.toFixed(
-      1,
-    )} KB raw exceeds ${lazySettingsRawKbLimit} KB`,
-  );
-}
-
-if (lazySettingsGzipKb > lazySettingsGzipKbLimit) {
-  failures.push(
-    `settings lazy JS: ${lazySettingsGzipKb.toFixed(
-      1,
-    )} KB gzip exceeds ${lazySettingsGzipKbLimit} KB`,
   );
 }
 
@@ -348,10 +338,6 @@ console.log(
   )} KB gzip across ${cssAssets.length} chunks\nexport workbook lazy JS: ${lazyWorkbookRawKb.toFixed(
     1,
   )} KB raw, ${lazyWorkbookGzipKb.toFixed(
-    1,
-  )} KB gzip\nsettings lazy JS: ${lazySettingsRawKb.toFixed(
-    1,
-  )} KB raw, ${lazySettingsGzipKb.toFixed(
     1,
   )} KB gzip\npassport OCR lazy JS: ${lazyPassportOcrRawKb.toFixed(
     1,

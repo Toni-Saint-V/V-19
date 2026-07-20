@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import {
   clearOpenQuestionnaireIssueErrors,
+  clearQuestionnaireIssueError,
   questionnaireFieldMatchesTarget,
 } from "./questionnaire";
 import { applicantFileStatusForFiles } from "./fileAsset";
@@ -1142,7 +1143,7 @@ export function markSubmissionIssueFixedResult(
     };
   }
 
-  const clearedSubmission = clearOpenQuestionnaireIssueErrors(submission);
+  const clearedSubmission = clearQuestionnaireIssueError(submission, issueId);
   const withFixedIssue: Submission = {
     ...clearedSubmission,
     issues: clearedSubmission.issues.map((item) =>
