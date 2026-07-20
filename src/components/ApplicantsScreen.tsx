@@ -4,6 +4,8 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -143,25 +145,24 @@ function applicantMarker(
   return "person";
 }
 
-function applicantRoleLabel(
-  role: Applicant["role"],
-  marker: ApplicantMarker,
-) {
-  if (role === "child") return "Ребёнок";
-  if (role === "spouse") {
-    return marker === "male"
-      ? "Супруг"
-      : marker === "female"
-        ? "Супруга"
-        : "Супруг/супруга";
-  }
-  return undefined;
-}
-
 function ApplicantMarkerIcon({ marker }: { marker: ApplicantMarker }) {
   const Icon = marker === "child" ? Baby : UserRound;
   const label = marker === "child" ? "Ребёнок" : "Заявитель";
   return <Icon aria-label={label} className="v19-applicant-person-icon" />;
+}
+
+function applicantCardDisplayName(applicant: Applicant, index: number) {
+  const normalizedName = applicant.fullName.trim().toLowerCase();
+  const isRolePlaceholder = [
+    "основной заявитель",
+    "супруг",
+    "супруга",
+    "супруг/супруга",
+    "ребенок",
+    "ребёнок",
+  ].includes(normalizedName);
+
+  return isRolePlaceholder ? `Заявитель ${index + 1}` : applicant.fullName;
 }
 
 function actionIcon(action: ApplicantWorkflowAction) {
@@ -182,6 +183,7 @@ function actionIcon(action: ApplicantWorkflowAction) {
 function ApplicantWorkflowActionButton({
   action,
   applicant,
+  isReplaced,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
   onUploadApplicantFile,
@@ -189,6 +191,7 @@ function ApplicantWorkflowActionButton({
 }: {
   action: ApplicantWorkflowAction;
   applicant: Applicant;
+  isReplaced: boolean;
   onOpenQuestionnaire?: ApplicantsScreenProps["onOpenQuestionnaire"];
   onOpenWorkspaceTarget?: ApplicantsScreenProps["onOpenWorkspaceTarget"];
   onUploadApplicantFile?: ApplicantsScreenProps["onUploadApplicantFile"];
@@ -264,6 +267,7 @@ function ApplicantWorkflowActionButton({
         aria-label={accessibleLabel}
         className={`v19-applicant-workflow-action is-${action.state}`}
         disabled={uploading}
+        tabIndex={isReplaced ? -1 : undefined}
         title={accessibleLabel}
         type="button"
         onClick={activate}
@@ -293,12 +297,14 @@ function ApplicantWorkflowActionButton({
 
 function ApplicantWorkflowActions({
   applicant,
+  isReplaced = false,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
   onUploadApplicantFile,
   submission,
 }: {
   applicant: Applicant;
+  isReplaced?: boolean;
   onOpenQuestionnaire?: ApplicantsScreenProps["onOpenQuestionnaire"];
   onOpenWorkspaceTarget?: ApplicantsScreenProps["onOpenWorkspaceTarget"];
   onUploadApplicantFile?: ApplicantsScreenProps["onUploadApplicantFile"];
@@ -307,13 +313,15 @@ function ApplicantWorkflowActions({
   return (
     <div
       aria-label={`Документы: ${applicant.fullName}`}
-      className="v19-applicant-workflow-actions"
+      aria-hidden={isReplaced || undefined}
+      className={`v19-applicant-workflow-actions${isReplaced ? " is-replaced" : ""}`}
       role="group"
     >
       {applicantWorkflowActions(submission, applicant).map((action) => (
         <ApplicantWorkflowActionButton
           action={action}
           applicant={applicant}
+          isReplaced={isReplaced}
           key={action.kind}
           onOpenQuestionnaire={onOpenQuestionnaire}
           onOpenWorkspaceTarget={onOpenWorkspaceTarget}
@@ -323,6 +331,13 @@ function ApplicantWorkflowActions({
       ))}
     </div>
   );
+}
+
+function submissionWorkflowIsReady(submission: Submission) {
+  const actions = submission.applicants.flatMap((applicant) =>
+    applicantWorkflowActions(submission, applicant),
+  );
+  return actions.length > 0 && actions.every((action) => action.state === "ready");
 }
 
 function lifecycleStatusTone(status: Submission["status"]) {
@@ -365,57 +380,106 @@ type CardCallbacks = Pick<
   submitting: boolean;
 };
 
-function AssignedPublicId({ submission }: { submission: Submission }) {
-  return submissionPublicNumber(submission) === null ? null : (
-    <span>{submissionPublicId(submission)}</span>
-  );
+function openSubmissionCardFromKeyboard(
+  event: ReactKeyboardEvent<HTMLElement>,
+  onOpen: () => void,
+) {
+  if (
+    event.currentTarget !== event.target ||
+    (event.key !== "Enter" && event.key !== " ")
+  ) {
+    return;
+  }
+  event.preventDefault();
+  onOpen();
 }
 
-function SubmissionStatusAction({
-  canSubmitForReview,
-  label,
-  onPrimaryAction,
+function AssignedPublicId({
+  showFallback = false,
   submission,
-  submitting,
 }: {
-  canSubmitForReview: boolean;
-  label: string;
-  onPrimaryAction: (submission: Submission) => void;
+  showFallback?: boolean;
   submission: Submission;
-  submitting: boolean;
 }) {
-  const completionDecision = agentQuestionnaireCompletionDecision(submission);
-  const canSubmit =
-    canSubmitForReview &&
-    (submission.status === "ready_for_export" ||
-      (completionDecision.action === "submit_for_review" &&
-        completionDecision.ok));
+  const publicId =
+    submissionPublicNumber(submission) === null
+      ? showFallback
+        ? "VF—"
+        : null
+      : submissionPublicId(submission);
 
-  if (canSubmit) {
-    const actionLabel = submitting
-      ? "Отправляем…"
-      : submission.status === "ready_for_export"
-        ? "К выгрузке"
-        : "Отправить на проверку";
-    return (
-      <button
-        aria-label={`${actionLabel}: ${label}`}
-        className="v19-applicant-status-action"
-        disabled={submitting}
-        type="button"
-        onClick={() => onPrimaryAction(submission)}
-      >
-        {actionLabel}
-      </button>
-    );
-  }
+  return publicId ? (
+    <span className="v19-applicant-public-id">{publicId}</span>
+  ) : null;
+}
 
+function SubmissionStatusLabel({ submission }: { submission: Submission }) {
   return (
     <span
       className={`v19-applicant-card-status ${lifecycleStatusTone(submission.status)}`}
     >
       {statusLabelFor(submission.status, "full")}
     </span>
+  );
+}
+
+function SubmissionPrimaryAction({
+  canSubmitForReview,
+  label,
+  onPrimaryAction,
+  submission,
+  submitting,
+  visible,
+}: {
+  canSubmitForReview: boolean;
+  label: string;
+  onPrimaryAction: (submission: Submission) => void;
+  submission: Submission;
+  submitting: boolean;
+  visible: boolean;
+}) {
+  const completionDecision = agentQuestionnaireCompletionDecision(submission);
+  const canSubmit =
+    canSubmitForReview &&
+    completionDecision.action === "submit_for_review" &&
+    completionDecision.ok;
+  let actionLabel =
+    submission.status === "ready_for_export" ? "К выгрузке" : "Открыть";
+  if (canSubmit) {
+    actionLabel = submitting ? "Отправляем…" : "К выгрузке";
+  }
+  return (
+    <button
+      aria-label={`${actionLabel}: ${label}`}
+      aria-hidden={!visible || undefined}
+      className={`v19-applicant-status-action${visible ? " is-visible" : ""}`}
+      disabled={submitting}
+      tabIndex={visible ? undefined : -1}
+      type="button"
+      onClick={() => onPrimaryAction(submission)}
+    >
+      {actionLabel}
+    </button>
+  );
+}
+
+function SubmissionWorkflowSwitch({
+  action,
+  children,
+  ready,
+}: {
+  action: ReactNode;
+  children: ReactNode;
+  ready: boolean;
+}) {
+  return (
+    <div
+      className="v19-applicant-workflow-switch"
+      data-ready={ready ? "true" : "false"}
+    >
+      {children}
+      {action}
+    </div>
   );
 }
 
@@ -437,6 +501,7 @@ function FamilySubmissionCard({
   const title =
     familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ??
     submission.title;
+  const workflowReady = submissionWorkflowIsReady(submission);
 
   return (
     <V19QueueCard
@@ -444,6 +509,7 @@ function FamilySubmissionCard({
       aria-label={`Подача ${title}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      tabIndex={0}
       onClick={(event) => {
         if (
           event.target instanceof Element &&
@@ -453,6 +519,9 @@ function FamilySubmissionCard({
         }
         onOpenDrawer(submission.id);
       }}
+      onKeyDown={(event) =>
+        openSubmissionCardFromKeyboard(event, () => onOpenDrawer(submission.id))
+      }
     >
       <div className="v19-applicant-family-header">
         <div className="v19-applicant-family-main">
@@ -465,23 +534,16 @@ function FamilySubmissionCard({
               <span>{submission.applicants.length} человек</span>
               <span aria-hidden="true">·</span>
               <span>{questionnaireCityForSubmission(submission)}</span>
-              <AssignedPublicId submission={submission} />
+              <AssignedPublicId showFallback submission={submission} />
             </p>
           </div>
         </div>
-        <SubmissionStatusAction
-          canSubmitForReview={canSubmitForReview}
-          label={title}
-          onPrimaryAction={onPrimaryAction}
-          submission={submission}
-          submitting={submitting}
-        />
+        <SubmissionStatusLabel submission={submission} />
       </div>
 
       <div className="v19-applicant-member-list">
-        {submission.applicants.map((applicant) => {
+        {submission.applicants.map((applicant, index) => {
           const marker = applicantMarker(submission, applicant);
-          const roleLabel = applicantRoleLabel(applicant.role, marker);
           return (
             <div
               className="v19-applicant-member-cell"
@@ -490,10 +552,9 @@ function FamilySubmissionCard({
             >
               <ApplicantMarkerIcon marker={marker} />
               <div className="v19-applicant-member-identity">
-                <span className="v19-applicant-member-name">{applicant.fullName}</span>
-                {roleLabel ? (
-                  <span className="v19-applicant-member-role">{roleLabel}</span>
-                ) : null}
+                <span className="v19-applicant-member-name">
+                  {applicantCardDisplayName(applicant, index)}
+                </span>
               </div>
               <ApplicantWorkflowActions
                 applicant={applicant}
@@ -509,6 +570,14 @@ function FamilySubmissionCard({
 
       <div className="v19-applicant-card-footer">
         <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
+        <SubmissionPrimaryAction
+          canSubmitForReview={canSubmitForReview}
+          label={title}
+          onPrimaryAction={onPrimaryAction}
+          submission={submission}
+          submitting={submitting}
+          visible={workflowReady}
+        />
         {error ? (
           <span className="v19-applicant-submit-error" role="alert">
             {error}
@@ -534,6 +603,7 @@ function IndividualSubmissionCard({
   const applicant = submission.applicants[0];
   const name = applicant?.fullName ?? submission.title;
   const marker = applicant ? applicantMarker(submission, applicant) : "person";
+  const workflowReady = submissionWorkflowIsReady(submission);
 
   return (
     <V19QueueCard
@@ -541,6 +611,7 @@ function IndividualSubmissionCard({
       aria-label={`Подача ${name}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      tabIndex={0}
       onClick={(event) => {
         if (
           event.target instanceof Element &&
@@ -550,6 +621,9 @@ function IndividualSubmissionCard({
         }
         onOpenDrawer(submission.id);
       }}
+      onKeyDown={(event) =>
+        openSubmissionCardFromKeyboard(event, () => onOpenDrawer(submission.id))
+      }
     >
       <div className="v19-applicant-individual-header">
         <div className="v19-applicant-individual-main">
@@ -566,25 +640,34 @@ function IndividualSubmissionCard({
             </p>
           </div>
         </div>
-        <SubmissionStatusAction
-          canSubmitForReview={canSubmitForReview}
-          label={name}
-          onPrimaryAction={onPrimaryAction}
-          submission={submission}
-          submitting={submitting}
-        />
+        <SubmissionStatusLabel submission={submission} />
       </div>
 
       <div className="v19-applicant-card-footer">
         <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
         {applicant ? (
-          <ApplicantWorkflowActions
-            applicant={applicant}
-            onOpenQuestionnaire={onOpenQuestionnaire}
-            onOpenWorkspaceTarget={onOpenWorkspaceTarget}
-            onUploadApplicantFile={onUploadApplicantFile}
-            submission={submission}
-          />
+          <SubmissionWorkflowSwitch
+            action={
+              <SubmissionPrimaryAction
+                canSubmitForReview={canSubmitForReview}
+                label={name}
+                onPrimaryAction={onPrimaryAction}
+                submission={submission}
+                submitting={submitting}
+                visible={workflowReady}
+              />
+            }
+            ready={workflowReady}
+          >
+            <ApplicantWorkflowActions
+              applicant={applicant}
+              isReplaced={workflowReady}
+              onOpenQuestionnaire={onOpenQuestionnaire}
+              onOpenWorkspaceTarget={onOpenWorkspaceTarget}
+              onUploadApplicantFile={onUploadApplicantFile}
+              submission={submission}
+            />
+          </SubmissionWorkflowSwitch>
         ) : null}
         {error ? (
           <span className="v19-applicant-submit-error" role="alert">
@@ -617,25 +700,6 @@ function profileNoun(count: number) {
   if (last === 1) return "профиль";
   if (last >= 2 && last <= 4) return "профиля";
   return "профилей";
-}
-
-function queueFilterLabel(filter: AgentSubmissionQueueFilter) {
-  if (filter === "blockers") return "Блокеры";
-  if (filter === "review") return "Проверить";
-  if (filter === "ready") return "К выгрузке";
-  return "";
-}
-
-function typeFilterLabel(filter: SubmissionTypeFilter) {
-  if (filter === "family") return "Семья";
-  if (filter === "single") return "Заявитель";
-  return "Все типы";
-}
-
-function sortLabel(sort: ApplicantSort) {
-  if (sort === "createdAsc") return "Сначала старые";
-  if (sort === "tripDate") return "По дате поездки";
-  return "Сначала новые";
 }
 
 function sortedSubmissions(
@@ -761,15 +825,6 @@ export function ApplicantsScreen({
     cityFilter !== "Все города" ||
     searchQuery.trim().length > 0 ||
     sortBy !== "createdDesc";
-  const activeFilterContext = [
-    typeFilterLabel(typeFilter),
-    queueFilterLabel(summaryFilter),
-    cityFilter !== "Все города" ? cityFilter : "",
-    searchQuery.trim() ? "Поиск" : "",
-    sortLabel(sortBy),
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   const resetFilters = () => {
     changeTypeFilter("all");
@@ -866,11 +921,7 @@ export function ApplicantsScreen({
           actionDisabled={!hasActiveFilters}
           actionLabel="Все"
           className="v19-admin-export-list-head-v2"
-          countLabel={
-            hasActiveFilters
-              ? `${activeFilterContext} · ${displayedSubmissions.length}/${metrics.queue}`
-              : `${metrics.queue} ${profileNoun(metrics.queue)}`
-          }
+          countLabel={`${displayedSubmissions.length}`}
           onAction={resetFilters}
           title="Мои подачи"
         />

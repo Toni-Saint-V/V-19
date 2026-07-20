@@ -10,12 +10,12 @@ import {
   drawerTabInitial,
   useDrawerDesktopQuery,
 } from "../shared/ui/drawer/drawerMotion";
+import { StatusBadge } from "../shared/ui/primitives";
 import {
   AlertCircle,
   Briefcase,
   Calendar,
   CheckCircle2,
-  Clock,
   CreditCard,
   Edit3,
   FileDigit,
@@ -24,7 +24,6 @@ import {
   Image as ImageIcon,
   MapPin,
   Plane,
-  ShieldAlert,
   UploadCloud,
   User,
   X,
@@ -32,7 +31,11 @@ import {
 
 import { historyTimestampForUser } from "../modules/submissions/historyPresentation";
 import { submissionPublicId } from "../modules/submissions/submissionIdentity";
-import { getPrimaryAction, statusLabelFor } from "../modules/submissions/status";
+import {
+  getPrimaryAction,
+  statusLabelFor,
+  statusTone,
+} from "../modules/submissions/status";
 import type {
   DrawerTab,
   Issue,
@@ -375,57 +378,6 @@ function primaryButtonToneClass(action: SubmissionAction) {
   }
   return "bg-[var(--v19b-color-control)] hover:bg-[var(--v19b-color-control-hover)]";
 }
-
-const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
-  const baseClassName =
-    "v19-submission-drawer-status inline-flex min-h-6 items-center gap-1.5 rounded-[var(--v19b-radius-pill)] border px-2.5 py-1 text-[11px] font-medium normal-case tracking-normal";
-
-  switch (status) {
-    case "in_progress":
-      return (
-        <span
-          className={`${baseClassName} border-[var(--vf-accent-border)] bg-[var(--vf-accent-soft)] [color:var(--v19b-color-primary-text)]`}
-        >
-          <Clock className="w-3.5 h-3.5" /> В работе
-        </span>
-      );
-    case "requires_action":
-    case "returned":
-      return (
-        <span
-          className={`${baseClassName} is-returned border-[var(--vf-danger-border)] bg-[var(--vf-danger-soft)] [color:var(--vf-danger)]`}
-        >
-          <AlertCircle className="w-3.5 h-3.5" /> {statusLabelFor(status)}
-        </span>
-      );
-    case "corrections_received":
-    case "submitted_for_review":
-      return (
-        <span
-          className={`${baseClassName} is-review border-[var(--vf-warning-border)] bg-[var(--vf-warning-soft)] [color:var(--vf-warning)]`}
-        >
-          <ShieldAlert className="w-3.5 h-3.5" /> {statusLabelFor(status)}
-        </span>
-      );
-    case "exported":
-    case "ready_for_export":
-      return (
-        <span
-          className={`${baseClassName} is-ready border-[var(--vf-success-border)] bg-[var(--vf-success-soft)] [color:var(--vf-success)]`}
-        >
-          <CheckCircle2 className="w-3.5 h-3.5" /> {statusLabelFor(status)}
-        </span>
-      );
-    default:
-      return (
-        <span
-          className={`${baseClassName} border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] [color:var(--v19b-color-text-muted)]`}
-        >
-          <FileText className="w-3.5 h-3.5" /> {statusLabelFor(status)}
-        </span>
-      );
-  }
-};
 
 const OverviewTab = ({
   data,
@@ -1062,42 +1014,19 @@ export function Drawer({
             </div>
 
             <header className="px-4 lg:px-6 pt-2 pb-0 bg-[var(--v19b-color-deep-drawer-95)] backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-[var(--v19b-color-border-faint)]">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <div className="min-w-0 flex-1 flex flex-wrap lg:flex-nowrap items-center gap-x-3 gap-y-1">
-                  <div className="flex shrink-0 items-center gap-2 text-[10px] lg:text-[11px] [color:var(--v19b-color-text-50)]">
-                    <span className="font-mono font-medium tracking-wider [color:var(--v19b-color-text-70)]">
-                      {data.id}
-                    </span>
-                    <span className="w-1 h-1 rounded-full bg-[var(--v19b-color-text-25)]" />
-                    <span className="uppercase tracking-wider">
-                      {data.type === "family" ? "Семейная" : "Индивидуальная"}
-                    </span>
-                  </div>
-                  <h2
-                    id="submission-drawer-heading"
-                    className="min-w-0 truncate text-[18px] lg:text-[19px] font-semibold [color:var(--v19b-color-text-strong)] leading-tight tracking-tight"
-                  >
-                    {data.title}
-                  </h2>
-                  <div className="flex shrink-0 items-center gap-1.5 lg:ml-auto">
-                    <StatusBadge status={data.status} />
-                    <span className="text-[12px] [color:var(--v19b-color-text-40)] flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" /> Обновлено {data.updated}
-                    </span>
-                  </div>
-                </div>
+              <h2 id="submission-drawer-heading" className="sr-only">
+                {data.title}
+              </h2>
+              <button
+                aria-label="Закрыть подачу"
+                className="hidden lg:flex absolute top-2 right-6 w-9 h-9 items-center justify-center bg-[var(--v19b-color-control)] hover:bg-[var(--v19b-color-control-hover)] [color:var(--v19b-color-text-70)] hover:[color:var(--v19b-color-text-strong)] rounded-[var(--v19b-radius-control)] transition-colors border border-[var(--v19b-color-border-faint)] hover:border-[var(--v19b-color-border-soft)]"
+                type="button"
+                onClick={onClose}
+              >
+                <X className="w-5 h-5" />
+              </button>
 
-                <button
-                  aria-label="Закрыть подачу"
-                  className="hidden lg:flex w-9 h-9 items-center justify-center bg-[var(--v19b-color-control)] hover:bg-[var(--v19b-color-control-hover)] [color:var(--v19b-color-text-70)] hover:[color:var(--v19b-color-text-strong)] rounded-[var(--v19b-radius-control)] transition-colors border border-[var(--v19b-color-border-faint)] hover:border-[var(--v19b-color-border-soft)]"
-                  type="button"
-                  onClick={onClose}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="w-full overflow-x-auto scrollbar-hide -mx-4 px-4 lg:mx-0 lg:px-0">
+              <div className="w-full overflow-x-auto scrollbar-hide -mx-4 px-4 lg:mx-0 lg:px-0 lg:pr-12">
                 <div
                   className="flex items-center gap-1.5 w-max mb-[-1px]"
                   role="tablist"
@@ -1192,10 +1121,22 @@ export function Drawer({
 
             <footer className="p-4 lg:px-8 lg:py-5 border-t border-[var(--v19b-color-border-soft)] bg-[var(--v19b-color-deep-drawer-95)] backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
               <div
-                className="text-[12px] [color:var(--v19b-color-text-40)] hidden sm:block"
-                role={actionError ? "alert" : undefined}
+                className="v19-drawer-lifecycle-context"
+                data-testid="drawer-lifecycle-context"
               >
-                {footerStatusText}
+                <div className="v19-drawer-lifecycle-identity">
+                  <span>{data.id}</span>
+                  <strong>{data.title}</strong>
+                </div>
+                <div className="v19-drawer-lifecycle-status">
+                  <StatusBadge
+                    label={statusLabelFor(data.status, "full")}
+                    tone={statusTone[data.status]}
+                  />
+                  <span role={actionError ? "alert" : undefined}>
+                    {footerStatusText}
+                  </span>
+                </div>
               </div>
               <div className="flex gap-3 w-full sm:w-auto">
                 <button

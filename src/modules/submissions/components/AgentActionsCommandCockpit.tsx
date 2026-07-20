@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
-import { UserRound, UsersRound } from "lucide-react";
-
 import { Badge, Button } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
+import { OperationalTableHeader } from "../../../shared/ui/OperationalTableHeader";
 import {
   V19SignalButton,
   type V19SignalButtonTone,
@@ -37,6 +35,8 @@ type AgentActionsCommandCockpitProps = {
   errorMessage?: string;
   loading?: boolean;
   selectedTask?: AgentActionTask;
+  showDesktopContext?: boolean;
+  showSummary?: boolean;
   summary: AgentActionTaskSummary;
   summaryTasks?: AgentActionTask[];
   tasks: AgentActionTask[];
@@ -56,6 +56,8 @@ export function AgentActionsCommandCockpit({
   errorMessage = "",
   loading = false,
   selectedTask,
+  showDesktopContext = true,
+  showSummary = true,
   summary,
   summaryTasks,
   tasks,
@@ -67,30 +69,9 @@ export function AgentActionsCommandCockpit({
   onSelectTask,
   onSummaryFilterChange,
 }: AgentActionsCommandCockpitProps) {
-  const [mobileDetailTaskId, setMobileDetailTaskId] = useState<string | null>(null);
-  const mobileDetailTask =
-    tasks.find((task) => task.id === mobileDetailTaskId) ?? null;
-
-  useEffect(() => {
-    if (!mobileDetailTaskId) return;
-    if (tasks.some((task) => task.id === mobileDetailTaskId)) return;
-    setMobileDetailTaskId(null);
-  }, [mobileDetailTaskId, tasks]);
-
-  useEffect(() => {
-    if (!mobileDetailTask) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileDetailTaskId(null);
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [mobileDetailTask]);
-
-  function openMobileDetail(task: AgentActionTask) {
+  function openMobileDrawer(task: AgentActionTask) {
     onSelectTask(task);
-    setMobileDetailTaskId(task.id);
+    onOpenSecondary(task);
   }
 
   if (errorMessage) {
@@ -115,12 +96,14 @@ export function AgentActionsCommandCockpit({
         aria-busy="true"
         aria-label="Загрузка действий"
       >
-        <CockpitSummary
-          activeFilter={activeSummaryFilter}
-          summary={summary}
-          tasks={summaryTasks ?? tasks}
-          onFilterChange={onSummaryFilterChange}
-        />
+        {showSummary ? (
+          <CockpitSummary
+            activeFilter={activeSummaryFilter}
+            summary={summary}
+            tasks={summaryTasks ?? tasks}
+            onFilterChange={onSummaryFilterChange}
+          />
+        ) : null}
         <div className="v19-actions-loading-grid">
           {["loading-1", "loading-2", "loading-3"].map((item) => (
             <div className="v19-actions-loading-card" key={item} />
@@ -152,20 +135,36 @@ export function AgentActionsCommandCockpit({
       data-testid="agent-actions-cockpit"
       aria-label="Очередь действий агента"
     >
-      <CockpitSummary
-        activeFilter={activeSummaryFilter}
-        summary={summary}
-        tasks={summaryTasks ?? tasks}
-        onFilterChange={onSummaryFilterChange}
-      />
+      {showSummary ? (
+        <CockpitSummary
+          activeFilter={activeSummaryFilter}
+          summary={summary}
+          tasks={summaryTasks ?? tasks}
+          onFilterChange={onSummaryFilterChange}
+        />
+      ) : null}
 
-      <div className="v19-actions-desktop-grid">
+      <div
+        className={cn(
+          "v19-actions-desktop-grid",
+          !showDesktopContext && "is-queue-only",
+        )}
+      >
         <section
           className="v19-actions-queue-panel"
           aria-label="Очередь действий"
           data-testid="agent-action-queue"
         >
           <PanelEyebrow label="Очередь" />
+          <OperationalTableHeader
+            className="v19-actions-table-head"
+            columns={[
+              { key: "submission", label: "Подача" },
+              { key: "task", label: "Заявитель / задача" },
+              { key: "dates", label: "Даты поездки" },
+              { key: "status", label: "Статус" },
+            ]}
+          />
           <div className="v19-actions-queue-list">
             {tasks.map((task) => (
               <ActionTaskCard
@@ -178,13 +177,15 @@ export function AgentActionsCommandCockpit({
           </div>
         </section>
 
-        <ActionSummaryPanel
-          task={activeTask}
-          onOpenIssue={(issue) => onOpenIssue(activeTask, issue)}
-          onOpenPrimary={() => onOpenPrimary(activeTask)}
-          onOpenSecondary={() => onOpenSecondary(activeTask)}
-          onOpenTab={(tab) => onOpenTab(activeTask, tab)}
-        />
+        {showDesktopContext ? (
+          <AgentActionContextPanel
+            task={activeTask}
+            onOpenIssue={(issue) => onOpenIssue(activeTask, issue)}
+            onOpenPrimary={() => onOpenPrimary(activeTask)}
+            onOpenSecondary={() => onOpenSecondary(activeTask)}
+            onOpenTab={(tab) => onOpenTab(activeTask, tab)}
+          />
+        ) : null}
       </div>
 
       <section
@@ -199,34 +200,11 @@ export function AgentActionsCommandCockpit({
               key={task.id}
               selected={activeTask.id === task.id}
               task={task}
-              onSelect={() => openMobileDetail(task)}
+              onSelect={() => openMobileDrawer(task)}
             />
           ))}
         </div>
       </section>
-
-      {mobileDetailTask ? (
-        <MobileActionDetail
-          task={mobileDetailTask}
-          onClose={() => setMobileDetailTaskId(null)}
-          onOpenIssue={(issue) => {
-            setMobileDetailTaskId(null);
-            onOpenIssue(mobileDetailTask, issue);
-          }}
-          onOpenPrimary={() => {
-            setMobileDetailTaskId(null);
-            onOpenPrimary(mobileDetailTask);
-          }}
-          onOpenSecondary={() => {
-            setMobileDetailTaskId(null);
-            onOpenSecondary(mobileDetailTask);
-          }}
-          onOpenTab={(tab) => {
-            setMobileDetailTaskId(null);
-            onOpenTab(mobileDetailTask, tab);
-          }}
-        />
-      ) : null}
     </div>
   );
 }
@@ -365,6 +343,7 @@ function ActionTaskCard({
     <button
       className={cn(
         "v19-actions-queue-item",
+        "v19-actions-table-row",
         `status-${task.status}`,
         selected && "is-selected",
       )}
@@ -377,28 +356,26 @@ function ActionTaskCard({
       onClick={onSelect}
     >
       <span className="v19-actions-queue-strip" aria-hidden="true" />
-      <span className="v19-actions-queue-icon" aria-hidden="true">
-        {task.submission.type === "family" ? (
-          <UsersRound size={17} />
-        ) : (
-          <UserRound size={17} />
-        )}
+      <span className="v19-actions-table-submission">
+        <span>
+          <strong>{submissionPublicId(task.submission)}</strong>
+          <small>{safeCity(task.submission.city)}</small>
+        </span>
       </span>
-      <span className="v19-actions-queue-main">
-        <span className="v19-actions-queue-topline">
-          <strong>{task.applicantName || formatSubmissionListTitle(task.submission)}</strong>
-        </span>
-        <span className="v19-actions-queue-facts">
-          <span>{dateLabel}</span>
-          <span>{safeCity(task.submission.city)}</span>
-          <span>{submissionPublicId(task.submission)}</span>
-        </span>
+      <span className="v19-actions-table-task">
+        <strong>{task.applicantName || formatSubmissionListTitle(task.submission)}</strong>
+        <small>{task.problem}</small>
+      </span>
+      <span className="v19-actions-table-dates">{dateLabel}</span>
+      <span className="v19-actions-table-status">
+        <StatusBadge status={task.status} label={task.statusLabel} />
+        <small>{task.nextAction.label}</small>
       </span>
     </button>
   );
 }
 
-function ActionSummaryPanel({
+export function AgentActionContextPanel({
   task,
   onOpenIssue,
   onOpenPrimary,
@@ -414,6 +391,7 @@ function ActionSummaryPanel({
   const openIssues = task.submission.issues.filter((issue) => issue.status === "open");
   const disabledReason = primaryActionDisabledReason(task);
   const disabledReasonId = `${stableDomId(task.id)}-primary-disabled-reason`;
+  const publicId = submissionPublicId(task.submission);
 
   return (
     <section
@@ -423,14 +401,33 @@ function ActionSummaryPanel({
     >
       <div className="v19-actions-active-head">
         <div>
-          <p>Сводка</p>
+          <p>
+            {publicId} · {safeCity(task.submission.city)}
+          </p>
           <h3>{formatSubmissionListTitle(task.submission)}</h3>
         </div>
         <StatusBadge status={task.status} label={task.statusLabel} />
       </div>
 
-      <div className="v19-actions-task-problem" aria-label="Проблема и причина">
-        <p>Проблема</p>
+      <div
+        className="v19-actions-context-progress"
+        aria-label={`Готовность подачи ${task.readiness.overallPercent}%`}
+      >
+        <span>
+          <small>Готовность подачи</small>
+          <strong>{task.readiness.overallPercent}%</strong>
+        </span>
+        <progress max={100} value={task.readiness.overallPercent} />
+      </div>
+
+      <div className="v19-actions-task-problem" aria-label="Следующее действие">
+        <p>Следующее действие</p>
+        <strong>{task.nextAction.label}</strong>
+        <span>{task.nextAction.detail}</span>
+      </div>
+
+      <div className="v19-actions-next-copy" aria-label="Причина действия">
+        <p>Почему сейчас</p>
         <strong>{task.problem}</strong>
         <span>{task.reason}</span>
       </div>
@@ -469,11 +466,6 @@ function ActionSummaryPanel({
           label="Заявители"
           value={applicantCountLabel(task.submission.applicants.length)}
         />
-      </div>
-
-      <div className="v19-actions-next-copy" aria-label="Что сделать дальше">
-        <p>Следующее</p>
-        <span>{task.nextAction.detail}</span>
       </div>
 
       <div className="v19-actions-detail-footer">
@@ -603,9 +595,8 @@ function TimelineEvent({
   task: AgentActionTask;
   onSelect: () => void;
 }) {
-  const owner = actionOwnerLabel(task);
-  const readiness = readinessPercentLabel(task);
   const submissionId = submissionPublicId(task.submission);
+  const dateLabel = tripDates(task.submission);
 
   return (
     <article
@@ -620,83 +611,25 @@ function TimelineEvent({
       <span className="v19-actions-timeline-node" aria-hidden="true" />
       <button
         className="v19-actions-timeline-hit"
+        aria-label={`Открыть действие: ${task.statusLabel}. ${formatSubmissionListTitle(task.submission)}. ${task.problem}`}
         type="button"
         onClick={onSelect}
       >
-        <span className="v19-actions-timeline-title">
-          <strong>{task.statusLabel}</strong>
+        <span className="v19-actions-mobile-cell-top">
           <small>{submissionId}</small>
+          <span>{task.statusLabel}</span>
         </span>
-        <span className="v19-actions-timeline-state">
+        <strong className="v19-actions-mobile-cell-title">
           {formatSubmissionListTitle(task.submission)}
+        </strong>
+        <span className="v19-actions-mobile-cell-route">
+          <span>{safeCity(task.submission.city)}</span>
+          <i aria-hidden="true" />
+          <span>{dateLabel}</span>
         </span>
-        <span className="v19-actions-queue-scope">{queueSubjectText(task)}</span>
-        <span className="v19-actions-timeline-state">
-          {safeCity(task.submission.city)}
-        </span>
-        <span className="v19-actions-timeline-state">Причина: {task.reason}</span>
-        <span className="v19-actions-timeline-state">Ответственный: {owner}</span>
-        {task.priority.reason ? (
-          <span className="v19-actions-timeline-meta">{priorityCopy(task)}</span>
-        ) : null}
-        <span className="v19-actions-timeline-state">
-          Следующее: {task.nextAction.label}
-        </span>
-        <span className="v19-actions-timeline-state">{readiness}</span>
+        <span className="v19-actions-mobile-cell-reason">{task.problem}</span>
       </button>
     </article>
-  );
-}
-
-function MobileActionDetail({
-  task,
-  onClose,
-  onOpenIssue,
-  onOpenPrimary,
-  onOpenSecondary,
-  onOpenTab,
-}: {
-  task: AgentActionTask;
-  onClose: () => void;
-  onOpenIssue: (issue: Issue) => void;
-  onOpenPrimary: () => void;
-  onOpenSecondary: () => void;
-  onOpenTab: (tab: DrawerTab) => void;
-}) {
-  return (
-    <div className="v19-actions-mobile-overlay" role="presentation">
-      <button
-        className="v19-actions-mobile-backdrop"
-        type="button"
-        onClick={onClose}
-      >
-        <span className="sr-only">Закрыть детали действия</span>
-      </button>
-      <section
-        className="v19-actions-mobile-detail"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Детали действия ${formatSubmissionListTitle(task.submission)}`}
-        data-testid="agent-action-mobile-detail"
-      >
-        <div className="v19-actions-mobile-detail-head">
-          <div>
-            <p>Сводка действия</p>
-            <h3>{formatSubmissionListTitle(task.submission)}</h3>
-          </div>
-          <button aria-label="Закрыть детали действия" type="button" onClick={onClose}>
-            Закрыть
-          </button>
-        </div>
-        <ActionSummaryPanel
-          task={task}
-          onOpenIssue={onOpenIssue}
-          onOpenPrimary={onOpenPrimary}
-          onOpenSecondary={onOpenSecondary}
-          onOpenTab={onOpenTab}
-        />
-      </section>
-    </div>
   );
 }
 
@@ -714,18 +647,6 @@ function queueSubjectText(task: AgentActionTask) {
   return task.problemScope === "applicant" ? task.applicantName : "Вся подача";
 }
 
-function priorityCopy(task: AgentActionTask) {
-  if (!task.priority.reason) return "";
-  return `${task.priority.label}: ${lowercaseFirst(task.priority.reason)}`;
-}
-
-function actionOwnerLabel(task: AgentActionTask) {
-  if (task.status === "in_review") return "Проверка админом";
-  if (task.status === "ready") return "Агент может отправить";
-  if (task.status === "blocked") return "Ожидание внешнего события";
-  return "Действие за агентом";
-}
-
 function primaryActionDisabledReason(task: AgentActionTask) {
   if (task.status === "blocked") {
     return "Действие недоступно: агент ждёт внешнее событие.";
@@ -734,19 +655,10 @@ function primaryActionDisabledReason(task: AgentActionTask) {
   return "";
 }
 
-function readinessPercentLabel(task: AgentActionTask) {
-  return `Готовность ${task.readiness.overallPercent}%`;
-}
-
 function safeCity(city: string) {
   return city.trim() || "Город не указан";
 }
 
 function stableDomId(value: string) {
   return value.replace(/[^A-Za-z0-9_-]/g, "-");
-}
-
-function lowercaseFirst(value: string) {
-  if (!value) return value;
-  return value[0].toLocaleLowerCase("ru-RU") + value.slice(1);
 }

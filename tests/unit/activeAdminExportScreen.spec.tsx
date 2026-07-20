@@ -83,11 +83,13 @@ describe("active admin export screen", () => {
     const { container } = render(<AdminExportScreen submissions={[submission]} />);
 
     expect(
-      container.querySelector(".v19-admin-export-row-submission-v2"),
+      container.querySelector(".v19-admin-export-row-identity-v2"),
     ).toBeInTheDocument();
     expect(
-      container.querySelector(".v19-admin-export-row-agent-v2"),
+      container.querySelector(".v19-admin-export-row-city-v2"),
     ).toBeInTheDocument();
+    expect(container.querySelector(".v19-admin-export-row-agent-v2"))
+      .toBeInTheDocument();
 
     const packageCheckbox = screen.getByRole("checkbox", {
       name: `Выбрать ${submission.listTitle ?? submission.title}`,
@@ -108,6 +110,50 @@ describe("active admin export screen", () => {
       within(table).getByText(preview.rows[0]?.[passportColumn] ?? "missing-passport"),
     ).toBeInTheDocument();
     expect(screen.getByText("A:BD · 56 колонок · 1 строка")).toBeInTheDocument();
+  });
+
+  test("counts only canonical family media and keeps one Excel row per tourist", async () => {
+    const submission = initialSubmissions.find((item) => item.id === "SUB-1102");
+    if (!submission) {
+      throw new Error("Missing family export fixture SUB-1102");
+    }
+
+    render(<AdminExportScreen submissions={[submission]} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `Выбрать ${submission.listTitle ?? submission.title}`,
+      }),
+    );
+
+    const table = await screen.findByRole("table", {
+      name: "Excel Preview Sheet1",
+    });
+    expect(within(table).getAllByRole("row")).toHaveLength(4);
+    expect(screen.getByText("A:BD · 56 колонок · 3 строки")).toBeInTheDocument();
+    expect(screen.getByText("5 файлов")).toBeInTheDocument();
+    expect(screen.queryByText("9 файлов")).not.toBeInTheDocument();
+  });
+
+  test("keeps canonical media counts in package control without repeating them in the queue row", () => {
+    const submission = initialSubmissions.find((item) => item.id === "SUB-1102");
+    if (!submission) {
+      throw new Error("Missing family export fixture SUB-1102");
+    }
+    const ambiguousPrimary: Submission = {
+      ...submission,
+      applicants: submission.applicants.map((applicant) => ({
+        ...applicant,
+        role: "main",
+      })),
+    };
+
+    render(<AdminExportScreen submissions={[ambiguousPrimary]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Стоп" }));
+
+    const filesMetric = screen.getByText("Файлы").parentElement;
+    expect(filesMetric).not.toBeNull();
+    expect(within(filesMetric as HTMLElement).getByText("3")).toBeInTheDocument();
+    expect(screen.queryByText(/Excel \+ \d+/)).not.toBeInTheDocument();
   });
 
   test("prepares Excel before exposing a real browser download link", async () => {

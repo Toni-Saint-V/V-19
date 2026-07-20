@@ -200,7 +200,8 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
   const mobileMenuButton = mobileMenuTrigger(page);
   const mobileNavigation = page
     .locator(".ops-shell.is-mobile-nav-open .ops-sidebar")
-    .or(page.getByRole("dialog", { exact: true, name: "Меню администратора" }));
+    .or(page.getByRole("dialog", { exact: true, name: "Меню администратора" }))
+    .or(page.getByRole("dialog", { exact: true, name: "Меню агента" }));
 
   if (
     (await hasAtLeastOneVisible(mobileMenuButton)) ||

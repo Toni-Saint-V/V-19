@@ -9,10 +9,22 @@ const expectedReferences = [
   ".agents/rules/visual-lock-tokens.md",
   "src/shared/ui/visual-baseline.css",
 ];
+const runtimeStyleImportsByOwner = new Map([
+  [
+    "src/main.tsx",
+    [
+      "src/shared/ui/tokens/index.css",
+      "src/shared/ui/system.css",
+      "src/shared/ui/visual-baseline.css",
+    ],
+  ],
+  [
+    "src/components/ReviewWorkspace.tsx",
+    ["src/shared/ui/review-workspace.css"],
+  ],
+]);
 const runtimeStyleFiles = [
-  "src/shared/ui/tokens/index.css",
-  "src/shared/ui/system.css",
-  "src/shared/ui/visual-baseline.css",
+  ...new Set([...runtimeStyleImportsByOwner.values()].flat()),
 ];
 const scannedRoots = ["docs", "src"].map((dir) => path.join(root, dir));
 const ignoredDirs = new Set([".git", "node_modules", "dist"]);
@@ -201,6 +213,40 @@ function verifyCssTokenContract() {
     }
   }
 
+  const expectedSemanticTokens = new Map([
+    ["--danger", "255 92 103"],
+    ["--warning", "245 158 11"],
+    ["--info", "96 165 250"],
+    ["--review", "143 163 255"],
+    ["--success", "52 211 153"],
+    ["--vf-red", "rgb(var(--danger))"],
+    ["--vf-yellow", "rgb(var(--warning))"],
+    ["--vf-green", "rgb(var(--success))"],
+    ["--vf-danger", "var(--vf-red)"],
+    ["--vf-warning", "var(--vf-yellow)"],
+    ["--vf-info", "rgb(var(--info))"],
+    ["--vf-review", "rgb(var(--review))"],
+    ["--vf-success", "var(--vf-green)"],
+    ["--vf-red-soft-bg", "var(--v19-depth-control)"],
+    ["--vf-yellow-soft-bg", "var(--v19-depth-control)"],
+    ["--vf-green-soft-bg", "var(--v19-depth-control)"],
+    ["--blue-review", "var(--vf-review)"],
+    ["--v19b-dot-danger", "#ff5c67"],
+    ["--v19b-dot-warning", "#f59e0b"],
+    ["--v19b-dot-info", "#60a5fa"],
+    ["--v19b-dot-review", "#8fa3ff"],
+    ["--v19b-dot-success", "#34d399"],
+  ]);
+
+  for (const [token, expectedValue] of expectedSemanticTokens) {
+    const actualValue = rootTokenValues.get(token);
+    if (actualValue !== expectedValue) {
+      failures.push(
+        `runtime semantic token ${token} expected ${expectedValue}, found ${actualValue ?? "missing"}`,
+      );
+    }
+  }
+
   const undefinedReferences = new Set();
   const combinedStyles = styleSources
     .map((styleSource) => styleSource.source)
@@ -259,20 +305,23 @@ function verifySingleStyleEntrypoint() {
 
   assertSameSet(
     [...new Set(cssImports.map((cssImport) => cssImport.owner))],
-    ["src/main.tsx"],
+    [...runtimeStyleImportsByOwner.keys()],
     "runtime stylesheet import owners",
   );
 
-  const expectedCssImports = runtimeStyleFiles;
-  const resolvedCssImports = cssImports.map((cssImport) => cssImport.resolved);
-
-  assertSameOrderedList(
-    resolvedCssImports,
-    expectedCssImports,
-    "src/main.tsx runtime stylesheet import order",
-  );
+  for (const [owner, expectedCssImports] of runtimeStyleImportsByOwner) {
+    const resolvedCssImports = cssImports
+      .filter((cssImport) => cssImport.owner === owner)
+      .map((cssImport) => cssImport.resolved);
+    assertSameOrderedList(
+      resolvedCssImports,
+      expectedCssImports,
+      `${owner} runtime stylesheet import order`,
+    );
+  }
 
   for (const cssImport of cssImports) {
+    const expectedCssImports = runtimeStyleImportsByOwner.get(cssImport.owner) ?? [];
     if (!expectedCssImports.includes(cssImport.resolved)) {
       failures.push(
         `${cssImport.owner} imports stylesheet ${cssImport.specifier}; expected approved V-19 runtime stylesheets`,

@@ -67,6 +67,14 @@
   background: var(--v19b-color-control-hover);
 }
 
+.v19-review-media-controls button:disabled,
+.v19-review-media-controls button:disabled:hover {
+  cursor: not-allowed;
+  color: var(--v19b-color-text-35);
+  background: var(--v19b-color-control);
+  opacity: var(--v19b-opacity-disabled);
+}
+
 .v19-review-back:active,
 .v19-review-download:active,
 .v19-review-media-controls button:active,
@@ -183,6 +191,13 @@
   background: var(--v19b-color-panel);
 }
 
+.v19-review-media-switcher {
+  flex: none;
+  padding: var(--v19b-size-10) var(--v19b-size-16);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+  background: var(--v19b-color-panel);
+}
+
 .v19-review-media-actions,
 .v19-review-filebar,
 .v19-review-media-controls {
@@ -239,6 +254,20 @@
   padding: var(--v19b-size-0) var(--v19b-size-12);
   font-size: var(--v19b-size-12);
   font-weight: var(--v19b-weight-control);
+}
+
+.v19-review-file-remark,
+.v19-review-field-remark {
+  border-color: var(--v19b-admin-orange-border);
+  color: var(--v19b-admin-orange);
+  background: var(--v19b-admin-orange-soft);
+}
+
+.v19-review-file-remark:hover,
+.v19-review-field-remark:hover {
+  border-color: var(--v19b-admin-orange);
+  color: var(--v19b-admin-orange);
+  background: var(--v19b-color-remark-hover-bg);
 }
 
 .v19-review-filebar {
@@ -393,6 +422,10 @@
   color: var(--v19b-admin-orange);
 }
 
+.v19-review-preview-state.is-unavailable strong {
+  color: var(--v19b-admin-orange);
+}
+
 .v19-review-preview-state a {
   color: var(--v19b-color-primary-text);
 }
@@ -419,6 +452,11 @@
 .v19-review-details-header h2,
 .v19-review-details-header p {
   margin: var(--v19b-size-0);
+}
+
+.v19-review-details-header.is-applicant-only {
+  min-height: var(--v19b-size-56);
+  justify-content: flex-end;
 }
 
 .v19-review-details-header h2 {
@@ -530,6 +568,7 @@
 }
 
 .v19-review-field-card.is-warning {
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
   border-color: var(--v19b-admin-orange-border);
   background: var(--v19b-admin-orange-soft);
 }
@@ -546,7 +585,7 @@
 
 .v19-review-field-label {
   overflow: hidden;
-  color: var(--v19b-color-text-40);
+  color: var(--v19b-color-text-muted);
   font-size: var(--v19b-size-10);
   font-weight: var(--v19b-weight-control);
   letter-spacing: var(--v19b-letter-spacing-label);
@@ -601,6 +640,15 @@
   border-color: var(--v19b-admin-orange-border);
   color: var(--v19b-admin-orange);
   background: var(--v19b-admin-orange-soft);
+}
+
+.v19-review-field-status.is-review {
+  position: absolute;
+  width: var(--v19b-size-1);
+  height: var(--v19b-size-1);
+  overflow: hidden;
+  clip-path: inset(var(--v19b-size-half));
+  white-space: nowrap;
 }
 
 .v19-review-field-remark {
@@ -775,6 +823,22 @@
 }
 
 @media (max-width: 1279px) {
+  .v19-review-field-grid {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  }
+
+  .v19-review-media-tabs button,
+  .v19-review-media-controls button,
+  .v19-review-applicant-progress button {
+    min-height: var(--v19b-size-40);
+  }
+
+  .v19-review-media-controls button {
+    min-width: var(--v19b-size-40);
+  }
+}
+
+@media (max-width: 1023px) {
   .v19-review-workspace {
     overflow-y: auto;
   }
@@ -804,25 +868,11 @@
     overflow: visible;
   }
 
-  .v19-review-field-grid {
-    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
-  }
-
   .v19-review-decision {
     grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) minmax(
         var(--v19b-size-320),
         var(--v19b-size-420)
       );
-  }
-
-  .v19-review-media-tabs button,
-  .v19-review-media-controls button,
-  .v19-review-applicant-progress button {
-    min-height: var(--v19b-size-40);
-  }
-
-  .v19-review-media-controls button {
-    min-width: var(--v19b-size-40);
   }
 }
 

@@ -75,7 +75,7 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
     }
   };
 
-  if (!enabled) return null;
+  if (!enabled || loading || (!error && packages.length === 0)) return null;
 
   return (
     <section className="mb-5 overflow-hidden rounded-2xl border border-[#242529] bg-[#161617]" data-testid="agent-return-packages-panel">
@@ -89,11 +89,7 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
         </div>
       </header>
 
-      {loading ? (
-        <div className="flex items-center gap-2 px-5 py-6 text-[13px] text-white/54">
-          <LoaderCircle className="h-4 w-4 animate-spin" /> Загрузка документов...
-        </div>
-      ) : packages.length ? (
+      {packages.length ? (
         <div className="divide-y divide-[#242529]">
           {packages.map((item) => (
             <article className="px-5 py-4" key={item.id}>
@@ -126,9 +122,7 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
             </article>
           ))}
         </div>
-      ) : (
-        <p className="m-0 px-5 py-6 text-[13px] text-white/48">Администратор пока не передал готовые документы.</p>
-      )}
+      ) : null}
 
       {error ? <p className="m-0 border-t border-[#513036] bg-[#281c20] px-5 py-3 text-[12px] text-[#ffbdc3]">{error}</p> : null}
     </section>

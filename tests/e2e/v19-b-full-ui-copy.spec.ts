@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { testArtifactPath } from "../support/artifacts";
 
 import { expect, test, type Page } from "@playwright/test";
-import { clickWorkspaceButton, isVisible } from "./v19-pilot-helpers";
+import {
+  clickWorkspaceButton,
+  isVisible,
+  openFreshWorkspace,
+} from "./v19-pilot-helpers";
 
 const proofDir = testArtifactPath("2026-07-01-b-full-ui-copy");
 
@@ -60,34 +64,12 @@ function collectBrowserProblems(page: Page) {
 
 async function openWorkspace(
   page: Page,
-  options: { email: string; heading: string; password?: string },
+  options: { email: string; heading: string },
 ) {
-  await page.goto("/");
-  await page.evaluate((email) => {
-    const browserGlobal = globalThis as unknown as {
-      localStorage: {
-        clear(): void;
-        setItem(key: string, value: string): void;
-      };
-    };
-
-    browserGlobal.localStorage.clear();
-    browserGlobal.localStorage.setItem("visaflow.workspaceEmail.v2", email);
-  }, options.email);
-  await page.reload();
-
-  const emailField = page.locator("#workspace-email");
-  if (await isVisible(emailField)) {
-    await emailField.fill(options.email);
-    await page
-      .locator("#workspace-password")
-      .fill(options.password ?? "local-dev-password");
-    await page.getByRole("button", { name: "Войти" }).click();
-  }
-
-  await expect(
-    page.getByRole("heading", { level: 1, name: options.heading }),
-  ).toBeVisible();
+  await openFreshWorkspace(page, {
+    heading: options.heading,
+    workspaceEmail: options.email,
+  });
 }
 
 async function openAgent(page: Page) {
@@ -100,7 +82,7 @@ async function openAgent(page: Page) {
 async function openAdmin(page: Page) {
   await openWorkspace(page, {
     email: "admin@visaflow.local",
-    heading: "Проверка",
+    heading: "Очередь на проверку",
   });
 }
 
@@ -206,12 +188,14 @@ async function closeOpenDialog(page: Page) {
   const dialog = page.getByRole("dialog").first();
   if (!(await isVisible(dialog))) return;
 
-  await page.keyboard.press("Escape");
+  await dialog.press("Escape");
   if (await isVisible(dialog)) {
     const closeButton = dialog
       .getByRole("button", { name: /Закрыть|Отмена|Назад/ })
       .first();
-    if (await isVisible(closeButton)) await closeButton.click();
+    if (await isVisible(closeButton)) {
+      await closeButton.evaluate((button: HTMLButtonElement) => button.click());
+    }
   }
   await expect(page.getByRole("dialog")).toHaveCount(0);
 }
@@ -224,11 +208,8 @@ async function exerciseAgentActions(page: Page) {
 
   if (await isVisible(mobileEvent)) {
     await mobileEvent.locator(".v19-actions-timeline-hit").click();
-    await expect(page.getByTestId("agent-action-mobile-detail")).toBeVisible();
-    await page
-      .getByTestId("agent-action-mobile-detail")
-      .getByRole("button", { name: "Заменить файл" })
-      .click();
+    await expect(page.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
+    await expect(page.getByRole("dialog").first()).toBeVisible();
     await closeOpenDialog(page);
     return;
   }
@@ -238,7 +219,8 @@ async function exerciseAgentActions(page: Page) {
   await queueItem.click();
   const activePanel = page.getByTestId("agent-action-active-panel");
   await expect(activePanel).toBeVisible();
-  await activePanel.getByRole("button", { name: "Заменить файл" }).click();
+  await activePanel.locator(".v19-actions-summary-cta button").last().click();
+  await expect(page.getByRole("dialog").first()).toBeVisible();
   await closeOpenDialog(page);
 }
 
@@ -247,67 +229,65 @@ async function exerciseMySubmissions(page: Page) {
   await expect(
     page.getByRole("heading", { level: 1, name: "Мои подачи" }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: /^Все/ }).click();
-  const submissionRow = page.locator(".v19-submission-row").first();
-  await expect(submissionRow).toBeVisible();
-  await submissionRow.click();
+  const submissionCard = page.getByRole("article", { name: /^Подача / }).first();
+  await expect(submissionCard).toBeVisible();
+  await submissionCard.click();
   await closeOpenDialog(page);
 }
 
 async function exerciseReview(page: Page) {
-  await page.getByRole("tab", { name: /На проверке/ }).click();
-  const reviewRow = page.locator(".v17-admin-work-row, .v17-admin-empty-state").first();
-  await expect(reviewRow).toBeVisible();
-  if (await isVisible(page.locator(".v17-admin-work-row").first())) {
-    await page.locator(".v17-admin-work-row").first().click();
+  const reviewMetric = page.getByRole("button", { name: "Ревью", exact: true });
+  const correctionsMetric = page.getByRole("button", {
+    name: "Правки",
+    exact: true,
+  });
+  await reviewMetric.click();
+  await expect(reviewMetric).toHaveAttribute("aria-pressed", "true");
+
+  const reviewCard = page
+    .getByRole("button", { name: /Ручная проверка заявки/ })
+    .first();
+  if (await isVisible(reviewCard)) {
+    await reviewCard.click();
     await closeOpenDialog(page);
   }
-  await page.getByRole("tab", { name: /Исправления получены/ }).click();
-  await expect(
-    page.locator(".v17-admin-work-row, .v17-admin-empty-state").first(),
-  ).toBeVisible();
-  await page.getByRole("tab", { name: /На проверке/ }).click();
+
+  await correctionsMetric.click();
+  await expect(correctionsMetric).toHaveAttribute("aria-pressed", "true");
+  await reviewMetric.click();
 }
 
 async function exerciseExport(page: Page) {
   await clickWorkspaceButton(page, /^Выгрузка/);
-  await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
-  await page.getByRole("tab", { name: /Готово к выгрузке/ }).click();
-
-  const selectAll = page.getByLabel("Выбрать все совместимые");
-  if (await isVisible(selectAll)) await selectAll.check();
-
   await expect(
-    page
-      .locator(
-        ".magic-export-list table, .magic-export-list .export-row, .vf-figma-family-card, .vf-figma-individual-card",
-      )
-      .first(),
+    page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
   ).toBeVisible();
-  const preview = page
-    .locator(".magic-export-preview, .v17-export-checks-card")
+  await page.getByRole("button", { name: "Доступно", exact: true }).click();
+
+  const exportRow = page.locator(".v19-admin-export-row-v2").first();
+  await expect(exportRow).toBeVisible();
+  const selectable = page
+    .locator('.v19-admin-export-row-v2 input[type="checkbox"]:not(:disabled)')
     .first();
+  if (await isVisible(selectable)) await selectable.check();
+
+  const preview = page.getByRole("region", {
+    name: "Панель контроля выгрузки",
+  });
   const panelToggle = page
-    .getByRole("button", {
-      name: /Контракт выгрузки открыт|Открыть контракт выгрузки/,
-    })
+    .getByRole("button", { name: /Контроль пакета/ })
     .first();
   const panelWasOpen = await isVisible(preview);
-
-  if (!panelWasOpen) {
-    await panelToggle.click();
-  }
+  if (!panelWasOpen) await panelToggle.click();
 
   await expect(preview).toBeVisible();
   await expect(page.getByRole("button", { name: "Сформировать Excel" })).toBeVisible();
 
   if (!panelWasOpen) {
-    const closePanel = page.getByRole("button", { name: "Закрыть панель" }).first();
-    if (await isVisible(closePanel)) {
-      await closePanel.click();
-    } else {
-      await panelToggle.click();
-    }
+    await page
+      .getByRole("button", { name: "Закрыть контроль пакета" })
+      .first()
+      .click();
     await expect(preview).toBeHidden();
   }
 }

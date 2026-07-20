@@ -49,17 +49,18 @@ export function ReviewPassportFieldRow({
         <strong>
           {hasAdminPassportReviewValue(field.value) ? field.value : "Не заполнено"}
         </strong>
-        {valid ? null : <small>Поле отсутствует или содержит ошибку</small>}
       </div>
 
-      <span className={`v19-review-field-status is-${state}`}>
-        {field.alreadyApproved ? (
-          <CheckCircle2 aria-hidden="true" />
-        ) : (
-          <AlertCircle aria-hidden="true" />
-        )}
-        {statusLabel}
-      </span>
+      {state === "warning" ? null : (
+        <span className={`v19-review-field-status is-${state}`}>
+          {field.alreadyApproved ? (
+            <CheckCircle2 aria-hidden="true" />
+          ) : (
+            <AlertCircle aria-hidden="true" />
+          )}
+          {statusLabel}
+        </span>
+      )}
 
       <button
         aria-label={`Добавить замечание: ${field.label}`}

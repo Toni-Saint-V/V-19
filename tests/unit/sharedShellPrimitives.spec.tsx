@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { BottomSheet, StatusTabs } from "../../src/shared/ui/primitives";
+import { OperationalTableHeader } from "../../src/shared/ui/OperationalTableHeader";
 import {
   ContextPanel,
   PanelActionFooter,
@@ -24,6 +25,24 @@ afterEach(() => {
 });
 
 describe("shared shell primitives", () => {
+  test("keeps operational visual headers presentation-only without orphaned grid roles", () => {
+    render(
+      <section aria-label="Очередь">
+        <OperationalTableHeader
+          columns={[
+            { key: "submission", label: "Подача" },
+            { key: "status", label: "Статус" },
+          ]}
+          leadingControl={<button type="button">Выбрать все</button>}
+        />
+      </section>,
+    );
+
+    expect(screen.queryByRole("row")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Выбрать все" })).toBeEnabled();
+  });
+
   test("owns operational metrics through one canonical design-system class", () => {
     const { container } = render(
       <V19MetricStrip>
@@ -86,11 +105,13 @@ describe("shared shell primitives", () => {
             </>
           }
           publicId="VF-1060"
+          queuePosition={1}
           shellDetail="Анкета"
           shellIcon={TestIcon}
           shellLabel="Задача"
           shellMeta="Сегодня"
           title="ANTON VOLKOV"
+          tripDates="22.07–31.07"
           onClick={handleOpen}
         />
       </V19OperationalCardGrid>,
@@ -110,10 +131,15 @@ describe("shared shell primitives", () => {
     expect(container.querySelector(".v19-operational-card-body")).toBeInTheDocument();
     expect(container.querySelector(".v19-operational-card-meta")).toHaveTextContent("VF-1060");
     expect(container.querySelector(".v19-operational-card-meta")).toHaveTextContent("2 чел.");
+    expect(
+      container.querySelector(".v19-operational-card-sequence"),
+    ).toHaveTextContent("1");
     expect(container.querySelector(".v19-operational-card-location")).toHaveTextContent(
       "Москва",
     );
-    expect(container.querySelector(".v19-submission-trip-dates")).not.toBeInTheDocument();
+    expect(container.querySelector(".v19-submission-trip-dates")).toHaveTextContent(
+      "22.07–31.07",
+    );
     expect(container.querySelector(".v19-admin-review-card")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /ANTON VOLKOV/ }));

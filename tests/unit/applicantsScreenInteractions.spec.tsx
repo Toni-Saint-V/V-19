@@ -115,6 +115,79 @@ describe("ApplicantsScreen interactions", () => {
     ).toHaveLength(4);
   });
 
+  it("opens the matching drawer from the card without stealing nested actions", () => {
+    const submission = createSubmission("single");
+    const onOpenDrawer = vi.fn();
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={onOpenDrawer}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+
+    const card = screen.getByRole("article", {
+      name: `Подача ${submission.applicants[0]!.fullName}`,
+    });
+    fireEvent.click(card);
+    expect(onOpenDrawer).toHaveBeenCalledOnce();
+    expect(onOpenDrawer).toHaveBeenCalledWith(submission.id);
+
+    fireEvent.keyDown(card, { key: "Enter" });
+    fireEvent.keyDown(card, { key: " " });
+    expect(onOpenDrawer).toHaveBeenCalledTimes(3);
+
+    fireEvent.click(within(card).getByRole("button", { name: /Анкета:/ }));
+    expect(onOpenDrawer).toHaveBeenCalledTimes(3);
+  });
+
+  it("animates the card action into the workflow slot only after every action is ready", () => {
+    const submission = createSubmission("single");
+    const view = render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+    const card = screen.getByRole("article", {
+      name: `Подача ${submission.applicants[0]!.fullName}`,
+    });
+    const workflowSwitch = card.querySelector(
+      ".v19-applicant-workflow-switch",
+    );
+    expect(workflowSwitch).toHaveAttribute("data-ready", "false");
+    expect(
+      within(card).queryByRole("button", { name: /^Открыть:/ }),
+    ).not.toBeInTheDocument();
+
+    const ready = {
+      ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(submission)),
+      status: "submitted_for_review" as const,
+    };
+    view.rerender(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        submissions={[ready]}
+        typeFilter="single"
+      />,
+    );
+
+    expect(workflowSwitch).toHaveAttribute("data-ready", "true");
+    expect(
+      within(card).getByRole("button", { name: /^Открыть:/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", { name: /Паспорт: готово/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      card.querySelector(".v19-applicant-workflow-actions"),
+    ).toHaveClass("is-replaced");
+    expect(
+      card.querySelector(".v19-applicant-status-action"),
+    ).toHaveClass("is-visible");
+  });
+
   it("shows selfies only for the main family applicant", () => {
     const submission = createSubmission("family");
     render(
@@ -126,6 +199,12 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     const documentGroups = screen.getAllByRole("group", { name: /^Документы:/ });
+    expect(
+      document.querySelectorAll(".v19-applicant-member-role"),
+    ).toHaveLength(0);
+    expect(screen.queryByText(/^Супруг(?:\/супруга)?$/)).not.toBeInTheDocument();
+    expect(screen.getByText("Заявитель 2")).toBeInTheDocument();
+    expect(screen.getByText("VF—")).toHaveClass("v19-applicant-public-id");
     expect(within(documentGroups[0]!).getAllByRole("button")).toHaveLength(4);
     expect(within(documentGroups[1]!).getAllByRole("button")).toHaveLength(2);
     expect(
@@ -252,6 +331,38 @@ describe("ApplicantsScreen interactions", () => {
     expect(visibleSubmissionIds()).toEqual([newerFamily.id, olderSingle.id]);
   });
 
+  it("shows only the currently visible card count next to the list title", () => {
+    const first = {
+      ...createSubmission("single"),
+      publicNumber: 731,
+    } satisfies Submission;
+    const second = {
+      ...createSubmission("single"),
+      publicNumber: 84,
+    } satisfies Submission;
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        submissions={[first, second]}
+        typeFilter="single"
+      />,
+    );
+
+    const header = document.querySelector<HTMLElement>(
+      ".v19-agent-submissions-board .v19-admin-list-header",
+    );
+    expect(header).not.toBeNull();
+    expect(header?.querySelector("strong")).toHaveTextContent("Мои подачи");
+    expect(header?.querySelector("small")).toHaveTextContent("2");
+    expect(header).not.toHaveTextContent("Сначала новые");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+      target: { value: "VF-731" },
+    });
+
+    expect(header?.querySelector("small")).toHaveTextContent("1");
+  });
+
   it("sorts the combined queue by createdAt in direct and reverse order", () => {
     const oldest = createSubmission("single", "2026-07-17T10:00:00.000Z");
     const newest = createSubmission("family", "2026-07-19T10:00:00.000Z");
@@ -308,7 +419,7 @@ describe("ApplicantsScreen interactions", () => {
     expect(visibleSubmissionIds()).toEqual([matched.id]);
   });
 
-  it("shows and executes the direct submit action for ready single and family cards", async () => {
+  it("sends ready single and family cards to admin review through the К выгрузке action", async () => {
     const single = readySubmission("single");
     const family = readySubmission("family");
     expect(canPerformAction(single, "submit_for_review", "agent").ok).toBe(true);
@@ -325,9 +436,14 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     const submitButtons = screen.getAllByRole("button", {
-      name: /Отправить на проверку:/,
+      name: /К выгрузке:/,
     });
     expect(submitButtons).toHaveLength(2);
+    const familyCard = screen.getByRole("article", { name: /Подача Семья/ });
+    expect(
+      within(familyCard).getAllByRole("group", { name: /^Документы:/ }),
+    ).toHaveLength(2);
+    expect(screen.getAllByText("В работе")).toHaveLength(2);
     fireEvent.click(submitButtons[0]!);
     expect(confirm).toHaveBeenCalledWith(
       "Отправить на проверку администратору?",
@@ -341,7 +457,9 @@ describe("ApplicantsScreen interactions", () => {
       single.agentId,
     );
     expect(transition.ok).toBe(true);
-    if (!transition.ok) return;
+    if (!transition.ok) {
+      return;
+    }
     expect(transition.data.status).toBe("submitted_for_review");
     expect(isAdminReviewQueueSubmission(transition.data)).toBe(true);
 
@@ -355,11 +473,40 @@ describe("ApplicantsScreen interactions", () => {
     );
     expect(screen.getByText("На проверке")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Отправить на проверку:/ }),
+      screen.queryByRole("button", { name: /К выгрузке:/ }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Открыть:/ }),
+    ).toBeInTheDocument();
   });
 
-  it("sends an export-ready package back to admin review", async () => {
+  it("cancels the review handoff when the agent answers no", () => {
+    const submission = readySubmission("single");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const onOpenDrawer = vi.fn();
+    const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={onOpenDrawer}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /К выгрузке:/ }),
+    );
+
+    expect(confirm).toHaveBeenCalledWith(
+      "Отправить на проверку администратору?",
+    );
+    expect(onSubmitForReview).not.toHaveBeenCalled();
+    expect(onOpenDrawer).not.toHaveBeenCalled();
+  });
+
+  it("sends an export-ready package back to admin review from the card action", async () => {
     const ready = readySubmission("single");
     const accepted: Submission = {
       ...ready,
@@ -397,31 +544,28 @@ describe("ApplicantsScreen interactions", () => {
       accepted.agentId,
     );
     expect(transition.ok).toBe(true);
-    if (!transition.ok) return;
+    if (!transition.ok) {
+      return;
+    }
     expect(transition.data.status).toBe("submitted_for_review");
     expect(transition.data.exportState).toBe("not_ready");
-    expect(
-      transition.data.files.every((file) => file.status === "pending_review"),
-    ).toBe(true);
+    expect(transition.data.files.every((file) => file.status === "pending_review"))
+      .toBe(true);
   });
 
-  it("does not send an export-ready package when confirmation is declined", () => {
-    const ready = readySubmission("single");
-    const accepted: Submission = {
-      ...ready,
-      exportState: "ready",
-      files: ready.files.map((file) => ({ ...file, status: "accepted" })),
-      status: "ready_for_export",
+  it("submits a ready saved draft through the canonical review handoff", async () => {
+    const readyDraft = {
+      ...readySubmission("single"),
+      status: "draft" as const,
     };
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const onOpenDrawer = vi.fn();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
     render(
       <ApplicantsScreen
-        onOpenDrawer={onOpenDrawer}
+        onOpenDrawer={vi.fn()}
         onSubmitForReview={onSubmitForReview}
-        submissions={[accepted]}
+        submissions={[readyDraft]}
         typeFilter="single"
       />,
     );
@@ -429,12 +573,27 @@ describe("ApplicantsScreen interactions", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /К выгрузке:/ }),
     );
+    await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(readyDraft.id));
 
-    expect(confirm).toHaveBeenCalledWith(
-      "Отправить на проверку администратору?",
+    const transition = applyAgentSubmitForReviewResult(
+      readyDraft,
+      readyDraft.agentId,
     );
-    expect(onSubmitForReview).not.toHaveBeenCalled();
-    expect(onOpenDrawer).not.toHaveBeenCalled();
+    expect(transition.ok).toBe(true);
+    if (!transition.ok) return;
+    expect(transition.data.status).toBe("submitted_for_review");
+    expect(transition.data.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fromStatus: "draft",
+          toStatus: "in_progress",
+        }),
+        expect.objectContaining({
+          fromStatus: "in_progress",
+          toStatus: "submitted_for_review",
+        }),
+      ]),
+    );
   });
 
   it("resets filters and ordering, then scrolls the saved card into view", async () => {

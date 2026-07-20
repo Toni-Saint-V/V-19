@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   BookUser,
-  Plus,
   UploadCloud,
   UserRound,
   UsersRound,
@@ -38,7 +37,6 @@ interface PreUploadScreenProps {
 }
 
 const finalStatuses: ProductFileStatus[] = ['recognized', 'needs_review', 'failed'];
-const passportExtractionTimeoutMs = 30000;
 const defaultFamilyResidence = { russia: 'yes', spain: 'yes' };
 
 function applicantRoleLabel(index: number) {
@@ -54,6 +52,28 @@ function applicantDisplayLabel(index: number, file?: ProductIntakeFile) {
     .filter(Boolean)
     .join(' ');
   return extractedName || applicantRoleLabel(index);
+}
+
+function applicantCompactDetails(file?: ProductIntakeFile) {
+  if (file?.status !== 'recognized') return '';
+  const fieldCount = file.extractedFieldKeys.length;
+  const fieldCountEnding = fieldCount % 100 >= 11 && fieldCount % 100 <= 14
+    ? 'полей'
+    : fieldCount % 10 === 1
+      ? 'поле'
+      : fieldCount % 10 >= 2 && fieldCount % 10 <= 4
+        ? 'поля'
+        : 'полей';
+  return [
+    file.extractedValues?.passportNo ? `№ ${file.extractedValues.passportNo}` : '',
+    file.extractedValues?.birthDate,
+    file.extractedValues?.passportExpiresAt
+      ? `до ${file.extractedValues.passportExpiresAt}`
+      : '',
+    `${fieldCount} ${fieldCountEnding}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function phaseFromFiles(files: ProductIntakeFile[]): ProductIntakePhase {
@@ -99,6 +119,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingApplicantIndexRef = useRef<number | null>(null);
   const pipelineRunRef = useRef(0);
+  const passportExtractionAbortControllerRef = useRef<AbortController | null>(null);
   const timersRef = useRef<number[]>([]);
 
   const applicantCount = packageType === 'family' ? familyApplicantCount : 1;
@@ -128,6 +149,8 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   const clearPipeline = () => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
     timersRef.current = [];
+    passportExtractionAbortControllerRef.current?.abort();
+    passportExtractionAbortControllerRef.current = null;
   };
 
   const schedule = (callback: () => void, delay: number) => {
@@ -139,7 +162,12 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     setFiles((current) => current.map((file) => (file.id === fileId ? { ...file, ...patch } : file)));
   };
 
-  const extractPassportFile = async (file: ProductIntakeFile, applicantIndex: number, runId: number) => {
+  const extractPassportFile = async (
+    file: ProductIntakeFile,
+    applicantIndex: number,
+    runId: number,
+    signal: AbortSignal,
+  ) => {
     const uploadFile = file.fileRef;
     if (!uploadFile) {
       patchFile(file.id, {
@@ -152,16 +180,12 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
     try {
       const { invokePassportExtraction } = await import('../modules/submissions/passportExtractionService');
-      const result = await Promise.race([
-        invokePassportExtraction({
-          applicantIndex,
-          localFile: uploadFile,
-          openAiFallbackAllowed: false,
-        }),
-        new Promise<never>((_, reject) =>
-          window.setTimeout(() => reject(new Error('Passport OCR timeout')), passportExtractionTimeoutMs),
-        ),
-      ]);
+      const result = await invokePassportExtraction({
+        applicantIndex,
+        localFile: uploadFile,
+        openAiFallbackAllowed: false,
+        signal,
+      });
       if (pipelineRunRef.current !== runId) return;
 
       const extractedValues = passportExtractionValues(result.fields);
@@ -176,7 +200,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         issue:
           result.status === 'extracted' && hasPassportIdentity
             ? result.summary
-            : 'OCR не подтвердил паспортные поля. Проверьте данные вручную.',
+            : result.summary || 'OCR не подтвердил паспортные поля. Проверьте данные вручную.',
         progress: 100,
         status:
           result.status === 'extracted' && hasPassportIdentity
@@ -197,7 +221,12 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     clearPipeline();
     const runId = pipelineRunRef.current + 1;
     pipelineRunRef.current = runId;
+    const passportExtractionAbortController = options.extractPassports
+      ? new AbortController()
+      : null;
+    passportExtractionAbortControllerRef.current = passportExtractionAbortController;
     const queued = resetFilesForPipeline(sourceFiles);
+    let passportExtractionQueue = Promise.resolve();
     setFiles(queued);
     setPhase('uploading');
 
@@ -214,11 +243,23 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
       }, offset + 260);
       schedule(() => {
         if (pipelineRunRef.current !== runId) return;
+        if (options.extractPassports && ['passport', 'unknown'].includes(file.kind)) {
+          passportExtractionQueue = passportExtractionQueue.then(async () => {
+            if (pipelineRunRef.current !== runId) return;
+            setPhase('extracting');
+            patchFile(file.id, { status: 'extracting', progress: 86 });
+            if (!passportExtractionAbortController) return;
+            await extractPassportFile(
+              file,
+              file.applicantIndex ?? index,
+              runId,
+              passportExtractionAbortController.signal,
+            );
+          });
+          return;
+        }
         setPhase('extracting');
         patchFile(file.id, { status: 'extracting', progress: 86 });
-        if (options.extractPassports && ['passport', 'unknown'].includes(file.kind)) {
-          void extractPassportFile(file, file.applicantIndex ?? index, runId);
-        }
       }, offset + 430);
       schedule(() => {
         if (pipelineRunRef.current !== runId) return;
@@ -392,6 +433,22 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const warmup = window.setTimeout(() => {
+      void import('../modules/submissions/passportExtractionService').then(
+        ({ prewarmLocalPassportOcr }) => {
+          if (!cancelled) void prewarmLocalPassportOcr();
+        },
+        () => undefined,
+      );
+    }, 240);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(warmup);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!manualUpload || files.length === 0) return;
     if (!files.every((file) => finalStatuses.includes(file.status))) return;
     setPhase(files.some((file) => file.status === 'recognized') ? 'ready' : 'review');
@@ -405,15 +462,15 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 18, scale: 0.992 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed inset-0 z-50 bg-[#101011] text-white flex flex-col overflow-hidden"
+      className="v19-preupload-screen fixed inset-0 z-50 flex flex-col overflow-hidden bg-[var(--v19-depth-canvas)] text-[var(--v19-depth-text)]"
       role="dialog"
     >
-      <header className="h-[64px] shrink-0 border-b border-[#202124] bg-[#141416]/95 backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
+      <header className="h-[64px] shrink-0 border-b border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
         <button
           aria-label="Назад"
           disabled={actionPending}
           onClick={onBack}
-          className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#242529] bg-[#1e1e21] text-white/70 transition-colors hover:bg-[#27272b] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-control)] text-[var(--v19-depth-text-muted)] transition-colors hover:bg-[var(--v19-depth-control-hover)] hover:text-[var(--v19-depth-text-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
         >
           <ArrowLeft className="h-4.5 w-4.5" />
         </button>
@@ -429,7 +486,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
           aria-label="Закрыть создание"
           disabled={actionPending}
           onClick={onBack}
-          className="ml-auto flex h-8 w-8 items-center justify-center rounded-[9px] border border-transparent bg-transparent text-white/45 transition-colors hover:text-white/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          className="ml-auto flex h-8 w-8 items-center justify-center rounded-[9px] border border-transparent bg-transparent text-[var(--v19-depth-text-faint)] transition-colors hover:text-[var(--v19-depth-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -439,17 +496,17 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         <div className="grid h-full min-h-full w-full grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] xl:gap-6 xl:p-6">
           <section className="flex h-full min-h-0 flex-col">
             <motion.div
-              className="v19-preupload-card relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-5 pb-0 pt-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)] lg:px-6 lg:pb-0 lg:pt-6 xl:rounded-3xl xl:border xl:border-[#242529]"
+              className="v19-preupload-card relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-gradient-to-br from-[var(--v19-depth-panel-strong)] to-[var(--v19-depth-page)] px-5 pb-0 pt-5 shadow-[var(--v19-depth-shadow-panel)] lg:px-6 lg:pb-0 lg:pt-6 xl:rounded-3xl xl:border xl:border-[var(--v19-depth-border-strong)]"
             >
               <motion.div
                 aria-hidden
-                className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#6f64ff]/10 blur-3xl"
+                className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[var(--v19-depth-accent-soft)] blur-3xl"
                 animate={{ scale: [1, 1.12, 1], opacity: [0.55, 0.8, 0.55] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               />
               <div className="relative z-10 mb-4 shrink-0">
                 <div className="relative w-full space-y-3">
-                  <div className="flex w-fit rounded-full border border-[#242529] bg-[#141416]/76 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
+                  <div className="flex w-fit rounded-full border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-page)] p-1 shadow-[var(--v19-depth-inner-highlight)]">
                     {[
                       { icon: UsersRound, label: 'Семья', type: 'family' as const },
                       { icon: UserRound, label: 'Заявитель', type: 'single' as const },
@@ -463,92 +520,109 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                             type="button"
                             disabled={actionPending}
                             onClick={() => resetScenario(item.type)}
-                          className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${
+                          className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${
                             active
-                              ? 'bg-[#6f64ff]/24 text-white shadow-[0_0_18px_rgba(111,100,255,0.18)]'
-                              : 'text-white/46 hover:bg-white/[0.04] hover:text-white/70'
+                              ? 'bg-[var(--v19-depth-accent-soft)] text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)]'
+                              : 'text-[var(--v19-depth-text-faint)] hover:bg-[var(--v19-depth-control-hover)] hover:text-[var(--v19-depth-text)]'
                           }`}
                         >
-                          <Icon className="h-3.5 w-3.5 text-[#b8baff]" />
+                          <Icon className="h-3.5 w-3.5 text-[var(--v19-depth-accent-text)]" />
                           {item.label}
                         </button>
                       );
                     })}
                   </div>
 
-                  <AnimatePresence initial={false}>
-                    {packageType === 'family' ? (
-                      <motion.div
-                        key="family-controls"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                        transition={{ duration: 0.18 }}
-                        className="v19-preupload-family-controls space-y-3"
+                  {packageType === 'family' ? (
+                    <div className="v19-preupload-family-summary">
+                      <strong data-testid="preupload-applicant-count">
+                        Заявителей: {applicantCount}
+                      </strong>
+                      <span>Паспорта загружайте по порядку: 1, 2, 3…</span>
+                    </div>
+                  ) : null}
+
+                  <AnimatePresence initial={false} mode="wait">
+                    <motion.div
+                      key={`applicant-controls-${packageType}`}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                      transition={{ duration: 0.18 }}
+                      className="v19-preupload-applicant-controls"
+                    >
+                      <div
+                        className="v19-preupload-applicant-grid"
+                        data-package-type={packageType}
+                        data-testid={`preupload-${packageType}-grid`}
+                        role="list"
                       >
-                        <div className="v19-preupload-family-summary">
-                          <button type="button" className="v19-preupload-family-add" disabled={actionPending} onClick={() => setFamilyApplicantCount((current) => current + 1)} aria-label="Добавить заявителя">
-                            <Plus aria-hidden="true" />
-                          </button>
-                        </div>
-                        <div className="v19-preupload-applicant-grid" data-testid="preupload-family-grid" role="list">
-                          {Array.from({ length: familyApplicantCount }, (_, applicantIndex) => {
-                            const file = assignedFiles.get(applicantIndex);
-                            const applicantLabel = applicantDisplayLabel(applicantIndex, file);
-                            const passportRecognized = file?.status === 'recognized';
-                            const isRemovableApplicant = applicantIndex >= 2 && !file;
-                            return (
-                              <article className={[file ? 'has-file' : '', passportRecognized ? 'is-recognized' : ''].filter(Boolean).join(' ')} key={applicantIndex} role="listitem">
-                                <button
-                                  type="button"
-                                  className="v19-preupload-applicant-label"
-                                  disabled={actionPending}
-                                  onClick={() => openFilePicker(applicantIndex)}
-                                  aria-label={`${file ? 'Заменить' : 'Загрузить'} паспорт: ${applicantLabel}`}
-                                >
-                                  <span aria-hidden="true" className="v19-preupload-applicant-order">
-                                    {applicantIndex + 1}
-                                  </span>
+                        {Array.from({ length: applicantCount }, (_, applicantIndex) => {
+                          const file = assignedFiles.get(applicantIndex);
+                          const applicantLabel = applicantDisplayLabel(applicantIndex, file);
+                          const applicantDetails = packageType === 'single'
+                            ? applicantCompactDetails(file)
+                            : '';
+                          const passportRecognized = file?.status === 'recognized';
+                          const isRemovableApplicant = applicantIndex >= 2 && !file;
+                          return (
+                            <article className={[file ? 'has-file' : '', passportRecognized ? 'is-recognized' : '', packageType === 'single' ? 'is-single' : ''].filter(Boolean).join(' ')} key={applicantIndex} role="listitem">
+                              <button
+                                type="button"
+                                className="v19-preupload-applicant-label"
+                                disabled={actionPending}
+                                onClick={() => openFilePicker(applicantIndex)}
+                                aria-label={`${file ? 'Заменить' : 'Загрузить'} паспорт: ${applicantLabel}`}
+                              >
+                                <span aria-hidden="true" className="v19-preupload-applicant-order">
+                                  {applicantIndex + 1}
+                                </span>
+                                <span className="v19-preupload-applicant-copy">
                                   <span className="v19-preupload-applicant-name">
                                     {applicantLabel}
                                   </span>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="v19-preupload-applicant-icon"
-                                  disabled={actionPending}
-                                  onClick={() => {
-                                    if (file) {
-                                      clearApplicantPassport(applicantIndex);
-                                    } else if (isRemovableApplicant) {
-                                      removeApplicant(applicantIndex);
-                                    } else {
-                                      openFilePicker(applicantIndex);
-                                    }
-                                  }}
-                                  aria-label={
-                                    file
-                                      ? `Удалить паспорт: ${applicantLabel}`
-                                      : isRemovableApplicant
-                                        ? `Удалить заявителя ${applicantIndex + 1}`
-                                        : `Открыть загрузку паспорта: ${applicantLabel}`
+                                  {applicantDetails ? (
+                                    <span className="v19-preupload-applicant-details">
+                                      {applicantDetails}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                className="v19-preupload-applicant-icon"
+                                disabled={actionPending}
+                                onClick={() => {
+                                  if (file) {
+                                    clearApplicantPassport(applicantIndex);
+                                  } else if (isRemovableApplicant) {
+                                    removeApplicant(applicantIndex);
+                                  } else {
+                                    openFilePicker(applicantIndex);
                                   }
-                                >
-                                  {isRemovableApplicant ? (
-                                    <X aria-hidden="true" />
-                                  ) : (
-                                    <>
-                                      <BookUser className="v19-preupload-passport-icon" aria-hidden="true" />
-                                      {file ? <X className="v19-preupload-remove-icon" aria-hidden="true" /> : null}
-                                    </>
-                                  )}
-                                </button>
-                              </article>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    ) : null}
+                                }}
+                                aria-label={
+                                  file
+                                    ? `Удалить паспорт: ${applicantLabel}`
+                                    : isRemovableApplicant
+                                      ? `Удалить заявителя ${applicantIndex + 1}`
+                                      : `Открыть загрузку паспорта: ${applicantLabel}`
+                                }
+                              >
+                                {isRemovableApplicant ? (
+                                  <X aria-hidden="true" />
+                                ) : (
+                                  <>
+                                    <BookUser className="v19-preupload-passport-icon" aria-hidden="true" />
+                                    {file ? <X className="v19-preupload-remove-icon" aria-hidden="true" /> : null}
+                                  </>
+                                )}
+                              </button>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
                   </AnimatePresence>
                 </div>
               </div>
@@ -580,24 +654,28 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   }}
                   onDragLeave={() => setDropActive(false)}
                   onDrop={handleDrop}
-                  className={`v19-preupload-dropzone relative min-h-[180px] rounded-3xl border border-dashed p-6 flex flex-col items-center justify-center text-center group transition-colors cursor-pointer overflow-hidden ${dropActive ? 'border-[#8fa3ff] bg-[#6f64ff]/[0.14]' : 'border-[#6f64ff]/40 bg-[#6f64ff]/5 hover:bg-[#6f64ff]/10'}`}
+                  className={`v19-preupload-dropzone relative min-h-[180px] rounded-3xl border border-dashed p-6 flex flex-col items-center justify-center text-center group transition-colors cursor-pointer overflow-hidden ${dropActive ? 'border-[var(--v19-depth-border-selected)] bg-[var(--v19-depth-accent-soft)]' : 'border-[var(--v19-depth-accent-border)] bg-[var(--v19-depth-page)] hover:bg-[var(--v19-depth-accent-soft)]'}`}
                   onClick={() => openFilePicker(null)}
                 >
                 <motion.div
                   aria-hidden
-                  className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#b8baff]/70 to-transparent"
+                  className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[var(--v19-depth-accent-text)] to-transparent"
                   animate={{ y: [0, 250, 0], opacity: [0.1, 0.9, 0.1] }}
                   transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
                 />
                 <motion.div
-                  className="w-12 h-12 rounded-2xl bg-[#6f64ff]/15 border border-[#6f64ff]/25 flex items-center justify-center mb-3"
+                  className="w-12 h-12 rounded-2xl bg-[var(--v19-depth-accent-soft)] border border-[var(--v19-depth-accent-border)] flex items-center justify-center mb-3"
                   animate={{ scale: phase === 'extracting' ? [1, 1.06, 1] : 1, rotate: dropActive ? 2 : 0 }}
                   transition={{ duration: 1.2, repeat: phase === 'extracting' ? Infinity : 0 }}
                 >
-                  {phase === 'extracting' ? <Wand2 className="w-6 h-6 text-[#b8baff]" /> : <UploadCloud className="w-6 h-6 text-[#b8baff]" />}
+                  {phase === 'extracting' ? <Wand2 className="w-6 h-6 text-[var(--v19-depth-accent-text)]" /> : <UploadCloud className="w-6 h-6 text-[var(--v19-depth-accent-text)]" />}
                 </motion.div>
                 <h3 className="text-[18px] font-semibold text-white">
-                  {files.length ? 'Добавить ещё паспорт' : 'Загрузить паспорт'}
+                  {files.length
+                    ? packageType === 'single'
+                      ? 'Заменить паспорт'
+                      : 'Добавить ещё паспорт'
+                    : 'Загрузить паспорт'}
                 </h3>
                 <p className="text-[13px] text-white/45 leading-relaxed mt-2 max-w-md">
                   Если вы загрузите паспорт, то вам меньше придется заполнять.
@@ -617,7 +695,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 </div>
               </div>
 
-              <div className="sticky bottom-0 z-20 -mx-5 grid shrink-0 grid-cols-2 gap-2 border-t border-white/[0.06] bg-gradient-to-t from-[#141416] via-[#141416]/95 to-[#141416]/70 px-5 pb-4 pt-3 lg:-mx-6 lg:px-6 xl:rounded-b-3xl">
+              <div className="sticky bottom-0 z-20 -mx-5 grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] px-5 pb-4 pt-3 lg:-mx-6 lg:px-6 xl:rounded-b-3xl">
                 {actionError ? (
                   <p className="col-span-2 m-0 text-left text-[12px] text-[var(--v19b-status-danger-text)]" role="alert">
                     {actionError}
@@ -627,7 +705,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   type="button"
                   disabled={actionPending}
                   onClick={() => void saveDraft()}
-                  className="h-11 rounded-[8px] border border-white/10 bg-transparent px-3 text-[13px] font-medium text-white/62 transition-colors hover:border-white/18 hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  className="h-11 rounded-[8px] border border-[var(--v19-depth-border-strong)] bg-transparent px-3 text-[13px] font-medium text-[var(--v19-depth-text-muted)] transition-colors hover:border-[var(--v19-depth-border-selected)] hover:text-[var(--v19-depth-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
                 >
                   {actionPending ? 'Сохраняем…' : 'Сохранить'}
                 </button>
@@ -636,7 +714,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   onClick={() => void completeDraft()}
                   aria-disabled={actionPending}
                   disabled={actionPending}
-                  className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#25252a] disabled:text-white/35 disabled:shadow-none"
+                  className="h-11 rounded-[8px] bg-[var(--v19-depth-accent)] px-3 text-[13px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
                 >
                   {actionPending ? 'Сохраняем…' : 'Далее'}
                 </button>
@@ -645,7 +723,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
           </section>
 
           <aside className="hidden min-h-0 space-y-5 xl:block">
-            <div className="sticky top-0 hidden overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] p-5 xl:flex xl:h-[calc(100dvh-112px)] xl:max-h-[calc(100dvh-112px)] xl:flex-col">
+            <div className="sticky top-0 hidden overflow-hidden rounded-2xl border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel)] p-5 shadow-[var(--v19-depth-shadow-card)] xl:flex xl:h-[calc(100dvh-112px)] xl:max-h-[calc(100dvh-112px)] xl:flex-col">
               <div className="mb-4 flex h-[96px] shrink-0 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.025] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-[14px] font-semibold text-white">Prefill-поля</h3>
@@ -665,7 +743,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                       animate={{ opacity: 1, x: 0, scale: 1 }}
                       exit={{ opacity: 0, x: -12, scale: 0.98 }}
                       transition={{ delay: index * 0.025 }}
-                      className={`v19-prefill-preview-field rounded-2xl border px-3 py-2 ${field.state === 'warning' ? 'border-[#6f64ff]/25 bg-[#6f64ff]/[0.08]' : 'border-[#242529] bg-[#1a1a1d]'}`}
+                      className={`v19-prefill-preview-field rounded-2xl border px-3 py-2 ${field.state === 'warning' ? 'border-[var(--v19-depth-accent-border)] bg-[var(--v19-depth-accent-soft)]' : 'border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel-strong)]'}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">

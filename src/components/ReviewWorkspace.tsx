@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { motion } from "motion/react";
 import "../shared/ui/review-workspace.css";
 import {
@@ -135,8 +142,11 @@ function reviewFieldsForApplicant(applicant?: Applicant): PassportReviewField[] 
 }
 
 function reviewFileName(target: ReviewMediaTarget, file?: SubmissionFile) {
+  const missingFileLabel =
+    target.type === "passport_scan" ? "Паспорт не загружен" : `${target.label} не загружен`;
+
   return (
-    file?.originalFileName ?? file?.generatedFileName ?? `${target.label} не загружен`
+    file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel
   );
 }
 
@@ -169,6 +179,10 @@ export function ReviewWorkspace({
 }: ReviewWorkspaceProps) {
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const previewPaneRef = useRef<HTMLDivElement | null>(null);
+  const mediaTabRefs = useRef<
+    Partial<Record<ReviewMediaType, HTMLButtonElement | null>>
+  >({});
+  const mediaPanelId = useId();
   const onBackRef = useRef(onBack);
   const mountedRef = useRef(true);
   const wasNestedDialogOpenRef = useRef(nestedDialogOpen);
@@ -452,11 +466,6 @@ export function ReviewWorkspace({
     (type) => mediaPreviews[type]?.status !== "ready",
   ).length;
   const readyMediaCount = requiredMediaTypes.length - unavailableMediaCount;
-  const detailsTitle = isIdentityComparison ? "Паспорт и лицо" : "Паспортные данные";
-  const detailsHint = isIdentityComparison
-    ? `Сопоставьте ${activeMediaTarget.label.toLocaleLowerCase()} с фото в паспорте.`
-    : "Сверьте восемь значений с оригиналом.";
-
   let completionReason = "Сверьте все восемь полей с паспортом и подтвердите секцию.";
   if (!selectedApplicantId) {
     completionReason = "Не выбран заявитель. Подтверждение недоступно.";
@@ -543,6 +552,40 @@ export function ReviewWorkspace({
     void previewPaneRef.current?.requestFullscreen?.().catch(() => undefined);
   };
 
+  const handleMediaSelect = (mediaType: ReviewMediaType) => {
+    setActiveMediaType(mediaType);
+    setZoom(100);
+    setRotation(0);
+  };
+
+  const handleMediaTabKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) => {
+    let nextIndex: number | undefined;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % mediaTargets.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + mediaTargets.length) % mediaTargets.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = mediaTargets.length - 1;
+    }
+
+    if (nextIndex === undefined) return;
+
+    const nextTarget = mediaTargets[nextIndex];
+    if (!nextTarget) return;
+
+    event.preventDefault();
+    handleMediaSelect(nextTarget.type);
+    mediaTabRefs.current[nextTarget.type]?.focus({ preventScroll: true });
+  };
+
+  const activeMediaTabId = `${mediaPanelId}-${activeMediaTarget.type}`;
+
   return (
     <motion.div
       animate={{ opacity: 1, scale: 1 }}
@@ -582,6 +625,7 @@ export function ReviewWorkspace({
               : undefined
           }
           href={activePreviewUrl}
+          tabIndex={activePreviewUrl ? undefined : -1}
         >
           <Download aria-hidden="true" />
           <span>Скачать</span>
@@ -591,49 +635,6 @@ export function ReviewWorkspace({
       <main className="v19-review-main">
         <section aria-label="Оригиналы документов" className="v19-review-media-pane">
           <div className="v19-review-media-toolbar">
-            <div className="v19-review-media-actions">
-              <div
-                aria-label="Выбор файла для проверки"
-                className="v19-review-media-tabs"
-                role="tablist"
-              >
-                {mediaTargets.map((target) => (
-                  <button
-                    aria-selected={activeMediaTarget.type === target.type}
-                    className={
-                      activeMediaTarget.type === target.type ? "is-active" : undefined
-                    }
-                    key={target.type}
-                    data-review-media={target.type}
-                    onClick={() => {
-                      setActiveMediaType(target.type);
-                      setZoom(100);
-                      setRotation(0);
-                    }}
-                    role="tab"
-                    type="button"
-                  >
-                    {target.shortLabel}
-                  </button>
-                ))}
-              </div>
-              <button
-                aria-label={`Добавить замечание: ${activeMediaTarget.label}`}
-                className="v19-review-file-remark"
-                onClick={() =>
-                  onAddRemark(
-                    `${activeMediaTarget.label}: требуется проверка`,
-                    selectedApplicant?.fullName,
-                    activeMediaTarget.type,
-                    selectedApplicantId,
-                  )
-                }
-                type="button"
-              >
-                <MessageSquarePlus aria-hidden="true" />
-                <span>Замечание</span>
-              </button>
-            </div>
             <div className="v19-review-filebar">
               {activeMediaTarget.type === "passport_scan" ? (
                 <FileText aria-hidden="true" />
@@ -644,6 +645,7 @@ export function ReviewWorkspace({
               <div className="v19-review-media-controls">
                 <button
                   aria-label="Уменьшить изображение"
+                  disabled={!activePreviewUrl || zoom <= 60}
                   onClick={() => setZoom((value) => Math.max(60, value - 10))}
                   type="button"
                 >
@@ -652,6 +654,7 @@ export function ReviewWorkspace({
                 <output aria-label="Масштаб изображения">{zoom}%</output>
                 <button
                   aria-label="Увеличить изображение"
+                  disabled={!activePreviewUrl || zoom >= 180}
                   onClick={() => setZoom((value) => Math.min(180, value + 10))}
                   type="button"
                 >
@@ -659,6 +662,7 @@ export function ReviewWorkspace({
                 </button>
                 <button
                   aria-label="Повернуть изображение"
+                  disabled={!activePreviewUrl}
                   onClick={() => setRotation((value) => (value + 90) % 360)}
                   type="button"
                 >
@@ -667,6 +671,7 @@ export function ReviewWorkspace({
                 <button
                   aria-label="Открыть на весь экран"
                   className="v19-review-fullscreen"
+                  disabled={!activePreviewUrl}
                   onClick={handleFullscreen}
                   type="button"
                 >
@@ -677,8 +682,11 @@ export function ReviewWorkspace({
           </div>
 
           <div
+            aria-labelledby={activeMediaTabId}
             className={`v19-review-media-stage${isIdentityComparison ? " is-comparison" : ""}`}
+            id={mediaPanelId}
             ref={previewPaneRef}
+            role="tabpanel"
           >
             {isIdentityComparison ? (
               <div
@@ -719,15 +727,60 @@ export function ReviewWorkspace({
               />
             )}
           </div>
+
+          <div className="v19-review-media-switcher">
+            <div className="v19-review-media-actions">
+              <div
+                aria-label="Выбор файла для проверки"
+                className="v19-review-media-tabs"
+                role="tablist"
+              >
+                {mediaTargets.map((target, index) => (
+                  <button
+                    aria-controls={mediaPanelId}
+                    aria-selected={activeMediaTarget.type === target.type}
+                    className={
+                      activeMediaTarget.type === target.type ? "is-active" : undefined
+                    }
+                    key={target.type}
+                    data-review-media={target.type}
+                    id={`${mediaPanelId}-${target.type}`}
+                    onClick={() => handleMediaSelect(target.type)}
+                    onKeyDown={(event) => handleMediaTabKeyDown(event, index)}
+                    ref={(element) => {
+                      mediaTabRefs.current[target.type] = element;
+                    }}
+                    role="tab"
+                    tabIndex={activeMediaTarget.type === target.type ? 0 : -1}
+                    type="button"
+                  >
+                    {target.shortLabel}
+                  </button>
+                ))}
+              </div>
+              <button
+                aria-label={`Добавить замечание: ${activeMediaTarget.label}`}
+                className="v19-review-file-remark"
+                onClick={() =>
+                  onAddRemark(
+                    `${activeMediaTarget.label}: требуется проверка`,
+                    selectedApplicant?.fullName,
+                    activeMediaTarget.type,
+                    selectedApplicantId,
+                  )
+                }
+                type="button"
+              >
+                <MessageSquarePlus aria-hidden="true" />
+                <span>Замечание</span>
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="v19-review-details-pane">
-          <header className="v19-review-details-header">
-            <div>
-              <h2>{detailsTitle}</h2>
-              <p>{detailsHint}</p>
-            </div>
-            {submission && submission.applicants.length > 1 ? (
+          {submission && submission.applicants.length > 1 ? (
+            <header className="v19-review-details-header is-applicant-only">
               <label className="v19-review-applicant-select">
                 <span>Заявитель</span>
                 <select
@@ -742,8 +795,8 @@ export function ReviewWorkspace({
                   ))}
                 </select>
               </label>
-            ) : null}
-          </header>
+            </header>
+          ) : null}
 
           <div className="v19-review-details-scroll">
             <div

@@ -33,6 +33,7 @@ import {
 import { getSupabaseClient } from "../lib/supabase/client";
 import { applyExportStateToSelection } from "../modules/submissions/submissionActions";
 import { submissionPublicId } from "../modules/submissions/submissionIdentity";
+import { requiredPassportReviewMediaSlots } from "../modules/submissions/passportReviewContract";
 import {
   buildExportArchiveInputSignature,
   buildExportPackageIdentity,
@@ -57,6 +58,7 @@ import {
   V19MetricStrip,
   V19QueueCard,
 } from "../shared/ui/v19-design-system";
+import { OperationalTableHeader } from "../shared/ui/OperationalTableHeader";
 import { agentDisplayName } from "../modules/submissions/agentDirectory";
 import {
   cityFilterValuesForSubmissions,
@@ -179,7 +181,7 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
         readiness: submission.completeness.total,
         warnings: summary.warnings.length,
         blockers: summary.blockers.length,
-        files: submission.files.length,
+        files: requiredPassportReviewMediaSlots(submission).length,
         agent: submission.agentId,
         packageSize: `${summary.rowCount} ${rowCountLabel(summary.rowCount)}`,
         blockerReasons: summary.blockers.map((blocker) => blocker.reason),
@@ -226,10 +228,13 @@ function fileCountLabel(count: number) {
   return countLabel(count, ["файл", "файла", "файлов"]);
 }
 
-function exportPackageMediaCount(
-  item: Pick<ExportItem, "applicantsCount" | "type">,
-) {
-  return item.type === "single" ? 3 : item.applicantsCount + 2;
+function exportAgentName(agentId: string) {
+  const displayName = agentDisplayName(agentId);
+  if (displayName === "Агент не указан") return "Не указан";
+
+  return displayName
+    .replace(/^Агент\s+/u, "")
+    .replace(/^Local Agent\s+/u, "");
 }
 
 export function AdminExportScreen({
@@ -819,6 +824,7 @@ export function AdminExportScreen({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className="v19-admin-screen v19-admin-export-screen-v2"
+      data-ui-pattern="operational-table-with-context"
     >
       <section className="v19-admin-export-main-v2">
         <V19MetricStrip>
@@ -933,26 +939,30 @@ export function AdminExportScreen({
             searchValue={searchQuery}
           />
 
-          <div className="grid shrink-0 grid-cols-[32px_minmax(140px,0.9fr)_minmax(190px,1.3fr)_minmax(120px,0.7fr)_minmax(140px,0.8fr)] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
-            <button
-              aria-label={
-                allDisplaySelected
-                  ? "Снять выбор со всех подач"
-                  : "Выбрать все подачи"
-              }
-              aria-pressed={allDisplaySelected}
-              onClick={toggleAll}
-              className={`flex h-5 w-5 items-center justify-center rounded-md border ${allDisplaySelected ? "border-[var(--v19b-color-primary)] bg-[var(--v19b-color-primary)]" : "border-[#242529] bg-[#161617]"}`}
-            >
-              {allDisplaySelected && (
-                  <CheckSquare className="h-3.5 w-3.5 text-white" />
-                )}
-            </button>
-            <div>Подача</div>
-            <div>Заявитель / пакет</div>
-            <div>Даты поездки</div>
-            <div>Агент</div>
-          </div>
+          <OperationalTableHeader
+            className="v19-admin-export-table-head-v2"
+            columns={[
+              { key: "applicant", label: "Заявитель" },
+              { key: "city", label: "Город" },
+              { key: "dates", label: "Даты поездки" },
+              { key: "agent", label: "Агент" },
+            ]}
+            leadingControl={
+              <button
+                aria-label={
+                  allDisplaySelected
+                    ? "Снять выбор со всех подач"
+                    : "Выбрать все подачи"
+                }
+                aria-pressed={allDisplaySelected}
+                onClick={toggleAll}
+                className={`v19-admin-export-select-all-v2 ${allDisplaySelected ? "is-selected" : ""}`}
+                type="button"
+              >
+                {allDisplaySelected ? <CheckSquare aria-hidden="true" /> : null}
+              </button>
+            }
+          />
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {displayItems.length === 0 ? (
@@ -980,46 +990,39 @@ export function AdminExportScreen({
                       aria-label={`Выбрать ${item.title}`}
                       checked={item.selected}
                       disabled={item.blockers > 0}
-                      className="h-5 w-5 shrink-0 accent-[#3a45b4]"
+                      className="h-5 w-5 shrink-0 accent-[var(--v19-depth-accent)]"
                       type="checkbox"
                       onChange={() => toggleItem(item.id)}
                     />
 
-                    <div className="v19-admin-export-row-submission-v2 flex min-w-0 items-center gap-2 text-[12px] text-white/55">
-                      <span className="shrink-0 rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/55">
-                        {item.publicId}
-                      </span>
-                      <MapPin className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                      <span>{item.city}</span>
-                    </div>
-
-                    <div className="v19-admin-export-row-applicant-v2 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {item.type === "family" ? (
-                          <Users className="h-3.5 w-3.5 shrink-0 text-[#8fa3ff]" />
-                        ) : (
-                          <User className="h-3.5 w-3.5 shrink-0 text-[#8fa3ff]" />
-                        )}
-                        <span className="text-[14px] font-medium text-white">
-                          {item.title}
+                    <div className="v19-admin-export-row-identity-v2 min-w-0">
+                      <div className="v19-admin-export-row-identity-meta-v2">
+                        <span className="v19-admin-export-row-public-id-v2">
+                          {item.publicId}
                         </span>
+                        {item.applicantsCount > 1 ? (
+                          <span
+                            aria-label={`${item.applicantsCount} ${applicantCountLabel(item.applicantsCount)}`}
+                            className="v19-admin-export-row-family-count-v2"
+                          >
+                            <Users aria-hidden="true" />
+                            {item.applicantsCount}
+                          </span>
+                        ) : null}
                       </div>
-                      <div className="v19-admin-export-row-package-v2">
-                        <span>
-                          {item.applicantsCount}{" "}
-                          {applicantCountLabel(item.applicantsCount)}
-                        </span>
-                        <i aria-hidden="true" />
-                        <span>
-                          Excel + {exportPackageMediaCount(item)}{" "}
-                          {fileCountLabel(exportPackageMediaCount(item))}
-                        </span>
-                      </div>
+                      <strong className="v19-admin-export-row-title-v2">
+                        {item.title}
+                      </strong>
                       {item.blockerReasons[0] ? (
                         <div className="v19-admin-export-row-reason-v2">
                           {item.blockerReasons[0]}
                         </div>
                       ) : null}
+                    </div>
+
+                    <div className="v19-admin-export-row-city-v2">
+                      <MapPin aria-hidden="true" />
+                      <span>{item.city}</span>
                     </div>
 
                     <div className="v19-admin-export-row-dates-v2 text-[12px] text-white/65 lg:text-[13px]">
@@ -1028,7 +1031,7 @@ export function AdminExportScreen({
 
                     <div className="v19-admin-export-row-agent-v2 flex items-center gap-2 text-[12px] text-white/65 lg:text-[13px]">
                       <User className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                      <span>{agentDisplayName(item.agent)}</span>
+                      <span>{exportAgentName(item.agent)}</span>
                     </div>
                   </V19QueueCard>
                 ))}
@@ -1052,7 +1055,7 @@ export function AdminExportScreen({
                 Контроль пакета
               </h3>
               <p className="mt-2 text-[12px] leading-relaxed text-white/45">
-                Состав, проверки, Excel и история перед скачиванием.
+                Состав, проверки, Excel и обязательные документы перед скачиванием.
               </p>
             </div>
             <div className="v19-admin-export-rail-icon-v2">
@@ -1213,7 +1216,7 @@ export function AdminExportScreen({
               </button>
               {preparedExport && workbookDownloadUrl ? (
                 <a
-                  className="flex h-9 items-center justify-center rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  className="flex h-9 items-center justify-center rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
                   download={preparedExport.workbookArtifact.fileName}
                   href={workbookDownloadUrl}
                   onClick={handleWorkbookDownloadClick}
@@ -1382,7 +1385,7 @@ export function AdminExportScreen({
                 {isExporting ? "Фиксируем выгрузку…" : "Подтвердить скачивание"}
               </button>
               <a
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#242529] bg-[#1e1e21] text-[12px] font-semibold text-white/75 transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#242529] bg-[#1e1e21] text-[12px] font-semibold text-white/75 transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
                 data-testid="repeat-export-download"
                 download={preparedArchive.artifact.fileName}
                 href={archiveDownloadUrl}
@@ -1395,7 +1398,7 @@ export function AdminExportScreen({
           ) : preparedArchive && archiveDownloadUrl ? (
             <a
               aria-disabled={isExporting}
-              className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${isExporting ? "cursor-wait opacity-60" : ""}`}
+              className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${isExporting ? "cursor-wait opacity-60" : ""}`}
               data-testid="export-download"
               download={preparedArchive.artifact.fileName}
               href={archiveDownloadUrl}
@@ -1409,7 +1412,7 @@ export function AdminExportScreen({
             <button
               onClick={handlePrepareArchive}
               disabled={selectedCount === 0 || isExporting || hasExportBlockers}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
             >
               {isExporting ? (
                 <UploadCloud className="h-4 w-4 animate-pulse" />
@@ -1421,7 +1424,7 @@ export function AdminExportScreen({
             </button>
           )}
           <div
-            className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? "text-[#d59aa3]" : exportNotice ? "text-[var(--v19b-color-primary-text)]" : "text-white/35"}`}
+            className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? "text-[var(--vf-red-soft-text)]" : exportNotice ? "text-[var(--v19b-color-primary-text)]" : "text-white/35"}`}
             id="export-action-hint"
           >
             <Clock3 className="h-3.5 w-3.5" />{" "}
@@ -1434,8 +1437,8 @@ export function AdminExportScreen({
                   : preparedArchive
                     ? "ZIP проверен, можно скачивать"
                     : preparedExport
-                      ? "Excel готов, сформируйте ZIP"
-                    : "Можно сформировать Excel и ZIP"
+                      ? "Excel готов и будет добавлен в ZIP"
+                      : "ZIP включает Excel и обязательные документы"
                 : "Выберите хотя бы одну подачу")}
           </div>
         </div>

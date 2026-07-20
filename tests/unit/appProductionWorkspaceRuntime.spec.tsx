@@ -114,6 +114,7 @@ vi.mock("motion/react", async () => {
       div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) =>
         React.createElement("div", props, children),
     },
+    useReducedMotion: () => false,
   };
 });
 

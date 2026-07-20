@@ -33,7 +33,7 @@ const localTesseractOptions = {
   workerPath: "/tesseract/worker.min.js",
 };
 
-const localOcrAttemptTimeoutMs = 45_000;
+const localOcrTotalTimeoutMs = 45_000;
 
 const mrzCountryNames: Record<string, string> = {
   ESP: "Spain",
@@ -85,6 +85,12 @@ type PassportOcrResponse = {
 
 type LocalPassportOcrWorker = {
   recognize(image: BrowserCanvas): Promise<PassportOcrResponse>;
+  terminate(): Promise<unknown>;
+};
+
+type LocalPassportOcrWorkerLease = {
+  promise: Promise<LocalPassportOcrWorker>;
+  worker: LocalPassportOcrWorker;
 };
 
 type LocalTesseractModule = {
@@ -103,6 +109,11 @@ type LocalTesseractModule = {
 };
 
 let localPassportOcrWorkerPromise: Promise<LocalPassportOcrWorker> | null = null;
+let localPassportOcrWorkerLifecycleBarrier: Promise<void> = Promise.resolve();
+const localPassportOcrWorkerShutdowns = new WeakMap<
+  LocalPassportOcrWorker,
+  Promise<void>
+>();
 
 type PassportOcrCandidate = {
   canvas: BrowserCanvas;
@@ -967,75 +978,113 @@ function unavailableWithQuality(
 async function invokeLocalPassportExtraction(input: {
   applicantIndex?: number;
   localFile: File;
+  signal?: AbortSignal;
 }): Promise<PassportExtractionResult> {
-  const fileKind = localPassportFileKind(input.localFile);
-  if (fileKind === "pdf") {
-    return invokeLocalPassportPdfExtraction(input);
-  }
+  const deadline = createPassportExtractionDeadline(input.signal);
+  let workerLease: LocalPassportOcrWorkerLease | undefined;
 
-  if (fileKind !== "image") {
-    return safeUnavailablePassportExtractionResult(input.applicantIndex);
-  }
-
-  const quality = await safePassportImageQualityFromFile(input.localFile);
-  const worker = await localPassportOcrWorker();
-  const recognizedTexts: string[] = [];
-  let bestResult: PassportExtractionResult | null = null;
-  for (const candidate of await passportOcrCandidatesFromFile(input.localFile)) {
-    const response = await withPassportOcrTimeout<PassportOcrResponse>(
-      worker.recognize(candidate.canvas),
-    );
-    recognizedTexts.push(response.data.text);
-    const mrzFields = parsePassportMrzText(response.data.text);
-    const visualFields = parsePassportVisualText(recognizedTexts.join("\n"), mrzFields);
-    const fields = mergePassportFields(
-      mrzFields,
-      visualFields,
-    );
-    const usedMrz = mrzFields.length > 0;
-    if (!usedMrz && !hasUsableVisualPassportFields(fields)) continue;
-
-    const result: PassportExtractionResult = {
-      applicantIndex: input.applicantIndex,
-      fields,
-      guardrails: [
-        "Данные из паспорта нужно проверить вручную.",
-        "Распознавание не является официальной проверкой.",
-        "Пустые или сомнительные поля остаются незаполненными.",
-      ],
-      orientation: usedMrz
-        ? {
-            corrected: candidate.rotation !== 0,
-            reason: "mrz_detected",
-            rotation: candidate.rotation,
-          }
-        : undefined,
-      source: "local-ocr",
-      status: "extracted",
-      summary:
-        !usedMrz
-          ? `Локальный OCR нашёл ${fields.length} визуальных паспортных полей без надежной MRZ. Проверьте их вручную перед отправкой.`
-          : candidate.rotation === 0 && !candidate.cropped
-          ? localOcrSummary(fields.length, quality)
-          : `${localOcrSummary(fields.length, quality)} MRZ найдена ${
-              candidate.cropped ? "в зоне паспорта" : "на полном изображении"
-            } после поворота на ${candidate.rotation}°.`,
-    };
-
-    const parsed = parsePassportExtractionResult(result);
-    if (!parsed.ok) throw new Error(parsed.safeMessage);
-    if (usedMrz && hasPassportIdentity(fields)) return parsed.data;
-    if (!bestResult || parsed.data.fields.length > bestResult.fields.length) {
-      bestResult = parsed.data;
+  try {
+    deadline.throwIfCancelled();
+    const fileKind = localPassportFileKind(input.localFile);
+    if (fileKind === "pdf") {
+      return await awaitPassportExtractionStep(
+        Promise.resolve().then(() =>
+          invokeLocalPassportPdfExtraction({
+            ...input,
+            signal: deadline.signal,
+          }),
+        ),
+        deadline,
+      );
     }
+
+    if (fileKind !== "image") {
+      return safeUnavailablePassportExtractionResult(input.applicantIndex);
+    }
+
+    const quality = await awaitPassportExtractionStep(
+      Promise.resolve().then(() =>
+        safePassportImageQualityFromFile(input.localFile),
+      ),
+      deadline,
+    );
+    const candidates = await awaitPassportExtractionStep(
+      Promise.resolve().then(() =>
+        passportOcrCandidatesFromFile(input.localFile),
+      ),
+      deadline,
+    );
+    workerLease = await localPassportOcrWorkerBeforeDeadline(deadline);
+
+    const recognizedTexts: string[] = [];
+    let bestResult: PassportExtractionResult | null = null;
+    for (const candidate of candidates) {
+      const response = await recognizePassportOcrCandidate(
+        workerLease,
+        candidate.canvas,
+        deadline,
+      );
+      recognizedTexts.push(response.data.text);
+      const mrzFields = parsePassportMrzText(response.data.text);
+      const visualFields = parsePassportVisualText(
+        recognizedTexts.join("\n"),
+        mrzFields,
+      );
+      const fields = mergePassportFields(mrzFields, visualFields);
+      const usedMrz = mrzFields.length > 0;
+      if (!usedMrz && !hasUsableVisualPassportFields(fields)) continue;
+
+      const result: PassportExtractionResult = {
+        applicantIndex: input.applicantIndex,
+        fields,
+        guardrails: [
+          "Данные из паспорта нужно проверить вручную.",
+          "Распознавание не является официальной проверкой.",
+          "Пустые или сомнительные поля остаются незаполненными.",
+        ],
+        orientation: usedMrz
+          ? {
+              corrected: candidate.rotation !== 0,
+              reason: "mrz_detected",
+              rotation: candidate.rotation,
+            }
+          : undefined,
+        source: "local-ocr",
+        status: "extracted",
+        summary:
+          !usedMrz
+            ? `Локальный OCR нашёл ${fields.length} визуальных паспортных полей без надежной MRZ. Проверьте их вручную перед отправкой.`
+            : candidate.rotation === 0 && !candidate.cropped
+              ? localOcrSummary(fields.length, quality)
+              : `${localOcrSummary(fields.length, quality)} MRZ найдена ${
+                  candidate.cropped ? "в зоне паспорта" : "на полном изображении"
+                } после поворота на ${candidate.rotation}°.`,
+      };
+
+      const parsed = parsePassportExtractionResult(result);
+      if (!parsed.ok) throw new Error(parsed.safeMessage);
+      if (usedMrz && hasPassportIdentity(fields)) return parsed.data;
+      if (!bestResult || parsed.data.fields.length > bestResult.fields.length) {
+        bestResult = parsed.data;
+      }
+    }
+
+    if (bestResult) return bestResult;
+
+    return unavailableWithQuality(input.applicantIndex, quality);
+  } catch (error) {
+    if (workerLease && deadline.signal.aborted) {
+      await invalidateLocalPassportOcrWorker(workerLease);
+    }
+    if (deadline.signal.aborted) throw deadline.error();
+    throw error;
+  } finally {
+    deadline.dispose();
   }
-
-  if (bestResult) return bestResult;
-
-  return unavailableWithQuality(input.applicantIndex, quality);
 }
 
-async function localPassportOcrWorker(): Promise<LocalPassportOcrWorker> {
+async function localPassportOcrWorker(): Promise<LocalPassportOcrWorkerLease> {
+  await localPassportOcrWorkerLifecycleBarrier;
   if (!localPassportOcrWorkerPromise) {
     localPassportOcrWorkerPromise = (async () => {
       const tesseract = (await import(
@@ -1051,7 +1100,11 @@ async function localPassportOcrWorker(): Promise<LocalPassportOcrWorker> {
       localPassportOcrWorkerPromise = null;
     });
   }
-  return localPassportOcrWorkerPromise;
+  const promise = localPassportOcrWorkerPromise;
+  return {
+    promise,
+    worker: await promise,
+  };
 }
 
 export async function prewarmLocalPassportOcr(): Promise<void> {
@@ -1065,9 +1118,12 @@ export async function prewarmLocalPassportOcr(): Promise<void> {
 async function invokeLocalPassportPdfExtraction(input: {
   applicantIndex?: number;
   localFile: File;
+  signal?: AbortSignal;
 }): Promise<PassportExtractionResult> {
+  throwIfPassportExtractionAborted(input.signal);
   const { extractPdfTextFromFile } = await import("./pdfTextExtraction");
   const pdf = await extractPdfTextFromFile(input.localFile);
+  throwIfPassportExtractionAborted(input.signal);
   const mrzFields = parsePassportMrzText(pdf.text);
   const fields = mergePassportFields(
     mrzFields,
@@ -1107,24 +1163,172 @@ function localOcrSummary(fields: number, quality: PassportImageQualityReport | n
   return `Локальный OCR нашёл ${fields} полей MRZ. Проверьте их вручную перед отправкой.${qualityNote}`;
 }
 
-function withPassportOcrTimeout<T>(task: Promise<T>) {
-  return new Promise<T>((resolve, reject) => {
-    const timer = globalThis.setTimeout(
-      () => reject(new Error("Local passport OCR timed out.")),
-      localOcrAttemptTimeoutMs,
-    );
+function passportExtractionAbortError() {
+  const error = new Error("Local passport OCR was cancelled.");
+  error.name = "AbortError";
+  return error;
+}
 
-    task.then(
-      (result) => {
-        globalThis.clearTimeout(timer);
-        resolve(result);
-      },
-      (error: unknown) => {
-        globalThis.clearTimeout(timer);
-        reject(error);
-      },
-    );
+function passportExtractionTimeoutError() {
+  return new Error("Local passport OCR timed out.");
+}
+
+type PassportExtractionDeadline = {
+  dispose(): void;
+  error(): Error;
+  signal: AbortSignal;
+  throwIfCancelled(): void;
+};
+
+function createPassportExtractionDeadline(
+  externalSignal: AbortSignal | undefined,
+): PassportExtractionDeadline {
+  const controller = new AbortController();
+  let cancellationError: Error | null = null;
+  const cancel = (error: Error) => {
+    if (controller.signal.aborted) return;
+    cancellationError = error;
+    controller.abort(error);
+  };
+  const timeout = globalThis.setTimeout(
+    () => cancel(passportExtractionTimeoutError()),
+    localOcrTotalTimeoutMs,
+  );
+  const abort = () => cancel(passportExtractionAbortError());
+
+  if (externalSignal?.aborted) abort();
+  else externalSignal?.addEventListener("abort", abort, { once: true });
+
+  const error = () => cancellationError ?? passportExtractionAbortError();
+  return {
+    dispose() {
+      globalThis.clearTimeout(timeout);
+      externalSignal?.removeEventListener("abort", abort);
+    },
+    error,
+    signal: controller.signal,
+    throwIfCancelled() {
+      if (controller.signal.aborted) throw error();
+    },
+  };
+}
+
+function throwIfPassportExtractionAborted(signal: AbortSignal | undefined) {
+  if (signal?.aborted) throw passportExtractionAbortError();
+}
+
+async function racePassportExtractionTask<T>(
+  task: Promise<T>,
+  deadline: PassportExtractionDeadline,
+): Promise<T> {
+  deadline.throwIfCancelled();
+  let rejectCancellation: ((error: Error) => void) | undefined;
+  const cancel = () => rejectCancellation?.(deadline.error());
+  const cancellation = new Promise<never>((_, reject) => {
+    rejectCancellation = reject;
+    if (deadline.signal.aborted) cancel();
+    else deadline.signal.addEventListener("abort", cancel, { once: true });
   });
+
+  try {
+    return await Promise.race([task, cancellation]);
+  } finally {
+    deadline.signal.removeEventListener("abort", cancel);
+  }
+}
+
+async function awaitPassportExtractionStep<T>(
+  task: Promise<T>,
+  deadline: PassportExtractionDeadline,
+): Promise<T> {
+  try {
+    return await racePassportExtractionTask(task, deadline);
+  } catch (error) {
+    if (!deadline.signal.aborted) throw error;
+    // Canvas/PDF preprocessing has no cancellation API. Do not release the
+    // applicant queue until the in-flight step has actually settled.
+    await task.then(
+      () => undefined,
+      () => undefined,
+    );
+    throw deadline.error();
+  }
+}
+
+function appendLocalPassportOcrLifecycleBarrier(task: Promise<unknown>) {
+  const previousBarrier = localPassportOcrWorkerLifecycleBarrier;
+  localPassportOcrWorkerLifecycleBarrier = Promise.all([
+    previousBarrier,
+    task,
+  ]).then(() => undefined);
+}
+
+async function invalidateLocalPassportOcrWorker(
+  lease: LocalPassportOcrWorkerLease,
+  recognitionTask?: Promise<PassportOcrResponse>,
+) {
+  if (localPassportOcrWorkerPromise === lease.promise) {
+    localPassportOcrWorkerPromise = null;
+  }
+
+  let shutdown = localPassportOcrWorkerShutdowns.get(lease.worker);
+  if (!shutdown) {
+    shutdown = (async () => {
+      try {
+        await lease.worker.terminate();
+      } catch {
+        // If termination cannot be confirmed, do not release the lifecycle
+        // barrier until the in-flight recognition actually settles.
+        if (recognitionTask) {
+          await recognitionTask.then(
+            () => undefined,
+            () => undefined,
+          );
+        }
+      }
+    })();
+    localPassportOcrWorkerShutdowns.set(lease.worker, shutdown);
+  }
+
+  appendLocalPassportOcrLifecycleBarrier(shutdown);
+  await shutdown;
+}
+
+async function localPassportOcrWorkerBeforeDeadline(
+  deadline: PassportExtractionDeadline,
+): Promise<LocalPassportOcrWorkerLease> {
+  const workerTask = localPassportOcrWorker();
+  try {
+    return await racePassportExtractionTask(workerTask, deadline);
+  } catch (error) {
+    if (!deadline.signal.aborted) throw error;
+    // Worker bootstrap cannot be interrupted. Reserve the lifecycle barrier
+    // immediately, then invalidate the worker as soon as creation settles.
+    const cleanup = workerTask.then(
+      (lease) => invalidateLocalPassportOcrWorker(lease),
+      () => undefined,
+    );
+    appendLocalPassportOcrLifecycleBarrier(cleanup);
+    await cleanup;
+    throw deadline.error();
+  }
+}
+
+async function recognizePassportOcrCandidate(
+  lease: LocalPassportOcrWorkerLease,
+  canvas: BrowserCanvas,
+  deadline: PassportExtractionDeadline,
+) {
+  deadline.throwIfCancelled();
+  const recognitionTask = Promise.resolve().then(() => lease.worker.recognize(canvas));
+
+  try {
+    return await racePassportExtractionTask(recognitionTask, deadline);
+  } catch (error) {
+    await invalidateLocalPassportOcrWorker(lease, recognitionTask);
+    if (deadline.signal.aborted) throw deadline.error();
+    throw error;
+  }
 }
 
 type PassportExtractionInput =
@@ -1133,6 +1337,7 @@ type PassportExtractionInput =
       file?: SubmissionFile;
       localFile: File;
       openAiFallbackAllowed?: boolean;
+      signal?: AbortSignal;
       submission?: Submission;
     }
   | {
@@ -1140,17 +1345,20 @@ type PassportExtractionInput =
       file: SubmissionFile;
       localFile?: File;
       openAiFallbackAllowed?: boolean;
+      signal?: AbortSignal;
       submission: Submission;
     };
 
 export async function invokePassportExtraction(
   input: PassportExtractionInput,
 ): Promise<PassportExtractionResult> {
+  throwIfPassportExtractionAborted(input.signal);
   let localResult: PassportExtractionResult | null = null;
   if (input.localFile) {
     localResult = await invokeLocalPassportExtraction({
       applicantIndex: input.applicantIndex,
       localFile: input.localFile,
+      signal: input.signal,
     });
     if (
       localResult.status === "extracted" ||
@@ -1165,6 +1373,8 @@ export async function invokePassportExtraction(
   if (!input.file || !input.submission) {
     return safeUnavailablePassportExtractionResult(input.applicantIndex);
   }
+
+  throwIfPassportExtractionAborted(input.signal);
 
   const client = getSupabaseClient();
   const mimeType = passportMimeType(input.file.mimeType);

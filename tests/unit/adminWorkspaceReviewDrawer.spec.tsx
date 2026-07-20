@@ -1135,6 +1135,44 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toHaveLength(1);
   });
 
+  test("keeps media tabs keyboard-operable and disables unavailable preview tools", () => {
+    const submission = singleSubmission();
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const passportTab = screen.getByRole("tab", { name: "Паспорт" });
+    const firstSelfieTab = screen.getByRole("tab", { name: "Селфи 1" });
+    const secondSelfieTab = screen.getByRole("tab", { name: "Селфи 2" });
+
+    expect(screen.getByRole("button", { name: "Увеличить изображение" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Повернуть изображение" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Открыть на весь экран" })).toBeDisabled();
+
+    passportTab.focus();
+    fireEvent.keyDown(passportTab, { key: "ArrowRight" });
+
+    expect(firstSelfieTab).toHaveFocus();
+    expect(firstSelfieTab).toHaveAttribute("aria-selected", "true");
+    expect(firstSelfieTab).toHaveAttribute("aria-controls");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      firstSelfieTab.id,
+    );
+
+    fireEvent.keyDown(firstSelfieTab, { key: "End" });
+
+    expect(secondSelfieTab).toHaveFocus();
+    expect(secondSelfieTab).toHaveAttribute("aria-selected", "true");
+  });
+
   test("uses canonical review guards for final production decisions", async () => {
     const readySubmission = reviewReadySubmission();
     const submission: Submission = {

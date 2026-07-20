@@ -15,6 +15,8 @@ export default tseslint.config(
       "test-results-*",
       "public/tesseract",
       "docs/References/**",
+      // Immutable visual handoff sources are reference-only, not product runtime code.
+      "V19_ADMIN_AGENT_UI_HANDOFF/REFERENCE_UI/**",
     ],
   },
   js.configs.recommended,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeftRight,
   ArrowUpDown,
@@ -36,10 +36,6 @@ import {
   V19ListHeader,
   V19MetricCard,
   V19MetricStrip,
-  V19OperationalCard,
-  V19OperationalCardGrid,
-  V19OperationalProgressLine,
-  V19PriorityHero,
   V19QueueToolbar,
   V19ToolbarSelect,
 } from "../shared/ui/v19-design-system";
@@ -53,7 +49,10 @@ import type {
   SubmissionAction,
   SubmissionFileType,
 } from "../modules/submissions/types";
-import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
+import {
+  targetForIssue,
+  type WorkspaceTarget,
+} from "../modules/submissions/workspaceModel";
 import {
   listItemsFromSubmissions,
   type LegacyAgentNavSection,
@@ -71,10 +70,17 @@ import {
 import {
   agentActionQueue,
   agentActionWorkspaceTarget,
+  buildAgentActionTasks,
   searchAgentActions,
+  summarizeAgentActionTasks,
   type AgentActionDue,
   type AgentActionItem,
+  type AgentActionTask,
 } from "../modules/submissions/agentActions";
+import {
+  AgentActionContextPanel,
+  AgentActionsCommandCockpit,
+} from "../modules/submissions/components/AgentActionsCommandCockpit";
 import {
   agentAgencyLabel,
   agentDisplayName,
@@ -89,7 +95,6 @@ import {
   mediaSlotTypeForSubmissionFileType,
   uploadRequiredFile,
 } from "../modules/submissions/submissionActions";
-import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
   buildMediaStoragePath,
   mediaMimeTypeForFile,
@@ -193,7 +198,6 @@ export function CommandCenter({
   usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
-  const prefersReducedMotion = useReducedMotion();
   const [activeNav, setActiveNav] = useState<AgentShellNavSection>("actions");
   const [currentView, setCurrentView] = useState<ViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
@@ -213,6 +217,9 @@ export function CommandCenter({
   const [actionCityFilter, setActionCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
+  const [selectedActionTaskId, setSelectedActionTaskId] = useState<string | null>(
+    null,
+  );
   const [settingsDigest, setSettingsDigest] = useState<"instant" | "daily">("instant");
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -305,9 +312,19 @@ export function CommandCenter({
         : right.submission.createdAt.localeCompare(left.submission.createdAt),
     );
   }, [actionCityFilter, actionQueue.completed, actionQueue.open, actionSort, actionSummaryFilter, searchQuery]);
-  const blockerActionCount = actionQueue.open.filter(
-    (action) => action.severity === "blocker",
-  ).length;
+  const actionTasks = useMemo(
+    () => buildAgentActionTasks(visibleActions),
+    [visibleActions],
+  );
+  const actionTaskSummary = useMemo(
+    () => summarizeAgentActionTasks(actionTasks),
+    [actionTasks],
+  );
+  const selectedActionTask = useMemo(
+    () =>
+      actionTasks.find((task) => task.id === selectedActionTaskId) ?? actionTasks[0],
+    [actionTasks, selectedActionTaskId],
+  );
   const actionFiltersActive =
     actionSummaryFilter !== "open" ||
     actionCityFilter !== "Все города" ||
@@ -549,6 +566,36 @@ export function CommandCenter({
     setDrawerActiveTab(action.tab);
     setDrawerFocusTarget(undefined);
     setSelectedRow(action.submission.id);
+    setDrawerOpen(true);
+  };
+
+  const handleActionTaskTab = (task: AgentActionTask, tab: DrawerTab) => {
+    if (tab === task.action.tab) {
+      handleActionOpen(task.action);
+      return;
+    }
+    if (tab === "questionnaire") {
+      handleOpenQuestionnaire(task.submission.id);
+      return;
+    }
+    if (tab === "files") {
+      const target = agentActionWorkspaceTarget(task.action);
+      if (target?.tab === "files") {
+        handleOpenWorkspaceTarget(task.submission.id, target);
+        return;
+      }
+      focusSubmissionInList(task.submission.id);
+      return;
+    }
+
+    bridge.onSubmissionOpen?.(task.submission.id);
+    emitVisaflowUiEvent(bridge, {
+      type: "submission.open",
+      submissionId: task.submission.id,
+    });
+    setDrawerActiveTab(tab);
+    setDrawerFocusTarget(undefined);
+    setSelectedRow(task.submission.id);
     setDrawerOpen(true);
   };
 
@@ -929,7 +976,7 @@ export function CommandCenter({
         aria-current={active ? "page" : undefined}
         aria-label={navLabel(normalizeAgentNav(section))}
         onClick={() => navigateTo(section)}
-        className={`v19-agent-sidebar-nav-item w-full flex items-center gap-2.5 border px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${active ? "is-active" : "border-transparent hover:bg-white/5 text-white/70 hover:text-white"}`}
+        className={`v19-agent-sidebar-nav-item w-full flex items-center gap-2.5 border px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${active ? "is-active" : "border-transparent hover:bg-white/5 text-white/70 hover:text-white"}`}
       >
         <span
           className={
@@ -953,26 +1000,6 @@ export function CommandCenter({
         ) : null}
       </button>
     );
-  };
-
-  const actionStatusTagClass = (action: AgentActionItem) =>
-    action.severity === "blocker"
-      ? "tone-danger"
-      : action.severity === "warning"
-        ? "tone-warning"
-        : action.severity === "ready"
-          ? "tone-ready"
-          : "tone-info";
-
-  const actionPeopleCount = (action: AgentActionItem) =>
-    action.submission.applicants.length;
-
-  const actionAreaLabel = (action: AgentActionItem) => {
-    if (action.tab === "questionnaire") return "Анкета";
-    if (action.tab === "files") return "Файлы";
-    if (action.tab === "issues") return "Замечания";
-    if (action.tab === "history") return "История";
-    return "Подача";
   };
 
   const renderNavContent = () => (
@@ -999,7 +1026,7 @@ export function CommandCenter({
 
       <button
         aria-label="Открыть командную палитру"
-        className="h-10 mb-4 bg-white/5 hover:bg-white/10 border border-[#242529] rounded-[10px] text-white/50 flex items-center gap-2 px-3 text-sm transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] mx-2"
+        className="h-10 mb-4 bg-white/5 hover:bg-white/10 border border-[#242529] rounded-[10px] text-white/50 flex items-center gap-2 px-3 text-sm transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] mx-2"
         type="button"
         onClick={openCommandPalette}
       >
@@ -1029,7 +1056,7 @@ export function CommandCenter({
         <button
           aria-label="Открыть профиль"
           onClick={() => navigateTo("settings")}
-          className="v19-agent-sidebar-profile w-full min-h-[60px] rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          className="v19-agent-sidebar-profile w-full min-h-[60px] rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
         >
           <span className="flex items-center gap-2.5">
             <span className="v19-agent-sidebar-avatar relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-[12px] font-bold text-white">
@@ -1060,7 +1087,7 @@ export function CommandCenter({
               onSwitchWorkspace();
             }}
             type="button"
-            className="v19-agent-sidebar-workspace w-full h-10 px-3 border rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+            className="v19-agent-sidebar-workspace w-full h-10 px-3 border rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
           >
             <ArrowLeftRight className="v19-agent-sidebar-workspace-icon w-4 h-4" />В
             админскую зону
@@ -1073,7 +1100,7 @@ export function CommandCenter({
               void onSignOut();
             }}
             type="button"
-            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white/82 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white/82 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
           >
             Выйти
           </button>
@@ -1085,22 +1112,13 @@ export function CommandCenter({
   const renderActionsList = () => (
     <section
       aria-label="Мои действия"
-      className="v19-legacy-actions-screen v19-agent-shared-screen"
+      className="v19-legacy-actions-screen v19-agent-shared-screen ops-shell surface-agent-actions"
+      data-ui-pattern="operational-table-with-context"
       data-testid="agent-actions-screen"
     >
-      <V19PriorityHero
-        actionAriaLabel={`Открыть приоритетные действия: ${blockerActionCount} требуют решения`}
-        actionCount={blockerActionCount}
-        hasBlockers={blockerActionCount > 0}
-        title={
-          blockerActionCount
-            ? `${blockerActionCount} ${blockerActionCount === 1 ? "действие требует" : "действия требуют"} решения`
-            : "Очередь готова к работе"
-        }
-        onAction={() => setActionSummaryFilter("blockers")}
-      />
-
-      <V19MetricStrip>
+      <div className="v19-agent-actions-layout-v2">
+        <div className="v19-agent-actions-main-v2">
+          <V19MetricStrip>
         <V19MetricCard
           active={actionSummaryFilter === "open"}
           detail="в работе"
@@ -1128,9 +1146,9 @@ export function CommandCenter({
           value={actionQueue.summary.completed}
           onClick={() => setActionSummaryFilter("completed")}
         />
-      </V19MetricStrip>
+          </V19MetricStrip>
 
-      <div className="v19-admin-review-board v19-agent-actions-board">
+          <div className="v19-admin-review-board v19-agent-actions-board">
         <V19ListHeader
           actionDisabled={actionControlsAreDefault}
           actionLabel="Все"
@@ -1182,101 +1200,54 @@ export function CommandCenter({
           searchPlaceholder="ID, семья или город"
           searchValue={searchQuery}
         />
-        <V19OperationalCardGrid className="v19-agent-actions-card-grid">
-          <AnimatePresence mode="popLayout">
-            {visibleActions.length === 0 ? (
-              <motion.div
-                key="empty-actions"
-                initial={false}
-                animate={{ opacity: 1, y: 0 }}
-                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
-                className="v19-legacy-actions-empty"
-                role="status"
-              >
-                <span aria-hidden="true" className="v19-legacy-actions-empty-icon">
-                  {actionFiltersActive ? <Search /> : <ListChecks />}
-                </span>
-                <h2>
-                  {actionFiltersActive ? "Ничего не найдено" : "Очередь действий пуста"}
-                </h2>
-                <p>
-                  {actionFiltersActive
-                    ? "Измените поисковый запрос или сбросьте выбранные фильтры."
-                    : "Создайте подачу — следующие шаги появятся здесь автоматически."}
-                </p>
-                <button
-                  type="button"
-                  onClick={actionFiltersActive ? resetActionFilters : createPackage}
-                >
-                  {actionFiltersActive ? "Сбросить фильтры" : "Новая подача"}
-                </button>
-              </motion.div>
-            ) : (
-              visibleActions.map((action) => (
-                <V19OperationalCard
-                  actionIcon={ListChecks}
-                  actionText={action.context}
-                  as={motion.button}
-                  city={action.submission.city}
-                  footer={
-                    <>
-                      <span className="v19-operational-card-signals">
-                        <span
-                          className={actionStatusTagClass(action)}
-                          data-testid="agent-action-status"
-                        >
-                          {action.dueLabel}
-                        </span>
-                      </span>
-                    </>
-                  }
-                  layout
-                  peopleCount={actionPeopleCount(action)}
-                  progress={
-                    <>
-                      <V19OperationalProgressLine
-                        label="Анкета"
-                        value={action.submission.completeness.questionnaire}
-                      />
-                      <V19OperationalProgressLine
-                        label="Файлы"
-                        value={action.submission.completeness.files}
-                      />
-                    </>
-                  }
-                  publicId={submissionPublicId(action.submission)}
-                  shellDetail={actionAreaLabel(action)}
-                  shellIcon={ListChecks}
-                  shellLabel="Задача"
-                  shellMeta={action.dueLabel}
-                  title={action.title}
-                  type="button"
-                  key={action.id}
-                  initial={false}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={
-                    prefersReducedMotion
-                      ? { opacity: 0 }
-                      : { opacity: 0, x: 120, scale: 0.992 }
-                  }
-                  transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
-                  onClick={() => handleActionOpen(action)}
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleActionOpen(action);
-                    }
-                  }}
-                  className={`severity-${action.severity}${action.severity === "blocker" ? " has-blocker" : ""}`}
-                  data-agent-action-id={action.id}
-                  data-testid="agent-action-row"
-                  aria-label={`${action.cta}: ${action.title}`}
-                />
-              ))
-            )}
-          </AnimatePresence>
-        </V19OperationalCardGrid>
+        <AgentActionsCommandCockpit
+          actionGroupLabel={
+            actionSummaryFilter === "completed"
+              ? "Закрытые действия"
+              : "Открытые действия"
+          }
+          emptyState={{
+            action: actionFiltersActive ? "Сбросить фильтры" : "Новая подача",
+            body: actionFiltersActive
+              ? "Измените поисковый запрос или сбросьте выбранные фильтры."
+              : "Создайте подачу — следующие шаги появятся здесь автоматически.",
+            title: actionFiltersActive
+              ? "Ничего не найдено"
+              : "Очередь действий пуста",
+          }}
+          selectedTask={selectedActionTask}
+          showDesktopContext={false}
+          showSummary={false}
+          summary={actionTaskSummary}
+          tasks={actionTasks}
+          onEmptyAction={actionFiltersActive ? resetActionFilters : createPackage}
+          onOpenIssue={(task, issue) =>
+            handleOpenWorkspaceTarget(task.submission.id, targetForIssue(issue))
+          }
+          onOpenPrimary={(task) => handleActionOpen(task.action)}
+          onOpenSecondary={(task) => handleActionTaskTab(task, "overview")}
+          onOpenTab={handleActionTaskTab}
+          onSelectTask={(task) => setSelectedActionTaskId(task.id)}
+        />
+          </div>
+        </div>
+
+        {selectedActionTask ? (
+          <AgentActionContextPanel
+            task={selectedActionTask}
+            onOpenIssue={(issue) =>
+              handleOpenWorkspaceTarget(
+                selectedActionTask.submission.id,
+                targetForIssue(issue),
+              )
+            }
+            onOpenPrimary={() => handleActionOpen(selectedActionTask.action)}
+            onOpenSecondary={() =>
+              handleActionTaskTab(selectedActionTask, "overview")
+            }
+            onOpenTab={(tab) => handleActionTaskTab(selectedActionTask, tab)}
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -1284,31 +1255,31 @@ export function CommandCenter({
   const renderSettings = () => (
     <section
       aria-labelledby="agent-settings-title"
-      className="grid max-w-3xl gap-5 rounded-2xl border border-[#242529] bg-[#161617] p-6"
+      className="v19-agent-settings-screen grid max-w-3xl gap-5 rounded-2xl border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel)] p-6 shadow-[var(--v19-depth-shadow-panel)]"
     >
       <div>
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-control)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-[var(--v19-depth-text-muted)]">
           <SlidersHorizontal className="w-3.5 h-3.5" /> Canonical V19
         </div>
         <h2
-          className="m-0 text-[24px] font-semibold tracking-tight text-white"
+          className="m-0 text-[24px] font-semibold tracking-tight text-[var(--v19-depth-text-strong)]"
           id="agent-settings-title"
         >
           Настройки рабочего места
         </h2>
-        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/60">
+        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[var(--v19-depth-text-muted)]">
           Основные параметры рабочего места агента сохраняются в этом контуре.
         </p>
       </div>
 
       <label className="grid max-w-sm gap-2">
-        <h2 className="m-0 text-[18px] font-semibold text-white">Уведомления</h2>
-        <span className="text-[13px] font-semibold text-white">
+        <h2 className="m-0 text-[18px] font-semibold text-[var(--v19-depth-text-strong)]">Уведомления</h2>
+        <span className="text-[13px] font-semibold text-[var(--v19-depth-text)]">
           Сводка по действиям
         </span>
         <select
           aria-label="Сводка по действиям"
-          className="h-10 rounded-[10px] border border-[#242529] bg-[#1e1e21] px-3 text-[13px] font-medium text-white outline-none focus:border-[#6f64ff]/55"
+          className="h-10 rounded-[10px] border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-control)] px-3 text-[13px] font-medium text-[var(--v19-depth-text)] outline-none focus:border-[var(--v19-depth-border-selected)]"
           value={settingsDigest}
           onChange={(event) => {
             setSettingsDigest(event.currentTarget.value as "instant" | "daily");
@@ -1321,11 +1292,11 @@ export function CommandCenter({
         </select>
       </label>
 
-      <label className="flex max-w-sm items-center justify-between gap-3 rounded-[12px] border border-[#242529] bg-[#1e1e21] p-3">
-        <span className="text-[13px] font-semibold text-white">Возврат подачи</span>
+      <label className="flex max-w-sm items-center justify-between gap-3 rounded-[12px] border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-control)] p-3">
+        <span className="text-[13px] font-semibold text-[var(--v19-depth-text)]">Возврат подачи</span>
         <input
           aria-label="Возврат подачи"
-          className="h-5 w-9 accent-[#3a45b4]"
+          className="h-5 w-9 accent-[var(--v19-depth-accent)]"
           defaultChecked
           role="switch"
           type="checkbox"
@@ -1334,12 +1305,18 @@ export function CommandCenter({
 
       {settingsDirty ? (
         <div
-          className="flex flex-col gap-3 rounded-[12px] border border-[#3b321d] bg-[#221d13] p-4 text-[13px] font-medium text-[#f6c66b] sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-[12px] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] p-4 text-[13px] font-medium text-[var(--v19b-color-text)] shadow-[var(--v19b-shadow-row-inner)] sm:flex-row sm:items-center sm:justify-between"
           role="status"
         >
-          <span>Есть несохранённые изменения</span>
+          <span className="inline-flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 rounded-full bg-[var(--v19b-dot-warning)]"
+            />
+            Есть несохранённые изменения
+          </span>
           <button
-            className="h-10 rounded-[10px] border border-[#4450c5] bg-[#3a45b4] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#4855d4]"
+            className="h-10 rounded-[10px] border border-[var(--v19-depth-accent-border)] bg-[var(--v19-depth-accent)] px-4 text-[13px] font-semibold text-[var(--v19-depth-text-strong)] transition-colors hover:bg-[var(--v19-depth-accent-hover)]"
             type="button"
             onClick={() => {
               setSettingsDirty(false);
@@ -1350,7 +1327,7 @@ export function CommandCenter({
           </button>
         </div>
       ) : (
-        <div className="text-[13px] font-medium text-white/60" role="status">
+        <div className="text-[13px] font-medium text-[var(--v19-depth-text-muted)]" role="status">
           {settingsSaved ? "Настройки сохранены" : "Изменений нет"}
         </div>
       )}
@@ -1472,7 +1449,7 @@ export function CommandCenter({
             <button
               aria-label="Новая подача"
               onClick={createPackage}
-              className="v19-action-surface-create h-[36px] lg:h-10 px-3.5 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="v19-action-surface-create h-[36px] lg:h-10 px-3.5 bg-[var(--v19-depth-accent)] hover:bg-[var(--v19-depth-accent-hover)] text-[var(--v19-depth-text-strong)] rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[var(--v19-depth-inner-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Новая подача</span>

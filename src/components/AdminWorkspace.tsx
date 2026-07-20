@@ -351,12 +351,12 @@ export function AdminWorkspace({
   const renderNavContent = () => (
     <>
       <div className="flex items-center gap-2.5 px-2 pb-4 mb-2 border-b border-[#242529]">
-        <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center font-bold text-sm shadow-[0_0_15px_rgba(249,115,22,0.3)]">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] text-sm font-bold text-[var(--v19b-color-primary-text)] shadow-[var(--v19b-shadow-row-inner)]">
           A
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold tracking-tight">VisaFlow V-19</div>
-          <div className="text-[11px] text-orange-400 font-medium">Admin Zone</div>
+          <div className="text-[11px] font-medium text-[var(--v19b-color-text-muted)]">Admin Zone</div>
         </div>
         <button
           aria-label="Закрыть меню администратора"
@@ -376,24 +376,24 @@ export function AdminWorkspace({
           <button
             aria-label="Проверка"
             onClick={() => navigateTo("review")}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "review" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)] ${activeNav === "review" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
-            <ScanSearch className="w-4 h-4 text-orange-400/80" />
+            <ScanSearch className="h-4 w-4 text-[var(--v19b-color-primary-text)]" />
             <span className="flex-1 text-left">Проверка</span>
-            <span className="px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 text-[11px] font-medium">
+            <span className="rounded-md border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--v19b-color-text-muted)]">
               {reviewQueueCount}
             </span>
           </button>
           <button
             aria-label="Выгрузка"
             onClick={() => navigateTo("export")}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "export" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)] ${activeNav === "export" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400/80" />
+            <FileSpreadsheet className="h-4 w-4 text-[var(--v19b-color-primary-text)]" />
             <span className="flex-1 text-left">Выгрузка</span>
-            <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[11px] font-medium">
+            <span className="rounded-md border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--v19b-color-text-muted)]">
               {exportQueueCount}
             </span>
           </button>
@@ -405,7 +405,7 @@ export function AdminWorkspace({
           </div>
           <button
             onClick={() => navigateTo("users")}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "users" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)] ${activeNav === "users" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
             <UsersRound className="w-4 h-4" />
@@ -413,7 +413,7 @@ export function AdminWorkspace({
           </button>
           <button
             onClick={() => navigateTo("settings")}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${activeNav === "settings" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)] ${activeNav === "settings" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
             type="button"
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -426,7 +426,7 @@ export function AdminWorkspace({
         {onSwitchWorkspace ? (
           <button
             onClick={onSwitchWorkspace}
-            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
             type="button"
           >
             <ArrowLeftRight className="w-4 h-4 text-white/50" />

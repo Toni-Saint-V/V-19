@@ -271,11 +271,13 @@ type V19OperationalCardProps<T extends ElementType> = V19QueueCardProps<T> & {
   peopleCount: number;
   progress?: ReactNode;
   publicId: string;
+  queuePosition?: number;
   shellDetail?: string;
   shellIcon?: ElementType;
   shellLabel?: string;
   shellMeta?: string;
   title: string;
+  tripDates?: string;
 };
 
 /**
@@ -295,11 +297,13 @@ export function V19OperationalCard<T extends ElementType = "button">({
   peopleCount,
   progress,
   publicId,
+  queuePosition,
   shellDetail,
   shellIcon: ShellIcon = FileCheck2,
   shellLabel = "Задача",
   shellMeta,
   title,
+  tripDates,
   ...props
 }: V19OperationalCardProps<T>) {
   const Component = as ?? "button";
@@ -329,6 +333,14 @@ export function V19OperationalCard<T extends ElementType = "button">({
         <span className="v19-operational-card-header">
           <span className="v19-operational-card-identity">
             <span className="v19-operational-card-meta">
+              {queuePosition ? (
+                <span
+                  aria-label={`Позиция в очереди: ${queuePosition}`}
+                  className="v19-operational-card-sequence"
+                >
+                  {queuePosition}
+                </span>
+              ) : null}
               <span className="v19-operational-card-id v19-admin-review-card-id">
                 {publicId}
               </span>
@@ -350,10 +362,15 @@ export function V19OperationalCard<T extends ElementType = "button">({
               {title}
             </strong>
           </span>
-          {city ? (
-            <span className="v19-operational-card-location">
-              <MapPin aria-hidden="true" />
-              <span>{city}</span>
+          {city || tripDates ? (
+            <span className="v19-operational-card-route">
+              {city ? (
+                <span className="v19-operational-card-location">
+                  <MapPin aria-hidden="true" />
+                  <span>{city}</span>
+                </span>
+              ) : null}
+              <V19SubmissionTripDates dates={tripDates} />
             </span>
           ) : null}
         </span>

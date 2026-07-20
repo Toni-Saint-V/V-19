@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { testArtifactPath } from "../support/artifacts";
 
 import { expect, test, type Page } from "@playwright/test";
+import { openFreshWorkspace } from "./v19-pilot-helpers";
 
 const proofDir = testArtifactPath("2026-07-01-agent-actions-cockpit");
 
@@ -44,56 +45,17 @@ function collectBrowserProblems(page: Page) {
 }
 
 async function openFreshAgentActions(page: Page) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    const browserGlobal = globalThis as unknown as {
-      localStorage: { clear(): void; setItem(key: string, value: string): void };
-    };
-
-    browserGlobal.localStorage.clear();
-    browserGlobal.localStorage.setItem(
-      "visaflow.workspaceEmail.v2",
-      "agent@visaflow.local",
-    );
+  await openFreshWorkspace(page, {
+    heading: "Мои действия",
+    workspaceEmail: "agent@visaflow.local",
   });
-  await page.reload();
-
-  const emailField = page.locator("#workspace-email");
-  if (await emailField.isVisible({ timeout: 750 }).catch(() => false)) {
-    await emailField.fill("agent@visaflow.local");
-    await page.locator("#workspace-password").fill("local-dev-password");
-    await page.getByRole("button", { name: "Войти" }).click();
-  }
-
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Мои действия" }),
-  ).toBeVisible();
   await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 }
 
 async function openFreshAdminReview(page: Page) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    const browserGlobal = globalThis as unknown as {
-      localStorage: { clear(): void; setItem(key: string, value: string): void };
-    };
-
-    browserGlobal.localStorage.clear();
-    browserGlobal.localStorage.setItem(
-      "visaflow.workspaceEmail.v2",
-      "admin@visaflow.local",
-    );
+  await openFreshWorkspace(page, {
+    workspaceEmail: "admin@visaflow.local",
   });
-  await page.reload();
-
-  const emailField = page.locator("#workspace-email");
-  if (await emailField.isVisible({ timeout: 750 }).catch(() => false)) {
-    await emailField.fill("admin@visaflow.local");
-    await page.locator("#workspace-password").fill("local-dev-password");
-    await page.getByRole("button", { name: "Войти" }).click();
-  }
-
-  await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
 }
 
 async function documentMetrics(page: Page) {
@@ -165,31 +127,16 @@ async function assertMobileCockpit(page: Page) {
   await expect(event).toBeVisible();
   await expect(event).toContainText("Ивановы");
   await expect(event).toContainText("Требует исправления");
-  await expect(event).toContainText("Причина: Заменить селфи 1: файл требует замены");
-  await expect(event).toContainText("Ответственный: Действие за агентом");
-  await expect(event).toContainText("Следующее: Заменить селфи 1");
-  await expect(event).toContainText("Срочно: дедлайн сегодня");
+  await expect(event).toContainText("Файлы не готовы");
+  await expect(event).toContainText("Москва");
 
   await event.locator(".v19-actions-timeline-hit").click();
-  const detail = page.getByTestId("agent-action-mobile-detail");
-  await expect(detail).toBeVisible();
-  await expect(detail).toContainText("Ивановы");
-  await expect(detail).toContainText("Сводка действия");
-  await expect(detail).toContainText("Проблема");
-  await expect(detail).toContainText("Файлы не готовы");
-  await expect(detail).toContainText("Заменить файл «селфи 1».");
-  await expect(detail).toContainText("Обязательные файлы");
-  await expect(detail).toContainText("Почему");
-  await expect(detail.getByRole("button", { name: "Заменить файл" })).toBeVisible();
-  await expect(
-    detail.getByRole("button", { name: "Открыть подачу полностью" }),
-  ).toBeVisible();
-
-  await detail.getByRole("button", { name: "Заменить файл" }).click();
-  await expect(detail).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toBeVisible();
+  await expect(page.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
+  const drawer = page.getByRole("dialog", { name: "Ивановы" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("Ивановы");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toHaveCount(0);
+  await expect(drawer).toHaveCount(0);
 }
 
 async function assertDesktopCockpit(page: Page) {
@@ -204,32 +151,29 @@ async function assertDesktopCockpit(page: Page) {
     .first();
   await expect(returnedItem).toBeVisible();
   await expect(returnedItem).toContainText("Требует исправления");
-  await expect(returnedItem).toContainText(
-    "Причина: Заменить селфи 1: файл требует замены",
-  );
-  await expect(returnedItem).toContainText("Ответственный: Действие за агентом");
-  await expect(returnedItem).toContainText("Следующее: Заменить селфи 1");
-  await expect(returnedItem).toContainText("Срочно: дедлайн сегодня");
-  await expect(returnedItem).toContainText("Готовность");
-  await expect(returnedItem).not.toContainText("Итог:");
+  await expect(returnedItem).toContainText("Файлы не готовы");
+  await expect(returnedItem).toContainText("Заменить селфи 1");
+  await expect(returnedItem).toContainText("Москва");
   await returnedItem.click();
 
   const activePanel = surface.getByTestId("agent-action-active-panel");
   await expect(activePanel).toContainText("Ивановы");
-  await expect(activePanel).toContainText("Сводка действия");
-  await expect(activePanel).toContainText("Проблема");
+  await expect(activePanel).toContainText("Следующее действие");
   await expect(activePanel).toContainText("Файлы не готовы");
-  await expect(activePanel).toContainText("Заменить файл «селфи 1».");
-  await expect(activePanel).toContainText("Следующее");
-  await expect(activePanel).toContainText("Почему");
-  await expect(activePanel).toContainText("Обязательные файлы");
-  await expect(activePanel).toContainText("Открыть подачу полностью");
+  await expect(activePanel).toContainText("Почему сейчас");
+  await expect(activePanel).toContainText("Что в работе");
+  await expect(activePanel).toContainText("Ключевые замечания");
   await expect(surface.locator(".v19-actions-summary-metric")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-cockpit-summary")).toHaveCount(0);
-  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Блокеры");
-  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Срочно");
-  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Готово");
-  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Всего");
+  await expect(
+    surface.getByRole("button", { name: "Открыто", exact: true }),
+  ).toBeVisible();
+  await expect(
+    surface.getByRole("button", { name: "Сегодня", exact: true }),
+  ).toBeVisible();
+  await expect(
+    surface.getByRole("button", { name: "Закрыто", exact: true }),
+  ).toBeVisible();
 
   const viewport = page.viewportSize();
   if (viewport && viewport.width >= 1280) {
@@ -251,10 +195,10 @@ async function assertDesktopCockpit(page: Page) {
   }
 
   await expect(surface.getByTestId("agent-action-next-panel")).toHaveCount(0);
-  await activePanel.getByRole("button", { name: "Заменить файл" }).click();
-  await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toBeVisible();
+  await activePanel.locator(".v19-actions-summary-cta button").last().click();
+  await expect(page.getByRole("dialog", { name: "Ивановы" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Ивановы" })).toHaveCount(0);
 
   await expect(
     page.getByRole("heading", { level: 1, name: "Мои действия" }),
@@ -263,27 +207,30 @@ async function assertDesktopCockpit(page: Page) {
 
 async function assertActionFilters(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
+  const chooseFilter = async (label: string) => {
+    await page.getByRole("button", { name: /^Фильтр действий:/ }).click();
+    await page.getByRole("option", { name: label, exact: true }).click();
+  };
 
-  await page.getByRole("tab", { name: /Блокеры/ }).click();
+  await chooseFilter("Блокеры");
   await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
     "Требует исправления",
   );
 
-  await page.getByRole("tab", { name: /Срочно/ }).click();
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
-    "Срочно: дедлайн сегодня",
-  );
+  await chooseFilter("Сегодня");
+  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
 
-  await page.getByRole("tab", { name: /^Готово/ }).click();
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
-    "Готово",
-  );
+  await chooseFilter("Закрыто");
+  await expect(
+    page.getByRole("button", { name: "Фильтр действий: Закрыто" }),
+  ).toBeVisible();
+  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
 
-  await page.getByRole("tab", { name: /^Все/ }).click();
+  await chooseFilter("Открыто");
 }
 
 test.describe("V-19 My Actions submission command cockpit", () => {
-  test("viewport matrix, selection, mobile detail, and existing drawer routing", async ({
+  test("viewport matrix, selection, and direct mobile drawer routing", async ({
     page,
   }) => {
     mkdirSync(proofDir, { recursive: true });
@@ -339,9 +286,8 @@ test.describe("V-19 My Actions submission command cockpit", () => {
 
     await page.setViewportSize({ height: 900, width: 1440 });
     await openFreshAdminReview(page);
-    await expect(
-      page.locator(".v17-admin-work-row, .v17-admin-empty-state").first(),
-    ).toBeVisible();
+    await expect(page.locator(".v19-admin-review-screen")).toBeVisible();
+    await expect(page.locator(".v19-admin-review-card-grid")).toBeVisible();
     await expect(page.locator(".vf-figma-action-row")).toHaveCount(0);
     await expect(page.getByTestId("agent-actions-cockpit")).toHaveCount(0);
     await page.screenshot({

@@ -187,6 +187,31 @@ describe("QuestionnaireScreen", () => {
     expect(nextSubmission.status).toBe("draft");
   });
 
+  test("keeps the full save-and-exit label on the mobile action", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+
+    render(
+      <QuestionnaireScreen
+        onBack={vi.fn()}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const saveAndExit = screen.getByRole("button", {
+      name: "Сохранить и выйти",
+    });
+    expect(saveAndExit).toHaveTextContent("Сохранить и выйти");
+    expect(saveAndExit).not.toHaveTextContent(/^Сохранить$/);
+  });
+
   test("assigns and announces a public number only after a complete questionnaire save", async () => {
     const submission = readySubmission("draft");
     const onAssignPublicNumber = vi.fn().mockResolvedValue({

@@ -208,7 +208,7 @@ describe("AdminWorkspace production navigation", () => {
     expect(screen.queryByText("Только агенту")).not.toBeInTheDocument();
   });
 
-  test("opens the passport workspace directly without the legacy review drawer", async () => {
+  test("opens the passport workspace directly with its lifecycle decision", async () => {
     const onAdminReviewOpen = vi.fn();
     const onVerifyDocument = vi.fn();
     const submission = acceptableReviewSubmission();
@@ -237,8 +237,8 @@ describe("AdminWorkspace production navigation", () => {
     expect(screen.getByRole("tab", { name: "Селфи 1" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Селфи 2" })).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: "Принять на выгрузку" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Принять на выгрузку" }),
+    ).toBeVisible();
     expect(onAdminReviewOpen).toHaveBeenCalledWith(submission.id);
     expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
   });
