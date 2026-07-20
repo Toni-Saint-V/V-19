@@ -7,12 +7,17 @@ import {
   type OperationalSideMenuMode,
 } from "./OperationalNavigation";
 
+export const operationalSideMenuId = "v19-operational-side-menu";
+
 export function OperationalSideMenu({
+  ariaLabel,
   displayMode,
+  inactive = false,
   items,
   mobileOpen,
   mobileTitle,
   sidebarId,
+  mobileCloseLabel,
   createAction,
   onChooseRole,
   onCommandSearch,
@@ -22,16 +27,18 @@ export function OperationalSideMenu({
   sessionDisplayName,
   sessionInitials,
   sessionRoleLabel,
-  showAdminZoneSwitch,
-  showRoleSwitcher,
+  showWorkspaceSwitch,
 }: {
+  ariaLabel: string;
   createAction?: {
     label: string;
     onClick: () => void;
   };
   displayMode: OperationalSideMenuMode;
+  inactive?: boolean;
   items: OperationalNavItem[];
   mobileOpen: boolean;
+  mobileCloseLabel?: string;
   mobileTitle: string;
   onChooseRole: (role: Role) => void;
   onCommandSearch?: () => void;
@@ -42,8 +49,7 @@ export function OperationalSideMenu({
   sessionInitials: string;
   sessionRoleLabel: string;
   sidebarId?: string;
-  showAdminZoneSwitch: boolean;
-  showRoleSwitcher: boolean;
+  showWorkspaceSwitch: boolean;
 }) {
   const navItems = items.map((item) => ({
     ...item,
@@ -61,93 +67,54 @@ export function OperationalSideMenu({
         },
       }
     : undefined;
-  const adminZoneButton = showAdminZoneSwitch ? (
+  const workspaceSwitchButton = showWorkspaceSwitch ? (
     <Button
       className="vf-figma-admin-zone"
-      aria-label="В админскую зону"
+      aria-label={role === "agent" ? "В админскую зону" : "В агентскую зону"}
       variant="secondary"
       onClick={() => {
-        onChooseRole("admin");
+        onChooseRole(role === "agent" ? "admin" : "agent");
         onCloseMobile();
       }}
     >
       <ArrowLeftRight aria-hidden="true" />
-      В админскую зону
+      {role === "agent" ? "В админскую зону" : "В агентскую зону"}
     </Button>
   ) : null;
-  const agentZoneButton =
-    null;
-  const useReferenceAgentFooter = showAdminZoneSwitch && role === "agent";
-  const useReferenceAdminFooter = role === "admin";
-  const footerInitials = useReferenceAgentFooter
-    ? "ТН"
-    : useReferenceAdminFooter
-      ? "ИЛ"
-      : sessionInitials;
-  const footerName = useReferenceAgentFooter
-    ? "Татьяна Николаева"
-    : useReferenceAdminFooter
-      ? "Ирина Лебедева"
-      : sessionDisplayName;
-  const footerRole = useReferenceAgentFooter
-    ? "Visa Center Spb"
-    : useReferenceAdminFooter
-      ? "Администратор"
-      : sessionRoleLabel;
   const footer = (
     <>
-      {adminZoneButton}
-      {agentZoneButton}
-      {showRoleSwitcher ? (
-        <>
-          <Button
-            className="ops-session"
-            aria-label="Сменить роль"
-            variant="ghost"
-            onClick={() => {
-              onChooseRole(role === "agent" ? "admin" : "agent");
-              onCloseMobile();
-            }}
-          >
-            <span>{role === "agent" ? "ТН" : "АД"}</span>
-            <div>
-              <strong>
-                {role === "agent" ? "Татьяна Николаева" : "Ирина Лебедева"}
-              </strong>
-              <small>{role === "agent" ? "Visa Center Spb" : "Администратор"}</small>
-            </div>
-            <Ellipsis className="ops-user-more" aria-hidden="true" />
-          </Button>
-        </>
-      ) : (
-        <Button
-          className="ops-session"
-          aria-label="Выйти из рабочей области"
-          variant="ghost"
-          onClick={() => {
-            void onResetWorkspace();
-            onCloseMobile();
-          }}
-        >
-          <span>{footerInitials}</span>
-          <div>
-            <strong>{footerName}</strong>
-            <small>{footerRole}</small>
-          </div>
-          <Ellipsis className="ops-user-more" aria-hidden="true" />
-        </Button>
-      )}
+      {workspaceSwitchButton}
+      <Button
+        className="ops-session"
+        aria-label="Выйти"
+        variant="ghost"
+        onClick={() => {
+          void onResetWorkspace();
+          onCloseMobile();
+        }}
+      >
+        <span>{sessionInitials}</span>
+        <div>
+          <strong>{sessionDisplayName}</strong>
+          <small>{sessionRoleLabel}</small>
+        </div>
+        <Ellipsis className="ops-user-more" aria-hidden="true" />
+      </Button>
     </>
   );
 
   return (
     <>
       <OperationalSidebar
+        ariaLabel={ariaLabel}
         createAction={sidebarCreateAction}
         displayMode={displayMode}
         footer={footer}
-        id={sidebarId}
+        id={sidebarId ?? operationalSideMenuId}
+        inactive={inactive}
         items={navItems}
+        mobileCloseLabel={mobileCloseLabel}
+        mobileOpen={mobileOpen}
         onCommandSearch={onCommandSearch}
         mobileTitle={mobileTitle}
         onMobileClose={onCloseMobile}
@@ -157,7 +124,7 @@ export function OperationalSideMenu({
           className="ops-mobile-menu-backdrop"
           type="button"
           aria-label="Закрыть меню"
-          aria-controls={sidebarId}
+          aria-controls={sidebarId ?? operationalSideMenuId}
           onClick={onCloseMobile}
         />
       ) : null}

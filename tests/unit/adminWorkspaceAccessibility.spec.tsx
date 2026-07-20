@@ -34,8 +34,7 @@ function submissionFixture(
 ): Submission {
   const source = initialSubmissions.find(
     (submission) =>
-      submission.id ===
-      (status === "ready_for_export" ? "ПД-1056" : "ПД-1053"),
+      submission.id === (status === "ready_for_export" ? "ПД-1056" : "ПД-1053"),
   );
   if (!source) throw new Error("Missing admin review fixture.");
 
@@ -170,11 +169,7 @@ describe("AdminWorkspace production navigation", () => {
       "corrections-card",
       "Только исправления",
     );
-    const returned = submissionFixture(
-      "returned",
-      "returned-card",
-      "Только агенту",
-    );
+    const returned = submissionFixture("returned", "returned-card", "Только агенту");
     const ready = submissionFixture(
       "ready_for_export",
       "ready-card",
@@ -196,8 +191,12 @@ describe("AdminWorkspace production navigation", () => {
     expect(
       within(screen.getByRole("button", { name: "Выгрузка" })).getByText("1"),
     ).toBeInTheDocument();
-    expect(container.querySelector('[data-submission-id="review-card"]')).not.toBeNull();
-    expect(container.querySelector('[data-submission-id="corrections-card"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-submission-id="review-card"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-submission-id="corrections-card"]'),
+    ).not.toBeNull();
     expect(container.querySelector('[data-submission-id="returned-card"]')).toBeNull();
     expect(container.querySelector('[data-submission-id="ready-card"]')).toBeNull();
 
@@ -213,9 +212,7 @@ describe("AdminWorkspace production navigation", () => {
     const onVerifyDocument = vi.fn();
     const submission = acceptableReviewSubmission();
     const { container } = render(
-      <VisaflowBusinessBridgeProvider
-        bridge={{ onAdminReviewOpen, onVerifyDocument }}
-      >
+      <VisaflowBusinessBridgeProvider bridge={{ onAdminReviewOpen, onVerifyDocument }}>
         <AdminWorkspace
           currentEmail="qa-admin@example.test"
           onSignOut={vi.fn()}
@@ -236,9 +233,7 @@ describe("AdminWorkspace production navigation", () => {
     expect(screen.getByRole("tab", { name: "Паспорт" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Селфи 1" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Селфи 2" })).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "Принять на выгрузку" }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeVisible();
     expect(onAdminReviewOpen).toHaveBeenCalledWith(submission.id);
     expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
   });
@@ -273,7 +268,9 @@ describe("AdminWorkspace production navigation", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Вернуться к очереди" }));
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Сверка паспорта" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("dialog", { name: "Сверка паспорта" }),
+      ).not.toBeInTheDocument();
       expect(card).toHaveFocus();
     });
   });
@@ -302,9 +299,7 @@ describe("AdminWorkspace production navigation", () => {
         name: "Добавить замечание: Скан загранпаспорта",
       }),
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Отправить замечание" }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Отправить замечание" }));
 
     expect(
       await screen.findByText(/Не удалось добавить замечание/),
@@ -314,14 +309,16 @@ describe("AdminWorkspace production navigation", () => {
 
   test("persists one remark for a submitted six-person partial family", async () => {
     let submission = productionLikePartialFamily();
-    const onAdminIssueAdd = vi.fn(async ({ input }: { input: Parameters<typeof addPreciseAdminIssue>[1] }) => {
-      submission = addPreciseAdminIssue(submission, input, adminProfile.id);
-      await saveCockpitSubmissionsForProfile(
-        adminProfile,
-        [submission],
-        new Map([[submission.id, submission.agentId]]),
-      );
-    });
+    const onAdminIssueAdd = vi.fn(
+      async ({ input }: { input: Parameters<typeof addPreciseAdminIssue>[1] }) => {
+        submission = addPreciseAdminIssue(submission, input, adminProfile.id);
+        await saveCockpitSubmissionsForProfile(
+          adminProfile,
+          [submission],
+          new Map([[submission.id, submission.agentId]]),
+        );
+      },
+    );
     const { container } = render(
       <VisaflowBusinessBridgeProvider bridge={{ onAdminIssueAdd }}>
         <AdminWorkspace
@@ -347,9 +344,7 @@ describe("AdminWorkspace production navigation", () => {
       await screen.findByPlaceholderText("Опишите, что именно нужно исправить..."),
       { target: { value: "Production lifecycle field correction" } },
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Отправить замечание" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Отправить замечание" }));
 
     await waitFor(() => expect(persistenceRuntime.rpc).toHaveBeenCalledTimes(1));
     expect(onAdminIssueAdd).toHaveBeenCalledTimes(1);
@@ -379,9 +374,7 @@ describe("AdminWorkspace production navigation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Выйти" }));
 
-    expect(
-      await screen.findByText(/Не удалось выйти из аккаунта/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Не удалось выйти из аккаунта/)).toBeInTheDocument();
     expect(onSignOut).toHaveBeenCalledTimes(1);
     expect(screen.getByTitle("qa-admin@example.test")).toBeInTheDocument();
   });
@@ -428,7 +421,8 @@ describe("AdminWorkspace production navigation", () => {
     });
     expect(trigger).toHaveAttribute("type", "button");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(trigger).toHaveAttribute("aria-controls", "admin-mobile-navigation");
+    expect(trigger).toHaveAttribute("aria-controls", "v19-operational-side-menu");
+    expect(document.querySelectorAll("#v19-operational-side-menu")).toHaveLength(1);
 
     trigger.focus();
     fireEvent.click(trigger);
@@ -438,6 +432,7 @@ describe("AdminWorkspace production navigation", () => {
     });
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(document.querySelectorAll("#v19-operational-side-menu")).toHaveLength(1);
     const closeButton = within(dialog).getByRole("button", {
       name: "Закрыть меню администратора",
     });

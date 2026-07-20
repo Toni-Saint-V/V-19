@@ -7,6 +7,7 @@ import { IconButton } from "../../../shared/ui/primitives";
 type AppShellProps = {
   children: ReactNode;
   header: ReactNode;
+  inactive?: boolean;
   mobileNavOpen: boolean;
   role: string;
   sidebar: ReactNode;
@@ -23,6 +24,7 @@ export function AppShell({
   collectionSurface = false,
   drawerOpen = false,
   header,
+  inactive = false,
   label = "Рабочая область подач",
   mobileNavOpen,
   overlays = null,
@@ -44,6 +46,8 @@ export function AppShell({
         mobileNavOpen && "is-mobile-nav-open",
       )}
       aria-label={label}
+      aria-hidden={inactive ? "true" : undefined}
+      inert={inactive ? true : undefined}
     >
       {sidebar}
       <section className="workspace">
@@ -86,17 +90,21 @@ type PageHeaderMenuButtonProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "children"
 > & {
+  closedLabel?: string;
   controls: string;
+  openLabel?: string;
   open: boolean;
 };
 
 export function PageHeaderMenuButton({
   className,
+  closedLabel = "Меню",
   controls,
   open,
+  openLabel = "Закрыть меню",
   ...props
 }: PageHeaderMenuButtonProps) {
-  const label = open ? "Закрыть меню" : "Меню";
+  const label = open ? openLabel : closedLabel;
   const Icon = open ? X : Menu;
 
   return (

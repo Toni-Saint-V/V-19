@@ -15,7 +15,6 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import visaOpsLogo from "../../../assets/v-logo-premium-black-style.webp";
 import { cn } from "../../../shared/ui/cn";
 import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
 
@@ -36,15 +35,20 @@ export type OperationalNavItem = {
 };
 
 export function OperationalSidebar({
+  ariaLabel,
   createAction,
   displayMode,
   footer,
   id,
+  inactive,
   items,
+  mobileCloseLabel,
+  mobileOpen,
   onCommandSearch,
   onMobileClose,
   mobileTitle,
 }: {
+  ariaLabel: string;
   brand?: string;
   createAction?: {
     label: string;
@@ -53,7 +57,10 @@ export function OperationalSidebar({
   displayMode: OperationalSideMenuMode;
   footer: ReactNode;
   id?: string;
+  inactive?: boolean;
   items: OperationalNavItem[];
+  mobileCloseLabel?: string;
+  mobileOpen: boolean;
   onCommandSearch?: () => void;
   onMobileClose?: () => void;
   mobileTitle?: string;
@@ -63,7 +70,11 @@ export function OperationalSidebar({
       id={id}
       className={cn("ops-sidebar opsu-sidebar", `is-${displayMode}`)}
       data-side-menu-mode={displayMode}
-      aria-label="Операционный центр"
+      aria-label={ariaLabel}
+      aria-hidden={inactive ? "true" : undefined}
+      aria-modal={mobileOpen ? "true" : undefined}
+      inert={inactive ? true : undefined}
+      role={mobileOpen ? "dialog" : undefined}
     >
       {mobileTitle ? (
         <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
@@ -73,14 +84,10 @@ export function OperationalSidebar({
       ) : null}
       <div className="ops-brand opsu-brand">
         <span
-          className="ops-brand-logo ops-brand-mark opsu-brand-mark vf-brand-capital vf-brand-capital--nav"
+          className="ops-brand-logo ops-brand-mark opsu-brand-mark"
           aria-hidden="true"
         >
-          <img
-            className="opsu-brand-image vf-brand-capital-image"
-            src={visaOpsLogo}
-            alt=""
-          />
+          <span className="ops-brand-letter">V</span>
         </span>
         <div className="ops-brand-copy opsu-brand-copy">
           <strong className="opsu-wordmark vf-brand-wordmark">VisaFlow</strong>
@@ -88,22 +95,26 @@ export function OperationalSidebar({
         {onMobileClose ? (
           <IconButton
             className="ops-mobile-close opsu-mobile-close"
-            icon={<X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />}
-            label="Закрыть меню"
+            icon={
+              <X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />
+            }
+            label={mobileCloseLabel ?? "Закрыть меню"}
             onClick={onMobileClose}
           />
         ) : null}
       </div>
-      <button
-        className="ops-sidebar-search"
-        type="button"
-        aria-label="Открыть командную палитру"
-        onClick={onCommandSearch}
-      >
-        <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
-        <span>Поиск...</span>
-        <kbd>⌘K</kbd>
-      </button>
+      {onCommandSearch ? (
+        <button
+          className="ops-sidebar-search"
+          type="button"
+          aria-label="Открыть командную палитру"
+          onClick={onCommandSearch}
+        >
+          <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
+          <span>Поиск...</span>
+          <kbd>⌘K</kbd>
+        </button>
+      ) : null}
       <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
         <span className="ops-nav-group-label">Работа</span>
         {items.map((item) => (
@@ -162,6 +173,7 @@ const operationalIconMap: Array<[needle: string, Icon: LucideIcon]> = [
   ["media", Images],
   ["issues", TriangleAlert],
   ["submissions", FileStack],
+  ["users", ContactRound],
   ["review", ScanSearch],
   ["work", ListChecks],
   ["export", FileSpreadsheet],

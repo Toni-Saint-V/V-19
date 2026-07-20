@@ -40526,3 +40526,195 @@ section[data-testid="agent-actions-screen"]
     display: none;
   }
 }
+
+/* The shared side menu stays mounted once; its trigger is only a compact-shell
+   affordance after the desktop rail becomes visible. */
+@media (min-width: 1025px) {
+  .ops-shell.has-unified-side-menu:is(.role-agent, .role-admin)
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-topbar-menu.mp-button.icon-button {
+    display: none !important;
+  }
+}
+
+/* Shared side-menu finish: one black rail, calm gray labels, and one
+   purple-blue active state across agent and admin surfaces. */
+#root .ops-shell.has-unified-side-menu > .ops-sidebar.opsu-sidebar {
+  border-color: var(--v19-line) !important;
+  background: var(--v19-canvas) !important;
+  color: var(--v19-fg-secondary) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-brand-logo {
+  display: grid !important;
+  place-items: center !important;
+  overflow: visible !important;
+  padding: var(--v19b-size-0) !important;
+  border: var(--v19b-size-0) !important;
+  border-radius: var(--v19b-size-0) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--v19-review) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-brand-letter {
+  display: block !important;
+  color: currentColor !important;
+  font-size: var(--v19b-size-24) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  :is(
+    .ops-brand-copy strong,
+    .ops-nav-group-label,
+    .ops-nav-item,
+    .ops-sidebar-search,
+    .ops-sidebar-create,
+    .ops-session,
+    .ops-session strong,
+    .ops-session small
+  ) {
+  color: var(--v19-fg-secondary) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-nav-item.is-active,
+#root .ops-shell.has-unified-side-menu .ops-nav-item[aria-current="page"] {
+  border-color: var(--v19-info) !important;
+  background: var(--v19-accent) !important;
+  box-shadow: inset var(--v19b-size-3) var(--v19b-size-0)
+    var(--v19b-size-0) var(--v19-info) !important;
+  color: var(--v19-fg) !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  :is(.ops-nav-item.is-active, .ops-nav-item[aria-current="page"])
+  :is(.ops-nav-copy strong, .ops-nav-icon) {
+  color: var(--v19-fg) !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  :is(.ops-nav-item.is-active, .ops-nav-item[aria-current="page"])
+  .ops-nav-count {
+  border-color: var(--v19-review) !important;
+  background: var(--v19-info) !important;
+  color: var(--v19-canvas) !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  > .ops-sidebar.is-regular
+  .ops-session {
+  display: grid !important;
+  grid-template-columns:
+    var(--v19b-size-32)
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    var(--v19b-size-20) !important;
+  align-items: center !important;
+  gap: var(--v19b-size-10) !important;
+  min-width: var(--v19b-size-0) !important;
+  min-height: var(--v19b-size-48) !important;
+  padding: var(--v19b-size-4) var(--v19b-size-8) !important;
+  overflow: hidden !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  > .ops-sidebar.is-regular
+  .ops-session
+  > span {
+  grid-column: 1 !important;
+  width: var(--v19b-size-32) !important;
+  min-width: var(--v19b-size-32) !important;
+  height: var(--v19b-size-32) !important;
+  min-height: var(--v19b-size-32) !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  > .ops-sidebar.is-regular
+  .ops-session
+  > div {
+  display: grid !important;
+  grid-column: 2 !important;
+  min-width: var(--v19b-size-0) !important;
+  max-width: var(--v19b-size-full) !important;
+  overflow: hidden !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  > .ops-sidebar.is-regular
+  .ops-session
+  :is(strong, small) {
+  display: block !important;
+  min-width: var(--v19b-size-0) !important;
+  max-width: var(--v19b-size-full) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  > .ops-sidebar.is-regular
+  .ops-session
+  .ops-user-more {
+  display: block !important;
+  grid-column: 3 !important;
+  width: var(--v19b-size-16) !important;
+  height: var(--v19b-size-16) !important;
+  justify-self: end !important;
+  color: var(--v19-fg-tertiary) !important;
+}
+
+@media (max-width: 1023px) {
+  #root
+    .ops-shell.has-unified-side-menu.is-mobile-nav-open
+    > .ops-sidebar.opsu-sidebar {
+    inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
+    display: flex !important;
+    width: min(
+      var(--vf-ref-size-360px),
+      calc(100vw - var(--v19b-size-16))
+    ) !important;
+    min-width: var(--v19b-size-0) !important;
+    max-width: calc(100vw - var(--v19b-size-16)) !important;
+    height: calc(100svh - var(--v19b-size-16)) !important;
+    max-height: calc(100svh - var(--v19b-size-16)) !important;
+    flex-direction: column !important;
+    padding: var(--v19b-size-14) !important;
+    overflow: hidden !important;
+    border: var(--v19b-size-1) solid var(--v19-line-strong) !important;
+    border-radius: var(--v19-radius-panel) !important;
+    background: var(--v19-canvas) !important;
+    transform: translateX(var(--v19b-size-0)) !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu .ops-brand {
+    grid-template-columns:
+      var(--v19b-size-32)
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19b-size-40) !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu .ops-mobile-close {
+    display: grid !important;
+    width: var(--v19b-size-40) !important;
+    min-width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    place-items: center !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu .ops-nav {
+    min-height: var(--v19b-size-0) !important;
+    overflow-y: auto !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu .ops-sidebar-footer {
+    flex: var(--v19b-size-0) 0 auto !important;
+    width: var(--v19b-size-full) !important;
+    margin: auto var(--v19b-size-0) var(--v19b-size-0) !important;
+    padding: var(--v19b-size-12) var(--v19b-size-0) var(--v19b-size-0) !important;
+  }
+}
