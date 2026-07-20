@@ -123,7 +123,7 @@ async function expectUnifiedSideMenuFinish(
   const menuBox = await sideMenu.boundingBox();
   expect(menuBox).not.toBeNull();
   expect(menuBox?.x).toBeGreaterThanOrEqual(8);
-  expect(menuBox?.width).toBeGreaterThanOrEqual(Math.min(360, viewportWidth - 16));
+  expect(menuBox?.width).toBeGreaterThanOrEqual(Math.min(280, viewportWidth - 16));
   expect((menuBox?.x ?? 0) + (menuBox?.width ?? 0)).toBeLessThanOrEqual(
     viewportWidth,
   );
@@ -131,7 +131,39 @@ async function expectUnifiedSideMenuFinish(
   await expect(sideMenu.locator(".ops-brand-letter")).toHaveText("V");
   await expect(sideMenu.locator(".ops-brand-logo img")).toHaveCount(0);
 
+  const createButton = sideMenu.getByRole("button", { name: "Новая подача" });
+  if ((await createButton.count()) > 0) {
+    await expect(createButton).toBeVisible();
+    await expect(createButton.locator("strong")).toHaveText("Новая подача");
+    await expect(createButton).toHaveCSS("background-color", "rgb(91, 96, 201)");
+    await expect
+      .poll(() =>
+        createButton.locator("strong").evaluate(
+          (element) => element.scrollWidth <= element.clientWidth,
+        ),
+      )
+      .toBe(true);
+  }
+
   const activeItem = sideMenu.locator('.ops-nav-item[aria-current="page"]');
+  const navIconBox = await activeItem.locator(".ops-nav-icon").boundingBox();
+  const navTextBox = await activeItem.locator(".ops-nav-copy strong").boundingBox();
+  expect(navIconBox).not.toBeNull();
+  expect(navTextBox).not.toBeNull();
+  expect(
+    Math.abs(
+      (navIconBox?.y ?? 0) + (navIconBox?.height ?? 0) / 2 -
+        ((navTextBox?.y ?? 0) + (navTextBox?.height ?? 0) / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+
+  await expect(sideMenu).toHaveCSS("opacity", "1");
+  expect(
+    await sideMenu.evaluate((element) =>
+      getComputedStyle(element).transitionProperty.includes("opacity"),
+    ),
+  ).toBe(true);
+
   const inactiveItem = sideMenu.locator(
     '.ops-nav-item:not([aria-current="page"])',
   ).first();

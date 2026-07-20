@@ -40540,10 +40540,81 @@ section[data-testid="agent-actions-screen"]
 
 /* Shared side-menu finish: one black rail, calm gray labels, and one
    purple-blue active state across agent and admin surfaces. */
+#root .ops-shell.has-unified-side-menu {
+  --v19-unified-sidebar-width: var(--v19b-size-224) !important;
+  --v19-unified-sidebar-mobile-width: var(--v19b-size-280) !important;
+  --v19-sidebar-width: var(--v19b-size-224) !important;
+}
+
 #root .ops-shell.has-unified-side-menu > .ops-sidebar.opsu-sidebar {
   border-color: var(--v19-line) !important;
   background: var(--v19-canvas) !important;
   color: var(--v19-fg-secondary) !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  :is(.ops-brand-copy, .ops-nav-copy, .ops-nav-copy strong, .ops-sidebar-search > span) {
+  display: flex !important;
+  min-height: var(--v19b-size-20) !important;
+  align-items: center !important;
+  align-content: center !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-nav-item {
+  align-items: center !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-sidebar-create {
+  display: grid !important;
+  grid-template-columns:
+    var(--v19b-size-20)
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  align-items: center !important;
+  gap: var(--v19b-size-8) !important;
+  min-height: var(--v19b-size-40) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-12) !important;
+  overflow: visible !important;
+  border-color: var(--v19-depth-accent-border) !important;
+  background: var(--v19-accent) !important;
+  box-shadow: var(--v19-depth-inner-highlight) !important;
+  color: var(--v19-fg) !important;
+}
+
+#root .ops-shell.has-unified-side-menu
+  .ops-sidebar-create:is(:hover, :focus-visible) {
+  border-color: var(--v19-review) !important;
+  background: var(--v19-accent-hover) !important;
+  color: var(--v19-fg) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-sidebar-create > span {
+  display: grid !important;
+  grid-column: 1 !important;
+  width: var(--v19b-size-20) !important;
+  min-width: var(--v19b-size-20) !important;
+  height: var(--v19b-size-20) !important;
+  min-height: var(--v19b-size-20) !important;
+  place-items: center !important;
+  color: var(--v19-fg) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-sidebar-create strong {
+  display: flex !important;
+  grid-column: 2 !important;
+  min-width: var(--v19b-size-0) !important;
+  min-height: var(--v19b-size-20) !important;
+  align-items: center !important;
+  overflow: visible !important;
+  color: var(--v19-fg) !important;
+  font-size: var(--v19b-size-13) !important;
+  line-height: var(--v19b-line-height-control) !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+#root .ops-shell.has-unified-side-menu .ops-session > div {
+  align-content: center !important;
 }
 
 #root .ops-shell.has-unified-side-menu .ops-brand-logo {
@@ -40665,16 +40736,46 @@ section[data-testid="agent-actions-screen"]
   color: var(--v19-fg-tertiary) !important;
 }
 
+@media (min-width: 1024px) {
+  #root .ops-shell.has-unified-side-menu {
+    grid-template-columns:
+      var(--v19b-size-224)
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu > .ops-sidebar.opsu-sidebar {
+    width: var(--v19b-size-224) !important;
+    min-width: var(--v19b-size-224) !important;
+    max-width: var(--v19b-size-224) !important;
+  }
+}
+
 @media (max-width: 1023px) {
+  #root
+    .ops-shell.has-unified-side-menu:not(.is-mobile-nav-open)
+    > .ops-sidebar.opsu-sidebar {
+    position: fixed !important;
+    inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
+    display: flex !important;
+    width: var(--v19b-size-280) !important;
+    min-width: var(--v19b-size-0) !important;
+    max-width: calc(100vw - var(--v19b-size-16)) !important;
+    opacity: var(--v19b-opacity-zero) !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: var(--v19b-transform-none) !important;
+    transition:
+      opacity var(--v19b-motion-panel-duration) var(--v19-motion-ease-out),
+      visibility var(--v19b-motion-instant) linear
+        var(--v19b-motion-panel-duration) !important;
+  }
+
   #root
     .ops-shell.has-unified-side-menu.is-mobile-nav-open
     > .ops-sidebar.opsu-sidebar {
     inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
     display: flex !important;
-    width: min(
-      var(--vf-ref-size-360px),
-      calc(100vw - var(--v19b-size-16))
-    ) !important;
+    width: var(--v19b-size-280) !important;
     min-width: var(--v19b-size-0) !important;
     max-width: calc(100vw - var(--v19b-size-16)) !important;
     height: calc(100svh - var(--v19b-size-16)) !important;
@@ -40685,9 +40786,13 @@ section[data-testid="agent-actions-screen"]
     border: var(--v19b-size-1) solid var(--v19-line-strong) !important;
     border-radius: var(--v19-radius-panel) !important;
     background: var(--v19-canvas) !important;
-    transform: translateX(var(--v19b-size-0)) !important;
+    opacity: var(--v19b-opacity-full) !important;
+    visibility: visible !important;
+    transform: var(--v19b-transform-none) !important;
     animation: none !important;
-    transition: none !important;
+    transition:
+      opacity var(--v19b-motion-panel-duration) var(--v19-motion-ease-out),
+      visibility var(--v19b-motion-instant) linear !important;
   }
 
   #root .ops-shell.has-unified-side-menu .ops-brand {
@@ -40716,5 +40821,11 @@ section[data-testid="agent-actions-screen"]
     width: var(--v19b-size-full) !important;
     margin: auto var(--v19b-size-0) var(--v19b-size-0) !important;
     padding: var(--v19b-size-12) var(--v19b-size-0) var(--v19b-size-0) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root .ops-shell.has-unified-side-menu > .ops-sidebar.opsu-sidebar {
+    transition: none !important;
   }
 }
