@@ -21,13 +21,11 @@ import {
   markSubmissionIssueFixedResult,
   withRecalculatedSubmissionProgress,
 } from "../modules/submissions/status";
-import { productIntakeDraftToSubmission } from "../modules/submissions/productIntakeSubmissionAdapter";
 import type {
   City,
   PassportExtractedFieldKey,
   Submission,
 } from "../modules/submissions/types";
-import type { ProductIntakeDraft } from "../modules/submissions/productIntakeFlow";
 import { blsQuestionnaireReadiness } from "../modules/submissions/questionnaireBlsRules";
 import type { PublicNumberAssignment } from "../modules/submissions/supabasePersistence";
 
@@ -39,7 +37,6 @@ interface QuestionnaireScreenProps {
   onAssignPublicNumber?: (submissionId: string) => Promise<PublicNumberAssignment>;
   onSavedAndExit?: (submission: Submission) => void | Promise<void>;
   onOpenDocuments?: (filter?: QuestionnaireDocumentsFilter) => void;
-  draft?: ProductIntakeDraft;
   submission?: Submission;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onSaveDraft?: (submissionId: string) => void | Promise<void>;
@@ -354,7 +351,6 @@ export function QuestionnaireScreen({
   onAssignPublicNumber,
   onSavedAndExit,
   onOpenDocuments,
-  draft,
   submission,
   onUploadFile,
   onSaveDraft,
@@ -367,16 +363,9 @@ export function QuestionnaireScreen({
   const sourceSubmission = useMemo(
     () =>
       normalizeSubmissionQuestionnaire(
-        submission ??
-          (draft
-            ? productIntakeDraftToSubmission(draft, {
-                agentId,
-                submissionId,
-                useIntakeFilesAsLocalDemoUploads: true,
-              })
-          : fallbackSubmission(submissionId, agentId)),
+        submission ?? fallbackSubmission(submissionId, agentId),
       ),
-    [agentId, draft, submission, submissionId],
+    [agentId, submission, submissionId],
   );
   const [workingSubmission, setWorkingSubmission] = useState(sourceSubmission);
   const workingSubmissionRef = useRef(sourceSubmission);

@@ -48,23 +48,21 @@ describe("async UI callers", () => {
     const firstSave = new Promise<void>((_resolve, reject) => {
       rejectFirstSave = reject;
     });
-    const onSaveDraft = vi
+    const onSubmit = vi
       .fn()
       .mockImplementationOnce(() => firstSave)
       .mockResolvedValueOnce(undefined);
 
-    render(
-      <PreUploadScreen
-        onBack={vi.fn()}
-        onSaveDraft={onSaveDraft}
-      />,
-    );
+    render(<PreUploadScreen onBack={vi.fn()} onSubmit={onSubmit} />);
 
-    const saveButton = screen.getByRole("button", { name: "Сохранить" });
+    fireEvent.change(screen.getByLabelText("Город подачи"), {
+      target: { value: "Самара" },
+    });
+    const saveButton = screen.getByRole("button", { name: "Сохранить черновик" });
     fireEvent.click(saveButton);
     fireEvent.click(saveButton);
 
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(saveButton).toBeDisabled();
     expect(screen.getByRole("button", { name: "Назад" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Закрыть создание" })).toBeDisabled();
@@ -75,13 +73,13 @@ describe("async UI callers", () => {
     });
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Не удалось сохранить черновик. Повторите попытку.",
+      "Не удалось сохранить подачу.",
     );
     expect(screen.queryByText("database details must stay private")).not.toBeInTheDocument();
     await waitFor(() => expect(saveButton).not.toBeDisabled());
 
     fireEvent.click(saveButton);
-    await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 

@@ -18,7 +18,7 @@
     .admin-passport-workspace,
     .v19-review-workspace,
     .v19-questionnaire-screen-shell,
-    .v19-create-drawer-shell
+    .v19-preupload-screen
   ) {
   box-sizing: border-box !important;
   border-style: solid !important;
@@ -27,16 +27,12 @@
     var(--vf-safe-area-left) !important;
 }
 
-#root
-  [data-create-submission-surface="preupload-blue"]
-  > footer.v19-create-drawer-footer {
+#root .v19-preupload-screen .v19-preupload-footer {
   padding-bottom: max(var(--v19b-size-16), var(--vf-safe-area-bottom)) !important;
 }
 
 @media (max-width: 767px) {
-  #root
-    [data-create-submission-surface="preupload-blue"]
-    > footer.v19-create-drawer-footer {
+  #root .v19-preupload-screen .v19-preupload-footer {
     padding-bottom: max(var(--v19b-size-8), var(--vf-safe-area-bottom)) !important;
   }
 }

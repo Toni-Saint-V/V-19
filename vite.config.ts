@@ -5,11 +5,13 @@ import { visaflowPwaServiceWorker } from "./config/pwa/visaflowPwaServiceWorker"
 export default defineConfig(({ mode }) => {
   const localDemoBuildEnabled =
     mode === "development" || mode === "local-demo" || mode === "test";
+  const envFilesDisabled = process.env.V19_DISABLE_ENV_FILES === "1";
 
   return {
     define: {
       __V19_LOCAL_DEMO_BUILD__: JSON.stringify(localDemoBuildEnabled),
     },
+    envDir: envFilesDisabled ? false : undefined,
     // Keep Vite's CSS assets intact. Replacing an emitted CSS file during
     // generateBundle leaves lazy-import preload maps pointing at a file that
     // no longer exists and can break the authenticated workspace at runtime.

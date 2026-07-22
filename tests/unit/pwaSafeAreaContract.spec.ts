@@ -39,7 +39,7 @@ describe("PWA safe-area boundary", () => {
 
   it("keeps fixed fullscreen owners inside the safe viewport", () => {
     const match = pwaShellCss.match(
-      /#root\s+:is\(\s*\.admin-passport-workspace,\s*\.v19-review-workspace,\s*\.v19-questionnaire-screen-shell,\s*\.v19-create-drawer-shell\s*\)\s*\{([^}]*)\}/,
+      /#root\s+:is\(\s*\.admin-passport-workspace,\s*\.v19-review-workspace,\s*\.v19-questionnaire-screen-shell,\s*\.v19-preupload-screen\s*\)\s*\{([^}]*)\}/,
     );
 
     if (match?.[1] === undefined) {
@@ -57,7 +57,7 @@ describe("PWA safe-area boundary", () => {
 
   it("lets the create footer own the bottom inset without adding it twice", () => {
     const rule = getRuleBody(
-      '#root [data-create-submission-surface="preupload-blue"] > footer.v19-create-drawer-footer',
+      "#root .v19-preupload-screen .v19-preupload-footer",
     );
 
     expect(rule).toContain(

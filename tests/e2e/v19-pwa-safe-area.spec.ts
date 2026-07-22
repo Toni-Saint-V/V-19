@@ -59,8 +59,8 @@ test("PWA fullscreen surfaces reserve one non-zero safe-area owner per edge", as
       <section class="vf-figma-questionnaire-screen codex-polish-v1 v19-questionnaire-screen-shell" data-safe-area-surface="questionnaire" style="position: fixed; inset: 0">
         <footer class="v19-questionnaire-mobile-footer" data-safe-area-bottom-owner="questionnaire"></footer>
       </section>
-      <section class="v19-create-drawer-shell" data-create-submission-surface="preupload-blue" data-safe-area-surface="create" style="position: fixed; inset: 0">
-        <footer class="v19-create-drawer-footer" data-safe-area-bottom-owner="create"></footer>
+      <section class="v19-preupload-screen" data-safe-area-surface="create" style="position: fixed; inset: 0">
+        <div class="v19-preupload-footer" data-safe-area-bottom-owner="create"></div>
       </section>
     `;
     root.append(fixture);
@@ -166,8 +166,8 @@ test("PWA fullscreen surfaces reserve one non-zero safe-area owner per edge", as
     create: {
       left: NON_ZERO_INSETS.left,
       paddingBottom: NON_ZERO_INSETS.bottom,
-      paddingLeft: 12,
-      paddingRight: 12,
+      paddingLeft: 0,
+      paddingRight: 0,
       rightGap: NON_ZERO_INSETS.right,
     },
     questionnaire: {

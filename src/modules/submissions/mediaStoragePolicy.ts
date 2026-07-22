@@ -39,6 +39,7 @@ export const passportScanUploadMimeTypes = [
 ] as const;
 export const passportScanUploadAccept = passportScanUploadMimeTypes.join(",");
 export const passportScanUploadFormatLabel = "JPEG, PNG, HEIC, HEIF или PDF";
+export const passportScanUploadMaxBytes = 50 * 1024 * 1024;
 const passportScanUploadExtensions = new Set([
   "jpg",
   "jpeg",
@@ -140,7 +141,7 @@ function maxSizeBytes(type: MediaStorageObjectType): number {
   if (type === "application_pdf") return maxVisaApplicationPdfBytes;
   if (type === "appointment_pdf") return maxVisaApplicationPdfBytes;
   if (type === "visa_application_pdf") return maxVisaApplicationPdfBytes;
-  return 50 * 1024 * 1024;
+  return passportScanUploadMaxBytes;
 }
 
 function maxLegacyArchiveSizeBytes(type: string): number {
@@ -239,13 +240,9 @@ function hasExpectedGeneratedSuffix(
   if (type === "selfie")
     return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png|heic|heif)$/.test(fileName);
   if (type === "selfie_2")
-    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png|heic|heif)$/.test(
-      fileName,
-    );
+    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png|heic|heif)$/.test(fileName);
   if (type === "passport_scan")
-    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|heic|heif|pdf)$/.test(
-      fileName,
-    );
+    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|heic|heif|pdf)$/.test(fileName);
   if (type === "application_pdf")
     return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_application_pdf\.pdf$/.test(fileName);
   if (type === "appointment_pdf")
@@ -347,6 +344,67 @@ export function isPassportScanUploadFileAccepted(
   }
 
   return passportScanUploadExtensions.has(extensionForFileName(file.name));
+}
+
+export type PassportScanUploadFileValidation =
+  | {
+      ok: true;
+      mimeType: (typeof passportScanUploadMimeTypes)[number];
+      ocrMode: "manual_review" | "supported";
+    }
+  | {
+      code: "empty_file" | "file_too_large" | "unsupported_format";
+      message: string;
+      ok: false;
+    };
+
+export function validatePassportScanUploadFile(
+  file: Pick<File, "name" | "size" | "type">,
+): PassportScanUploadFileValidation {
+  if (!isPassportScanUploadFileAccepted(file)) {
+    return {
+      code: "unsupported_format",
+      message: `Выберите паспорт в формате ${passportScanUploadFormatLabel}.`,
+      ok: false,
+    };
+  }
+  if (!Number.isInteger(file.size) || file.size <= 0) {
+    return {
+      code: "empty_file",
+      message: "Файл паспорта пуст. Выберите другой файл.",
+      ok: false,
+    };
+  }
+  if (file.size > passportScanUploadMaxBytes) {
+    return {
+      code: "file_too_large",
+      message: "Файл паспорта больше 50 МБ. Уменьшите его и повторите загрузку.",
+      ok: false,
+    };
+  }
+
+  const mimeType = mediaMimeTypeForFile(file);
+  if (
+    !mimeType ||
+    !passportScanUploadMimeTypes.includes(
+      mimeType as (typeof passportScanUploadMimeTypes)[number],
+    )
+  ) {
+    return {
+      code: "unsupported_format",
+      message: `Выберите паспорт в формате ${passportScanUploadFormatLabel}.`,
+      ok: false,
+    };
+  }
+
+  return {
+    mimeType: mimeType as (typeof passportScanUploadMimeTypes)[number],
+    ocrMode:
+      mimeType === "image/heic" || mimeType === "image/heif"
+        ? "manual_review"
+        : "supported",
+    ok: true,
+  };
 }
 
 export function buildMediaStoragePath(

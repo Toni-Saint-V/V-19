@@ -1,7 +1,4 @@
-import { mkdirSync } from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { testArtifactPath } from "../support/artifacts";
 import {
   clickFirstVisible,
   collectBrowserProblems,
@@ -9,29 +6,14 @@ import {
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
 
-const realPassportPath = "/Users/user/Desktop/passport.jpeg";
-const qaDir = testArtifactPath("passport-ai-hints-20260706");
-const intakeDraftStorageKey = "visaflow.v19.productIntakeDrafts.v1";
+const canonicalStorageKey = "visaflow.v19.submissions.v1";
+const legacyIntakeStorageKey = "visaflow.v19.productIntakeDrafts.v1";
 
-type StoredIntakeDraft = {
-  applicants?: Array<{
-    fields?: {
-      birthDate?: unknown;
-      firstName?: unknown;
-      passportExpiresAt?: unknown;
-      passportNo?: unknown;
-      surname?: unknown;
-    };
-  }>;
-};
-
-test.describe("V-19 real passport OCR proof", () => {
-  test("agent uploads the provided passport photo and sees extracted fields in the create flow", async ({
+test.describe("V-19 privacy-safe passport intake proof", () => {
+  test("stores a synthetic manual-review passport only in the canonical draft", async ({
     page,
-  }, testInfo) => {
-    test.setTimeout(140_000);
+  }) => {
     const browserProblems = collectBrowserProblems(page);
-
     await openFreshWorkspace(page, { heading: "Мои действия" });
     const createButton = page.getByRole("button", {
       name: /^(Создать пакет|Новая подача)$/,
@@ -39,71 +21,55 @@ test.describe("V-19 real passport OCR proof", () => {
     await expectAtLeastOneVisible(createButton, "No visible create button matched.");
     await clickFirstVisible(createButton);
 
-    await expect(
-      page.getByRole("heading", {
-        level: 1,
-        name: "Новая подача",
-      }),
-    ).toBeVisible();
-    await page.getByRole("button", { exact: true, name: "Один" }).click();
-    await page.locator('input[type="file"]').setInputFiles(realPassportPath);
-
-    await expect(page.getByText("Успешно распознано").first()).toBeVisible({
-      timeout: 90_000,
+    const dialog = page.getByRole("dialog", { name: "Новая подача" });
+    await dialog.getByRole("radio", { name: "Заявитель" }).click();
+    await dialog.getByLabel("Город подачи").selectOption("Самара");
+    await dialog.locator('input[type="file"]').setInputFiles({
+      buffer: Buffer.from([0x00, 0x00, 0x00, 0x18]),
+      mimeType: "image/heic",
+      name: "synthetic-passport.heic",
     });
-    await expect(page.getByText("7 полей").first()).toBeVisible();
+
+    await expect(dialog.getByText("Нужна ручная проверка")).toBeVisible();
+    await dialog.getByRole("button", { name: "Создать и открыть анкету" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Анкета:/ }),
+    ).toBeVisible();
 
     await expect
       .poll(() =>
-        page.evaluate(() => {
-          const runtime = globalThis as unknown as {
-            document: { documentElement: { scrollWidth: number } };
-            window: { innerWidth: number };
-          };
-
-          return (
-            runtime.document.documentElement.scrollWidth <= runtime.window.innerWidth
-          );
-        }),
-      )
-      .toBe(true);
-    mkdirSync(qaDir, { recursive: true });
-    await page.screenshot({
-      path: path.join(qaDir, `create-passport-ai-intake-${testInfo.project.name}.png`),
-      fullPage: true,
-    });
-
-    await page.getByRole("button", { exact: true, name: "Далее" }).click();
-    await expect(
-      page.getByRole("heading", { name: /Анкета|VOLKOV|Schengen/ }),
-    ).toBeVisible();
-
-    await expect
-      .poll(
-        async () =>
-          page.evaluate((storageKey) => {
-            const raw = localStorage.getItem(storageKey);
-            if (!raw) return null;
-
-            const drafts = JSON.parse(raw) as StoredIntakeDraft[];
-            const fields = drafts[0]?.applicants?.[0]?.fields;
-
+        page.evaluate(
+          ({ canonicalKey, legacyKey }) => {
+            const canonical = JSON.parse(
+              localStorage.getItem(canonicalKey) ?? "[]",
+            ) as Array<{
+              city?: string;
+              files?: Array<{
+                originalFileName?: string;
+                storageAdapter?: string;
+                type?: string;
+              }>;
+            }>;
+            const created = canonical.find((submission) =>
+              submission.files?.some(
+                (file) => file.originalFileName === "synthetic-passport.heic",
+              ),
+            );
             return {
-              birthDate: fields?.birthDate,
-              firstName: fields?.firstName,
-              passportExpiry: fields?.passportExpiresAt,
-              passportNo: fields?.passportNo,
-              surname: fields?.surname,
+              city: created?.city,
+              legacyDraftExists: localStorage.getItem(legacyKey) !== null,
+              storageAdapter: created?.files?.find(
+                (file) => file.type === "passport_scan",
+              )?.storageAdapter,
             };
-          }, intakeDraftStorageKey),
-        { timeout: 10_000 },
+          },
+          { canonicalKey: canonicalStorageKey, legacyKey: legacyIntakeStorageKey },
+        ),
       )
-      .toMatchObject({
-        birthDate: "20.08.1990",
-        firstName: "ANTON",
-        passportExpiry: "26.02.2026",
-        passportNo: "752869613",
-        surname: "VOLKOV",
+      .toEqual({
+        city: "Самара",
+        legacyDraftExists: false,
+        storageAdapter: "local-dev",
       });
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

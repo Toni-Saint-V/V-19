@@ -45,10 +45,7 @@ import {
 } from "../shared/ui/v19-design-system";
 import { createDraft } from "../modules/submissions/domainEngine";
 import type {
-  City,
   DrawerTab,
-  PassportUploadDraft,
-  PreliminaryIntakeDraft,
   Submission,
   SubmissionAction,
   SubmissionFileType,
@@ -62,15 +59,10 @@ import {
   type LegacyAgentNavSection,
   type LegacySubmissionListItem,
 } from "./v19BusinessScreenAdapter";
-import {
-  loadProductIntakeDrafts,
-  saveProductIntakeDrafts,
-  type ProductIntakeDraft,
-} from "../modules/submissions/productIntakeFlow";
-import {
-  productIntakeDraftToPassportUploads,
-  productIntakeDraftToSubmission,
-} from "../modules/submissions/productIntakeSubmissionAdapter";
+import type {
+  SubmissionIntakeIntent,
+  SubmissionIntakeProgressListener,
+} from "../modules/submissions/submissionIntake";
 import {
   agentActionQueue,
   agentActionWorkspaceTarget,
@@ -137,25 +129,6 @@ type CommandCenterProps = {
   usesSupabase?: boolean;
 };
 
-function intakeDraftToListItem(draft: ProductIntakeDraft): SubmissionListItem {
-  return {
-    id: draft.id,
-    title: draft.title,
-    type: draft.type,
-    applicantsCount: draft.applicants.length,
-    city: draft.city,
-    tripDates: draft.tripDates.replace(/\.2026/g, "").replace(/\s+–\s+/g, "–"),
-    status: draft.issues.some((issue) => issue.severity === "blocker")
-      ? "returned"
-      : "in_progress",
-    completeness: draft.readyPercent,
-    updated: "только что",
-    owner: "Татьяна Н.",
-    issueCount: draft.issues.length,
-    nextAction: draft.nextAction,
-  };
-}
-
 function canonicalBridgeNav(section: LegacyAgentNavSection): AgentNavSection | null {
   if (section === "actions" || section === "submissions" || section === "settings")
     return section;
@@ -216,21 +189,16 @@ export function CommandCenter({
   const [searchQuery, setSearchQuery] = useState("");
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
   const [selectedActionTaskId, setSelectedActionTaskId] = useState<string | null>(null);
-  const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() =>
-    usesSupabase ? [] : loadProductIntakeDrafts(),
-  );
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
   const questionnaireSubmissionSnapshotRef = useRef<Submission | undefined>(undefined);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
-  const createCity: City = "Москва";
-  const createFamilyCount = 2;
-  const createType: Submission["type"] = "single";
   const [canonicalOverrides, setCanonicalOverrides] = useState<
     Record<string, Submission>
   >({});
   const pendingCreatedSubmissionRef = useRef<Submission | null>(null);
   const createSubmissionPromiseRef = useRef<Promise<void> | null>(null);
   const attemptedCreateStoragePathsRef = useRef(new Set<string>());
+  const legacyMigrationStartedRef = useRef(false);
 
   const effectiveCanonicalSubmissions = useMemo(() => {
     const byId = new Map(
@@ -264,14 +232,7 @@ export function CommandCenter({
     () => listItemsFromSubmissions(effectiveCanonicalSubmissions),
     [effectiveCanonicalSubmissions],
   );
-  const intakeRows = useMemo(
-    () => intakeDrafts.map(intakeDraftToListItem),
-    [intakeDrafts],
-  );
-  const rows = useMemo(
-    () => (usesSupabase ? canonicalRows : [...intakeRows, ...canonicalRows]),
-    [canonicalRows, intakeRows, usesSupabase],
-  );
+  const rows = canonicalRows;
   const actionQueue = useMemo(
     () => agentActionQueue(effectiveCanonicalSubmissions),
     [effectiveCanonicalSubmissions],
@@ -355,28 +316,7 @@ export function CommandCenter({
     (questionnaireSubmissionSnapshotRef.current?.id === selectedRow
       ? questionnaireSubmissionSnapshotRef.current
       : undefined);
-  const selectedIntakeDraft = useMemo(
-    () => intakeDrafts.find((draft) => draft.id === selectedRow),
-    [intakeDrafts, selectedRow],
-  );
-
-  const intakeSubmissionsForCards = useMemo(
-    () =>
-      intakeDrafts.map((draft) =>
-        productIntakeDraftToSubmission(draft, {
-          agentId,
-          useIntakeFilesAsLocalDemoUploads: true,
-        }),
-      ),
-    [agentId, intakeDrafts],
-  );
-  const submissionCards = useMemo(
-    () =>
-      usesSupabase
-        ? effectiveCanonicalSubmissions
-        : [...intakeSubmissionsForCards, ...effectiveCanonicalSubmissions],
-    [effectiveCanonicalSubmissions, intakeSubmissionsForCards, usesSupabase],
-  );
+  const submissionCards = effectiveCanonicalSubmissions;
 
   useEffect(() => {
     const handleResize = () => {
@@ -404,9 +344,20 @@ export function CommandCenter({
   }, []);
 
   useEffect(() => {
-    if (usesSupabase) return;
-    saveProductIntakeDrafts(intakeDrafts);
-  }, [intakeDrafts, usesSupabase]);
+    if (usesSupabase || legacyMigrationStartedRef.current || !onSubmissionsChange) {
+      return;
+    }
+    legacyMigrationStartedRef.current = true;
+    void import("../modules/submissions/legacyProductIntakeMigration")
+      .then(({ migrateLegacyProductIntakeDrafts }) =>
+        migrateLegacyProductIntakeDrafts({
+          agentId,
+          canonicalSubmissions: effectiveCanonicalSubmissions,
+          persistSubmissions: onSubmissionsChange,
+        }),
+      )
+      .catch(() => undefined);
+  }, [agentId, effectiveCanonicalSubmissions, onSubmissionsChange, usesSupabase]);
 
   const navigateTo = (nav: LegacyAgentNavSection) => {
     const normalizedNav = normalizeAgentNav(nav);
@@ -444,15 +395,6 @@ export function CommandCenter({
     questionnaireOriginFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setQuestionnaireInitialFocus(undefined);
-    if (intakeDrafts.some((draft) => draft.id === id)) {
-      bridge.onQuestionnaireOpen?.(id);
-      emitVisaflowUiEvent(bridge, { type: "questionnaire.open", submissionId: id });
-      setSelectedRow(id);
-      setDrawerOpen(false);
-      setCurrentView("questionnaire");
-      return;
-    }
-
     bridge.onSubmissionOpen?.(id);
     emitVisaflowUiEvent(bridge, { type: "submission.open", submissionId: id });
     setDrawerActiveTab("overview");
@@ -605,14 +547,10 @@ export function CommandCenter({
   };
 
   const executeCreateCanonicalDraft = async (
-    passportUploads: PassportUploadDraft[] = [],
-    preliminaryIntake?: PreliminaryIntakeDraft,
-    options?: {
-      familyCount?: number;
-      openQuestionnaire?: boolean;
-      type?: Submission["type"];
-    },
+    intent: SubmissionIntakeIntent,
+    onProgress: SubmissionIntakeProgressListener,
   ) => {
+    const passportUploads = intent.passportUploads;
     const applicantNames: string[] = [];
     for (const upload of passportUploads) {
       const firstName = upload.extractedFields
@@ -630,18 +568,17 @@ export function CommandCenter({
       const result = createDraft({
         agentId,
         applicantNames,
-        city: createCity,
-        familyCount: options?.familyCount ?? createFamilyCount,
-        idScheme: "supabase",
-        preliminaryIntake,
-        submissions: canonicalSubmissions ?? [],
-        type: options?.type ?? createType,
+        city: intent.city,
+        familyCount: intent.familyCount,
+        idScheme: usesSupabase ? "supabase" : "local",
+        submissions: effectiveCanonicalSubmissions,
+        type: intent.type,
       });
       if (!result.ok) throw new Error(result.error.message);
       pendingSubmission = result.data;
     }
     if (!onSubmissionsChange) {
-      throw new Error("Supabase persistence недоступен для создания подачи.");
+      throw new Error("Сохранение подачи недоступно.");
     }
 
     const nextSubmission = await persistCreatedSubmissionWithPassports({
@@ -649,6 +586,7 @@ export function CommandCenter({
       onPendingSubmission: (submission) => {
         pendingCreatedSubmissionRef.current = submission;
       },
+      onProgress,
       passportUploads,
       persistSubmission: async (submission) => {
         await onSubmissionsChange([submission]);
@@ -657,6 +595,7 @@ export function CommandCenter({
           [submission.id]: submission,
         }));
       },
+      storageAdapter: usesSupabase ? "supabase-private" : "local-dev",
       submission: pendingSubmission,
     });
 
@@ -667,7 +606,7 @@ export function CommandCenter({
       [nextSubmission.id]: nextSubmission,
     }));
     setSearchQuery("");
-    if (options?.openQuestionnaire) {
+    if (intent.destination === "questionnaire") {
       setActiveNav("submissions");
       setSelectedRow(nextSubmission.id);
       setQuestionnaireInitialFocus({
@@ -683,22 +622,13 @@ export function CommandCenter({
   };
 
   const createCanonicalDraft = (
-    passportUploads: PassportUploadDraft[] = [],
-    preliminaryIntake?: PreliminaryIntakeDraft,
-    options?: {
-      familyCount?: number;
-      openQuestionnaire?: boolean;
-      type?: Submission["type"];
-    },
+    intent: SubmissionIntakeIntent,
+    onProgress: SubmissionIntakeProgressListener,
   ) => {
     if (createSubmissionPromiseRef.current) {
       return createSubmissionPromiseRef.current;
     }
-    const promise = executeCreateCanonicalDraft(
-      passportUploads,
-      preliminaryIntake,
-      options,
-    ).finally(() => {
+    const promise = executeCreateCanonicalDraft(intent, onProgress).finally(() => {
       if (createSubmissionPromiseRef.current === promise) {
         createSubmissionPromiseRef.current = null;
       }
@@ -894,62 +824,7 @@ export function CommandCenter({
     return nextSubmission;
   };
 
-  const handleUploadComplete = (draft: ProductIntakeDraft) => {
-    bridge.onQuestionnaireOpen?.(draft.id);
-    emitVisaflowUiEvent(bridge, { type: "questionnaire.open", submissionId: draft.id });
-    setIntakeDrafts((current) =>
-      [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8),
-    );
-    setSelectedRow(draft.id);
-    setQuestionnaireInitialFocus({
-      applicantId: draft.applicants[0]?.id,
-      field: "surname",
-      section: "Личные данные заявителя",
-    });
-    setDrawerOpen(false);
-    setActiveNav("submissions");
-    setSearchQuery("");
-    setCurrentView("questionnaire");
-  };
-
-  const persistSupabasePreUploadDraft = async (
-    draft: ProductIntakeDraft,
-    preliminaryIntake: PreliminaryIntakeDraft,
-    openQuestionnaire: boolean,
-  ) => {
-    await createCanonicalDraft(
-      productIntakeDraftToPassportUploads(draft),
-      preliminaryIntake,
-      {
-        familyCount: draft.applicants.length,
-        openQuestionnaire,
-        type: draft.type,
-      },
-    );
-    if (!openQuestionnaire) setCurrentView("main");
-  };
-
-  const handleUploadDraftSave = (draft: ProductIntakeDraft) => {
-    setIntakeDrafts((current) =>
-      [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8),
-    );
-    setSelectedRow(draft.id);
-    setDrawerOpen(false);
-    setActiveNav("submissions");
-    setSubmissionTypeFilter(draft.type);
-    setSubmissionFocusRequest((current) => ({
-      revision: (current?.revision ?? 0) + 1,
-      submissionId: draft.id,
-      type: draft.type,
-    }));
-    setSearchQuery("");
-    setCurrentView("main");
-  };
-
   const persistQuestionnaireSubmission = (nextSubmission: Submission) => {
-    setIntakeDrafts((current) =>
-      current.filter((draft) => draft.id !== nextSubmission.id),
-    );
     return onSubmissionsChange?.([nextSubmission]);
   };
 
@@ -1153,21 +1028,20 @@ export function CommandCenter({
             agentId={agentId}
             initialFocus={questionnaireInitialFocus}
             submissionId={selectedRow}
-            draft={selectedIntakeDraft}
             submission={selectedQuestionnaireSubmission}
             onAssignPublicNumber={onAssignPublicNumber}
             onBack={handleQuestionnaireBack}
             onSavedAndExit={showSavedSubmissionInList}
             onOpenDocuments={() => focusSubmissionInList(selectedRow)}
             onSubmissionUpdate={
-              onSubmissionUpdate && !selectedIntakeDraft
+              onSubmissionUpdate
                 ? (update) => onSubmissionUpdate(selectedRow, update)
                 : undefined
             }
             onSubmissionChange={persistQuestionnaireSubmission}
             onMarkIssueFixed={markAgentIssueFixed}
             onUploadFile={
-              usesSupabase && selectedRow
+              selectedRow
                 ? async (fileId, file) => {
                     await uploadCanonicalFile(selectedRow, fileId, file);
                   }
@@ -1179,23 +1053,16 @@ export function CommandCenter({
           <PreUploadScreen
             key="upload"
             onBack={() => setCurrentView("main")}
-            onSaveDraft={
-              usesSupabase
-                ? (draft, preliminaryIntake) =>
-                    persistSupabasePreUploadDraft(draft, preliminaryIntake, false)
-                : handleUploadDraftSave
-            }
-            onComplete={
-              usesSupabase
-                ? (draft, preliminaryIntake) =>
-                    persistSupabasePreUploadDraft(draft, preliminaryIntake, true)
-                : handleUploadComplete
-            }
+            onSubmit={createCanonicalDraft}
           />
         )}
       </AnimatePresence>
 
-      <div className="contents">
+      <div
+        aria-hidden={currentView !== "main" ? true : undefined}
+        className="contents"
+        inert={currentView !== "main"}
+      >
         <AppShell
           className="is-agent-shell-source-actions"
           collectionSurface={activeNav !== "settings"}

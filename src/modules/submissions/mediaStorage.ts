@@ -17,6 +17,7 @@ export {
   MediaStorageValidationError,
   passportScanUploadAccept,
   passportScanUploadFormatLabel,
+  passportScanUploadMaxBytes,
   passportScanUploadMimeTypes,
   selfieUploadAccept,
   selfieUploadFormatLabel,
@@ -25,10 +26,12 @@ export {
   validateApplicationPdfStorageTarget,
   validateAppointmentPdfStorageTarget,
   validateMediaStorageTarget,
+  validatePassportScanUploadFile,
   validateVisaApplicationPdfStorageTarget,
   type MediaStorageTarget,
   type MediaStorageObjectType,
   type MediaStorageValidationInput,
+  type PassportScanUploadFileValidation,
 } from "./mediaStoragePolicy";
 
 export async function uploadMediaToStorage(

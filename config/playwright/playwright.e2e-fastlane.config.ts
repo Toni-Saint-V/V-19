@@ -48,6 +48,7 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
     env: {
+      V19_DISABLE_ENV_FILES: "1",
       VITE_SUPABASE_BACKEND_TARGET: "local-demo",
       VITE_SUPABASE_SANDBOX_PROBE_ENABLED: "false",
       VITE_SUPABASE_RELEASE_ENABLED: "false",

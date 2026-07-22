@@ -6,6 +6,7 @@ export default defineConfig({
   define: {
     __V19_LOCAL_DEMO_BUILD__: "true",
   },
+  envDir: false,
   test: {
     include: [
       "tests/unit/**/*.{test,spec}.{ts,tsx}",

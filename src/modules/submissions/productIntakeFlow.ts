@@ -479,3 +479,13 @@ export function saveProductIntakeDrafts(drafts: ProductIntakeDraft[]) {
     // Local demo persistence is best-effort; canonical persistence remains in V19 submissions.
   }
 }
+
+export function clearProductIntakeDrafts() {
+  const storage = globalThis.localStorage;
+  if (!storage) return;
+  try {
+    storage.removeItem(storageKey);
+  } catch {
+    // Keep legacy data untouched when local demo storage is unavailable.
+  }
+}

@@ -53,6 +53,40 @@ function uploadedPassportCount(submission: Submission): number {
 }
 
 describe("persistCreatedSubmissionWithPassports", () => {
+  test("uses the same canonical pipeline for local demo without claiming private storage", async () => {
+    const progress: string[] = [];
+    const persisted: Submission[] = [];
+    const uploadMedia = vi.fn();
+    const initial = draft(1);
+
+    const result = await persistCreatedSubmissionWithPassports({
+      onPendingSubmission: () => undefined,
+      onProgress: (event) => progress.push(event.stage),
+      passportUploads: [passportUpload(0)],
+      persistSubmission: async (submission) => {
+        persisted.push(submission);
+      },
+      storageAdapter: "local-dev",
+      submission: initial,
+      uploadMedia,
+    });
+
+    expect(uploadMedia).not.toHaveBeenCalled();
+    expect(progress).toEqual([
+      "saving_submission",
+      "uploading_passport",
+      "saving_passport_metadata",
+      "complete",
+    ]);
+    expect(persisted).toHaveLength(2);
+    expect(result.files.find((file) => file.type === "passport_scan")).toMatchObject({
+      originalFileName: "audit-1.png",
+      storageAdapter: "local-dev",
+      uploadStatus: "uploaded",
+    });
+    expect(result.applicants[0]?.passportExtraction?.status).toBe("ready");
+  });
+
   test("persists parent rows before Storage and records every passport immediately", async () => {
     const events: string[] = [];
     let pending: Submission | null = null;
