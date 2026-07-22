@@ -273,6 +273,7 @@ describe("VisaFlow service worker integration", () => {
       url: `${APP_ORIGIN}/storage/v1/object/submission-media/passport.pdf`,
     },
     { mode: "cors", url: "https://tenant.supabase.co/rest/v1/submissions" },
+    { mode: "cors", url: "https://supabase.co/rest/v1/submissions" },
   ])("does not intercept sensitive response $url", async ({ mode, url }) => {
     const harness = createServiceWorkerHarness();
     const worker = harness.createWorker(createServiceWorkerSource(["/"], "current"));
@@ -454,7 +455,7 @@ describe("VisaFlow precache revision", () => {
         {
           fileName: "index.html",
           source:
-            '<link rel="canonical" href="/submissions"><link rel="alternate" href="/ru"><link rel="icon" href="/v19-app-icon.svg">',
+            '<link rel="canonical" href="/submissions"><link rel="alternate" href="/ru"><link rel="preload nofollow" as="fetch" href="/bootstrap-data"><link rel="icon" href="/v19-app-icon.svg">',
         },
       ],
       "/repo",
@@ -465,7 +466,40 @@ describe("VisaFlow precache revision", () => {
     expect(plan.paths).toContain("/v19-app-icon.svg");
     expect(plan.paths).not.toContain("/submissions");
     expect(plan.paths).not.toContain("/ru");
+    expect(plan.paths).not.toContain("/bootstrap-data");
   });
+
+  it.each([
+    {
+      bundle: [
+        {
+          fileName: "index.html",
+          source: '<link rel="icon" href="/api/bootstrap.png">',
+        },
+      ],
+      reader: createAssetReader(),
+      sensitivePath: "/api/bootstrap.png",
+    },
+    {
+      bundle: bundleFiles,
+      reader: createAssetReader({
+        "manifest.webmanifest": JSON.stringify({
+          icons: [{ src: "/storage/v1/object/private/passport.png" }],
+          name: "VisaFlow",
+        }),
+      }),
+      sensitivePath: "/storage/v1/object/private/passport.png",
+    },
+  ])(
+    "fails closed when build metadata references sensitive path $sensitivePath",
+    async ({ bundle, reader, sensitivePath }) => {
+      await expect(
+        createPrecachePlan(bundle, "/repo", "/repo/public", reader),
+      ).rejects.toThrow(
+        `VisaFlow PWA refuses to precache sensitive path: ${sensitivePath}`,
+      );
+    },
+  );
 });
 
 describe("VisaFlow Vite PWA build integration", () => {

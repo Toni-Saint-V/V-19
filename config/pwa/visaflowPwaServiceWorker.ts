@@ -15,6 +15,23 @@ const PRECACHE_LINK_RELATIONS = new Set([
   "preload",
   "stylesheet",
 ]);
+const PRECACHE_PRELOAD_DESTINATIONS = new Set([
+  "font",
+  "image",
+  "script",
+  "style",
+  "worker",
+]);
+const EXCLUDED_PATH_PREFIXES = [
+  "/api",
+  "/auth",
+  "/document",
+  "/documents",
+  "/functions/v1",
+  "/realtime/v1",
+  "/rest/v1",
+  "/storage/v1",
+] as const;
 
 export type PrecacheBundleFile = {
   fileName: string;
@@ -48,21 +65,42 @@ function normalizeReferencedPath(reference: string) {
   return url.pathname;
 }
 
+function isExcludedPath(pathname: string) {
+  return EXCLUDED_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
 function extractHtmlLinkPaths(source: string | Uint8Array) {
   const paths: string[] = [];
 
   for (const linkMatch of sourceToText(source).matchAll(/<link\b[^>]*>/gi)) {
     const relMatch = linkMatch[0].match(/\brel\s*=\s*(?:"([^"]+)"|'([^']+)')/i);
     const rel = relMatch?.[1] ?? relMatch?.[2];
+    const relations = rel?.toLowerCase().split(/\s+/) ?? [];
+    const hasPrecacheRelation = relations.some((relation) =>
+      PRECACHE_LINK_RELATIONS.has(relation),
+    );
+    const onlyPreloadRequiresSupportedDestination =
+      relations.includes("preload") &&
+      !relations.some(
+        (relation) => relation !== "preload" && PRECACHE_LINK_RELATIONS.has(relation),
+      );
 
-    if (
-      rel === undefined ||
-      !rel
-        .toLowerCase()
-        .split(/\s+/)
-        .some((relation) => PRECACHE_LINK_RELATIONS.has(relation))
-    ) {
+    if (!hasPrecacheRelation) {
       continue;
+    }
+
+    if (onlyPreloadRequiresSupportedDestination) {
+      const asMatch = linkMatch[0].match(/\bas\s*=\s*(?:"([^"]+)"|'([^']+)')/i);
+      const destination = (asMatch?.[1] ?? asMatch?.[2])?.toLowerCase();
+
+      if (
+        destination === undefined ||
+        !PRECACHE_PRELOAD_DESTINATIONS.has(destination)
+      ) {
+        continue;
+      }
     }
 
     const hrefMatch = linkMatch[0].match(/\bhref\s*=\s*(?:"([^"]+)"|'([^']+)')/i);
@@ -187,6 +225,12 @@ export async function createPrecachePlan(
       ...emittedStaticPaths,
     ]),
   ].toSorted();
+  const excludedPath = paths.find(isExcludedPath);
+
+  if (excludedPath !== undefined) {
+    throw new Error(`VisaFlow PWA refuses to precache sensitive path: ${excludedPath}`);
+  }
+
   const contents = await Promise.all(
     paths.map(async (path): Promise<PrecacheContent> => {
       const fileName = path === "/" ? "index.html" : path.replace(/^\/+/, "");
@@ -251,16 +295,7 @@ const PRECACHE_PATH_SET = new Set(PRECACHE_PATHS);
 const PRECACHE_REQUESTS = PRECACHE_PATHS.map(
   (path) => new Request(new URL(path, self.location.origin), { cache: "reload" }),
 );
-const EXCLUDED_PATH_PREFIXES = [
-  "/api",
-  "/auth",
-  "/document",
-  "/documents",
-  "/functions/v1",
-  "/realtime/v1",
-  "/rest/v1",
-  "/storage/v1",
-];
+const EXCLUDED_PATH_PREFIXES = ${JSON.stringify(EXCLUDED_PATH_PREFIXES)};
 
 function isExcludedPath(pathname) {
   return EXCLUDED_PATH_PREFIXES.some(
@@ -294,6 +329,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (
     url.origin !== self.location.origin ||
+    url.hostname === "supabase.co" ||
     url.hostname.endsWith(".supabase.co") ||
     isExcludedPath(url.pathname)
   ) return;
