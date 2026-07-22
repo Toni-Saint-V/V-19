@@ -33453,16 +33453,16 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   [class~="text-white/42"],
   [class~="text-white/45"],
   [class~="text-white/46"]
-) {
+):not([data-v19-linear-drawer] *) {
   color: var(--v19b-color-text-faint) !important;
 }
 
-:where([class~="bg-white/[0.025]"]) {
+:where([class~="bg-white/[0.025]"]):not([data-v19-linear-drawer] *) {
   color: var(--v19b-color-text-muted) !important;
 }
 
-[role="dialog"],
-[role="dialog"] * {
+[role="dialog"]:not([data-v19-linear-drawer]),
+[role="dialog"]:not([data-v19-linear-drawer]) * {
   color: var(--v19b-color-text) !important;
 }
 

@@ -1,20 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { LucideIcon } from "lucide-react";
-import {
-  drawerMotion,
-  drawerPanelExit,
-  drawerPanelInitial,
-  drawerPanelTransition,
-  drawerTabExit,
-  drawerTabInitial,
-  useDrawerDesktopQuery,
-} from "../shared/ui/drawer/drawerMotion";
+import { useDrawerDesktopQuery } from "../shared/ui/drawer/drawerMotion";
+import { linearDrawerMotion } from "../shared/ui/drawer/linearDrawerMotion";
 import {
   AlertCircle,
   Briefcase,
   Calendar,
   CheckCircle2,
+  Clock,
   CreditCard,
   Edit3,
   FileDigit,
@@ -23,6 +17,7 @@ import {
   Image as ImageIcon,
   MapPin,
   Plane,
+  ShieldAlert,
   UploadCloud,
   User,
   X,
@@ -72,6 +67,7 @@ interface SubmissionDetail {
   status: SubmissionStatus;
   updated: string;
   issuesCount: number;
+  openIssuesCount: number;
 }
 
 interface DrawerProps {
@@ -117,7 +113,11 @@ const questionnaireSectionBlueprint: ReadonlyArray<{
 }> = [
   { Icon: User, sectionIds: ["personal", "contacts"], title: "Личные данные" },
   { Icon: FileDigit, sectionIds: ["passport"], title: "Паспортные данные" },
-  { Icon: Briefcase, sectionIds: ["employment"], title: "Место работы / Учебы" },
+  {
+    Icon: Briefcase,
+    sectionIds: ["employment"],
+    title: "Место работы / Учебы",
+  },
   { Icon: CreditCard, sectionIds: ["payment"], title: "Спонсоры и финансы" },
   {
     Icon: Plane,
@@ -136,14 +136,6 @@ const questionnaireSectionBlueprint: ReadonlyArray<{
   },
 ];
 
-const neutralStatusStyles = `
-  [data-v19-submission-drawer="true"] .v19-submission-drawer-status:not([data-preserve-status-tone="true"]) {
-    border-color: var(--v19b-color-border-strong) !important;
-    color: var(--v19b-color-text-muted) !important;
-    background: var(--v19b-color-control) !important;
-  }
-`;
-
 function applicantRoleLabel(role: string) {
   if (role === "main") return "Основной";
   if (role === "spouse") return "Супруг(а)";
@@ -151,7 +143,9 @@ function applicantRoleLabel(role: string) {
   return role;
 }
 
-function applicantQuestionnairePercent(applicant: Submission["applicants"][number]) {
+function applicantQuestionnairePercent(
+  applicant: Submission["applicants"][number],
+) {
   if (applicant.questionnaireStatus === "complete") return 100;
   if (applicant.questionnaireStatus === "empty") return 0;
   if (applicant.sections.length === 0) return 0;
@@ -172,8 +166,12 @@ function buildSubmissionDetail(submission: Submission): SubmissionDetail {
     applicantsCount: submission.applicants.length,
     city: submission.city,
     id: submissionPublicId(submission),
-    issuesCount: submission.issues.filter((issue) => issue.status !== "closed_by_admin")
-      .length,
+    issuesCount: submission.issues.filter(
+      (issue) => issue.status !== "closed_by_admin",
+    ).length,
+    openIssuesCount: submission.issues.filter(
+      (issue) => issue.status === "open",
+    ).length,
     status: submission.status,
     title: submission.title,
     tripDates: tripDatesForSubmission(submission),
@@ -232,8 +230,12 @@ function questionnaireSectionCandidateProgress(
   const filledFields = requiredFields.filter(
     (field) => field.value.trim().length > 0 && !field.error,
   );
-  const calculated = Math.round((filledFields.length / requiredFields.length) * 100);
-  return candidate.status === "needs_fix" ? Math.min(calculated, 90) : calculated;
+  const calculated = Math.round(
+    (filledFields.length / requiredFields.length) * 100,
+  );
+  return candidate.status === "needs_fix"
+    ? Math.min(calculated, 90)
+    : calculated;
 }
 
 function questionnaireProgressStatus(
@@ -246,7 +248,11 @@ function questionnaireProgressStatus(
 
 function remainingFieldsLabel(count: number) {
   if (count % 10 === 1 && count % 100 !== 11) return `${count} поле`;
-  if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14)) {
+  if (
+    count % 10 >= 2 &&
+    count % 10 <= 4 &&
+    (count % 100 < 12 || count % 100 > 14)
+  ) {
     return `${count} поля`;
   }
   return `${count} полей`;
@@ -257,7 +263,11 @@ function remainingBlocksLabel(count: number) {
   if (count % 10 === 1 && count % 100 !== 11) {
     return `Осталось заполнить ${count} блок данных`;
   }
-  if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14)) {
+  if (
+    count % 10 >= 2 &&
+    count % 10 <= 4 &&
+    (count % 100 < 12 || count % 100 > 14)
+  ) {
     return `Осталось заполнить ${count} блока данных`;
   }
   return `Осталось заполнить ${count} блоков данных`;
@@ -321,7 +331,9 @@ function buildQuestionnaireSections(
       Icon: blueprint.Icon,
       progress,
       remaining:
-        remainingFieldCount > 0 ? remainingFieldsLabel(remainingFieldCount) : undefined,
+        remainingFieldCount > 0
+          ? remainingFieldsLabel(remainingFieldCount)
+          : undefined,
       status: questionnaireProgressStatus(progress),
       target: targetCandidate
         ? {
@@ -341,41 +353,102 @@ function drawerTab(activeTab: DrawerTab | undefined): TabId {
   return "overview";
 }
 
-function questionnaireSectionIconClass(status: QuestionnaireSectionDetail["status"]) {
+function questionnaireSectionIconClass(
+  status: QuestionnaireSectionDetail["status"],
+) {
   if (status === "done") {
-    return "[color:var(--vf-success)]";
+    return "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
   }
   if (status === "in_progress") {
-    return "[color:var(--v19b-color-primary-text)]";
+    return "bg-[#3a45b4]/10 border-[#3a45b4]/20 text-[#8fa3ff]";
   }
-  return "[color:var(--v19b-color-text-40)]";
+  return "bg-white/5 border-white/10 text-white/40";
 }
 
 function questionnaireSectionProgressClass(
   status: QuestionnaireSectionDetail["status"],
 ) {
-  if (status === "done") return "bg-[var(--vf-success)]";
-  if (status === "in_progress") return "bg-[var(--v19b-color-primary)]";
-  return "bg-[var(--v19b-color-tag-selected)]";
+  if (status === "done") return "bg-emerald-500";
+  if (status === "in_progress") return "bg-[#3a45b4]";
+  return "bg-white/10";
 }
 
 function historyEventBorderClass(tone: string) {
   if (tone === "warning") {
-    return "border-[var(--vf-warning-border)] shadow-[var(--v19b-shadow-primary-soft)]";
+    return "border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.2)]";
   }
-  if (tone === "info") return "border-[var(--vf-accent-border)]";
-  return "border-[var(--v19b-color-border-soft)]";
+  if (tone === "info") return "border-[#3a45b4]/50";
+  return "border-white/10";
 }
 
 function primaryButtonToneClass(action: SubmissionAction) {
   if (action === "submit_corrections") {
-    return "bg-[var(--vf-warning)] hover:bg-[var(--v19b-admin-orange)]";
+    return "bg-orange-500 hover:bg-orange-600 shadow-[0_0_20px_rgba(249,115,22,0.2)]";
   }
-  if (action === "submit_for_review") {
-    return "bg-[var(--v19b-color-primary)] hover:bg-[var(--v19b-color-primary-hover)]";
+  if (action === "submit_for_review" || action === "open_history") {
+    return "bg-[#3a45b4] hover:bg-[#4855d4] shadow-[0_0_20px_rgba(58,69,180,0.3)]";
   }
-  return "bg-[var(--v19b-color-control)] hover:bg-[var(--v19b-color-control-hover)]";
+  return "bg-white/10 hover:bg-white/15";
 }
+
+type StatusBadgePresentation = {
+  Icon: LucideIcon;
+  toneClassName: string;
+};
+
+const statusBadgePresentation = {
+  draft: {
+    Icon: FileText,
+    toneClassName: "bg-white/5 border-white/10 text-white/70",
+  },
+  in_progress: {
+    Icon: Clock,
+    toneClassName: "bg-blue-500/10 border-blue-500/20 text-blue-400",
+  },
+  requires_action: {
+    Icon: AlertCircle,
+    toneClassName: "bg-orange-500/10 border-orange-500/20 text-orange-400",
+  },
+  submitted_for_review: {
+    Icon: ShieldAlert,
+    toneClassName: "bg-[#3a45b4]/20 border-[#3a45b4]/30 text-[#8fa3ff]",
+  },
+  returned: {
+    Icon: AlertCircle,
+    toneClassName: "bg-orange-500/10 border-orange-500/20 text-orange-400",
+  },
+  corrections_received: {
+    Icon: ShieldAlert,
+    toneClassName: "bg-[#3a45b4]/20 border-[#3a45b4]/30 text-[#8fa3ff]",
+  },
+  ready_for_export: {
+    Icon: CheckCircle2,
+    toneClassName: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+  },
+  exported: {
+    Icon: CheckCircle2,
+    toneClassName: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+  },
+} satisfies Record<SubmissionStatus, StatusBadgePresentation>;
+
+const statusBadgeBaseClassName =
+  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium uppercase tracking-wide";
+
+const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
+  const presentation = statusBadgePresentation[status];
+  const StatusIcon = presentation.Icon;
+
+  return (
+    <span
+      className={[statusBadgeBaseClassName, presentation.toneClassName].join(
+        " ",
+      )}
+      data-testid="drawer-status-badge"
+    >
+      <StatusIcon className="w-3.5 h-3.5" /> {statusLabelFor(status, "full")}
+    </span>
+  );
+};
 
 const OverviewTab = ({
   data,
@@ -388,114 +461,105 @@ const OverviewTab = ({
   const readyFilesCount = submission.files.filter(isFileReady).length;
 
   return (
-    <div className="space-y-6" data-v19-drawer-overview>
-      <div className="overflow-hidden rounded-xl border border-[var(--v19b-color-border-faint)] bg-[var(--v19b-color-panel)]">
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          <section
-            aria-labelledby="submission-drawer-route-title"
-            className="flex flex-col p-5 lg:pr-6"
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <section
+          aria-labelledby="submission-drawer-route-title"
+          className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors"
+        >
+          <h3
+            className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-5"
+            id="submission-drawer-route-title"
           >
-            <h3
-              className="mb-4 text-[11px] font-medium uppercase tracking-wider [color:var(--v19b-color-text-40)]"
-              id="submission-drawer-route-title"
-            >
-              Маршрут и подача
-            </h3>
-            <div className="grid flex-1 grid-cols-1 content-center gap-4 text-sm sm:grid-cols-2">
-              <div className="flex min-w-0 gap-4">
-                <Calendar className="h-5 w-5 shrink-0 [color:var(--v19b-color-text-30)]" />
-                <div className="min-w-0">
-                  <div className="font-medium [color:var(--v19b-color-text)]">
-                    {data.tripDates}
-                  </div>
-                  <div className="mt-0.5 text-[11px] [color:var(--v19b-color-text-40)]">
-                    Даты поездки
-                  </div>
+            Маршрут и подача
+          </h3>
+          <div className="space-y-4 text-sm">
+            <div className="flex gap-4">
+              <Calendar className="w-5 h-5 text-white/30 shrink-0" />
+              <div>
+                <div className="text-white/90 font-medium">
+                  {data.tripDates}
                 </div>
-              </div>
-              <div className="flex min-w-0 gap-4">
-                <MapPin className="h-5 w-5 shrink-0 [color:var(--v19b-color-text-30)]" />
-                <div className="min-w-0">
-                  <div className="font-medium [color:var(--v19b-color-text)]">
-                    {data.city}
-                  </div>
-                  <div className="mt-0.5 text-[11px] [color:var(--v19b-color-text-40)]">
-                    Визовый центр подачи
-                  </div>
+                <div className="text-white/40 text-[11px] mt-0.5">
+                  Даты поездки
                 </div>
               </div>
             </div>
-          </section>
+            <div className="flex gap-4">
+              <MapPin className="w-5 h-5 text-white/30 shrink-0" />
+              <div>
+                <div className="text-white/90 font-medium">{data.city}</div>
+                <div className="text-white/40 text-[11px] mt-0.5">
+                  Визовый центр подачи
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-          <section
-            aria-labelledby="submission-drawer-documents-title"
-            className="flex flex-col border-t border-[var(--v19b-color-border-faint)] p-5 lg:border-l lg:border-t-0 lg:pl-6"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3
-                className="text-[11px] font-medium uppercase tracking-wider [color:var(--v19b-color-text-40)]"
-                id="submission-drawer-documents-title"
-              >
-                Чеклист документов
-              </h3>
-              <span className="v19-submission-drawer-status is-ready inline-flex min-h-6 items-center rounded-[var(--v19b-radius-pill)] border border-[var(--vf-success-border)] bg-[var(--vf-success-soft)] px-2 text-[11px] font-mono font-medium [color:var(--vf-success)]">
-                {readyFilesCount}/{submission.files.length}
-              </span>
-            </div>
-            <div className="flex flex-1 flex-col justify-center space-y-3">
-              {packageItems.map((doc) => (
-                <div key={doc.label} className="flex items-center gap-3">
-                  {doc.status === "done" ? (
-                    <CheckCircle2 className="h-4 w-4 [color:var(--vf-success)]" />
-                  ) : (
-                    <div className="h-4 w-4 rounded-full border border-[var(--v19b-color-border-soft)]" />
-                  )}
-                  <span
-                    className={`text-[13px] ${doc.status === "done" ? "[color:var(--v19b-color-text-70)]" : "[color:var(--v19b-color-text-strong)]"}`}
-                  >
-                    {doc.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+        <section
+          aria-labelledby="submission-drawer-documents-title"
+          className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3
+              className="text-[11px] font-medium text-white/40 uppercase tracking-wider"
+              id="submission-drawer-documents-title"
+            >
+              Чеклист документов
+            </h3>
+            <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
+              {readyFilesCount}/{submission.files.length}
+            </span>
+          </div>
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
+            {packageItems.map((doc) => (
+              <div key={doc.label} className="flex items-center gap-3">
+                {doc.status === "done" ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-white/20" />
+                )}
+                <span
+                  className={`text-[13px] ${doc.status === "done" ? "text-white/70" : "text-white"}`}
+                >
+                  {doc.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
       <section
         aria-labelledby="submission-drawer-applicants-title"
         className="space-y-3"
       >
-        <div className="flex items-center justify-between px-1">
-          <h3
-            className="text-[11px] font-medium uppercase tracking-wider [color:var(--v19b-color-text-40)]"
-            id="submission-drawer-applicants-title"
-          >
-            Участники
-          </h3>
-          <span className="text-[11px] font-medium [color:var(--v19b-color-text-40)]">
-            {data.applicantsCount}
-          </span>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
+        <h3
+          className="text-[11px] font-medium text-white/40 uppercase tracking-wider pl-1"
+          id="submission-drawer-applicants-title"
+        >
+          Участники ({data.applicantsCount})
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data.applicants.map((applicant) => (
             <article
               key={applicant.name}
-              className="flex items-center rounded-xl border border-[var(--v19b-color-border-faint)] bg-[var(--v19b-color-panel)] p-4"
+              className="flex items-center p-3 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-xl transition-all group"
             >
-              <div className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--v19b-color-border-soft)] bg-gradient-to-br from-[var(--v19b-color-border-selected)] to-[var(--v19b-color-panel-strong)] text-xs font-semibold shadow-inner [color:var(--v19b-color-text-70)]">
+              <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
                 {applicantInitials(applicant.name)}
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] font-medium [color:var(--v19b-color-text-strong)]">
+              <div className="flex-1 min-w-0">
+                <div className="text-[14px] text-white font-medium truncate group-hover:text-[#8fa3ff] transition-colors">
                   {applicant.name}
                 </div>
-                <div className="mt-0.5 text-[11px] [color:var(--v19b-color-text-50)]">
+                <div className="text-[11px] text-white/50 mt-0.5">
                   {applicant.role}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[12px] font-mono font-medium [color:var(--vf-success)]">
+                <div className="text-[12px] font-mono font-medium text-emerald-400">
                   {applicant.completeness}%
                 </div>
               </div>
@@ -528,16 +592,16 @@ const QuestionnaireTab = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-[16px] font-semibold [color:var(--v19b-color-text-strong)]">
+          <h3 className="text-[16px] font-semibold text-white">
             Прогресс заполнения
           </h3>
-          <p className="text-[12px] [color:var(--v19b-color-text-50)] mt-1">
+          <p className="text-[12px] text-white/50 mt-1">
             {remainingBlockLabel}
           </p>
         </div>
         <button
           onClick={() => onOpenQuestionnaire()}
-          className="h-9 px-4 bg-[var(--v19b-color-control)] hover:bg-[var(--v19b-color-control-hover)] [color:var(--v19b-color-text-strong)] text-[13px] font-medium rounded-[var(--v19b-radius-control)] transition-colors flex items-center gap-2"
+          className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
           type="button"
         >
           <Edit3 className="w-4 h-4" /> Открыть анкету
@@ -548,7 +612,7 @@ const QuestionnaireTab = ({
         {sections.map((section) => (
           <div
             key={section.title}
-            className="p-4 bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border-faint)] rounded-xl flex items-center gap-4 hover:bg-[var(--v19b-color-panel-strong)] transition-colors cursor-pointer"
+            className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
             role="button"
             tabIndex={0}
             onClick={() => openSection(section.target)}
@@ -559,21 +623,21 @@ const QuestionnaireTab = ({
             }}
           >
             <div
-              className={`flex h-5 w-5 shrink-0 items-center justify-center
+              className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border
               ${questionnaireSectionIconClass(section.status)}`}
             >
               <section.Icon className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
-                <span className="truncate text-[length:var(--v19b-size-11)] font-[var(--v19b-weight-control)] [color:var(--v19b-color-text-strong)]">
+                <span className="text-[13px] font-medium text-white truncate">
                   {section.title}
                 </span>
-                <span className="text-[length:var(--v19b-size-11)] font-[var(--v19b-weight-control)] [color:var(--v19b-color-text-50)]">
+                <span className="text-[11px] font-mono text-white/50">
                   {section.progress}%
                 </span>
               </div>
-              <div className="h-[var(--v19b-size-2)] w-full overflow-hidden rounded-full bg-[var(--v19b-color-control)]">
+              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                 <div
                   aria-hidden="true"
                   className={`h-full rounded-full ${questionnaireSectionProgressClass(section.status)}`}
@@ -581,7 +645,7 @@ const QuestionnaireTab = ({
                 />
               </div>
               {section.remaining ? (
-                <div className="text-[10px] [color:var(--v19b-color-text-40)] mt-1.5">
+                <div className="text-[10px] text-white/40 mt-1.5">
                   Осталось: {section.remaining}
                 </div>
               ) : null}
@@ -598,7 +662,10 @@ function issueTargetLabel(issue: Issue) {
     return `${issue.target.applicantName} • ${fileLabel(issue.target.fileType)}`;
   }
 
-  return [issue.target.applicantName, issue.target.field ?? issue.target.section]
+  return [
+    issue.target.applicantName,
+    issue.target.field ?? issue.target.section,
+  ]
     .filter(Boolean)
     .join(" • ");
 }
@@ -628,6 +695,8 @@ const IssuesTab = ({
   submission: Submission;
 }) => {
   const [uploadingIssueId, setUploadingIssueId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const uploadingIssueIdsRef = useRef(new Set<string>());
   const unresolvedIssues = submission.issues.filter(
     (issue) => issue.status !== "closed_by_admin",
   );
@@ -639,7 +708,10 @@ const IssuesTab = ({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !issue.target.fileType || !onUploadApplicantFile) return;
+    if (uploadingIssueIdsRef.current.size > 0) return;
 
+    uploadingIssueIdsRef.current.add(issue.id);
+    setUploadError("");
     setUploadingIssueId(issue.id);
     try {
       await onUploadApplicantFile(
@@ -649,29 +721,39 @@ const IssuesTab = ({
         file,
       );
     } catch (error) {
-      window.alert(
+      setUploadError(
         error instanceof Error ? error.message : "Не удалось загрузить файл.",
       );
     } finally {
+      uploadingIssueIdsRef.current.delete(issue.id);
       setUploadingIssueId(null);
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-[var(--v19b-color-border-faint)] pb-4">
+      <div className="flex items-center justify-between border-b border-white/5 pb-4">
         <div>
-          <h3 className="text-[16px] font-semibold [color:var(--v19b-color-text-strong)]">
+          <h3 className="text-[16px] font-semibold text-white">
             Список задач по замечаниям
           </h3>
-          <p className="text-[12px] [color:var(--v19b-color-text-50)] mt-1">
+          <p className="text-[12px] text-white/50 mt-1">
             Ошибки, выявленные администратором при проверке
           </p>
         </div>
-        <div data-preserve-status-tone="true" className="v19-submission-drawer-status is-review inline-flex min-h-6 items-center rounded-[var(--v19b-radius-pill)] border border-[var(--vf-warning-border)] bg-[var(--vf-warning-soft)] px-3 py-1 text-[12px] font-medium [color:var(--vf-warning)]">
-          Замечания: {data.issuesCount}
+        <div
+          className="px-3 py-1 bg-orange-500/10 text-orange-400 rounded-lg text-[12px] font-medium border border-orange-500/20"
+          data-testid="drawer-open-issues-count"
+        >
+          Требуют исправления: {data.openIssuesCount}
         </div>
       </div>
+
+      {uploadError ? (
+        <p className="text-[12px] text-orange-400" role="alert">
+          {uploadError} Состояние файла не изменено. Повторите попытку.
+        </p>
+      ) : null}
 
       {unresolvedIssues.length > 0 ? (
         <div className="space-y-4">
@@ -682,40 +764,46 @@ const IssuesTab = ({
               tab: "issues",
             });
             const uploadInputId = `${issueElementId}-upload`;
+            const uploadStatusId = `${issueElementId}-upload-status`;
             const canUploadReplacement =
               Boolean(issue.target.fileType) &&
               issue.status !== "fixed_by_agent" &&
               Boolean(onUploadApplicantFile);
+            const isUploadingThisIssue = uploadingIssueId === issue.id;
 
             return (
               <div
                 id={issueElementId}
                 key={issue.id}
-                className="p-4 bg-[var(--v19b-color-panel-strong)] border border-[var(--vf-warning-border)] rounded-xl relative overflow-hidden flex flex-col sm:flex-row gap-4"
+                className="p-4 bg-[#1a1a1d] border border-orange-500/20 rounded-xl relative overflow-hidden flex flex-col sm:flex-row gap-4"
               >
-                <div className="absolute top-0 left-0 w-1 h-full bg-[var(--vf-warning)]" />
-                <div className="w-10 h-10 rounded-full bg-[var(--vf-warning-soft)] flex items-center justify-center shrink-0 border border-[var(--vf-warning-border)]">
-                  <IssueIcon className="w-5 h-5 [color:var(--vf-warning)]" />
+                <div className="absolute top-0 left-0 w-1 h-full bg-orange-500" />
+                <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
+                  <IssueIcon className="w-5 h-5 text-orange-400" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="text-[14px] font-semibold [color:var(--v19b-color-text-strong)]">
+                    <h4 className="text-[14px] font-semibold text-white">
                       {issue.reason}
                     </h4>
-                    <span data-preserve-status-tone="true" className="v19-submission-drawer-status is-returned inline-flex min-h-6 items-center rounded-[var(--v19b-radius-pill)] border border-[var(--vf-danger-border)] bg-[var(--vf-danger-soft)] px-2 py-0.5 text-[10px] font-medium [color:var(--vf-danger)]">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400 font-medium">
                       {issueBadgeLabel(issue)}
                     </span>
                   </div>
-                  <div className="text-[11px] font-medium [color:var(--vf-warning)] uppercase tracking-wider mb-2">
+                  <div className="text-[11px] font-medium text-orange-400/80 uppercase tracking-wider mb-2">
                     {issueTargetLabel(issue)}
                   </div>
-                  <p className="text-[13px] [color:var(--v19b-color-text-60)] leading-relaxed max-w-xl">
+                  <p className="text-[13px] text-white/60 leading-relaxed max-w-xl">
                     {issue.comment || issue.reason}
                   </p>
                 </div>
                 <div className="sm:w-[180px] shrink-0 flex items-center">
                   <button
-                    disabled={uploadingIssueId === issue.id}
+                    aria-busy={isUploadingThisIssue}
+                    aria-describedby={
+                      isUploadingThisIssue ? uploadStatusId : undefined
+                    }
+                    disabled={Boolean(uploadingIssueId)}
                     onClick={() => {
                       if (canUploadReplacement) {
                         document.getElementById(uploadInputId)?.click();
@@ -723,11 +811,21 @@ const IssuesTab = ({
                       }
                       onOpenWorkspaceTarget(targetForIssue(issue));
                     }}
-                    className="w-full h-10 bg-[var(--v19b-color-control)] hover:bg-[var(--v19b-color-control-hover)] border border-[var(--v19b-color-border-soft)] rounded-[var(--v19b-radius-control)] text-[13px] font-medium [color:var(--v19b-color-text-strong)] transition-colors"
+                    className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[13px] font-medium text-white transition-colors"
                     type="button"
                   >
-                    {issueActionLabel(issue)}
+                    {isUploadingThisIssue
+                      ? "Загрузка…"
+                      : issueActionLabel(issue)}
                   </button>
+                  <span
+                    aria-live="polite"
+                    className="sr-only"
+                    id={uploadStatusId}
+                    role="status"
+                  >
+                    {isUploadingThisIssue ? "Файл загружается." : ""}
+                  </span>
                   {canUploadReplacement ? (
                     <input
                       accept={
@@ -751,14 +849,15 @@ const IssuesTab = ({
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 bg-[var(--vf-success-soft)] rounded-full flex items-center justify-center mb-4 border border-[var(--vf-success-border)]">
-            <CheckCircle2 className="w-8 h-8 [color:var(--vf-success)]" />
+          <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/20">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
           </div>
-          <h4 className="text-[16px] font-semibold [color:var(--v19b-color-text-strong)] mb-2">
+          <h4 className="text-[16px] font-semibold text-white mb-2">
             Ошибок не найдено
           </h4>
-          <p className="text-[13px] [color:var(--v19b-color-text-50)] max-w-sm">
-            Все данные проверены администратором. Замечаний к анкете и документам нет.
+          <p className="text-[13px] text-white/50 max-w-sm">
+            Все данные проверены администратором. Замечаний к анкете и
+            документам нет.
           </p>
         </div>
       )}
@@ -782,34 +881,36 @@ function historyEventTone(text: string) {
 
 function historyEventIcon(tone: string) {
   if (tone === "warning") {
-    return <AlertCircle className="w-4 h-4 [color:var(--vf-warning)]" />;
+    return <AlertCircle className="w-4 h-4 text-orange-400" />;
   }
   if (tone === "info") {
-    return <UploadCloud className="w-4 h-4 [color:var(--v19b-color-primary-text)]" />;
+    return <UploadCloud className="w-4 h-4 text-[#8fa3ff]" />;
   }
-  return <FileText className="w-4 h-4 [color:var(--v19b-color-text-40)]" />;
+  return <FileText className="w-4 h-4 text-white/40" />;
 }
 
 const HistoryTab = ({ submission }: { submission: Submission }) => (
-  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-[var(--v19b-color-border-soft)]">
+  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-white/10">
     {submission.history.map((event) => {
       const tone = historyEventTone(event.text);
 
       return (
-        <div key={event.id} className="relative flex gap-5">
+        <div className="relative flex gap-5" key={event.id}>
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[var(--v19b-color-app)] z-10
+            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10
           ${historyEventBorderClass(tone)}`}
           >
             {historyEventIcon(tone)}
           </div>
           <div className="pt-1.5">
-            <div className="text-[14px] font-medium [color:var(--v19b-color-text)]">
+            <div className="text-[14px] font-medium text-white/90">
               {event.text}
             </div>
-            <div className="flex items-center gap-2 mt-1.5 text-[12px] [color:var(--v19b-color-text-40)]">
-              <span>{historyTimestampForUser(event.createdAt ?? event.at)}</span>
-              <span className="w-1 h-1 rounded-full bg-[var(--v19b-color-text-25)]" />
+            <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
+              <span>
+                {historyTimestampForUser(event.createdAt ?? event.at)}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-white/20" />
               <span>{historySourceLabel(event.source)}</span>
             </div>
           </div>
@@ -849,6 +950,21 @@ function footerActionLabel(action: SubmissionAction, fallback: string) {
   return fallback;
 }
 
+const footerInstructions = {
+  draft: "Сохраните текущий прогресс, чтобы продолжить позже.",
+  in_progress: "Проверьте все данные перед отправкой администратору.",
+  requires_action: "Дождитесь синхронизации статуса перед повторной отправкой.",
+  submitted_for_review:
+    "Подача отправлена администратору и доступна для просмотра.",
+  returned: "Исправьте замечания перед повторной отправкой.",
+  corrections_received:
+    "Исправления отправлены администратору и ожидают проверки.",
+  ready_for_export: "Подача принята и готова к выгрузке.",
+  exported: "Подача выгружена; история статусов доступна для просмотра.",
+} satisfies Record<SubmissionStatus, string>;
+
+const footerInstructionId = "submission-drawer-primary-action-notice";
+
 export function Drawer({
   activeTab: requestedTab = "overview",
   focusTarget,
@@ -861,7 +977,9 @@ export function Drawer({
   onOpenWorkspaceTarget,
   onUploadApplicantFile,
 }: DrawerProps) {
-  const [activeTab, setActiveTab] = useState<TabId>(() => drawerTab(requestedTab));
+  const [activeTab, setActiveTab] = useState<TabId>(() =>
+    drawerTab(requestedTab),
+  );
   const [actionError, setActionError] = useState("");
   const [actionPending, setActionPending] = useState(false);
   const actionRequestIdRef = useRef(0);
@@ -871,16 +989,58 @@ export function Drawer({
   const isDesktop = useDrawerDesktopQuery();
   const prefersReducedMotion = useReducedMotion();
   const shouldReduceMotion = Boolean(prefersReducedMotion);
-  const panelInitial = drawerPanelInitial(isDesktop, shouldReduceMotion);
-  const panelExit = drawerPanelExit(isDesktop, shouldReduceMotion);
-  const panelTransition = drawerPanelTransition(shouldReduceMotion);
-  const tabInitial = drawerTabInitial(shouldReduceMotion);
-  const tabExit = drawerTabExit(shouldReduceMotion);
+  const panelInitial = shouldReduceMotion
+    ? { opacity: 1, x: 0, y: 0 }
+    : {
+        opacity: 0.5,
+        x: isDesktop ? "100%" : 0,
+        y: isDesktop ? 0 : "100%",
+      };
+  const panelExit = shouldReduceMotion
+    ? { opacity: 0, x: 0, y: 0 }
+    : {
+        opacity: 0,
+        x: isDesktop ? "100%" : 0,
+        y: isDesktop ? 0 : "100%",
+      };
+  const panelTransition = shouldReduceMotion
+    ? linearDrawerMotion.reduced
+    : linearDrawerMotion.panel;
+  const tabInitial = shouldReduceMotion
+    ? { opacity: 0, y: 0 }
+    : { opacity: 0, y: 10 };
+  const tabExit = shouldReduceMotion
+    ? { opacity: 0, y: 0 }
+    : { opacity: 0, y: -10 };
   const data = buildSubmissionDetail(submission);
   const primaryAction = getPrimaryAction(submission, "agent", "agent");
-  const primaryLabel = footerActionLabel(primaryAction.action, primaryAction.label);
+  const primaryLabel = footerActionLabel(
+    primaryAction.action,
+    primaryAction.label,
+  );
   const footerActionNotice =
     actionError || (primaryAction.disabled ? primaryAction.reason : "");
+  const footerInstruction =
+    footerActionNotice || footerInstructions[data.status];
+  let footerInstructionToneClassName = "text-white/40";
+  if (footerActionNotice) {
+    footerInstructionToneClassName = "text-white/70";
+  }
+  if (actionError) {
+    footerInstructionToneClassName = "text-orange-400";
+  }
+  let footerInstructionRole: "alert" | "status" | undefined;
+  if (footerActionNotice) {
+    footerInstructionRole = "status";
+  }
+  if (actionError) {
+    footerInstructionRole = "alert";
+  }
+  const footerInstructionClassName = [
+    "text-[12px]",
+    footerActionNotice ? "block" : "hidden sm:block",
+    footerInstructionToneClassName,
+  ].join(" ");
   const primaryButtonClassName = primaryButtonToneClass(primaryAction.action);
 
   useEffect(() => {
@@ -915,7 +1075,9 @@ export function Drawer({
     if (!isOpen) return;
 
     previouslyFocusedElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -939,7 +1101,9 @@ export function Drawer({
     if (event.key !== "Tab") return;
 
     const focusableElements = Array.from(
-      dialogRef.current?.querySelectorAll<HTMLElement>(drawerFocusableSelector) ?? [],
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        drawerFocusableSelector,
+      ) ?? [],
     ).filter((element) => element.offsetParent !== null);
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
@@ -960,10 +1124,14 @@ export function Drawer({
     }
   }
 
-  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, tab: TabId) {
+  function handleTabKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    tab: TabId,
+  ) {
     const currentIndex = drawerTabs.findIndex((item) => item.id === tab);
     let nextIndex = currentIndex;
-    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % drawerTabs.length;
+    if (event.key === "ArrowRight")
+      nextIndex = (currentIndex + 1) % drawerTabs.length;
     else if (event.key === "ArrowLeft") {
       nextIndex = (currentIndex - 1 + drawerTabs.length) % drawerTabs.length;
     } else if (event.key === "Home") nextIndex = 0;
@@ -1012,11 +1180,13 @@ export function Drawer({
           <motion.div
             aria-hidden="true"
             animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-[var(--v19-dialog-backdrop)] backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
             exit={{ opacity: 0 }}
             initial={{ opacity: 0 }}
             transition={
-              shouldReduceMotion ? drawerMotion.reduced : drawerMotion.overlay
+              shouldReduceMotion
+                ? linearDrawerMotion.reduced
+                : linearDrawerMotion.overlay
             }
             onClick={onClose}
           />
@@ -1025,50 +1195,65 @@ export function Drawer({
             aria-labelledby="submission-drawer-heading"
             aria-modal="true"
             animate={{ opacity: 1, x: 0, y: 0 }}
-            className="fixed z-50 flex flex-col bg-[var(--v19b-color-app)] border-[var(--v19b-color-border-soft)] shadow-[var(--v19-dialog-shadow)] [font-family:var(--v19-font-family)]
+            className="fixed z-50 flex flex-col bg-[#111113] border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.6)]
               lg:inset-y-2 lg:right-2 lg:left-auto lg:w-[840px] lg:rounded-2xl lg:border lg:overflow-hidden
-              inset-x-0 bottom-0 top-12 rounded-t-[28px] border-t border-x overflow-x-hidden overflow-y-auto"
+              inset-x-0 bottom-0 top-12 rounded-t-[28px] border-t border-x overflow-y-auto"
             exit={panelExit}
             initial={panelInitial}
-            data-v19-submission-drawer="true"
+            data-v19-linear-drawer="true"
             ref={dialogRef}
             role="dialog"
             tabIndex={-1}
             transition={panelTransition}
             onKeyDown={handleDialogKeyDown}
           >
-            <style>{neutralStatusStyles}</style>
-            <div className="lg:hidden sticky top-0 z-30 w-full flex items-center justify-center py-3 bg-[var(--v19b-color-deep-drawer-90)] backdrop-blur-md">
-              <div className="w-12 h-1.5 rounded-full bg-[var(--v19b-color-text-25)]" />
+            <div className="lg:hidden sticky top-0 z-30 w-full flex items-center justify-center py-3 bg-[#111113]/90 backdrop-blur-md">
+              <div className="w-12 h-1.5 rounded-full bg-white/20" />
             </div>
 
-            <header className="px-4 lg:px-6 pt-2 pb-0 bg-[var(--v19b-color-deep-drawer-95)] backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-[var(--v19b-color-border-faint)]">
-              <h2 id="submission-drawer-heading" className="sr-only">
-                {data.title}
-              </h2>
-              <button
-                aria-label="Закрыть подачу"
-                className="hidden lg:flex absolute top-2 right-6 w-9 h-9 items-center justify-center bg-[var(--v19b-color-control)] hover:bg-[var(--v19b-color-control-hover)] [color:var(--v19b-color-text-70)] hover:[color:var(--v19b-color-text-strong)] rounded-[var(--v19b-radius-control)] transition-colors border border-[var(--v19b-color-border-faint)] hover:border-[var(--v19b-color-border-soft)]"
-                type="button"
-                onClick={onClose}
-              >
-                <X className="w-5 h-5" />
-              </button>
-
+            <header className="px-5 lg:px-8 pt-4 pb-0 bg-[#111113]/95 backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-white/5">
               <div
-                className="v19-drawer-lifecycle-context lg:pr-12"
+                className="flex items-start justify-between gap-4 mb-6"
                 data-testid="drawer-lifecycle-context"
               >
-                <div className="v19-drawer-lifecycle-identity">
-                  <span>{data.id}</span>
-                  <strong>{data.title}</strong>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[11px] lg:text-xs text-white/50 mb-2">
+                    <span className="font-mono font-medium tracking-wider text-white/70">
+                      {data.id}
+                    </span>
+                    <span className="w-1 h-1 rounded-full bg-white/20" />
+                    <span className="uppercase tracking-wider">
+                      {data.type === "family" ? "Семейная" : "Индивидуальная"}
+                    </span>
+                  </div>
+                  <h2
+                    className="text-[24px] font-semibold text-white leading-tight tracking-tight mb-4"
+                    id="submission-drawer-heading"
+                  >
+                    {data.title}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <StatusBadge status={data.status} />
+                    <span
+                      className="text-[12px] text-white/40 flex items-center gap-1.5"
+                      data-testid="drawer-updated-at"
+                    >
+                      <Clock className="w-3 h-3" /> Обновлено {data.updated}
+                    </span>
+                  </div>
                 </div>
-                <span className="sr-only">
-                  Статус подачи: {statusLabelFor(data.status, "full")}
-                </span>
+
+                <button
+                  aria-label="Закрыть подачу"
+                  className="hidden lg:flex w-10 h-10 items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10"
+                  type="button"
+                  onClick={onClose}
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div className="w-full overflow-x-auto scrollbar-hide -mx-4 px-4 lg:mx-0 lg:px-0 lg:pr-12">
+              <div className="w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
                 <div
                   className="flex items-center gap-1.5 w-max mb-[-1px]"
                   role="tablist"
@@ -1081,8 +1266,8 @@ export function Drawer({
                       <button
                         aria-controls={`submission-drawer-panel-${tab.id}`}
                         aria-selected={isActive}
-                        className={`relative min-h-9 px-3 text-[12px] font-medium transition-colors flex items-center gap-1.5 focus-visible:outline-none whitespace-nowrap
-                          ${isActive ? "[color:var(--v19b-color-text-strong)]" : "[color:var(--v19b-color-text-50)] hover:[color:var(--v19b-color-text-80)]"}
+                        className={`relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap
+                          ${isActive ? "text-white" : "text-white/50 hover:text-white/80"}
                         `}
                         id={`submission-drawer-tab-${tab.id}`}
                         key={tab.id}
@@ -1095,23 +1280,20 @@ export function Drawer({
                         <span>{tab.label}</span>
                         {count > 0 ? (
                           <span
-                            data-preserve-status-tone={
-                              tab.isWarning ? "true" : undefined
-                            }
-                            className={`v19-submission-drawer-status inline-flex min-h-6 items-center rounded-[var(--v19b-radius-pill)] border px-2 py-0.5 text-[10px] leading-none ml-1 ${tab.isWarning ? "is-review border-[var(--vf-warning-border)] bg-[var(--vf-warning-soft)] [color:var(--vf-warning)]" : "border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] [color:var(--v19b-color-text-70)]"}`}
+                            className={`px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${tab.isWarning ? "bg-orange-500/20 text-orange-400" : "bg-white/10 text-white/70"}`}
                           >
                             {count}
                           </span>
                         ) : null}
                         {isActive ? (
                           <motion.div
-                            className="absolute bottom-0 inset-x-0 h-0.5 bg-[var(--v19b-color-primary)]"
+                            className="absolute bottom-0 inset-x-0 h-0.5 bg-white"
                             initial={false}
                             layoutId="drawerAgentActiveTab"
                             transition={
                               shouldReduceMotion
-                                ? drawerMotion.reduced
-                                : drawerMotion.tabIndicator
+                                ? linearDrawerMotion.reduced
+                                : linearDrawerMotion.tabIndicator
                             }
                           />
                         ) : null}
@@ -1134,7 +1316,9 @@ export function Drawer({
                   role="tabpanel"
                   tabIndex={0}
                   transition={
-                    shouldReduceMotion ? drawerMotion.reduced : drawerMotion.tab
+                    shouldReduceMotion
+                      ? linearDrawerMotion.reduced
+                      : linearDrawerMotion.tab
                   }
                 >
                   {activeTab === "overview" ? (
@@ -1149,6 +1333,7 @@ export function Drawer({
                   {activeTab === "issues" ? (
                     <IssuesTab
                       data={data}
+                      key={submission.id}
                       onOpenWorkspaceTarget={onOpenWorkspaceTarget}
                       onUploadApplicantFile={onUploadApplicantFile}
                       submission={submission}
@@ -1161,19 +1346,19 @@ export function Drawer({
               </AnimatePresence>
             </div>
 
-            <footer className="p-4 lg:px-8 lg:py-5 border-t border-[var(--v19b-color-border-soft)] bg-[var(--v19b-color-deep-drawer-95)] backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-end gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
-              {footerActionNotice ? (
-                <span
-                  className="v19-drawer-action-notice"
-                  role={actionError ? "alert" : undefined}
-                >
-                  {footerActionNotice}
-                </span>
-              ) : null}
+            <footer className="p-4 lg:px-8 lg:py-5 border-t border-white/10 bg-[#111113]/95 backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
+              <div
+                className={footerInstructionClassName}
+                data-testid="drawer-footer-instruction"
+                id={footerInstructionId}
+                role={footerInstructionRole}
+              >
+                {footerInstruction}
+              </div>
               <div className="flex gap-3 w-full sm:w-auto">
                 <button
                   aria-label="Отменить и закрыть подачу"
-                  className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-[var(--v19b-color-control)] [color:var(--v19b-color-text-70)] hover:[color:var(--v19b-color-text-strong)] font-medium text-[14px] rounded-[var(--v19b-radius-control)] transition-colors"
+                  className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
                   type="button"
                   onClick={onClose}
                 >
@@ -1181,7 +1366,10 @@ export function Drawer({
                 </button>
                 <button
                   aria-busy={actionPending}
-                  className={`flex-1 sm:flex-none h-11 px-8 ${primaryButtonClassName} [color:var(--v19b-color-text-strong)] font-medium text-[14px] rounded-[var(--v19b-radius-control)] shadow-none transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
+                  aria-describedby={
+                    footerActionNotice ? footerInstructionId : undefined
+                  }
+                  className={`flex-1 sm:flex-none h-11 px-8 ${primaryButtonClassName} text-white font-medium text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                   disabled={primaryAction.disabled || actionPending}
                   type="button"
                   onClick={() => void handlePrimaryAction()}

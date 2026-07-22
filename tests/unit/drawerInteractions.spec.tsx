@@ -19,8 +19,10 @@ import type {
   DrawerTab,
   Submission,
   SubmissionAction,
+  SubmissionStatus,
 } from "../../src/modules/submissions/types";
 import type { WorkspaceTarget } from "../../src/modules/submissions/workspaceModel";
+import { linearDrawerMotion } from "../../src/shared/ui/drawer/linearDrawerMotion";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function deferred<T>() {
@@ -121,11 +123,79 @@ afterEach(() => {
 });
 
 describe("Drawer interactions", () => {
+  test("keeps the original motion timings and reduced-motion duration", () => {
+    expect(linearDrawerMotion).toEqual({
+      overlay: { duration: 0.25 },
+      panel: { damping: 28, mass: 0.8, stiffness: 240, type: "spring" },
+      reduced: { duration: 0.01 },
+      tab: { duration: 0.2 },
+      tabIndicator: { bounce: 0.2, duration: 0.5, type: "spring" },
+    });
+  });
+
+  test("renders the canonical label and original semantic tone for every lifecycle status", () => {
+    const expectations = [
+      { label: "Черновик", status: "draft", toneClassName: "text-white/70" },
+      {
+        label: "В работе",
+        status: "in_progress",
+        toneClassName: "text-blue-400",
+      },
+      {
+        label: "Действие",
+        status: "requires_action",
+        toneClassName: "text-orange-400",
+      },
+      {
+        label: "На проверке",
+        status: "submitted_for_review",
+        toneClassName: "text-[#8fa3ff]",
+      },
+      {
+        label: "Возвращено",
+        status: "returned",
+        toneClassName: "text-orange-400",
+      },
+      {
+        label: "Исправления получены",
+        status: "corrections_received",
+        toneClassName: "text-[#8fa3ff]",
+      },
+      {
+        label: "Готово к выгрузке",
+        status: "ready_for_export",
+        toneClassName: "text-emerald-400",
+      },
+      {
+        label: "Выгружено",
+        status: "exported",
+        toneClassName: "text-emerald-400",
+      },
+    ] satisfies ReadonlyArray<{
+      label: string;
+      status: SubmissionStatus;
+      toneClassName: string;
+    }>;
+
+    for (const expectation of expectations) {
+      cleanup();
+      renderDrawer({
+        submission: { ...readySubmission(), status: expectation.status },
+      });
+
+      const badge = screen.getByTestId("drawer-status-badge");
+      expect(badge).toHaveTextContent(expectation.label);
+      expect(badge).toHaveClass(expectation.toneClassName);
+    }
+  });
+
   test("keeps the visible identity above the tabs and switches every tab", async () => {
     renderDrawer();
 
     const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
-    const lifecycleContext = within(dialog).getByTestId("drawer-lifecycle-context");
+    const lifecycleContext = within(dialog).getByTestId(
+      "drawer-lifecycle-context",
+    );
     const lifecycleHeader = lifecycleContext.closest("header");
     if (!lifecycleHeader) throw new Error("Expected lifecycle header.");
     expect(within(lifecycleContext).getByText("VF-1048")).toBeInTheDocument();
@@ -134,11 +204,15 @@ describe("Drawer interactions", () => {
       within(dialog).getByRole("button", { name: "Отправить исправления" }),
     ).toBeInTheDocument();
     expect(within(dialog).getByText("Мария Иванова")).toBeInTheDocument();
-    expect(within(dialog).queryByText("Семья Петровых")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByText("Семья Петровых"),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Анкета" }));
     await waitFor(() =>
-      expect(within(dialog).getByText("Прогресс заполнения")).toBeInTheDocument(),
+      expect(
+        within(dialog).getByText("Прогресс заполнения"),
+      ).toBeInTheDocument(),
     );
 
     fireEvent.click(within(dialog).getByRole("tab", { name: /Замечания/ }));
@@ -157,7 +231,9 @@ describe("Drawer interactions", () => {
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Обзор" }));
     await waitFor(() =>
-      expect(within(dialog).getByText("Чеклист документов")).toBeInTheDocument(),
+      expect(
+        within(dialog).getByText("Чеклист документов"),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -167,10 +243,14 @@ describe("Drawer interactions", () => {
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Анкета" }));
     await waitFor(() => within(dialog).getByText("Прогресс заполнения"));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Открыть анкету" }));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Открыть анкету" }),
+    );
     expect(onOpenQuestionnaire).toHaveBeenCalledWith();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: /Личные данные/ }));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: /Личные данные/ }),
+    );
     expect(onOpenQuestionnaire).toHaveBeenLastCalledWith(
       expect.objectContaining({ applicantId: "з-1048-1" }),
     );
@@ -184,7 +264,13 @@ describe("Drawer interactions", () => {
       within(dialog).getByLabelText("Выбрать файл: Мария Иванова • Селфи 1", {
         selector: "input",
       }),
-      { target: { files: [new File(["replacement"], "selfie.png", { type: "image/png" })] } },
+      {
+        target: {
+          files: [
+            new File(["replacement"], "selfie.png", { type: "image/png" }),
+          ],
+        },
+      },
     );
     await waitFor(() =>
       expect(onUploadApplicantFile).toHaveBeenCalledWith(
@@ -200,18 +286,132 @@ describe("Drawer interactions", () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
     renderDrawer({ onAction, submission: readySubmission() });
 
-    const submit = screen.getByRole("button", { name: "Отправить на проверку" });
+    const submit = screen.getByRole("button", {
+      name: "Отправить на проверку",
+    });
     expect(submit).toBeEnabled();
     fireEvent.click(submit);
-    await waitFor(() => expect(onAction).toHaveBeenCalledWith("submit_for_review"));
+    await waitFor(() =>
+      expect(onAction).toHaveBeenCalledWith("submit_for_review"),
+    );
 
     cleanup();
     renderDrawer({ submission: returnedSubmission() });
+    const disabledAction = screen.getByRole("button", {
+      name: "Отправить исправления",
+    });
+    const disabledReason = screen.getByText(
+      "Сначала отметьте замечания исправленными",
+    );
+    expect(disabledAction).toBeDisabled();
+    expect(disabledReason).not.toHaveClass("hidden");
+    expect(disabledReason).toHaveAttribute("role", "status");
+    expect(disabledAction).toHaveAttribute(
+      "aria-describedby",
+      disabledReason.id,
+    );
+  });
+
+  test("keeps rejected primary-action feedback visible and associated with the CTA", async () => {
+    const onAction = vi.fn().mockRejectedValue(new Error("network failed"));
+    renderDrawer({ onAction, submission: readySubmission() });
+
+    const primaryAction = screen.getByRole("button", {
+      name: "Отправить на проверку",
+    });
+    fireEvent.click(primaryAction);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Состояние подачи не изменено");
+    expect(alert).not.toHaveClass("hidden");
+    expect(primaryAction).toHaveAttribute("aria-describedby", alert.id);
+  });
+
+  test("keeps upload pending and errors isolated to the submission that started them", async () => {
+    const uploadA = deferred<unknown>();
+    const onUploadApplicantFile = vi
+      .fn()
+      .mockImplementationOnce(() => uploadA.promise)
+      .mockResolvedValueOnce(undefined);
+    const submissionA = { ...returnedSubmission(), id: "upload-submission-a" };
+    const submissionB = { ...returnedSubmission(), id: "upload-submission-b" };
+    const drawerProps = {
+      activeTab: "issues" as const,
+      isOpen: true,
+      onAction: vi.fn(),
+      onClose: vi.fn(),
+      onOpenQuestionnaire: vi.fn(),
+      onOpenWorkspaceTarget: vi.fn(),
+      onUploadApplicantFile,
+    };
+    const { rerender } = render(
+      <Drawer {...drawerProps} submission={submissionA} />,
+    );
+
+    fireEvent.change(
+      screen.getByLabelText("Выбрать файл: Мария Иванова • Селфи 1", {
+        selector: "input",
+      }),
+      { target: { files: [new File(["a"], "a.png", { type: "image/png" })] } },
+    );
+    await waitFor(() => expect(onUploadApplicantFile).toHaveBeenCalledTimes(1));
+    const pendingUpload = screen.getByRole("button", { name: "Загрузка…" });
+    expect(pendingUpload).toBeDisabled();
+    expect(pendingUpload).toHaveAttribute("aria-busy", "true");
+    expect(pendingUpload).toHaveAttribute(
+      "aria-describedby",
+      expect.stringContaining("upload-status"),
+    );
+
+    rerender(<Drawer {...drawerProps} submission={submissionB} />);
+    const submissionBButtons = await screen.findAllByRole("button", {
+      name: "Перезагрузить файл",
+    });
+    for (const button of submissionBButtons) {
+      expect(button).toBeEnabled();
+    }
+
+    await act(async () => {
+      uploadA.reject(new Error("Submission A failed late."));
+      await uploadA.promise.catch(() => undefined);
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    fireEvent.change(
+      screen.getByLabelText("Выбрать файл: Мария Иванова • Селфи 1", {
+        selector: "input",
+      }),
+      { target: { files: [new File(["b"], "b.png", { type: "image/png" })] } },
+    );
+    await waitFor(() =>
+      expect(onUploadApplicantFile).toHaveBeenLastCalledWith(
+        "upload-submission-b",
+        "з-1048-1",
+        "selfie",
+        expect.objectContaining({ name: "b.png" }),
+      ),
+    );
+  });
+
+  test("counts only open issues as requiring correction", async () => {
+    const [fixedIssue, openIssue] = returnedSubmission().issues;
+    if (!fixedIssue || !openIssue) {
+      throw new Error("Expected two issue fixtures.");
+    }
+    const submission = {
+      ...returnedSubmission(),
+      issues: [
+        { ...fixedIssue, status: "fixed_by_agent" as const },
+        { ...openIssue, status: "open" as const },
+      ],
+    };
+    renderDrawer({ activeTab: "issues", submission });
+
     expect(
-      screen.getByRole("button", { name: "Отправить исправления" }),
-    ).toBeDisabled();
+      await screen.findByTestId("drawer-open-issues-count"),
+    ).toHaveTextContent("Требуют исправления: 1");
     expect(
-      screen.getByText("Сначала отметьте замечания исправленными"),
+      screen.getByRole("tab", { name: /Замечания\s*2/ }),
     ).toBeInTheDocument();
   });
 
@@ -232,9 +432,13 @@ describe("Drawer interactions", () => {
       onOpenQuestionnaire: vi.fn(),
       onOpenWorkspaceTarget: vi.fn(),
     };
-    const { rerender } = render(<Drawer {...drawerProps} submission={submissionA} />);
+    const { rerender } = render(
+      <Drawer {...drawerProps} submission={submissionA} />,
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "Отправить на проверку" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Отправить на проверку" }),
+    );
     await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
 
     rerender(<Drawer {...drawerProps} submission={submissionB} />);
@@ -298,7 +502,9 @@ describe("Drawer interactions", () => {
     await waitFor(() => expect(onClearFocusTarget).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Закрыть подачу" }));
-    fireEvent.click(screen.getByRole("button", { name: "Отменить и закрыть подачу" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Отменить и закрыть подачу" }),
+    );
     fireEvent.keyDown(window, { key: "Escape" });
     const overlay = container.querySelector<HTMLElement>(
       '[aria-hidden="true"].fixed.inset-0',
