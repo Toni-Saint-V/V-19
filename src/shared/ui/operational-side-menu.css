@@ -1,0 +1,278 @@
+/*
+ * Single visual contract for the shared OperationalSideMenu.
+ * Screen and role selectors must not restyle this component independently.
+ */
+
+:root {
+  --v19-operational-side-menu-desktop-width: 288px;
+  --v19-operational-side-menu-mobile-width: 280px;
+  --v19-operational-side-menu-background: #161617;
+  --v19-operational-side-menu-border: #202124;
+  --v19-operational-side-menu-control: #1e1e21;
+  --v19-operational-side-menu-control-border: #242529;
+  --v19-operational-side-menu-active: #27272b;
+  --v19-operational-side-menu-text: rgb(255 255 255 / 0.7);
+  --v19-operational-side-menu-text-muted: rgb(255 255 255 / 0.4);
+}
+
+#root .ops-shell.has-unified-side-menu {
+  --v19-unified-sidebar-width: var(
+    --v19-operational-side-menu-desktop-width
+  ) !important;
+  --v19-unified-sidebar-mobile-width: var(
+    --v19-operational-side-menu-mobile-width
+  ) !important;
+  --v19-sidebar-width: var(--v19-operational-side-menu-desktop-width) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+  padding: 12px 8px !important;
+  border-color: var(--v19-operational-side-menu-border) !important;
+  border-radius: 0 !important;
+  background: var(--v19-operational-side-menu-background) !important;
+  box-shadow: none !important;
+  color: var(--v19-operational-side-menu-text) !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-brand {
+  min-height: 48px !important;
+  margin: 0 0 8px !important;
+  padding: 0 8px 16px !important;
+  border: 0 !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-brand-logo {
+  width: 32px !important;
+  height: 32px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .opsu-wordmark {
+  color: #fff !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .v19-ds-side-menu-subtitle {
+  color: rgb(255 255 255 / 0.5) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-sidebar-search {
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 0 0 16px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--v19-operational-side-menu-control-border) !important;
+  border-radius: 10px !important;
+  background: rgb(255 255 255 / 0.05) !important;
+  box-shadow: none !important;
+  color: rgb(255 255 255 / 0.5) !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-sidebar-search:hover {
+  border-color: var(--v19-operational-side-menu-control-border) !important;
+  background: rgb(255 255 255 / 0.1) !important;
+  color: rgb(255 255 255 / 0.72) !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-sidebar-search
+  kbd {
+  border: 1px solid var(--v19-operational-side-menu-control-border) !important;
+  border-radius: 4px !important;
+  background: rgb(0 0 0 / 0.4) !important;
+  box-shadow: none !important;
+  color: rgb(255 255 255 / 0.56) !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav {
+  gap: 2px !important;
+  padding: 0 !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-group-label {
+  padding: 0 8px 4px !important;
+  color: var(--v19-operational-side-menu-text-muted) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.025em !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-item {
+  min-height: 40px !important;
+  padding: 8px 10px !important;
+  gap: 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--v19-operational-side-menu-text) !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-item:not([data-nav-id="agent-create"]):not(.is-active):not(
+    [aria-current="page"]
+  ):is(:hover, :focus-visible) {
+  border-color: transparent !important;
+  background: rgb(255 255 255 / 0.05) !important;
+  color: #fff !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-item:is(.is-active, [aria-current="page"]) {
+  border-color: transparent !important;
+  background: var(--v19-operational-side-menu-active) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-item:is(.is-active, [aria-current="page"])
+  :is(.ops-nav-icon, .ops-nav-copy strong, .ops-nav-copy small) {
+  color: #fff !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-item[data-nav-id="agent-create"] {
+  border-color: transparent !important;
+  background: var(--v19-depth-accent) !important;
+  color: #fff !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-item[data-nav-id="agent-create"]:is(:hover, :focus-visible) {
+  background: var(--v19-depth-accent-hover) !important;
+  color: #fff !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-nav-item
+  .ops-nav-count {
+  border-color: rgb(255 255 255 / 0.05) !important;
+  background: #18181b !important;
+  color: rgb(255 255 255 / 0.8) !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-sidebar-footer {
+  margin: auto 0 0 !important;
+  padding: 12px !important;
+  gap: 8px !important;
+  border-top: 1px solid var(--v19-operational-side-menu-border) !important;
+  background: transparent !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .v19-ds-side-menu-profile {
+  min-height: 40px !important;
+  padding: 4px 0 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#root
+  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .v19-ds-side-menu-signout {
+  min-height: 40px !important;
+  border-color: var(--v19-operational-side-menu-control-border) !important;
+  border-radius: 10px !important;
+  background: var(--v19-operational-side-menu-control) !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+
+@media (min-width: 1024px) {
+  #root .ops-shell.has-unified-side-menu {
+    grid-template-columns:
+      var(--v19-operational-side-menu-desktop-width)
+      minmax(0, 1fr) !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    width: var(--v19-operational-side-menu-desktop-width) !important;
+    min-width: var(--v19-operational-side-menu-desktop-width) !important;
+    max-width: var(--v19-operational-side-menu-desktop-width) !important;
+    flex-basis: var(--v19-operational-side-menu-desktop-width) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    width: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
+    min-width: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
+    max-width: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
+    flex-basis: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
+    inline-size: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    opacity: var(--v19-side-menu-motion-opacity, 0) !important;
+    transform: translate3d(var(--v19-side-menu-motion-x, -100%), 0, 0) !important;
+    transition: visibility 0s linear 220ms !important;
+    will-change: opacity, transform;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu.is-mobile-nav-open
+    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transition-delay: 0s !important;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu:not(.is-mobile-nav-open)
+    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    transition-delay: 0s !important;
+    will-change: auto;
+  }
+}

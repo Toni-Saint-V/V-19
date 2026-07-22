@@ -1,4 +1,5 @@
 import { ArrowLeftRight, SlidersHorizontal } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "../../../shared/ui/primitives";
 import {
   V19SideMenu,
@@ -48,6 +49,7 @@ export function OperationalSideMenu({
   sidebarId?: string;
   showWorkspaceSwitch: boolean;
 }) {
+  const reduceMotion = useReducedMotion();
   const navItems = items.map((item) => ({
     ...item,
     onClick: () => {
@@ -132,15 +134,21 @@ export function OperationalSideMenu({
         onCommandSearch={onCommandSearch}
         onMobileClose={onCloseMobile}
       />
-      {mobileOpen ? (
-        <button
-          className="ops-mobile-menu-backdrop"
-          type="button"
-          aria-label="Закрыть меню"
-          aria-controls={id}
-          onClick={onCloseMobile}
-        />
-      ) : null}
+      <AnimatePresence initial={false}>
+        {mobileOpen ? (
+          <motion.button
+            animate={{ opacity: 1 }}
+            aria-controls={id}
+            aria-label="Закрыть меню"
+            className="ops-mobile-menu-backdrop"
+            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.18 }}
+            type="button"
+            onClick={onCloseMobile}
+          />
+        ) : null}
+      </AnimatePresence>
     </>
   );
 }

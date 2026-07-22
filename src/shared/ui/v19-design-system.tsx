@@ -45,7 +45,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import visaflowLogo from "../../assets/v-logo-premium-black-style.webp";
 import { cn } from "./cn";
 import { Badge, Button, IconButton, NavCount } from "./primitives";
@@ -275,7 +275,7 @@ export function V19SideMenu({
   onCommandSearch,
   onMobileClose,
   ...props
-}: Omit<ComponentPropsWithoutRef<"aside">, "aria-label"> & {
+}: Omit<ComponentPropsWithoutRef<typeof motion.aside>, "aria-label"> & {
   ariaLabel: string;
   brandSubtitle: string;
   createAction?: { label: string; onClick: () => void };
@@ -289,9 +289,15 @@ export function V19SideMenu({
   onCommandSearch?: () => void;
   onMobileClose: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <aside
+    <motion.aside
       {...props}
+      animate={{
+        "--v19-side-menu-motion-opacity": mobileOpen ? 1 : 0,
+        "--v19-side-menu-motion-x": mobileOpen ? "0%" : "-100%",
+      }}
       aria-hidden={inactive ? "true" : undefined}
       aria-label={ariaLabel}
       aria-modal={mobileOpen ? "true" : undefined}
@@ -304,7 +310,11 @@ export function V19SideMenu({
       data-side-menu-mode={displayMode}
       data-v19-component="side-menu"
       inert={inactive ? true : undefined}
+      initial={false}
       role={mobileOpen ? "dialog" : undefined}
+      transition={
+        reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+      }
     >
       <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
         <strong>{mobileTitle}</strong>
@@ -393,7 +403,7 @@ export function V19SideMenu({
         </Button>
       ) : null}
       <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
-    </aside>
+    </motion.aside>
   );
 }
 
