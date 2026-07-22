@@ -15,7 +15,7 @@ function appointmentCityValue(submission: ReturnType<typeof createDraftSubmissio
 }
 
 describe("questionnaire submission-context prefill", () => {
-  test("fills a blank appointment city from the canonical submission city", () => {
+  test("keeps appointment city blank until the user selects it", () => {
     const draft = createDraftSubmission({
       city: "Казань",
       familyCount: 1,
@@ -24,7 +24,7 @@ describe("questionnaire submission-context prefill", () => {
     });
 
     const normalized = normalizeSubmissionQuestionnaire(draft);
-    expect(appointmentCityValue(normalized).field.value).toBe("Казань");
+    expect(appointmentCityValue(normalized).field.value).toBe("");
   });
 
   test("never overwrites an explicitly selected appointment city", () => {

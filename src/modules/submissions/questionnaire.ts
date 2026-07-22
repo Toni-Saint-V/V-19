@@ -269,6 +269,35 @@ export function isQuestionnaireDateField(
   );
 }
 
+export type QuestionnaireDateIntent = "future" | "past" | "unknown";
+
+const pastQuestionnaireDateFieldIds = new Set([
+  "birth-date",
+  "passport-issue-date",
+  "previous-biometrics-date",
+  "fingerprints-date",
+]);
+
+const futureQuestionnaireDateFieldIds = new Set([
+  "arrival-date",
+  "departure-date",
+  "desired-date-1",
+  "desired-date-2",
+  "desired-date-3",
+  "final-entry-permit-valid-from",
+  "final-entry-permit-valid-to",
+  "passport-expiry-date",
+  "residence-permit-valid-until",
+]);
+
+export function questionnaireDateIntent(
+  field: Pick<QuestionnaireField, "id" | "label">,
+): QuestionnaireDateIntent {
+  if (pastQuestionnaireDateFieldIds.has(field.id)) return "past";
+  if (futureQuestionnaireDateFieldIds.has(field.id)) return "future";
+  return "unknown";
+}
+
 export function validateQuestionnaireFieldValue(
   field: QuestionnaireValidationField,
   value = field.value ?? "",
@@ -323,63 +352,6 @@ export type QuestionnaireFieldUpdate = {
   reviewState?: QuestionnaireReviewState;
 };
 
-const familyAppointmentFieldIds = new Set([
-  "appointment-city",
-  "desired-date-1",
-  "desired-date-2",
-]);
-
-export function familyAppointmentUpdatesForPrimary(
-  submission: Submission,
-  sourceApplicantId: string,
-  sourceUpdate: QuestionnaireFieldUpdate,
-): QuestionnaireFieldUpdate[] {
-  const primaryApplicant = submission.applicants[0];
-  if (
-    submission.type !== "family" ||
-    !primaryApplicant ||
-    primaryApplicant.id !== sourceApplicantId ||
-    !familyAppointmentFieldIds.has(sourceUpdate.fieldId)
-  ) {
-    return [];
-  }
-
-  return submission.applicants.slice(1).flatMap((applicant) => {
-    const targetSection = applicant.sections.find(
-      (section) =>
-        section.id === sourceUpdate.sectionId ||
-        section.id.endsWith(`-${sourceUpdate.sectionId}`),
-    );
-    const targetField = targetSection?.fields.find(
-      (field) => field.id === sourceUpdate.fieldId,
-    );
-    if (!targetField) return [];
-
-    const wasFamilyShared =
-      targetField.reviewSource === "family_shared" ||
-      targetField.reviewOriginSource === "family_shared";
-    const isDefaultAppointmentCity =
-      sourceUpdate.fieldId === "appointment-city" &&
-      targetField.value === submission.city;
-    if (targetField.value.trim() && !wasFamilyShared && !isDefaultAppointmentCity) {
-      return [];
-    }
-
-    return [
-      {
-        applicantId: applicant.id,
-        error: validateQuestionnaireFieldValue(targetField, sourceUpdate.value),
-        fieldId: sourceUpdate.fieldId,
-        reviewOriginSource: "family_shared",
-        reviewSource: "family_shared",
-        reviewState: "confirmed",
-        sectionId: sourceUpdate.sectionId,
-        value: sourceUpdate.value,
-      },
-    ];
-  });
-}
-
 export function questionnaireSectionPreviews(): QuestionnaireSectionPreview[] {
   return questionnaireBlueprint.map((section) => ({
     id: section.id,
@@ -388,6 +360,16 @@ export function questionnaireSectionPreviews(): QuestionnaireSectionPreview[] {
       questionnaireSectionSummaries[section.id] ??
       `${section.fields.length} полей после сохранения черновика`,
     title: section.title,
+  }));
+}
+
+export function questionnaireBlueprintContract() {
+  return questionnaireBlueprint.map((section) => ({
+    fields: section.fields.map((field) => ({
+      id: field.id,
+      required: field.required !== false,
+    })),
+    id: section.id,
   }));
 }
 
@@ -430,9 +412,6 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
         sections: sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) => {
-            if (field.id === "appointment-city" && !field.value.trim()) {
-              return { ...field, value: submission.city };
-            }
             if (field.id === "visa-type") return { ...field, value: "Шенгенская" };
             if (field.id === "category") return { ...field, value: "Normal" };
             if (field.id === "nationality") {

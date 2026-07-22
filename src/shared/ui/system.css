@@ -3414,6 +3414,11 @@ p {
   line-height: var(--vf-ref-line-height-1neg-2);
 }
 
+.access-form--registration .access-field-label {
+  margin-left: var(--vf-ref-size-6px);
+  font-weight: var(--vf-ref-font-weight-500);
+}
+
 .access-card input[aria-invalid="true"] {
   border-color: var(--vf-red-soft-border);
 }

@@ -1,9 +1,15 @@
 import type { Role, SubmissionAction, SubmissionStatus, Surface } from "./types";
 
-export type BusinessClickSurface = Surface | "submission-drawer" | "excel-preview";
+export type BusinessClickSurface =
+  | Surface
+  | "excel-preview"
+  | "new-submission"
+  | "questionnaire"
+  | "submission-drawer";
 
 export type BusinessClickExecutionPath =
   | "applySubmissionActionResult"
+  | "applyAgentSubmitForReviewResult"
   | "createDraft"
   | "updateQuestionnaireField"
   | "uploadRequiredFile"
@@ -40,7 +46,7 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     intent: "create_submission",
     ownerRole: "agent",
     productionLogic: "src/modules/submissions/domainEngine.createDraft",
-    surfaces: ["agent-submissions", "submission-drawer"],
+    surfaces: ["agent-submissions", "new-submission", "submission-drawer"],
   },
   save_progress: {
     executionPath: "applySubmissionActionResult",
@@ -57,14 +63,26 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     ownerRole: "agent",
     productionLogic:
       "src/modules/submissions/submissionActions.updateQuestionnaireField",
-    surfaces: ["submission-drawer"],
+    surfaces: ["questionnaire", "submission-drawer"],
   },
   upload_required_file: {
     executionPath: "uploadRequiredFile",
     intent: "workspace_edit",
     ownerRole: "agent",
     productionLogic: "src/modules/submissions/submissionActions.uploadRequiredFile",
-    surfaces: ["submission-drawer"],
+    surfaces: ["agent-submissions", "submission-drawer"],
+  },
+  prepare_and_submit_for_review: {
+    executionPath: "applyAgentSubmitForReviewResult",
+    intent: "submission_lifecycle",
+    ownerRole: "agent",
+    productionLogic:
+      "src/modules/submissions/status.applyAgentSubmitForReviewResult",
+    surfaces: ["agent-submissions"],
+    transition: {
+      from: ["draft", "in_progress"],
+      to: "submitted_for_review",
+    },
   },
   submit_for_review: {
     executionPath: "applySubmissionActionResult",
@@ -99,7 +117,12 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     intent: "issue_lifecycle",
     ownerRole: "agent",
     productionLogic: "src/modules/submissions/status.markSubmissionIssueFixedResult",
-    surfaces: ["agent-actions", "agent-submissions", "submission-drawer"],
+    surfaces: [
+      "agent-actions",
+      "agent-submissions",
+      "questionnaire",
+      "submission-drawer",
+    ],
   },
   submit_corrections: {
     executionPath: "applySubmissionActionResult",
@@ -195,5 +218,5 @@ export function businessClickContractFor(
 }
 
 export function isBusinessClickIntent(value: string): value is BusinessClickIntent {
-  return value in V19_BUSINESS_CLICK_CONTRACTS;
+  return Object.hasOwn(V19_BUSINESS_CLICK_CONTRACTS, value);
 }

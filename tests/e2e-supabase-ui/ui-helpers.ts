@@ -1,6 +1,12 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { expect, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  type Locator,
+  type Page,
+  type Request,
+  type Response,
+} from "@playwright/test";
 
 import { testArtifactPath } from "../support/artifacts";
 import {
@@ -364,6 +370,17 @@ type QuestionnaireSectionEvidence = {
   submissionId: string;
 };
 
+export type QuestionnaireSaveIntegrationEvidence = {
+  saveNetwork: {
+    method: "POST";
+    path: string;
+    status: number;
+  };
+  saveWriteCount: number;
+  submissionId: string;
+  surnameReadbacks: Array<{ applicantIndex: number; value: string }>;
+};
+
 export async function fillQuestionnaire(
   page: Page,
   runId: string,
@@ -372,7 +389,7 @@ export async function fillQuestionnaire(
     state: "preview" | "complete",
     submissionId: string,
   ) => Promise<void>,
-): Promise<string> {
+): Promise<QuestionnaireSaveIntegrationEvidence> {
   const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
   if (!(await isVisible(questionnaire))) {
     const open = drawer(page).getByRole("button", { name: "Открыть анкету" }).first();
@@ -457,6 +474,9 @@ export async function fillQuestionnaire(
           .first();
         if (await isVisible(dropdown)) {
           const currentValue = (await dropdown.innerText()).trim();
+          if (label === "Город подачи" && applicantIndex === 0) {
+            expect(currentValue).toContain("Выберите город");
+          }
           if (currentValue.includes("Выберите")) {
             await dropdown.click();
             const options = questionnaire.locator(
@@ -482,7 +502,7 @@ export async function fillQuestionnaire(
 
     if (applicantIndex === 0 && applicantCount > 1) {
       const copyShared = questionnaire.getByRole("button", {
-        name: "Заполнить общие поля семьи",
+        name: "Копировать для всех",
       });
       await expect(copyShared).toBeVisible();
       await copyShared.click();
@@ -497,14 +517,76 @@ export async function fillQuestionnaire(
   }
 
   expect(fieldIndex).toBeGreaterThan(0);
-  await clickAndWaitForSupabaseWrite(
-    page,
-    () => questionnaire.getByRole("button", { name: "Черновик", exact: true }).click(),
-    /\/rest\/v1\/rpc\/save_submission_draft$/,
-  );
-  await questionnaire.getByRole("button", { name: "Назад" }).click();
-  await expect(questionnaire).toHaveCount(0);
-  return submissionId;
+  const surnameReadbacks: Array<{ applicantIndex: number; value: string }> = [];
+  for (
+    let applicantIndex = 0;
+    applicantIndex < Math.max(applicantCount, 1);
+    applicantIndex += 1
+  ) {
+    if (applicantCount > 0) await applicants.nth(applicantIndex).click();
+    await questionnaire
+      .locator(".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab")
+      .filter({ hasText: "Личные данные" })
+      .click();
+    surnameReadbacks.push({
+      applicantIndex,
+      value: await questionnaire
+        .locator('[data-model-field-id="surname"] input')
+        .inputValue(),
+    });
+  }
+
+  const matchingSaveRequests: Request[] = [];
+  const matchingSaveResponses: Response[] = [];
+  const isMatchingSaveRequest = (request: Request) => {
+    const url = new URL(request.url());
+    return (
+      url.origin === supabaseOrigin() &&
+      url.pathname.endsWith("/rest/v1/rpc/save_submission_draft") &&
+      request.method() === "POST"
+    );
+  };
+  const recordSaveRequest = (request: Request) => {
+    if (isMatchingSaveRequest(request)) matchingSaveRequests.push(request);
+  };
+  const recordSaveResponse = (response: Response) => {
+    if (isMatchingSaveRequest(response.request())) matchingSaveResponses.push(response);
+  };
+  page.on("request", recordSaveRequest);
+  page.on("response", recordSaveResponse);
+  let saveResponse: Response | undefined;
+  try {
+    saveResponse = await clickAndWaitForSupabaseWrite(
+      page,
+      () =>
+        questionnaire
+          .getByRole("button", { name: "Сохранить и выйти", exact: true })
+          .click(),
+      /\/rest\/v1\/rpc\/save_submission_draft$/,
+    );
+    await expect(questionnaire).toHaveCount(0);
+    // Keep observing through the 900 ms questionnaire autosave debounce so a
+    // delayed or rejected duplicate request cannot masquerade as exact-once.
+    await page.waitForTimeout(1_000);
+  } finally {
+    page.off("request", recordSaveRequest);
+    page.off("response", recordSaveResponse);
+  }
+  if (!saveResponse) throw new Error("Save & Exit did not return a response.");
+  expect(matchingSaveRequests).toHaveLength(1);
+  expect(matchingSaveResponses).toHaveLength(1);
+  expect(matchingSaveResponses[0]?.status()).toBeGreaterThanOrEqual(200);
+  expect(matchingSaveResponses[0]?.status()).toBeLessThan(300);
+  return {
+    saveNetwork: {
+      method: "POST",
+      path: new URL(saveResponse.url()).pathname,
+      status: saveResponse.status(),
+    },
+    saveWriteCount: matchingSaveRequests.length,
+    submissionId,
+    surnameReadbacks,
+  };
 }
 
 export async function openDrawerTab(page: Page, name: string | RegExp) {

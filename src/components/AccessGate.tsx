@@ -600,7 +600,7 @@ export function AccessGate({
       <p className="access-intro" id="workspace-register-copy">
         Заполните данные агентства. Доступ появится после подтверждения администратором.
       </p>
-      <form className="access-form" onSubmit={(event) => void submitRegistration(event)} noValidate>
+      <form className="access-form access-form--registration" onSubmit={(event) => void submitRegistration(event)} noValidate>
         {registrationFields.map((field) => {
           const errorId = `${field.id}-error`;
           const fieldError = registerErrors[field.key];

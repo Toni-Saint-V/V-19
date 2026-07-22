@@ -495,9 +495,14 @@ export function TabCount({ children }: { children: ReactNode }) {
   return <span className="tab-count v19-tab-count">{children}</span>;
 }
 
-export function NavCount({ children, label }: { children: ReactNode; label?: string }) {
+export function NavCount({
+  children,
+  className,
+  label,
+  ...props
+}: HTMLAttributes<HTMLSpanElement> & { children: ReactNode; label?: string }) {
   return (
-    <span className="ops-nav-count" aria-label={label}>
+    <span className={cn("ops-nav-count", className)} aria-label={label} {...props}>
       {children}
     </span>
   );

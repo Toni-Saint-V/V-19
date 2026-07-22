@@ -25,8 +25,10 @@ import {
   BLS_CITY_OPTIONS,
   POPULAR_RUSSIAN_CITY_OPTIONS,
   isQuestionnaireDateField,
+  questionnaireDateIntent,
   updateQuestionnaireField,
   validateQuestionnaireFieldValue,
+  type QuestionnaireDateIntent,
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
 import {
@@ -43,9 +45,11 @@ import {
   agentQuestionnaireCompletionDecision,
   agentQuestionnaireStatusPresentation,
 } from "../status";
+import { agentInteractionProps } from "../agentInteractionContract";
 import {
   passportReviewMediaTypeForIssue,
   passportReviewMediaTypesVisibleForApplicant,
+  primaryApplicantIdForPassportReview,
   requiredPassportReviewMediaTypesForApplicant,
   type PassportReviewMediaType,
 } from "../passportReviewContract";
@@ -62,6 +66,7 @@ import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
 } from "./QuestionnaireWorkspacePrimitives";
+import "./questionnaire-codex-polish-v1.css";
 
 type FieldState = "normal" | "needs_review" | "invalid";
 type ApplicantTabStatus = "complete" | "issue" | "pending";
@@ -73,6 +78,15 @@ type ApplicantTab = {
   status: ApplicantTabStatus;
   total: number;
 };
+
+function applicantDropdownLabel(applicant: ApplicantTab) {
+  const progress = `${applicant.completed} из ${applicant.total}`;
+  if (applicant.status === "complete") return `${applicant.name} — готово, ${progress}`;
+  if (applicant.status === "issue") {
+    return `${applicant.name} — есть замечание, ${progress}`;
+  }
+  return `${applicant.name} — ${progress}`;
+}
 type SectionTab = {
   id: string;
   meta: string;
@@ -222,6 +236,23 @@ type QuestionnaireReviewConfirmation = {
 
 type QuestionnaireSaveIntent = "autosave" | "completion" | "manual" | "navigation";
 
+const questionnaireSaveIntentPriority: Record<QuestionnaireSaveIntent, number> = {
+  autosave: 0,
+  navigation: 1,
+  manual: 2,
+  completion: 3,
+};
+
+function strongestQuestionnaireSaveIntent(
+  current: QuestionnaireSaveIntent,
+  incoming: QuestionnaireSaveIntent,
+): QuestionnaireSaveIntent {
+  return questionnaireSaveIntentPriority[incoming] >=
+    questionnaireSaveIntentPriority[current]
+    ? incoming
+    : current;
+}
+
 type QuestionnaireSaveWaiter = {
   reject: (reason?: unknown) => void;
   resolve: () => void;
@@ -351,7 +382,6 @@ type StructuredHomeAddressKey =
   | "homeStreet"
   | "homeUnit";
 
-
 const BLS_COUNTRY_OPTIONS = [
   "Russian Federation",
   "USSR",
@@ -406,11 +436,7 @@ const RUSSIAN_STREET_TYPE_SUGGESTIONS = [
 
 const RUSSIAN_BUILDING_TYPE_SUGGESTIONS = ["корпус ", "строение "];
 
-const RUSSIAN_UNIT_TYPE_SUGGESTIONS = [
-  "квартира ",
-  "офис ",
-  "помещение ",
-];
+const RUSSIAN_UNIT_TYPE_SUGGESTIONS = ["квартира ", "офис ", "помещение "];
 
 const BLS_OCCUPATION_OPTIONS = [
   "UNEMPLOYED",
@@ -489,11 +515,20 @@ const optionSearchAliases: Record<string, string[]> = {
   "United States": ["сша", "америка"],
 };
 
-function formatDateInput(value: string, inputType?: string) {
-  if (inputType?.startsWith("delete")) {
-    return value.replace(/[^\d.]/g, "").slice(0, 10);
+function formatDateInput(
+  value: string,
+  inputType: string | undefined,
+  intent: QuestionnaireDateIntent,
+) {
+  const sanitized = value.replace(/[^\d.]/g, "").slice(0, 10);
+  const digits = sanitized.replace(/\D/g, "").slice(0, 8);
+
+  // Keep compact digit-only input untouched until blur so both DDMYY and
+  // DDMMYY remain possible (for example 22626 and 221226).
+  if (!sanitized.includes(".")) {
+    return digits.length === 8 ? normalizeDateInput(digits, intent) : digits;
   }
-  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (inputType?.startsWith("delete")) return sanitized;
   if (digits.length <= 1) return digits;
   if (digits.length <= 3) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
   if (digits.length <= 4) {
@@ -502,6 +537,45 @@ function formatDateInput(value: string, inputType?: string) {
     }`;
   }
   return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+function normalizeDateInput(value: string, intent: QuestionnaireDateIntent) {
+  const digits = value.replace(/\D/g, "");
+  const expandYear = (twoDigitYear: string) => {
+    const numericYear = Number(twoDigitYear);
+    if (intent === "unknown") return undefined;
+    if (intent === "future") return String(2000 + numericYear);
+    const currentYear = new Date().getFullYear();
+    const currentTwoDigitYear = currentYear % 100;
+    return String(
+      numericYear <= currentTwoDigitYear
+        ? 2000 + numericYear
+        : 1900 + numericYear,
+    );
+  };
+  let day = "";
+  let month = "";
+  let year = "";
+
+  if (digits.length === 5) {
+    day = digits.slice(0, 2);
+    month = digits.slice(2, 3).padStart(2, "0");
+    year = expandYear(digits.slice(3)) ?? "";
+  } else if (digits.length === 6) {
+    day = digits.slice(0, 2);
+    month = digits.slice(2, 4);
+    year = expandYear(digits.slice(4)) ?? "";
+  } else if (digits.length === 8) {
+    day = digits.slice(0, 2);
+    month = digits.slice(2, 4);
+    year = digits.slice(4);
+  } else {
+    return value;
+  }
+
+  if (!year) return value;
+  const normalized = `${day}.${month}.${year}`;
+  return parseQuestionnaireDate(normalized) ? normalized : value;
 }
 
 function formatPhoneInput(value: string, prefix: "+7" | "+34") {
@@ -626,6 +700,7 @@ function FormField({
       : options;
   }, [optionQuery, options]);
   const dateField = isQuestionnaireDateField({ id: modelFieldId, label });
+  const dateIntent = questionnaireDateIntent({ id: modelFieldId, label });
   const emailField =
     type === "email" || label.toLocaleLowerCase("ru-RU").includes("email");
   const fieldId = `questionnaire-${generatedFieldId.replace(/:/g, "")}`;
@@ -653,9 +728,9 @@ function FormField({
   );
   const inputSuggestionListOpen = Boolean(
     inputSuggestions.length &&
-      isSuggestionsOpen &&
-      !addressSuggestion &&
-      visibleInputSuggestions.length,
+    isSuggestionsOpen &&
+    !addressSuggestion &&
+    visibleInputSuggestions.length,
   );
 
   useEffect(() => {
@@ -860,22 +935,22 @@ function FormField({
           deleteIndex >= 0
             ? `${value.slice(0, deleteIndex)}${value.slice(deleteIndex + 1)}`
             : value.slice(caret);
-        onChange?.(formatDateInput(nextValue, "deleteContentBackward"));
+        onChange?.(
+          formatDateInput(nextValue, "deleteContentBackward", dateIntent),
+        );
         window.requestAnimationFrame(() => {
           const nextCaret = Math.max(0, caret - 2);
           input.setSelectionRange(nextCaret, nextCaret);
         });
         return;
       }
-      if (
-        caret !== null &&
-        event.key === "Delete" &&
-        value[caret] === "."
-      ) {
+      if (caret !== null && event.key === "Delete" && value[caret] === ".") {
         event.preventDefault();
         const input = event.currentTarget;
         const nextValue = `${value.slice(0, caret + 1)}${value.slice(caret + 2)}`;
-        onChange?.(formatDateInput(nextValue, "deleteContentForward"));
+        onChange?.(
+          formatDateInput(nextValue, "deleteContentForward", dateIntent),
+        );
         window.requestAnimationFrame(() =>
           input.setSelectionRange(caret + 1, caret + 1),
         );
@@ -890,6 +965,7 @@ function FormField({
     <div
       data-field-focused={canonicalFocused ? "true" : undefined}
       data-field-label={label}
+      data-model-field-id={modelFieldId}
       data-family-copy-preview={copyPreview ? "true" : undefined}
       className={`v19-questionnaire-field v19-questionnaire-field-cell flex flex-col ${
         canonicalState === "needs_review" ? "has-review-confirmation " : ""
@@ -917,285 +993,310 @@ function FormField({
           canonicalState === "needs_review" ? " has-confirmation" : ""
         }`}
       >
-      {options && usesQuickOptions ? (
-        <div
-          aria-describedby={shouldShowError ? fieldErrorId : undefined}
-          aria-invalid={effectiveState === "invalid" ? "true" : undefined}
-          aria-labelledby={fieldLabelId}
-          aria-required={canonicalRequired ? "true" : undefined}
-          className={`v19-questionnaire-quick-options${
-            collapsesQuickOptions && value ? " has-selection" : ""
-          }${
-            collapsesQuickOptions && value && !quickOptionsExpanded
-              ? " is-collapsed"
-              : ""
-          }`}
-          data-option-count={visibleQuickOptions?.length}
-          data-wrap-options={
-            label === "Тип принимающей стороны" ? "true" : undefined
-          }
-          role="group"
-        >
-          {visibleQuickOptions?.map((option) => (
-            <button
-              aria-expanded={
-                collapsesQuickOptions && value === option
-                  ? quickOptionsExpanded
-                  : undefined
-              }
-              aria-pressed={value === option}
-              className={`v19-questionnaire-field-control v19-questionnaire-quick-option ${
-                value === option ? "is-selected" : stateClasses
-              }`}
-              key={option}
-              title={
-                collapsesQuickOptions && value === option && !quickOptionsExpanded
-                  ? "Изменить выбор"
-                  : undefined
-              }
-              type="button"
-              onClick={() => {
-                if (collapsesQuickOptions && value === option) {
-                  setQuickOptionsExpanded((current) => !current);
-                  return;
-                }
-                onChange?.(option);
-                if (collapsesQuickOptions) setQuickOptionsExpanded(false);
-              }}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      ) : options ? (
-        <div
-          className="relative"
-          ref={dropdownRef}
-          onBlur={(event) => {
-            if (event.currentTarget.contains(event.relatedTarget as Node | null))
-              return;
-            closeOptions();
-          }}
-        >
-          <button
-            aria-activedescendant={activeOptionId}
-            aria-controls={optionsListboxId}
+        {options && usesQuickOptions ? (
+          <div
             aria-describedby={shouldShowError ? fieldErrorId : undefined}
-            aria-expanded={isOpen}
-            aria-haspopup="listbox"
             aria-invalid={effectiveState === "invalid" ? "true" : undefined}
             aria-labelledby={fieldLabelId}
             aria-required={canonicalRequired ? "true" : undefined}
-            className={`flex items-center justify-between text-left ${baseClasses} ${stateClasses}`}
-            id={fieldId}
-            ref={optionTriggerRef}
-            role="combobox"
-            type="button"
-            onClick={() => {
-              if (isOpen) closeOptions();
-              else openOptions();
-            }}
-            onKeyDown={handleOptionKeyboard}
+            className={`v19-questionnaire-quick-options${
+              collapsesQuickOptions && value ? " has-selection" : ""
+            }${
+              collapsesQuickOptions && value && !quickOptionsExpanded
+                ? " is-collapsed"
+                : ""
+            }`}
+            data-option-count={visibleQuickOptions?.length}
+            data-wrap-options={label === "Тип принимающей стороны" ? "true" : undefined}
+            role="group"
           >
-            <span className="v19-questionnaire-select-value">
-              {value || (
-                <span className="v19-questionnaire-placeholder">
-                  Выберите вариант
-                </span>
-              )}
-            </span>
-            <ChevronDown className="w-4 h-4 text-white/40 shrink-0 ml-2" />
-          </button>
-
-          <AnimatePresence>
-            {isOpen ? (
-              <motion.div
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="v19-questionnaire-dropdown"
-                exit={{ opacity: 0, scale: 0.98, y: -4 }}
-                initial={{ opacity: 0, scale: 0.98, y: -4 }}
-                transition={{ duration: 0.15 }}
+            {visibleQuickOptions?.map((option) => (
+              <button
+                {...agentInteractionProps(
+                  collapsesQuickOptions && value === option
+                    ? "questionnaire.navigate"
+                    : "questionnaire.update-field",
+                )}
+                aria-expanded={
+                  collapsesQuickOptions && value === option
+                    ? quickOptionsExpanded
+                    : undefined
+                }
+                aria-pressed={value === option}
+                className={`v19-questionnaire-field-control v19-questionnaire-quick-option ${
+                  value === option ? "is-selected" : stateClasses
+                }`}
+                key={option}
+                title={
+                  collapsesQuickOptions && value === option && !quickOptionsExpanded
+                    ? "Изменить выбор"
+                    : undefined
+                }
+                type="button"
+                onClick={() => {
+                  if (collapsesQuickOptions && value === option) {
+                    setQuickOptionsExpanded((current) => !current);
+                    return;
+                  }
+                  onChange?.(option);
+                  if (collapsesQuickOptions) setQuickOptionsExpanded(false);
+                }}
               >
-                {usesOptionSearch ? (
-                  <input
-                    aria-activedescendant={activeOptionId}
-                    aria-controls={optionsListboxId}
-                    aria-label={`Поиск: ${label}`}
-                    className="v19-questionnaire-field-control"
-                    placeholder="Найти вариант"
-                    ref={optionSearchRef}
-                    type="search"
-                    value={optionQuery}
-                    onChange={(event) => {
-                      setOptionQuery(event.target.value);
-                      setActiveOptionIndex(0);
-                    }}
-                    onKeyDown={handleOptionKeyboard}
-                  />
-                ) : null}
-                <div id={optionsListboxId} role="listbox">
-                  {filteredOptions.map((option, index) => (
-                    <button
-                      aria-selected={value === option}
-                      className={`v19-questionnaire-dropdown-option ${
-                        value === option ? "is-selected" : ""
-                      } ${activeOptionIndex === index ? "is-active" : ""}`}
-                      id={`${optionsListboxId}-option-${index}`}
-                      key={option}
-                      role="option"
-                      tabIndex={-1}
-                      type="button"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => setActiveOptionIndex(index)}
-                      onClick={() => selectOptionAt(index)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                  {!filteredOptions.length ? (
-                    <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
+                {option}
+              </button>
+            ))}
+          </div>
+        ) : options ? (
+          <div
+            className="relative"
+            ref={dropdownRef}
+            onBlur={(event) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null))
+                return;
+              closeOptions();
+            }}
+          >
+            <button
+              {...agentInteractionProps("questionnaire.navigate")}
+              aria-activedescendant={activeOptionId}
+              aria-controls={optionsListboxId}
+              aria-describedby={shouldShowError ? fieldErrorId : undefined}
+              aria-expanded={isOpen}
+              aria-haspopup="listbox"
+              aria-invalid={effectiveState === "invalid" ? "true" : undefined}
+              aria-labelledby={fieldLabelId}
+              aria-required={canonicalRequired ? "true" : undefined}
+              className={`flex items-center justify-between text-left ${baseClasses} ${stateClasses}`}
+              id={fieldId}
+              ref={optionTriggerRef}
+              role="combobox"
+              type="button"
+              onClick={() => {
+                if (isOpen) closeOptions();
+                else openOptions();
+              }}
+              onKeyDown={handleOptionKeyboard}
+            >
+              <span className="v19-questionnaire-select-value">
+                {value || (
+                  <span className="v19-questionnaire-placeholder">
+                    {visiblePlaceholder || "Выберите вариант"}
+                  </span>
+                )}
+              </span>
+              <ChevronDown className="w-4 h-4 text-white/40 shrink-0 ml-2" />
+            </button>
+
+            <AnimatePresence>
+              {isOpen ? (
+                <motion.div
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="v19-questionnaire-dropdown"
+                  exit={{ opacity: 0, scale: 0.98, y: -4 }}
+                  initial={{ opacity: 0, scale: 0.98, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {usesOptionSearch ? (
+                    <input
+                      {...agentInteractionProps("questionnaire.search")}
+                      aria-activedescendant={activeOptionId}
+                      aria-controls={optionsListboxId}
+                      aria-label={`Поиск: ${label}`}
+                      className="v19-questionnaire-field-control"
+                      placeholder="Найти вариант"
+                      ref={optionSearchRef}
+                      type="search"
+                      value={optionQuery}
+                      onChange={(event) => {
+                        setOptionQuery(event.target.value);
+                        setActiveOptionIndex(0);
+                      }}
+                      onKeyDown={handleOptionKeyboard}
+                    />
                   ) : null}
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
-      ) : type === "textarea" ? (
-        <textarea
-          aria-describedby={shouldShowError ? fieldErrorId : undefined}
-          aria-invalid={effectiveState === "invalid" ? "true" : undefined}
-          aria-label={label}
-          aria-required={canonicalRequired ? "true" : undefined}
-          className={`${baseClasses} is-textarea ${compact ? "is-compact-address" : ""} ${stateClasses}`}
-          id={fieldId}
-          name={modelFieldId}
-          onBlur={onBlur}
-          placeholder={visiblePlaceholder}
-          readOnly={readOnly ?? !onChange}
-          value={value}
-          onChange={(event) => onChange?.(event.target.value)}
-        />
-      ) : (
-        <div
-          className="relative"
-          ref={inputSuggestions.length ? suggestionsRef : undefined}
-        >
-          <input
+                  <div id={optionsListboxId} role="listbox">
+                    {filteredOptions.map((option, index) => (
+                      <button
+                        {...agentInteractionProps("questionnaire.update-field")}
+                        aria-selected={value === option}
+                        className={`v19-questionnaire-dropdown-option ${
+                          value === option ? "is-selected" : ""
+                        } ${activeOptionIndex === index ? "is-active" : ""}`}
+                        id={`${optionsListboxId}-option-${index}`}
+                        key={option}
+                        role="option"
+                        tabIndex={-1}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setActiveOptionIndex(index)}
+                        onClick={() => selectOptionAt(index)}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                    {!filteredOptions.length ? (
+                      <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
+                    ) : null}
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        ) : type === "textarea" ? (
+          <textarea
+            {...(onChange ? agentInteractionProps("questionnaire.update-field") : {})}
             aria-describedby={shouldShowError ? fieldErrorId : undefined}
             aria-invalid={effectiveState === "invalid" ? "true" : undefined}
             aria-label={label}
             aria-required={canonicalRequired ? "true" : undefined}
-            aria-activedescendant={activeSuggestionId}
-            aria-autocomplete={inputSuggestions.length ? "list" : undefined}
-            aria-controls={inputSuggestions.length ? suggestionsId : undefined}
-            aria-expanded={inputSuggestions.length ? inputSuggestionListOpen : undefined}
-            autoComplete={inputSuggestions.length ? "off" : inputAutocomplete(label, type)}
-            className={`${baseClasses} ${compact ? "is-compact-address" : ""} ${stateClasses}`}
-            inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
+            className={`${baseClasses} is-textarea ${compact ? "is-compact-address" : ""} ${stateClasses}`}
             id={fieldId}
-            maxLength={
-              dateField
-                ? 10
-                : phonePrefix
-                  ? phonePrefix === "+7"
-                    ? 17
-                    : 15
-                  : undefined
-            }
             name={modelFieldId}
-            placeholder={
-              visiblePlaceholder ??
-              (dateField
-                ? "ДД.ММ.ГГГГ"
-                : phonePrefix
-                  ? `${phonePrefix} ${phonePrefix === "+7" ? "900 000-00-00" : "600 000 000"}`
-                  : emailField
-                    ? "name@example.com"
-                    : undefined)
-            }
+            onBlur={onBlur}
+            placeholder={visiblePlaceholder}
             readOnly={readOnly ?? !onChange}
-            role={inputSuggestions.length ? "combobox" : undefined}
-            type={
-              type === "email" || type === "number" || type === "tel" ? type : "text"
-            }
             value={value}
-            onBlur={(event) => {
-              onBlur?.();
-              if (suggestionsRef.current?.contains(event.relatedTarget as Node | null))
-                return;
-              setIsSuggestionsOpen(false);
-              setActiveSuggestionIndex(-1);
-            }}
-            onChange={(event) => {
-              const inputType = (event.nativeEvent as InputEvent).inputType;
-              const nextValue = phonePrefix
-                ? formatPhoneInput(event.target.value, phonePrefix)
-                : dateField
-                  ? formatDateInput(event.target.value, inputType)
-                  : event.target.value;
-              onChange?.(nextValue);
-              if (inputSuggestions.length) {
-                setIsSuggestionsOpen(true);
-                setActiveSuggestionIndex(0);
-              }
-            }}
-            onFocus={() => {
-              if (phonePrefix && !value) onChange?.(phonePrefix);
-              if (inputSuggestions.length) {
-                setIsSuggestionsOpen(true);
-                setActiveSuggestionIndex(0);
-              }
-            }}
-            onKeyDown={handleInputKeyboard}
+            onChange={(event) => onChange?.(event.target.value)}
           />
-          {inputSuggestionListOpen ? (
-            <motion.div
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="v19-questionnaire-dropdown"
-              exit={{ opacity: 0, scale: 0.98, y: -4 }}
-              id={suggestionsId}
-              initial={{ opacity: 0, scale: 0.98, y: -4 }}
-              role="listbox"
-              transition={{ duration: 0.15 }}
-            >
-              {visibleInputSuggestions.map((suggestion, index) => (
-                <button
-                  aria-selected={value === suggestion}
-                  className={`v19-questionnaire-dropdown-option ${
-                    value === suggestion ? "is-selected" : ""
-                  } ${activeSuggestionIndex === index ? "is-active" : ""}`}
-                  id={`${suggestionsId}-option-${index}`}
-                  key={suggestion}
-                  role="option"
-                  tabIndex={-1}
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onMouseEnter={() => setActiveSuggestionIndex(index)}
-                  onClick={() => selectSuggestionAt(index)}
-                >
-                  {suggestion}
-                </button>
-              ))}
-              {!visibleInputSuggestions.length ? (
-                <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
-              ) : null}
-            </motion.div>
-          ) : null}
-        </div>
-      )}
-
-      {canonicalState === "needs_review" ? (
-        <div className="v19-questionnaire-review-confirmation">
-          <span>{canonicalReviewSource ?? "Сверьте значение с документом"}</span>
-          <button
-            aria-label={`Подтвердить поле: ${label}`}
-            type="button"
-            onClick={() => fieldContract?.confirmReview(modelFieldId)}
+        ) : (
+          <div
+            className="relative"
+            ref={inputSuggestions.length ? suggestionsRef : undefined}
           >
-            Подтвердить
-          </button>
-        </div>
-      ) : null}
+            <input
+              {...(onChange ? agentInteractionProps("questionnaire.update-field") : {})}
+              aria-describedby={shouldShowError ? fieldErrorId : undefined}
+              aria-invalid={effectiveState === "invalid" ? "true" : undefined}
+              aria-label={label}
+              aria-required={canonicalRequired ? "true" : undefined}
+              aria-activedescendant={activeSuggestionId}
+              aria-autocomplete={inputSuggestions.length ? "list" : undefined}
+              aria-controls={inputSuggestions.length ? suggestionsId : undefined}
+              aria-expanded={
+                inputSuggestions.length ? inputSuggestionListOpen : undefined
+              }
+              autoComplete={
+                inputSuggestions.length ? "off" : inputAutocomplete(label, type)
+              }
+              className={`${baseClasses} ${compact ? "is-compact-address" : ""} ${
+                dateField ? "is-date" : ""
+              } ${stateClasses}`}
+              inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
+              id={fieldId}
+              maxLength={
+                dateField
+                  ? 10
+                  : phonePrefix
+                    ? phonePrefix === "+7"
+                      ? 17
+                      : 15
+                    : undefined
+              }
+              name={modelFieldId}
+              placeholder={
+                visiblePlaceholder ??
+                (dateField
+                  ? "ДД.ММ.ГГГГ"
+                  : phonePrefix
+                    ? `${phonePrefix} ${phonePrefix === "+7" ? "900 000-00-00" : "600 000 000"}`
+                    : emailField
+                      ? "name@example.com"
+                      : undefined)
+              }
+              readOnly={readOnly ?? !onChange}
+              role={inputSuggestions.length ? "combobox" : undefined}
+              type={
+                type === "email" || type === "number" || type === "tel" ? type : "text"
+              }
+              value={value}
+              onBlur={(event) => {
+                if (dateField && onChange) {
+                  const normalizedDate = normalizeDateInput(
+                    event.currentTarget.value,
+                    dateIntent,
+                  );
+                  if (normalizedDate !== value) onChange(normalizedDate);
+                }
+                onBlur?.();
+                if (
+                  suggestionsRef.current?.contains(event.relatedTarget as Node | null)
+                )
+                  return;
+                setIsSuggestionsOpen(false);
+                setActiveSuggestionIndex(-1);
+              }}
+              onChange={(event) => {
+                const inputType = (event.nativeEvent as InputEvent).inputType;
+                const nextValue = phonePrefix
+                  ? formatPhoneInput(event.target.value, phonePrefix)
+                  : dateField
+                    ? formatDateInput(event.target.value, inputType, dateIntent)
+                    : event.target.value;
+                onChange?.(nextValue);
+                if (inputSuggestions.length) {
+                  setIsSuggestionsOpen(true);
+                  setActiveSuggestionIndex(0);
+                }
+              }}
+              onFocus={() => {
+                if (phonePrefix && !value) onChange?.(phonePrefix);
+                if (inputSuggestions.length) {
+                  setIsSuggestionsOpen(true);
+                  setActiveSuggestionIndex(0);
+                }
+              }}
+              onKeyDown={handleInputKeyboard}
+            />
+            {inputSuggestionListOpen ? (
+              <motion.div
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                className="v19-questionnaire-dropdown"
+                exit={{ opacity: 0, scale: 0.98, y: -4 }}
+                id={suggestionsId}
+                initial={{ opacity: 0, scale: 0.98, y: -4 }}
+                role="listbox"
+                transition={{ duration: 0.15 }}
+              >
+                {visibleInputSuggestions.map((suggestion, index) => (
+                  <button
+                    {...agentInteractionProps("questionnaire.update-field")}
+                    aria-selected={value === suggestion}
+                    className={`v19-questionnaire-dropdown-option ${
+                      value === suggestion ? "is-selected" : ""
+                    } ${activeSuggestionIndex === index ? "is-active" : ""}`}
+                    id={`${suggestionsId}-option-${index}`}
+                    key={suggestion}
+                    role="option"
+                    tabIndex={-1}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveSuggestionIndex(index)}
+                    onClick={() => selectSuggestionAt(index)}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+                {!visibleInputSuggestions.length ? (
+                  <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
+                ) : null}
+              </motion.div>
+            ) : null}
+          </div>
+        )}
+
+        {canonicalState === "needs_review" ? (
+          <div className="v19-questionnaire-review-confirmation">
+            <span>{canonicalReviewSource ?? "Сверьте значение с документом"}</span>
+            <button
+              {...agentInteractionProps("questionnaire.update-field")}
+              aria-label={`Подтвердить поле: ${label}`}
+              type="button"
+              onClick={() => fieldContract?.confirmReview(modelFieldId)}
+            >
+              Подтвердить
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {addressSuggestion && onChange ? (
@@ -1205,11 +1306,10 @@ function FormField({
             <strong>{addressSuggestion}</strong>
           </span>
           <button
+            {...agentInteractionProps("questionnaire.update-field")}
             aria-label={`Подставить адрес: ${label}`}
             type="button"
-            onClick={() =>
-              (onAddressSuggestionAccept ?? onChange)(addressSuggestion)
-            }
+            onClick={() => (onAddressSuggestionAccept ?? onChange)(addressSuggestion)}
           >
             Подставить
           </button>
@@ -1316,8 +1416,7 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
         }),
       ) ||
       submission.issues.some(
-        (issue) =>
-          issue.status === "open" && issue.target.applicantId === applicant.id,
+        (issue) => issue.status === "open" && issue.target.applicantId === applicant.id,
       );
 
     const questionnaireName = [formData.firstName, formData.surname]
@@ -1330,8 +1429,10 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
     const displayName = hasActualName
       ? sourceName
           .toLocaleLowerCase("ru-RU")
-          .replace(/(^|[\s'-])(\p{L})/gu, (_, separator: string, letter: string) =>
-            `${separator}${letter.toLocaleUpperCase("ru-RU")}`,
+          .replace(
+            /(^|[\s'-])(\p{L})/gu,
+            (_, separator: string, letter: string) =>
+              `${separator}${letter.toLocaleUpperCase("ru-RU")}`,
           )
       : `Заявитель ${index + 1}`;
 
@@ -1476,6 +1577,7 @@ type RequiredQuestionnaireFileType = PassportReviewMediaType;
 type QuestionnaireBlockerTarget = {
   applicantId: string;
   comment?: string;
+  deferredUntilSectionExit?: boolean;
   fileId?: string;
   fileType?: RequiredQuestionnaireFileType;
   label?: string;
@@ -1483,10 +1585,7 @@ type QuestionnaireBlockerTarget = {
   sectionId: SectionId;
 };
 
-const requiredQuestionnaireFileLabels: Record<
-  RequiredQuestionnaireFileType,
-  string
-> = {
+const requiredQuestionnaireFileLabels: Record<RequiredQuestionnaireFileType, string> = {
   passport_scan: "Загранпаспорт",
   selfie: "Селфи 1",
   selfie_2: "Селфи 2",
@@ -1524,6 +1623,56 @@ function questionnaireUpdateKey(
   update: Pick<QuestionnaireFieldUpdate, "applicantId" | "fieldId" | "sectionId">,
 ) {
   return `${update.applicantId}:${update.sectionId}:${update.fieldId}`;
+}
+
+function questionnaireCommitMutationFingerprint(
+  payload: QuestionnaireCommitPayload,
+) {
+  const fieldUpdates = [...payload.fieldUpdates].sort((left, right) =>
+    questionnaireUpdateKey(left).localeCompare(questionnaireUpdateKey(right)),
+  );
+  const reviewConfirmations = [...payload.reviewConfirmations].sort((left, right) =>
+    `${left.applicantId}:${left.sectionId}:${left.fieldId}`.localeCompare(
+      `${right.applicantId}:${right.sectionId}:${right.fieldId}`,
+    ),
+  );
+
+  return JSON.stringify({
+    fieldUpdates,
+    focusedUpdate: payload.focusedUpdate,
+    reviewConfirmations,
+    travelEnd: payload.travelEnd,
+    travelStart: payload.travelStart,
+  });
+}
+
+function mergeQuestionnaireCommitPayloads(
+  current: QuestionnaireCommitPayload,
+  incoming: QuestionnaireCommitPayload,
+): QuestionnaireCommitPayload {
+  const fieldUpdates = new Map<string, QuestionnaireFieldUpdate>();
+  for (const update of [...current.fieldUpdates, ...incoming.fieldUpdates]) {
+    fieldUpdates.set(questionnaireUpdateKey(update), update);
+  }
+  const mergedFieldUpdates = [...fieldUpdates.values()];
+
+  return {
+    fieldUpdates: mergedFieldUpdates,
+    focusedUpdate: incoming.focusedUpdate ?? current.focusedUpdate,
+    reviewConfirmations: mergedFieldUpdates
+      .filter((update) => update.reviewState === "confirmed")
+      .map((update) => ({
+        applicantId: update.applicantId,
+        fieldId: update.fieldId,
+        sectionId: update.sectionId,
+      })),
+    saveIntent: strongestQuestionnaireSaveIntent(
+      current.saveIntent,
+      incoming.saveIntent,
+    ),
+    travelEnd: incoming.travelEnd,
+    travelStart: incoming.travelStart,
+  };
 }
 
 function applyQuestionnaireUpdates(
@@ -1662,10 +1811,7 @@ function fileIsReadyForQuestionnaire(file: Submission["files"][number] | undefin
   if (!file) return false;
   if (file.status === "missing" || file.status === "needs_replacement") return false;
   if (file.uploadStatus && file.uploadStatus !== "uploaded") return false;
-  return ![
-    "replace_required",
-    "poor_quality",
-  ].includes(file.reviewStatus ?? "");
+  return !["replace_required", "poor_quality"].includes(file.reviewStatus ?? "");
 }
 
 function riskLabel(count: number) {
@@ -1703,7 +1849,7 @@ function questionnaireFormDataFromSubmission(
     appointmentCity: submissionFieldValue(
       applicant,
       "appointment-city",
-      submission.city || fallback.appointmentCity,
+      fallback.appointmentCity,
     ),
     appointmentNote: submissionFieldValue(
       applicant,
@@ -2202,8 +2348,8 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
     sectionId: "hotel",
   },
   { fieldId: "company-phone", formKey: "companyPhone", sectionId: "hotel" },
-  { fieldId: "cost-covered-by", formKey: "paymentSponsor", sectionId: "payment" },
-  { fieldId: "means-of-support", formKey: "paymentType", sectionId: "payment" },
+  { fieldId: "cost-covered-by", formKey: "paymentSponsor", sectionId: "trip" },
+  { fieldId: "means-of-support", formKey: "paymentType", sectionId: "trip" },
   {
     fieldId: "sponsor-in-host-fields",
     formKey: "sponsorInHostFields",
@@ -2215,6 +2361,49 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "form-filler-contact", formKey: "formFillerContact", sectionId: "filler" },
   { fieldId: "form-filler-phone", formKey: "formFillerPhone", sectionId: "filler" },
 ];
+
+// Exported only for the exhaustive blueprint/binding/rendering contract test.
+// eslint-disable-next-line react-refresh/only-export-components
+export const questionnaireUiNonRenderedFieldDispositions = {
+  "birth-citizenship": "derived from country of birth",
+  "category": "service-managed appointment value",
+  "cost-covered-by": "service-managed payment value",
+  "final-entry-permit": "reserved optional visa field",
+  "final-entry-permit-issued-by": "reserved optional visa field",
+  "final-entry-permit-valid-from": "reserved optional visa field",
+  "final-entry-permit-valid-to": "reserved optional visa field",
+  "home-address": "derived from structured address fields",
+  "means-of-support": "service-managed payment value",
+  "nationality": "derived from passport issue country",
+  "visa-type": "service-managed appointment value",
+} as const;
+
+// Legacy form keys stay bound for previously saved submissions, but they are
+// not part of the current seven-section questionnaire blueprint.
+// eslint-disable-next-line react-refresh/only-export-components
+export const questionnaireUiLegacyBindingDispositions = {
+  "appointment-note": { reason: "legacy appointment note", sectionId: "appointment" },
+  "desired-date-3": { reason: "legacy third appointment date", sectionId: "appointment" },
+  "occupation-specify": { reason: "legacy free-form occupation", sectionId: "employment" },
+  "eu-relationship": { reason: "legacy EU-relative relation", sectionId: "euRelative" },
+  "eu-relative-details": { reason: "legacy EU-relative details", sectionId: "euRelative" },
+  "form-filler-contact": { reason: "legacy form-filler contact", sectionId: "filler" },
+  "form-filler-name": { reason: "legacy form-filler name", sectionId: "filler" },
+  "form-filler-phone": { reason: "legacy form-filler phone", sectionId: "filler" },
+  "other-sponsor": { reason: "legacy sponsor identity", sectionId: "payment" },
+  "sponsor-in-host-fields": { reason: "legacy sponsor host data", sectionId: "payment" },
+  "sponsor-means": { reason: "legacy sponsor means", sectionId: "payment" },
+  "national-id": { reason: "legacy national identifier", sectionId: "personal" },
+  "other-citizenship": { reason: "legacy additional citizenship", sectionId: "personal" },
+} as const;
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function questionnaireUiBindingContract() {
+  return questionnaireFieldBindings.map(({ fieldId, sectionId }) => ({
+    fieldId,
+    sectionId,
+  }));
+}
 
 const questionnaireFieldAliasesByFormKey: Partial<
   Record<keyof QuestionnaireFormData, readonly string[]>
@@ -2235,7 +2424,9 @@ function questionnaireFieldBindingForApplicant(
     ...(questionnaireFieldAliasesByFormKey[formKey] ?? []),
   ];
   for (const section of applicant.sections) {
-    const field = section.fields.find((candidate) => candidateIds.includes(candidate.id));
+    const field = section.fields.find((candidate) =>
+      candidateIds.includes(candidate.id),
+    );
     if (field) {
       return {
         ...binding,
@@ -2306,10 +2497,7 @@ function conditionalFieldClearsFor(
       applicant?.role,
       formData,
     ).flatMap((fieldKey) => {
-      const binding = questionnaireFieldBindingForApplicant(
-        applicant,
-        fieldKey,
-      );
+      const binding = questionnaireFieldBindingForApplicant(applicant, fieldKey);
       if (!binding || !questionnaireField(applicant, binding.fieldId)) return [];
 
       return [
@@ -2478,6 +2666,18 @@ function sectionIdMatches(sectionId: string, canonicalId: string) {
   return sectionId === canonicalId || sectionId.endsWith(`-${canonicalId}`);
 }
 
+function departedSectionKey(applicantId: string, sectionId: SectionId) {
+  return `${encodeURIComponent(applicantId)}::${sectionId}`;
+}
+
+function departedSectionContext(key: string) {
+  const [encodedApplicantId, sectionId] = key.split("::", 2);
+  return {
+    applicantId: decodeURIComponent(encodedApplicantId ?? ""),
+    sectionId: sectionId as SectionId,
+  };
+}
+
 export function FigmaQuestionnaireScreen({
   initialFocus,
   onBack,
@@ -2507,8 +2707,9 @@ export function FigmaQuestionnaireScreen({
   const applicants = useMemo(() => applicantTabs(draftSubmission), [draftSubmission]);
   const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
   const initialFocusApplicant =
-    draftSubmission.applicants.find((applicant) => applicant.id === initialApplicantId) ??
-    draftSubmission.applicants[0];
+    draftSubmission.applicants.find(
+      (applicant) => applicant.id === initialApplicantId,
+    ) ?? draftSubmission.applicants[0];
   const initialFieldTarget = focusableFieldFor(
     initialFocus?.field,
     initialFocusApplicant,
@@ -2520,8 +2721,8 @@ export function FigmaQuestionnaireScreen({
   const [showGuardianDetails, setShowGuardianDetails] = useState(false);
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [familyCopyMessage, setFamilyCopyMessage] = useState<string>();
-  const [familyCopyPreview, setFamilyCopyPreview] =
-    useState<FamilyCopyPreview>();
+  const [familyCopyPreview, setFamilyCopyPreview] = useState<FamilyCopyPreview>();
+  const [departedSectionKeys, setDepartedSectionKeys] = useState<string[]>([]);
   const [revealRequiredErrors, setRevealRequiredErrors] = useState(false);
   const [issueResolutionError, setIssueResolutionError] = useState("");
   const [pendingIssueResolutionId, setPendingIssueResolutionId] = useState<
@@ -2531,12 +2732,17 @@ export function FigmaQuestionnaireScreen({
   const [saveStatus, setSaveStatus] = useState<
     "dirty" | "error" | "idle" | "saved" | "saving"
   >("idle");
+  const [navigationPending, setNavigationPending] = useState(false);
   const familyCopyStatusId = useId();
   const prefersReducedMotion = useReducedMotion();
   const autosaveRevisionRef = useRef(0);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const completionInFlightRef = useRef(false);
   const issueResolutionPendingRef = useRef(false);
+  const issueResolutionPromiseRef = useRef<Promise<boolean> | undefined>(
+    undefined,
+  );
+  const navigationPendingRef = useRef(false);
   const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const queuedSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const onSaveDraftRef = useRef(onSaveDraft);
@@ -2554,6 +2760,7 @@ export function FigmaQuestionnaireScreen({
     [activeApplicant, draftSubmission],
   );
   const [formData, setFormData] = useState<QuestionnaireFormData>(() => sourceFormData);
+  const formDataRef = useRef<QuestionnaireFormData>(sourceFormData);
   const screenRef = useRef<HTMLDivElement>(null);
   const workPanelRef = useRef<HTMLDivElement>(null);
   const activeApplicantTabRef = useRef<HTMLButtonElement>(null);
@@ -2565,9 +2772,14 @@ export function FigmaQuestionnaireScreen({
     setPendingFieldUpdates({});
     setFamilyCopyMessage(undefined);
     setFamilyCopyPreview(undefined);
+    setDepartedSectionKeys([]);
     setRevealRequiredErrors(false);
     setSaveStatus("idle");
     setSaveMessage("Изменений нет");
+    navigationPendingRef.current = false;
+    issueResolutionPendingRef.current = false;
+    issueResolutionPromiseRef.current = undefined;
+    setNavigationPending(false);
   }, [submission.id]);
 
   useEffect(() => {
@@ -2589,6 +2801,7 @@ export function FigmaQuestionnaireScreen({
   }, [activeApplicant, activeSection]);
 
   useEffect(() => {
+    formDataRef.current = sourceFormData;
     setFormData(sourceFormData);
   }, [sourceFormData]);
 
@@ -2636,8 +2849,8 @@ export function FigmaQuestionnaireScreen({
         return;
       }
       const fieldLabel = initialFieldTarget
-        ? (questionnaireField(activeApplicantModel, initialFieldTarget.fieldId)?.label ??
-          initialFieldTarget.labels[0])
+        ? (questionnaireField(activeApplicantModel, initialFieldTarget.fieldId)
+            ?.label ?? initialFieldTarget.labels[0])
         : undefined;
       const focusedFile = screenRef.current?.querySelector<HTMLElement>(
         '[data-file-focused="true"]',
@@ -2650,7 +2863,9 @@ export function FigmaQuestionnaireScreen({
       }
       if (fieldLabel) {
         const element =
-          screenRef.current?.querySelector<HTMLElement>('[data-field-focused="true"]') ??
+          screenRef.current?.querySelector<HTMLElement>(
+            '[data-field-focused="true"]',
+          ) ??
           screenRef.current?.querySelector<HTMLElement>(
             `[data-field-label="${CSS.escape(fieldLabel)}"]`,
           );
@@ -2872,13 +3087,12 @@ export function FigmaQuestionnaireScreen({
     const passportRisks = passportGateIssues(draftSubmission);
     const completionDecision = agentQuestionnaireCompletionDecision(draftSubmission);
     const requiredFileSlots = draftSubmission.applicants.flatMap((applicant) =>
-      requiredPassportReviewMediaTypesForApplicant(
-        draftSubmission,
-        applicant.id,
-      ).map((type) => ({
-        applicantId: applicant.id,
-        type,
-      })),
+      requiredPassportReviewMediaTypesForApplicant(draftSubmission, applicant.id).map(
+        (type) => ({
+          applicantId: applicant.id,
+          type,
+        }),
+      ),
     );
     const readyFiles = requiredFileSlots.filter((slot) =>
       fileIsReadyForQuestionnaire(
@@ -2908,51 +3122,50 @@ export function FigmaQuestionnaireScreen({
 
   const sections = useMemo(
     () =>
-      sectionDefinitions
-        .map(({ canonicalId, ...definition }) => {
-          const sourceSection = activeApplicantModel?.sections.find((section) =>
-            sectionIdMatches(section.id, canonicalId),
-          );
+      sectionDefinitions.map(({ canonicalId, ...definition }) => {
+        const sourceSection = activeApplicantModel?.sections.find((section) =>
+          sectionIdMatches(section.id, canonicalId),
+        );
 
-          if (!sourceSection) return definition;
+        if (!sourceSection) return definition;
 
-          const activeFormData = questionnaireFormDataFromSubmission(
-            draftSubmission,
-            activeApplicantModel.id,
-          ) as unknown as BlsFormData;
-          const requiredFields = sourceSection.fields.filter((field) =>
-            isBlsQuestionnaireFieldRequired({
-              applicantRole: activeApplicantModel.role,
-              field,
-              formData: activeFormData,
-            }),
-          );
-          const total = requiredFields.length;
-          const completed = requiredFields.filter((field) =>
-            isBlsQuestionnaireFieldReady({
-              applicantRole: activeApplicantModel.role,
-              field,
-              formData: activeFormData,
-            }),
-          ).length;
-          const hasRisk = sourceSection.fields.some((field) =>
-            isBlsQuestionnaireFieldBlockingIssue({
-              applicantRole: activeApplicantModel.role,
-              field,
-              formData: activeFormData,
-            }),
-          );
+        const activeFormData = questionnaireFormDataFromSubmission(
+          draftSubmission,
+          activeApplicantModel.id,
+        ) as unknown as BlsFormData;
+        const requiredFields = sourceSection.fields.filter((field) =>
+          isBlsQuestionnaireFieldRequired({
+            applicantRole: activeApplicantModel.role,
+            field,
+            formData: activeFormData,
+          }),
+        );
+        const total = requiredFields.length;
+        const completed = requiredFields.filter((field) =>
+          isBlsQuestionnaireFieldReady({
+            applicantRole: activeApplicantModel.role,
+            field,
+            formData: activeFormData,
+          }),
+        ).length;
+        const hasRisk = sourceSection.fields.some((field) =>
+          isBlsQuestionnaireFieldBlockingIssue({
+            applicantRole: activeApplicantModel.role,
+            field,
+            formData: activeFormData,
+          }),
+        );
 
-          return {
-            ...definition,
-            meta: `${completed} из ${total}`,
-            status: hasRisk
-              ? "issue"
-              : total > 0 && completed === total
-                ? "complete"
-                : "pending",
-          } satisfies SectionTab & { id: SectionId };
-        }),
+        return {
+          ...definition,
+          meta: `${completed} из ${total}`,
+          status: hasRisk
+            ? "issue"
+            : total > 0 && completed === total
+              ? "complete"
+              : "pending",
+        } satisfies SectionTab & { id: SectionId };
+      }),
     [activeApplicantModel, draftSubmission],
   );
   const activeApplicantContext = applicants.find(
@@ -2967,6 +3180,12 @@ export function FigmaQuestionnaireScreen({
     (applicant) => applicant.id === activeApplicant,
   );
   const nextApplicant = applicants[activeApplicantIndex + 1];
+  let continueActionLabel = "Готово — сохранить и выйти";
+  if (nextSection) {
+    continueActionLabel = `Далее: ${nextSection.title}`;
+  } else if (nextApplicant) {
+    continueActionLabel = `Далее: ${nextApplicant.name}`;
+  }
   const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
   const showPurposeDetails = formData.stayPurpose === "OTHER";
   const showPreviousBiometricsDetails = formData.previousBiometrics === "Да";
@@ -2977,9 +3196,10 @@ export function FigmaQuestionnaireScreen({
   const guardianDetailsAreVisible =
     applicantIsMinor && (Boolean(formData.guardianInfo.trim()) || showGuardianDetails);
   const showCompanyInviteFields = isBlsQuestionnaireInvitingCompanySelected(formData);
-  const primaryApplicant =
-    draftSubmission.applicants.find((applicant) => applicant.role === "main") ??
-    draftSubmission.applicants[0];
+  const primaryApplicantId = primaryApplicantIdForPassportReview(draftSubmission);
+  const primaryApplicant = draftSubmission.applicants.find(
+    (applicant) => applicant.id === primaryApplicantId,
+  );
   const familyCopyRecipients = primaryApplicant
     ? draftSubmission.applicants.filter(
         (applicant) => applicant.id !== primaryApplicant.id,
@@ -3048,12 +3268,25 @@ export function FigmaQuestionnaireScreen({
   }
 
   function updateField(key: keyof QuestionnaireFormData, value: string) {
-    if (!isEditable || completionInFlightRef.current) return;
+    if (
+      !isEditable ||
+      completionInFlightRef.current ||
+      navigationPendingRef.current ||
+      issueResolutionPendingRef.current
+    ) {
+      return;
+    }
+    if (familyCopyPreview) {
+      setFamilyCopyPreview(undefined);
+      setFamilyCopyMessage(
+        "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
+      );
+    }
     const dependentKeys = dependentFieldKeysFor(
       key,
       value,
       activeApplicantModel?.role,
-      formData,
+      formDataRef.current,
     );
     const buildUpdate = (fieldKey: keyof QuestionnaireFormData, fieldValue: string) => {
       const binding = questionnaireFieldBindingForApplicant(
@@ -3082,27 +3315,28 @@ export function FigmaQuestionnaireScreen({
       };
     };
 
-    const updates = [
+    const directUpdates = [
       buildUpdate(key, value),
       ...dependentKeys.map((dependentKey) => buildUpdate(dependentKey, "")),
     ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
-    setFormData((current) => {
-      const next = { ...current, [key]: value };
-      for (const dependentKey of dependentKeys) next[dependentKey] = "";
-      return next;
-    });
+    const updates = directUpdates;
+    const nextFormData = { ...formDataRef.current, [key]: value };
+    for (const dependentKey of dependentKeys) nextFormData[dependentKey] = "";
+    formDataRef.current = nextFormData;
+    setFormData(nextFormData);
 
     if (updates.length) {
       const next = { ...pendingFieldUpdatesRef.current };
-      for (const { binding, update } of updates) {
+      for (const { update } of updates) {
         const updateKey = questionnaireUpdateKey(update);
         const baseApplicant = submission.applicants.find(
           (applicant) => applicant.id === update.applicantId,
         );
+        const baseField = questionnaireField(baseApplicant, update.fieldId);
         const confirmsPendingReview =
           update.reviewState === "confirmed" &&
-          questionnaireField(baseApplicant, update.fieldId)?.reviewState === "needs_review";
-        if (update.value === baseFormData[binding.formKey] && !confirmsPendingReview) {
+          baseField?.reviewState === "needs_review";
+        if (update.value === (baseField?.value ?? "") && !confirmsPendingReview) {
           delete next[updateKey];
         } else {
           next[updateKey] = update;
@@ -3112,28 +3346,27 @@ export function FigmaQuestionnaireScreen({
       updateDirtyState(next);
     }
 
-    for (const { binding, update } of updates) {
-      if (update.value !== baseFormData[binding.formKey]) onFieldChange?.(update);
+    for (const { update } of updates) {
+      const baseApplicant = submission.applicants.find(
+        (applicant) => applicant.id === update.applicantId,
+      );
+      if (
+        update.value !==
+        (questionnaireField(baseApplicant, update.fieldId)?.value ?? "")
+      ) {
+        onFieldChange?.(update);
+      }
     }
   }
 
-  function updateTravelDate(
-    key: "travelStart" | "travelEnd",
-    value: string,
-  ) {
+  function updateTravelDate(key: "travelStart" | "travelEnd", value: string) {
     const travelStart = key === "travelStart" ? value : formData.travelStart;
     const travelEnd = key === "travelEnd" ? value : formData.travelEnd;
     updateField(key, value);
-    updateField(
-      "stayDuration",
-      blsStayDurationFromDates(travelStart, travelEnd),
-    );
+    updateField("stayDuration", blsStayDurationFromDates(travelStart, travelEnd));
   }
 
-  function updateStructuredAddressField(
-    key: StructuredHomeAddressKey,
-    value: string,
-  ) {
+  function updateStructuredAddressField(key: StructuredHomeAddressKey, value: string) {
     const nextAddressData = { ...formData, [key]: value };
     updateField(key, value);
     updateField("contactAddress", composeQuestionnaireHomeAddress(nextAddressData));
@@ -3163,10 +3396,7 @@ export function FigmaQuestionnaireScreen({
   }
 
   function applyPassportValidityYears(validityYears: 5 | 10) {
-    const expiry = passportExpiryFromIssueDate(
-      formData.passportIssued,
-      validityYears,
-    );
+    const expiry = passportExpiryFromIssueDate(formData.passportIssued, validityYears);
     if (expiry) updateField("passportExpiry", expiry);
   }
 
@@ -3196,10 +3426,7 @@ export function FigmaQuestionnaireScreen({
   }
 
   function normalizeBirthPlaceField() {
-    const normalized = historicalBirthPlaceForDate(
-      formData.birthPlace,
-      formData.dob,
-    );
+    const normalized = historicalBirthPlaceForDate(formData.birthPlace, formData.dob);
     if (normalized !== formData.birthPlace) updateField("birthPlace", normalized);
   }
 
@@ -3207,6 +3434,8 @@ export function FigmaQuestionnaireScreen({
     if (
       !isEditable ||
       completionInFlightRef.current ||
+      navigationPendingRef.current ||
+      issueResolutionPendingRef.current ||
       !primaryApplicant ||
       !canCopyFamilyWide ||
       activeApplicant !== primaryApplicant.id ||
@@ -3257,13 +3486,21 @@ export function FigmaQuestionnaireScreen({
       return;
     }
 
-    const affectedApplicants = new Set(updates.map((update) => update.applicantId)).size;
+    const affectedApplicants = new Set(updates.map((update) => update.applicantId))
+      .size;
     setFamilyCopyPreview({ affectedApplicants, updates });
     setFamilyCopyMessage(undefined);
   }
 
   function confirmFamilyCopy() {
-    if (!familyCopyPreview || !isEditable) return;
+    if (
+      !familyCopyPreview ||
+      !isEditable ||
+      navigationPendingRef.current ||
+      issueResolutionPendingRef.current
+    ) {
+      return;
+    }
     const next = { ...pendingFieldUpdatesRef.current };
     for (const update of familyCopyPreview.updates) {
       next[questionnaireUpdateKey(update)] = update;
@@ -3278,6 +3515,7 @@ export function FigmaQuestionnaireScreen({
   }
 
   function cancelFamilyCopy() {
+    if (navigationPendingRef.current || issueResolutionPendingRef.current) return;
     setFamilyCopyPreview(undefined);
     setFamilyCopyMessage("Копирование отменено; данные не изменены.");
   }
@@ -3324,7 +3562,14 @@ export function FigmaQuestionnaireScreen({
   }
 
   function confirmFieldReview(fieldId: string) {
-    if (!isEditable || completionInFlightRef.current) return;
+    if (
+      !isEditable ||
+      completionInFlightRef.current ||
+      navigationPendingRef.current ||
+      issueResolutionPendingRef.current
+    ) {
+      return;
+    }
     const field = questionnaireField(activeApplicantModel, fieldId);
     const binding = questionnaireFieldBindings.find((item) => item.fieldId === fieldId);
     if (!field || !binding || field.reviewState !== "needs_review") return;
@@ -3416,74 +3661,69 @@ export function FigmaQuestionnaireScreen({
 
   const completionPayload = useCallback(
     (saveIntent: QuestionnaireSaveIntent): QuestionnaireCommitPayload => {
-    const conditionalClears = conditionalFieldClearsFor(
-      activeApplicantModel,
-      activeApplicant,
-      formData,
-    );
-    const updates = new Map<string, QuestionnaireFieldUpdate>();
-    for (const update of [
-      ...Object.values(pendingFieldUpdates),
-      ...conditionalClears,
-    ]) {
-      updates.set(questionnaireUpdateKey(update), update);
-    }
-
-    const automaticStayDuration = blsStayDurationFromDates(
-      formData.travelStart,
-      formData.travelEnd,
-    );
-    const stayDurationBinding = questionnaireFieldBindingForApplicant(
-      activeApplicantModel,
-      "stayDuration",
-    );
-    const stayDurationField = stayDurationBinding
-      ? questionnaireField(activeApplicantModel, stayDurationBinding.fieldId)
-      : undefined;
-    if (
-      stayDurationBinding &&
-      stayDurationField &&
-      stayDurationField.value !== automaticStayDuration
-    ) {
-      const automaticStayDurationUpdate = {
-        applicantId: activeApplicant,
-        error: validationMessageForQuestionnaireField(
-          stayDurationField,
-          automaticStayDuration,
-        ),
-        fieldId: stayDurationBinding.fieldId,
-        sectionId: stayDurationBinding.sectionId,
-        value: automaticStayDuration,
-      } satisfies QuestionnaireFieldUpdate;
-      updates.set(
-        questionnaireUpdateKey(automaticStayDurationUpdate),
-        automaticStayDurationUpdate,
+      const currentFormData = formDataRef.current;
+      const conditionalClears = conditionalFieldClearsFor(
+        activeApplicantModel,
+        activeApplicant,
+        currentFormData,
       );
-    }
+      const updates = new Map<string, QuestionnaireFieldUpdate>();
+      for (const update of [
+        ...Object.values(pendingFieldUpdatesRef.current),
+        ...conditionalClears,
+      ]) {
+        updates.set(questionnaireUpdateKey(update), update);
+      }
 
-    const fieldUpdates = [...updates.values()];
-    return {
-      fieldUpdates,
-      focusedUpdate: focusedUpdatePayload,
-      reviewConfirmations: fieldUpdates
-        .filter((update) => update.reviewState === "confirmed")
-        .map((update) => ({
-          applicantId: update.applicantId,
-          fieldId: update.fieldId,
-          sectionId: update.sectionId,
-        })),
-      saveIntent,
-      travelEnd: formData.travelEnd,
-      travelStart: formData.travelStart,
-    };
+      const automaticStayDuration = blsStayDurationFromDates(
+        currentFormData.travelStart,
+        currentFormData.travelEnd,
+      );
+      const stayDurationBinding = questionnaireFieldBindingForApplicant(
+        activeApplicantModel,
+        "stayDuration",
+      );
+      const stayDurationField = stayDurationBinding
+        ? questionnaireField(activeApplicantModel, stayDurationBinding.fieldId)
+        : undefined;
+      if (
+        stayDurationBinding &&
+        stayDurationField &&
+        stayDurationField.value !== automaticStayDuration
+      ) {
+        const automaticStayDurationUpdate = {
+          applicantId: activeApplicant,
+          error: validationMessageForQuestionnaireField(
+            stayDurationField,
+            automaticStayDuration,
+          ),
+          fieldId: stayDurationBinding.fieldId,
+          sectionId: stayDurationBinding.sectionId,
+          value: automaticStayDuration,
+        } satisfies QuestionnaireFieldUpdate;
+        updates.set(
+          questionnaireUpdateKey(automaticStayDurationUpdate),
+          automaticStayDurationUpdate,
+        );
+      }
+
+      const fieldUpdates = [...updates.values()];
+      return {
+        fieldUpdates,
+        focusedUpdate: focusedUpdatePayload,
+        reviewConfirmations: fieldUpdates
+          .filter((update) => update.reviewState === "confirmed")
+          .map((update) => ({
+            applicantId: update.applicantId,
+            fieldId: update.fieldId,
+            sectionId: update.sectionId,
+          })),
+        saveIntent,
+        travelEnd: currentFormData.travelEnd,
+        travelStart: currentFormData.travelStart,
+      };
     },
-    [
-      activeApplicant,
-      activeApplicantModel,
-      focusedUpdatePayload,
-      formData,
-      pendingFieldUpdates,
-    ],
+    [activeApplicant, activeApplicantModel, focusedUpdatePayload],
   );
 
   const searchMatches = useMemo(() => {
@@ -3550,15 +3790,20 @@ export function FigmaQuestionnaireScreen({
       new Promise<void>((resolve, reject) => {
         const waiter = { reject, resolve } satisfies QuestionnaireSaveWaiter;
         const inFlight = inFlightSaveRef.current;
-        if (inFlight?.revision === revision) {
+        const queued = queuedSaveRef.current;
+        if (
+          !queued &&
+          inFlight?.revision === revision &&
+          questionnaireCommitMutationFingerprint(inFlight.payload) ===
+            questionnaireCommitMutationFingerprint(payload)
+        ) {
           inFlight.waiters.push(waiter);
           return;
         }
 
-        const queued = queuedSaveRef.current;
         if (queued) {
           queuedSaveRef.current = {
-            payload,
+            payload: mergeQuestionnaireCommitPayloads(queued.payload, payload),
             revision,
             waiters: [...queued.waiters, waiter],
           };
@@ -3578,7 +3823,14 @@ export function FigmaQuestionnaireScreen({
 
   useEffect(() => {
     clearAutosaveTimer();
-    if (!pendingUpdates.length || !canSaveDraft) return;
+    if (
+      !pendingUpdates.length ||
+      !canSaveDraft ||
+      navigationPending ||
+      pendingIssueResolutionId !== null
+    ) {
+      return;
+    }
     const revision = autosaveRevisionRef.current;
     const payload = completionPayload("autosave");
     const timer = window.setTimeout(() => {
@@ -3597,7 +3849,9 @@ export function FigmaQuestionnaireScreen({
     canSaveDraft,
     completionPayload,
     enqueueDraftSave,
+    navigationPending,
     pendingUpdates.length,
+    pendingIssueResolutionId,
   ]);
 
   useEffect(() => {
@@ -3616,6 +3870,7 @@ export function FigmaQuestionnaireScreen({
     if (!pendingUpdates.length || !onSaveDraft) return;
 
     const flushPendingWork = () => {
+      if (navigationPendingRef.current || issueResolutionPendingRef.current) return;
       clearAutosaveTimer();
       const revision = autosaveRevisionRef.current;
       void enqueueDraftSave(completionPayload("autosave"), revision).catch(
@@ -3673,9 +3928,12 @@ export function FigmaQuestionnaireScreen({
   }
 
   function focusQuestionnaireTarget(target: QuestionnaireBlockerTarget) {
-    setActiveApplicant(target.applicantId);
+    navigateQuestionnaire(
+      target.applicantId,
+      target.sectionId === "files" ? activeSection : target.sectionId,
+      { preserveRequiredErrors: true },
+    );
     if (target.sectionId === "files") return;
-    setActiveSection(target.sectionId);
     focusFieldLabel(target.label);
   }
 
@@ -3687,25 +3945,32 @@ export function FigmaQuestionnaireScreen({
 
   function firstQuestionnaireBlockerTarget(
     applicantId?: string,
+    sectionId?: SectionId,
   ): QuestionnaireBlockerTarget | undefined {
     const scopedApplicants = applicantId
       ? draftSubmission.applicants.filter((applicant) => applicant.id === applicantId)
       : draftSubmission.applicants;
-    const fieldSlots = scopedApplicants.flatMap((applicant) => {
-      const applicantFormData = questionnaireFormDataFromSubmission(
-        draftSubmission,
-        applicant.id,
-      ) as unknown as BlsFormData;
+    const fieldSlots = scopedApplicants
+      .flatMap((applicant) => {
+        const applicantFormData = questionnaireFormDataFromSubmission(
+          draftSubmission,
+          applicant.id,
+        ) as unknown as BlsFormData;
 
-      return applicant.sections.flatMap((section) =>
-        section.fields.map((field) => ({
-          applicant,
-          field,
-          formData: applicantFormData,
-          section,
-        })),
+        return applicant.sections.flatMap((section) =>
+          section.fields.map((field) => ({
+            applicant,
+            field,
+            formData: applicantFormData,
+            section,
+          })),
+        );
+      })
+      .filter(
+        (slot) =>
+          !sectionId ||
+          sectionIdForQuestionnaireField(slot.section.id, slot.field.id) === sectionId,
       );
-    });
     const validationRisk = fieldSlots.find((slot) =>
       isBlsQuestionnaireFieldBlockingIssue({
         applicantRole: slot.applicant.role,
@@ -3713,9 +3978,18 @@ export function FigmaQuestionnaireScreen({
         formData: slot.formData,
       }),
     );
+    let deferredRequiredTarget: QuestionnaireBlockerTarget | undefined;
     if (validationRisk) {
-      return {
+      const requiredButEmpty =
+        !validationRisk.field.value.trim() &&
+        isBlsQuestionnaireFieldRequired({
+          applicantRole: validationRisk.applicant.role,
+          field: validationRisk.field,
+          formData: validationRisk.formData,
+        });
+      const target = {
         applicantId: validationRisk.applicant.id,
+        deferredUntilSectionExit: requiredButEmpty,
         label: validationRisk.field.label,
         reason:
           validateBlsQuestionnaireField({
@@ -3727,7 +4001,9 @@ export function FigmaQuestionnaireScreen({
           validationRisk.section.id,
           validationRisk.field.id,
         ),
-      };
+      } satisfies QuestionnaireBlockerTarget;
+      if (!requiredButEmpty) return target;
+      deferredRequiredTarget = target;
     }
 
     const requiredEmpty = fieldSlots.find(
@@ -3743,12 +4019,13 @@ export function FigmaQuestionnaireScreen({
           formData: slot.formData,
         }),
     );
-    if (requiredEmpty) {
+    if (requiredEmpty && !deferredRequiredTarget) {
       const quickOptions = requiredEmpty.field.options?.filter((option) =>
         option.trim(),
       );
-      return {
+      deferredRequiredTarget = {
         applicantId: requiredEmpty.applicant.id,
+        deferredUntilSectionExit: true,
         label: requiredEmpty.field.label,
         reason:
           quickOptions && quickOptions.length >= 2 && quickOptions.length <= 3
@@ -3760,6 +4037,8 @@ export function FigmaQuestionnaireScreen({
         ),
       };
     }
+
+    if (sectionId) return deferredRequiredTarget;
 
     for (const applicant of scopedApplicants) {
       const requiredFileTypes = questionnaireVisibleFileTypes(
@@ -3820,7 +4099,7 @@ export function FigmaQuestionnaireScreen({
         ).includes(candidateFileType)
       );
     });
-    if (!issue?.target.applicantId) return undefined;
+    if (!issue?.target.applicantId) return deferredRequiredTarget;
 
     const issueFileType = requiredQuestionnaireFileTypeForIssue(issue);
     if (issueFileType) {
@@ -3884,10 +4163,33 @@ export function FigmaQuestionnaireScreen({
     } satisfies QuestionnaireBlockerTarget;
   }
 
+  function rememberDepartedSection() {
+    const key = departedSectionKey(activeApplicant, activeSection);
+    const hasBlocker = Boolean(
+      firstQuestionnaireBlockerTarget(activeApplicant, activeSection),
+    );
+    setDepartedSectionKeys((current) => {
+      if (hasBlocker) return current.includes(key) ? current : [...current, key];
+      return current.filter((item) => item !== key);
+    });
+  }
+
+  function navigateQuestionnaire(
+    applicantId: string,
+    sectionId: SectionId,
+    { preserveRequiredErrors = false } = {},
+  ) {
+    if (navigationPendingRef.current || issueResolutionPendingRef.current) return;
+    if (applicantId === activeApplicant && sectionId === activeSection) return;
+    rememberDepartedSection();
+    if (!preserveRequiredErrors) setRevealRequiredErrors(false);
+    setActiveApplicant(applicantId);
+    setActiveSection(sectionId);
+  }
+
   function continueSectionFlow() {
     if (nextSection) {
-      setRevealRequiredErrors(false);
-      setActiveSection(nextSection.id);
+      navigateQuestionnaire(activeApplicant, nextSection.id);
       window.setTimeout(() => {
         const firstField = workPanelRef.current?.querySelector<HTMLElement>(
           "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
@@ -3905,9 +4207,7 @@ export function FigmaQuestionnaireScreen({
       const firstSection = sections[0];
       if (!firstSection) return;
 
-      setRevealRequiredErrors(false);
-      setActiveApplicant(nextApplicant.id);
-      setActiveSection(firstSection.id);
+      navigateQuestionnaire(nextApplicant.id, firstSection.id);
       window.setTimeout(() => {
         const firstField = workPanelRef.current?.querySelector<HTMLElement>(
           "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
@@ -3925,7 +4225,7 @@ export function FigmaQuestionnaireScreen({
   }
 
   function focusFirstBlocker() {
-    const target = firstQuestionnaireBlockerTarget();
+    const target = mobileBlockerTarget ?? firstQuestionnaireBlockerTarget();
     if (!target) return;
     setRevealRequiredErrors(true);
     setSaveStatus("idle");
@@ -3961,66 +4261,104 @@ export function FigmaQuestionnaireScreen({
   }
 
   async function saveAndExitFromButton() {
-    if (!isEditable || completionInFlightRef.current) return;
-    await saveDraftFromButton();
-    if (onSaveAndExit) {
-      await onSaveAndExit();
+    if (!isEditable || completionInFlightRef.current || navigationPendingRef.current) {
       return;
     }
-    onBack();
+    navigationPendingRef.current = true;
+    setNavigationPending(true);
+    try {
+      const pendingIssueResolution = issueResolutionPromiseRef.current;
+      if (pendingIssueResolution && !(await pendingIssueResolution)) return;
+      const hasDraftWork =
+        Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
+        Boolean(inFlightSaveRef.current) ||
+        Boolean(queuedSaveRef.current);
+      if (!pendingIssueResolution || hasDraftWork) {
+        await saveDraftFromButton();
+      }
+      if (onSaveAndExit) {
+        await onSaveAndExit();
+        return;
+      }
+      onBack();
+    } catch (error) {
+      setSaveStatus("error");
+      setSaveMessage(
+        error instanceof Error ? error.message : "Не удалось сохранить анкету",
+      );
+      throw error;
+    } finally {
+      navigationPendingRef.current = false;
+      setNavigationPending(false);
+    }
   }
 
-  async function resolveCurrentIssue() {
+  function resolveCurrentIssue(): Promise<boolean> | undefined {
     if (
       !isEditable ||
       !currentSectionIssue ||
       currentSectionIssue.status !== "open" ||
       !onMarkIssueFixed ||
-      issueResolutionPendingRef.current
+      issueResolutionPendingRef.current ||
+      navigationPendingRef.current
     ) {
-      return;
+      return issueResolutionPromiseRef.current;
     }
 
+    const issueId = currentSectionIssue.id;
     issueResolutionPendingRef.current = true;
-    setPendingIssueResolutionId(currentSectionIssue.id);
+    setPendingIssueResolutionId(issueId);
     setIssueResolutionError("");
-    try {
-      await saveDraftFromButton();
-      await onMarkIssueFixed(currentSectionIssue.id);
-      setSaveStatus("saved");
-      setSaveMessage("Исправление отмечено и готово к отправке");
-    } catch (error) {
-      setIssueResolutionError(
-        error instanceof Error
-          ? error.message
-          : "Не удалось отметить замечание исправленным.",
-      );
-    } finally {
-      issueResolutionPendingRef.current = false;
-      setPendingIssueResolutionId(null);
-    }
+    const resolution = (async () => {
+      try {
+        await saveDraftFromButton();
+        await onMarkIssueFixed(issueId);
+        setSaveStatus("saved");
+        setSaveMessage("Исправление отмечено и готово к отправке");
+        return true;
+      } catch (error) {
+        setIssueResolutionError(
+          error instanceof Error
+            ? error.message
+            : "Не удалось отметить замечание исправленным.",
+        );
+        return false;
+      } finally {
+        issueResolutionPendingRef.current = false;
+        issueResolutionPromiseRef.current = undefined;
+        setPendingIssueResolutionId(null);
+      }
+    })();
+    issueResolutionPromiseRef.current = resolution;
+    return resolution;
   }
 
   async function requestBack() {
-    if (completionInFlightRef.current) return;
+    if (completionInFlightRef.current || navigationPendingRef.current) return;
+    navigationPendingRef.current = true;
+    setNavigationPending(true);
     clearAutosaveTimer();
-    const hasDraftWork =
-      Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
-      Boolean(inFlightSaveRef.current) ||
-      Boolean(queuedSaveRef.current);
-    if (hasDraftWork && onSaveDraftRef.current) {
-      const revision = autosaveRevisionRef.current;
-      try {
+    try {
+      const pendingIssueResolution = issueResolutionPromiseRef.current;
+      if (pendingIssueResolution && !(await pendingIssueResolution)) return;
+      const hasDraftWork =
+        Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
+        Boolean(inFlightSaveRef.current) ||
+        Boolean(queuedSaveRef.current);
+      if (hasDraftWork && onSaveDraftRef.current) {
+        const revision = autosaveRevisionRef.current;
         await enqueueDraftSave(completionPayload("navigation"), revision);
-      } catch (error) {
-        setSaveStatus("error");
-        setSaveMessage(
-          error instanceof Error ? error.message : "Не удалось сохранить анкету",
-        );
       }
+      onBack();
+    } catch (error) {
+      setSaveStatus("error");
+      setSaveMessage(
+        error instanceof Error ? error.message : "Не удалось сохранить анкету",
+      );
+    } finally {
+      navigationPendingRef.current = false;
+      setNavigationPending(false);
     }
-
-    onBack();
   }
 
   function renderSectionFields() {
@@ -4033,6 +4371,7 @@ export function FigmaQuestionnaireScreen({
             modelFieldId="appointment-city"
             number="A1"
             options={selectOptions.appointmentCity}
+            placeholder="Выберите город"
             value={formData.appointmentCity}
             onChange={(value) => updateField("appointmentCity", value)}
           />
@@ -4096,7 +4435,10 @@ export function FigmaQuestionnaireScreen({
           <div className="v19-questionnaire-passport-validity-cell">
             <FormField
               excelMap="Cell: C5"
-              errorMessage={fieldErrorMessage("passport-expiry-date", "Действителен до")}
+              errorMessage={fieldErrorMessage(
+                "passport-expiry-date",
+                "Действителен до",
+              )}
               focused={
                 fieldReviewState("passport-expiry-date", "Действителен до") ===
                 "needs_review"
@@ -4104,7 +4446,10 @@ export function FigmaQuestionnaireScreen({
               label="Действителен до"
               modelFieldId="passport-expiry-date"
               number="4"
-              reviewSource={fieldReviewSource("passport-expiry-date", "Действителен до")}
+              reviewSource={fieldReviewSource(
+                "passport-expiry-date",
+                "Действителен до",
+              )}
               state={fieldReviewState("passport-expiry-date", "Действителен до")}
               value={formData.passportExpiry}
               onChange={(value) => updateField("passportExpiry", value)}
@@ -4118,12 +4463,15 @@ export function FigmaQuestionnaireScreen({
                   );
                   return (
                     <button
+                      {...agentInteractionProps("questionnaire.update-field")}
                       aria-pressed={formData.passportExpiry === expiry}
                       className="v19-questionnaire-draft-button v19-questionnaire-passport-validity-option"
                       disabled={!isEditable}
                       key={validityYears}
                       type="button"
-                      onClick={() => applyPassportValidityYears(validityYears as 5 | 10)}
+                      onClick={() =>
+                        applyPassportValidityYears(validityYears as 5 | 10)
+                      }
                     >
                       {validityYears} лет
                     </button>
@@ -4425,10 +4773,7 @@ export function FigmaQuestionnaireScreen({
             number={nextTripQuestionNumber()}
             readOnly
             type="number"
-            value={blsStayDurationFromDates(
-              formData.travelStart,
-              formData.travelEnd,
-            )}
+            value={blsStayDurationFromDates(formData.travelStart, formData.travelEnd)}
           />
           <FormField
             excelMap="Анкета: previous-biometrics"
@@ -4592,6 +4937,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: previous-surname"
+            fullWidth
             label="Предыдущие фамилии"
             modelFieldId="previous-surname"
             number="1.1"
@@ -4674,6 +5020,7 @@ export function FigmaQuestionnaireScreen({
             />
           ) : applicantIsMinor ? (
             <button
+              {...agentInteractionProps("questionnaire.navigate")}
               className="v19-questionnaire-optional-reveal"
               type="button"
               onClick={() => setShowGuardianDetails(true)}
@@ -4695,7 +5042,9 @@ export function FigmaQuestionnaireScreen({
       Boolean(
         familyCopyPreview?.updates.some(
           (update) =>
-            update.applicantId === activeApplicant && update.fieldId === fieldId,
+            update.fieldId === fieldId &&
+            (update.applicantId === activeApplicant ||
+              activeApplicant === primaryApplicant?.id),
         ),
       ),
     errorMessage: fieldErrorMessage,
@@ -4707,9 +5056,16 @@ export function FigmaQuestionnaireScreen({
     reviewSource: fieldReviewSource,
     state: fieldReviewState,
   };
-  const mobileBlockerTarget = readinessStats.canSubmit
-    ? undefined
-    : firstQuestionnaireBlockerTarget();
+  const immediateBlockerTarget = firstQuestionnaireBlockerTarget();
+  const departedSectionBlockerTarget = departedSectionKeys
+    .map(departedSectionContext)
+    .map(({ applicantId, sectionId }) =>
+      firstQuestionnaireBlockerTarget(applicantId, sectionId),
+    )
+    .find((target): target is QuestionnaireBlockerTarget => target !== undefined);
+  const mobileBlockerTarget = immediateBlockerTarget?.deferredUntilSectionExit
+    ? departedSectionBlockerTarget
+    : immediateBlockerTarget;
   const mobileBlockerLabel =
     mobileBlockerTarget?.label ??
     readinessStats.completionReason ??
@@ -4719,12 +5075,14 @@ export function FigmaQuestionnaireScreen({
   const showWorkToolbar =
     showFamilyCopyControl ||
     Boolean(currentSectionIssue) ||
-    (isEditable && !readinessStats.canSubmit);
+    (isEditable && Boolean(mobileBlockerTarget));
+  const questionnaireInteractionPending =
+    navigationPending || pendingIssueResolutionId !== null;
 
   return (
     <motion.div
       animate={{ opacity: 1 }}
-      className={`vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell questionnaire-screen${
+      className={`vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell questionnaire-screen codex-polish-v1${
         isEditable ? "" : " is-read-only"
       }`}
       data-submission-id={draftSubmission.id}
@@ -4735,8 +5093,10 @@ export function FigmaQuestionnaireScreen({
     >
       <header className="v19-questionnaire-screen-header">
         <button
+          {...agentInteractionProps("questionnaire.back")}
           aria-label="Назад"
           className="v19-questionnaire-back-button"
+          disabled={navigationPending}
           type="button"
           onClick={() => void requestBack()}
         >
@@ -4744,15 +5104,28 @@ export function FigmaQuestionnaireScreen({
         </button>
 
         <div className="v19-questionnaire-title-wrap">
-          <h1
-            aria-label={`Анкета: ${draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}`}
-            className="v19-questionnaire-title"
-          >
-            <span className="v19-questionnaire-title-mobile">Анкета</span>
-            <span className="v19-questionnaire-title-desktop">
-              Анкета: {draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}
-            </span>
+          <h1 className="sr-only">
+            Анкета: {draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}
           </h1>
+          <label className="v19-questionnaire-tourist-switcher">
+            <span className="sr-only">Выбрать туриста</span>
+            <select
+              {...agentInteractionProps("questionnaire.navigate")}
+              aria-label="Выбрать туриста"
+              disabled={applicants.length < 2 || questionnaireInteractionPending}
+              value={activeApplicant}
+              onChange={(event) =>
+                navigateQuestionnaire(event.target.value, activeSection)
+              }
+            >
+              {applicants.map((applicant) => (
+                <option key={applicant.id} value={applicant.id}>
+                  {applicantDropdownLabel(applicant)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown aria-hidden="true" />
+          </label>
         </div>
 
         <div className="v19-questionnaire-header-actions">
@@ -4761,9 +5134,11 @@ export function FigmaQuestionnaireScreen({
           </span>
           {isEditable ? (
             <button
+              {...agentInteractionProps("questionnaire.save-exit")}
               aria-label={saveStatus === "saving" ? "Сохраняем" : "Сохранить и выйти"}
+              aria-busy={navigationPending || saveStatus === "saving"}
               className="v19-questionnaire-complete-button v19-questionnaire-save-button is-ready"
-              disabled={saveStatus === "saving"}
+              disabled={navigationPending || saveStatus === "saving"}
               type="button"
               onClick={() => void saveAndExitFromButton().catch(() => undefined)}
             >
@@ -4781,8 +5156,12 @@ export function FigmaQuestionnaireScreen({
               data-testid="questionnaire-read-only-status"
               role="status"
             >
-              <span className="hidden sm:inline">{questionnaireStatus.readOnly.label}</span>
-              <span className="sm:hidden">{questionnaireStatus.readOnly.mobileLabel}</span>
+              <span className="hidden sm:inline">
+                {questionnaireStatus.readOnly.label}
+              </span>
+              <span className="sm:hidden">
+                {questionnaireStatus.readOnly.mobileLabel}
+              </span>
             </span>
           ) : null}
         </div>
@@ -4816,6 +5195,16 @@ export function FigmaQuestionnaireScreen({
 
       <div className="v19-questionnaire-scroll">
         <div className="v19-questionnaire-scroll-frame max-w-[var(--v19b-size-1240)] mx-auto flex flex-col h-full min-h-0 gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
+          {saveStatus === "error" ? (
+            <div
+              className="v19-questionnaire-save-error"
+              data-testid="questionnaire-save-error"
+              role="alert"
+            >
+              <AlertCircle aria-hidden="true" />
+              <span>{saveMessage}</span>
+            </div>
+          ) : null}
           {questionnaireStatus.readOnly ? (
             <section
               className="v19-questionnaire-next-blocker"
@@ -4851,6 +5240,7 @@ export function FigmaQuestionnaireScreen({
                     key={applicant.id}
                   >
                     <button
+                      {...agentInteractionProps("questionnaire.navigate")}
                       aria-label={`${applicant.name}: ${applicant.completed} из ${applicant.total}, ${statusLabel}`}
                       aria-pressed={activeApplicant === applicant.id}
                       className={`v19-questionnaire-applicant-tab status-${applicant.status} ${
@@ -4861,8 +5251,9 @@ export function FigmaQuestionnaireScreen({
                           ? activeApplicantTabRef
                           : undefined
                       }
+                      disabled={questionnaireInteractionPending}
                       type="button"
-                      onClick={() => setActiveApplicant(applicant.id)}
+                      onClick={() => navigateQuestionnaire(applicant.id, activeSection)}
                     >
                       <span className="v19-questionnaire-applicant-index">
                         {applicant.index}
@@ -4879,7 +5270,7 @@ export function FigmaQuestionnaireScreen({
                         ) : applicant.status === "issue" ? (
                           <AlertCircle className="w-3.5 h-3.5" />
                         ) : (
-                          `${applicant.completed}/${applicant.total}`
+                          `${applicant.completed} из ${applicant.total}`
                         )}
                       </QuestionnaireProgressBadge>
                     </button>
@@ -4903,8 +5294,9 @@ export function FigmaQuestionnaireScreen({
             className="v19-questionnaire-section-list v19-questionnaire-section-list--pinned"
             role="group"
           >
-            {sections.map((section) => (
+            {sections.map((section, sectionIndex) => (
               <button
+                {...agentInteractionProps("questionnaire.navigate")}
                 aria-label={
                   section.status === "issue"
                     ? `${section.title}: есть замечание`
@@ -4918,30 +5310,18 @@ export function FigmaQuestionnaireScreen({
                 ref={
                   activeSection === section.id ? activePinnedSectionTabRef : undefined
                 }
+                disabled={questionnaireInteractionPending}
                 type="button"
-                onClick={() => setActiveSection(section.id)}
+                onClick={() => navigateQuestionnaire(activeApplicant, section.id)}
               >
+                <span aria-hidden="true" className="v19-questionnaire-section-number">
+                  {sectionIndex + 1}
+                </span>
                 <div className="v19-questionnaire-section-copy flex-1 min-w-0">
                   <div className="v19-questionnaire-section-title text-[var(--v19b-size-12)] font-semibold truncate">
                     {section.title}
                   </div>
-                  {section.status !== "issue" ? (
-                    <div className="v19-questionnaire-section-meta text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
-                      {section.meta}
-                    </div>
-                  ) : null}
                 </div>
-                <QuestionnaireProgressBadge
-                  className={`v19-questionnaire-progress-badge status-${section.status}`}
-                >
-                  {section.status === "complete" ? (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  ) : section.status === "issue" ? (
-                    <AlertCircle className="w-3.5 h-3.5" />
-                  ) : (
-                    "-"
-                  )}
-                </QuestionnaireProgressBadge>
               </button>
             ))}
           </div>
@@ -4957,6 +5337,7 @@ export function FigmaQuestionnaireScreen({
 
               <div className="flex flex-col gap-2">
                 <V19SearchField
+                  {...agentInteractionProps("questionnaire.search")}
                   id="questionnaire-field-search"
                   label="Поиск поля анкеты"
                   name="questionnaire-field-search"
@@ -4969,15 +5350,13 @@ export function FigmaQuestionnaireScreen({
                     focusFirstSearchMatch();
                   }}
                 />
-                {fieldSearchQuery.trim() || saveStatus === "error" ? (
+                {fieldSearchQuery.trim() ? (
                   <div
                     aria-live="polite"
                     className="v19-questionnaire-sidebar-status"
                     role="status"
                   >
-                    {fieldSearchQuery.trim()
-                      ? `${searchMatches.length} совпадений`
-                      : saveMessage}
+                    {searchMatches.length} совпадений
                   </div>
                 ) : null}
               </div>
@@ -4987,8 +5366,9 @@ export function FigmaQuestionnaireScreen({
                 className="v19-questionnaire-section-list v19-questionnaire-section-list--sidebar"
                 role="group"
               >
-                {sections.map((section) => (
+                {sections.map((section, sectionIndex) => (
                   <button
+                    {...agentInteractionProps("questionnaire.navigate")}
                     aria-label={
                       section.status === "issue"
                         ? `${section.title}: есть замечание`
@@ -5004,31 +5384,21 @@ export function FigmaQuestionnaireScreen({
                         ? activeSidebarSectionTabRef
                         : undefined
                     }
+                    disabled={questionnaireInteractionPending}
                     type="button"
-                    onClick={() => setActiveSection(section.id)}
+                    onClick={() => navigateQuestionnaire(activeApplicant, section.id)}
                   >
+                    <span
+                      aria-hidden="true"
+                      className="v19-questionnaire-section-number"
+                    >
+                      {sectionIndex + 1}
+                    </span>
                     <div className="v19-questionnaire-section-copy flex-1 min-w-0">
                       <div className="v19-questionnaire-section-title text-[var(--v19b-size-12)] font-semibold truncate">
                         {section.title}
                       </div>
-                      {section.status !== "issue" ? (
-                        <div className="v19-questionnaire-section-meta text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
-                          {section.meta}
-                        </div>
-                      ) : null}
                     </div>
-
-                    <QuestionnaireProgressBadge
-                      className={`v19-questionnaire-progress-badge status-${section.status}`}
-                    >
-                      {section.status === "complete" ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      ) : section.status === "issue" ? (
-                        <AlertCircle className="w-3.5 h-3.5" />
-                      ) : (
-                        "-"
-                      )}
-                    </QuestionnaireProgressBadge>
                   </button>
                 ))}
               </div>
@@ -5042,13 +5412,15 @@ export function FigmaQuestionnaireScreen({
                   }`}
                 >
                   <div className="v19-questionnaire-work-toolbar-notice">
-                    {isEditable && !readinessStats.canSubmit ? (
+                    {isEditable && mobileBlockerTarget ? (
                       <button
+                        {...agentInteractionProps("questionnaire.navigate")}
                         aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
                           mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
                         }`}
                         className="v19-questionnaire-next-blocker"
                         data-testid="questionnaire-next-blocker"
+                        disabled={questionnaireInteractionPending}
                         type="button"
                         onClick={focusFirstBlocker}
                       >
@@ -5113,11 +5485,12 @@ export function FigmaQuestionnaireScreen({
                         onMarkIssueFixed ? (
                           <div className="flex shrink-0 flex-col items-end gap-2">
                             <button
+                              {...agentInteractionProps("questionnaire.mark-fixed")}
                               aria-busy={
                                 pendingIssueResolutionId === currentSectionIssue.id
                               }
                               className="v19-questionnaire-draft-button"
-                              disabled={pendingIssueResolutionId !== null}
+                              disabled={questionnaireInteractionPending}
                               type="button"
                               onClick={() => void resolveCurrentIssue()}
                             >
@@ -5142,13 +5515,18 @@ export function FigmaQuestionnaireScreen({
                   {showFamilyCopyControl ? (
                     <div className="v19-questionnaire-work-toolbar-copy">
                       <button
+                        {...agentInteractionProps("questionnaire.preview-family-copy")}
                         aria-describedby={
                           !familyCopyPreview && familyCopyMessage
                             ? familyCopyStatusId
                             : undefined
                         }
                         className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
-                        disabled={!isEditable || Boolean(familyCopyPreview)}
+                        disabled={
+                          !isEditable ||
+                          Boolean(familyCopyPreview) ||
+                          questionnaireInteractionPending
+                        }
                         type="button"
                         onClick={copySharedDataToFamily}
                       >
@@ -5161,8 +5539,7 @@ export function FigmaQuestionnaireScreen({
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {showFamilyCopyControl &&
-                (familyCopyPreview || familyCopyMessage) ? (
+                {showFamilyCopyControl && (familyCopyPreview || familyCopyMessage) ? (
                   <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
                     {familyCopyPreview ? (
                       <>
@@ -5171,18 +5548,23 @@ export function FigmaQuestionnaireScreen({
                           className="v19-questionnaire-family-copy-status"
                           role="status"
                         >
-                          Будет скопировано заполненных пользователем полей: {familyCopyPreview.updates.length}
+                          Будет скопировано заполненных пользователем полей:{" "}
+                          {familyCopyPreview.updates.length}
                           {" · "}членов семьи: {familyCopyPreview.affectedApplicants}.
                         </p>
                         <button
+                          {...agentInteractionProps("questionnaire.copy-family")}
                           className="v19-questionnaire-complete-button v19-questionnaire-family-copy-confirm is-ready"
+                          disabled={questionnaireInteractionPending}
                           type="button"
                           onClick={confirmFamilyCopy}
                         >
                           Подтвердить копирование
                         </button>
                         <button
+                          {...agentInteractionProps("questionnaire.cancel-family-copy")}
                           className="v19-questionnaire-draft-button"
+                          disabled={questionnaireInteractionPending}
                           type="button"
                           onClick={cancelFamilyCopy}
                         >
@@ -5221,13 +5603,15 @@ export function FigmaQuestionnaireScreen({
                     ) : null}
                   </div>
                 ) : null}
-                <QuestionnaireFieldUiContext.Provider value={questionnaireFieldUiContract}>
+                <QuestionnaireFieldUiContext.Provider
+                  value={questionnaireFieldUiContract}
+                >
                   <fieldset
                     aria-label={
                       isEditable ? "Поля анкеты" : "Поля анкеты — только просмотр"
                     }
                     className="v19-questionnaire-fields-grid"
-                    disabled={!isEditable}
+                    disabled={!isEditable || questionnaireInteractionPending}
                   >
                     {renderSectionFields()}
                   </fieldset>
@@ -5235,17 +5619,27 @@ export function FigmaQuestionnaireScreen({
               </div>
 
               {isEditable ? (
-                <button
-                  className="v19-questionnaire-next-button v19-questionnaire-next-button--simple"
-                  type="button"
-                  onClick={continueSectionFlow}
-                >
-                  {nextSection
-                    ? `Далее: ${nextSection.title}`
-                    : nextApplicant
-                      ? `Далее: ${nextApplicant.name}`
-                      : "Готово — сохранить и выйти"}
-                </button>
+                <div className="v19-questionnaire-next-action-bar">
+                  <button
+                    {...agentInteractionProps(
+                      nextSection || nextApplicant
+                        ? "questionnaire.navigate"
+                        : "questionnaire.save-exit",
+                    )}
+                    aria-label={continueActionLabel}
+                    aria-busy={
+                      !nextSection && !nextApplicant ? navigationPending : undefined
+                    }
+                    className="v19-questionnaire-next-button v19-questionnaire-next-button--simple"
+                    disabled={
+                      questionnaireInteractionPending
+                    }
+                    type="button"
+                    onClick={continueSectionFlow}
+                  >
+                    {continueActionLabel}
+                  </button>
+                </div>
               ) : null}
             </div>
           </QuestionnaireWorkspaceShell>

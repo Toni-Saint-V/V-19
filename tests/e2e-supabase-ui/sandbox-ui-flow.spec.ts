@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import {
   assertNoOverflow,
@@ -17,6 +18,11 @@ import {
   fillQuestionnaire,
 } from "./ui-helpers";
 import { captureUiEvidence, uiEvidenceRunId } from "./ui-evidence";
+import {
+  auditAgentInteractionEvidence,
+  type AgentInteractionEvidenceRecord,
+} from "../../src/modules/submissions/agentInteractionEvidence";
+import { V19_AGENT_INTERACTION_CONTRACTS } from "../../src/modules/submissions/agentInteractionContract";
 
 let runId = "";
 let singleSubmissionId = "";
@@ -69,7 +75,7 @@ async function createAndSubmitSubmission(
     /\/rest\/v1\/rpc\/save_submission_draft$/,
   );
   await expect(createDialog).toHaveCount(0);
-  const submissionId = await fillQuestionnaire(
+  const questionnaireSaveEvidence = await fillQuestionnaire(
     page,
     `${runId}-${type}`,
     async ({
@@ -160,6 +166,8 @@ async function createAndSubmitSubmission(
       });
     },
   );
+  const { saveNetwork, saveWriteCount, submissionId, surnameReadbacks } =
+    questionnaireSaveEvidence;
   await captureUiEvidence({
     description: `${typeLabel}: анкета сохранена как черновик через UI после обхода всех разделов.`,
     page,
@@ -168,8 +176,91 @@ async function createAndSubmitSubmission(
     submissionId,
     testInfo,
   });
+  await page.reload();
   await clickWorkspaceButton(page, /Мои подачи/);
   await openSubmissionById(page, submissionId);
+  await openDrawerTab(page, /Анкета/);
+  await drawer(page).getByRole("button", { name: "Открыть анкету" }).click();
+  const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
+  await expect(questionnaire).toBeVisible();
+  const canonicalSurnameReadbacks: Array<{ applicantIndex: number; value: string }> =
+    [];
+  const applicantTabs = questionnaire.locator(".v19-questionnaire-applicant-tab");
+  for (const baseline of surnameReadbacks) {
+    await applicantTabs.nth(baseline.applicantIndex).click();
+    await questionnaire
+      .locator(".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab")
+      .filter({ hasText: "Личные данные" })
+      .click();
+    const value = await questionnaire
+      .locator('[data-model-field-id="surname"] input')
+      .inputValue();
+    expect(value).toBe(baseline.value);
+    canonicalSurnameReadbacks.push({
+      applicantIndex: baseline.applicantIndex,
+      value,
+    });
+  }
+  const interactionEvidence: AgentInteractionEvidenceRecord = {
+    assertions: {
+      "network-readback": {
+        detail: `${saveNetwork.method} ${saveNetwork.path} -> ${saveNetwork.status}; writes=${saveWriteCount}`,
+        passed: true,
+      },
+      "reload-readback": {
+        detail: `surname readback after canonical reopen: ${canonicalSurnameReadbacks.length} applicants`,
+        passed: true,
+      },
+    },
+    expectedEffect: {
+      description: "Persist current progress exactly once and return to My submissions.",
+      detail: "Save & Exit closed the questionnaire and the canonical reopen matched exact surname values.",
+      passed: true,
+    },
+    execution: {
+      artifactIds: [`playwright:${runId}:${type}:questionnaire.save-exit`],
+      capturedAt: new Date().toISOString(),
+      runId,
+    },
+    fixture: {
+      id: `${runId}-${type}`,
+      submissionStatuses: ["draft"],
+    },
+    id: `playwright:${runId}:${type}:questionnaire.save-exit`,
+    interactionId: "questionnaire.save-exit",
+    mutation: {
+      canonicalReloadReadback: {
+        assertion: "Exact surname values matched after network-backed reload.",
+        fields: surnameReadbacks.map(
+          ({ applicantIndex }) => `applicant-${applicantIndex + 1}:surname`,
+        ),
+      },
+      networkResponse: saveNetwork,
+      unintendedWrites: {
+        assertion: "Every applicant retained the exact pre-save personal surname.",
+        changedTargets: ["questionnaire_answers"],
+        checkedTargets:
+          V19_AGENT_INTERACTION_CONTRACTS["questionnaire.save-exit"].writeScope
+            .requiredCheckedTargets,
+      },
+    },
+    network: {
+      responses: [{ ...saveNetwork, write: true }],
+    },
+    role: "agent",
+    surface: "questionnaire",
+    testCase: testInfo.titlePath.join(" > "),
+  };
+  expect(
+    auditAgentInteractionEvidence(
+      [interactionEvidence],
+      ["questionnaire.save-exit"],
+      { statusFixtureCoverage: "provided-records" },
+    ),
+  ).toEqual([]);
+  await questionnaire.getByRole("button", { name: "Назад" }).click();
+  await expect(questionnaire).toHaveCount(0);
+
   await openDrawerTab(page, /Файлы/);
   await uploadVisibleRequiredFiles(page, assets);
   await captureUiEvidence({
@@ -181,12 +272,10 @@ async function createAndSubmitSubmission(
     testInfo,
   });
   await openDrawerTab(page, /Анкета/);
-  await drawer(page).getByRole("button", { name: "Открыть анкету" }).click();
-  const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
-  await expect(questionnaire).toBeVisible();
-  await expect(
-    questionnaire.getByRole("button", { name: /Отправить на проверку|Отправить/ }),
-  ).toBeEnabled({ timeout: 30_000 });
+  const submitForReview = drawer(page)
+    .getByRole("button", { name: /Отправить на проверку|Отправить/ })
+    .first();
+  await expect(submitForReview).toBeEnabled({ timeout: 30_000 });
   await captureUiEvidence({
     description: `${typeLabel}: после анкеты и файлов primary CTA «Отправить на проверку» доступен.`,
     page,
@@ -196,10 +285,8 @@ async function createAndSubmitSubmission(
     testInfo,
   });
   await clickAndWaitForSupabaseWrite(page, () =>
-    questionnaire.getByRole("button", { name: /Отправить на проверку|Отправить/ }).click(),
+    submitForReview.click(),
   );
-  await questionnaire.getByRole("button", { name: "Назад" }).click();
-  await expect(questionnaire).toHaveCount(0);
   await clickWorkspaceButton(page, /Мои подачи/);
   await openSubmissionById(page, submissionId);
 
@@ -1550,9 +1637,22 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     await expect(received).toBeVisible();
     await expect(received).toContainText("PDF-список");
     await expect(received).toContainText("Готовая анкета");
+    const downloadButton = received
+      .getByRole("button", { name: /^Скачать /u })
+      .first();
+    const downloadPromise = page.waitForEvent("download");
+    await downloadButton.click();
+    const returnedPdf = await downloadPromise;
+    await expect(returnedPdf.failure()).resolves.toBeNull();
+    expect(returnedPdf.suggestedFilename()).toMatch(/\.pdf$/iu);
+    const returnedPdfPath = await returnedPdf.path();
+    expect(returnedPdfPath).not.toBeNull();
+    const returnedPdfBytes = await readFile(returnedPdfPath!);
+    expect(returnedPdfBytes.byteLength).toBeGreaterThan(5);
+    expect(returnedPdfBytes.subarray(0, 5).toString("utf8")).toBe("%PDF-");
     await captureUiEvidence({
       description:
-        "Агент открыл полученный пакет и видит оба типа документа: PDF-список и готовую анкету.",
+        "Агент открыл пакет, скачал synthetic PDF и подтвердил непустую PDF-сигнатуру.",
       page,
       role: "agent",
       step: "08-agent-return-package-received",
