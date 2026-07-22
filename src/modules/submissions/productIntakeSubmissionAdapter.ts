@@ -434,7 +434,6 @@ function sectionsFromDraftApplicant(
     }
   }
 
-  setValue('appointment-city', draft.city);
   setValue('visa-type', 'Шенгенская');
   setValue('category', 'Normal');
   setValue('birth-country', applicant.fields.birthCountry || birthCountryFromBirthDate(applicant.fields.birthDate) || 'Russian Federation');

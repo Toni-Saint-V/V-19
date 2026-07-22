@@ -117,6 +117,10 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
   expect(serviceWorkerResponse.headers()["content-type"]).toContain("javascript");
   const serviceWorkerSource = await serviceWorkerResponse.text();
   expect(serviceWorkerSource).toContain('const CACHE_PREFIX = "visaflow-app-shell-"');
-  expect(serviceWorkerSource).not.toContain("supabase.co");
-  expect(serviceWorkerSource).not.toContain("/api/");
+  expect(serviceWorkerSource).toContain('url.hostname.endsWith(".supabase.co")');
+  expect(serviceWorkerSource).toContain('"/api"');
+  expect(serviceWorkerSource).toContain('"/documents"');
+  expect(serviceWorkerSource).toContain("caches.open(CACHE_NAME)");
+  expect(serviceWorkerSource).toContain('{ cache: "reload" }');
+  expect(serviceWorkerSource).not.toContain("self.skipWaiting");
 });

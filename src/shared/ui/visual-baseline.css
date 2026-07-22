@@ -34389,13 +34389,19 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
 .v19-admin-passport-field-remark {
   min-height: var(--v19b-size-40) !important;
-  border-color: var(--v19b-color-border-selected) !important;
-  background: var(--v19b-color-control) !important;
-  color: var(--v19b-color-text-strong) !important;
+  border-color: color-mix(in srgb, var(--v19b-dot-warning) 48%, transparent) !important;
+  background: var(--v19b-dot-halo-warning) !important;
+  color: var(--v19b-dot-warning) !important;
 }
 
 .v19-admin-passport-field-remark:hover {
-  background: var(--v19b-color-control-hover) !important;
+  border-color: var(--v19b-dot-warning) !important;
+  background: color-mix(
+    in srgb,
+    var(--v19b-dot-warning) 22%,
+    var(--v19b-color-control)
+  ) !important;
+  color: var(--v19b-color-text-strong) !important;
 }
 
 .v19-admin-passport-completion {
@@ -40857,10 +40863,7 @@ section[data-testid="agent-actions-screen"]
 }
 
 @media (min-width: 768px) and (max-width: 1024px) {
-  #root
-    .ops-shell.has-unified-side-menu
-    > .workspace
-    > .topbar.v19-page-header {
+  #root .ops-shell.has-unified-side-menu > .workspace > .topbar.v19-page-header {
     grid-template-columns:
       var(--v19-control-row-height)
       minmax(var(--v19b-size-0), var(--v19b-grid-fr))
@@ -40893,10 +40896,7 @@ section[data-testid="agent-actions-screen"]
 }
 
 @media (min-width: 1025px) {
-  #root
-    .ops-shell.has-unified-side-menu
-    > .workspace
-    > .topbar.v19-page-header {
+  #root .ops-shell.has-unified-side-menu > .workspace > .topbar.v19-page-header {
     grid-template-columns:
       minmax(var(--v19b-size-0), var(--v19b-grid-fr))
       auto !important;
@@ -41367,9 +41367,7 @@ section[data-testid="agent-actions-screen"]
     padding-inline: var(--v19b-size-0) !important;
   }
 
-  #root
-    .ops-shell.has-unified-side-menu
-    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+  #root .ops-shell.has-unified-side-menu > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
     inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
     width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
     min-width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
@@ -41925,40 +41923,6 @@ section[data-testid="agent-actions-screen"]
   }
 }
 
-/* Fullscreen workspaces keep the canonical My Actions rail on desktop. */
-@media (min-width: 1024px) {
-  #root
-    .has-persistent-operational-sidebar
-    > :is(
-      .v19-preupload-screen,
-      .v19-questionnaire-screen-shell,
-      .v19-review-workspace
-    ) {
-    left: var(--v19b-size-224) !important;
-    width: auto !important;
-  }
-}
-
-/* Final owner: the shared design-system drawer beats legacy sidebar layers. */
-@media (max-width: 767px) {
-  #root
-    .ops-shell.has-unified-side-menu
-    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
-    inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
-    width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
-    min-width: min(var(--v19b-size-288), calc(100vw - var(--v19b-size-16))) !important;
-    max-width: calc(100vw - var(--v19b-size-16)) !important;
-    height: auto !important;
-    min-height: var(--v19b-size-0) !important;
-    max-height: none !important;
-    padding: var(--v19b-size-8) !important;
-    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
-    border-radius: var(--v19b-radius-panel) !important;
-    background: var(--v19b-color-panel) !important;
-    box-shadow: var(--v19b-shadow-panel) !important;
-  }
-}
-
 /* Historical My Actions menu is the single visual owner for every role. */
 .ops-shell.has-unified-side-menu .v19-ds-side-menu-subtitle {
   display: block !important;
@@ -41980,10 +41944,8 @@ section[data-testid="agent-actions-screen"]
   color: var(--v19b-color-text) !important;
 }
 
-@media (max-width: 767px) {
-  #root
-    .ops-shell.has-unified-side-menu
-    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+@media (max-width: 1023px) {
+  #root .ops-shell.has-unified-side-menu > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
     inset: var(--v19b-size-0) auto var(--v19b-size-0) var(--v19b-size-0) !important;
     width: var(--v19b-size-280) !important;
     min-width: var(--v19b-size-280) !important;
@@ -42023,7 +41985,9 @@ section[data-testid="agent-actions-screen"]
 
   #root .v19-ds-side-menu .ops-nav-item {
     min-height: var(--v19b-size-44) !important;
+    border-color: transparent !important;
     border-radius: var(--v19b-size-8) !important;
+    background: transparent !important;
   }
 
   #root .v19-ds-side-menu .ops-sidebar-footer {
@@ -42046,29 +42010,79 @@ section[data-testid="agent-actions-screen"]
 }
 
 /* Exact visual contract reused from yesterday's My Actions menu (ac4fc3ff). */
-.ops-shell.has-unified-side-menu .v19-ds-side-menu .v19-agent-sidebar-nav-item.is-active {
-  border-color: var(--vf-accent-border) !important;
-  background: var(--vf-accent-soft) !important;
+.ops-shell.has-unified-side-menu
+  .v19-ds-side-menu
+  .v19-agent-sidebar-nav-item.is-active {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-primary-soft-10) !important;
   box-shadow: inset var(--v19b-size-3) var(--v19b-size-0) var(--v19b-size-0)
     var(--vf-info) !important;
 }
 
 .ops-shell.has-unified-side-menu .v19-ds-side-menu .v19-agent-sidebar-profile {
-  border-color: var(--vf-accent-border) !important;
-  background: var(--vf-accent-soft) !important;
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-primary-soft-10) !important;
 }
 
 .ops-shell.has-unified-side-menu .v19-ds-side-menu .v19-agent-sidebar-avatar {
-  border-color: var(--vf-accent-border) !important;
-  background: var(--vf-accent) !important;
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-primary) !important;
   box-shadow: var(--v19b-shadow-primary-soft) !important;
 }
 
-@media (max-width: 767px) {
-  #root
-    .ops-shell.has-unified-side-menu
-    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+.ops-shell.has-unified-side-menu .v19-ds-side-menu .ops-sidebar-search:disabled {
+  color: var(--v19b-color-text-muted) !important;
+  cursor: default !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 1023px) {
+  #root .ops-shell.has-unified-side-menu > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
     background: var(--v19b-color-page) !important;
     box-shadow: 0 0 var(--v19b-size-40) rgb(0 0 0 / 0.5) !important;
   }
+}
+
+@media (min-width: 1024px) {
+  #root .ops-shell.has-unified-side-menu {
+    --v19-unified-sidebar-width: var(--v19b-size-288);
+    grid-template-columns: var(--v19b-size-288) minmax(
+        var(--v19b-size-0),
+        var(--v19b-grid-fr)
+      ) !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+    width: var(--v19b-size-288) !important;
+    min-width: var(--v19b-size-288) !important;
+    max-width: var(--v19b-size-288) !important;
+  }
+}
+
+#root .ops-shell.has-unified-side-menu .v19-ds-side-menu .ops-brand-copy {
+  display: flex !important;
+  flex-direction: column !important;
+  align-content: center !important;
+  gap: var(--v19b-size-0) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .v19-ds-side-menu .ops-nav {
+  gap: var(--v19b-size-2) !important;
+}
+
+#root .ops-shell.has-unified-side-menu .v19-ds-side-menu .ops-nav-item {
+  min-height: var(--v19b-size-44) !important;
+  border-color: transparent !important;
+  border-radius: var(--v19b-size-8) !important;
+  background: transparent !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  .v19-ds-side-menu
+  .v19-agent-sidebar-nav-item.is-active {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-primary-soft-10) !important;
+  box-shadow: inset var(--v19b-size-3) var(--v19b-size-0) var(--v19b-size-0)
+    var(--vf-info) !important;
 }

@@ -17,7 +17,6 @@ import {
   ChevronDown,
   Copy,
   Plus,
-  Save,
   UsersRound,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
@@ -236,6 +235,39 @@ type QuestionnaireReviewConfirmation = {
 };
 
 type QuestionnaireSaveIntent = "autosave" | "completion" | "manual" | "navigation";
+
+type QuestionnaireSaveFailureAction = "back" | "draft" | "save-exit";
+
+function questionnaireSaveFailureMessage(error: unknown) {
+  const rawMessage = error instanceof Error ? error.message.trim() : "";
+  const normalized = rawMessage.toLocaleLowerCase("ru-RU");
+
+  if (
+    /failed to fetch|load failed|network|networkerror|offline|соединени|сеть/.test(
+      normalized,
+    )
+  ) {
+    return "Нет соединения с сервером. Проверьте интернет и повторите сохранение — введённые данные остаются в анкете.";
+  }
+
+  if (/jwt|token|session|unauth|401|сесси/.test(normalized)) {
+    return "Сессия завершилась. Введённые данные остаются в анкете; повторите сохранение после восстановления доступа.";
+  }
+
+  if (
+    /forbidden|permission|row.level|not authorized|403|недоступна текущему агенту|нет доступа/.test(
+      normalized,
+    )
+  ) {
+    return "Нет доступа к этой подаче. Введённые данные остаются в анкете; обновите список подач или обратитесь к администратору.";
+  }
+
+  if (/conflict|409|already updated|изменилась|обновлена другим/.test(normalized)) {
+    return "Подача была изменена в другом окне. Введённые данные остаются в анкете; обновите подачу и повторите сохранение.";
+  }
+
+  return "Сервис не подтвердил сохранение. Введённые данные остаются в анкете — повторите попытку или продолжите редактирование.";
+}
 
 const questionnaireSaveIntentPriority: Record<QuestionnaireSaveIntent, number> = {
   autosave: 0,
@@ -2733,6 +2765,9 @@ export function FigmaQuestionnaireScreen({
   const [saveStatus, setSaveStatus] = useState<
     "dirty" | "error" | "idle" | "saved" | "saving"
   >("idle");
+  const [saveFailureAction, setSaveFailureAction] =
+    useState<QuestionnaireSaveFailureAction>();
+  const [discardExitArmed, setDiscardExitArmed] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
   const familyCopyStatusId = useId();
   const prefersReducedMotion = useReducedMotion();
@@ -2744,6 +2779,7 @@ export function FigmaQuestionnaireScreen({
     undefined,
   );
   const navigationPendingRef = useRef(false);
+  const saveAndExitDraftReadyRef = useRef(false);
   const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const queuedSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
   const onSaveDraftRef = useRef(onSaveDraft);
@@ -2777,7 +2813,10 @@ export function FigmaQuestionnaireScreen({
     setRevealRequiredErrors(false);
     setSaveStatus("idle");
     setSaveMessage("Изменений нет");
+    setSaveFailureAction(undefined);
+    setDiscardExitArmed(false);
     navigationPendingRef.current = false;
+    saveAndExitDraftReadyRef.current = false;
     issueResolutionPendingRef.current = false;
     issueResolutionPromiseRef.current = undefined;
     setNavigationPending(false);
@@ -3176,7 +3215,6 @@ export function FigmaQuestionnaireScreen({
   const activeSectionIndex = sections.findIndex(
     (section) => section.id === activeSection,
   );
-  const previousSection = sections[activeSectionIndex - 1];
   const nextSection = sections[activeSectionIndex + 1];
   const activeApplicantIndex = applicants.findIndex(
     (applicant) => applicant.id === activeApplicant,
@@ -3258,6 +3296,9 @@ export function FigmaQuestionnaireScreen({
 
   function updateDirtyState(next: Record<string, QuestionnaireFieldUpdate>) {
     autosaveRevisionRef.current += 1;
+    saveAndExitDraftReadyRef.current = false;
+    setSaveFailureAction(undefined);
+    setDiscardExitArmed(false);
     if (Object.keys(next).length > 0) {
       setSaveStatus("dirty");
       setSaveMessage("Есть несохранённые изменения");
@@ -3752,6 +3793,7 @@ export function FigmaQuestionnaireScreen({
   const runSaveRequest = useCallback(
     async (request: QuestionnaireSaveRequest) => {
       inFlightSaveRef.current = request;
+      let failed = false;
       if (autosaveRevisionRef.current === request.revision) {
         setSaveStatus("saving");
         setSaveMessage("Сохраняем…");
@@ -3764,21 +3806,36 @@ export function FigmaQuestionnaireScreen({
           replacePendingFieldUpdates({});
           setSaveStatus("saved");
           setSaveMessage("Сохранено");
+          setSaveFailureAction(undefined);
+          setDiscardExitArmed(false);
         }
         for (const waiter of request.waiters) waiter.resolve();
       } catch (error) {
+        failed = true;
         if (autosaveRevisionRef.current === request.revision) {
           setSaveStatus("error");
-          setSaveMessage(
-            error instanceof Error ? error.message : "Не удалось сохранить анкету",
-          );
+          setSaveFailureAction("draft");
+          setDiscardExitArmed(false);
+          setSaveMessage(questionnaireSaveFailureMessage(error));
         }
         for (const waiter of request.waiters) waiter.reject(error);
       } finally {
         inFlightSaveRef.current = undefined;
         const nextRequest = queuedSaveRef.current;
         queuedSaveRef.current = undefined;
-        if (nextRequest) saveRequestRunnerRef.current(nextRequest);
+        if (nextRequest) {
+          saveRequestRunnerRef.current(
+            failed && nextRequest.revision === request.revision
+              ? {
+                  ...nextRequest,
+                  payload: mergeQuestionnaireCommitPayloads(
+                    request.payload,
+                    nextRequest.payload,
+                  ),
+                }
+              : nextRequest,
+          );
+        }
       }
     },
     [clearAutosaveTimer, replacePendingFieldUpdates],
@@ -3799,6 +3856,24 @@ export function FigmaQuestionnaireScreen({
           questionnaireCommitMutationFingerprint(inFlight.payload) ===
             questionnaireCommitMutationFingerprint(payload)
         ) {
+          const strongestIntent = strongestQuestionnaireSaveIntent(
+            inFlight.payload.saveIntent,
+            payload.saveIntent,
+          );
+          if (strongestIntent !== inFlight.payload.saveIntent) {
+            queuedSaveRef.current = {
+              payload: {
+                ...payload,
+                fieldUpdates: [],
+                focusedUpdate: undefined,
+                reviewConfirmations: [],
+                saveIntent: strongestIntent,
+              },
+              revision,
+              waiters: [waiter],
+            };
+            return;
+          }
           inFlight.waiters.push(waiter);
           return;
         }
@@ -4226,38 +4301,6 @@ export function FigmaQuestionnaireScreen({
     void saveAndExitFromButton().catch(() => undefined);
   }
 
-  function previousSectionFlow() {
-    if (!previousSection) return;
-
-    navigateQuestionnaire(activeApplicant, previousSection.id);
-    window.setTimeout(() => {
-      const firstField = workPanelRef.current?.querySelector<HTMLElement>(
-        "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
-      );
-      firstField?.focus({ preventScroll: true });
-      workPanelRef.current?.scrollIntoView?.({
-        behavior: prefersReducedMotion ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 0);
-  }
-
-  function nextSectionFlow() {
-    if (!nextSection) return;
-
-    navigateQuestionnaire(activeApplicant, nextSection.id);
-    window.setTimeout(() => {
-      const firstField = workPanelRef.current?.querySelector<HTMLElement>(
-        "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
-      );
-      firstField?.focus({ preventScroll: true });
-      workPanelRef.current?.scrollIntoView?.({
-        behavior: prefersReducedMotion ? "auto" : "smooth",
-        block: "start",
-      });
-    }, 0);
-  }
-
   function focusFirstBlocker() {
     const target = mobileBlockerTarget ?? firstQuestionnaireBlockerTarget();
     if (!target) return;
@@ -4292,6 +4335,7 @@ export function FigmaQuestionnaireScreen({
     clearAutosaveTimer();
     const revision = autosaveRevisionRef.current;
     await enqueueDraftSave(completionPayload("manual"), revision);
+    saveAndExitDraftReadyRef.current = true;
   }
 
   async function saveAndExitFromButton() {
@@ -4307,7 +4351,7 @@ export function FigmaQuestionnaireScreen({
         Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
         Boolean(inFlightSaveRef.current) ||
         Boolean(queuedSaveRef.current);
-      if (!pendingIssueResolution || hasDraftWork) {
+      if (hasDraftWork || !saveAndExitDraftReadyRef.current) {
         await saveDraftFromButton();
       }
       if (onSaveAndExit) {
@@ -4317,9 +4361,9 @@ export function FigmaQuestionnaireScreen({
       onBack();
     } catch (error) {
       setSaveStatus("error");
-      setSaveMessage(
-        error instanceof Error ? error.message : "Не удалось сохранить анкету",
-      );
+      setSaveFailureAction("save-exit");
+      setDiscardExitArmed(false);
+      setSaveMessage(questionnaireSaveFailureMessage(error));
       throw error;
     } finally {
       navigationPendingRef.current = false;
@@ -4386,13 +4430,44 @@ export function FigmaQuestionnaireScreen({
       onBack();
     } catch (error) {
       setSaveStatus("error");
-      setSaveMessage(
-        error instanceof Error ? error.message : "Не удалось сохранить анкету",
-      );
+      setSaveFailureAction("back");
+      setDiscardExitArmed(false);
+      setSaveMessage(questionnaireSaveFailureMessage(error));
     } finally {
       navigationPendingRef.current = false;
       setNavigationPending(false);
     }
+  }
+
+  async function retryFailedSave() {
+    setDiscardExitArmed(false);
+    if (saveFailureAction === "back") {
+      await requestBack();
+      return;
+    }
+    if (saveFailureAction === "save-exit") {
+      await saveAndExitFromButton();
+      return;
+    }
+    await saveDraftFromButton();
+  }
+
+  function continueAfterSaveFailure() {
+    setDiscardExitArmed(false);
+    setSaveFailureAction(undefined);
+    if (Object.keys(pendingFieldUpdatesRef.current).length > 0) {
+      setSaveStatus("dirty");
+      setSaveMessage("Есть несохранённые изменения");
+      return;
+    }
+    setSaveStatus("idle");
+    setSaveMessage("Изменений нет");
+  }
+
+  function exitWithoutSaving() {
+    clearAutosaveTimer();
+    setDiscardExitArmed(false);
+    onBack();
   }
 
   function renderSectionFields() {
@@ -5236,7 +5311,63 @@ export function FigmaQuestionnaireScreen({
               role="alert"
             >
               <AlertCircle aria-hidden="true" />
-              <span>{saveMessage}</span>
+              <div className="v19-questionnaire-save-error-copy">
+                <strong>Не удалось сохранить и выйти</strong>
+                <span>{saveMessage}</span>
+              </div>
+              <div className="v19-questionnaire-save-error-actions">
+                {discardExitArmed ? (
+                  <>
+                    <span className="v19-questionnaire-save-error-warning">
+                      Последние несохранённые изменения будут потеряны. Уже
+                      сохранённые данные останутся.
+                    </span>
+                    <button
+                      {...agentInteractionProps("questionnaire.back")}
+                      type="button"
+                      onClick={exitWithoutSaving}
+                    >
+                      Да, выйти без сохранения
+                    </button>
+                    <button
+                      {...agentInteractionProps("questionnaire.navigate")}
+                      type="button"
+                      onClick={() => setDiscardExitArmed(false)}
+                    >
+                      Остаться
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      {...agentInteractionProps("questionnaire.save-exit")}
+                      aria-busy={navigationPending}
+                      disabled={navigationPending}
+                      type="button"
+                      onClick={() => void retryFailedSave().catch(() => undefined)}
+                    >
+                      Повторить сохранение
+                    </button>
+                    <button
+                      {...agentInteractionProps("questionnaire.navigate")}
+                      type="button"
+                      onClick={continueAfterSaveFailure}
+                    >
+                      Продолжить редактирование
+                    </button>
+                    {saveFailureAction === "back" ||
+                    saveFailureAction === "save-exit" ? (
+                      <button
+                        {...agentInteractionProps("questionnaire.back")}
+                        type="button"
+                        onClick={() => setDiscardExitArmed(true)}
+                      >
+                        Выйти без сохранения
+                      </button>
+                    ) : null}
+                  </>
+                )}
+              </div>
             </div>
           ) : null}
           {questionnaireStatus.readOnly ? (
@@ -5665,9 +5796,7 @@ export function FigmaQuestionnaireScreen({
                       !nextSection && !nextApplicant ? navigationPending : undefined
                     }
                     className="v19-questionnaire-next-button v19-questionnaire-next-button--simple"
-                    disabled={
-                      questionnaireInteractionPending
-                    }
+                    disabled={questionnaireInteractionPending}
                     type="button"
                     onClick={continueSectionFlow}
                   >
@@ -5680,90 +5809,6 @@ export function FigmaQuestionnaireScreen({
         </div>
       </div>
 
-      <footer
-        aria-label="Действия анкеты"
-        className="v19-questionnaire-mobile-footer"
-        data-testid="questionnaire-mobile-footer"
-      >
-        <button
-          {...agentInteractionProps("questionnaire.navigate")}
-          aria-label={
-            previousSection
-              ? `Предыдущий раздел: ${previousSection.title}`
-              : "Предыдущий раздел недоступен"
-          }
-          className="v19-questionnaire-mobile-footer-arrow"
-          disabled={!previousSection || questionnaireInteractionPending}
-          type="button"
-          onClick={previousSectionFlow}
-        >
-          <ArrowLeft aria-hidden="true" />
-        </button>
-
-        <button
-          {...agentInteractionProps(
-            isEditable ? "questionnaire.save-exit" : "questionnaire.back",
-          )}
-          aria-busy={navigationPending || saveStatus === "saving"}
-          aria-label={
-            isEditable
-              ? saveStatus === "saving"
-                ? "Сохраняем анкету в нижней панели"
-                : "Сохранить и выйти — нижняя панель"
-              : "Выйти из анкеты — нижняя панель"
-          }
-          className="v19-questionnaire-mobile-footer-save"
-          disabled={navigationPending || saveStatus === "saving"}
-          type="button"
-          onClick={() =>
-            void (isEditable ? saveAndExitFromButton() : requestBack()).catch(
-              () => undefined,
-            )
-          }
-        >
-          <Save aria-hidden="true" />
-          <span>
-            <strong>{saveStatus === "saving" ? "Сохраняем" : "Сохранить"}</strong>
-            <small>{isEditable ? "и выйти" : "выйти"}</small>
-          </span>
-        </button>
-
-        <label className="v19-questionnaire-mobile-footer-applicant">
-          <UsersRound aria-hidden="true" />
-          <span>{activeApplicantContext?.name ?? "Заявитель"}</span>
-          <ChevronDown aria-hidden="true" />
-          <select
-            {...agentInteractionProps("questionnaire.navigate")}
-            aria-label="Выбрать заявителя"
-            disabled={applicants.length < 2 || questionnaireInteractionPending}
-            value={activeApplicant}
-            onChange={(event) =>
-              navigateQuestionnaire(event.target.value, activeSection)
-            }
-          >
-            {applicants.map((applicant) => (
-              <option key={`mobile-${applicant.id}`} value={applicant.id}>
-                {applicantDropdownLabel(applicant)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <button
-          {...agentInteractionProps("questionnaire.navigate")}
-          aria-label={
-            nextSection
-              ? `Следующий раздел: ${nextSection.title}`
-              : "Следующий раздел недоступен"
-          }
-          className="v19-questionnaire-mobile-footer-arrow"
-          disabled={!nextSection || questionnaireInteractionPending}
-          type="button"
-          onClick={nextSectionFlow}
-        >
-          <ArrowRight aria-hidden="true" />
-        </button>
-      </footer>
     </motion.div>
   );
 }

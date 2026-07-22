@@ -8,7 +8,6 @@ import {
   Plus,
   RotateCcw,
   Shapes,
-  SlidersHorizontal,
 } from "lucide-react";
 import { QuestionnaireScreen } from "./QuestionnaireScreen";
 import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
@@ -18,6 +17,7 @@ import {
   type SubmissionTypeFilter,
 } from "./ApplicantsScreen";
 import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
+import { WorkspaceExperienceSettingsScreen } from "./AdminSystemSettingsScreen";
 import { PreUploadScreen } from "./PreUploadScreen";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import {
@@ -25,7 +25,10 @@ import {
   PageHeader,
   PageHeaderMenuButton,
 } from "../modules/submissions/components/AppShell";
-import { operationalSideMenuId } from "../modules/submissions/components/OperationalSideMenu";
+import {
+  operationalSideMenuDesktopMinWidth,
+  operationalSideMenuId,
+} from "../modules/submissions/components/OperationalSideMenu";
 import { Drawer } from "./Drawer";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
 import {
@@ -107,6 +110,7 @@ import {
 } from "../modules/submissions/status";
 import { persistCreatedSubmissionWithPassports } from "../modules/submissions/createSubmissionPassportUseCase";
 import type { PublicNumberAssignment } from "../modules/submissions/supabasePersistence";
+import { agentInteractionProps } from "../modules/submissions/agentInteractionContract";
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
@@ -213,9 +217,6 @@ export function CommandCenter({
   const [searchQuery, setSearchQuery] = useState("");
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
   const [selectedActionTaskId, setSelectedActionTaskId] = useState<string | null>(null);
-  const [settingsDigest, setSettingsDigest] = useState<"instant" | "daily">("instant");
-  const [settingsDirty, setSettingsDirty] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
   const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() =>
     usesSupabase ? [] : loadProductIntakeDrafts(),
   );
@@ -380,7 +381,9 @@ export function CommandCenter({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) setMobileNavOpen(false);
+      if (window.innerWidth >= operationalSideMenuDesktopMinWidth) {
+        setMobileNavOpen(false);
+      }
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -965,6 +968,7 @@ export function CommandCenter({
               active={actionSummaryFilter === "open"}
               detail="в работе"
               icon={ListChecks}
+              interactionId="actions.summary-filter"
               label="Открыто"
               tone="neutral"
               value={actionQueue.summary.open}
@@ -974,6 +978,7 @@ export function CommandCenter({
               active={actionSummaryFilter === "today"}
               detail="сегодня"
               icon={Clock}
+              interactionId="actions.summary-filter"
               label="Сегодня"
               tone="amber"
               value={actionQueue.summary.today}
@@ -983,6 +988,7 @@ export function CommandCenter({
               active={actionSummaryFilter === "completed"}
               detail="закрыто"
               icon={CheckCircle2}
+              interactionId="actions.summary-filter"
               label="Закрыто"
               tone="green"
               value={actionQueue.summary.completed}
@@ -996,6 +1002,7 @@ export function CommandCenter({
               actionLabel="Все"
               className="v19-admin-review-list-head"
               countLabel={`${visibleActions.length}`}
+              interactionId="actions.reset-filters"
               onAction={resetActionFilters}
               title="Очередь действий"
             />
@@ -1010,6 +1017,7 @@ export function CommandCenter({
                     ariaLabel="Фильтр действий"
                     className={actionSummaryFilter !== "open" ? "is-active" : ""}
                     icon={Shapes}
+                    interactionId="actions.status-filter"
                     label="Статус"
                     options={[
                       { label: "Открыто", value: "open" },
@@ -1025,6 +1033,7 @@ export function CommandCenter({
                     ariaLabel="Сортировка действий"
                     className={actionSort !== "tripDate" ? "is-active" : ""}
                     icon={ArrowUpDown}
+                    interactionId="actions.sort"
                     label="Сортировка"
                     options={[
                       { label: "По дате вылета", value: "tripDate" },
@@ -1036,6 +1045,11 @@ export function CommandCenter({
                 </>
               }
               filterLabel="Сбросить фильтры"
+              interactionIds={{
+                cityFilter: "actions.city-filter",
+                reset: "actions.reset-filters",
+                search: "actions.search",
+              }}
               onCityFilterChange={setActionCityFilter}
               onFilterClick={resetActionFilters}
               onSearchChange={setSearchQuery}
@@ -1092,95 +1106,6 @@ export function CommandCenter({
     </section>
   );
 
-  const renderSettings = () => (
-    <section
-      aria-labelledby="agent-settings-title"
-      className="v19-agent-settings-screen grid max-w-3xl gap-5 rounded-2xl border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel)] p-6 shadow-[var(--v19-depth-shadow-panel)]"
-    >
-      <div>
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-control)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-[var(--v19-depth-text-muted)]">
-          <SlidersHorizontal className="w-3.5 h-3.5" /> Canonical V19
-        </div>
-        <h2
-          className="m-0 text-[24px] font-semibold tracking-tight text-[var(--v19-depth-text-strong)]"
-          id="agent-settings-title"
-        >
-          Настройки рабочего места
-        </h2>
-        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[var(--v19-depth-text-muted)]">
-          Основные параметры рабочего места агента сохраняются в этом контуре.
-        </p>
-      </div>
-
-      <label className="grid max-w-sm gap-2">
-        <h2 className="m-0 text-[18px] font-semibold text-[var(--v19-depth-text-strong)]">
-          Уведомления
-        </h2>
-        <span className="text-[13px] font-semibold text-[var(--v19-depth-text)]">
-          Сводка по действиям
-        </span>
-        <select
-          aria-label="Сводка по действиям"
-          className="h-10 rounded-[10px] border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-control)] px-3 text-[13px] font-medium text-[var(--v19-depth-text)] outline-none focus:border-[var(--v19-depth-border-selected)]"
-          value={settingsDigest}
-          onChange={(event) => {
-            setSettingsDigest(event.currentTarget.value as "instant" | "daily");
-            setSettingsDirty(true);
-            setSettingsSaved(false);
-          }}
-        >
-          <option value="instant">Сразу</option>
-          <option value="daily">Раз в день</option>
-        </select>
-      </label>
-
-      <label className="flex max-w-sm items-center justify-between gap-3 rounded-[12px] border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-control)] p-3">
-        <span className="text-[13px] font-semibold text-[var(--v19-depth-text)]">
-          Возврат подачи
-        </span>
-        <input
-          aria-label="Возврат подачи"
-          className="h-5 w-9 accent-[var(--v19-depth-accent)]"
-          defaultChecked
-          role="switch"
-          type="checkbox"
-        />
-      </label>
-
-      {settingsDirty ? (
-        <div
-          className="flex flex-col gap-3 rounded-[12px] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-control)] p-4 text-[13px] font-medium text-[var(--v19b-color-text)] shadow-[var(--v19b-shadow-row-inner)] sm:flex-row sm:items-center sm:justify-between"
-          role="status"
-        >
-          <span className="inline-flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              className="h-2 w-2 rounded-full bg-[var(--v19b-dot-warning)]"
-            />
-            Есть несохранённые изменения
-          </span>
-          <button
-            className="h-10 rounded-[10px] border border-[var(--v19-depth-accent-border)] bg-[var(--v19-depth-accent)] px-4 text-[13px] font-semibold text-[var(--v19-depth-text-strong)] transition-colors hover:bg-[var(--v19-depth-accent-hover)]"
-            type="button"
-            onClick={() => {
-              setSettingsDirty(false);
-              setSettingsSaved(true);
-            }}
-          >
-            Сохранить
-          </button>
-        </div>
-      ) : (
-        <div
-          className="text-[13px] font-medium text-[var(--v19-depth-text-muted)]"
-          role="status"
-        >
-          {settingsSaved ? "Настройки сохранены" : "Изменений нет"}
-        </div>
-      )}
-    </section>
-  );
-
   const title = navLabel(activeNav);
   const sideMenuItems = [
     {
@@ -1188,6 +1113,7 @@ export function CommandCenter({
       count: actionQueue.summary.open,
       icon: "✓",
       id: "agent-actions",
+      interactionId: "shell.navigate-actions",
       label: "Мои действия",
       meta: "Очередь задач",
       onClick: () => navigateTo("actions"),
@@ -1197,6 +1123,7 @@ export function CommandCenter({
       count: rows.length,
       icon: "▤",
       id: "agent-submissions",
+      interactionId: "shell.navigate-submissions",
       label: "Мои подачи",
       meta: "Пакеты заявителей",
       onClick: () => navigateTo("submissions"),
@@ -1205,8 +1132,9 @@ export function CommandCenter({
       active: activeNav === "settings",
       icon: "⚙",
       id: "agent-settings",
+      interactionId: "shell.navigate-settings",
       label: "Настройки",
-      meta: "Профиль и уведомления",
+      meta: "Интерфейс и доступность",
       onClick: () => navigateTo("settings"),
     },
   ];
@@ -1278,6 +1206,7 @@ export function CommandCenter({
               actions={
                 <div className="ml-auto flex items-center gap-2">
                   <button
+                    {...agentInteractionProps("shell.create-submission")}
                     aria-label="Новая подача"
                     onClick={createPackage}
                     className="v19-action-surface-create h-[36px] lg:h-10 px-3.5 bg-[var(--v19-depth-accent)] hover:bg-[var(--v19-depth-accent-hover)] text-[var(--v19-depth-text-strong)] rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[var(--v19-depth-inner-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
@@ -1289,6 +1218,7 @@ export function CommandCenter({
               }
               menuButton={
                 <PageHeaderMenuButton
+                  {...agentInteractionProps("shell.toggle-mobile-menu")}
                   controls={operationalSideMenuId}
                   onClick={() => setMobileNavOpen((open) => !open)}
                   open={mobileNavOpen}
@@ -1330,7 +1260,13 @@ export function CommandCenter({
                 data-agent-screen={activeNav}
                 data-testid="agent-screen-transition"
               >
-                {activeNav === "settings" && renderSettings()}
+                {activeNav === "settings" && (
+                  <WorkspaceExperienceSettingsScreen
+                    currentIdentity={agentName}
+                    instrumentAgentInteractions
+                    usesSupabase={usesSupabase}
+                  />
+                )}
                 {activeNav === "actions" && renderActionsList()}
                 {activeNav === "submissions" && (
                   <div>

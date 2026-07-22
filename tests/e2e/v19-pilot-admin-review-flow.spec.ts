@@ -5,7 +5,6 @@ import {
   collectBrowserProblems,
   drawer,
   isVisible,
-  openDrawerTab,
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
 
@@ -104,7 +103,7 @@ async function verifyRemarkSubmitActionability(
   const browserProblems = collectBrowserProblems(page);
 
   await openFreshWorkspace(page, {
-    heading: "Проверка",
+    heading: "Очередь на проверку",
     workspaceEmail: "admin@visaflow.local",
   });
 
@@ -115,37 +114,12 @@ async function verifyRemarkSubmitActionability(
   await expectBodyMatches(page, [/Нина Волкова|ПД-1053|Проверка|Очередь/i]);
 
   await openAdminSubmission(page, /Нина Волкова|ПД-1053|Смирнов|Петров|Волков/i);
-
-  await openDrawerTab(page, ["Обзор"]).catch(() => undefined);
-  await openDrawerTab(page, ["Файлы"]).catch(() => undefined);
-  await openDrawerTab(page, ["Замечания"]).catch(() => undefined);
-
-  // The "Добавить замечание" action belongs to the questionnaire rows.
-  // Return there before clicking; otherwise Motion may detach the previous
-  // tab content while Playwright waits for actionability.
-  await openDrawerTab(page, ["Анкета", "Данные"]).catch(() => undefined);
-  await page.waitForTimeout(350);
-
-  const collapsedQuestionnaireSection = await firstVisible(
-    drawer(page).locator("details:not([open])"),
-  );
-  if (collapsedQuestionnaireSection) {
-    await collapsedQuestionnaireSection.locator("summary").click();
-  }
-
-  const addRemarkButton = await firstVisible(
-    drawer(page).locator(
-      '[data-testid="admin-review-add-remark"], button[title="Добавить замечание"]',
-    ),
-  );
-  if (!addRemarkButton) {
-    throw new Error("No visible in-drawer remark action was rendered.");
-  }
-
-  await expect(addRemarkButton).toBeVisible();
-  await addRemarkButton.evaluate((element) => {
-    (element as { click(): void }).click();
+  const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+  const addRemarkButton = reviewWorkspace.getByRole("button", {
+    name: "Добавить замечание: Номер паспорта",
   });
+  await expect(addRemarkButton).toBeVisible();
+  await addRemarkButton.click();
 
   const remarkDialog = page
     .getByRole("dialog")
@@ -172,11 +146,10 @@ async function verifyRemarkSubmitActionability(
   await submitRemarkButton.click();
 
   await expect(remarkDialog).toHaveCount(0);
-  await expect(drawer(page)).toBeVisible();
-  await openDrawerTab(page, ["Замечания"]).catch(() => undefined);
-  await expectBodyMatches(page, [
-    /Замечания|Исправить|Требуется|Анкета|Файлы|ПД-|SUB-/i,
-  ]);
+  await expect(reviewWorkspace).toBeVisible();
+  await expect(
+    reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
+  ).toContainText(/Замечания\s+1/);
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
@@ -189,22 +162,15 @@ async function verifyEveryAdminDrawerSubview(
   viewport: { height: number; width: number },
 ) {
   const browserProblems = collectBrowserProblems(page);
-  const applicantTabs = [
-    ["overview", "Обзор"],
-    ["media", "Файлы"],
-    ["issues", "Замечания"],
-    ["history", "История"],
+  const mediaTabs = [
+    ["passport_scan", "Паспорт"],
+    ["selfie", "Селфи 1"],
+    ["selfie_2", "Селфи 2"],
   ] as const;
-  const expectedPanelContent: Record<(typeof applicantTabs)[number][0], RegExp> = {
-    overview: /Нина Волкова|Проверено полей/i,
-    media: /Скан паспорта|Файлов пока нет/i,
-    issues: /Замечаний нет|Замечания не загружены/i,
-    history: /15\.06|История пока пуста/i,
-  };
 
   await page.setViewportSize(viewport);
   await openFreshWorkspace(page, {
-    heading: "Проверка",
+    heading: "Очередь на проверку",
     workspaceEmail: "admin@visaflow.local",
   });
   if (viewport.width >= 768) {
@@ -212,47 +178,40 @@ async function verifyEveryAdminDrawerSubview(
   }
   await openAdminSubmission(page, /Нина Волкова|ПД-1053/);
 
-  const reviewTabs = drawer(page).getByRole("tablist", {
-    name: "Разделы проверки",
+  const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+  const mediaTablist = reviewWorkspace.getByRole("tablist", {
+    name: "Выбор файла для проверки",
   });
-  const applicantsTab = reviewTabs.getByRole("tab", { name: /Заявители/ });
-  const questionnaireTab = reviewTabs.getByRole("tab", { name: /Анкета/ });
+  await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
+  await expect(mediaTablist.getByRole("tab")).toHaveCount(3);
 
-  // Both tablists use manual activation and retain focus after arrow-key navigation.
-  await applicantsTab.focus();
-  await expect(applicantsTab).toBeFocused();
-  await applicantsTab.press("ArrowRight");
-  await expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
-  await expect(questionnaireTab).toBeFocused();
-  await questionnaireTab.press("Home");
-  await expect(applicantsTab).toHaveAttribute("aria-selected", "true");
-  await expect(applicantsTab).toBeFocused();
+  const passportTab = mediaTablist.getByRole("tab", { name: "Паспорт" });
+  const firstSelfieTab = mediaTablist.getByRole("tab", { name: "Селфи 1" });
+  const secondSelfieTab = mediaTablist.getByRole("tab", { name: "Селфи 2" });
+  await passportTab.focus();
+  await expect(passportTab).toBeFocused();
+  await passportTab.press("ArrowRight");
+  await expect(firstSelfieTab).toHaveAttribute("aria-selected", "true");
+  await expect(firstSelfieTab).toBeFocused();
+  await firstSelfieTab.press("End");
+  await expect(secondSelfieTab).toHaveAttribute("aria-selected", "true");
+  await expect(secondSelfieTab).toBeFocused();
+  await secondSelfieTab.press("Home");
+  await expect(passportTab).toHaveAttribute("aria-selected", "true");
+  await expect(passportTab).toBeFocused();
 
-  const travelerTabs = drawer(page).getByRole("tablist", {
-    name: /Разделы заявителя:/,
-  });
-  const overviewTab = travelerTabs.getByRole("tab", { name: "Обзор" });
-  const mediaTab = travelerTabs.getByRole("tab", { name: /Файлы/ });
-  const historyTab = travelerTabs.getByRole("tab", { name: /История/ });
-  await overviewTab.focus();
-  await expect(overviewTab).toBeFocused();
-  await overviewTab.press("ArrowRight");
-  await expect(mediaTab).toHaveAttribute("aria-selected", "true");
-  await expect(mediaTab).toBeFocused();
-  await mediaTab.press("End");
-  await expect(historyTab).toHaveAttribute("aria-selected", "true");
-  await expect(historyTab).toBeFocused();
-  await historyTab.press("Home");
-  await expect(overviewTab).toHaveAttribute("aria-selected", "true");
-  await expect(overviewTab).toBeFocused();
-
-  for (const [id, label] of applicantTabs) {
-    await travelerTabs.getByRole("tab", { name: label }).click();
-
-    const panel = drawer(page).locator(`#admin-review-traveler-panel-${id}`);
-    await expect(panel).toBeVisible();
-    await expect(panel).toHaveCSS("opacity", "1");
-    await expect(panel).toContainText(expectedPanelContent[id]);
+  for (const [id, label] of mediaTabs) {
+    const tab = mediaTablist.getByRole("tab", { name: label, exact: true });
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+    await expect(reviewWorkspace.getByRole("tabpanel")).toBeVisible();
+    await expect
+      .poll(() =>
+        reviewWorkspace.locator(
+          ".v19-review-preview-state.is-unavailable:visible",
+        ).count(),
+      )
+      .toBeGreaterThan(0);
 
     expect(
       await page.evaluate(() => {
@@ -265,42 +224,14 @@ async function verifyEveryAdminDrawerSubview(
     ).toBe(true);
 
     const screenshotPath = testInfo.outputPath(
-      `admin-drawer-${viewport.width}-${id}.png`,
+      `admin-review-workspace-${viewport.width}-${id}.png`,
     );
     await page.screenshot({ path: screenshotPath });
-    await testInfo.attach(`admin-drawer-${viewport.width}-${id}`, {
+    await testInfo.attach(`admin-review-workspace-${viewport.width}-${id}`, {
       contentType: "image/png",
       path: screenshotPath,
     });
   }
-
-  await questionnaireTab.click();
-  const questionnairePanel = drawer(page).getByRole("tabpanel").first();
-  await expect(questionnairePanel).toContainText(/Заявитель/i);
-
-  // The applicant subviews unmount while the questionnaire tab is active.
-  // Return to the parent tab and resolve the fresh Overview button after the
-  // Motion transition instead of clicking the detached pre-transition locator.
-  await applicantsTab.click();
-  const restoredOverviewTab = drawer(page)
-    .getByRole("tablist", { name: /Разделы заявителя:/ })
-    .getByRole("tab", { name: "Обзор" });
-  await expect(restoredOverviewTab).toBeVisible();
-  await restoredOverviewTab.click();
-  const metricLabels = drawer(page).locator(".admin-review-traveler-overview dt");
-  await expect(metricLabels).toHaveCount(4);
-  expect(
-    await metricLabels.evaluateAll((labels) =>
-      labels.every((label) => {
-        const metric = label.parentElement;
-        return Boolean(
-          metric &&
-          label.scrollWidth <= label.clientWidth &&
-          metric.getBoundingClientRect().width > 0,
-        );
-      }),
-    ),
-  ).toBe(true);
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
@@ -315,13 +246,13 @@ test.describe("V-19 pilot admin review click flow", () => {
     const screens = [
       {
         fileName: "review",
-        heading: "Проверка",
+        heading: "Очередь на проверку",
         nav: /^Проверка$/,
-        readyText: "Очередь готова к проверке",
+        readyText: "Очередь проверки",
       },
       {
         fileName: "export",
-        heading: "Выгрузка",
+        heading: "Центр выгрузки",
         nav: /^Выгрузка$/,
         readyText: "Пакеты к выгрузке",
       },
@@ -329,13 +260,13 @@ test.describe("V-19 pilot admin review click flow", () => {
         fileName: "users",
         heading: "Управление пользователями",
         nav: /^Пользователи$/,
-        readyText: "Заявки на доступ",
+        readyText: "Пользователи и заявки",
       },
       {
         fileName: "settings",
         heading: "Системные настройки",
         nav: /^Настройки$/,
-        readyText: "Уведомления",
+        readyText: "Ощущение интерфейса",
       },
     ] as const;
 
@@ -345,7 +276,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     ]) {
       await page.setViewportSize(viewport);
       await openFreshWorkspace(page, {
-        heading: "Проверка",
+        heading: "Очередь на проверку",
         workspaceEmail: "admin@visaflow.local",
       });
 
@@ -357,13 +288,6 @@ test.describe("V-19 pilot admin review click flow", () => {
         await expect(
           page.getByText(screen.readyText, { exact: true }).first(),
         ).toBeVisible();
-        if (viewport.width < 768 && screen.fileName === "settings") {
-          const activeSettingsTab = page.locator(
-            ".settings-nav button[aria-current='page']",
-          );
-          await expect(activeSettingsTab).toHaveText("Уведомления");
-          await expectWithinViewport(page, activeSettingsTab);
-        }
         expect(
           await page.evaluate(
             () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -387,18 +311,10 @@ test.describe("V-19 pilot admin review click flow", () => {
     ).toEqual([]);
   });
 
-  test("admin settings subviews remain reachable on desktop and mobile", async ({
+  test("admin settings preferences persist across reload on desktop and mobile", async ({
     page,
   }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
-    const sections = [
-      ["Профиль", "Профиль"],
-      ["Входящие заявки на регистрацию", "Заявки на доступ"],
-      ["Команда и роли", "Команда и роли"],
-      ["Уведомления", "Уведомления"],
-      ["Выгрузка", "Выгрузка"],
-      ["Интерфейс", "Интерфейс"],
-    ] as const;
 
     for (const viewport of [
       { height: 900, width: 1440 },
@@ -406,37 +322,53 @@ test.describe("V-19 pilot admin review click flow", () => {
     ]) {
       await page.setViewportSize(viewport);
       await openFreshWorkspace(page, {
-        heading: "Проверка",
+        heading: "Очередь на проверку",
         workspaceEmail: "admin@visaflow.local",
       });
       await clickWorkspaceButton(page, /^Настройки$/);
 
-      const navigation = page.getByRole("navigation", {
-        name: "Разделы настроек",
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Системные настройки" }),
+      ).toBeVisible();
+      const compactDensity = page.getByRole("switch", {
+        name: "Компактная плотность",
       });
-      await expect(navigation).toBeVisible();
+      await expect(compactDensity).toHaveAttribute("aria-checked", "false");
+      await compactDensity.click();
+      await expect(compactDensity).toHaveAttribute("aria-checked", "true");
+      await expect
+        .poll(() =>
+          page.evaluate(() => document.documentElement.dataset.v19Density),
+        )
+        .toBe("compact");
 
-      for (const [buttonLabel, heading] of sections) {
-        const button = navigation.getByRole("button", { name: buttonLabel });
-        await button.click();
-        await expect(
-          page.getByRole("heading", { level: 2, name: heading, exact: true }),
-        ).toBeVisible();
-        if (viewport.width < 768) {
-          await expectWithinViewport(page, button);
-        }
-        expect(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth <= window.innerWidth,
-          ),
-        ).toBe(true);
-      }
+      await page.reload();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
+      ).toBeVisible();
+      await clickWorkspaceButton(page, /^Настройки$/);
+      await expect(
+        page.getByRole("switch", { name: "Компактная плотность" }),
+      ).toHaveAttribute("aria-checked", "true");
+      await page.getByRole("button", { name: "Сбросить" }).click();
+      await expect(
+        page.getByRole("switch", { name: "Компактная плотность" }),
+      ).toHaveAttribute("aria-checked", "false");
+      await expect(
+        page.locator(".v19-settings-panel-footer").getByRole("status"),
+      ).toContainText("Настройки сохранены");
+
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
 
       const screenshotPath = testInfo.outputPath(
-        `admin-settings-${viewport.width}-interface.png`,
+        `admin-settings-${viewport.width}-preferences.png`,
       );
       await page.screenshot({ path: screenshotPath });
-      await testInfo.attach(`admin-settings-${viewport.width}-interface`, {
+      await testInfo.attach(`admin-settings-${viewport.width}-preferences`, {
         contentType: "image/png",
         path: screenshotPath,
       });
@@ -454,7 +386,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Очередь на проверку",
       workspaceEmail: "admin@visaflow.local",
     });
 
@@ -463,34 +395,21 @@ test.describe("V-19 pilot admin review click flow", () => {
       .first();
     await expect(reviewAction).toBeVisible();
     await reviewAction.click();
-    await expect(drawer(page)).toBeVisible();
-
-    await openDrawerTab(page, ["Файлы"]);
-    const verifyPassport = drawer(page)
-      .locator(".v19-drawer-file-item")
-      .filter({ hasText: "Скан паспорта" })
-      .getByRole("button", { name: "Проверить", exact: true })
-      .first();
-    await expect(verifyPassport).toBeVisible();
-    await verifyPassport.click();
-
-    const passportWorkspace = page.locator(".v19-admin-passport-workspace");
-    await expect(passportWorkspace).toBeVisible();
+    const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+    await expect(reviewWorkspace).toBeVisible();
+    await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: /Паспортная секция/ }),
+      reviewWorkspace
+        .getByText(/Защищённый оригинал недоступен|Файл не загружен/)
+        .first(),
     ).toBeVisible();
     await expect(
-      passportWorkspace
-        .locator('[data-review-media="passport_scan"]')
-        .getByText(/Защищённый оригинал недоступен|Файл не загружен/),
-    ).toBeVisible();
-    await expect(
-      passportWorkspace.getByRole("button", {
+      reviewWorkspace.getByRole("button", {
         name: "Подтвердить паспортную секцию",
       }),
     ).toBeDisabled();
     await expect(
-      passportWorkspace.getByRole("button", { name: /^Подтвердить:/ }),
+      reviewWorkspace.getByRole("button", { name: /^Подтвердить:/ }),
     ).toHaveCount(0);
 
     expect(
@@ -503,8 +422,13 @@ test.describe("V-19 pilot admin review click flow", () => {
       }),
     ).toBe(true);
 
-    await passportWorkspace.getByRole("button", { name: "Вернуться к подаче" }).click();
-    await expect(drawer(page)).toBeVisible();
+    await reviewWorkspace
+      .getByRole("button", { name: "Вернуться к очереди" })
+      .click();
+    await expect(reviewWorkspace).toBeHidden();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
+    ).toBeVisible();
 
     expect(
       blockingBrowserProblems(browserProblems),
@@ -512,7 +436,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     ).toEqual([]);
   });
 
-  test("admin drawer opens every subview without overflow on desktop and mobile", async ({
+  test("admin review workspace opens every protected-media view without overflow on desktop and mobile", async ({
     page,
   }, testInfo) => {
     await verifyEveryAdminDrawerSubview(page, testInfo, {
@@ -542,21 +466,18 @@ test.describe("V-19 pilot admin review click flow", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Очередь на проверку",
       workspaceEmail: "admin@visaflow.local",
     });
 
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+      page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
     ).toBeVisible();
 
     await clearExportSelection(page);
 
-    const exportRow = page
-      .locator(".export-row")
-      .filter({ hasText: /Семья Волковых|SUB-1102|Семья Петровых|ПД-1054/ })
-      .first();
+    const exportRow = page.getByTestId("admin-export-row-SUB-1102");
 
     await expect(exportRow).toBeVisible();
     await exportRow.getByRole("checkbox").check();

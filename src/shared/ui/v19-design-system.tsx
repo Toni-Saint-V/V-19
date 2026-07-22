@@ -21,26 +21,19 @@ import {
   ChevronRight,
   Clock,
   Columns3,
-  ContactRound,
   FileCheck2,
-  FileClock,
-  FileSpreadsheet,
-  FileStack,
-  Files,
   Filter,
   Flame,
   Folder,
-  Images,
   List,
-  ListChecks,
   MapPin,
-  Plus,
-  ScanSearch,
+  Menu,
+  FileText,
   Search,
   ShieldCheck,
   SlidersHorizontal,
-  TriangleAlert,
   UserRound,
+  Users,
   UsersRound,
   X,
   type LucideIcon,
@@ -48,7 +41,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import visaflowLogo from "../../assets/v-logo-premium-black-style.webp";
 import { cn } from "./cn";
-import { Badge, Button, IconButton, NavCount } from "./primitives";
+import { Badge, Button, IconButton } from "./primitives";
 
 export type V19VisualTone = "blue" | "danger" | "green" | "indigo" | "warning";
 
@@ -253,6 +246,7 @@ export type V19SideMenuItem = {
   disabled?: boolean;
   icon: string;
   id: string;
+  interactionId?: string;
   label: string;
   meta: string;
   onClick: () => void;
@@ -264,12 +258,13 @@ export function V19SideMenu({
   ariaLabel,
   brandSubtitle,
   className,
-  createAction,
+  commandInteractionId,
   displayMode,
   footer,
   inactive = false,
   items,
   mobileCloseLabel = "Закрыть меню",
+  mobileCloseInteractionId,
   mobileOpen,
   mobileTitle,
   onCommandSearch,
@@ -278,12 +273,13 @@ export function V19SideMenu({
 }: Omit<ComponentPropsWithoutRef<typeof motion.aside>, "aria-label"> & {
   ariaLabel: string;
   brandSubtitle: string;
-  createAction?: { label: string; onClick: () => void };
+  commandInteractionId?: string;
   displayMode: V19SideMenuMode;
   footer: ReactNode;
   inactive?: boolean;
   items: V19SideMenuItem[];
   mobileCloseLabel?: string;
+  mobileCloseInteractionId?: string;
   mobileOpen: boolean;
   mobileTitle: string;
   onCommandSearch?: () => void;
@@ -327,21 +323,26 @@ export function V19SideMenu({
           className="ops-brand-logo h-8 w-8 shrink-0 rounded-lg object-cover"
         />
         <div className="ops-brand-copy opsu-brand-copy flex-1 min-w-0">
-          <strong className="opsu-wordmark vf-brand-wordmark text-sm font-semibold tracking-tight">VisaFlow V-19</strong>
-          <small className="v19-ds-side-menu-subtitle text-[11px] text-white/50">{brandSubtitle}</small>
+          <strong className="opsu-wordmark vf-brand-wordmark text-sm font-semibold tracking-tight">
+            VisaFlow V-19
+          </strong>
+          <small className="v19-ds-side-menu-subtitle text-[11px] text-white/50">
+            {brandSubtitle}
+          </small>
         </div>
         <IconButton
           className="ops-mobile-close opsu-mobile-close"
           icon={<X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />}
           label={mobileCloseLabel}
+          data-v19-interaction-id={mobileCloseInteractionId}
           onClick={onMobileClose}
         />
       </div>
       <button
+        data-v19-interaction-id={commandInteractionId}
         className="ops-sidebar-search"
         type="button"
         aria-label="Открыть командную палитру"
-        disabled={!onCommandSearch}
         onClick={onCommandSearch}
       >
         <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
@@ -350,7 +351,7 @@ export function V19SideMenu({
       </button>
       <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
         <span className="ops-nav-group-label">Работа</span>
-        {items.map((item) => (
+        {items.map((item, index) => (
           <Button
             aria-current={item.active ? "page" : undefined}
             aria-label={item.label}
@@ -360,6 +361,7 @@ export function V19SideMenu({
               item.tone && `tone-${item.tone}`,
             )}
             data-nav-id={item.id}
+            data-v19-interaction-id={item.interactionId}
             disabled={item.disabled}
             key={item.id}
             variant="ghost"
@@ -372,18 +374,21 @@ export function V19SideMenu({
               )}
               aria-hidden="true"
             >
-              <V19SideMenuIcon id={item.id} fallback={item.icon} />
+              <V19SideMenuIcon index={index} fallback={item.icon} />
             </span>
             <span className="ops-nav-copy opsu-nav-copy">
               <strong>{item.label}</strong>
             </span>
             {typeof item.count === "number" ? (
-              <NavCount
-                className={cn("v19-agent-sidebar-nav-count", item.active && "is-active")}
-                label={`${item.count}`}
+              <span
+                className={cn(
+                  "ops-nav-count v19-agent-sidebar-nav-count",
+                  item.active && "is-active",
+                )}
+                aria-label={`${item.count}`}
               >
                 {item.count}
-              </NavCount>
+              </span>
             ) : null}
             {item.quickAction ? (
               <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
@@ -391,41 +396,16 @@ export function V19SideMenu({
           </Button>
         ))}
       </nav>
-      {createAction ? (
-        <Button
-          className="ops-sidebar-create opsu-sidebar-create"
-          aria-label={createAction.label}
-          variant="plain"
-          onClick={createAction.onClick}
-        >
-          <span aria-hidden="true"><Plus focusable="false" /></span>
-          <strong>{createAction.label}</strong>
-        </Button>
-      ) : null}
       <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
     </motion.aside>
   );
 }
 
-const v19SideMenuIconMap: Array<[needle: string, Icon: LucideIcon]> = [
-  ["actions", ListChecks],
-  ["documents", Files],
-  ["drafts", FileClock],
-  ["applicants", ContactRound],
-  ["media", Images],
-  ["issues", TriangleAlert],
-  ["submissions", FileStack],
-  ["users", ContactRound],
-  ["review", ScanSearch],
-  ["work", ListChecks],
-  ["export", FileSpreadsheet],
-  ["settings", SlidersHorizontal],
-];
+const v19SideMenuSlotIcons: LucideIcon[] = [Menu, FileText, Users, SlidersHorizontal];
 
-function V19SideMenuIcon({ fallback, id }: { fallback: string; id: string }) {
-  const match = v19SideMenuIconMap.find(([needle]) => id.includes(needle));
-  if (!match) return <span>{fallback}</span>;
-  const Icon = match[1];
+function V19SideMenuIcon({ fallback, index }: { fallback: string; index: number }) {
+  const Icon = v19SideMenuSlotIcons[index];
+  if (!Icon) return <span>{fallback}</span>;
   return <Icon aria-hidden="true" focusable="false" size={17} strokeWidth={1.8} />;
 }
 
@@ -555,9 +535,7 @@ export function V19OperationalCard<T extends ElementType = "button">({
                 <span>{peopleCount} чел.</span>
               </span>
               {metaDetail ? <i aria-hidden="true" /> : null}
-              {metaDetail ? (
-                <span>{metaDetail}</span>
-              ) : null}
+              {metaDetail ? <span>{metaDetail}</span> : null}
             </span>
             <strong className="v19-operational-card-title" title={title}>
               {title}
@@ -589,9 +567,7 @@ export function V19OperationalCard<T extends ElementType = "button">({
         {progress ? (
           <span className="v19-operational-card-progress">{progress}</span>
         ) : null}
-        {footer ? (
-          <span className="v19-operational-card-footer">{footer}</span>
-        ) : null}
+        {footer ? <span className="v19-operational-card-footer">{footer}</span> : null}
         <span className="v19-operational-card-open" aria-hidden="true">
           <ChevronRight />
         </span>
@@ -705,6 +681,7 @@ export function V19MetricCard({
   active = false,
   detail,
   icon,
+  interactionId,
   label,
   onClick,
   tone = "neutral",
@@ -713,17 +690,14 @@ export function V19MetricCard({
   active?: boolean;
   detail?: ReactNode;
   icon: V19SurfaceIcon;
+  interactionId?: string;
   label: string;
   onClick?: () => void;
   tone?: string;
   value: ReactNode;
 }) {
   const mappedTone: V19MetricTone =
-    tone === "green"
-      ? "green"
-      : tone === "red"
-        ? "danger"
-        : "neutral";
+    tone === "green" ? "green" : tone === "red" ? "danger" : "neutral";
   const Icon = icon;
   const content = (
     <>
@@ -743,11 +717,8 @@ export function V19MetricCard({
       <button
         aria-label={label}
         aria-pressed={active}
-        className={cn(
-          "v19-metric-card",
-          `tone-${mappedTone}`,
-          active && "is-active",
-        )}
+        className={cn("v19-metric-card", `tone-${mappedTone}`, active && "is-active")}
+        data-v19-interaction-id={interactionId}
         type="button"
         onClick={onClick}
       >
@@ -848,6 +819,7 @@ export function V19ListHeader({
   actionLabel,
   className = "",
   countLabel,
+  interactionId,
   onAction,
   title,
 }: {
@@ -855,6 +827,7 @@ export function V19ListHeader({
   actionLabel?: string;
   className?: string;
   countLabel: string;
+  interactionId?: string;
   onAction?: () => void;
   title: string;
 }) {
@@ -865,7 +838,12 @@ export function V19ListHeader({
         <small>{countLabel}</small>
       </div>
       {actionLabel && onAction ? (
-        <button disabled={actionDisabled} type="button" onClick={onAction}>
+        <button
+          data-v19-interaction-id={interactionId}
+          disabled={actionDisabled}
+          type="button"
+          onClick={onAction}
+        >
           {actionLabel}
         </button>
       ) : null}
@@ -877,6 +855,7 @@ export function V19ToolbarSelect<T extends string>({
   ariaLabel,
   className = "",
   icon: Icon,
+  interactionId,
   label,
   onChange,
   options,
@@ -885,6 +864,7 @@ export function V19ToolbarSelect<T extends string>({
   ariaLabel?: string;
   className?: string;
   icon?: V19SurfaceIcon;
+  interactionId?: string;
   label: string;
   onChange: (value: T) => void;
   options: Array<{ label: string; value: T }>;
@@ -983,6 +963,7 @@ export function V19ToolbarSelect<T extends string>({
         aria-haspopup="listbox"
         aria-label={`${ariaLabel ?? label}: ${selectedOption?.label ?? ""}`}
         className="v19-admin-toolbar-select-trigger"
+        data-v19-interaction-id={interactionId}
         title={Icon ? `${label}: ${selectedOption?.label ?? ""}` : undefined}
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -1010,6 +991,7 @@ export function V19ToolbarSelect<T extends string>({
               key={option.value}
               aria-selected={option.value === value}
               className={option.value === value ? "is-selected" : ""}
+              data-v19-interaction-id={interactionId}
               role="option"
               tabIndex={option.value === value ? 0 : -1}
               type="button"
@@ -1035,6 +1017,7 @@ export function V19QueueToolbar({
   cityOptions,
   controls,
   filterLabel = "Фильтры",
+  interactionIds,
   onCityFilterChange,
   onFilterClick,
   onSearchChange,
@@ -1049,6 +1032,11 @@ export function V19QueueToolbar({
   cityOptions: string[];
   controls?: ReactNode;
   filterLabel?: string;
+  interactionIds?: {
+    cityFilter?: string;
+    reset?: string;
+    search?: string;
+  };
   onCityFilterChange: (city: string) => void;
   onFilterClick?: () => void;
   onSearchChange: (value: string) => void;
@@ -1072,6 +1060,7 @@ export function V19QueueToolbar({
               ariaLabel="Фильтр городов"
               className={`v19-admin-city-filter ${cityActive ? "is-active" : ""}`}
               icon={MapPin}
+              interactionId={interactionIds?.cityFilter}
               label="Город"
               options={cityOptions.map((city) => ({
                 label: city === "Все города" ? "Города" : city,
@@ -1090,6 +1079,7 @@ export function V19QueueToolbar({
             aria-label={searchAriaLabel ?? searchPlaceholder}
             name="queue-search"
             className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[11px] font-medium text-white/70 placeholder:text-[#525151] outline-none focus:border-[#6f64ff]/55"
+            data-v19-interaction-id={interactionIds?.search}
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(event) => onSearchChange(event.currentTarget.value)}
@@ -1102,6 +1092,7 @@ export function V19QueueToolbar({
             aria-label={filterLabel}
             title={filterLabel}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+            data-v19-interaction-id={interactionIds?.reset}
             disabled={actionDisabled}
             type="button"
             onClick={onFilterClick}
@@ -2088,5 +2079,42 @@ export function V19SectionEmpty({
       <strong>{title}</strong>
       <span className="vf-figma-column-subline">{children}</span>
     </div>
+  );
+}
+
+export function V19ProductEmptyState({
+  description,
+  eyebrow = "Раздел продукта",
+  icon: Icon = Folder,
+  title,
+}: {
+  description: ReactNode;
+  eyebrow?: string;
+  icon?: LucideIcon;
+  title: string;
+}) {
+  const titleId = useId();
+
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="v19-product-empty-state"
+      data-v19-component="product-empty-state"
+      role="status"
+    >
+      <span className="v19-product-empty-state-icon" aria-hidden="true">
+        <Icon focusable="false" />
+      </span>
+      <div className="v19-product-empty-state-copy">
+        <span className="v19-product-empty-state-eyebrow">{eyebrow}</span>
+        <h2 id={titleId}>{title}</h2>
+        <p>{description}</p>
+      </div>
+      <span className="v19-product-empty-state-rail" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+    </section>
   );
 }

@@ -363,7 +363,7 @@ describe("ApplicantsScreen interactions", () => {
     expect(header?.querySelector("small")).toHaveTextContent("1");
   });
 
-  it("sorts the combined queue by createdAt in direct and reverse order", () => {
+  it("sorts each visible type group by createdAt in direct and reverse order", () => {
     const oldest = createSubmission("single", "2026-07-17T10:00:00.000Z");
     const newest = createSubmission("family", "2026-07-19T10:00:00.000Z");
     const middle = createSubmission("single", "2026-07-18T10:00:00.000Z");
@@ -383,7 +383,7 @@ describe("ApplicantsScreen interactions", () => {
       }),
     );
     fireEvent.click(screen.getByRole("option", { name: "Сначала старые" }));
-    expect(visibleSubmissionIds()).toEqual([oldest.id, middle.id, newest.id]);
+    expect(visibleSubmissionIds()).toEqual([newest.id, oldest.id, middle.id]);
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -440,7 +440,7 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     const submitButtons = screen.getAllByRole("button", {
-      name: /К выгрузке:/,
+      name: /Отправить на проверку:/,
     });
     expect(submitButtons).toHaveLength(2);
     const familyCard = screen.getByRole("article", { name: /Подача Семья/ });
@@ -454,7 +454,7 @@ describe("ApplicantsScreen interactions", () => {
     expect(singleCard).not.toBeNull();
     fireEvent.click(
       within(singleCard as HTMLElement).getByRole("button", {
-        name: /К выгрузке:/,
+        name: /Отправить на проверку:/,
       }),
     );
     expect(nativeConfirm).not.toHaveBeenCalled();
@@ -508,7 +508,7 @@ describe("ApplicantsScreen interactions", () => {
     );
     expect(screen.getByText("На проверке")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /К выгрузке:/ }),
+      screen.queryByRole("button", { name: /Отправить на проверку:/ }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Открыть:/ }),
@@ -531,7 +531,7 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /К выгрузке:/ }),
+      screen.getByRole("button", { name: /Отправить на проверку:/ }),
     );
 
     const dialog = screen.getByRole("dialog", {
@@ -556,7 +556,7 @@ describe("ApplicantsScreen interactions", () => {
       }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /К выгрузке:/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
     fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
 
     expect(nativeConfirm).not.toHaveBeenCalled();
@@ -577,7 +577,7 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /К выгрузке:/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
     const alert = await screen.findByRole("alert");
@@ -611,7 +611,7 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /К выгрузке:/ }),
+      screen.getByRole("button", { name: /Отправить на проверку:/ }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
     await waitFor(() =>
@@ -650,7 +650,7 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /К выгрузке:/ }),
+      screen.getByRole("button", { name: /Отправить на проверку:/ }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
     await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(readyDraft.id));

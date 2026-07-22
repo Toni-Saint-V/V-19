@@ -15,6 +15,9 @@ import { formatSubmissionListTitle } from "../listFormatters";
 import { submissionPublicId } from "../submissionIdentity";
 import { applicantCountLabel, tripDates } from "../selectors";
 import type { DrawerTab, Issue } from "../types";
+import { CaseCopilotBriefCard } from "./CaseCopilotBriefCard";
+import { WorkspaceIntelligencePulse } from "./WorkspaceIntelligencePulse";
+import { agentInteractionProps } from "../agentInteractionContract";
 
 type EmptyState = {
   action: string;
@@ -80,7 +83,11 @@ export function AgentActionsCommandCockpit({
         <div className="v19-empty-state is-error" role="alert">
           <h3>Не удалось загрузить действия.</h3>
           <p>{errorMessage}</p>
-          <Button variant="secondary" onClick={onEmptyAction}>
+          <Button
+            {...agentInteractionProps("actions.retry")}
+            variant="secondary"
+            onClick={onEmptyAction}
+          >
             Повторить
           </Button>
         </div>
@@ -116,10 +123,18 @@ export function AgentActionsCommandCockpit({
   if (!tasks.length) {
     return (
       <div className="v19-actions-cockpit-empty" data-testid="agent-actions-cockpit">
-        <div className="v19-empty-state">
+        <div className="v19-empty-state" role="status">
           <h3>{emptyState.title}</h3>
           <p>{emptyState.body}</p>
-          <Button variant="secondary" onClick={onEmptyAction}>
+          <Button
+            {...agentInteractionProps(
+              emptyState.action === "Новая подача"
+                ? "shell.create-submission"
+                : "actions.reset-filters",
+            )}
+            variant="secondary"
+            onClick={onEmptyAction}
+          >
             {emptyState.action}
           </Button>
         </div>
@@ -128,6 +143,12 @@ export function AgentActionsCommandCockpit({
   }
 
   const activeTask = selectedTask ?? tasks[0];
+  const intelligenceTasks = summaryTasks ?? tasks;
+  const intelligenceSubmissions = Array.from(
+    new Map(
+      intelligenceTasks.map((task) => [task.submission.id, task.submission] as const),
+    ).values(),
+  );
 
   return (
     <div
@@ -141,6 +162,19 @@ export function AgentActionsCommandCockpit({
           summary={summary}
           tasks={summaryTasks ?? tasks}
           onFilterChange={onSummaryFilterChange}
+        />
+      ) : null}
+
+      {showSummary ? (
+        <WorkspaceIntelligencePulse
+          role="agent"
+          submissions={intelligenceSubmissions}
+          onOpenSubmission={(submissionId) => {
+            const target = intelligenceTasks.find(
+              (task) => task.submission.id === submissionId,
+            );
+            if (target) onSelectTask(target);
+          }}
         />
       ) : null}
 
@@ -299,6 +333,7 @@ function SummarySignal({
 }) {
   return (
     <V19SignalButton
+      {...agentInteractionProps("actions.summary-filter")}
       active={active}
       ariaLabel={`Фильтр: ${label}. ${valueLabel}. ${note}`}
       className="v19-actions-summary-signal"
@@ -341,6 +376,7 @@ function ActionTaskCard({
 
   return (
     <button
+      {...agentInteractionProps("actions.select-task")}
       className={cn(
         "v19-actions-queue-item",
         "v19-actions-table-row",
@@ -363,7 +399,9 @@ function ActionTaskCard({
         </span>
       </span>
       <span className="v19-actions-table-task">
-        <strong>{task.applicantName || formatSubmissionListTitle(task.submission)}</strong>
+        <strong>
+          {task.applicantName || formatSubmissionListTitle(task.submission)}
+        </strong>
         <small>{task.problem}</small>
       </span>
       <span className="v19-actions-table-dates">{dateLabel}</span>
@@ -409,6 +447,13 @@ export function AgentActionContextPanel({
         <StatusBadge status={task.status} label={task.statusLabel} />
       </div>
 
+      <CaseCopilotBriefCard
+        compact
+        role="agent"
+        submission={task.submission}
+        surface="agent"
+      />
+
       <div
         className="v19-actions-context-progress"
         aria-label={`Готовность подачи ${task.readiness.overallPercent}%`}
@@ -445,8 +490,16 @@ export function AgentActionContextPanel({
           </div>
           <div className="v19-actions-blocker-list">
             {openIssues.slice(0, 2).map((issue) => (
-              <button key={issue.id} type="button" onClick={() => onOpenIssue(issue)}>
-                <span className="v19-actions-status-node status-error" aria-hidden="true" />
+              <button
+                {...agentInteractionProps("actions.open-issue")}
+                key={issue.id}
+                type="button"
+                onClick={() => onOpenIssue(issue)}
+              >
+                <span
+                  className="v19-actions-status-node status-error"
+                  aria-hidden="true"
+                />
                 <span>
                   <strong>{issue.reason}</strong>
                   <small>{issue.target.applicantName}</small>
@@ -460,11 +513,7 @@ export function AgentActionContextPanel({
       <div className="v19-actions-active-meta" aria-label="Информация по подаче">
         <MetaItem label="ФИО" value={task.applicantName} />
         <MetaItem label="ID" value={submissionPublicId(task.submission)} />
-        <MetaItem
-          breakAfterSeparator
-          label="Направление"
-          value={task.destination}
-        />
+        <MetaItem breakAfterSeparator label="Направление" value={task.destination} />
         <MetaItem label="Даты поездки" value={tripDates(task.submission)} />
         <MetaItem
           label="Заявители"
@@ -480,6 +529,7 @@ export function AgentActionContextPanel({
         ) : null}
         <div className="v19-actions-summary-cta">
           <Button
+            {...agentInteractionProps("actions.open-primary")}
             aria-describedby={disabledReason ? disabledReasonId : undefined}
             disabled={Boolean(disabledReason)}
             title={disabledReason || undefined}
@@ -489,7 +539,12 @@ export function AgentActionContextPanel({
           >
             {task.nextAction.primaryLabel}
           </Button>
-          <Button variant="secondary" wide onClick={onOpenSecondary}>
+          <Button
+            {...agentInteractionProps("actions.open-secondary")}
+            variant="secondary"
+            wide
+            onClick={onOpenSecondary}
+          >
             {task.secondaryAction.label}
           </Button>
         </div>
@@ -599,6 +654,7 @@ function ReadinessLine({
 }) {
   return (
     <button
+      {...agentInteractionProps("actions.open-tab")}
       className={cn("v19-actions-readiness-line", `state-${state}`)}
       type="button"
       onClick={() => onOpen(tab)}
@@ -634,6 +690,7 @@ function TimelineEvent({
     >
       <span className="v19-actions-timeline-node" aria-hidden="true" />
       <button
+        {...agentInteractionProps("actions.select-task")}
         className="v19-actions-timeline-hit"
         aria-label={`Открыть действие: ${task.statusLabel}. ${formatSubmissionListTitle(task.submission)}. ${task.problem}`}
         type="button"

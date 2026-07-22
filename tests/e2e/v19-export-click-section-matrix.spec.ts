@@ -8,7 +8,7 @@ import {
 } from "./v19-pilot-helpers";
 
 function exportRowById(page: Page, submissionId: string) {
-  return page.locator(".export-row").filter({ hasText: submissionId }).first();
+  return page.getByTestId(`admin-export-row-${submissionId}`);
 }
 
 function exportRail(page: Page) {
@@ -38,7 +38,7 @@ test.describe("V-19 export click and section matrix", () => {
     await openFreshWorkspace(page, { workspaceEmail: "admin@visaflow.local" });
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+      page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, "desktop export initial");
 
@@ -134,7 +134,7 @@ test.describe("V-19 export click and section matrix", () => {
     await openFreshWorkspace(page, { workspaceEmail: "admin@visaflow.local" });
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+      page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, "mobile export initial");
 

@@ -22,6 +22,7 @@ import {
   type ProductPackageType,
 } from '../modules/submissions/productIntakeFlow';
 import type { PassportExtractionField } from '../modules/submissions/passportExtractionContract';
+import { agentInteractionProps } from '../modules/submissions/agentInteractionContract';
 import type { PreliminaryIntakeDraft } from '../modules/submissions/types';
 
 interface PreUploadScreenProps {
@@ -156,6 +157,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   const passportExtractionAbortControllerRef = useRef<AbortController | null>(null);
   const previousRecognizedCountRef = useRef(0);
   const timersRef = useRef<number[]>([]);
+  const actionPendingRef = useRef(false);
 
   const applicantCount = packageType === 'family' ? familyApplicantCount : 1;
   const assignedFiles = useMemo(() => {
@@ -344,7 +346,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   };
 
   const handleFiles = (fileList: FileList | File[]) => {
-    if (actionPending) return;
+    if (actionPendingRef.current) return;
     const browserFiles = createBrowserIntakeFiles(Array.from(fileList), packageType);
     if (!browserFiles.length) return;
 
@@ -392,7 +394,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     event.currentTarget.value = '';
   };
 
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setDropActive(false);
     pendingApplicantIndexRef.current = null;
@@ -400,7 +402,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   };
 
   const openFilePicker = (applicantIndex: number | null) => {
-    if (actionPending) return;
+    if (actionPendingRef.current) return;
     pendingApplicantIndexRef.current = applicantIndex;
     fileInputRef.current?.click();
   };
@@ -435,6 +437,8 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   };
 
   const completeDraft = async () => {
+    if (actionPendingRef.current) return;
+    actionPendingRef.current = true;
     setActionError('');
     setActionPending(true);
     try {
@@ -445,11 +449,14 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     } catch {
       setActionError('Не удалось создать подачу. Повторите попытку.');
     } finally {
+      actionPendingRef.current = false;
       setActionPending(false);
     }
   };
 
   const saveDraft = async () => {
+    if (actionPendingRef.current) return;
+    actionPendingRef.current = true;
     setActionError('');
     setActionPending(true);
     try {
@@ -460,6 +467,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     } catch {
       setActionError('Не удалось сохранить черновик. Повторите попытку.');
     } finally {
+      actionPendingRef.current = false;
       setActionPending(false);
     }
   };
@@ -522,8 +530,9 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
       className="v19-preupload-screen fixed inset-0 z-50 flex flex-col overflow-hidden bg-[var(--v19-depth-canvas)] text-[var(--v19-depth-text)]"
       role="dialog"
     >
-      <header className="h-[64px] shrink-0 border-b border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
+      <header className="v19-preupload-header h-[64px] shrink-0 border-b border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
         <button
+          {...agentInteractionProps('new-submission.back')}
           aria-label="Назад"
           disabled={actionPending}
           onClick={onBack}
@@ -540,6 +549,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
           </h1>
         </div>
         <button
+          {...agentInteractionProps('new-submission.back')}
           aria-label="Закрыть создание"
           disabled={actionPending}
           onClick={onBack}
@@ -549,9 +559,9 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         </button>
       </header>
 
-      <main className="h-[calc(100dvh-64px)] flex-1 min-h-0 overflow-hidden p-0">
-        <div className="grid h-full min-h-full w-full grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] xl:gap-6 xl:p-6">
-          <section className="flex h-full min-h-0 flex-col">
+      <main className="v19-preupload-main h-[calc(100dvh-64px)] flex-1 min-h-0 overflow-hidden p-0">
+        <div className="v19-preupload-layout grid h-full min-h-full w-full grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] xl:gap-6 xl:p-6">
+          <section className="v19-preupload-primary flex h-full min-h-0 flex-col">
             <motion.div
               className="v19-preupload-card relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-gradient-to-br from-[var(--v19-depth-panel-strong)] to-[var(--v19-depth-page)] px-5 pb-0 pt-5 shadow-[var(--v19-depth-shadow-panel)] lg:px-6 lg:pb-0 lg:pt-6 xl:rounded-3xl xl:border xl:border-[var(--v19-depth-border-strong)]"
             >
@@ -563,7 +573,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
               />
               <div className="relative z-10 mb-4 shrink-0">
                 <div className="relative w-full space-y-3">
-                  <div className="flex w-fit rounded-full border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-page)] p-1 shadow-[var(--v19-depth-inner-highlight)]">
+                  <div className="v19-preupload-package-toggle flex w-fit rounded-full border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-page)] p-1 shadow-[var(--v19-depth-inner-highlight)]">
                     {[
                       { icon: UsersRound, label: 'Семья', type: 'family' as const },
                       { icon: UserRound, label: 'Заявитель', type: 'single' as const },
@@ -573,11 +583,12 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
                       return (
                           <button
+                            {...agentInteractionProps('new-submission.configure')}
                             key={item.type}
                             type="button"
                             disabled={actionPending}
                             onClick={() => resetScenario(item.type)}
-                          className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${
+                          className={`v19-preupload-package-option flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${
                             active
                               ? 'bg-[var(--v19-depth-accent-soft)] text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)]'
                               : 'text-[var(--v19-depth-text-faint)] hover:bg-[var(--v19-depth-control-hover)] hover:text-[var(--v19-depth-text)]'
@@ -616,6 +627,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                           return (
                             <article className={[file ? 'has-file' : '', passportRecognized ? 'is-recognized' : '', packageType === 'single' ? 'is-single' : ''].filter(Boolean).join(' ')} key={applicantIndex} role="listitem">
                               <button
+                                {...agentInteractionProps('new-submission.choose-files')}
                                 type="button"
                                 className="v19-preupload-applicant-label"
                                 disabled={actionPending}
@@ -637,6 +649,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                                 </span>
                               </button>
                               <button
+                                {...agentInteractionProps(file || isRemovableApplicant ? 'new-submission.manage-file' : 'new-submission.choose-files')}
                                 type="button"
                                 className="v19-preupload-applicant-icon"
                                 disabled={actionPending}
@@ -672,6 +685,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                         {packageType === 'family' ? (
                           <article className="v19-preupload-add-applicant" role="listitem">
                             <button
+                              {...agentInteractionProps('new-submission.configure')}
                               aria-label="Добавить следующего заявителя"
                               disabled={actionPending}
                               type="button"
@@ -708,7 +722,11 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   </div>
                 ) : null}
 
-                <div
+                <button
+                  {...agentInteractionProps('new-submission.choose-files')}
+                  aria-label="Выбрать файлы"
+                  disabled={actionPending}
+                  type="button"
                   onDragOver={(event) => {
                     event.preventDefault();
                     setDropActive(true);
@@ -741,28 +759,21 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 <p className="text-[13px] text-white/45 leading-relaxed mt-2 max-w-md">
                   Если вы загрузите паспорт, то вам меньше придется заполнять.
                 </p>
-                <button
-                  type="button"
-                  disabled={actionPending}
-                  className="v19-file-picker-button mt-3"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openFilePicker(null);
-                  }}
-                >
+                <span className="v19-file-picker-button mt-3">
                   Выбрать файл
+                </span>
                 </button>
-                  <input ref={fileInputRef} type="file" multiple={packageType === 'family'} accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" disabled={actionPending} onClick={(event) => event.stopPropagation()} onChange={handleFileInput} />
-                </div>
+                <input {...agentInteractionProps('new-submission.choose-files')} ref={fileInputRef} type="file" multiple={packageType === 'family'} accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" disabled={actionPending} onChange={handleFileInput} />
               </div>
 
-              <div className="sticky bottom-0 z-20 -mx-5 grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] px-5 pb-4 pt-3 lg:-mx-6 lg:px-6 xl:rounded-b-3xl">
+              <div className="v19-preupload-footer sticky bottom-0 z-20 -mx-5 grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] px-5 pb-4 pt-3 lg:-mx-6 lg:px-6 xl:rounded-b-3xl">
                 {actionError ? (
                   <p className="col-span-2 m-0 text-left text-[12px] text-[var(--v19b-status-danger-text)]" role="alert">
                     {actionError}
                   </p>
                 ) : null}
                 <button
+                  {...agentInteractionProps('new-submission.save-draft')}
                   type="button"
                   disabled={actionPending}
                   onClick={() => void saveDraft()}
@@ -771,6 +782,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   {actionPending ? 'Сохраняем…' : 'Сохранить'}
                 </button>
                 <button
+                  {...agentInteractionProps('new-submission.continue')}
                   type="button"
                   onClick={() => void completeDraft()}
                   aria-disabled={actionPending}
@@ -783,7 +795,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
             </motion.div>
           </section>
 
-          <aside className="hidden min-h-0 space-y-5 xl:block">
+          <aside className="v19-preupload-rail hidden min-h-0 space-y-5 xl:block">
             <div className="sticky top-0 hidden overflow-hidden rounded-2xl border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel)] p-5 shadow-[var(--v19-depth-shadow-card)] xl:flex xl:h-[calc(100dvh-112px)] xl:max-h-[calc(100dvh-112px)] xl:flex-col">
               <div className="mb-4 flex h-[96px] shrink-0 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.025] p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -800,6 +812,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
           {previewFields.length > 0 && !mobilePrefillOpen ? (
             <button
+              {...agentInteractionProps('new-submission.toggle-prefill')}
               aria-label="Открыть распознанные OCR-поля"
               className="v19-preupload-prefill-trigger"
               type="button"
@@ -820,6 +833,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 initial={{ opacity: 0 }}
               >
                 <button
+                  {...agentInteractionProps('new-submission.toggle-prefill')}
                   aria-label="Закрыть распознанные OCR-поля"
                   className="v19-preupload-prefill-backdrop"
                   type="button"
@@ -843,6 +857,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                     </div>
                     <span>{recognizedCount} OCR</span>
                     <button
+                      {...agentInteractionProps('new-submission.toggle-prefill')}
                       aria-label="Закрыть"
                       type="button"
                       onClick={() => setMobilePrefillOpen(false)}

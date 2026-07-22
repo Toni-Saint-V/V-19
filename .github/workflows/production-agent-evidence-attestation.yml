@@ -1,0 +1,46 @@
+name: Production agent evidence attestation
+
+on:
+  workflow_dispatch:
+
+# Security boundary: owner-uploaded JSON, screenshots, and ledgers are not a
+# trusted observation source. This workflow deliberately cannot mint an
+# attestation until a protected runner/provider capture job exists and builds
+# the v2 manifest from its own Chrome, Supabase, and Vercel observations.
+permissions:
+  contents: read
+
+concurrency:
+  group: production-agent-evidence-attestation
+  cancel-in-progress: false
+
+jobs:
+  blocked-until-runner-capture:
+    if: github.ref == 'refs/heads/main'
+    environment: production-evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          cache: npm
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Run local release contracts
+        run: |
+          npm run typecheck
+          npx vitest run tests/unit/agentInteractionProductionEvidenceVerifier.spec.ts
+
+      - name: Block assertion-only attestation
+        run: |
+          echo 'BLOCKED: trusted v2 evidence must be captured by a protected runner or verified provider-signed raw capture.'
+          echo 'Owner-uploaded summaries may be supplemental, but this workflow will not sign them.'
+          exit 1

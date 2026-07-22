@@ -54,6 +54,23 @@ function reviewReadySubmission(submissionId = "ПД-1056"): Submission {
   return submission;
 }
 
+async function revealReviewMedia(
+  targets: Array<"Паспорт" | "Селфи 1" | "Селфи 2">,
+) {
+  const altByTarget = {
+    Паспорт: "Оригинал загранпаспорта",
+    "Селфи 1": "Первое селфи заявителя",
+    "Селфи 2": "Второе селфи заявителя",
+  } as const;
+
+  for (const target of targets) {
+    fireEvent.click(screen.getByRole("tab", { name: target }));
+    const image = await screen.findByRole("img", { name: altByTarget[target] });
+    fireEvent.load(image);
+    await waitFor(() => expect(image).toHaveClass("is-ready"));
+  }
+}
+
 function AdminReviewExportHarness({
   initialSubmission,
   onAction,
@@ -393,7 +410,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     );
   });
 
-  test("renders queue cards in their colored review lanes", () => {
+  test("renders queue cards in the prioritized queue and exposes lane filters", () => {
     const review = initialSubmissions.find((item) => item.id === "ПД-1053");
     const returned = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!review || !returned) throw new Error("Expected review queue fixtures.");
@@ -413,18 +430,13 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     ).toHaveTextContent("VF-1053");
     expect(
       container.querySelectorAll(
-        '.v19-admin-review-lane[data-lane="review"] > div > [data-submission-card]',
+        '.v19-review-queue-list [data-submission-card]',
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(
-      container.querySelectorAll(
-        '.v19-admin-review-lane[data-lane="returned"] > div > [data-submission-card]',
-      ),
-    ).toHaveLength(1);
-    expect(container.querySelectorAll(".v19-admin-review-lane")).toHaveLength(3);
-    expect(
-      container.querySelectorAll(".v19-admin-review-lane-header"),
-    ).toHaveLength(3);
+      screen.getByRole("tab", { name: /Первичная проверка/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Исправления/ })).toBeInTheDocument();
   });
 
   test("keeps blocker styling and applicant metadata on the colored card", () => {
@@ -451,7 +463,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     const card = container.querySelector('[data-submission-id="ПД-1053"]');
     expect(card).toHaveClass("has-blocker");
     expect(card).toHaveTextContent("1 чел.");
-    expect(card).toHaveTextContent("1 критичных");
+    expect(card).toHaveTextContent("1 блокер");
   });
 
   test("does not expose internal questionnaire status values", async () => {
@@ -1393,9 +1405,13 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
+    await revealReviewMedia(["Паспорт"]);
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
+    );
+    fireEvent.load(
+      screen.getByRole("img", { name: "Первое селфи заявителя" }),
     );
     expect(
       screen.getByRole("group", {
@@ -1408,6 +1424,9 @@ describe("ReviewWorkspace passport section contract", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible(),
+    );
+    fireEvent.load(
+      screen.getByRole("img", { name: "Второе селфи заявителя" }),
     );
     const confirmButton = screen.getByRole("button", {
       name: "Подтвердить паспортную секцию",
@@ -1523,6 +1542,8 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
+    await revealReviewMedia(["Паспорт", "Селфи 1", "Селфи 2"]);
+
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
@@ -1565,6 +1586,8 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       await screen.findByRole("dialog", { name: "Сверка паспорта" }),
     ).toBeVisible();
+
+    await revealReviewMedia(["Паспорт", "Селфи 1", "Селфи 2"]);
 
     const confirmButton = await screen.findByRole("button", {
       name: "Подтвердить паспортную секцию",
@@ -1616,6 +1639,7 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
+    await revealReviewMedia(["Паспорт"]);
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(1);
     expect(
       screen.queryByTestId("protected-media-preview-selfie"),
@@ -1690,6 +1714,7 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
     );
+    await revealReviewMedia(["Паспорт", "Селфи 1"]);
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(2);
     expect(
       screen.queryByTestId("protected-media-preview-selfie_2"),

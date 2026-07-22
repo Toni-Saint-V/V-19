@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type SetStateAction,
-} from "react";
+import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { Badge, Button } from "../../../shared/ui/primitives";
@@ -14,80 +7,6 @@ import type { SubmissionHistoryItem } from "../types";
 import { ProgressMeter } from "./CollectionPrimitives";
 
 export type RailBadgeTone = "amber" | "blue" | "danger" | "default" | "muted" | "teal";
-
-export function useRailDisclosure({
-  defaultOpen = false,
-  enabled,
-  onClose,
-  transition,
-}: {
-  defaultOpen?: boolean;
-  enabled: boolean;
-  onClose?: () => void;
-  transition?: (update: () => void) => void;
-}) {
-  const [open, setOpen] = useState(() => enabled && defaultOpen);
-  const userClosedRef = useRef(false);
-  const previousEnabledRef = useRef(enabled);
-  const commit = useMemo(
-    () => transition ?? ((update: () => void) => update()),
-    [transition],
-  );
-
-  useEffect(() => {
-    const wasEnabled = previousEnabledRef.current;
-    previousEnabledRef.current = enabled;
-
-    if (!enabled) {
-      if (open) commit(() => setOpen(false));
-      return;
-    }
-
-    if (!wasEnabled && defaultOpen && !userClosedRef.current) {
-      commit(() => setOpen(true));
-    }
-  }, [commit, defaultOpen, enabled, open]);
-
-  useEffect(() => {
-    if (!enabled || !open) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      userClosedRef.current = true;
-      commit(() => setOpen(false));
-      onClose?.();
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [commit, enabled, onClose, open]);
-
-  return {
-    close: () => {
-      userClosedRef.current = true;
-      commit(() => setOpen(false));
-      onClose?.();
-    },
-    open,
-    setOpen: (nextValue: SetStateAction<boolean>) =>
-      commit(() =>
-        setOpen((current) => {
-          const next =
-            typeof nextValue === "function" ? nextValue(current) : nextValue;
-          userClosedRef.current = !next;
-          return next;
-        }),
-      ),
-    toggle: () =>
-      commit(() =>
-        setOpen((value) => {
-          const next = !value;
-          userClosedRef.current = !next;
-          return next;
-        }),
-      ),
-  };
-}
 
 export function RailCard({
   children,
@@ -187,7 +106,10 @@ export function RailIssueList({
             type="button"
             onClick={issue.onOpen}
           >
-            <span className={`v19-rail-issue-dot tone-${issue.tone}`} aria-hidden="true" />
+            <span
+              className={`v19-rail-issue-dot tone-${issue.tone}`}
+              aria-hidden="true"
+            />
             <span>
               <strong>{issue.reason}</strong>
               <small>{issue.targetLine}</small>
@@ -224,11 +146,7 @@ export function RailQuickLinks({
   );
 }
 
-export function RailHistoryList({
-  history,
-}: {
-  history: SubmissionHistoryItem[];
-}) {
+export function RailHistoryList({ history }: { history: SubmissionHistoryItem[] }) {
   return (
     <RailCard className="v19-rail-history-card">
       <p className="v19-rail-label">Последние изменения</p>

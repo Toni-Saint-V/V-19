@@ -7,6 +7,10 @@ import {
 } from "../../../shared/ui/primitives";
 import { statusLabels, statusTone } from "../status";
 import type { Submission } from "../types";
+import {
+  agentInteractionProps,
+  type AgentInteractionId,
+} from "../agentInteractionContract";
 
 export function PanelHeader<T extends string>({
   action,
@@ -101,8 +105,10 @@ export function EmptyState({ text }: { text: string }) {
 export function ConfirmationDialog({
   busy = false,
   cancelLabel = "Остаться",
+  cancelInteractionId,
   confirmDanger = true,
   confirmLabel = "Закрыть без сохранения",
+  confirmInteractionId,
   description = "Черновик изменён. Закрытие без сохранения потребует подтверждения.",
   error,
   kicker = "Несохранённые изменения",
@@ -112,8 +118,10 @@ export function ConfirmationDialog({
 }: {
   busy?: boolean;
   cancelLabel?: string;
+  cancelInteractionId?: AgentInteractionId;
   confirmDanger?: boolean;
   confirmLabel?: string;
+  confirmInteractionId?: AgentInteractionId;
   description?: ReactNode;
   error?: ReactNode;
   kicker?: string;
@@ -220,6 +228,9 @@ export function ConfirmationDialog({
         ) : null}
         <div className="dialog-actions">
           <Button
+            {...(cancelInteractionId
+              ? agentInteractionProps(cancelInteractionId)
+              : {})}
             ref={cancelButtonRef}
             disabled={busy}
             variant="secondary"
@@ -230,6 +241,9 @@ export function ConfirmationDialog({
             {cancelLabel}
           </Button>
           <Button
+            {...(confirmInteractionId
+              ? agentInteractionProps(confirmInteractionId)
+              : {})}
             danger={confirmDanger}
             loading={busy}
             onClick={() => {

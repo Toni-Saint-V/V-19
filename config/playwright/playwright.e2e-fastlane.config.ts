@@ -41,6 +41,7 @@ export default defineConfig({
     },
   ],
   webServer: {
+    cwd: "../..",
     command: `npx vite --host ${e2eServerHost} --port ${e2ePort} --strictPort`,
     url: e2eUrl,
     // Keep fastlane evidence bound to its own local-demo server as well.

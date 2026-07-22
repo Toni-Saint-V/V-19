@@ -105,6 +105,76 @@
 }
 
 .vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-save-error-copy {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  flex: 1 1 var(--v19b-size-320);
+  gap: var(--v19b-size-2);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-save-error-copy
+  strong {
+  color: var(--v19b-color-text-strong);
+  font-weight: var(--v19b-weight-title);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-save-error-actions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--v19b-size-8);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-save-error-actions
+  button {
+  min-height: var(--v19b-size-36);
+  padding: var(--v19b-size-0) var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-status-danger-border);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-control);
+  font: inherit;
+  font-weight: var(--v19b-weight-control);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-save-error-actions
+  button:is(:hover, :focus-visible) {
+  background: var(--v19b-color-control-hover);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-save-error-warning {
+  flex: 1 1 var(--v19b-size-280);
+  color: var(--v19b-color-text-strong);
+}
+
+@media (max-width: 767px) {
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-save-error {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-save-error-actions {
+    width: var(--v19b-size-full);
+    justify-content: stretch;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-save-error-actions
+    button {
+    flex: 1 1 var(--v19b-size-160);
+  }
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
   .v19-questionnaire-save-error
   svg {
   width: var(--v19b-size-18);
@@ -551,10 +621,6 @@
   flex: 0 0 auto;
   justify-content: flex-end;
   padding: var(--v19b-size-0) var(--v19b-size-24) var(--v19b-size-16);
-}
-
-.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-mobile-footer {
-  display: none;
 }
 
 .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-next-button {
@@ -1298,10 +1364,37 @@
 }
 
 @media (max-width: 767px) {
-  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-screen-header,
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-progress-track,
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-applicant-bar {
     display: none !important;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-screen-header {
+    display: grid !important;
+    min-height: var(--v19b-size-60) !important;
+    flex: 0 0 auto;
+    grid-template-columns: var(--v19b-size-44) minmax(
+        var(--v19b-size-0),
+        var(--v19b-grid-fr)
+      ) auto;
+    gap: var(--v19b-size-6) !important;
+    padding: var(--v19b-size-6) var(--v19b-size-8) !important;
+    border-bottom: var(--v19b-size-1) solid var(--questionnaire-polish-line) !important;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-tourist-switcher {
+    max-width: none;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-tourist-switcher
+    select {
+    font-size: var(--v19b-size-14);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-save-button {
+    padding-inline: var(--v19b-size-8) !important;
+    font-size: var(--v19b-size-11) !important;
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-scroll {
@@ -1347,7 +1440,15 @@
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-next-action-bar {
-    display: none !important;
+    position: static;
+    display: flex !important;
+    width: var(--v19b-size-full);
+    margin-inline: var(--v19b-size-0);
+    padding: var(--v19b-size-12) var(--v19b-size-0)
+      max(var(--v19b-size-16), env(safe-area-inset-bottom));
+    border-top: var(--v19b-size-0);
+    background: transparent;
+    box-shadow: none;
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-mobile-footer {

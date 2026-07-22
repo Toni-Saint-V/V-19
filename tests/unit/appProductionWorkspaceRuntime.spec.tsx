@@ -1,5 +1,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { SignOutCurrentSessionResult } from "../../src/services/authService";
+import type { AccessRequest } from "../../src/shared/authContract";
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
 
 const runtime = vi.hoisted(() => ({
   actionActorId: "",
@@ -17,6 +29,19 @@ const runtime = vi.hoisted(() => ({
   resolveSave: undefined as unknown as (value: Map<string, string>) => void,
   rejectSave: undefined as unknown as (error: Error) => void,
   exportStateCalls: [] as string[],
+}));
+
+const authMocks = vi.hoisted(() => ({
+  signInSupabaseWithPassword: vi.fn(),
+  signOutCurrentSession: vi.fn<() => Promise<SignOutCurrentSessionResult>>(
+    async () => ({ status: "signed_out" }),
+  ),
+}));
+
+const accessRequestMocks = vi.hoisted(() => ({
+  approveAccessRequest: vi.fn(),
+  listAccessRequests: vi.fn(),
+  rejectAccessRequest: vi.fn(),
 }));
 
 const exportMocks = vi.hoisted(() => ({
@@ -119,7 +144,25 @@ vi.mock("motion/react", async () => {
 });
 
 vi.mock("../../src/components/AccessGate", () => ({
-  AccessGate: () => <div data-testid="access-gate" />,
+  AccessGate: ({
+    error,
+    onLogin,
+  }: {
+    error?: string;
+    onLogin: (email: string, password: string) => Promise<void>;
+  }) => (
+    <div data-testid="access-gate">
+      {error}
+      <button
+        type="button"
+        onClick={() => {
+          runtime.lastMutationPromise = onLogin("admin-b@example.test", "password");
+        }}
+      >
+        Login admin B
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../../src/components/CommandCenter", () => ({
@@ -132,7 +175,21 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
   >("../../src/integration/visaflowBusinessBridge");
 
   return {
-    AdminWorkspace: ({ submissions }: { submissions: Array<{ id: string }> }) => {
+    AdminWorkspace: ({
+      accessRequests,
+      currentEmail,
+      onApproveAccessRequest,
+      onRejectAccessRequest,
+      onSignOut,
+      submissions,
+    }: {
+      accessRequests: Array<{ id: string; status: string }>;
+      currentEmail: string;
+      onApproveAccessRequest: (requestId: string) => void | Promise<void>;
+      onRejectAccessRequest: (requestId: string) => void | Promise<void>;
+      onSignOut: () => Promise<void>;
+      submissions: Array<{ id: string }>;
+    }) => {
       const bridge = useVisaflowBusinessBridge();
       const capture = (promise: void | Promise<void> | undefined) => {
         runtime.lastMutationPromise = Promise.resolve(promise).catch((error) => {
@@ -142,7 +199,30 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
 
       return (
         <div data-testid="admin-workspace">
+          <span data-testid="current-admin-email">{currentEmail}</span>
           <span data-testid="submission-count">{submissions.length}</span>
+          <button type="button" onClick={() => capture(onSignOut())}>
+            Sign out session
+          </button>
+          {accessRequests.map((request) => (
+            <div key={request.id}>
+              <span data-testid={`access-request-${request.id}-status`}>
+                {request.status}
+              </span>
+              <button
+                type="button"
+                onClick={() => capture(onApproveAccessRequest(request.id))}
+              >
+                Approve access request
+              </button>
+              <button
+                type="button"
+                onClick={() => capture(onRejectAccessRequest(request.id))}
+              >
+                Reject access request
+              </button>
+            </div>
+          ))}
           <button
             type="button"
             onClick={() =>
@@ -198,8 +278,12 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
                   archiveInputSignature: "archive-input-a",
                   documentExport: {
                     applicantCount: 1,
-                    assetIds: ["00000000-0000-4000-8000-000000000801"],
-                    fileCount: 2,
+                    assetIds: [
+                      "00000000-0000-4000-8000-000000000801",
+                      "00000000-0000-4000-8000-000000000802",
+                      "00000000-0000-4000-8000-000000000803",
+                    ],
+                    fileCount: 3,
                     workbookFileName: exportRuleMocks.preparedIdentity.fileName,
                     zipFileName: `visaflow-export-${exportRuleMocks.preparedIdentity.idempotencyKey}_documents.zip`,
                   },
@@ -283,10 +367,22 @@ vi.mock("../../src/modules/submissions/exportRules", () => ({
   exportPackageIdentityMatches: exportRuleMocks.exportPackageIdentityMatches,
 }));
 
-const persistenceMocks = vi.hoisted(() => ({
-  loadCockpitSubmissionsForProfile: vi.fn(() => runtime.loadPromise),
-  saveCockpitSubmissionsForProfile: vi.fn(() => runtime.savePromise),
-}));
+const persistenceMocks = vi.hoisted(() => {
+  const saveCockpitSubmissionsForProfile = vi.fn(async () => {
+    const ownerIdsBySubmissionId = await runtime.savePromise;
+    return {
+      caseRevisionsBySubmissionId: new Map([["submission-1", 2]]),
+      operationId: "00000000-0000-4000-8000-000000000901",
+      ownerIdsBySubmissionId,
+    };
+  });
+  return {
+    isAdminSubmissionConcurrencyConflict: vi.fn(() => false),
+    loadCockpitSubmissionsForProfile: vi.fn(() => runtime.loadPromise),
+    saveAdminCockpitSubmissionsIfCurrent: saveCockpitSubmissionsForProfile,
+    saveCockpitSubmissionsForProfile,
+  };
+});
 
 vi.mock("../../src/modules/submissions/supabasePersistence", () => persistenceMocks);
 
@@ -309,9 +405,7 @@ vi.mock("../../src/shared/authRegistration", () => ({
 }));
 
 vi.mock("../../src/shared/supabaseAuthRegistration", () => ({
-  supabaseAccessRequestRepository: {
-    listAccessRequests: vi.fn(async () => []),
-  },
+  supabaseAccessRequestRepository: accessRequestMocks,
 }));
 
 vi.mock("../../src/services/authService", () => ({
@@ -333,8 +427,8 @@ vi.mock("../../src/services/authService", () => ({
     },
   })),
   requestPasswordReset: vi.fn(),
-  signInSupabaseWithPassword: vi.fn(),
-  signOutCurrentSession: vi.fn(async () => undefined),
+  signInSupabaseWithPassword: authMocks.signInSupabaseWithPassword,
+  signOutCurrentSession: authMocks.signOutCurrentSession,
 }));
 
 vi.mock("../../src/services/supabaseInviteFlow", () => ({
@@ -364,8 +458,19 @@ function resetDeferredRuntime() {
     runtime.resolveSave = resolve;
     runtime.rejectSave = reject;
   });
-  persistenceMocks.loadCockpitSubmissionsForProfile.mockClear();
-  persistenceMocks.saveCockpitSubmissionsForProfile.mockClear();
+  persistenceMocks.loadCockpitSubmissionsForProfile.mockReset();
+  persistenceMocks.loadCockpitSubmissionsForProfile.mockImplementation(
+    () => runtime.loadPromise,
+  );
+  persistenceMocks.saveCockpitSubmissionsForProfile.mockReset();
+  persistenceMocks.saveCockpitSubmissionsForProfile.mockImplementation(async () => {
+    const ownerIdsBySubmissionId = await runtime.savePromise;
+    return {
+      caseRevisionsBySubmissionId: new Map([["submission-1", 2]]),
+      operationId: "00000000-0000-4000-8000-000000000901",
+      ownerIdsBySubmissionId,
+    };
+  });
   exportMocks.completeExportPackage.mockClear();
   exportMocks.reconcileExportPackageCompletion.mockClear();
   exportRuleMocks.buildExportArchiveInputSignature.mockClear();
@@ -394,16 +499,282 @@ const loadedSubmission = {
   id: "submission-1",
 };
 
+const pendingAccessRequest: AccessRequest = {
+  city: "Москва",
+  companyName: "Response Lost Travel",
+  createdAt: "2026-07-22T09:00:00.000Z",
+  email: "response-lost@example.test",
+  fullName: "Response Lost Agent",
+  id: "access-request-response-lost",
+  phone: "+7 000 000-00-09",
+  requestedRole: "agent",
+  status: "pending",
+  userId: "response-lost-user",
+};
+
 beforeEach(() => {
   resetDeferredRuntime();
+  accessRequestMocks.approveAccessRequest.mockReset();
+  accessRequestMocks.listAccessRequests.mockReset();
+  accessRequestMocks.listAccessRequests.mockResolvedValue([]);
+  accessRequestMocks.rejectAccessRequest.mockReset();
+  authMocks.signOutCurrentSession.mockReset();
+  authMocks.signOutCurrentSession.mockResolvedValue({ status: "signed_out" });
+  authMocks.signInSupabaseWithPassword.mockReset();
 });
 
 afterEach(() => {
   cleanup();
   vi.clearAllTimers();
+  vi.useRealTimers();
 });
 
 describe("App production workspace runtime", () => {
+  test.each([
+    ["approve", "approved", "Approve access request"],
+    ["reject", "rejected", "Reject access request"],
+  ] as const)(
+    "reconciles a response-lost access %s when the canonical row is %s",
+    async (action, terminalStatus, buttonName) => {
+      let canonicalStatus: AccessRequest["status"] = "pending";
+      const decisionMock =
+        action === "approve"
+          ? accessRequestMocks.approveAccessRequest
+          : accessRequestMocks.rejectAccessRequest;
+      accessRequestMocks.listAccessRequests.mockImplementation(async () => [
+        { ...pendingAccessRequest, status: canonicalStatus },
+      ]);
+      decisionMock.mockImplementationOnce(async () => {
+        canonicalStatus = terminalStatus;
+        throw new Error(`Access ${action} response was lost`);
+      });
+      runtime.loadPromise = Promise.resolve({
+        caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+
+      render(<App />);
+      await screen.findByTestId("admin-workspace");
+      expect(
+        await screen.findByTestId(
+          `access-request-${pendingAccessRequest.id}-status`,
+        ),
+      ).toHaveTextContent("pending");
+
+      fireEvent.click(screen.getByRole("button", { name: buttonName }));
+      await act(async () => runtime.lastMutationPromise);
+
+      expect(decisionMock).toHaveBeenCalledWith(
+        pendingAccessRequest.id,
+        "admin-production-uuid",
+      );
+      expect(runtime.lastMutationError).toBeNull();
+      expect(
+        screen.getByTestId(`access-request-${pendingAccessRequest.id}-status`),
+      ).toHaveTextContent(terminalStatus);
+    },
+  );
+
+  test("rethrows a response-lost access error while the canonical row is pending", async () => {
+    const decisionError = new Error("Access approve response was lost");
+    accessRequestMocks.listAccessRequests.mockResolvedValue([pendingAccessRequest]);
+    accessRequestMocks.approveAccessRequest.mockRejectedValueOnce(decisionError);
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Approve access request" }),
+    );
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(runtime.lastMutationError).toBe(decisionError);
+    expect(
+      screen.getByTestId(`access-request-${pendingAccessRequest.id}-status`),
+    ).toHaveTextContent("pending");
+  });
+
+  test("reloads canonical revisions before restoring a workspace after sign-out rejects", async () => {
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    authMocks.signOutCurrentSession.mockRejectedValueOnce(
+      new Error("Supabase sign-out rejected safely"),
+    );
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValueOnce({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 2]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [{ ...loadedSubmission, title: "Recovered canonical" }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(screen.getByTestId("admin-workspace")).toBeInTheDocument();
+    expect(screen.queryByTestId("access-gate")).not.toBeInTheDocument();
+    expect(authMocks.signOutCurrentSession).toHaveBeenCalledTimes(1);
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Array),
+      expect.any(Map),
+      new Map([["submission-1", 2]]),
+    );
+  });
+
+  test("releases the sign-out fence when both sign-out and recovery refresh reject", async () => {
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    authMocks.signOutCurrentSession.mockRejectedValueOnce(
+      new Error("Supabase sign-out rejected safely"),
+    );
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockRejectedValueOnce(
+      new Error("Canonical recovery refresh rejected safely"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(screen.getByTestId("admin-workspace")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Завершаем сессию" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Не удалось выйти из аккаунта. Повторите попытку.",
+    );
+    expect(runtime.lastMutationError).toEqual(
+      new Error("Supabase sign-out rejected safely"),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(await screen.findByTestId("access-gate")).toBeInTheDocument();
+    expect(authMocks.signOutCurrentSession).toHaveBeenCalledTimes(2);
+  });
+
+  test("unmounts the authenticated workspace while remote sign-out is pending", async () => {
+    const signOut = deferred<SignOutCurrentSessionResult>();
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    authMocks.signOutCurrentSession.mockReturnValueOnce(signOut.promise);
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Завершаем сессию" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-workspace")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("access-gate")).not.toBeInTheDocument();
+
+    await act(async () => {
+      signOut.resolve({ status: "signed_out" });
+      await runtime.lastMutationPromise;
+    });
+    expect(await screen.findByTestId("access-gate")).toBeInTheDocument();
+  });
+
+  test("drains a fenced in-flight mutation before failed sign-out recovery", async () => {
+    const externalIssue = vi.fn(async () => undefined);
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    authMocks.signOutCurrentSession.mockRejectedValueOnce(
+      new Error("Supabase sign-out rejected safely"),
+    );
+    render(<App bridge={{ onAdminIssueAdd: externalIssue }} />);
+    await screen.findByTestId("admin-workspace");
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValueOnce({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 3]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [{ ...loadedSubmission, title: "Recovered after drain" }],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
+    await waitFor(() =>
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+    );
+    const staleMutation = runtime.lastMutationPromise;
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    const signOutRecovery = runtime.lastMutationPromise;
+    expect(
+      await screen.findByRole("heading", { name: "Завершаем сессию" }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      runtime.resolveSave(new Map([["submission-1", "agent-owner-uuid"]]));
+      await Promise.all([staleMutation, signOutRecovery]);
+    });
+
+    expect(await screen.findByTestId("admin-workspace")).toBeInTheDocument();
+    expect(externalIssue).not.toHaveBeenCalled();
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
+    await act(async () => runtime.lastMutationPromise);
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenLastCalledWith(
+      expect.any(Object),
+      expect.any(Array),
+      expect.any(Map),
+      new Map([["submission-1", 3]]),
+    );
+  });
+
+  test("fails closed when the local session is already gone after a rejected sign-out", async () => {
+    runtime.loadPromise = Promise.resolve({
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    authMocks.signOutCurrentSession.mockResolvedValueOnce({
+      status: "local_session_cleared",
+      warning:
+        "Сеанс на этом устройстве завершён, но серверное подтверждение выхода не получено.",
+    });
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(await screen.findByTestId("access-gate")).toHaveTextContent(
+      "Сеанс на этом устройстве завершён, но серверное подтверждение выхода не получено.",
+    );
+    expect(screen.queryByTestId("admin-workspace")).not.toBeInTheDocument();
+    expect(authMocks.signOutCurrentSession).toHaveBeenCalledTimes(1);
+  });
+
   test("shows a blocking retry state instead of a false empty workspace on initial load failure", async () => {
     render(<App />);
     await screen.findByText("Загрузка данных Supabase...");
@@ -486,6 +857,260 @@ describe("App production workspace runtime", () => {
     });
   });
 
+  test("serializes competing admin mutations and rebases the later write", async () => {
+    render(<App />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValue({
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [{ ...loadedSubmission, issueApplied: true }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Approve passport section" }),
+    );
+
+    await waitFor(() =>
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+    );
+    expect(runtime.passportSectionActorId).toBe("");
+
+    await act(async () => {
+      runtime.resolveSave(new Map([["submission-1", "agent-owner-uuid"]]));
+      await runtime.lastMutationPromise;
+    });
+
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+    expect(
+      persistenceMocks.saveCockpitSubmissionsForProfile.mock.calls[1]?.[1],
+    ).toEqual([
+      expect.objectContaining({
+        id: "submission-1",
+        issueApplied: true,
+        passportSectionApproved: true,
+      }),
+    ]);
+  });
+
+  test("keeps a corrupt cockpit snapshot read-only until explicit repair", async () => {
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      quarantinedSubmissionIds: new Set(["submission-1"]),
+      submissions: [loadedSubmission],
+    });
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept submission" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
+    expect(runtime.lastMutationError?.message).toMatch(
+      /только для чтения.*snapshot повреждён/i,
+    );
+  });
+
+  test("detaches a new session from a timed-out previous-session queue", async () => {
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
+    await waitFor(() =>
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+    );
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValue({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 5]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [{ ...loadedSubmission, title: "Admin B canonical" }],
+    });
+    authMocks.signInSupabaseWithPassword.mockResolvedValue({
+      mode: "supabase",
+      profile: {
+        displayName: "Production Admin B",
+        email: "admin-b@example.test",
+        id: "admin-production-b-uuid",
+        organizationName: "VisaFlow",
+        role: "admin",
+      },
+      supabaseSession: {
+        expires_at: 2_000_000_100,
+        user: {
+          created_at: "2026-07-22T10:00:00.000Z",
+          id: "admin-production-b-uuid",
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    expect(await screen.findByTestId("access-gate")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Login admin B" }));
+    expect(
+      await screen.findByTestId("current-admin-email", undefined, {
+        timeout: 4_000,
+      }),
+    ).toHaveTextContent("admin-b@example.test");
+
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenLastCalledWith(
+      expect.any(Object),
+      expect.any(Array),
+      expect.any(Map),
+      new Map([["submission-1", 5]]),
+    );
+  });
+
+  test("fences a deferred admin A export before admin B terminal RPC and bridge", async () => {
+    const externalExport = vi.fn(async () => undefined);
+    render(<App bridge={{ onExportPackages: externalExport }} />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await waitFor(() =>
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+    );
+    const adminAMutation = runtime.lastMutationPromise;
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValue({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 2]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [{ ...loadedSubmission, title: "Admin B canonical" }],
+    });
+    authMocks.signInSupabaseWithPassword.mockResolvedValue({
+      mode: "supabase",
+      profile: {
+        displayName: "Production Admin B",
+        email: "admin-b@example.test",
+        id: "admin-production-b-uuid",
+        organizationName: "VisaFlow",
+        role: "admin",
+      },
+      supabaseSession: {
+        expires_at: 2_000_000_100,
+        user: {
+          created_at: "2026-07-22T10:00:00.000Z",
+          id: "admin-production-b-uuid",
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    expect(await screen.findByTestId("access-gate")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Login admin B" }));
+
+    await act(async () => {
+      runtime.resolveSave(new Map([["submission-1", "agent-owner-uuid"]]));
+      await adminAMutation;
+    });
+
+    expect(await screen.findByTestId("current-admin-email")).toHaveTextContent(
+      "admin-b@example.test",
+    );
+    expect(exportMocks.completeExportPackage).not.toHaveBeenCalled();
+    expect(externalExport).not.toHaveBeenCalled();
+  });
+
+  test("does not roll back or bridge an export committed while admin A logs out", async () => {
+    const terminalCommit = deferred<{
+      batch: { id: string };
+      commit: { duplicate: boolean };
+      status: "exported";
+      submissions: Array<Record<string, unknown>>;
+    }>();
+    exportMocks.completeExportPackage.mockReturnValueOnce(terminalCommit.promise);
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    const externalExport = vi.fn(async () => undefined);
+
+    render(<App bridge={{ onExportPackages: externalExport }} />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await waitFor(() =>
+      expect(exportMocks.completeExportPackage).toHaveBeenCalledTimes(1),
+    );
+    const adminAMutation = runtime.lastMutationPromise;
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValue({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 3]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [{ ...loadedSubmission, title: "Admin B after terminal commit" }],
+    });
+    authMocks.signInSupabaseWithPassword.mockResolvedValue({
+      mode: "supabase",
+      profile: {
+        displayName: "Production Admin B",
+        email: "admin-b@example.test",
+        id: "admin-production-b-uuid",
+        organizationName: "VisaFlow",
+        role: "admin",
+      },
+      supabaseSession: {
+        expires_at: 2_000_000_100,
+        user: {
+          created_at: "2026-07-22T10:00:00.000Z",
+          id: "admin-production-b-uuid",
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out session" }));
+    expect(await screen.findByTestId("access-gate")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Login admin B" }));
+
+    await act(async () => {
+      terminalCommit.resolve({
+        batch: { id: "export-batch-committed-under-admin-a" },
+        commit: { duplicate: false },
+        status: "exported",
+        submissions: [{ ...loadedSubmission, status: "exported" }],
+      });
+      await adminAMutation;
+    });
+
+    expect(await screen.findByTestId("current-admin-email")).toHaveTextContent(
+      "admin-b@example.test",
+    );
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    expect(externalExport).not.toHaveBeenCalled();
+  });
+
   test("persists the whole passport section once before notifying the external bridge", async () => {
     const externalPassportSectionApprove = vi.fn(async () => undefined);
     render(
@@ -529,6 +1154,33 @@ describe("App production workspace runtime", () => {
       submissionId: "submission-1",
     });
     expect(externalPassportSectionApprove).toHaveBeenCalledTimes(1);
+  });
+
+  test("retries an idempotent post-commit observer without replaying the domain save", async () => {
+    const observer = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("observer unavailable"))
+      .mockResolvedValueOnce(undefined);
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    render(<App bridge={{ onPostCommitEvent: observer }} />);
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
+    await act(async () => runtime.lastMutationPromise);
+    await waitFor(() => expect(observer).toHaveBeenCalledTimes(2));
+
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    expect(runtime.lastMutationError).toBeNull();
+    expect(observer.mock.calls[0]?.[0].eventId).toBe(
+      observer.mock.calls[1]?.[0].eventId,
+    );
   });
 
   test("keeps the canonical workspace and surfaces a rejected Supabase mutation", async () => {
@@ -600,6 +1252,34 @@ describe("App production workspace runtime", () => {
       persistenceMocks.saveCockpitSubmissionsForProfile.mock.invocationCallOrder[0];
     const rpcOrder = exportMocks.completeExportPackage.mock.invocationCallOrder[0];
     expect(firstPersistenceOrder).toBeLessThan(rpcOrder ?? 0);
+  });
+
+  test("resumes terminal export from a canonical file_downloaded checkpoint", async () => {
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 4]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [
+        {
+          ...loadedSubmission,
+          exportPackage: exportRuleMocks.preparedIdentity,
+          exportState: "file_downloaded",
+        },
+      ],
+    });
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(runtime.exportStateCalls).toEqual([]);
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
+    expect(exportMocks.completeExportPackage).toHaveBeenCalledWith(
+      [expect.objectContaining({ exportState: "file_downloaded" })],
+      expect.objectContaining({ createdBy: "admin-production-uuid" }),
+    );
+    expect(runtime.lastMutationError).toBeNull();
   });
 
   test("fails closed before persistence when a canonical refresh makes the prepared ZIP identity stale", async () => {
@@ -743,7 +1423,61 @@ describe("App production workspace runtime", () => {
         format: "xlsx",
       }),
       expect.objectContaining({ message: "Atomic export RPC failed safely" }),
+      expect.objectContaining({ assertCurrent: expect.any(Function) }),
     );
+  });
+
+  test("pins rollback to the checkpoint revision and preserves a refreshed canonical payload", async () => {
+    const terminalCommit = deferred<never>();
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    exportMocks.completeExportPackage.mockReturnValueOnce(terminalCommit.promise);
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValue({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 9]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [
+        {
+          ...loadedSubmission,
+          exportState: "file_downloaded",
+          title: "Concurrent canonical title",
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await waitFor(() =>
+      expect(exportMocks.completeExportPackage).toHaveBeenCalledTimes(1),
+    );
+    await waitFor(() =>
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2),
+    );
+
+    await act(async () => {
+      terminalCommit.reject(new Error("Atomic export RPC failed after refresh"));
+      await runtime.lastMutationPromise;
+    });
+
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+    expect(
+      persistenceMocks.saveCockpitSubmissionsForProfile.mock.calls[1]?.[1],
+    ).toEqual([
+      expect.objectContaining({
+        exportState: "ready",
+        id: "submission-1",
+        title: "Concurrent canonical title",
+      }),
+    ]);
+    expect(
+      persistenceMocks.saveCockpitSubmissionsForProfile.mock.calls[1]?.[3],
+    ).toEqual(new Map([["submission-1", 2]]));
   });
 
   test("keeps committed export state when the atomic RPC response is lost", async () => {

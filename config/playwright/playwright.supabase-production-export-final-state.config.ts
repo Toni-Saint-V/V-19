@@ -117,6 +117,7 @@ export default defineConfig({
     video: "off",
   },
   webServer: {
+    cwd: "../..",
     command:
       "npm run build:supabase-production && npm run preview -- --host 127.0.0.1 --port 4202 --strictPort",
     env: loadProductionEnv(),

@@ -474,8 +474,11 @@ describe("QuestionnaireScreen", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() =>
-      expect(screen.getAllByText("Supabase недоступен").length).toBeGreaterThan(0),
+      expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
+        "Сервис не подтвердил сохранение",
+      ),
     );
+    expect(screen.queryByText("Supabase недоступен")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));

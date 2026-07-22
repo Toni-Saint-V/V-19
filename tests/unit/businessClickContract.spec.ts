@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   businessClickContractFor,
+  isBusinessClickIntent,
   V19_BUSINESS_CLICK_CONTRACTS,
   V19_BUSINESS_CLICK_CONTRACT_LIST,
   V19_SUBMISSION_ACTION_CLICK_CONTRACTS,
@@ -24,6 +25,7 @@ import {
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
 import {
+  applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
   canPerformAction,
   transitionMatrix,
@@ -84,6 +86,31 @@ describe("V-19 business click contract", () => {
     expect(surfaces.has("agent-applicants")).toBe(false);
     expect(surfaces.has("agent-family")).toBe(false);
     expect(surfaces.has("agent-media")).toBe(false);
+  });
+
+  test("executes the combined draft-to-review intent through the canonical lifecycle", () => {
+    expect(businessClickContractFor("prepare_and_submit_for_review")).toMatchObject({
+      executionPath: "applyAgentSubmitForReviewResult",
+      ownerRole: "agent",
+      transition: {
+        from: ["draft", "in_progress"],
+        to: "submitted_for_review",
+      },
+    });
+    const draftReady = { ...inProgressReadyFixture(), status: "draft" as const };
+
+    const result = applyAgentSubmitForReviewResult(
+      draftReady,
+      "00000000-0000-4000-8000-000000000901",
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.status).toBe("submitted_for_review");
+    expect(result.data.history.slice(0, 2).map((item) => item.toStatus)).toEqual([
+      "submitted_for_review",
+      "in_progress",
+    ]);
   });
 
   test("runs every submission lifecycle click through guard and mutation logic", () => {
@@ -263,6 +290,10 @@ describe("V-19 business click contract", () => {
   });
 
   test("does not allow unregistered business click intents", () => {
+    expect(isBusinessClickIntent("submit_for_review")).toBe(true);
+    expect(isBusinessClickIntent("constructor")).toBe(false);
+    expect(isBusinessClickIntent("toString")).toBe(false);
+
     expect(businessClickContractFor("submit_for_review")).toMatchObject({
       executionPath: "applySubmissionActionResult",
       submissionAction: "submit_for_review",

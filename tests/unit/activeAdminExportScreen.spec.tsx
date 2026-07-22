@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -208,6 +209,53 @@ describe("active admin export screen", () => {
       await screen.findByRole("link", { name: "Скачать Excel" }),
     ).toHaveAttribute("href", "blob:verified-export-workbook");
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  test("locks rapid duplicate Excel preparation and unlocks for retry", async () => {
+    const submission = readySubmission();
+    const workbookVerification = await import(
+      "../../src/modules/submissions/exportWorkbookVerification"
+    );
+    const verifyWorkbook = vi
+      .spyOn(workbookVerification, "verifyExportWorkbookArtifact")
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    Object.defineProperty(globalThis.URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:retry-safe-export-workbook"),
+    });
+    Object.defineProperty(globalThis.URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+
+    render(<AdminExportScreen submissions={[submission]} />);
+    expect(
+      screen.getByTestId(`admin-export-row-${submission.id}`),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `Выбрать ${submission.listTitle ?? submission.title}`,
+      }),
+    );
+    const prepare = screen.getByRole("button", { name: "Сформировать Excel" });
+
+    act(() => {
+      prepare.click();
+      prepare.click();
+    });
+
+    expect(
+      await screen.findByText("Excel preview не совпал с XLSX. Файл не скачан."),
+    ).toBeInTheDocument();
+    expect(verifyWorkbook).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Сформировать Excel" }));
+    expect(await screen.findByRole("link", { name: "Скачать Excel" })).toHaveAttribute(
+      "href",
+      "blob:retry-safe-export-workbook",
+    );
+    expect(verifyWorkbook).toHaveBeenCalledTimes(2);
   });
 
   test("invalidates prepared downloads when a PDF-only questionnaire field changes", async () => {

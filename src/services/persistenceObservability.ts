@@ -6,11 +6,13 @@ export type SupabasePersistenceOperation =
   | "auth.access_request_submit"
   | "auth.access_requests_list"
   | "auth.sign_in_password"
+  | "auth.sign_out"
   | "auth.sign_up_password"
   | "admin_pdf_artifacts.list"
   | "admin_pdf_artifacts.upsert"
   | "profile.read"
   | "profile.upsert"
+  | "profiles.agent-list"
   | "submissions.list"
   | "applicants.list"
   | "questionnaire_answers.list"
@@ -32,9 +34,13 @@ export type SupabasePersistenceOperation =
   | "rpc.publish_returned_pdf_handoff"
   | "rpc.start_agent_return_package"
   | "rpc.publish_agent_return_package"
+  | "rpc.prepare_agent_return_package_artifact_upload"
+  | "rpc.finalize_agent_return_package_artifact_upload"
+  | "rpc.abort_agent_return_package_artifact_upload"
   | "rpc.upsert_questionnaire_answers"
   | "status_history.list"
   | "status_history.insert"
+  | "rpc.save_admin_submission_batch_if_current"
   | "rpc.save_submission_draft"
   | "rpc.submit_corrections_handoff"
   | "storage.upload_media"
@@ -137,7 +143,12 @@ function kindForOperation(
   fallbackKind: PersistenceFailureKind | undefined,
 ): PersistenceFailureKind {
   if (operation.startsWith("auth.")) return "auth";
-  if (operation === "rpc.save_submission_draft") return "save";
+  if (
+    operation === "rpc.save_submission_draft" ||
+    operation === "rpc.save_admin_submission_batch_if_current"
+  ) {
+    return "save";
+  }
   if (
     operation === "storage.upload_media" ||
     operation === "storage.upload_agent_return_package_artifact"

@@ -1733,7 +1733,7 @@ describe("FigmaQuestionnaireScreen", () => {
     },
   );
 
-  test("stays in the questionnaire when the navigation save fails", async () => {
+  test("explains a navigation save failure and offers an explicit safe exit", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -1763,22 +1763,32 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Назад" }));
 
     await waitFor(() =>
-      expect(
-        screen.getAllByText("Подача недоступна текущему агенту.").length,
-      ).toBeGreaterThan(0),
+      expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
+        "Нет доступа к этой подаче. Введённые данные остаются в анкете; обновите список подач или обратитесь к администратору.",
+      ),
     );
     expect(screen.getByTestId("questionnaire-save-error")).toHaveAttribute(
       "role",
       "alert",
     );
     expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
-      "Подача недоступна текущему агенту.",
+      "Не удалось сохранить и выйти",
     );
+    expect(screen.queryByText("Подача недоступна текущему агенту.")).not.toBeInTheDocument();
     expect(onBack).not.toHaveBeenCalled();
     expect(onSaveDraft).toHaveBeenCalledWith(
       expect.objectContaining({ saveIntent: "navigation" }),
     );
     expect(screen.getByRole("button", { name: "Назад" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Выйти без сохранения" }));
+    expect(
+      screen.getByText(/Последние несохранённые изменения будут потеряны/),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Да, выйти без сохранения" }),
+    );
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   test("serializes autosaves and keeps only the latest queued revision", async () => {
@@ -1844,7 +1854,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("deduplicates Save and Exit behind an in-flight autosave of the same revision", async () => {
+  test("reconciles manual Save and Exit intent after an in-flight autosave", async () => {
     vi.useFakeTimers();
     const autosave = deferred();
     const submission = createDraftSubmission({
@@ -1893,8 +1903,178 @@ describe("FigmaQuestionnaireScreen", () => {
       await Promise.resolve();
     });
 
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+    expect(onSaveDraft.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        fieldUpdates: [],
+        saveIntent: "manual",
+      }),
+    );
     expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+  });
+
+  test("retries the full edit payload when Save and Exit follows a rejected autosave", async () => {
+    vi.useFakeTimers();
+    const autosave = deferred();
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onSaveAndExit = vi.fn().mockResolvedValue(undefined);
+    const onSaveDraft = vi
+      .fn()
+      .mockImplementationOnce(() => autosave.promise)
+      .mockResolvedValueOnce(undefined);
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onSaveAndExit={onSaveAndExit}
+        onSaveDraft={onSaveDraft}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Личные данные");
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "VOLKOV" },
+    });
+    clickPinnedSection(result.container, "Отель / приглашение");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
+    );
+
+    await act(async () => {
+      autosave.reject(new Error("temporary autosave failure"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+    expect(onSaveDraft.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        fieldUpdates: expect.arrayContaining([
+          expect.objectContaining({ fieldId: "surname", value: "VOLKOV" }),
+        ]),
+        saveIntent: "manual",
+      }),
+    );
+    expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+  });
+
+  test("retries the full edit payload when Back follows a rejected autosave", async () => {
+    vi.useFakeTimers();
+    const autosave = deferred();
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onBack = vi.fn();
+    const onSaveDraft = vi
+      .fn()
+      .mockImplementationOnce(() => autosave.promise)
+      .mockResolvedValueOnce(undefined);
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={onBack}
+        onComplete={vi.fn()}
+        onSaveDraft={onSaveDraft}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Личные данные");
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "VOLKOV" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Назад" }));
+
+    await act(async () => {
+      autosave.reject(new Error("temporary autosave failure"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+    expect(onSaveDraft.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        fieldUpdates: expect.arrayContaining([
+          expect.objectContaining({ fieldId: "surname", value: "VOLKOV" }),
+        ]),
+        saveIntent: "navigation",
+      }),
+    );
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not resurrect a reverted edit after an older autosave fails", async () => {
+    vi.useFakeTimers();
+    const autosave = deferred();
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onBack = vi.fn();
+    const onSaveDraft = vi
+      .fn()
+      .mockImplementationOnce(() => autosave.promise)
+      .mockResolvedValueOnce(undefined);
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={onBack}
+        onComplete={vi.fn()}
+        onSaveDraft={onSaveDraft}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Личные данные");
+    const surname = screen.getByLabelText("Фамилия") as HTMLInputElement;
+    const originalSurname = surname.value;
+    fireEvent.change(surname, { target: { value: "STALE-SURNAME" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    fireEvent.change(surname, { target: { value: originalSurname } });
+    fireEvent.click(screen.getByRole("button", { name: "Назад" }));
+
+    await act(async () => {
+      autosave.reject(new Error("temporary autosave failure"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+    expect(onSaveDraft.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({ saveIntent: "navigation" }),
+    );
+    expect(
+      onSaveDraft.mock.calls[1]?.[0].fieldUpdates.some(
+        (update) => update.fieldId === "surname" && update.value === "STALE-SURNAME",
+      ),
+    ).toBe(false);
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   test("keeps a queued applicant payload before Back returns to the in-flight applicant", async () => {
@@ -1974,7 +2154,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  test("deduplicates Back behind an in-flight autosave of the same revision", async () => {
+  test("reconciles navigation intent after an in-flight autosave", async () => {
     vi.useFakeTimers();
     const autosave = deferred();
     const submission = createDraftSubmission({
@@ -2015,11 +2195,17 @@ describe("FigmaQuestionnaireScreen", () => {
       await Promise.resolve();
     });
 
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+    expect(onSaveDraft.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        fieldUpdates: [],
+        saveIntent: "navigation",
+      }),
+    );
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  test("deduplicates issue save and Back behind the same in-flight revision", async () => {
+  test("preserves issue manual-save intent before Back behind an in-flight autosave", async () => {
     vi.useFakeTimers();
     const autosave = deferred();
     const draft = createDraftSubmission({
@@ -2064,7 +2250,13 @@ describe("FigmaQuestionnaireScreen", () => {
       await Promise.resolve();
     });
 
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+    expect(onSaveDraft.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        fieldUpdates: [],
+        saveIntent: "manual",
+      }),
+    );
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -4406,6 +4598,52 @@ describe("FigmaQuestionnaireScreen", () => {
 
     await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(1));
     expect(onBack).not.toHaveBeenCalled();
+  });
+
+  test("retries a failed exit without duplicating an already successful draft save", async () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onSaveAndExit = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Failed to fetch"))
+      .mockResolvedValueOnce(undefined);
+    const onSaveDraft = vi.fn().mockResolvedValue(undefined);
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onSaveAndExit={onSaveAndExit}
+        onSaveDraft={onSaveDraft}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Личные данные");
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "VOLKOV" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
+        "Нет соединения с сервером",
+      ),
+    );
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Повторить сохранение" }),
+    );
+
+    await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(2));
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
   });
 
   test("deduplicates rapid save-and-exit clicks through the final navigation side effect", async () => {

@@ -23,6 +23,7 @@ vi.mock("../../src/lib/supabase/config", () => ({
 
 import {
   requestPasswordReset,
+  signOutCurrentSession,
   signInSupabaseWithPassword,
 } from "../../src/services/authService";
 import { saveSubmissionDraft } from "../../src/services/submissionService";
@@ -272,6 +273,56 @@ describe("Supabase persistence failure paths", () => {
       },
       userMessage: "Unable to sign in. Check email, password, and Supabase profile.",
     });
+  });
+
+  test("does not report sign-out success when Supabase rejects the request", async () => {
+    const signOut = vi.fn(async () => ({
+      error: {
+        name: "AuthRetryableFetchError",
+        status: 503,
+        message: "upstream auth details",
+      },
+    }));
+    const getSession = vi.fn(async () => ({
+      data: { session: { access_token: "synthetic-session" } },
+      error: null,
+    }));
+    supabaseMock.client = { auth: { getSession, signOut } };
+
+    await expect(signOutCurrentSession()).rejects.toMatchObject({
+      diagnostics: {
+        operation: "auth.sign_out",
+        kind: "auth",
+        retryable: true,
+      },
+      userMessage: expect.stringMatching(/Supabase|sign/i),
+    });
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(getSession).toHaveBeenCalledTimes(1);
+  });
+
+  test("reports a local-only logout when Supabase rejects after clearing the session", async () => {
+    const signOut = vi.fn(async () => ({
+      error: {
+        name: "AuthRetryableFetchError",
+        status: 503,
+        message: "upstream auth details",
+      },
+    }));
+    const getSession = vi.fn(async () => ({
+      data: { session: null },
+      error: null,
+    }));
+    supabaseMock.client = { auth: { getSession, signOut } };
+
+    await expect(signOutCurrentSession()).resolves.toEqual({
+      status: "local_session_cleared",
+      warning:
+        "Сеанс на этом устройстве завершён, но серверное подтверждение выхода не получено.",
+    });
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(getSession).toHaveBeenCalledTimes(1);
   });
 
   test("requests real Supabase password reset when Auth is active", async () => {

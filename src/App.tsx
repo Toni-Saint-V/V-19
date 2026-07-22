@@ -29,10 +29,17 @@ import {
 import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submissions/exportPackageDocumentCommit";
 import {
   ensureSubmissionPublicNumber,
+  isAdminSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
+  saveAdminCockpitSubmissionsIfCurrent,
   saveCockpitSubmissionsForProfile,
   type PublicNumberAssignment,
 } from "./modules/submissions/supabasePersistence";
+import {
+  PostCommitBridgePolicy,
+  type VisaflowPostCommitEvent,
+  type VisaflowPostCommitObserver,
+} from "./integration/postCommitBridgePolicy";
 import {
   submissionPublicNumber,
   submissionPublicNumberMax,
@@ -62,6 +69,7 @@ import {
   isCurrentWorkspaceSession,
   isLatestWorkspaceResponse,
   shouldBlockLocalDemoDataSource,
+  waitForWorkspaceMutationQueueDrain,
   WorkspaceRefreshCoordinator,
   workspaceDataState as workspaceDataStatusForCount,
   workspaceInitialGate,
@@ -74,12 +82,38 @@ import type { AppProfile, AppSession } from "./types/session";
 
 type Workspace = "agent" | "admin";
 
+type AppBusinessBridge = VisaflowBusinessBridge & {
+  /** Idempotent observer; retries reuse the same eventId. */
+  onPostCommitEvent?: VisaflowPostCommitObserver;
+};
+
 type WorkspaceDataState = {
   error?: string;
   refreshedAt?: string;
   sessionUserId?: string;
   status: WorkspaceDataStatus;
 };
+
+type WorkspaceMutationFence = {
+  assertCurrent: () => void;
+  isCurrent: () => boolean;
+  token: WorkspaceSessionToken;
+};
+
+class WorkspaceSessionChangedError extends Error {
+  readonly code = "WORKSPACE_SESSION_CHANGED";
+
+  constructor() {
+    super("Сессия изменилась. Данные будут загружены заново; повторите действие.");
+    this.name = "WorkspaceSessionChangedError";
+  }
+}
+
+function isWorkspaceSessionChangedError(
+  error: unknown,
+): error is WorkspaceSessionChangedError {
+  return error instanceof WorkspaceSessionChangedError;
+}
 
 type AppRuntimeStateProps = {
   actionLabel?: string;
@@ -189,7 +223,7 @@ function approvedSessionUserId(session: Session | null): string | null {
 }
 
 export interface AppProps {
-  bridge?: VisaflowBusinessBridge;
+  bridge?: AppBusinessBridge;
   initialWorkspace?: Workspace;
   inviteSetupPromise?: Promise<{ email: string; userId: string } | null>;
   recoverySetupPromise?: Promise<{ email: string; userId: string } | null>;
@@ -223,6 +257,7 @@ export default function App({
   const [recoverySetupEmail, setRecoverySetupEmail] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [signOutPending, setSignOutPending] = useState(false);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
   const [accessRequestsBusy, setAccessRequestsBusy] = useState(false);
   const [supabaseProfile, setSupabaseProfile] = useState<AppProfile | null>(null);
@@ -238,14 +273,22 @@ export default function App({
     }),
   );
   const submissionsRef = useRef(submissions);
+  const caseRevisionsBySubmissionIdRef = useRef<Map<string, number>>(new Map());
+  const quarantinedSubmissionIdsRef = useRef<Set<string>>(new Set());
   const ownerIdsBySubmissionIdRef = useRef(ownerIdsBySubmissionId);
+  const postCommitBridgePolicyRef = useRef(new PostCommitBridgePolicy());
   const workspaceRefreshRequestRef = useRef(0);
   const workspaceRefreshCoordinatorRef = useRef(new WorkspaceRefreshCoordinator());
+  const signOutPendingRef = useRef(false);
   const workspaceSessionGenerationRef = useRef(0);
   const workspaceSessionUserIdRef = useRef<string | null>(null);
+  const workspaceSessionNeedsQueueDrainRef = useRef(false);
   const workspaceMutationStateRef = useRef({ count: 0, generation: 0 });
-  const workspaceSubmissionMutationQueueRef = useRef(
-    new Map<string, Promise<Submission>>(),
+  const workspaceSubmissionMutationQueueRef = useRef<Promise<unknown>>(
+    Promise.resolve(),
+  );
+  const refreshCanonicalSubmissionsRef = useRef<() => Promise<void>>(
+    async () => undefined,
   );
   const publicNumberAssignmentQueueRef = useRef<Promise<void>>(Promise.resolve());
   const activeApprovedSession =
@@ -258,12 +301,13 @@ export default function App({
     workspaceSessionUserIdRef.current = nextUserId;
     workspaceRefreshRequestRef.current += 1;
     workspaceRefreshCoordinatorRef.current.invalidate();
+    workspaceSessionNeedsQueueDrainRef.current = true;
     workspaceMutationStateRef.current = {
       count: 0,
       generation: workspaceSessionGenerationRef.current,
     };
-    workspaceSubmissionMutationQueueRef.current.clear();
-    publicNumberAssignmentQueueRef.current = Promise.resolve();
+    caseRevisionsBySubmissionIdRef.current = new Map();
+    quarantinedSubmissionIdsRef.current = new Set();
   }, []);
 
   const commitAuthSession = useCallback(
@@ -292,9 +336,12 @@ export default function App({
     }
 
     submissionsRef.current = [];
+    caseRevisionsBySubmissionIdRef.current = new Map();
+    quarantinedSubmissionIdsRef.current = new Set();
     ownerIdsBySubmissionIdRef.current = new Map();
     setSubmissions([]);
     setOwnerIdsBySubmissionId(new Map());
+    setAccessRequestsBusy(false);
     setSupabaseProfile(null);
     setWorkspaceDataState({
       sessionUserId: nextUserId ?? undefined,
@@ -341,6 +388,7 @@ export default function App({
         return;
       }
       setAccessRequests(nextAccessRequests);
+      return nextAccessRequests;
     },
     [loadAccessRequests],
   );
@@ -356,7 +404,31 @@ export default function App({
     };
   }, [activeApprovedSession]);
 
-  const runCanonicalSubmissionsRefresh = useCallback(async () => {
+  const createWorkspaceMutationFence = useCallback(
+    (sessionUserId: string): WorkspaceMutationFence => {
+      const token: WorkspaceSessionToken = {
+        generation: workspaceSessionGenerationRef.current,
+        userId: sessionUserId,
+      };
+      const isCurrent = () =>
+        isCurrentWorkspaceSession(
+          token,
+          workspaceSessionGenerationRef.current,
+          workspaceSessionUserIdRef.current,
+        );
+      return {
+        assertCurrent: () => {
+          if (!isCurrent()) throw new WorkspaceSessionChangedError();
+        },
+        isCurrent,
+        token,
+      };
+    },
+    [],
+  );
+
+  const runCanonicalSubmissionsRefresh = useCallback(
+    async (throwOnFailure = false) => {
     if (!supabaseEnabled || !activeApprovedSession || !activeProfile) return;
 
     const sessionToken: WorkspaceSessionToken = {
@@ -371,6 +443,51 @@ export default function App({
       )
     ) {
       return;
+    }
+
+    if (workspaceSessionNeedsQueueDrainRef.current) {
+      const pendingMutations = workspaceSubmissionMutationQueueRef.current;
+      const queueDrain = await waitForWorkspaceMutationQueueDrain(pendingMutations);
+      if (
+        !isCurrentWorkspaceSession(
+          sessionToken,
+          workspaceSessionGenerationRef.current,
+          workspaceSessionUserIdRef.current,
+        )
+      ) {
+        return;
+      }
+      workspaceSessionNeedsQueueDrainRef.current = false;
+      if (queueDrain === "timed_out") {
+        // A never-settling mutation from the previous session must not remain
+        // the parent promise for every mutation in the newly loaded session.
+        // Its own fence still prevents a late continuation from committing.
+        workspaceSubmissionMutationQueueRef.current = Promise.resolve();
+        void pendingMutations.then(
+          () => {
+            if (
+              isCurrentWorkspaceSession(
+                sessionToken,
+                workspaceSessionGenerationRef.current,
+                workspaceSessionUserIdRef.current,
+              )
+            ) {
+              void refreshCanonicalSubmissionsRef.current();
+            }
+          },
+          () => {
+            if (
+              isCurrentWorkspaceSession(
+                sessionToken,
+                workspaceSessionGenerationRef.current,
+                workspaceSessionUserIdRef.current,
+              )
+            ) {
+              void refreshCanonicalSubmissionsRef.current();
+            }
+          },
+        );
+      }
     }
 
     const requestId = workspaceRefreshRequestRef.current + 1;
@@ -403,6 +520,10 @@ export default function App({
       if (!isCurrentResponse()) return;
 
       submissionsRef.current = loaded.submissions;
+      caseRevisionsBySubmissionIdRef.current =
+        loaded.caseRevisionsBySubmissionId ?? new Map();
+      quarantinedSubmissionIdsRef.current =
+        loaded.quarantinedSubmissionIds ?? new Set();
       ownerIdsBySubmissionIdRef.current = loaded.ownerIdsBySubmissionId;
       setSupabaseProfile(activeProfile);
       setOwnerIdsBySubmissionId(loaded.ownerIdsBySubmissionId);
@@ -423,8 +544,11 @@ export default function App({
         sessionUserId: sessionToken.userId,
         status: "error",
       });
+      if (throwOnFailure) throw error;
     }
-  }, [activeApprovedSession, activeProfile, loadAccessRequests, supabaseEnabled]);
+    },
+    [activeApprovedSession, activeProfile, loadAccessRequests, supabaseEnabled],
+  );
 
   const refreshCanonicalSubmissions = useCallback(() => {
     const mutationState = workspaceMutationStateRef.current;
@@ -436,6 +560,10 @@ export default function App({
       blockedByMutation,
     );
   }, [runCanonicalSubmissionsRefresh]);
+
+  useEffect(() => {
+    refreshCanonicalSubmissionsRef.current = refreshCanonicalSubmissions;
+  }, [refreshCanonicalSubmissions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -595,38 +723,40 @@ export default function App({
   }, [activeApprovedSession, refreshCanonicalSubmissions, supabaseEnabled]);
 
   const persistSubmissions = useCallback(
-    async (nextSubmissions: Submission[]) => {
+    async (
+      nextSubmissions: Submission[],
+      providedFence?: WorkspaceMutationFence,
+      expectedCaseRevisions?: ReadonlyMap<string, number>,
+    ) => {
       const currentSubmissions = submissionsRef.current;
       const currentOwnerIds = ownerIdsBySubmissionIdRef.current;
+      const currentCaseRevisions =
+        expectedCaseRevisions ?? caseRevisionsBySubmissionIdRef.current;
+      const mutationFence =
+        providedFence ??
+        (activeApprovedSession
+          ? createWorkspaceMutationFence(activeApprovedSession.userId)
+          : null);
+      mutationFence?.assertCurrent();
       if (!supabaseEnabled) {
-        if (!localDemoEnabled) return;
+        if (!localDemoEnabled) return undefined;
         submissionsRef.current = nextSubmissions;
         setSubmissions(nextSubmissions);
-        if (!__V19_LOCAL_DEMO_BUILD__) return;
+        if (!__V19_LOCAL_DEMO_BUILD__) return undefined;
         const { saveSubmissions } = await import("./modules/submissions/persistence");
+        mutationFence?.assertCurrent();
         saveSubmissions(nextSubmissions);
-        return;
+        return undefined;
       }
 
       if (!activeApprovedSession || !activeProfile) {
         throw new Error("Активная Supabase-сессия не найдена. Войдите снова.");
       }
 
-      const sessionToken: WorkspaceSessionToken = {
-        generation: workspaceSessionGenerationRef.current,
-        userId: activeApprovedSession.userId,
-      };
-      const isCurrentMutationSession = () =>
-        isCurrentWorkspaceSession(
-          sessionToken,
-          workspaceSessionGenerationRef.current,
-          workspaceSessionUserIdRef.current,
-        );
-      if (!isCurrentMutationSession()) {
-        throw new Error(
-          "Сессия изменилась. Обновите данные перед повторным действием.",
-        );
-      }
+      const fence =
+        mutationFence ?? createWorkspaceMutationFence(activeApprovedSession.userId);
+      const { token: sessionToken } = fence;
+      fence.assertCurrent();
 
       const persistenceProfile =
         supabaseProfile?.id === activeProfile.id ? supabaseProfile : activeProfile;
@@ -642,7 +772,15 @@ export default function App({
       const changedSubmissions = nextSubmissions.filter(
         (submission) => currentById.get(submission.id) !== submission,
       );
-      if (!changedSubmissions.length) return;
+      if (!changedSubmissions.length) return undefined;
+      const quarantinedSubmission = changedSubmissions.find((submission) =>
+        quarantinedSubmissionIdsRef.current.has(submission.id),
+      );
+      if (quarantinedSubmission) {
+        throw new Error(
+          `Подача ${quarantinedSubmission.id} доступна только для чтения: cockpit snapshot повреждён и требует отдельного восстановления.`,
+        );
+      }
 
       if (workspaceMutationStateRef.current.generation !== sessionToken.generation) {
         workspaceMutationStateRef.current = {
@@ -655,16 +793,31 @@ export default function App({
       workspaceRefreshCoordinatorRef.current.invalidate();
       let mutationSucceeded = false;
       try {
-        const nextOwnerIds = await saveCockpitSubmissionsForProfile(
-          persistenceProfile,
-          changedSubmissions,
-          currentOwnerIds,
-        );
-        if (!isCurrentMutationSession()) return;
+        const adminSaveResult =
+          persistenceProfile.role === "admin"
+            ? await saveAdminCockpitSubmissionsIfCurrent(
+                persistenceProfile,
+                changedSubmissions,
+                currentOwnerIds,
+                currentCaseRevisions,
+              )
+            : null;
+        const nextOwnerIds = adminSaveResult
+          ? adminSaveResult.ownerIdsBySubmissionId
+          : await saveCockpitSubmissionsForProfile(
+              persistenceProfile,
+              changedSubmissions,
+              currentOwnerIds,
+            );
+        fence.assertCurrent();
 
         workspaceRefreshRequestRef.current += 1;
         submissionsRef.current = nextSubmissions;
         setSubmissions(nextSubmissions);
+        if (adminSaveResult) {
+          caseRevisionsBySubmissionIdRef.current =
+            adminSaveResult.caseRevisionsBySubmissionId;
+        }
         ownerIdsBySubmissionIdRef.current = nextOwnerIds;
         setOwnerIdsBySubmissionId(nextOwnerIds);
         setWorkspaceDataState({
@@ -673,13 +826,16 @@ export default function App({
           status: workspaceDataStatusForCount(nextSubmissions.length),
         });
         mutationSucceeded = true;
+        return adminSaveResult?.caseRevisionsBySubmissionId;
       } catch (error) {
-        if (isCurrentMutationSession()) {
+        if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
+          const errorMessage = isAdminSubmissionConcurrencyConflict(error)
+            ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
+            : error instanceof Error
+              ? error.message
+              : "Не удалось сохранить данные Supabase.";
           setWorkspaceDataState({
-            error:
-              error instanceof Error
-                ? error.message
-                : "Не удалось сохранить данные Supabase.",
+            error: errorMessage,
             sessionUserId: sessionToken.userId,
             status: "error",
           });
@@ -694,7 +850,7 @@ export default function App({
           if (
             mutationSucceeded &&
             workspaceMutationStateRef.current.count === 0 &&
-            isCurrentMutationSession()
+            fence.isCurrent()
           ) {
             void refreshCanonicalSubmissions();
           }
@@ -704,6 +860,7 @@ export default function App({
     [
       activeApprovedSession,
       activeProfile,
+      createWorkspaceMutationFence,
       localDemoEnabled,
       refreshCanonicalSubmissions,
       supabaseEnabled,
@@ -711,26 +868,55 @@ export default function App({
     ],
   );
 
+  const enqueueWorkspaceSubmissionMutation = useCallback(
+    <Result,>(
+      sessionUserId: string,
+      mutation: (fence: WorkspaceMutationFence) => Result | Promise<Result>,
+    ): Promise<Result> => {
+      const fence = createWorkspaceMutationFence(sessionUserId);
+      const queuedMutation = workspaceSubmissionMutationQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          fence.assertCurrent();
+          const result = await mutation(fence);
+          fence.assertCurrent();
+          return result;
+        });
+      workspaceSubmissionMutationQueueRef.current = queuedMutation.then(
+        () => undefined,
+        () => undefined,
+      );
+      return queuedMutation;
+    },
+    [createWorkspaceMutationFence],
+  );
+
   const persistVisibleAgentSubmissions = useCallback(
     async (nextVisibleSubmissions: Submission[]) => {
-      const currentSubmissions = submissionsRef.current;
-      const nextById = new Map(
-        nextVisibleSubmissions.map((submission) => [submission.id, submission]),
-      );
-      const existingIds = new Set(
-        currentSubmissions.map((submission) => submission.id),
-      );
-      const additions = nextVisibleSubmissions.filter(
-        (submission) => !existingIds.has(submission.id),
-      );
-      await persistSubmissions([
-        ...additions,
-        ...currentSubmissions.map(
-          (submission) => nextById.get(submission.id) ?? submission,
-        ),
-      ]);
+      const session = activeApprovedSession;
+      if (!session || session.role !== "agent") {
+        throw new Error("Только активный агент может изменить свои подачи.");
+      }
+      await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+        const currentSubmissions = submissionsRef.current;
+        const nextById = new Map(
+          nextVisibleSubmissions.map((submission) => [submission.id, submission]),
+        );
+        const existingIds = new Set(
+          currentSubmissions.map((submission) => submission.id),
+        );
+        const additions = nextVisibleSubmissions.filter(
+          (submission) => !existingIds.has(submission.id),
+        );
+        await persistSubmissions([
+          ...additions,
+          ...currentSubmissions.map(
+            (submission) => nextById.get(submission.id) ?? submission,
+          ),
+        ], fence);
+      });
     },
-    [persistSubmissions],
+    [activeApprovedSession, enqueueWorkspaceSubmissionMutation, persistSubmissions],
   );
 
   const updateVisibleAgentSubmission = useCallback(
@@ -745,40 +931,42 @@ export default function App({
         );
       }
       const ownerAgentId = session.ownerAgentId ?? session.userId;
-      const queue = workspaceSubmissionMutationQueueRef.current;
-      const previous = queue.get(submissionId) ?? Promise.resolve(undefined);
-      const mutation = previous
-        .catch(() => undefined)
-        .then(async () => {
-          const current = submissionsRef.current.find(
+      return enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+        const current = submissionsRef.current.find(
+          (submission) => submission.id === submissionId,
+        );
+        if (!current || current.agentId !== ownerAgentId) {
+          throw new Error("Подача недоступна текущему агенту.");
+        }
+        const nextSubmission = update(current);
+        if (nextSubmission === current) return current;
+        const nextSubmissions = submissionsRef.current.map((submission) =>
+          submission.id === submissionId ? nextSubmission : submission,
+        );
+        await persistSubmissions(nextSubmissions, fence);
+        return (
+          submissionsRef.current.find(
             (submission) => submission.id === submissionId,
-          );
-          if (!current || current.agentId !== ownerAgentId) {
-            throw new Error("Подача недоступна текущему агенту.");
-          }
-          const nextSubmission = update(current);
-          if (nextSubmission === current) return current;
-          const nextSubmissions = submissionsRef.current.map((submission) =>
-            submission.id === submissionId ? nextSubmission : submission,
-          );
-          await persistSubmissions(nextSubmissions);
-          return (
-            submissionsRef.current.find(
-              (submission) => submission.id === submissionId,
-            ) ?? nextSubmission
-          );
-        });
-      const tracked = mutation.finally(() => {
-        if (queue.get(submissionId) === tracked) queue.delete(submissionId);
+          ) ?? nextSubmission
+        );
       });
-      queue.set(submissionId, tracked);
-      return tracked;
     },
-    [activeApprovedSession, persistSubmissions],
+    [
+      activeApprovedSession,
+      enqueueWorkspaceSubmissionMutation,
+      persistSubmissions,
+    ],
   );
 
   const assignVisibleAgentSubmissionPublicNumber = useCallback(
     (submissionId: string): Promise<PublicNumberAssignment> => {
+      const session = activeApprovedSession;
+      if (!session || session.role !== "agent") {
+        return Promise.reject(
+          new Error("Только активный агент может присвоить номер подаче."),
+        );
+      }
+      const fence = createWorkspaceMutationFence(session.userId);
       let resolveAssignment!: (assignment: PublicNumberAssignment) => void;
       let rejectAssignment!: (error: unknown) => void;
       const result = new Promise<PublicNumberAssignment>((resolve, reject) => {
@@ -788,6 +976,7 @@ export default function App({
       const task = publicNumberAssignmentQueueRef.current
         .catch(() => undefined)
         .then(async () => {
+          fence.assertCurrent();
           const current = submissionsRef.current.find(
             (submission) => submission.id === submissionId,
           );
@@ -810,6 +999,7 @@ export default function App({
                     ),
                   ) + 1,
               };
+          fence.assertCurrent();
           if (assignment.publicNumber > submissionPublicNumberMax) {
             throw new Error("Лимит номеров подач исчерпан.");
           }
@@ -824,8 +1014,9 @@ export default function App({
           if (supabaseEnabled) {
             void refreshCanonicalSubmissions();
           } else {
-            await persistSubmissions(nextSubmissions);
+            await persistSubmissions(nextSubmissions, fence);
           }
+          fence.assertCurrent();
           resolveAssignment({
             assignedNow: assignment.assignedNow,
             publicNumber: assignment.publicNumber,
@@ -837,7 +1028,13 @@ export default function App({
       publicNumberAssignmentQueueRef.current = task;
       return result;
     },
-    [persistSubmissions, refreshCanonicalSubmissions, supabaseEnabled],
+    [
+      activeApprovedSession,
+      createWorkspaceMutationFence,
+      persistSubmissions,
+      refreshCanonicalSubmissions,
+      supabaseEnabled,
+    ],
   );
 
   const handleLogin = useCallback(
@@ -937,39 +1134,86 @@ export default function App({
   );
 
   const handleSignOut = useCallback(async () => {
+    if (signOutPendingRef.current) return;
+    signOutPendingRef.current = true;
     const signedOutUserId = activeApprovedSession?.userId ?? null;
+    let signOutWarning = "";
+    setSignOutPending(true);
+    setWorkspaceDataState((current) => ({ ...current, error: undefined }));
     invalidateWorkspaceSession(null);
+    setSupabaseProfile(null);
+    setWorkspaceDataState({
+      sessionUserId: signedOutUserId ?? undefined,
+      status: "loading",
+    });
     try {
       if (supabaseEnabled) {
-        await signOutCurrentSession();
+        const result: unknown = await signOutCurrentSession();
+        if (
+          typeof result === "object" &&
+          result !== null &&
+          "status" in result &&
+          result.status === "local_session_cleared" &&
+          "warning" in result &&
+          typeof result.warning === "string"
+        ) {
+          signOutWarning = result.warning;
+        }
       } else {
-        if (!__V19_LOCAL_DEMO_BUILD__ || !localDemoEnabled) return;
+        if (!__V19_LOCAL_DEMO_BUILD__ || !localDemoEnabled) {
+          return;
+        }
         const { authRepository } = await import("./shared/authRegistration");
         await authRepository.logout();
       }
+      setAuthSession(null);
+      setWorkspace("agent");
+      setAccessRequests([]);
+      submissionsRef.current = [];
+      caseRevisionsBySubmissionIdRef.current = new Map();
+      quarantinedSubmissionIdsRef.current = new Set();
+      ownerIdsBySubmissionIdRef.current = new Map();
+      setSubmissions([]);
+      setOwnerIdsBySubmissionId(new Map());
+      setSupabaseProfile(null);
+      setWorkspaceDataState({ status: "idle" });
+      setAuthError(signOutWarning);
     } catch (error) {
       invalidateWorkspaceSession(signedOutUserId);
+      if (supabaseEnabled && signedOutUserId) {
+        try {
+          await runCanonicalSubmissionsRefresh(true);
+        } catch {
+          // Keep the last known canonical snapshot available for a retry-safe
+          // workspace recovery even when the recovery read also fails.
+        }
+      }
+      setSupabaseProfile(activeProfile);
+      setWorkspaceDataState((current) => ({
+        ...current,
+        error: "Не удалось выйти из аккаунта. Повторите попытку.",
+        sessionUserId: signedOutUserId ?? undefined,
+        status: "error",
+      }));
       throw error;
+    } finally {
+      signOutPendingRef.current = false;
+      setSignOutPending(false);
     }
-    setAuthSession(null);
-    setWorkspace("agent");
-    setAccessRequests([]);
-    submissionsRef.current = [];
-    ownerIdsBySubmissionIdRef.current = new Map();
-    setSubmissions([]);
-    setOwnerIdsBySubmissionId(new Map());
-    setSupabaseProfile(null);
-    setWorkspaceDataState({ status: "idle" });
   }, [
     activeApprovedSession?.userId,
+    activeProfile,
     invalidateWorkspaceSession,
     localDemoEnabled,
+    runCanonicalSubmissionsRefresh,
     supabaseEnabled,
   ]);
 
   const handleApproveAccessRequest = useCallback(
     async (requestId: string) => {
-      if (!activeApprovedSession || activeApprovedSession.role !== "admin") return;
+      const session = activeApprovedSession;
+      if (!session || session.role !== "admin") return;
+      const fence = createWorkspaceMutationFence(session.userId);
       setAccessRequestsBusy(true);
       try {
         const repository = supabaseEnabled
@@ -979,18 +1223,46 @@ export default function App({
             : null;
         if (!repository)
           throw new Error("Supabase production data source is unavailable.");
-        await repository.approveAccessRequest(requestId, activeApprovedSession.userId);
-        await refreshAccessRequests(activeApprovedSession);
+        await repository.approveAccessRequest(requestId, session.userId);
+        fence.assertCurrent();
+        await refreshAccessRequests(session);
+        fence.assertCurrent();
+      } catch (error) {
+        if (fence.isCurrent()) {
+          try {
+            const canonicalRequests = await refreshAccessRequests(session);
+            fence.assertCurrent();
+            if (
+              canonicalRequests?.some(
+                (request) => request.id === requestId && request.status === "approved",
+              )
+            ) {
+              return;
+            }
+          } catch {
+            // The action remains retry-safe. Keep the original decision error
+            // for the active screen while preserving the last known queue.
+          }
+        }
+        throw error;
       } finally {
-        setAccessRequestsBusy(false);
+        if (fence.isCurrent()) setAccessRequestsBusy(false);
       }
     },
-    [activeApprovedSession, localDemoEnabled, refreshAccessRequests, supabaseEnabled],
+    [
+      activeApprovedSession,
+      createWorkspaceMutationFence,
+      localDemoEnabled,
+      refreshAccessRequests,
+      supabaseEnabled,
+    ],
   );
 
   const handleRejectAccessRequest = useCallback(
     async (requestId: string) => {
-      if (!activeApprovedSession || activeApprovedSession.role !== "admin") return;
+      const session = activeApprovedSession;
+      if (!session || session.role !== "admin") return;
+      const fence = createWorkspaceMutationFence(session.userId);
       setAccessRequestsBusy(true);
       try {
         const repository = supabaseEnabled
@@ -1000,102 +1272,228 @@ export default function App({
             : null;
         if (!repository)
           throw new Error("Supabase production data source is unavailable.");
-        await repository.rejectAccessRequest(requestId, activeApprovedSession.userId);
-        await refreshAccessRequests(activeApprovedSession);
+        await repository.rejectAccessRequest(requestId, session.userId);
+        fence.assertCurrent();
+        await refreshAccessRequests(session);
+        fence.assertCurrent();
+      } catch (error) {
+        if (fence.isCurrent()) {
+          try {
+            const canonicalRequests = await refreshAccessRequests(session);
+            fence.assertCurrent();
+            if (
+              canonicalRequests?.some(
+                (request) => request.id === requestId && request.status === "rejected",
+              )
+            ) {
+              return;
+            }
+          } catch {
+            // Preserve the decision failure; retry uses the idempotent claim.
+          }
+        }
+        throw error;
       } finally {
-        setAccessRequestsBusy(false);
+        if (fence.isCurrent()) setAccessRequestsBusy(false);
       }
     },
-    [activeApprovedSession, localDemoEnabled, refreshAccessRequests, supabaseEnabled],
+    [
+      activeApprovedSession,
+      createWorkspaceMutationFence,
+      localDemoEnabled,
+      refreshAccessRequests,
+      supabaseEnabled,
+    ],
   );
 
   const applySubmissionAction = useCallback(
     async (submissionId: string, action: SubmissionAction, source: Role) => {
-      if (!activeApprovedSession || activeApprovedSession.role !== source) {
+      const session = activeApprovedSession;
+      if (!session || session.role !== source) {
         const error = new Error("Действие недоступно для текущей Supabase-роли.");
         setWorkspaceDataState({
           error: error.message,
-          sessionUserId: activeApprovedSession?.userId,
+          sessionUserId: session?.userId,
           status: "error",
         });
         throw error;
       }
 
-      const result = applyActionToSubmissionListResult(
-        submissionsRef.current,
-        submissionId,
-        action,
-        source,
-        activeApprovedSession.userId,
-      );
-      if (!result.ok) {
-        const error = new Error(result.error.message);
-        setWorkspaceDataState({
-          error: error.message,
-          sessionUserId: activeApprovedSession.userId,
-          status: "error",
+      try {
+        await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+          const result = applyActionToSubmissionListResult(
+            submissionsRef.current,
+            submissionId,
+            action,
+            source,
+            session.userId,
+          );
+          if (!result.ok) throw new Error(result.error.message);
+          await persistSubmissions(result.data, fence);
         });
+      } catch (caught) {
+        const error =
+          caught instanceof Error ? caught : new Error("Не удалось изменить подачу.");
+        if (isAdminSubmissionConcurrencyConflict(error)) {
+          await refreshCanonicalSubmissions();
+        }
+        if (
+          !isWorkspaceSessionChangedError(error) &&
+          workspaceSessionUserIdRef.current === session.userId
+        ) {
+          setWorkspaceDataState({
+            error: error.message,
+            sessionUserId: session.userId,
+            status: "error",
+          });
+        }
         throw error;
       }
-      await persistSubmissions(result.data);
     },
-    [activeApprovedSession, persistSubmissions],
+    [
+      activeApprovedSession,
+      enqueueWorkspaceSubmissionMutation,
+      persistSubmissions,
+      refreshCanonicalSubmissions,
+    ],
   );
 
   const updateAdminSubmission = useCallback(
     async (submissionId: string, update: (submission: Submission) => Submission) => {
-      if (!activeApprovedSession || activeApprovedSession.role !== "admin") {
+      const session = activeApprovedSession;
+      if (!session || session.role !== "admin") {
         const error = new Error("Только активный администратор может изменить подачу.");
         setWorkspaceDataState({
           error: error.message,
-          sessionUserId: activeApprovedSession?.userId,
+          sessionUserId: session?.userId,
           status: "error",
         });
         throw error;
       }
 
-      let changed = false;
-      const nextSubmissions = submissionsRef.current.map((submission) => {
-        if (submission.id !== submissionId) return submission;
-        const nextSubmission = update(submission);
-        changed ||= nextSubmission !== submission;
-        return nextSubmission;
-      });
-      if (changed) await persistSubmissions(nextSubmissions);
+      try {
+        await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+          let found = false;
+          let changed = false;
+          const nextSubmissions = submissionsRef.current.map((submission) => {
+            if (submission.id !== submissionId) return submission;
+            found = true;
+            const nextSubmission = update(submission);
+            changed ||= nextSubmission !== submission;
+            return nextSubmission;
+          });
+          if (!found) throw new Error("Подача для изменения не найдена.");
+          if (changed) await persistSubmissions(nextSubmissions, fence);
+        });
+      } catch (caught) {
+        const error =
+          caught instanceof Error ? caught : new Error("Не удалось изменить подачу.");
+        if (isAdminSubmissionConcurrencyConflict(error)) {
+          await refreshCanonicalSubmissions();
+        }
+        if (
+          !isWorkspaceSessionChangedError(error) &&
+          workspaceSessionUserIdRef.current === session.userId
+        ) {
+          setWorkspaceDataState({
+            error: isAdminSubmissionConcurrencyConflict(error)
+              ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
+              : error.message,
+            sessionUserId: session.userId,
+            status: "error",
+          });
+        }
+        throw error;
+      }
     },
-    [activeApprovedSession, persistSubmissions],
+    [
+      activeApprovedSession,
+      enqueueWorkspaceSubmissionMutation,
+      persistSubmissions,
+      refreshCanonicalSubmissions,
+    ],
+  );
+
+  const dispatchPostCommitBridge = useCallback(
+    (
+      event: VisaflowPostCommitEvent,
+      fence: WorkspaceMutationFence,
+      legacyObserver?: () => void | Promise<void>,
+    ) => {
+      void postCommitBridgePolicyRef.current.dispatch({
+        event,
+        isSessionCurrent: fence.isCurrent,
+        legacyObserver,
+        observer: bridge.onPostCommitEvent,
+      });
+    },
+    [bridge],
   );
 
   const appBridge = useMemo<VisaflowBusinessBridge>(
     () => ({
       ...bridge,
       onSubmissionAction: async ({ submissionId, action, source }) => {
+        const session = activeApprovedSession;
+        if (!session) throw new WorkspaceSessionChangedError();
+        const fence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
         await applySubmissionAction(submissionId, action, source);
-        await bridge.onSubmissionAction?.({ submissionId, action, source });
+        fence.assertCurrent();
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: { action, source, submissionId },
+            submissionIds: [submissionId],
+            type: "submission.action",
+          },
+          fence,
+          () => bridge.onSubmissionAction?.({ submissionId, action, source }),
+        );
       },
       onAdminIssueAdd: async ({ submissionId, input }) => {
-        if (!activeApprovedSession || activeApprovedSession.role !== "admin") {
+        const session = activeApprovedSession;
+        if (!session || session.role !== "admin") {
           throw new Error("Только активный администратор может добавить замечание.");
         }
+        const fence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
         await updateAdminSubmission(submissionId, (submission) =>
-          addPreciseAdminIssue(submission, input, activeApprovedSession.userId),
+          addPreciseAdminIssue(submission, input, session.userId),
         );
-        await bridge.onAdminIssueAdd?.({ submissionId, input });
+        fence.assertCurrent();
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: { input, submissionId },
+            submissionIds: [submissionId],
+            type: "admin.issue.add",
+          },
+          fence,
+          () => bridge.onAdminIssueAdd?.({ submissionId, input }),
+        );
       },
       onAdminPassportSectionApprove: async ({ submissionId, applicantId }) => {
-        if (!activeApprovedSession || activeApprovedSession.role !== "admin") {
+        const session = activeApprovedSession;
+        if (!session || session.role !== "admin") {
           throw new Error(
             "Только активный администратор может подтвердить паспортную секцию.",
           );
         }
 
+        const fence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
         let foundSubmission = false;
         await updateAdminSubmission(submissionId, (submission) => {
           foundSubmission = true;
           const result = approvePassportReviewSectionForAdmin(
             submission,
             { applicantId },
-            activeApprovedSession.userId,
+            session.userId,
           );
           if (!result.ok) throw new Error(result.error.message);
           return result.data;
@@ -1103,23 +1501,90 @@ export default function App({
         if (!foundSubmission) {
           throw new Error("Подача для подтверждения паспортной секции не найдена.");
         }
-        await bridge.onAdminPassportSectionApprove?.({ submissionId, applicantId });
+        fence.assertCurrent();
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: { applicantId, submissionId },
+            submissionIds: [submissionId],
+            type: "admin.passport-section.approve",
+          },
+          fence,
+          () =>
+            bridge.onAdminPassportSectionApprove?.({ submissionId, applicantId }),
+        );
       },
       onAdminAiReviewRun: async (submissionId) => {
+        const session = activeApprovedSession;
+        if (!session || session.role !== "admin") {
+          throw new Error("Только активный администратор может запустить AI-проверку.");
+        }
+        const fence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
         await updateAdminSubmission(submissionId, runAiReview);
-        await bridge.onAdminAiReviewRun?.(submissionId);
+        fence.assertCurrent();
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: { submissionId },
+            submissionIds: [submissionId],
+            type: "admin.ai.run",
+          },
+          fence,
+          () => bridge.onAdminAiReviewRun?.(submissionId),
+        );
       },
       onAdminAiSuggestionAccept: async ({ submissionId, suggestionId }) => {
+        const session = activeApprovedSession;
+        if (!session || session.role !== "admin") {
+          throw new Error("Только активный администратор может принять AI-подсказку.");
+        }
+        const fence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
         await updateAdminSubmission(submissionId, (submission) =>
           acceptAiSuggestionAsIssue(submission, suggestionId, "admin"),
         );
-        await bridge.onAdminAiSuggestionAccept?.({ submissionId, suggestionId });
+        fence.assertCurrent();
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: { submissionId, suggestionId },
+            submissionIds: [submissionId],
+            type: "admin.ai.accept",
+          },
+          fence,
+          () => bridge.onAdminAiSuggestionAccept?.({ submissionId, suggestionId }),
+        );
       },
       onAdminAiSuggestionDismiss: async ({ submissionId, suggestionId }) => {
+        const session = activeApprovedSession;
+        if (!session || session.role !== "admin") {
+          throw new Error("Только активный администратор может отклонить AI-подсказку.");
+        }
+        const fence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
         await updateAdminSubmission(submissionId, (submission) =>
           dismissAiSuggestion(submission, suggestionId, "admin"),
         );
-        await bridge.onAdminAiSuggestionDismiss?.({ submissionId, suggestionId });
+        fence.assertCurrent();
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: { submissionId, suggestionId },
+            submissionIds: [submissionId],
+            type: "admin.ai.dismiss",
+          },
+          fence,
+          () => bridge.onAdminAiSuggestionDismiss?.({ submissionId, suggestionId }),
+        );
       },
       onExportPackages: async ({
         archiveInputSignature,
@@ -1127,195 +1592,244 @@ export default function App({
         packageIdentity,
         submissionIds,
       }) => {
+        const session = activeApprovedSession;
         if (
           workspace !== "admin" ||
-          activeApprovedSession?.role !== "admin" ||
-          activeApprovedSession.status !== "active" ||
-          activeApprovedSession.approvalStatus !== "approved"
+          session?.role !== "admin" ||
+          session.status !== "active" ||
+          session.approvalStatus !== "approved"
         ) {
           throw new Error(
             "Only an approved admin session can complete export packages.",
           );
         }
 
-        const currentSubmissions = submissionsRef.current;
-        const requestedSubmissionIds = new Set(submissionIds);
-        const selectedCurrent = currentSubmissions.filter((submission) =>
-          requestedSubmissionIds.has(submission.id),
-        );
-        const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
-        const currentArchiveInputSignature =
-          buildExportArchiveInputSignature(selectedCurrent);
-        const artifactStillMatchesCurrentSelection =
-          requestedSubmissionIds.size === submissionIds.length &&
-          selectedCurrent.length === submissionIds.length &&
-          archiveInputSignature === currentArchiveInputSignature &&
-          exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
-          exportPackageDocumentCommitMatchesIdentity(
-            documentExport,
-            packageIdentity,
+        const postCommitFence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
+        try {
+          await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+          const currentSubmissions = submissionsRef.current;
+          const requestedSubmissionIds = new Set(submissionIds);
+          const selectedCurrent = currentSubmissions.filter((submission) =>
+            requestedSubmissionIds.has(submission.id),
           );
-        if (!artifactStillMatchesCurrentSelection) {
-          throw new Error(
-            "Export artifact is stale; regenerate Excel and ZIP before retrying.",
-          );
-        }
+          const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
+          const currentArchiveInputSignature =
+            buildExportArchiveInputSignature(selectedCurrent);
+          const artifactStillMatchesCurrentSelection =
+            requestedSubmissionIds.size === submissionIds.length &&
+            selectedCurrent.length === submissionIds.length &&
+            archiveInputSignature === currentArchiveInputSignature &&
+            exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
+            exportPackageDocumentCommitMatchesIdentity(
+              documentExport,
+              packageIdentity,
+            );
+          if (!artifactStillMatchesCurrentSelection) {
+            throw new Error(
+              "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+            );
+          }
 
-        const generatedSubmissions = applyExportStateToSelection(
-          currentSubmissions,
-          submissionIds,
-          "file_generated",
-        );
-        const downloadedSubmissions = applyExportStateToSelection(
-          generatedSubmissions,
-          submissionIds,
-          "file_downloaded",
-        );
-        if (downloadedSubmissions === generatedSubmissions) {
-          throw new Error("Export download state was blocked by domain guards.");
-        }
-
-        const selectedDownloaded = downloadedSubmissions.filter((submission) =>
-          requestedSubmissionIds.has(submission.id),
-        );
-        const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
-        const downloadedArchiveInputSignature =
-          buildExportArchiveInputSignature(selectedDownloaded);
-        const downloadedSelectionMatchesArtifact =
-          selectedDownloaded.length === submissionIds.length &&
-          archiveInputSignature === downloadedArchiveInputSignature &&
-          exportPackageIdentityMatches(packageIdentity, downloadedIdentity) &&
-          selectedDownloaded.every(
+          const selectionAlreadyDownloaded = selectedCurrent.every(
             (submission) =>
+              submission.exportState === "file_downloaded" &&
               submission.exportPackage &&
               exportPackageIdentityMatches(
-                packageIdentity,
                 submission.exportPackage,
+                currentPackageIdentity,
               ),
           );
-        if (!downloadedSelectionMatchesArtifact) {
-          throw new Error(
-            "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+          let downloadedSubmissions = currentSubmissions;
+          let rollbackExpectedCaseRevisions = new Map(
+            caseRevisionsBySubmissionIdRef.current,
           );
-        }
+          if (!selectionAlreadyDownloaded) {
+            const generatedSubmissions = applyExportStateToSelection(
+              currentSubmissions,
+              submissionIds,
+              "file_generated",
+            );
+            downloadedSubmissions = applyExportStateToSelection(
+              generatedSubmissions,
+              submissionIds,
+              "file_downloaded",
+            );
+            if (downloadedSubmissions === generatedSubmissions) {
+              throw new Error("Export download state was blocked by domain guards.");
+            }
+          }
 
-        await persistSubmissions(downloadedSubmissions);
-        const failWithRetryableExportState = async (
-          failure: unknown,
-        ): Promise<never> => {
-          const retryableSubmissions = applyExportStateToSelection(
-            downloadedSubmissions,
-            submissionIds,
-            "ready",
+          const selectedDownloaded = downloadedSubmissions.filter((submission) =>
+            requestedSubmissionIds.has(submission.id),
           );
-          const failureMessage =
-            failure instanceof Error
-              ? failure.message
-              : typeof failure === "string"
-                ? failure
-                : "Export package completion failed.";
-          if (retryableSubmissions === downloadedSubmissions) {
+          const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
+          const downloadedArchiveInputSignature =
+            buildExportArchiveInputSignature(selectedDownloaded);
+          const downloadedSelectionMatchesArtifact =
+            selectedDownloaded.length === submissionIds.length &&
+            archiveInputSignature === downloadedArchiveInputSignature &&
+            exportPackageIdentityMatches(packageIdentity, downloadedIdentity) &&
+            selectedDownloaded.every(
+              (submission) =>
+                submission.exportPackage &&
+                exportPackageIdentityMatches(
+                  packageIdentity,
+                  submission.exportPackage,
+                ),
+            );
+          if (!downloadedSelectionMatchesArtifact) {
             throw new Error(
-              `${failureMessage} Export state could not be restored for retry.`,
+              "Export artifact is stale; regenerate Excel and ZIP before retrying.",
             );
           }
-          try {
-            await persistSubmissions(retryableSubmissions);
-          } catch {
-            throw new Error(
-              `${failureMessage} Export state rollback could not be persisted.`,
+
+          if (!selectionAlreadyDownloaded) {
+            const checkpointRevisions = await persistSubmissions(
+              downloadedSubmissions,
+              fence,
             );
+            if (checkpointRevisions) {
+              rollbackExpectedCaseRevisions = new Map(checkpointRevisions);
+            }
           }
-          throw new Error(failureMessage);
-        };
-
-        const completionOptions = {
-          batchId: crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
-          createdBy: activeApprovedSession.userId,
-          documentExport,
-          format: "xlsx" as const,
-        };
-        let completed: Awaited<ReturnType<typeof completeExportPackage>>;
-        try {
-          completed = await completeExportPackage(
-            selectedDownloaded,
-            completionOptions,
-          );
-        } catch (error) {
-          const reconciliation = await reconcileExportPackageCompletion(
-            selectedDownloaded,
-            completionOptions,
-            error,
-          );
-          if (reconciliation.status === "committed") {
-            // A lost RPC response can still represent a committed transaction.
-            // Converge from canonical Supabase state and never roll that commit back.
-            try {
-              await refreshCanonicalSubmissions();
-            } catch {
-              // Canonical refresh is follow-up only after durable commit proof.
+          const failWithRetryableExportState = async (
+            failure: unknown,
+          ): Promise<never> => {
+            fence.assertCurrent();
+            const rollbackBaseSubmissions = submissionsRef.current;
+            const retryableSubmissions = applyExportStateToSelection(
+              rollbackBaseSubmissions,
+              submissionIds,
+              "ready",
+            );
+            const failureMessage =
+              failure instanceof Error
+                ? failure.message
+                : typeof failure === "string"
+                  ? failure
+                  : "Export package completion failed.";
+            if (retryableSubmissions === rollbackBaseSubmissions) {
+              throw new Error(
+                `${failureMessage} Export state could not be restored for retry.`,
+              );
             }
             try {
-              await bridge.onExportPackages?.({
-                archiveInputSignature,
-                documentExport,
-                packageIdentity,
-                submissionIds,
-              });
-            } catch {
-              // External bridge/tracking is deliberately non-transactional.
+              await persistSubmissions(
+                retryableSubmissions,
+                fence,
+                rollbackExpectedCaseRevisions,
+              );
+            } catch (rollbackError) {
+              if (isWorkspaceSessionChangedError(rollbackError)) throw rollbackError;
+              throw new Error(
+                `${failureMessage} Export state rollback could not be persisted.`,
+              );
             }
-            return;
-          }
-          if (reconciliation.status === "not_committed") {
-            return failWithRetryableExportState(error);
-          }
+            throw new Error(failureMessage);
+          };
 
-          try {
-            await refreshCanonicalSubmissions();
-          } catch {
-            // Preserve the uncertain outcome classification across refresh failures.
-          }
-          const failureMessage =
-            error instanceof Error
-              ? error.message
-              : "Export package completion failed.";
-          throw new ExportPackageCompletionUncertainError(
-            `${failureMessage} Canonical export commit could not be confirmed; automatic rollback was skipped.`,
-            { cause: error },
-          );
-        }
-        if (completed.status === "blocked") {
-          return failWithRetryableExportState(completed.blockers.join("; "));
-        }
-
-        // `complete_export_package` is the durable, atomic terminal transition.
-        // Do not send the exported snapshot through the generic draft writer: that
-        // endpoint correctly rejects terminal submissions and would surface a false
-        // save error after a successful export. Converge the workspace from the
-        // canonical Supabase state instead.
-        try {
-          await refreshCanonicalSubmissions();
-        } catch {
-          // A failed follow-up read must not undo a committed export package.
-        }
-        try {
-          await bridge.onExportPackages?.({
-            archiveInputSignature,
+          const completionOptions = {
+            batchId: crypto.randomUUID(),
+            createdAt: new Date().toISOString(),
+            createdBy: session.userId,
             documentExport,
-            packageIdentity,
-            submissionIds,
+            format: "xlsx" as const,
+          };
+          let completed: Awaited<ReturnType<typeof completeExportPackage>>;
+          try {
+            fence.assertCurrent();
+            completed = await completeExportPackage(
+              selectedDownloaded,
+              completionOptions,
+            );
+            fence.assertCurrent();
+          } catch (error) {
+            if (isWorkspaceSessionChangedError(error)) throw error;
+            fence.assertCurrent();
+            const reconciliation = await reconcileExportPackageCompletion(
+              selectedDownloaded,
+              completionOptions,
+              error,
+              fence,
+            );
+            fence.assertCurrent();
+            if (reconciliation.status === "committed") {
+              // A lost response can still represent a committed transaction.
+              // Follow-up reads and observers never roll that commit back.
+              void refreshCanonicalSubmissions();
+              return;
+            }
+            if (reconciliation.status === "not_committed") {
+              return failWithRetryableExportState(error);
+            }
+
+            void refreshCanonicalSubmissions();
+            const failureMessage =
+              error instanceof Error
+                ? error.message
+                : "Export package completion failed.";
+            throw new ExportPackageCompletionUncertainError(
+              `${failureMessage} Canonical export commit could not be confirmed; automatic rollback was skipped.`,
+              { cause: error },
+            );
+          }
+          if (completed.status === "blocked") {
+            return failWithRetryableExportState(completed.blockers.join("; "));
+          }
+
+          // `complete_export_package` is the durable, atomic terminal transition.
+          // Follow-up reads are best-effort and remain outside that transaction.
+            void refreshCanonicalSubmissions();
           });
-        } catch {
-          // External bridge/tracking is deliberately non-transactional after persistence.
+        } catch (error) {
+          if (isAdminSubmissionConcurrencyConflict(error)) {
+            await refreshCanonicalSubmissions();
+            if (postCommitFence.isCurrent()) {
+              setWorkspaceDataState({
+                error:
+                  "Подача изменилась в другой сессии. Загружена актуальная версия; повторите выгрузку.",
+                sessionUserId: session.userId,
+                status: "error",
+              });
+            }
+          }
+          throw error;
         }
+
+        postCommitFence.assertCurrent();
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: {
+              archiveInputSignature,
+              documentExport,
+              packageIdentity,
+              submissionIds,
+          },
+            submissionIds,
+            type: "export.complete",
+          },
+          postCommitFence,
+          () =>
+            bridge.onExportPackages?.({
+              archiveInputSignature,
+              documentExport,
+              packageIdentity,
+              submissionIds,
+            }),
+        );
       },
     }),
     [
       activeApprovedSession,
       applySubmissionAction,
       bridge,
+      createWorkspaceMutationFence,
+      dispatchPostCommitBridge,
+      enqueueWorkspaceSubmissionMutation,
       persistSubmissions,
       refreshCanonicalSubmissions,
       updateAdminSubmission,
@@ -1345,6 +1859,19 @@ export default function App({
         id="production-runtime-blocked-title"
         title="Supabase не активирован"
         tone="blocked"
+      />
+    );
+  }
+
+  if (signOutPending) {
+    return (
+      <AppRuntimeState
+        description="Закрываем текущую сессию и останавливаем все связанные операции."
+        eyebrow="Безопасный выход"
+        id="sign-out-pending-title"
+        statusText="Завершаем сессию..."
+        title="Завершаем сессию"
+        tone="loading"
       />
     );
   }
@@ -1439,6 +1966,7 @@ export default function App({
         }}
         bridge={appBridge}
         onRetryWorkspace={refreshCanonicalSubmissions}
+        sessionKey={activeApprovedSession.userId}
         workspace={workspace}
         workspaceDataState={workspaceDataState}
       />

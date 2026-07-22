@@ -87,6 +87,7 @@ export default defineConfig({
     video: "off",
   },
   webServer: {
+    cwd: "../..",
     command: "npm run dev -- --port 4198 --strictPort",
     env: loadBrowserSafeSmokeEnv(),
     url: "http://127.0.0.1:4198",

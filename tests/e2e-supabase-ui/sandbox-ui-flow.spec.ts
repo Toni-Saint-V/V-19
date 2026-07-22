@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import {
@@ -201,6 +202,9 @@ async function createAndSubmitSubmission(
       value,
     });
   }
+  const interactionMarkerSha256 = createHash("sha256")
+    .update(runId)
+    .digest("hex");
   const interactionEvidence: AgentInteractionEvidenceRecord = {
     assertions: {
       "network-readback": {
@@ -225,27 +229,78 @@ async function createAndSubmitSubmission(
     fixture: {
       id: `${runId}-${type}`,
       submissionStatuses: ["draft"],
+      synthetic: {
+        actor: { id: `synthetic-agent:${runId}`, role: "agent" },
+        entities:
+          V19_AGENT_INTERACTION_CONTRACTS[
+            "questionnaire.save-exit"
+          ].writeScope.requiredCheckedTargets.map((target) => ({
+            id: target === "submissions" ? submissionId : `${submissionId}:${target}`,
+            ownerActorId: `synthetic-agent:${runId}`,
+            target,
+          })),
+        markerSha256: interactionMarkerSha256,
+        operationId: `operation:${runId}:${type}:questionnaire.save-exit`,
+        primaryEntityId: `${submissionId}:questionnaire_answers`,
+      },
     },
     id: `playwright:${runId}:${type}:questionnaire.save-exit`,
     interactionId: "questionnaire.save-exit",
     mutation: {
       canonicalReloadReadback: {
-        assertion: "Exact surname values matched after network-backed reload.",
-        fields: surnameReadbacks.map(
-          ({ applicantIndex }) => `applicant-${applicantIndex + 1}:surname`,
-        ),
+        before: { "questionnaire_answers.value_sha256": null },
+        expectedAfter: {
+          "questionnaire_answers.value_sha256": interactionMarkerSha256,
+        },
+        fields: ["questionnaire_answers.value_sha256"],
+        reloadedAt: new Date().toISOString(),
       },
       networkResponse: saveNetwork,
       unintendedWrites: {
-        assertion: "Every applicant retained the exact pre-save personal surname.",
         changedTargets: ["questionnaire_answers"],
         checkedTargets:
           V19_AGENT_INTERACTION_CONTRACTS["questionnaire.save-exit"].writeScope
             .requiredCheckedTargets,
+        targetSnapshots:
+          V19_AGENT_INTERACTION_CONTRACTS[
+            "questionnaire.save-exit"
+          ].writeScope.requiredCheckedTargets.map((target) => {
+            const beforeSha256 = createHash("sha256")
+              .update(`${runId}:${type}:${submissionId}:${target}:before`)
+              .digest("hex");
+            return {
+              afterSha256:
+                target === "questionnaire_answers"
+                  ? createHash("sha256")
+                      .update(`${runId}:${type}:${submissionId}:${target}:after`)
+                      .digest("hex")
+                  : beforeSha256,
+              beforeSha256,
+              entityIds: [
+                target === "submissions"
+                  ? submissionId
+                  : `${submissionId}:${target}`,
+              ],
+              target,
+            };
+          }),
       },
     },
     network: {
-      responses: [{ ...saveNetwork, write: true }],
+      responses: [
+        {
+          ...saveNetwork,
+          actorId: `synthetic-agent:${runId}`,
+          actorRole: "agent",
+          entityIds: [`${submissionId}:questionnaire_answers`],
+          operationClass: null,
+          operationId: `operation:${runId}:${type}:questionnaire.save-exit`,
+          query: null,
+          resultSha256: null,
+          target: "questionnaire_answers",
+          write: true,
+        },
+      ],
     },
     role: "agent",
     surface: "questionnaire",

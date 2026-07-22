@@ -163,6 +163,24 @@ export type Database = {
         };
         Returns: AgentReturnPackagePublishResult;
       };
+      prepare_agent_return_package_artifact_upload: {
+        Args: {
+          payload: AgentReturnPackageArtifactUploadPreparePayload;
+        };
+        Returns: AgentReturnPackageArtifactUploadPrepareResult;
+      };
+      finalize_agent_return_package_artifact_upload: {
+        Args: {
+          p_operation_id: string;
+        };
+        Returns: AgentReturnPackageArtifactUploadFinalizeResult;
+      };
+      abort_agent_return_package_artifact_upload: {
+        Args: {
+          p_operation_id: string;
+        };
+        Returns: AgentReturnPackageArtifactUploadAbortResult;
+      };
       save_submission_draft: {
         Args: {
           payload: SubmissionDraftPersistencePayload;
@@ -174,6 +192,45 @@ export type Database = {
           mediaAssets: number;
           statusHistory: number;
         };
+      };
+      save_admin_submission_batch_if_current: {
+        Args: {
+          actor_id: string;
+          expected_revisions: Json;
+          operation_id: string;
+          payloads: SubmissionDraftPersistencePayload[];
+        };
+        Returns: {
+          caseRevisions: Record<string, number>;
+          operationId: string;
+          results: Array<{
+            submissionId: string;
+            applicants: number;
+            questionnaireAnswers?: number;
+            mediaAssets: number;
+            statusHistory: number;
+          }>;
+        };
+      };
+      claim_access_request_review: {
+        Args: {
+          p_action: "approve" | "reject";
+          p_admin_id: string;
+          p_operation_id: string;
+          p_request_id: string;
+        };
+        Returns: AccessRequestRow;
+      };
+      finalize_access_request_review: {
+        Args: {
+          p_action: "approve" | "reject";
+          p_admin_id: string;
+          p_operation_id: string;
+          p_rejection_reason?: string | null;
+          p_request_id: string;
+          p_user_id?: string | null;
+        };
+        Returns: AccessRequestRow;
       };
       submit_corrections_handoff: {
         Args: {
@@ -249,15 +306,28 @@ export interface AccessRequestRow extends DbRecord {
   reviewed_at: string | null;
   reviewed_by_admin_id: string | null;
   rejection_reason: string | null;
+  review_claim_action?: "approve" | "reject" | null;
+  review_claim_id?: string | null;
+  review_claimed_at?: string | null;
 }
 
 export type AccessRequestInsert = Omit<
   AccessRequestRow,
-  "id" | "created_at" | "updated_at" | "requested_role" | "status"
+  | "id"
+  | "created_at"
+  | "review_claim_action"
+  | "review_claim_id"
+  | "review_claimed_at"
+  | "updated_at"
+  | "requested_role"
+  | "status"
 > & {
   id?: string;
   created_at?: string;
   requested_role?: "agent";
+  review_claim_action?: "approve" | "reject" | null;
+  review_claim_id?: string | null;
+  review_claimed_at?: string | null;
   status?: AccessRequestStatus;
   updated_at?: string;
 };
@@ -265,6 +335,7 @@ export type AccessRequestInsert = Omit<
 export interface SubmissionRow extends DbRecord {
   id: string;
   public_number: number | null;
+  case_revision?: number | null;
   agent_id: string;
   type: "single" | "family";
   title: string;
@@ -616,6 +687,35 @@ export interface AgentReturnPackagePublishResult extends DbRecord {
   status: AgentReturnPackageStatus;
   artifactCount: number;
   duplicate: boolean;
+}
+
+export interface AgentReturnPackageArtifactUploadPreparePayload {
+  applicantId: string | null;
+  artifactKind: AgentReturnPackageArtifactKind;
+  operationId: string;
+  returnPackageId: string;
+  sha256: string;
+  sizeBytes: number;
+}
+
+export interface AgentReturnPackageArtifactUploadPrepareResult extends DbRecord {
+  fileName: "agent_list.pdf" | "visa_application.pdf";
+  operationId: string;
+  status: "prepared" | "finalized" | "aborted";
+  storageBucket: "agent-return-packages";
+  storagePath: string;
+}
+
+export interface AgentReturnPackageArtifactUploadFinalizeResult extends DbRecord {
+  artifact: AgentReturnPackageArtifactRow;
+  duplicate: boolean;
+  operationId: string;
+  previousStoragePath: string | null;
+}
+
+export interface AgentReturnPackageArtifactUploadAbortResult extends DbRecord {
+  operationId: string;
+  status: "aborted";
 }
 
 export interface DocumentExportEventRow extends DbRecord {

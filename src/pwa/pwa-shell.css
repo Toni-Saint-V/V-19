@@ -7,11 +7,66 @@
 
 #root {
   box-sizing: border-box;
+  min-height: 100svh;
   min-height: 100dvh;
-  padding-top: var(--vf-safe-area-top);
-  padding-right: var(--vf-safe-area-right);
-  padding-left: var(--vf-safe-area-left);
-  scroll-padding-bottom: var(--vf-safe-area-bottom);
+  scroll-padding: var(--vf-safe-area-top) var(--vf-safe-area-right)
+    var(--vf-safe-area-bottom) var(--vf-safe-area-left);
+}
+
+#root
+  :is(
+    .admin-passport-workspace,
+    .v19-review-workspace,
+    .v19-questionnaire-screen-shell,
+    .v19-create-drawer-shell
+  ) {
+  box-sizing: border-box !important;
+  border-style: solid !important;
+  border-color: transparent !important;
+  border-width: var(--vf-safe-area-top) var(--vf-safe-area-right) 0
+    var(--vf-safe-area-left) !important;
+}
+
+#root
+  [data-create-submission-surface="preupload-blue"]
+  > footer.v19-create-drawer-footer {
+  padding-bottom: max(var(--v19b-size-16), var(--vf-safe-area-bottom)) !important;
+}
+
+@media (max-width: 767px) {
+  #root
+    [data-create-submission-surface="preupload-blue"]
+    > footer.v19-create-drawer-footer {
+    padding-bottom: max(var(--v19b-size-8), var(--vf-safe-area-bottom)) !important;
+  }
+}
+
+#root .admin-passport-workspace > .admin-passport-workspace-footer {
+  padding-right: max(var(--v19b-size-16), var(--vf-safe-area-right)) !important;
+  padding-left: max(var(--v19b-size-16), var(--vf-safe-area-left)) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+  box-sizing: border-box !important;
+  border-top: var(--vf-safe-area-top) solid transparent !important;
+  border-bottom: var(--vf-safe-area-bottom) solid transparent !important;
+  border-left: var(--vf-safe-area-left) solid transparent !important;
+}
+
+#root .ops-shell.has-unified-side-menu > .workspace {
+  box-sizing: border-box !important;
+  border-top: var(--vf-safe-area-top) solid transparent !important;
+  border-right: var(--vf-safe-area-right) solid transparent !important;
+  scroll-padding: var(--vf-safe-area-top) var(--vf-safe-area-right)
+    var(--vf-safe-area-bottom) var(--vf-safe-area-left);
+}
+
+@media (max-width: 1024px) {
+  #root .ops-shell.has-unified-side-menu > .workspace {
+    border-left: var(--vf-safe-area-left) solid transparent !important;
+  }
 }
 
 #pwa-install-assistant-root {

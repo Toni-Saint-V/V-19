@@ -1,6 +1,6 @@
 /*
- * Single visual contract for the shared OperationalSideMenu.
- * Screen and role selectors must not restyle this component independently.
+ * Canonical late-cascade contract for the shared OperationalSideMenu.
+ * Keep role/screen differences outside this component-level layer.
  */
 
 :root {
@@ -12,7 +12,7 @@
   --v19-operational-side-menu-control-border: #242529;
   --v19-operational-side-menu-active: #27272b;
   --v19-operational-side-menu-text: rgb(255 255 255 / 0.7);
-  --v19-operational-side-menu-text-muted: rgb(255 255 255 / 0.4);
+  --v19-operational-side-menu-text-muted: rgb(255 255 255 / 0.52);
 }
 
 #root .ops-shell.has-unified-side-menu {
@@ -27,7 +27,7 @@
 
 #root
   .ops-shell.has-unified-side-menu
-  > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
   padding: 12px 8px !important;
   border-color: var(--v19-operational-side-menu-border) !important;
   border-radius: 0 !important;
@@ -37,7 +37,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-brand {
   min-height: 48px !important;
   margin: 0 0 8px !important;
@@ -46,7 +47,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-brand-logo {
   width: 32px !important;
   height: 32px !important;
@@ -56,7 +58,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .opsu-wordmark {
   color: #fff !important;
   font-size: 14px !important;
@@ -64,7 +67,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .v19-ds-side-menu-subtitle {
   color: rgb(255 255 255 / 0.5) !important;
   font-size: 11px !important;
@@ -72,7 +76,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-sidebar-search {
   height: 40px !important;
   min-height: 40px !important;
@@ -86,7 +91,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-sidebar-search:hover {
   border-color: var(--v19-operational-side-menu-control-border) !important;
   background: rgb(255 255 255 / 0.1) !important;
@@ -94,7 +100,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-sidebar-search
   kbd {
   border: 1px solid var(--v19-operational-side-menu-control-border) !important;
@@ -105,14 +112,16 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav {
   gap: 2px !important;
   padding: 0 !important;
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-group-label {
   padding: 0 8px 4px !important;
   color: var(--v19-operational-side-menu-text-muted) !important;
@@ -122,7 +131,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item {
   min-height: 40px !important;
   padding: 8px 10px !important;
@@ -137,7 +147,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item:not([data-nav-id="agent-create"]):not(.is-active):not(
     [aria-current="page"]
   ):is(:hover, :focus-visible) {
@@ -147,7 +158,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item:is(.is-active, [aria-current="page"]) {
   border-color: transparent !important;
   background: var(--v19-operational-side-menu-active) !important;
@@ -156,29 +168,36 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item:is(.is-active, [aria-current="page"])
   :is(.ops-nav-icon, .ops-nav-copy strong, .ops-nav-copy small) {
   color: #fff !important;
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
-  .ops-nav-item[data-nav-id="agent-create"] {
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  :is(.ops-nav-item[data-nav-id="agent-create"], .ops-sidebar-create) {
   border-color: transparent !important;
   background: var(--v19-depth-accent) !important;
   color: #fff !important;
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
-  .ops-nav-item[data-nav-id="agent-create"]:is(:hover, :focus-visible) {
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  :is(.ops-nav-item[data-nav-id="agent-create"], .ops-sidebar-create):is(
+    :hover,
+    :focus-visible
+  ) {
   background: var(--v19-depth-accent-hover) !important;
   color: #fff !important;
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item
   .ops-nav-count {
   border-color: rgb(255 255 255 / 0.05) !important;
@@ -187,7 +206,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-sidebar-footer {
   margin: auto 0 0 !important;
   padding: 12px !important;
@@ -197,7 +217,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .v19-ds-side-menu-profile {
   min-height: 40px !important;
   padding: 4px 0 !important;
@@ -207,7 +228,8 @@
 }
 
 #root
-  #v19-operational-side-menu.v19-ds-side-menu[data-v19-component="side-menu"]
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .v19-ds-side-menu-signout {
   min-height: 40px !important;
   border-color: var(--v19-operational-side-menu-control-border) !important;
@@ -217,7 +239,7 @@
   color: #fff !important;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1025px) {
   #root .ops-shell.has-unified-side-menu {
     grid-template-columns:
       var(--v19-operational-side-menu-desktop-width)
@@ -226,7 +248,7 @@
 
   #root
     .ops-shell.has-unified-side-menu
-    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
     width: var(--v19-operational-side-menu-desktop-width) !important;
     min-width: var(--v19-operational-side-menu-desktop-width) !important;
     max-width: var(--v19-operational-side-menu-desktop-width) !important;
@@ -234,10 +256,13 @@
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1024px) {
   #root
     .ops-shell.has-unified-side-menu
-    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    z-index: var(--v19b-z-overlay) !important;
     width: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
     min-width: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
     max-width: min(var(--v19-operational-side-menu-mobile-width), 100vw) !important;
@@ -254,7 +279,7 @@
 
   #root
     .ops-shell.has-unified-side-menu.is-mobile-nav-open
-    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
     visibility: visible !important;
     pointer-events: auto !important;
     transition-delay: 0s !important;
@@ -262,17 +287,33 @@
 
   #root
     .ops-shell.has-unified-side-menu:not(.is-mobile-nav-open)
-    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
     visibility: hidden !important;
     pointer-events: none !important;
   }
+
+  #root .ops-shell.has-unified-side-menu .ops-mobile-menu-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: calc(var(--v19b-z-overlay) - 1) !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    border: 0 !important;
+    background: var(--v19-dialog-backdrop) !important;
+    pointer-events: none !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu.is-mobile-nav-open .ops-mobile-menu-backdrop {
+    pointer-events: auto !important;
+  }
 }
 
-@media (max-width: 1023px) and (prefers-reduced-motion: reduce) {
+@media (max-width: 1024px) and (prefers-reduced-motion: reduce) {
   #root
     .ops-shell.has-unified-side-menu
-    > #v19-operational-side-menu.v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
-    transition-delay: 0s !important;
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
+    transition: none !important;
     will-change: auto;
   }
 }

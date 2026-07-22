@@ -76,8 +76,16 @@ Apply migrations only in the repository order declared by
 - `20260718190000_global_submission_public_numbers.sql`
 - `20260719160000_assign_public_number_after_questionnaire.sql`
 - `20260720000000_export_package_media_only_file_count.sql`
+- `20260722000000_harden_workflow_rpc_anon_execute.sql`
+- `20260722001000_admin_submission_batch_concurrency.sql`
+- `20260722002000_access_request_review_claim.sql`
+- `20260722003000_atomic_return_package_artifact_upload.sql`
 
 ## Final Sandbox RLS And Storage Smoke
+
+Before any promotion, confirm the hosted API Settings expose only `public` and
+`graphql_public`; `app_private` must remain absent, matching
+`supabase/config.toml`.
 
 Run `npm run test:supabase-live` only against the allow-listed V-19 sandbox
 project. The smoke must stay sandbox-only and must not read app `.env` files.

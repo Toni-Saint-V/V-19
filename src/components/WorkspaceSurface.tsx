@@ -31,6 +31,7 @@ type WorkspaceSurfaceProps = {
   agentWorkspaceProps: ComponentProps<typeof CommandCenterComponent>;
   bridge: VisaflowBusinessBridge;
   onRetryWorkspace: () => void | Promise<void>;
+  sessionKey: string;
   workspace: Workspace;
   workspaceDataState: WorkspaceDataState;
 };
@@ -44,6 +45,7 @@ export function WorkspaceSurface({
   agentWorkspaceProps,
   bridge,
   onRetryWorkspace,
+  sessionKey,
   workspace,
   workspaceDataState,
 }: WorkspaceSurfaceProps) {
@@ -83,7 +85,7 @@ export function WorkspaceSurface({
         ) : null}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={workspace}
+            key={`${workspace}:${sessionKey}`}
             {...workspaceMotion}
             className="v19-fullscreen-app h-full w-full"
           >

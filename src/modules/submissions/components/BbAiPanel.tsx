@@ -8,6 +8,7 @@ import { fileTypeLabels } from "../status";
 import type { AiReviewState, AiSuggestion, Role, Submission } from "../types";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import { EmptyState } from "./Primitives";
+import { CaseCopilotBriefCard } from "./CaseCopilotBriefCard";
 
 export function BbAiPanel({
   compact = false,
@@ -50,6 +51,13 @@ export function BbAiPanel({
           {stateLabel(state, suggestions.length)}
         </Badge>
       </div>
+
+      <CaseCopilotBriefCard
+        compact={compact}
+        role={role}
+        submission={submission}
+        surface={surface}
+      />
 
       <div className="bb-actions">
         <Button

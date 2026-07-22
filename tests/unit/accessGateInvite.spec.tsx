@@ -2,12 +2,100 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { AccessGate } from "../../src/components/AccessGate";
+import { auditAgentInteractionControls } from "../../src/modules/submissions/agentInteractionContract";
 
 afterEach(() => {
   cleanup();
 });
 
 describe("AccessGate invite password setup", () => {
+  test("deduplicates rapid login submissions", async () => {
+    let resolveLogin!: () => void;
+    const login = new Promise<void>((resolve) => {
+      resolveLogin = resolve;
+    });
+    const onLogin = vi.fn(() => login);
+
+    const view = render(
+      <AccessGate
+        error=""
+        inviteSetupEmail=""
+        recoverySetupEmail=""
+        pendingSession={null}
+        onCompleteInvite={vi.fn(async () => undefined)}
+        onCompleteRecovery={vi.fn(async () => undefined)}
+        onLogin={onLogin}
+        onRegister={vi.fn(async () => undefined)}
+        onResetPassword={vi.fn(async () => "")}
+        onSignOut={vi.fn(async () => undefined)}
+      />,
+    );
+
+    expect(auditAgentInteractionControls(view.container)).toEqual([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Уже есть доступ? Войти" }));
+    expect(auditAgentInteractionControls(view.container)).toEqual([]);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "agent@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Пароль"), {
+      target: { value: "synthetic-password" },
+    });
+    const submit = screen.getByRole("button", { name: "Войти в кабинет" });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    expect(onLogin).toHaveBeenCalledTimes(1);
+    expect(submit).toBeDisabled();
+    resolveLogin();
+    await waitFor(() => expect(submit).toBeEnabled());
+  });
+
+  test("keeps a pending session visible when sign-out fails and allows retry", async () => {
+    const onSignOut = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Не удалось завершить сессию. Повторите попытку."))
+      .mockResolvedValueOnce(undefined);
+
+    render(
+      <AccessGate
+        error=""
+        inviteSetupEmail=""
+        recoverySetupEmail=""
+        pendingSession={{
+          approvalStatus: "pending",
+          companyName: "CODEX E2E",
+          createdAt: "2026-07-22T00:00:00.000Z",
+          email: "pending.agent@example.test",
+          fullName: "CODEX E2E AGENT",
+          role: "agent",
+          status: "pending",
+          userId: "synthetic-user",
+        }}
+        onCompleteInvite={vi.fn(async () => undefined)}
+        onCompleteRecovery={vi.fn(async () => undefined)}
+        onLogin={vi.fn(async () => undefined)}
+        onRegister={vi.fn(async () => undefined)}
+        onResetPassword={vi.fn(async () => "")}
+        onSignOut={onSignOut}
+      />,
+    );
+
+    const signOut = screen.getByRole("button", { name: "Выйти" });
+    fireEvent.click(signOut);
+    fireEvent.click(signOut);
+
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Не удалось завершить сессию. Повторите попытку.",
+    );
+    expect(screen.getByRole("heading", { name: "Ожидает подтверждения" })).toBeVisible();
+    await waitFor(() => expect(signOut).toBeEnabled());
+
+    fireEvent.click(signOut);
+    await waitFor(() => expect(onSignOut).toHaveBeenCalledTimes(2));
+  });
+
   test("does not collect an unused password for a Supabase access request", async () => {
     const onRegister = vi.fn(async () => undefined);
 

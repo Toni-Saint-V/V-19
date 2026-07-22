@@ -121,6 +121,7 @@ export default defineConfig({
   },
   testMatch: /sandbox-ui-flow\.spec\.ts/,
   webServer: {
+    cwd: "../..",
     command: "npm run dev -- --host 127.0.0.1 --port 4199 --strictPort",
     env: loadSandboxBrowserEnv(),
     url: "http://127.0.0.1:4199",

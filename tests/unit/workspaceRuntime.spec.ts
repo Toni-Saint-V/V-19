@@ -3,6 +3,7 @@ import {
   canRefreshVisibleWorkspace,
   isLatestWorkspaceResponse,
   shouldBlockLocalDemoDataSource,
+  waitForWorkspaceMutationQueueDrain,
   workspaceDataState,
   workspaceRefreshIntervalMs,
 } from "../../src/lib/supabase/workspaceRuntime";
@@ -49,5 +50,16 @@ describe("workspace runtime production guard", () => {
   test("maps loaded Supabase result counts to deterministic UI states", () => {
     expect(workspaceDataState(0)).toBe("empty");
     expect(workspaceDataState(1)).toBe("ready");
+  });
+
+  test("bounds cross-session queue draining without treating a rejection as pending", async () => {
+    const neverSettles = new Promise<void>(() => undefined);
+
+    await expect(
+      waitForWorkspaceMutationQueueDrain(neverSettles, 0),
+    ).resolves.toBe("timed_out");
+    await expect(
+      waitForWorkspaceMutationQueueDrain(Promise.reject(new Error("stale")), 100),
+    ).resolves.toBe("settled");
   });
 });

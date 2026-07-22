@@ -1,13 +1,11 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
-  clickFirstVisible,
+  clickWorkspaceButton,
   collectBrowserProblems,
   drawer,
   expectNoHorizontalOverflow,
-  isVisible,
   openFreshWorkspace,
   openMobileMenu,
-  submissionCardById,
 } from "./v19-pilot-helpers";
 
 const breakpointMatrix = [
@@ -54,45 +52,14 @@ type BrowserGlobal = {
 };
 
 async function clickOperationalNav(page: Page, name: string | RegExp) {
-  const mobileMenuButton = page.getByRole("button", { exact: true, name: "Меню" });
-  const mobileShellOpen = page.locator(".ops-shell.is-mobile-nav-open .ops-sidebar");
-
-  if ((await hasVisible(mobileMenuButton)) || (await hasVisible(mobileShellOpen))) {
-    if (!(await hasVisible(mobileShellOpen))) {
-      await openMobileMenu(page);
-    }
-
-    const mobileButton = mobileShellOpen.getByRole("button", { name }).first();
-    await mobileButton.waitFor({ state: "visible", timeout: 2_000 });
-    await mobileButton.click({ timeout: 10_000 });
-    return;
-  }
-
-  const button = page.getByRole("button", { name });
-
-  if (!(await isVisible(button.first()))) {
-    await openMobileMenu(page);
-    await button.first().waitFor({ state: "visible", timeout: 2_000 });
-  }
-
-  await clickFirstVisible(button);
-}
-
-async function hasVisible(locator: Locator) {
-  const count = await locator.count();
-
-  for (let index = 0; index < count; index += 1) {
-    if (await isVisible(locator.nth(index))) return true;
-  }
-
-  return false;
+  await clickWorkspaceButton(page, name);
 }
 
 async function expectCenterHitTarget(target: Locator, context: string) {
   await target.scrollIntoViewIfNeeded();
   await expect(target, context).toBeVisible();
 
-  const hit = await target.evaluate((element) => {
+  const readHit = () => target.evaluate((element) => {
     const browser = globalThis as unknown as BrowserGlobal;
     const targetElement = element as unknown as BrowserElement;
     const rect = targetElement.getBoundingClientRect();
@@ -102,6 +69,8 @@ async function expectCenterHitTarget(target: Locator, context: string) {
       browser.innerHeight - 1,
     );
     const top = browser.document.elementFromPoint(x, y);
+    const footer = targetElement.closest?.("footer");
+    const dialogElement = targetElement.closest?.('[role="dialog"]');
     const cover = top?.closest?.(
       ".ops-mobile-tabbar, .mobile-create-dock, .v19-context-panel, .v19-context-backdrop, .ops-mobile-menu-backdrop",
     );
@@ -109,12 +78,30 @@ async function expectCenterHitTarget(target: Locator, context: string) {
     return {
       coverClass: cover?.getAttribute("class") ?? null,
       ok: top === targetElement || targetElement.contains(top),
+      dialogRect: dialogElement?.getBoundingClientRect() ?? null,
+      footerRect: footer?.getBoundingClientRect() ?? null,
+      targetRect: rect,
+      targetPointerEvents: browser.getComputedStyle(targetElement).pointerEvents,
       targetText:
         targetElement.textContent?.trim().replace(/\s+/g, " ").slice(0, 120) ?? "",
       topClass: top?.getAttribute("class") ?? null,
       topText: top?.textContent?.trim().replace(/\s+/g, " ").slice(0, 120) ?? "",
+      viewport: { height: browser.innerHeight, width: browser.innerWidth },
     };
   });
+
+  let hit = await readHit();
+  if (!hit.ok) {
+    await expect
+      .poll(
+        async () => {
+          hit = await readHit();
+          return hit.ok;
+        },
+        { message: `${context}: wait for the animated surface to settle`, timeout: 3_000 },
+      )
+      .toBe(true);
+  }
 
   expect(hit.ok, `${context}: ${JSON.stringify(hit)}`).toBe(true);
 }
@@ -224,7 +211,9 @@ async function expectMobileTabbarCompact(page: Page) {
 
 function drawerCloseButton(page: Page) {
   return drawer(page)
-    .getByRole("button", { name: /Закрыть (подачу|проверку)/ })
+    .locator(
+      '[data-v19-interaction-id="drawer.close"]:visible, button[aria-label="Закрыть проверку"]:visible, button[aria-label="Вернуться к очереди"]:visible',
+    )
     .first();
 }
 
@@ -242,7 +231,7 @@ test.describe("V-19 mobile click real logic", () => {
     await expectNoFixedLayerOverControls(page, "390 agent actions");
 
     const lastEventAction = page
-      .getByRole("button", { name: /^Открыть подачу:/ })
+      .getByRole("button", { name: /^Открыть (действие|подачу):/ })
       .last();
     await expectCenterHitTarget(lastEventAction, "390 actions last row action");
     await lastEventAction.click();
@@ -281,11 +270,9 @@ test.describe("V-19 mobile click real logic", () => {
     await expectNoHorizontalOverflow(page, "390 agent submissions");
     await expectNoFixedLayerOverControls(page, "390 agent submissions");
 
-    await page.getByRole("button", { name: "Фильтры подач" }).click();
-    const statusDialog = page.getByRole("dialog", { name: "Статус подач" });
-    const readyOption = statusDialog
-      .locator(".v19-mobile-filter-options")
-      .getByRole("button", { name: "Готово" });
+    await page.getByRole("button", { name: /^Фильтр подач:/ }).click();
+    const statusDialog = page.getByRole("listbox", { name: "Фильтр подач" });
+    const readyOption = statusDialog.getByRole("option", { name: "К выгрузке" });
 
     await expect(statusDialog).toBeVisible();
     await expectCenterHitTarget(readyOption, "390 submission filter option");
@@ -304,8 +291,10 @@ test.describe("V-19 mobile click real logic", () => {
       page.getByRole("heading", { level: 1, name: "Мои подачи" }),
     ).toBeVisible();
 
-    await submissionCardById(page, "ПД-1048").click();
-    await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toBeVisible();
+    const visibleSubmissionCard = page.locator(".v19-agent-shared-card").first();
+    await expectCenterHitTarget(visibleSubmissionCard, "390 visible submission card");
+    await visibleSubmissionCard.click();
+    await expect(drawer(page)).toBeVisible();
     await expect(page.locator(".ops-mobile-tabbar")).toBeHidden();
     await expect(page.locator(".mobile-create-dock")).toBeHidden();
     await expectCenterHitTarget(
@@ -325,16 +314,14 @@ test.describe("V-19 mobile click real logic", () => {
 
     await page.setViewportSize({ height: 844, width: 390 });
     await openFreshWorkspace(page, {
-      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
     await expectNoHorizontalOverflow(page, "390 admin review");
     await expectNoFixedLayerOverControls(page, "390 admin review");
 
     const firstReviewAction = page
-      .locator("[data-submission-card]")
-      .first()
-      .locator(".v17-admin-row-action");
+      .locator(".v19-review-queue-list [data-submission-card]")
+      .first();
     await expectCenterHitTarget(firstReviewAction, "390 admin review card action");
     await firstReviewAction.click();
     await expect(drawer(page)).toBeVisible();
@@ -345,8 +332,12 @@ test.describe("V-19 mobile click real logic", () => {
     await openMobileMenu(page);
     await expect(page.locator(".ops-mobile-menu-backdrop")).toBeVisible();
     await page.setViewportSize({ height: 1024, width: 768 });
+    await expect(page.locator(".ops-mobile-menu-backdrop")).toBeVisible();
+    await page.setViewportSize({ height: 800, width: 1024 });
+    await expect(page.locator(".ops-mobile-menu-backdrop")).toBeVisible();
+    await page.setViewportSize({ height: 800, width: 1025 });
     await expect(page.locator(".ops-mobile-menu-backdrop")).toBeHidden();
-    await expectNoHorizontalOverflow(page, "768 admin after mobile menu resize");
+    await expectNoHorizontalOverflow(page, "1025 admin after mobile menu resize");
     await page.setViewportSize({ height: 844, width: 390 });
     await page.keyboard.press("Escape");
     await expect(page.locator(".ops-mobile-menu-backdrop")).toHaveCount(0);
@@ -358,17 +349,20 @@ test.describe("V-19 mobile click real logic", () => {
     );
     await clickOperationalNav(page, /^Выгрузка$/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+      page.getByRole("heading", {
+        level: 1,
+        name: /^(Выгрузка|Центр выгрузки)$/,
+      }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, "390 export");
     await expectNoFixedLayerOverControls(page, "390 export");
 
+    const exportScreen = page.locator(".v19-admin-export-screen-v2");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Пакеты к выгрузке" }),
+      exportScreen.getByText("Пакеты к выгрузке", { exact: true }),
     ).toBeVisible();
-    const exportScreen = page.getByTestId("admin-export-reference-screen");
     const olgaPackage = exportScreen
-      .locator(".v19-admin-export-row")
+      .locator(".v19-admin-export-row-v2")
       .filter({ hasText: "Ольга Фролова" });
     const choosePackage = olgaPackage.getByRole("checkbox", {
       name: "Выбрать Ольга Фролова",
@@ -376,24 +370,26 @@ test.describe("V-19 mobile click real logic", () => {
 
     await expectCenterHitTarget(choosePackage, "390 export choose package");
     await choosePackage.click();
-    await expect(
-      olgaPackage.getByRole("button", {
-        name: "Убрать Ольга Фролова из выгрузки",
-      }),
-    ).toBeVisible();
+    await expect(choosePackage).toBeChecked();
 
-    const continueExport = page.getByRole("button", { name: "Выгрузить" });
+    const summaryButton = page.getByRole("button", { name: /^Контроль пакета/ });
+    await expectCenterHitTarget(summaryButton, "390 export control sheet");
+    await summaryButton.click();
+    const controlPanel = page.getByRole("complementary", {
+      name: "Контроль пакета",
+    });
+    await expect(controlPanel).toBeVisible();
+    const continueExport = controlPanel.getByRole("button", {
+      name: "Сформировать ZIP с Excel",
+    });
     await expectCenterHitTarget(
       continueExport,
       "390 export generate CTA",
     );
-    const summaryButton = page.getByRole("button", { name: "Сводка" });
-    await expectCenterHitTarget(summaryButton, "390 export summary sheet");
-    await summaryButton.click();
-    await expect(page.locator(".v19-admin-export-mobile-sheet")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await page.locator(".v19-admin-export-mobile-sheet button[aria-label='Закрыть']").click();
-    await expect(page.locator(".v19-admin-export-mobile-sheet")).toHaveCount(0);
+    await controlPanel
+      .getByRole("button", { name: "Закрыть контроль пакета" })
+      .click();
+    await expect(controlPanel).toBeHidden();
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
@@ -423,7 +419,7 @@ test.describe("V-19 mobile click real logic", () => {
       await expectNoFixedLayerOverControls(page, `${viewport.label} agent submissions`);
 
       await openFreshWorkspace(page, {
-        heading: "Проверка",
+        heading: /^(Очередь на проверку|Проверка)$/,
         workspaceEmail: "admin@visaflow.local",
       });
       await expectNoHorizontalOverflow(page, `${viewport.label} admin review`);
@@ -436,7 +432,10 @@ test.describe("V-19 mobile click real logic", () => {
       await expectNoFixedLayerOverControls(page, `${viewport.label} admin settings`);
       await clickOperationalNav(page, /^Выгрузка$/);
       await expect(
-        page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+        page.getByRole("heading", {
+          level: 1,
+          name: /^(Выгрузка|Центр выгрузки)$/,
+        }),
       ).toBeVisible();
       await expectNoHorizontalOverflow(page, `${viewport.label} export`);
       await expectNoFixedLayerOverControls(page, `${viewport.label} export`);

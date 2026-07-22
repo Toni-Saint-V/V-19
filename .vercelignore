@@ -19,3 +19,9 @@ config/playwright/
 supabase/.temp/
 .DS_Store
 /VisaFlow_AI_*.html
+/V19_ADMIN_AGENT_UI_HANDOFF/
+/Архив.zip
+/.v19-backups/
+/.v19-reports/
+/.v19-tools/
+/.v19-runtime/

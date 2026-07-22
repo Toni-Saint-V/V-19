@@ -21,6 +21,7 @@ const productionApprovalChecklistPath = resolve(
   "docs/release/supabase-production-approval-checklist.md",
 );
 const supabaseReadmePath = resolve(repoRoot, "supabase/README.md");
+const supabaseConfigPath = resolve(repoRoot, "supabase/config.toml");
 const liveSmokePath = resolve(repoRoot, "tests/integration/supabase-live.spec.ts");
 const productionWorkflowSmokePath = resolve(
   repoRoot,
@@ -234,6 +235,23 @@ function verifyMigrationOrder() {
   } else {
     pass("No undeclared Supabase migrations exist outside promotion order");
   }
+}
+
+function verifyPrivateSchemaIsNotExposed() {
+  const config = readProjectFile(
+    supabaseConfigPath,
+    "Supabase API exposure config exists",
+  );
+  expectContains(
+    config,
+    'schemas = ["public", "graphql_public"]',
+    "PostgREST exposes only approved API schemas",
+  );
+  expectNotContains(
+    config,
+    "app_private",
+    "app_private is absent from PostgREST exposed schemas",
+  );
 }
 
 function verifyRuntimeGuards() {
@@ -1147,6 +1165,7 @@ function report() {
 }
 
 verifyMigrationOrder();
+verifyPrivateSchemaIsNotExposed();
 verifyRuntimeGuards();
 verifyWorkspaceMediaSlotContract();
 verifyAdminPassportReviewMediaPolicy();

@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Download,
   FileText,
+  LoaderCircle,
   Maximize2,
   MessageSquarePlus,
   RotateCw,
@@ -79,6 +80,11 @@ type ReviewMediaTarget = {
 
 type PreviewStateMap = Partial<Record<ReviewMediaType, ReviewMediaPreviewState>>;
 
+type OwnedPreviewState = {
+  ownerKey: string;
+  previews: PreviewStateMap;
+};
+
 const passportFieldLabels: Record<AdminPassportReviewFieldId, string> = {
   "first-name": "Имя",
   surname: "Фамилия",
@@ -143,11 +149,11 @@ function reviewFieldsForApplicant(applicant?: Applicant): PassportReviewField[] 
 
 function reviewFileName(target: ReviewMediaTarget, file?: SubmissionFile) {
   const missingFileLabel =
-    target.type === "passport_scan" ? "Паспорт не загружен" : `${target.label} не загружен`;
+    target.type === "passport_scan"
+      ? "Паспорт не загружен"
+      : `${target.label} не загружен`;
 
-  return (
-    file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel
-  );
+  return file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel;
 }
 
 function sectionActionLabel(accepted: boolean, pending: boolean) {
@@ -178,6 +184,7 @@ export function ReviewWorkspace({
   submissionId,
 }: ReviewWorkspaceProps) {
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const decisionFooterRef = useRef<HTMLElement | null>(null);
   const previewPaneRef = useRef<HTMLDivElement | null>(null);
   const mediaTabRefs = useRef<
     Partial<Record<ReviewMediaType, HTMLButtonElement | null>>
@@ -185,6 +192,7 @@ export function ReviewWorkspace({
   const mediaPanelId = useId();
   const onBackRef = useRef(onBack);
   const mountedRef = useRef(true);
+  const sectionApprovalRunRef = useRef(0);
   const wasNestedDialogOpenRef = useRef(nestedDialogOpen);
   onBackRef.current = onBack;
 
@@ -206,9 +214,67 @@ export function ReviewWorkspace({
     submission && selectedApplicantId
       ? requiredPassportReviewMediaTypesForApplicant(submission, selectedApplicantId)
       : (["passport_scan"] as const);
+  const protectedMedia = useMemo(
+    () =>
+      mediaTargets.map((target) => {
+        const file = submission?.files.find(
+          (candidate) =>
+            candidate.applicantId === selectedApplicantId &&
+            candidate.type === target.type,
+        );
+        const protectedFile =
+          file &&
+          selectedApplicantId &&
+          isPersistablePrivateFileAssetAtSubmissionTarget(file, {
+            applicantId: selectedApplicantId,
+            fileType: target.type,
+            submissionId,
+          })
+            ? file
+            : undefined;
+        return { protectedFile, target };
+      }),
+    [mediaTargets, selectedApplicantId, submission, submissionId],
+  );
+  const [mediaRetryAttempt, setMediaRetryAttempt] = useState(0);
+  const mediaGenerationKey = protectedMedia
+    .map(({ protectedFile, target }) =>
+      [
+        target.type,
+        protectedFile?.id ?? "missing",
+        protectedFile?.storageBucket ?? "no-bucket",
+        protectedFile?.storagePath ?? "no-path",
+        protectedFile?.uploadedAtIso ?? protectedFile?.uploadedAt ?? "no-upload-time",
+      ].join(":"),
+    )
+    .join("|");
+  const mediaOwnerKey = `${submissionId}:${selectedApplicantId ?? "unselected"}:${mediaGenerationKey}:attempt-${mediaRetryAttempt}`;
+  const initialMediaPreviews = useMemo(
+    () =>
+      Object.fromEntries(
+        protectedMedia.map(({ protectedFile, target }) => [
+          target.type,
+          { status: protectedFile ? "loading" : "unavailable" },
+        ]),
+      ) as PreviewStateMap,
+    [protectedMedia],
+  );
+  const mediaGeneration = useMemo(
+    () => ({ initialMediaPreviews, protectedMedia }),
+    // mediaOwnerKey fingerprints every field consumed by this async generation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mediaOwnerKey],
+  );
   const [activeMediaType, setActiveMediaType] =
     useState<ReviewMediaType>("passport_scan");
-  const [mediaPreviews, setMediaPreviews] = useState<PreviewStateMap>({});
+  const [ownedMediaPreviews, setOwnedMediaPreviews] = useState<OwnedPreviewState>({
+    ownerKey: mediaOwnerKey,
+    previews: initialMediaPreviews,
+  });
+  const mediaPreviews =
+    ownedMediaPreviews.ownerKey === mediaOwnerKey
+      ? ownedMediaPreviews.previews
+      : initialMediaPreviews;
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [sectionApprovalPending, setSectionApprovalPending] = useState(false);
@@ -278,6 +344,7 @@ export function ReviewWorkspace({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      sectionApprovalRunRef.current += 1;
     };
   }, []);
 
@@ -298,12 +365,43 @@ export function ReviewWorkspace({
   }, [activeMediaType, mediaTargets]);
 
   useEffect(() => {
+    sectionApprovalRunRef.current += 1;
     setZoom(100);
     setRotation(0);
+    setSectionApprovalPending(false);
     setSectionApprovedLocally(false);
     setAcceptanceError("");
     setReviewActionError("");
   }, [selectedApplicantId, submissionId]);
+
+  useEffect(() => {
+    const footer = decisionFooterRef.current;
+    const workspace = workspaceRef.current;
+    if (!footer || !workspace) return;
+
+    const updateDecisionHeight = () => {
+      const height = Math.ceil(footer.getBoundingClientRect().height);
+      if (height > 0) {
+        workspace.style.setProperty("--v19-review-decision-height", `${height}px`);
+      }
+    };
+
+    updateDecisionHeight();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateDecisionHeight);
+      return () => {
+        window.removeEventListener("resize", updateDecisionHeight);
+        workspace.style.removeProperty("--v19-review-decision-height");
+      };
+    }
+
+    const observer = new ResizeObserver(updateDecisionHeight);
+    observer.observe(footer);
+    return () => {
+      observer.disconnect();
+      workspace.style.removeProperty("--v19-review-decision-height");
+    };
+  }, []);
 
   useEffect(() => {
     const wasNestedDialogOpen = wasNestedDialogOpenRef.current;
@@ -352,66 +450,45 @@ export function ReviewWorkspace({
 
   useEffect(() => {
     let cancelled = false;
-    const protectedMedia = mediaTargets.map((target) => {
-      const file = submission?.files.find(
-        (candidate) =>
-          candidate.applicantId === selectedApplicantId &&
-          candidate.type === target.type,
-      );
-      const protectedFile =
-        file &&
-        selectedApplicantId &&
-        isPersistablePrivateFileAssetAtSubmissionTarget(file, {
-          applicantId: selectedApplicantId,
-          fileType: target.type,
-          submissionId,
-        })
-          ? file
-          : undefined;
-      return { protectedFile, target };
+    setOwnedMediaPreviews({
+      ownerKey: mediaOwnerKey,
+      previews: mediaGeneration.initialMediaPreviews,
     });
 
-    setMediaPreviews(
-      Object.fromEntries(
-        protectedMedia.map(({ protectedFile, target }) => [
-          target.type,
-          { status: protectedFile ? "loading" : "unavailable" },
-        ]),
-      ) as PreviewStateMap,
-    );
+    mediaGeneration.protectedMedia.forEach(({ protectedFile, target }) => {
+      if (!protectedFile) return;
 
-    const loadProtectedMedia = async () => {
-      const loaded = await Promise.all(
-        protectedMedia.map(async ({ protectedFile, target }) => {
-          if (!protectedFile) {
-            return [target.type, unavailablePreview] as const;
-          }
-          try {
-            const url = await createMediaSignedUrl({
-              bucket: mediaStorageBucket,
-              path: protectedFile.storagePath,
-            });
-            return [
-              target.type,
-              url
-                ? ({ status: "ready", url } satisfies ReviewMediaPreviewState)
-                : unavailablePreview,
-            ] as const;
-          } catch {
-            return [target.type, unavailablePreview] as const;
-          }
-        }),
-      );
-      if (!cancelled) {
-        setMediaPreviews(Object.fromEntries(loaded) as PreviewStateMap);
-      }
-    };
+      void (async () => {
+        let preview: ReviewMediaPreviewState = unavailablePreview;
 
-    void loadProtectedMedia();
+        try {
+          const url = await createMediaSignedUrl({
+            bucket: mediaStorageBucket,
+            path: protectedFile.storagePath,
+          });
+          if (url) preview = { status: "ready", url };
+        } catch {
+          preview = unavailablePreview;
+        }
+
+        if (cancelled) return;
+        setOwnedMediaPreviews((current) =>
+          current.ownerKey === mediaOwnerKey
+            ? {
+                ...current,
+                previews: {
+                  ...current.previews,
+                  [target.type]: preview,
+                },
+              }
+            : current,
+        );
+      })();
+    });
     return () => {
       cancelled = true;
     };
-  }, [mediaTargets, selectedApplicantId, submission, submissionId]);
+  }, [mediaGeneration, mediaOwnerKey]);
 
   const passportIssueInScope = (issue: Submission["issues"][number]) =>
     Boolean(
@@ -446,13 +523,18 @@ export function ReviewWorkspace({
         hasAdminPassportReviewValue(field.value) &&
         !field.hasError,
     );
-  const allProtectedMediaReady = requiredMediaTypes.every(
-    (type) => mediaPreviews[type]?.status === "ready",
-  );
   const requiredMediaFiles = requiredMediaTypes.map((type) =>
     submission?.files.find(
       (file) => file.applicantId === selectedApplicantId && file.type === type,
     ),
+  );
+  const requiredMediaStates = requiredMediaTypes.map((type, index) => {
+    const status = mediaPreviews[type]?.status;
+    if (status) return status;
+    return requiredMediaFiles[index] ? "loading" : "unavailable";
+  });
+  const allProtectedMediaAvailable = requiredMediaStates.every(
+    (status) => status === "ready",
   );
   const sectionAlreadyAccepted =
     sectionApprovedLocally ||
@@ -465,7 +547,7 @@ export function ReviewWorkspace({
     hasUnambiguousPrimaryApplicant &&
     onApproveSection &&
     allFieldsFilled &&
-    allProtectedMediaReady &&
+    allProtectedMediaAvailable &&
     !hasOpenPassportIssue &&
     !sectionAlreadyAccepted &&
     !sectionApprovalPending,
@@ -473,10 +555,15 @@ export function ReviewWorkspace({
   const filledFieldCount = reviewFields.filter(
     (field) => hasAdminPassportReviewValue(field.value) && !field.hasError,
   ).length;
-  const unavailableMediaCount = requiredMediaTypes.filter(
-    (type) => mediaPreviews[type]?.status !== "ready",
+  const loadingMediaCount = requiredMediaStates.filter(
+    (status) => status === "loading",
   ).length;
-  const readyMediaCount = requiredMediaTypes.length - unavailableMediaCount;
+  const unavailableMediaCount = requiredMediaStates.filter(
+    (status) => status === "unavailable",
+  ).length;
+  const availableMediaCount = requiredMediaStates.filter(
+    (status) => status === "ready",
+  ).length;
   let completionReason = "Сверьте все восемь полей с паспортом и подтвердите секцию.";
   if (!selectedApplicantId) {
     completionReason = "Не выбран заявитель. Подтверждение недоступно.";
@@ -486,10 +573,12 @@ export function ReviewWorkspace({
   } else if (!allFieldsFilled) {
     completionReason =
       "Заполнены не все восемь паспортных полей или в данных есть ошибка.";
-  } else if (!allProtectedMediaReady) {
+  } else if (unavailableMediaCount > 0) {
     completionReason = requiredMediaTypes.includes("selfie")
       ? "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи."
       : "Для подтверждения нужен защищённый оригинал паспорта.";
+  } else if (loadingMediaCount > 0) {
+    completionReason = "Загружаем защищённые оригиналы для сверки…";
   } else if (hasOpenPassportIssue) {
     completionReason =
       "Есть открытое замечание. Сначала агент должен отправить исправление.";
@@ -517,21 +606,49 @@ export function ReviewWorkspace({
       ? (availableDecision.reason ?? reviewDecisionReason)
       : (acceptDecision?.reason ?? returnDecision?.reason ?? reviewDecisionReason);
   }
+  const confirmationState = acceptanceError
+    ? "error"
+    : sectionApprovalPending
+      ? "pending"
+      : sectionAlreadyAccepted
+        ? "complete"
+        : "idle";
+  const decisionState = reviewActionError
+    ? "error"
+    : reviewActionPending
+      ? "pending"
+      : "idle";
+  const visibleReviewDecisionReason = reviewActionPending
+    ? reviewActionPending === "accept" || reviewActionPending === "close_issues_accept"
+      ? "Сохраняем принятие подачи…"
+      : "Сохраняем возврат на исправление…"
+    : reviewDecisionReason;
+  const confirmationAnnouncement = sectionApprovalPending
+    ? "Сохраняем подтверждение паспортной секции…"
+    : sectionAlreadyAccepted
+      ? "Паспортная секция подтверждена."
+      : "";
+  const decisionAnnouncement = reviewActionPending ? visibleReviewDecisionReason : "";
 
   const handleConfirmSection = async () => {
     if (!canConfirmSection || !selectedApplicantId || !onApproveSection) return;
+    const approvalRun = ++sectionApprovalRunRef.current;
     setAcceptanceError("");
     setSectionApprovalPending(true);
     try {
       const approved = await onApproveSection({ applicantId: selectedApplicantId });
+      if (!mountedRef.current || sectionApprovalRunRef.current !== approvalRun) return;
       if (approved === false) throw new Error("Approval rejected");
       setSectionApprovedLocally(true);
     } catch {
+      if (!mountedRef.current || sectionApprovalRunRef.current !== approvalRun) return;
       setAcceptanceError(
         "Не удалось подтвердить паспортную секцию. Повторите попытку.",
       );
     } finally {
-      setSectionApprovalPending(false);
+      if (mountedRef.current && sectionApprovalRunRef.current === approvalRun) {
+        setSectionApprovalPending(false);
+      }
     }
   };
 
@@ -559,10 +676,21 @@ export function ReviewWorkspace({
   };
 
   const handlePreviewError = (mediaType: ReviewMediaType) => {
-    setMediaPreviews((current) => ({
-      ...current,
-      [mediaType]: unavailablePreview,
-    }));
+    setOwnedMediaPreviews((current) =>
+      current.ownerKey === mediaOwnerKey
+        ? {
+            ...current,
+            previews: {
+              ...current.previews,
+              [mediaType]: unavailablePreview,
+            },
+          }
+        : current,
+    );
+  };
+
+  const handlePreviewRetry = () => {
+    setMediaRetryAttempt((attempt) => attempt + 1);
   };
 
   const handleFullscreen = () => {
@@ -714,33 +842,39 @@ export function ReviewWorkspace({
                 <ReviewMediaPreview
                   alt={passportMediaTarget.alt}
                   file={passportMediaFile}
+                  key="passport-reference"
                   label="Паспорт"
                   preview={passportPreview}
                   testId="protected-media-preview-passport_scan"
                   variant="reference"
                   onError={() => handlePreviewError("passport_scan")}
+                  onRetry={handlePreviewRetry}
                 />
                 <ReviewMediaPreview
                   alt={activeMediaTarget.alt}
                   file={activeMediaFile}
+                  key={activeMediaTarget.type}
                   label={activeMediaTarget.shortLabel}
                   preview={activePreview}
                   testId={`protected-media-preview-${activeMediaTarget.type}`}
                   transform={activeMediaTransform}
                   variant="active"
                   onError={() => handlePreviewError(activeMediaTarget.type)}
+                  onRetry={handlePreviewRetry}
                 />
               </div>
             ) : (
               <ReviewMediaPreview
                 alt={activeMediaTarget.alt}
                 file={activeMediaFile}
+                key={activeMediaTarget.type}
                 label={activeMediaTarget.shortLabel}
                 preview={activePreview}
                 testId={`protected-media-preview-${activeMediaTarget.type}`}
                 transform={activeMediaTransform}
                 variant="single"
                 onError={() => handlePreviewError(activeMediaTarget.type)}
+                onRetry={handlePreviewRetry}
               />
             )}
           </div>
@@ -829,11 +963,26 @@ export function ReviewWorkspace({
                 <AlertCircle aria-hidden="true" />
                 Замечания <strong>{openPassportIssueCount}</strong>
               </span>
-              <span className={unavailableMediaCount ? "has-warning" : undefined}>
+              <span
+                aria-label={
+                  unavailableMediaCount
+                    ? `Оригиналы: недоступно ${unavailableMediaCount}; загружается ${loadingMediaCount}; доступно ${availableMediaCount} из ${requiredMediaTypes.length}`
+                    : loadingMediaCount
+                      ? `Оригиналы: загружается ${loadingMediaCount}; доступно ${availableMediaCount} из ${requiredMediaTypes.length}`
+                      : undefined
+                }
+                className={
+                  unavailableMediaCount
+                    ? "has-warning"
+                    : loadingMediaCount
+                      ? "is-loading"
+                      : undefined
+                }
+              >
                 <ShieldCheck aria-hidden="true" />
-                Файлы{" "}
+                Доступно{" "}
                 <strong>
-                  {readyMediaCount}/{requiredMediaTypes.length}
+                  {availableMediaCount}/{requiredMediaTypes.length}
                 </strong>
               </span>
             </div>
@@ -849,18 +998,32 @@ export function ReviewWorkspace({
               ))}
             </div>
 
-            <section aria-live="polite" className="v19-review-confirmation">
+            <span aria-atomic="true" className="sr-only" role="status">
+              {confirmationAnnouncement}
+            </span>
+            <section
+              aria-busy={sectionApprovalPending}
+              className={`v19-review-confirmation is-${confirmationState}${canConfirmSection ? " is-ready" : ""}`}
+            >
               <div>
                 <strong>Паспортная секция</strong>
                 <p id="passport-review-completion-reason">{completionReason}</p>
               </div>
               <button
+                aria-busy={sectionApprovalPending}
                 aria-describedby="passport-review-completion-reason"
                 disabled={!canConfirmSection}
                 onClick={() => void handleConfirmSection()}
                 type="button"
               >
-                <CheckCircle2 aria-hidden="true" />
+                {sectionApprovalPending ? (
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="v19-review-action-spinner"
+                  />
+                ) : (
+                  <CheckCircle2 aria-hidden="true" />
+                )}
                 {sectionActionLabel(sectionAlreadyAccepted, sectionApprovalPending)}
               </button>
               {acceptanceError ? (
@@ -871,7 +1034,14 @@ export function ReviewWorkspace({
             </section>
           </div>
 
-          <footer className="v19-review-decision">
+          <span aria-atomic="true" className="sr-only" role="status">
+            {decisionAnnouncement}
+          </span>
+          <footer
+            aria-busy={Boolean(reviewActionPending)}
+            className={`v19-review-decision is-${decisionState}`}
+            ref={decisionFooterRef}
+          >
             <div className="v19-review-decision-context">
               <div className="v19-review-decision-title">
                 <strong>Решение</strong>
@@ -905,11 +1075,12 @@ export function ReviewWorkspace({
                   ))}
                 </div>
               ) : null}
-              <p id="admin-review-decision-reason">{reviewDecisionReason}</p>
+              <p id="admin-review-decision-reason">{visibleReviewDecisionReason}</p>
             </div>
 
             <div className="v19-review-decision-actions">
               <button
+                aria-busy={reviewActionPending === returnDecision?.action}
                 aria-describedby="admin-review-decision-reason"
                 className="v19-review-return"
                 disabled={Boolean(
@@ -921,7 +1092,14 @@ export function ReviewWorkspace({
                 onClick={() => void handleReviewDecision(returnDecision)}
                 type="button"
               >
-                <MessageSquarePlus aria-hidden="true" />
+                {reviewActionPending === returnDecision?.action ? (
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="v19-review-action-spinner"
+                  />
+                ) : (
+                  <MessageSquarePlus aria-hidden="true" />
+                )}
                 {reviewActionLabel(
                   returnDecision,
                   reviewActionPending,
@@ -930,6 +1108,7 @@ export function ReviewWorkspace({
                 )}
               </button>
               <button
+                aria-busy={reviewActionPending === acceptDecision?.action}
                 aria-describedby="admin-review-decision-reason"
                 className="v19-review-accept"
                 disabled={Boolean(
@@ -941,7 +1120,14 @@ export function ReviewWorkspace({
                 onClick={() => void handleReviewDecision(acceptDecision)}
                 type="button"
               >
-                <CheckCircle2 aria-hidden="true" />
+                {reviewActionPending === acceptDecision?.action ? (
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="v19-review-action-spinner"
+                  />
+                ) : (
+                  <CheckCircle2 aria-hidden="true" />
+                )}
                 {reviewActionLabel(
                   acceptDecision,
                   reviewActionPending,

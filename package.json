@@ -33,8 +33,8 @@
     "verify:v19-ui-proof": "playwright test tests/e2e/v19-accessibility.spec.ts tests/e2e/v19-responsive-proof.spec.ts tests/e2e/v19-ux-states.spec.ts --project=chromium",
     "verify:safety": "node scripts/verify-safety.mjs",
     "verify:repo-hygiene": "node scripts/verify-repository-hygiene.mjs",
-    "verify:codex-hook": "node scripts/verify-codex-hook.mjs",
-    "verify:agent-screen-system": "node scripts/verify-agent-screen-system.mjs",
+    "verify:agent-screen-runtime": "node scripts/verify-agent-screen-runtime.mjs",
+    "verify:agent-interaction-evidence": "node scripts/verify-agent-interaction-evidence.mjs",
     "verify:v19-boundary": "node scripts/verify-v19-boundary.mjs",
     "verify:supabase-release": "node scripts/verify-supabase-release.mjs",
     "verify:auth-data-readiness": "node scripts/verify-auth-data-readiness.mjs",
@@ -47,9 +47,7 @@
     "verify:security": "npm audit --omit=dev",
     "verify:business-logic": "node scripts/verify-business-logic.mjs",
     "verify:business-logic:security": "node scripts/verify-business-logic.mjs --include-security",
-    "v19:e2e:lanes": "node scripts/launch-v19-parallel-e2e.mjs",
-    "v19:e2e:4": "node scripts/launch-v19-parallel-e2e.mjs --allow-dirty-source",
-    "verify": "npm run typecheck && npm run lint && npm run verify:deployment-headers && npm run verify:safety && npm run verify:repo-hygiene && npm run verify:codex-hook && npm run verify:agent-screen-system && npm run verify:v19-boundary && npm run verify:v19-ui-proof && npm run test && npm run build && npm run verify:performance",
+    "verify": "npm run typecheck && npm run lint && npm run verify:deployment-headers && npm run verify:safety && npm run verify:repo-hygiene && npm run verify:agent-screen-runtime && npm run verify:v19-boundary && npm run verify:v19-ui-proof && npm run test && npm run build && npm run verify:performance",
     "verify:local-readiness": "npm run verify && npm run verify:security && npm run test:e2e",
     "verify:full": "npm run verify:local-readiness && npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet",
     "test:e2e:smoke": "playwright test tests/e2e/v19-local-demo-smoke.spec.ts --config=config/playwright/playwright.e2e-fastlane.config.ts --project=chromium",
@@ -57,7 +55,9 @@
     "verify:e2e-fastlane": "npm run typecheck && npm run lint && npm run build && npm run test:e2e:smoke && npm run test:e2e:pilot",
     "test:e2e:focused": "playwright test tests/e2e/v19-pilot-agent-flow.spec.ts tests/e2e/v19-pilot-admin-review-flow.spec.ts tests/e2e/v19-admin-export-download-proof.spec.ts --config=config/playwright/playwright.e2e-fastlane.config.ts --project=chromium",
     "verify:e2e-localhost": "npm run typecheck && npm run build && npm run test:e2e:smoke && npm run test:e2e:focused",
-    "verify:e2e-focused-root": "npm run typecheck && npm run build && npm run test:e2e:smoke && npm run test:e2e:focused"
+    "verify:e2e-focused-root": "npm run typecheck && npm run build && npm run test:e2e:smoke && npm run test:e2e:focused",
+    "verify:premium-ai-ux": "npm run typecheck && npm run lint && cross-env VITE_SUPABASE_BACKEND_TARGET=local-demo VITE_SUPABASE_SANDBOX_PROBE_ENABLED=false vitest run tests/unit/workspaceIntelligence.spec.ts tests/unit/premiumExperienceScreens.spec.tsx tests/unit/adminWorkspaceAccessibility.spec.tsx tests/unit/agentActionsCommandCockpit.spec.tsx tests/unit/aiHelperSurfacePanel.spec.tsx tests/unit/caseCopilot.spec.ts tests/unit/adminTriageRadar.spec.ts",
+    "dev:premium": "vite --host 127.0.0.1 --open"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

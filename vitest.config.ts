@@ -7,6 +7,10 @@ export default defineConfig({
     __V19_LOCAL_DEMO_BUILD__: "true",
   },
   test: {
+    include: [
+      "tests/unit/**/*.{test,spec}.{ts,tsx}",
+      "tests/integration/**/*.{test,spec}.{ts,tsx}",
+    ],
     exclude: [
       "tests/e2e/**",
       "node_modules/**",

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { PreUploadScreen } from '../../src/components/PreUploadScreen';
+import { auditAgentInteractionControls } from '../../src/modules/submissions/agentInteractionContract';
 import {
   invokePassportExtraction,
   prewarmLocalPassportOcr,
@@ -34,9 +35,10 @@ afterEach(() => {
 
 describe('PreUploadScreen', () => {
   test('prewarms local passport OCR when the screen opens', async () => {
-    render(<PreUploadScreen onBack={() => undefined} />);
+    const view = render(<PreUploadScreen onBack={() => undefined} />);
 
     await waitFor(() => expect(prewarmLocalPassportOcr).toHaveBeenCalledTimes(1));
+    expect(auditAgentInteractionControls(view.container)).toEqual([]);
   });
 
   test('keeps Next available for a single applicant without a passport', async () => {

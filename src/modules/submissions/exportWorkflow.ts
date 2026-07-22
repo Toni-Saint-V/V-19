@@ -27,6 +27,10 @@ export type ExportPackageCommitter = (
 ) => Promise<ExportPackageCommitOutcome | null>;
 export type ExportedSubmissionPersister = (submissions: Submission[]) => Promise<void>;
 
+export interface ExportCompletionReconciliationFence {
+  assertCurrent: () => void;
+}
+
 export interface CompleteExportPackageOptions {
   batchId?: string;
   createdAt: string;
@@ -65,26 +69,33 @@ export async function reconcileExportPackageCompletion(
   submissions: Submission[],
   options: CompleteExportPackageOptions,
   failure: unknown,
+  fence?: ExportCompletionReconciliationFence,
 ): Promise<ExportPackageCommitReconciliation> {
+  fence?.assertCurrent();
   const identity = buildExportPackageIdentity(submissions, options.format);
   if (!identity) return { status: "unknown" };
 
   const diagnostics = safeDiagnosticsForPersistenceError(failure);
   if (diagnostics?.retryable) {
+    fence?.assertCurrent();
     try {
       const retried = await completeExportPackage(submissions, options);
+      fence?.assertCurrent();
       if (retried.status === "exported") {
         return { batch: retried.batch, status: "committed" };
       }
     } catch {
+      fence?.assertCurrent();
       // The canonical read below is the final authority after an idempotent retry.
     }
   }
 
+  fence?.assertCurrent();
   const canonical = await reconcileSubmissionExportPackage(
     identity,
     options.documentExport,
   );
+  fence?.assertCurrent();
   if (canonical.status === "committed") return canonical;
   if (
     canonical.status === "not_committed" &&

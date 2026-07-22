@@ -18,7 +18,7 @@ export function collectBrowserProblems(page: Page) {
 
 export async function openFreshWorkspace(
   page: Page,
-  options: { heading?: string; workspaceEmail?: string } = {},
+  options: { heading?: RegExp | string; workspaceEmail?: string } = {},
 ) {
   const workspaceEmail = normalizeLocalDemoWorkspaceEmail(options.workspaceEmail);
   const workspacePassword = localDemoPasswordForEmail(workspaceEmail);

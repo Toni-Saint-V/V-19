@@ -19,6 +19,13 @@ export type PasswordResetRequestResult =
       status: "unavailable";
     };
 
+export type SignOutCurrentSessionResult =
+  | { status: "signed_out" }
+  | {
+      status: "local_session_cleared";
+      warning: string;
+    };
+
 const demoProfiles: Record<Role, AppProfile> = {
   agent: {
     id: "agent-1",
@@ -224,11 +231,29 @@ export async function requestPasswordReset(
   };
 }
 
-export async function signOutCurrentSession(): Promise<void> {
+export async function signOutCurrentSession(): Promise<SignOutCurrentSessionResult> {
   const client = getSupabaseClient();
-  if (!client) return;
+  if (!client) return { status: "signed_out" };
 
-  await client.auth.signOut();
+  const { error } = await client.auth.signOut({ scope: "local" });
+  if (error) {
+    const mappedError = mapSupabasePersistenceError(error, {
+      operation: "auth.sign_out",
+      fallbackKind: "auth",
+    });
+    const canonicalSession = await client.auth.getSession();
+    if (canonicalSession.error || canonicalSession.data.session) {
+      throw mappedError;
+    }
+
+    return {
+      status: "local_session_cleared",
+      warning:
+        "Сеанс на этом устройстве завершён, но серверное подтверждение выхода не получено.",
+    };
+  }
+
+  return { status: "signed_out" };
 }
 
 export function canAccessRole(profile: AppProfile | null, requiredRole: Role): boolean {

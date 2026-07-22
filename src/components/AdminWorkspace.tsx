@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { SlidersHorizontal, UsersRound, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
 import { RemarkForm } from "./RemarkForm";
 import { ReviewWorkspace } from "./ReviewWorkspace";
+import { AdminUsersAccessScreen } from "./AdminUsersAccessScreen";
+import { AdminSystemSettingsScreen } from "./AdminSystemSettingsScreen";
 import {
   AppShell,
   PageHeader,
   PageHeaderMenuButton,
 } from "../modules/submissions/components/AppShell";
-import { operationalSideMenuId } from "../modules/submissions/components/OperationalSideMenu";
+import {
+  operationalSideMenuDesktopMinWidth,
+  operationalSideMenuId,
+} from "../modules/submissions/components/OperationalSideMenu";
+import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import type { AccessRequest } from "../shared/authContract";
 import type {
   IssueInput,
@@ -33,8 +39,8 @@ interface AdminWorkspaceProps {
   accessRequestsBusy?: boolean;
   currentEmail?: string;
   currentDisplayName?: string;
-  onApproveAccessRequest?: (requestId: string) => void;
-  onRejectAccessRequest?: (requestId: string) => void;
+  onApproveAccessRequest?: (requestId: string) => void | Promise<void>;
+  onRejectAccessRequest?: (requestId: string) => void | Promise<void>;
   onSignOut: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
   submissions?: Submission[];
@@ -42,11 +48,16 @@ interface AdminWorkspaceProps {
 }
 
 export function AdminWorkspace({
+  accessRequests = [],
+  accessRequestsBusy = false,
   currentDisplayName = "",
   currentEmail = "",
+  onApproveAccessRequest,
+  onRejectAccessRequest,
   onSignOut,
   onSwitchWorkspace,
   submissions,
+  usesSupabase = false,
 }: AdminWorkspaceProps) {
   const bridge = useVisaflowBusinessBridge();
   const [activeNav, setActiveNav] = useState<AdminNavSection>("review");
@@ -56,6 +67,7 @@ export function AdminWorkspace({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
   const [adminAsyncError, setAdminAsyncError] = useState("");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [remarkContext, setRemarkContext] = useState<{
     applicantId?: string;
     applicant?: string;
@@ -68,6 +80,7 @@ export function AdminWorkspace({
   const adminPassportApprovalPendingRef = useRef(false);
   const adminReviewActionPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
+  const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
 
   const selectedSubmission =
     submissions?.find((submission) => submission.id === selectedRow) ?? null;
@@ -87,11 +100,7 @@ export function AdminWorkspace({
       .toUpperCase() || "АД";
 
   useEffect(() => {
-    if (
-      currentView !== "review_workspace" ||
-      !selectedRow ||
-      selectedSubmission
-    ) {
+    if (currentView !== "review_workspace" || !selectedRow || selectedSubmission) {
       return;
     }
 
@@ -103,11 +112,34 @@ export function AdminWorkspace({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) setMobileNavOpen(false);
+      if (window.innerWidth >= operationalSideMenuDesktopMinWidth) {
+        setMobileNavOpen(false);
+      }
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        currentView === "main" &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k"
+      ) {
+        event.preventDefault();
+        if (!commandPaletteOpen) {
+          commandPaletteFocusOriginRef.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+        }
+        setCommandPaletteOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [commandPaletteOpen, currentView]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -149,6 +181,21 @@ export function AdminWorkspace({
     };
   }, [mobileNavOpen]);
 
+  const openCommandPalette = () => {
+    commandPaletteFocusOriginRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setCommandPaletteOpen(true);
+  };
+
+  const handleCommandPaletteOpenChange = (open: boolean) => {
+    setCommandPaletteOpen(open);
+    if (!open) {
+      window.requestAnimationFrame(() => {
+        commandPaletteFocusOriginRef.current?.focus({ preventScroll: true });
+      });
+    }
+  };
+
   const handleOpenReviewDrawer = (submissionId: string) => {
     const submission = submissions?.find((item) => item.id === submissionId);
     reviewReturnFocusRef.current =
@@ -164,6 +211,7 @@ export function AdminWorkspace({
       submissionId,
     });
     setAdminAsyncError("");
+    setCommandPaletteOpen(false);
     setSelectedRow(submissionId);
     setReviewApplicantId(
       submission ? primaryApplicantIdForPassportReview(submission) : undefined,
@@ -406,15 +454,13 @@ export function AdminWorkspace({
           : "settings";
 
   return (
-    <div className="has-persistent-operational-sidebar relative h-full w-full overflow-hidden bg-[#101011]">
+    <div className="v19-admin-workspace-root has-persistent-operational-sidebar relative h-full w-full overflow-hidden">
       {adminAsyncError ? (
-        <div
-          className="fixed left-1/2 top-3 z-[90] flex w-[min(92vw,560px)] -translate-x-1/2 items-center gap-3 rounded-xl border border-red-500/30 bg-[#211416] px-4 py-3 text-[13px] text-white shadow-2xl"
-          role="alert"
-        >
+        <div className="v19-admin-toast" role="alert">
           <span className="min-w-0 flex-1">{adminAsyncError}</span>
           <button
             aria-label="Закрыть сообщение об ошибке"
+            className="v19-admin-toast-close"
             onClick={() => setAdminAsyncError("")}
             type="button"
           >
@@ -456,9 +502,20 @@ export function AdminWorkspace({
             <PageHeader
               actions={
                 <div className="ml-auto flex items-center gap-2">
+                  <button
+                    aria-keyshortcuts="Meta+K Control+K"
+                    aria-label="Открыть командную палитру"
+                    className="v19-command-trigger"
+                    type="button"
+                    onClick={openCommandPalette}
+                  >
+                    <Search aria-hidden="true" />
+                    <span>Поиск</span>
+                    <kbd>⌘K</kbd>
+                  </button>
                   <div
                     aria-label={adminIdentity}
-                    className="v19-admin-header-identity w-8 h-8 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-medium text-white/70 shadow-inner"
+                    className="v19-admin-header-identity"
                     title={adminIdentity}
                   >
                     {adminInitials}
@@ -480,6 +537,7 @@ export function AdminWorkspace({
               title={pageTitle}
             />
           }
+          inactive={currentView === "review_workspace"}
           label="Рабочая область администратора"
           mobileNavOpen={mobileNavOpen}
           role="admin"
@@ -493,6 +551,7 @@ export function AdminWorkspace({
             mobileTitle: pageTitle,
             onChooseRole: () => onSwitchWorkspace?.(),
             onCloseMobile: () => setMobileNavOpen(false),
+            onCommandSearch: openCommandPalette,
             onResetWorkspace: handleSignOut,
             role: "admin",
             sessionDisplayName: adminIdentity,
@@ -517,26 +576,36 @@ export function AdminWorkspace({
                 <AdminExportScreen submissions={submissions} />
               ) : null}
               {activeNav === "users" ? (
-                <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-[#242529] rounded-2xl bg-[#161617]">
-                  <UsersRound className="w-10 h-10 text-white/20 mb-4" />
-                  <h3 className="text-white font-medium">Пользователи</h3>
-                  <p className="text-[13px] text-white/50 mt-1">
-                    Управление ролями и доступом
-                  </p>
-                </div>
+                <AdminUsersAccessScreen
+                  busy={accessRequestsBusy}
+                  currentIdentity={adminIdentity}
+                  onApprove={onApproveAccessRequest}
+                  onReject={onRejectAccessRequest}
+                  requests={accessRequests}
+                  usesSupabase={usesSupabase}
+                />
               ) : null}
               {activeNav === "settings" ? (
-                <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-[#242529] rounded-2xl bg-[#161617]">
-                  <SlidersHorizontal className="w-10 h-10 text-white/20 mb-4" />
-                  <h3 className="text-white font-medium">Настройки системы</h3>
-                  <p className="text-[13px] text-white/50 mt-1">
-                    Управление справочниками и правилами экспорта
-                  </p>
-                </div>
+                <AdminSystemSettingsScreen
+                  currentIdentity={adminIdentity}
+                  usesSupabase={usesSupabase}
+                />
               ) : null}
             </div>
           </div>
         </AppShell>
+
+        <CommandPalette
+          onNavigateAdminExport={() => navigateTo("export")}
+          onNavigateAdminReview={() => navigateTo("review")}
+          onNavigateSettings={() => navigateTo("settings")}
+          onNavigateUsers={() => navigateTo("users")}
+          onOpenChange={handleCommandPaletteOpenChange}
+          onOpenSubmission={(submission) => handleOpenReviewDrawer(submission.id)}
+          open={commandPaletteOpen}
+          role="admin"
+          submissions={submissions ?? []}
+        />
       </div>
     </div>
   );

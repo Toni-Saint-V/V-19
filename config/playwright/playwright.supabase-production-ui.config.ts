@@ -106,6 +106,7 @@ export default defineConfig({
   },
   testMatch: /production-readonly\.spec\.ts/,
   webServer: {
+    cwd: "../..",
     command: "npm run dev -- --host 127.0.0.1 --port 4201 --strictPort",
     env: loadProductionBrowserEnv(),
     url: "http://127.0.0.1:4201",

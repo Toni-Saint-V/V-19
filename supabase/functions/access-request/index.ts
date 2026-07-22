@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveAccessRequestUserId } from "../_shared/accessRequestProvisioning.ts";
 
 type AccessRequestAction = "approve" | "reject" | "submit";
 
@@ -49,6 +50,38 @@ function requiredString(value: unknown): string {
 
 function normalizeEmail(value: unknown): string {
   return requiredString(value).toLowerCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+type ClaimedAccessRequest = {
+  city: string;
+  company_name: string;
+  email: string;
+  full_name: string;
+  id: string;
+  phone: string;
+  status: string;
+  user_id: string | null;
+};
+
+function requireClaimedAccessRequest(value: unknown): ClaimedAccessRequest {
+  if (
+    !isRecord(value) ||
+    typeof value.city !== "string" ||
+    typeof value.company_name !== "string" ||
+    typeof value.email !== "string" ||
+    typeof value.full_name !== "string" ||
+    typeof value.id !== "string" ||
+    typeof value.phone !== "string" ||
+    typeof value.status !== "string" ||
+    (value.user_id !== null && typeof value.user_id !== "string")
+  ) {
+    throw new Error("INVALID_ACCESS_REVIEW_CLAIM");
+  }
+  return value as ClaimedAccessRequest;
 }
 
 function adminKey(): string {
@@ -250,52 +283,48 @@ async function handleApprove(
   const requestId = requiredString(id);
   if (!requestId) return jsonResponse(400, { error: "Request id is required." });
 
-  const { data: accessRequest, error: readError } = await admin
-    .from("access_requests")
-    .select(accessRequestSelect)
-    .eq("id", requestId)
-    .eq("status", "pending")
-    .single();
-  if (readError) throw readError;
-  let approvedUserId = accessRequest.user_id;
-  if (!approvedUserId) {
-    const { data: invitedUser, error: inviteError } =
-      await admin.auth.admin.inviteUserByEmail(accessRequest.email, {
-        data: {
-          city: accessRequest.city,
-          display_name: accessRequest.full_name,
-          organization_name: accessRequest.company_name,
-          password_setup_required: true,
-          phone: accessRequest.phone,
-        },
-      });
-    if (inviteError || !invitedUser.user?.id) throw inviteError;
-    approvedUserId = invitedUser.user.id;
+  const operationId = crypto.randomUUID();
+  const { data: claimedAccessRequest, error: claimError } = await admin.rpc(
+    "claim_access_request_review",
+    {
+      p_action: "approve",
+      p_admin_id: adminId,
+      p_operation_id: operationId,
+      p_request_id: requestId,
+    },
+  );
+  if (claimError) throw claimError;
+  const accessRequest = requireClaimedAccessRequest(claimedAccessRequest);
+  if (accessRequest?.status === "approved") {
+    return jsonResponse(200, { request: accessRequest });
   }
 
-  const reviewedAt = new Date().toISOString();
-  const { error: profileError } = await admin.from("profiles").upsert({
-    display_name: accessRequest.full_name,
-    email: accessRequest.email,
-    id: approvedUserId,
-    organization_name: accessRequest.company_name,
-    role: "agent",
-  });
-  if (profileError) throw profileError;
+  const approvedUserId =
+    accessRequest.user_id ??
+    (await resolveAccessRequestUserId(
+      admin.auth.admin,
+      accessRequest.email,
+      {
+        city: accessRequest.city,
+        display_name: accessRequest.full_name,
+        organization_name: accessRequest.company_name,
+        password_setup_required: true,
+        phone: accessRequest.phone,
+      },
+    ));
 
-  const { data: updatedRequest, error: updateError } = await admin
-    .from("access_requests")
-    .update({
-      reviewed_at: reviewedAt,
-      reviewed_by_admin_id: adminId,
-      status: "approved",
-      updated_at: reviewedAt,
-      user_id: approvedUserId,
-    })
-    .eq("id", accessRequest.id)
-    .select(accessRequestSelect)
-    .single();
-  if (updateError) throw updateError;
+  const { data: updatedRequest, error: finalizeError } = await admin.rpc(
+    "finalize_access_request_review",
+    {
+      p_action: "approve",
+      p_admin_id: adminId,
+      p_operation_id: operationId,
+      p_rejection_reason: null,
+      p_request_id: accessRequest.id,
+      p_user_id: approvedUserId,
+    },
+  );
+  if (finalizeError) throw finalizeError;
 
   return jsonResponse(200, { request: updatedRequest });
 }
@@ -310,21 +339,34 @@ async function handleReject(
   const requestId = requiredString(id);
   if (!requestId) return jsonResponse(400, { error: "Request id is required." });
 
-  const reviewedAt = new Date().toISOString();
-  const { data: updatedRequest, error } = await admin
-    .from("access_requests")
-    .update({
-      rejection_reason: requiredString(reason) || null,
-      reviewed_at: reviewedAt,
-      reviewed_by_admin_id: adminId,
-      status: "rejected",
-      updated_at: reviewedAt,
-    })
-    .eq("id", requestId)
-    .eq("status", "pending")
-    .select(accessRequestSelect)
-    .single();
-  if (error) throw error;
+  const operationId = crypto.randomUUID();
+  const { data: claimedAccessRequest, error: claimError } = await admin.rpc(
+    "claim_access_request_review",
+    {
+      p_action: "reject",
+      p_admin_id: adminId,
+      p_operation_id: operationId,
+      p_request_id: requestId,
+    },
+  );
+  if (claimError) throw claimError;
+  const accessRequest = requireClaimedAccessRequest(claimedAccessRequest);
+  if (accessRequest?.status === "rejected") {
+    return jsonResponse(200, { request: accessRequest });
+  }
+
+  const { data: updatedRequest, error: finalizeError } = await admin.rpc(
+    "finalize_access_request_review",
+    {
+      p_action: "reject",
+      p_admin_id: adminId,
+      p_operation_id: operationId,
+      p_rejection_reason: requiredString(reason) || null,
+      p_request_id: requestId,
+      p_user_id: null,
+    },
+  );
+  if (finalizeError) throw finalizeError;
 
   return jsonResponse(200, { request: updatedRequest });
 }
@@ -347,6 +389,7 @@ Deno.serve(async (request) => {
     return jsonResponse(400, { error: "Unknown access request action." });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    const errorCode = isRecord(error) ? error.code : undefined;
     if (message === "AUTH_REQUIRED") return jsonResponse(401, { error: "AUTH_REQUIRED" });
     if (message === "ADMIN_REQUIRED") return jsonResponse(403, { error: "ADMIN_REQUIRED" });
     if (message === "SUPABASE_ADMIN_UNAVAILABLE") {
@@ -358,7 +401,10 @@ Deno.serve(async (request) => {
     if (message === "Request id is required.") {
       return jsonResponse(400, { error: message });
     }
+    if (errorCode === "40001") {
+      return jsonResponse(409, { error: "ACCESS_REVIEW_CONFLICT" });
+    }
 
-    return jsonResponse(400, { error: "Access request action failed." });
+    return jsonResponse(503, { error: "Access request action failed; retry safely." });
   }
 });

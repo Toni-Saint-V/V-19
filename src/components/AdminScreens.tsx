@@ -1,18 +1,19 @@
-import React, { useMemo, useState } from "react";
+// src/components/AdminScreens.tsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   ArrowUpDown,
+  ArrowUpRight,
   Bot,
   CheckCircle2,
-  ChevronRight,
   Clock,
-  FileCheck2,
   Flame,
+  ListChecks,
   MessageSquareWarning,
+  Plane,
   RotateCcw,
   ShieldCheck,
   Shapes,
-  Sparkles,
   User,
   Users,
   X,
@@ -23,11 +24,7 @@ import {
   AdminQueueToolbar,
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
-import {
-  V19MetricCard,
-  V19MetricStrip,
-  V19PriorityHero,
-} from "../shared/ui/v19-design-system";
+import { V19MetricCard, V19MetricStrip } from "../shared/ui/v19-design-system";
 import {
   buildAdminTriageRadar,
   type AdminTriageRadarItem,
@@ -41,6 +38,11 @@ import { getPrimaryAction } from "../modules/submissions/status";
 import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import type { Submission } from "../modules/submissions/types";
 import { isAdminReviewQueueSubmission } from "../modules/submissions/uiTypes";
+import {
+  buildAdminReviewQueuePlan,
+  type AdminReviewPriorityBand,
+  type AdminReviewQueuePlanItem,
+} from "../modules/submissions/adminReviewQueuePlan";
 
 interface AdminScreenProps {
   onOpenDrawer: (id: string) => void;
@@ -49,7 +51,7 @@ interface AdminScreenProps {
 }
 
 type Lane = "urgent" | "review" | "returned";
-type AdminReviewSort = "tripDate" | "createdAt";
+type AdminReviewSort = "priority" | "tripDate" | "createdAt";
 type AdminReviewTypeFilter = "all" | "family" | "single";
 
 interface ReviewCard {
@@ -73,6 +75,11 @@ interface ReviewCard {
   lastEvent: string;
   createdAtIso: string;
   tripDateIso: string;
+  tripDateLabel: string;
+  daysToTrip: number | null;
+  priorityBand: AdminReviewPriorityBand;
+  priorityReason: string;
+  priorityScore: number;
 }
 
 function openIssues(submission: Submission) {
@@ -113,7 +120,10 @@ function dateIsoFromLabel(value: string, fallbackIso: string): string {
   return fallbackIso;
 }
 
-function reviewCardFromSubmission(submission: Submission): ReviewCard {
+function reviewCardFromSubmission(
+  submission: Submission,
+  planItem: AdminReviewQueuePlanItem,
+): ReviewCard {
   const primaryAction = getPrimaryAction(submission, "admin", "review");
   const blockers = unresolvedBlockerCount(submission);
   const warnings = unresolvedWarningCount(submission);
@@ -151,50 +161,33 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
     lastEvent: submission.history[0]?.text ?? "История пока пустая",
     createdAtIso: dateIsoFromLabel(submission.createdAt, updatedIso),
     tripDateIso: tripIso,
+    tripDateLabel: submission.tripDateFrom,
+    daysToTrip: planItem.daysToTrip,
+    priorityBand: planItem.band,
+    priorityReason: planItem.priorityReason,
+    priorityScore: planItem.score,
   };
 }
 
-function reviewCardsFromSubmissions(submissions: Submission[]): ReviewCard[] {
-  return submissions.filter(isAdminReviewQueueSubmission).map(reviewCardFromSubmission);
+function reviewCardsFromSubmissions(
+  submissions: Submission[],
+  planItems: AdminReviewQueuePlanItem[],
+): ReviewCard[] {
+  const planBySubmissionId = new Map(
+    planItems.map((item) => [item.submissionId, item]),
+  );
+
+  return submissions.filter(isAdminReviewQueueSubmission).flatMap((submission) => {
+    const planItem = planBySubmissionId.get(submission.id);
+    return planItem ? [reviewCardFromSubmission(submission, planItem)] : [];
+  });
 }
 
-const lanes: Array<{
-  id: Lane;
-  title: string;
-  subtitle: string;
-  tone: "red" | "blue";
-  icon: React.ElementType;
-}> = [
-  {
-    id: "urgent",
-    title: "Блокеры",
-    subtitle: "сначала сюда",
-    tone: "red",
-    icon: Flame,
-  },
-  {
-    id: "review",
-    title: "Проверить",
-    subtitle: "ручная сверка",
-    tone: "blue",
-    icon: ShieldCheck,
-  },
-  {
-    id: "returned",
-    title: "Исправления",
-    subtitle: "ответ агента",
-    tone: "blue",
-    icon: MessageSquareWarning,
-  },
-];
-
-function toneClasses(tone: "red" | "blue") {
-  if (tone === "red") {
-    return "border-[#5b2b32]/45 bg-[#24191b]/60 text-[#d59aa3]";
-  }
-
-  return "border-[#393c7f] bg-[#23264f] text-[#b5caf2]";
-}
+const priorityBandOrder = {
+  critical: 0,
+  attention: 1,
+  standard: 2,
+} satisfies Record<AdminReviewPriorityBand, number>;
 
 function reviewCountLabel(count: number) {
   const lastTwoDigits = count % 100;
@@ -208,126 +201,213 @@ function reviewCountLabel(count: number) {
 
 function ProgressLine({ label, value }: { label: string; value: number }) {
   return (
-    <div>
-      <div className="mb-1 flex justify-between text-[10.5px] text-white/40">
+    <div className="v19-review-progress">
+      <div>
         <span>{label}</span>
-        <span>{value}%</span>
+        <strong>{value}%</strong>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-        <div
-          className="h-full rounded-full bg-[#8fa3ff]"
-          style={{ width: `${value}%` }}
-        />
-      </div>
+      <span aria-hidden="true" className="v19-review-progress-track">
+        <span style={{ width: `${value}%` }} />
+      </span>
     </div>
   );
+}
+
+function priorityBandLabel(band: AdminReviewPriorityBand) {
+  if (band === "critical") return "Критично";
+  if (band === "attention") return "Внимание";
+  return "Планово";
+}
+
+function tripTimingLabel(item: ReviewCard) {
+  if (item.daysToTrip === null) return `Вылет ${item.tripDateLabel}`;
+  if (item.daysToTrip < 0) return "Дата поездки прошла";
+  if (item.daysToTrip === 0) return "Вылет сегодня";
+  if (item.daysToTrip === 1) return "1 день до вылета";
+  if (item.daysToTrip <= 30) return `${item.daysToTrip} дней до вылета`;
+  return `Вылет ${item.tripDateLabel}`;
 }
 
 function ReviewQueueCard({
   item,
   onOpenDrawer,
+  rank,
 }: {
   item: ReviewCard;
   onOpenDrawer: (id: string) => void;
+  rank: number;
 }) {
   const hasBlocker = item.blockers > 0;
   const shortQueueTime = item.timeInQueue.replace(/\s+\d+\s+мин$/, "");
 
   return (
-    <button
-      type="button"
-      aria-label={`Ручная проверка заявки ${item.title}`}
-      data-submission-card=""
-      data-submission-id={item.id}
-      onClick={() => onOpenDrawer(item.id)}
-      className={`v19-admin-review-card group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${
-        hasBlocker ? "has-blocker " : ""
-      }${
-        hasBlocker
-          ? "border-[#5b2b32]/45 bg-[#1d1719]/80 hover:border-[#74414a]/55"
-          : "border-[#393c7f]/70 bg-[#17192b] hover:border-[#5960a7]"
-      }`}
-    >
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="mb-1.5 flex max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10.5px] font-medium tracking-wide text-white/40">
-            <span className="v19-admin-review-card-id shrink-0 font-mono text-white/60">
-              {item.publicId}
-            </span>
-            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
-            <span className="shrink-0">{item.city}</span>
-            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
-            <span className="shrink-0">{shortQueueTime}</span>
-          </div>
-          <h3 className="truncate text-[15px] font-semibold text-white group-hover:text-[#b8baff]">
-            {item.title}
-          </h3>
-          <div className="mt-1 flex min-w-0 items-center gap-2 overflow-hidden text-[11.5px] font-medium text-white/45">
-            {item.type === "family" ? (
-              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            ) : (
-              <User className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            )}
-            <span className="shrink-0">{item.applicants} чел.</span>
+    <div className="v19-review-queue-entry" role="listitem">
+      <button
+        type="button"
+        aria-label={`Ручная проверка заявки ${item.title}`}
+        data-priority-band={item.priorityBand}
+        data-submission-card=""
+        data-submission-id={item.id}
+        onClick={() => onOpenDrawer(item.id)}
+        className={`v19-admin-review-card v19-review-queue-row group ${
+          hasBlocker ? "has-blocker" : ""
+        }`}
+      >
+        <span className="v19-review-row-rank" aria-label={`Позиция ${rank}`}>
+          {String(rank).padStart(2, "0")}
+        </span>
+
+        <span className="v19-review-row-identity">
+          <span className="v19-review-row-overline">
+            <span className="v19-admin-review-card-id">{item.publicId}</span>
             <span aria-hidden="true">·</span>
-            <span className="truncate">{item.agent}</span>
-          </div>
+            <span>{item.city}</span>
+            <span aria-hidden="true">·</span>
+            <span>{shortQueueTime}</span>
+          </span>
+          <strong>{item.title}</strong>
+          <small>
+            {item.type === "family" ? (
+              <Users aria-hidden="true" />
+            ) : (
+              <User aria-hidden="true" />
+            )}
+            {item.applicants} чел. · {item.agent}
+          </small>
+          <em>{item.lastEvent}</em>
+        </span>
+
+        <span className="v19-review-row-priority">
+          <span className={`v19-review-priority-badge is-${item.priorityBand}`}>
+            {priorityBandLabel(item.priorityBand)}
+            <strong>{item.priorityScore}</strong>
+          </span>
+          <strong>{item.priorityReason}</strong>
+          <small>{item.nextAction}</small>
+        </span>
+
+        <span className="v19-review-row-readiness">
+          <ProgressLine label="Анкета" value={item.questionnaire} />
+          <ProgressLine label="Файлы" value={item.files} />
+        </span>
+
+        <span className="v19-review-row-signals">
+          <span className="v19-review-trip-label">
+            <Plane aria-hidden="true" />
+            {tripTimingLabel(item)}
+          </span>
+          <span className="v19-review-signal-chips">
+            {item.blockers > 0 ? (
+              <span className="is-critical">{item.blockers} блокер</span>
+            ) : null}
+            {item.fixedIssues > 0 ? (
+              <span className="is-attention">{item.fixedIssues} исправлено</span>
+            ) : null}
+            {item.warnings > 0 ? <span>{item.warnings} проверить</span> : null}
+            {item.aiFlags > 0 ? <span>AI {item.aiFlags}</span> : null}
+            {item.blockers === 0 &&
+            item.fixedIssues === 0 &&
+            item.warnings === 0 &&
+            item.aiFlags === 0 ? (
+              <span className="is-clear">без замечаний</span>
+            ) : null}
+          </span>
+        </span>
+
+        <span className="v19-review-row-open">
+          Открыть
+          <ArrowUpRight aria-hidden="true" />
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function ReviewQueueCommandPanel({
+  attentionCount,
+  criticalCount,
+  onOpenTop,
+  onShowCritical,
+  top,
+  totalCount,
+}: {
+  attentionCount: number;
+  criticalCount: number;
+  onOpenTop: () => void;
+  onShowCritical: () => void;
+  top?: ReviewCard;
+  totalCount: number;
+}) {
+  return (
+    <section
+      aria-labelledby="review-queue-command-title"
+      className={`v19-review-command-panel is-${top?.priorityBand ?? "empty"}`}
+    >
+      <div className="v19-review-command-copy">
+        <div className="v19-review-command-kicker">
+          <span>
+            <ListChecks aria-hidden="true" />
+            Операционный план
+          </span>
+          <em>без автоприменения</em>
         </div>
-        <ChevronRight
-          aria-hidden="true"
-          className="mt-1 h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/55"
-        />
-      </div>
-
-      <div className="mb-3 rounded-[8px] border border-white/5 bg-white/[0.025] p-3">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-white/75">
-          {item.aiFlags > 0 ? (
-            <Sparkles className="h-3.5 w-3.5 text-[#b8baff]" aria-hidden="true" />
-          ) : (
-            <FileCheck2 className="h-3.5 w-3.5 text-[#b8baff]" aria-hidden="true" />
-          )}
-          Следующее действие
+        <h2 id="review-queue-command-title">
+          {top
+            ? `Следующий пакет: ${top.publicId} · ${top.title}`
+            : "По текущему фильтру пакетов нет"}
+        </h2>
+        <p>
+          {top?.priorityReason ??
+            "Сбросьте фильтры или дождитесь новой подачи на проверку."}
+        </p>
+        <div className="v19-review-command-guardrail">
+          <ShieldCheck aria-hidden="true" />
+          Порядок учитывает статус, замечания и дату поездки. Решение всегда
+          подтверждает администратор.
         </div>
-        <p className="text-[12px] leading-relaxed text-white/50">{item.nextAction}</p>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <ProgressLine label="Анкета" value={item.questionnaire} />
-        <ProgressLine label="Файлы" value={item.files} />
+      <div className="v19-review-command-metrics" aria-label="Состояние плана">
+        <span className={criticalCount ? "is-critical" : "is-clear"}>
+          <strong>{criticalCount}</strong>
+          <small>критично</small>
+        </span>
+        <span className={attentionCount ? "is-attention" : "is-clear"}>
+          <strong>{attentionCount}</strong>
+          <small>внимание</small>
+        </span>
+        <span>
+          <strong>{totalCount}</strong>
+          <small>в очереди</small>
+        </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {item.blockers > 0 ? (
-          <span className="rounded-full border border-[#5b2b32]/45 bg-[#24191b]/60 px-2 py-1 text-[10.5px] font-medium text-[#d59aa3]">
-            {item.blockers} критичных
+      <div className="v19-review-command-actions">
+        <button
+          aria-keyshortcuts="Alt+Enter"
+          className="v19-review-command-primary"
+          disabled={!top}
+          type="button"
+          onClick={onOpenTop}
+        >
+          <span>
+            <ArrowUpRight aria-hidden="true" />
+            Начать проверку
           </span>
-        ) : null}
-        {item.fixedIssues > 0 ? (
-          <span className="rounded-full border border-[#393c7f] bg-[#23264f] px-2 py-1 text-[10.5px] font-medium text-[#b5caf2]">
-            {item.fixedIssues} исправлено
-          </span>
-        ) : null}
-        {item.warnings > 0 ? (
-          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10.5px] font-medium text-white/62">
-            {item.warnings} проверить
-          </span>
-        ) : null}
-        {item.aiFlags > 0 ? (
-          <span className="rounded-full border border-[#393c7f] bg-[#23264f] px-2 py-1 text-[10.5px] font-medium text-[#b5caf2]">
-            ИИ {item.aiFlags}
-          </span>
-        ) : null}
-        {item.blockers === 0 && item.fixedIssues === 0 && item.warnings === 0 ? (
-          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10.5px] font-medium text-[#b5caf2]">
-            без замечаний
-          </span>
-        ) : null}
+          <kbd>Alt ↵</kbd>
+        </button>
+        <button
+          className="v19-review-command-secondary"
+          disabled={criticalCount === 0}
+          type="button"
+          onClick={onShowCritical}
+        >
+          <Flame aria-hidden="true" />
+          Критичные
+          <strong>{criticalCount}</strong>
+        </button>
       </div>
-
-      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] text-white/35">
-        {item.lastEvent}
-      </div>
-    </button>
+    </section>
   );
 }
 
@@ -394,51 +474,107 @@ export function ReviewScreen({
   const [activeLane, setActiveLane] = useState<Lane | "all">("all");
   const [cityFilter, setCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<AdminReviewSort>("tripDate");
+  const [sortBy, setSortBy] = useState<AdminReviewSort>("priority");
   const [typeFilter, setTypeFilter] = useState<AdminReviewTypeFilter>("all");
   const [mobileContextOpen, setMobileContextOpen] = useState(false);
   const reviewSubmissions = useMemo(
     () => (submissions ?? []).filter(isAdminReviewQueueSubmission),
     [submissions],
   );
-  const reviewSource = useMemo(
-    () => reviewCardsFromSubmissions(reviewSubmissions),
+  const reviewPlan = useMemo(
+    () => buildAdminReviewQueuePlan(reviewSubmissions),
     [reviewSubmissions],
+  );
+  const reviewSource = useMemo(
+    () => reviewCardsFromSubmissions(reviewSubmissions, reviewPlan.items),
+    [reviewPlan.items, reviewSubmissions],
   );
   const cityOptions = useMemo(
     () => cityFilterValuesForSubmissions(reviewSubmissions),
     [reviewSubmissions],
   );
-  const searchNeedle = searchQuery.trim().toLowerCase();
-  const filteredReviews = reviewSource
-    .filter((item) => {
-      const cityMatches = cityFilter === "Все города" || item.city === cityFilter;
-      const typeMatches = typeFilter === "all" || item.type === typeFilter;
-      const searchMatches =
-        !searchNeedle ||
-        [item.id, item.title, item.agent, item.city]
-          .join(" ")
-          .toLowerCase()
-          .includes(searchNeedle);
-      return cityMatches && typeMatches && searchMatches;
-    })
-    .sort((left, right) => {
-      if (sortBy === "createdAt") {
-        return Date.parse(right.createdAtIso) - Date.parse(left.createdAtIso);
+  const filteredReviews = useMemo(() => {
+    const searchNeedle = searchQuery.trim().toLowerCase();
+
+    return reviewSource
+      .filter((item) => {
+        const cityMatches = cityFilter === "Все города" || item.city === cityFilter;
+        const typeMatches = typeFilter === "all" || item.type === typeFilter;
+        const searchMatches =
+          !searchNeedle ||
+          [item.id, item.publicId, item.title, item.agent, item.city]
+            .join(" ")
+            .toLowerCase()
+            .includes(searchNeedle);
+        return cityMatches && typeMatches && searchMatches;
+      })
+      .sort((left, right) => {
+        if (sortBy === "priority") {
+          return (
+            priorityBandOrder[left.priorityBand] -
+              priorityBandOrder[right.priorityBand] ||
+            right.priorityScore - left.priorityScore ||
+            Date.parse(left.tripDateIso) - Date.parse(right.tripDateIso) ||
+            left.id.localeCompare(right.id)
+          );
+        }
+        if (sortBy === "createdAt") {
+          return Date.parse(right.createdAtIso) - Date.parse(left.createdAtIso);
+        }
+        return Date.parse(left.tripDateIso) - Date.parse(right.tripDateIso);
+      });
+  }, [cityFilter, reviewSource, searchQuery, sortBy, typeFilter]);
+  const visibleReviews = useMemo(
+    () =>
+      activeLane === "all"
+        ? filteredReviews
+        : activeLane === "urgent"
+          ? filteredReviews.filter((item) => item.priorityBand === "critical")
+          : filteredReviews.filter((item) => item.lane === activeLane),
+    [activeLane, filteredReviews],
+  );
+  const nextVisibleReview = visibleReviews[0];
+  const openNextVisibleReview = useCallback(() => {
+    if (nextVisibleReview) onOpenDrawer(nextVisibleReview.id);
+  }, [nextVisibleReview, onOpenDrawer]);
+
+  useEffect(() => {
+    const openPriorityFromKeyboard = (event: KeyboardEvent) => {
+      if (!event.altKey || event.key !== "Enter" || event.defaultPrevented) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return;
       }
-      return Date.parse(left.tripDateIso) - Date.parse(right.tripDateIso);
-    });
-  const visibleReviews =
-    activeLane === "all"
-      ? filteredReviews
-      : filteredReviews.filter((item) => item.lane === activeLane);
-  const totalBlockers = filteredReviews.reduce((sum, item) => sum + item.blockers, 0);
+      if (!nextVisibleReview) return;
+
+      event.preventDefault();
+      openNextVisibleReview();
+    };
+
+    document.addEventListener("keydown", openPriorityFromKeyboard);
+    return () => document.removeEventListener("keydown", openPriorityFromKeyboard);
+  }, [nextVisibleReview, openNextVisibleReview]);
+
   const packagesWithBlockers = filteredReviews.filter(
     (item) => item.blockers > 0,
   ).length;
+  const fixedIssuesAwaitingClosure = filteredReviews.reduce(
+    (sum, item) => sum + item.fixedIssues,
+    0,
+  );
   const laneCounts = {
     review: filteredReviews.filter((item) => item.lane === "review").length,
     returned: filteredReviews.filter((item) => item.lane === "returned").length,
+    urgent: filteredReviews.filter((item) => item.priorityBand === "critical").length,
+  };
+  const priorityCounts = {
+    attention: filteredReviews.filter((item) => item.priorityBand === "attention")
+      .length,
+    critical: laneCounts.urgent,
+    standard: filteredReviews.filter((item) => item.priorityBand === "standard").length,
   };
   const exportQueueCount = (submissions ?? []).filter(
     (submission) => submission.status === "ready_for_export",
@@ -447,12 +583,31 @@ export function ReviewScreen({
     activeLane !== "all" ||
     cityFilter !== "Все города" ||
     searchQuery.length > 0 ||
-    sortBy !== "tripDate" ||
+    sortBy !== "priority" ||
     typeFilter !== "all";
   const aiWatchlist = useMemo(
     () => buildReviewAiWatchlist(reviewSubmissions),
     [reviewSubmissions],
   );
+
+  const resetQueueView = useCallback(() => {
+    setActiveLane("all");
+    setCityFilter("Все города");
+    setSearchQuery("");
+    setSortBy("priority");
+    setTypeFilter("all");
+  }, []);
+
+  const focusTabs: Array<{
+    count: number;
+    id: Lane | "all";
+    label: string;
+  }> = [
+    { count: filteredReviews.length, id: "all", label: "Вся очередь" },
+    { count: laneCounts.urgent, id: "urgent", label: "Критично" },
+    { count: laneCounts.review, id: "review", label: "Первичная проверка" },
+    { count: laneCounts.returned, id: "returned", label: "Исправления" },
+  ];
 
   return (
     <motion.div
@@ -461,16 +616,13 @@ export function ReviewScreen({
       className="v19-admin-screen v19-admin-review-screen"
     >
       <section className="v19-admin-review-main min-w-0 space-y-5">
-        <V19PriorityHero
-          actionAriaLabel={`Открыть критические пакеты: ${totalBlockers} требуют решения`}
-          actionCount={totalBlockers}
-          hasBlockers={totalBlockers > 0}
-          title={
-            totalBlockers
-              ? `${totalBlockers} ${totalBlockers === 1 ? "критичное замечание требует" : "критичных замечания требуют"} решения`
-              : "Очередь готова к проверке"
-          }
-          onAction={() => setActiveLane("urgent")}
+        <ReviewQueueCommandPanel
+          attentionCount={priorityCounts.attention}
+          criticalCount={priorityCounts.critical}
+          onOpenTop={openNextVisibleReview}
+          onShowCritical={() => setActiveLane("urgent")}
+          top={nextVisibleReview}
+          totalCount={filteredReviews.length}
         />
 
         <V19MetricStrip>
@@ -517,21 +669,36 @@ export function ReviewScreen({
           title="Контекст проверки"
         />
 
-        <div className="v19-admin-review-board border border-[#242529] bg-[#161617]">
+        <div className="v19-admin-review-board">
           <AdminListHeader
             actionDisabled={!hasActiveFilters}
-            actionLabel="Все"
+            actionLabel="Сбросить"
             className="v19-admin-review-list-head"
             countLabel={`${visibleReviews.length} ${reviewCountLabel(visibleReviews.length)}`}
-            onAction={() => {
-              setActiveLane("all");
-              setCityFilter("Все города");
-              setSearchQuery("");
-              setSortBy("tripDate");
-              setTypeFilter("all");
-            }}
+            onAction={resetQueueView}
             title="Очередь проверки"
           />
+
+          <div
+            aria-label="Фокус очереди"
+            className="v19-review-focus-tabs"
+            role="tablist"
+          >
+            {focusTabs.map((tab) => (
+              <button
+                aria-selected={activeLane === tab.id}
+                className={activeLane === tab.id ? "is-active" : ""}
+                key={tab.id}
+                role="tab"
+                type="button"
+                onClick={() => setActiveLane(tab.id)}
+              >
+                <span>{tab.label}</span>
+                <strong>{tab.count}</strong>
+              </button>
+            ))}
+          </div>
+
           <AdminQueueToolbar
             actionDisabled={!hasActiveFilters}
             actionIcon={RotateCcw}
@@ -546,6 +713,7 @@ export function ReviewScreen({
                   value={sortBy}
                   onChange={setSortBy}
                   options={[
+                    { value: "priority", label: "По приоритету" },
                     { value: "tripDate", label: "По дате вылета" },
                     { value: "createdAt", label: "По дате создания" },
                   ]}
@@ -564,74 +732,41 @@ export function ReviewScreen({
               </>
             }
             onCityFilterChange={setCityFilter}
-            onFilterClick={() => {
-              setActiveLane("all");
-              setCityFilter("Все города");
-              setSearchQuery("");
-              setSortBy("tripDate");
-              setTypeFilter("all");
-            }}
+            onFilterClick={resetQueueView}
             onSearchChange={setSearchQuery}
             searchPlaceholder="ID, семья или агент"
             searchValue={searchQuery}
           />
 
-          <div className="v19-admin-review-lanes grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
-            {lanes.map((lane) => {
-              const Icon = lane.icon;
-              const laneItems = visibleReviews.filter((item) => item.lane === lane.id);
-
-              if (activeLane !== "all" && activeLane !== lane.id) {
-                return null;
-              }
-
-              return (
-                <section
-                  className="v19-admin-review-lane min-h-0 rounded-[10px] border border-[#242529] bg-[#141416] p-3 lg:min-h-[360px]"
-                  data-active={activeLane === lane.id ? "true" : undefined}
-                  data-empty={laneItems.length === 0 ? "true" : undefined}
-                  data-lane={lane.id}
-                  key={lane.id}
-                >
-                  <header className="v19-admin-review-lane-header mb-3 flex items-center justify-between gap-2 px-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`flex h-8 w-8 items-center justify-center rounded-[8px] border ${toneClasses(lane.tone)}`}
-                      >
-                        <Icon className="h-4 w-4" aria-hidden="true" />
-                      </span>
-                      <span>
-                        <strong className="block text-[13px] font-semibold text-white">
-                          {lane.title}
-                        </strong>
-                        <small className="block text-[10.5px] text-white/35">
-                          {lane.subtitle}
-                        </small>
-                      </span>
-                    </div>
-                    <span className="rounded-[8px] bg-white/5 px-2 py-1 text-[11px] font-medium text-white/45">
-                      {laneItems.length}
-                    </span>
-                  </header>
-
-                  <div className="space-y-3">
-                    {laneItems.length ? (
-                      laneItems.map((item) => (
-                        <ReviewQueueCard
-                          item={item}
-                          key={item.id}
-                          onOpenDrawer={onOpenDrawer}
-                        />
-                      ))
-                    ) : (
-                      <div className="v19-admin-review-lane-empty rounded-[10px] border border-dashed border-white/10 p-5 text-center text-[12px] text-white/30">
-                        Пусто
-                      </div>
-                    )}
-                  </div>
-                </section>
-              );
-            })}
+          <div
+            aria-label="Приоритетная очередь проверки"
+            className="v19-review-queue-list"
+            role="list"
+          >
+            {visibleReviews.length ? (
+              visibleReviews.map((item, index) => (
+                <ReviewQueueCard
+                  item={item}
+                  key={item.id}
+                  onOpenDrawer={onOpenDrawer}
+                  rank={index + 1}
+                />
+              ))
+            ) : (
+              <div className="v19-review-queue-empty">
+                <ListChecks aria-hidden="true" />
+                <strong>По текущим условиям пакетов нет</strong>
+                <p>
+                  Измените фокус очереди или сбросьте фильтры, чтобы вернуться к полному
+                  списку.
+                </p>
+                {hasActiveFilters ? (
+                  <button type="button" onClick={resetQueueView}>
+                    Показать всю очередь
+                  </button>
+                ) : null}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -653,112 +788,106 @@ export function ReviewScreen({
             <X aria-hidden="true" />
           </button>
         </div>
-        <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Bot className="h-4 w-4 text-[var(--v19b-color-primary-text)]" />
-            <h3 className="text-[15px] font-semibold text-white">Тихая AI-помощь</h3>
+
+        <div className="v19-review-rail-card">
+          <div className="v19-review-rail-title">
+            <Bot aria-hidden="true" />
+            <div>
+              <h3>Тихая AI-помощь</h3>
+              <small>Только сигналы для ручной сверки</small>
+            </div>
           </div>
-          <div className="space-y-2.5">
+          <div className="v19-review-watchlist">
             {aiWatchlist.length ? (
               aiWatchlist.map((item) => (
                 <button
-                  className={`w-full rounded-[10px] border p-3 text-left transition-colors hover:border-[var(--v19b-color-primary)] ${watchToneClass(item.tone)}`}
+                  className={`v19-review-watch-item ${watchToneClass(item.tone)}`}
                   data-submission-card=""
                   data-submission-id={item.id}
                   key={item.id}
                   type="button"
                   onClick={() => onOpenDrawer(item.id)}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 whitespace-normal text-[12px] font-semibold text-white">
+                  <span>
+                    <strong>
                       {item.publicId} · {item.title}
-                    </span>
-                    {typeof item.score === "number" ? (
-                      <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--v19b-color-text-muted)]">
-                        {item.score}
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-white/48">
-                    {item.reason}
-                  </p>
-                  {"agent" in item && item.agent ? (
-                    <small className="mt-2 block text-[10.5px] text-white/35">
-                      {item.agent}
-                    </small>
-                  ) : null}
+                    </strong>
+                    {typeof item.score === "number" ? <em>{item.score}</em> : null}
+                  </span>
+                  <p>{item.reason}</p>
+                  {"agent" in item && item.agent ? <small>{item.agent}</small> : null}
                 </button>
               ))
             ) : (
-              <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
-                <div className="text-[12px] font-medium text-white">
-                  Активных AI/OCR сигналов нет
-                </div>
-                <p className="mt-1 text-[11.5px] leading-relaxed text-white/42">
-                  Очередь можно разбирать по фильтрам и ручным правилам.
-                </p>
+              <div className="v19-review-rail-empty">
+                <strong>Активных AI/OCR-сигналов нет</strong>
+                <p>Очередь можно разбирать по правилам и ручным фильтрам.</p>
               </div>
             )}
           </div>
-          <div className="mt-3 rounded-[10px] border border-white/5 bg-white/[0.025] px-3 py-2 text-[11px] leading-relaxed text-white/38">
+          <div className="v19-review-rail-guardrail">
             Подсказка не принимает решение и не закрывает замечания.
           </div>
         </div>
 
-        <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-white/40" />
-            <h3 className="text-[15px] font-semibold text-white">Очередь сейчас</h3>
+        <div className="v19-review-rail-card">
+          <div className="v19-review-rail-title">
+            <Clock aria-hidden="true" />
+            <div>
+              <h3>Очередь сейчас</h3>
+              <small>После применённых фильтров</small>
+            </div>
           </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">
-                Пакетов
-              </span>
-              <span className="text-[13px] font-semibold text-white">
-                {filteredReviews.length}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">
-                С критичными замечаниями
-              </span>
-              <span className="text-[13px] font-semibold text-white/62">
-                {packagesWithBlockers}
-              </span>
-            </div>
-            <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">
-                К выгрузке
-              </span>
-              <span className="text-[13px] font-semibold text-[var(--v19b-color-primary-text)]">
-                {exportQueueCount}
-              </span>
-            </div>
+          <div className="v19-review-rail-stats">
+            <span>
+              <small>Пакетов</small>
+              <strong>{filteredReviews.length}</strong>
+            </span>
+            <span>
+              <small>Критический приоритет</small>
+              <strong>{priorityCounts.critical}</strong>
+            </span>
+            <span>
+              <small>Исправлений закрыть</small>
+              <strong>{fixedIssuesAwaitingClosure}</strong>
+            </span>
+            <span>
+              <small>С блокерами</small>
+              <strong>{packagesWithBlockers}</strong>
+            </span>
+            <span className="is-ready">
+              <small>К выгрузке</small>
+              <strong>{exportQueueCount}</strong>
+            </span>
           </div>
         </div>
 
-        <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
-          <h3 className="mb-4 text-[15px] font-semibold text-white">
-            Операционные правила
-          </h3>
-          <div className="space-y-3 text-[12px] leading-relaxed text-white/45">
-            <div className="flex gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--v19b-color-primary-text)]" />{" "}
+        <div className="v19-review-rail-card">
+          <div className="v19-review-rail-title">
+            <ShieldCheck aria-hidden="true" />
+            <div>
+              <h3>Правила решения</h3>
+              <small>Fail-closed контроль</small>
+            </div>
+          </div>
+          <div className="v19-review-rules">
+            <p>
+              <CheckCircle2 aria-hidden="true" />
               Не принимать пакет с открытыми blocker-замечаниями.
-            </div>
-            <div className="flex gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--v19b-color-primary-text)]" />{" "}
-              AI-флаг не является решением, только подсказка для проверки.
-            </div>
-            <div className="flex gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--v19b-color-primary-text)]" />{" "}
-              После принятия пакет получает status ready_for_export и попадает в
-              Excel-выгрузку с audit trail.
-            </div>
+            </p>
+            <p>
+              <CheckCircle2 aria-hidden="true" />
+              AI-флаг остаётся подсказкой и не меняет статус автоматически.
+            </p>
+            <p>
+              <CheckCircle2 aria-hidden="true" />
+              После принятия пакет становится готовым к Excel-выгрузке, а действие
+              фиксируется в истории.
+            </p>
           </div>
         </div>
       </aside>
+
       {mobileContextOpen ? (
         <button
           aria-label="Закрыть контекст проверки"

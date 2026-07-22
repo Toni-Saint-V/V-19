@@ -46,5 +46,8 @@ jobs:
       - name: Boundary verifier
         run: npm run verify:v19-boundary
 
+      - name: Agent screen runtime contract
+        run: npm run verify:agent-screen-runtime
+
       - name: Security audit
         run: npm run verify:security

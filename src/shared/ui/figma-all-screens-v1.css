@@ -1,0 +1,509 @@
+/*
+ * Final Figma convergence layer for the 21-frame Page 1 transfer.
+ * Keep every rule behind an active runtime surface or component scope so this
+ * file cannot change domain behavior or legacy/non-mounted screens.
+ */
+
+@media (min-width: 1024px) {
+  #root .ops-shell.has-unified-side-menu {
+    --v19-unified-sidebar-width: 240px;
+    --v19b-shell-sidebar-width: 240px;
+    --v19-shell-sidebar-width: 240px;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar {
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+    flex-basis: 240px !important;
+  }
+
+  [data-v19-submission-drawer="true"].v19-submission-detail-dialog {
+    top: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: 50% !important;
+    width: min(720px, calc(100vw - 48px)) !important;
+    height: min(446px, calc(100dvh - 48px));
+    max-height: calc(100dvh - 48px);
+    overflow: hidden !important;
+    translate: -50% -50%;
+  }
+}
+
+@media (min-width: 1400px) {
+  #root .v19-agent-actions-layout-v2 {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+/* New submission: keep the upload action next to its setup controls. */
+.v19-preupload-package-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 10px;
+}
+
+.v19-preupload-package-option {
+  width: 100%;
+  min-height: 36px;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.v19-preupload-upload-group {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.v19-preupload-dropzone {
+  height: 220px;
+  min-height: 220px !important;
+  max-height: none;
+  flex: 0 0 220px;
+  border-radius: 16px !important;
+}
+
+.v19-preupload-footer {
+  position: static !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  margin: 24px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.v19-preupload-applicant-grid:not([data-package-type="single"]) {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.v19-preupload-applicant-grid:not([data-package-type="single"])
+  > article:not(.v19-preupload-add-applicant) {
+  min-width: 140px;
+  flex: 1 1 calc((100% - 60px) / 2);
+}
+
+.v19-preupload-applicant-grid > .v19-preupload-add-applicant {
+  flex: 0 0 44px;
+}
+
+@media (min-width: 1280px) {
+  .v19-preupload-screen {
+    left: 240px !important;
+  }
+
+  .v19-preupload-header {
+    position: absolute;
+    top: 40px;
+    right: 404px;
+    left: 40px;
+    z-index: 30;
+    height: 64px;
+    padding-inline: 24px !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .v19-preupload-main {
+    height: 100dvh !important;
+    padding: 0 !important;
+  }
+
+  .v19-preupload-layout {
+    grid-template-columns: minmax(0, 1fr) 340px !important;
+    gap: 24px !important;
+    padding: 40px !important;
+  }
+
+  .v19-preupload-card {
+    padding-top: 70px !important;
+  }
+
+  .v19-preupload-card,
+  .v19-preupload-rail > div {
+    border-radius: 16px !important;
+  }
+
+  .v19-preupload-dropzone {
+    height: 216px;
+    min-height: 216px !important;
+    flex-basis: 216px;
+    border-radius: 12px !important;
+  }
+
+  .v19-preupload-footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    margin-top: 12px !important;
+  }
+
+  .v19-preupload-applicant-grid:not([data-package-type="single"])
+    > article:not(.v19-preupload-add-applicant) {
+    min-width: 180px;
+    flex: 0 1 220px;
+  }
+
+  .v19-preupload-rail > div {
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+}
+
+/* Figma mobile detail uses a full-width segmented tab group. */
+@media (max-width: 767px) {
+  [data-v19-submission-drawer="true"].v19-submission-detail-dialog {
+    top: auto !important;
+    height: auto !important;
+    max-height: calc(100dvh - 56px);
+    border-radius: 24px 24px 0 0 !important;
+    background: #09090b !important;
+    overflow: hidden !important;
+  }
+
+  [data-v19-submission-drawer="true"]
+    > .v19-submission-detail-grabber {
+    position: relative !important;
+    padding-block: 10px 6px !important;
+    background: #09090b !important;
+    backdrop-filter: none !important;
+  }
+
+  [data-v19-submission-drawer="true"]
+    > .v19-submission-detail-grabber
+    > div {
+    width: 32px !important;
+    height: 4px !important;
+    background: #3a3a45 !important;
+  }
+
+  [data-v19-submission-drawer="true"] > header {
+    padding: 0 20px !important;
+    border-bottom: 0 !important;
+    background: #09090b !important;
+    backdrop-filter: none !important;
+  }
+
+  [data-v19-submission-drawer="true"] .v19-drawer-lifecycle-context {
+    min-height: 44px;
+    padding: 0 52px 8px 0;
+  }
+
+  [data-v19-submission-drawer="true"] .v19-drawer-lifecycle-identity {
+    gap: 10px;
+  }
+
+  [data-v19-submission-drawer="true"]
+    .v19-drawer-lifecycle-identity
+    strong {
+    font-size: 16px;
+    line-height: 22px;
+  }
+
+  [data-v19-submission-drawer="true"]
+    > header
+    button[aria-label="Закрыть подачу"] {
+    top: 8px !important;
+    right: 14px !important;
+    display: flex !important;
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  [data-v19-submission-drawer="true"] > .v19-submission-detail-body {
+    min-height: 0;
+    flex: 0 1 auto;
+    padding: 16px 20px !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    background: #09090b;
+  }
+
+  [data-v19-submission-drawer="true"]
+    > .v19-submission-detail-footer {
+    flex-direction: row !important;
+    gap: 12px !important;
+    padding: 12px 20px max(12px, env(safe-area-inset-bottom)) !important;
+    border-color: rgb(255 255 255 / 0.07) !important;
+    background: #09090b !important;
+    backdrop-filter: none !important;
+  }
+
+  [data-v19-submission-drawer="true"]
+    > footer:has(.v19-drawer-action-notice) {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  [data-v19-submission-drawer="true"]
+    > footer
+    .v19-drawer-action-notice {
+    width: 100%;
+  }
+
+  .v19-submission-detail-actions {
+    gap: 12px !important;
+  }
+
+  .v19-submission-detail-secondary-action {
+    border: 1px solid rgb(255 255 255 / 0.07);
+    background: #121216 !important;
+  }
+
+  .v19-submission-detail-primary-action {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08) !important;
+  }
+
+  .v19-submission-detail-tabs-scroll {
+    width: 100% !important;
+    margin-inline: 0 !important;
+    padding: 3px !important;
+    overflow: visible !important;
+    border-radius: 8px;
+    background: #121216;
+  }
+
+  .v19-submission-detail-tabs {
+    display: grid !important;
+    width: 100% !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px !important;
+    margin: 0 !important;
+  }
+
+  .v19-submission-detail-tabs > button {
+    min-width: 0;
+    min-height: 44px !important;
+    justify-content: center;
+    gap: 3px !important;
+    overflow: hidden;
+    padding-inline: 5px !important;
+    border-radius: 6px;
+    font-size: 11.5px !important;
+  }
+
+  .v19-submission-detail-tabs > button[aria-selected="true"] {
+    background: #2d2b3a;
+    box-shadow: inset 0 0 0 4px #121216;
+  }
+
+  .v19-submission-detail-tabs > button > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .v19-submission-detail-tab-indicator {
+    display: none;
+  }
+
+  .v19-drawer-history {
+    display: grid !important;
+    gap: 8px !important;
+    padding-left: 0 !important;
+  }
+
+  .v19-drawer-history::before {
+    display: none;
+  }
+
+  .v19-drawer-history-item {
+    display: grid !important;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px !important;
+    padding: 12px;
+    border: 1px solid rgb(255 255 255 / 0.07);
+    border-radius: 12px;
+    background: #121216;
+  }
+
+  .v19-drawer-history-icon {
+    border-width: 1px !important;
+    background: #181820 !important;
+  }
+
+  .v19-drawer-history-copy {
+    min-width: 0;
+    padding-top: 0 !important;
+  }
+
+  .v19-drawer-history-copy > div:first-child {
+    font-size: 13px !important;
+    line-height: 19px;
+  }
+
+  .v19-drawer-history-meta {
+    flex-wrap: wrap;
+    gap: 6px !important;
+    margin-top: 4px !important;
+    font-size: 11px !important;
+    line-height: 16px;
+  }
+
+  .access-layout:has(#workspace-register-title) {
+    width: 100% !important;
+    max-width: 350px;
+    gap: 28px !important;
+  }
+
+  .access-layout:has(#workspace-register-title) .access-brand-panel {
+    width: 100%;
+    min-height: 120px !important;
+    border: 1px solid rgb(255 255 255 / 0.07) !important;
+    border-radius: 16px !important;
+  }
+
+  .access-layout:has(#workspace-register-title) .access-brand-logo {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .access-layout:has(#workspace-register-title) .access-card {
+    padding: 0 !important;
+    overflow: visible;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  .access-layout:has(#workspace-register-title) .access-back-button {
+    width: auto !important;
+    min-height: 32px !important;
+    height: 32px !important;
+    justify-self: end;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .access-layout:has(#workspace-register-title) .access-back-button svg,
+  .access-layout:has(#workspace-register-title) .access-card-header > svg {
+    display: none;
+  }
+
+  .access-layout:has(#workspace-register-title) .access-card-header {
+    display: block !important;
+  }
+
+  .access-layout:has(#workspace-register-title) .access-card h1 {
+    font-size: 24px !important;
+  }
+
+  .v19-command-palette-content {
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100dvh;
+    max-height: 100dvh !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    transform: none !important;
+  }
+
+  .v19-command-palette {
+    position: relative;
+    display: flex;
+    height: 100%;
+    max-height: none;
+    flex-direction: column;
+    padding: 54px 20px 24px;
+  }
+
+  .v19-command-palette::before {
+    content: "Command Palette";
+    position: absolute;
+    top: 26px;
+    left: 20px;
+    color: #a1a1aa;
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .v19-command-palette-search {
+    grid-template-columns: 24px minmax(0, 1fr) !important;
+    min-height: 48px !important;
+    padding-inline: 14px !important;
+    border: 1px solid #544a66 !important;
+    border-radius: 999px;
+    background: #181820 !important;
+  }
+
+  .v19-command-palette-search kbd {
+    position: absolute;
+    top: 25px;
+    right: 20px;
+  }
+
+  .v19-command-palette-list {
+    max-height: none !important;
+    flex: 1 1 auto;
+    padding: 12px 0 0 !important;
+  }
+
+  .ops-shell.surface-admin-review .v19-review-command-panel {
+    gap: 10px;
+    padding: 14px 14px 13px 16px;
+  }
+
+  .ops-shell.surface-admin-review
+    .v19-review-command-copy
+    > :is(p, .v19-review-command-guardrail),
+  .ops-shell.surface-admin-review .v19-review-command-kicker > em {
+    display: none;
+  }
+
+  .ops-shell.surface-admin-review .v19-review-command-copy {
+    gap: 7px;
+  }
+
+  .ops-shell.surface-admin-review .v19-review-command-copy h2 {
+    font-size: 18px;
+    line-height: 1.14;
+  }
+
+  .ops-shell.surface-admin-review .v19-review-command-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    padding: 0;
+  }
+
+  .ops-shell.surface-admin-review .v19-review-command-metrics > span {
+    min-height: 52px;
+    padding-block: 6px;
+  }
+
+  .ops-shell.surface-admin-review .v19-review-command-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 0.46fr);
+  }
+
+  .ops-shell.surface-admin-review .v19-review-command-actions button {
+    min-height: 40px;
+  }
+}
+
+.fixed.inset-0:has(+ [data-v19-submission-drawer="true"]) {
+  background: rgb(0 0 0 / 0.82) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+@media (max-width: 420px) {
+  .v19-preupload-card {
+    padding-top: 20px !important;
+  }
+
+  .v19-preupload-upload-group {
+    margin-top: 12px;
+  }
+
+  .v19-preupload-dropzone {
+    padding: 18px !important;
+  }
+}

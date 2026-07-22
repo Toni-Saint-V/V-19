@@ -101,6 +101,9 @@ describe("Supabase security contract", () => {
     const accessRequestFunction = readProjectFile(
       "supabase/functions/access-request/index.ts",
     );
+    const accessRequestProvisioning = readProjectFile(
+      "supabase/functions/_shared/accessRequestProvisioning.ts",
+    );
 
     expect(migration).toContain("create table public.access_requests");
     expect(migration).toContain(
@@ -130,8 +133,10 @@ describe("Supabase security contract", () => {
     expect(accessRequestFunction).toContain("rejection_reason: null");
     expect(accessRequestFunction).toContain("reviewed_at: null");
     expect(accessRequestFunction).toContain("reviewed_by_admin_id: null");
-    expect(accessRequestFunction).toContain("inviteUserByEmail");
-    expect(accessRequestFunction).toContain('role: "agent"');
+    expect(accessRequestFunction).toContain("resolveAccessRequestUserId");
+    expect(accessRequestProvisioning).toContain("inviteUserByEmail");
+    expect(accessRequestProvisioning).toContain("findAuthUserByEmail");
+    expect(accessRequestProvisioning).toContain("listUsers");
     expect(accessRequestFunction).toContain("requireAdminProfile");
     expect(accessRequestFunction).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(accessRequestFunction).not.toContain("email_confirm: true");

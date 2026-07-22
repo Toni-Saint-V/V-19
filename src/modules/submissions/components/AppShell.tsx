@@ -1,4 +1,11 @@
-import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { Menu, X } from "lucide-react";
 
 import { cn } from "../../../shared/ui/cn";
@@ -38,8 +45,31 @@ export function AppShell({
   surface,
   workspaceInactive = false,
 }: AppShellProps) {
+  const shellRef = useRef<HTMLElement>(null);
+  const [inactiveFocusReleased, setInactiveFocusReleased] = useState(false);
+  const shellInactiveRequested = inactive || workspaceInactive;
+
+  useLayoutEffect(() => {
+    if (!shellInactiveRequested) {
+      setInactiveFocusReleased(false);
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLElement &&
+      shellRef.current?.contains(activeElement)
+    ) {
+      activeElement.blur();
+    }
+    setInactiveFocusReleased(true);
+  }, [shellInactiveRequested]);
+
+  const shellInactive = shellInactiveRequested && inactiveFocusReleased;
+
   return (
     <main
+      ref={shellRef}
       className={cn(
         "ops-shell",
         "has-unified-side-menu",
@@ -53,8 +83,8 @@ export function AppShell({
         className,
       )}
       aria-label={label}
-      aria-hidden={inactive ? "true" : undefined}
-      inert={inactive ? true : undefined}
+      aria-hidden={shellInactive ? "true" : undefined}
+      inert={shellInactive ? true : undefined}
     >
       <OperationalSideMenu {...sideMenu} />
       <section

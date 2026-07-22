@@ -61,6 +61,7 @@ import type {
   SubmissionFileType,
 } from "../modules/submissions/types";
 import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
+import { agentInteractionProps } from "../modules/submissions/agentInteractionContract";
 import {
   V19ListHeader,
   V19MetricCard,
@@ -269,6 +270,13 @@ function ApplicantWorkflowActionButton({
   return (
     <span className="v19-applicant-workflow-action-wrap">
       <button
+        {...agentInteractionProps(
+          action.kind === "questionnaire"
+            ? "submissions.open-questionnaire"
+            : action.state === "ready"
+              ? "submissions.open"
+              : "submissions.upload-file",
+        )}
         aria-label={accessibleLabel}
         className={`v19-applicant-workflow-action is-${action.state}`}
         disabled={uploading}
@@ -281,6 +289,7 @@ function ApplicantWorkflowActionButton({
       </button>
       {!isQuestionnaire ? (
         <input
+          {...agentInteractionProps("submissions.upload-file")}
           ref={inputRef}
           accept={
             action.kind === "passport_scan"
@@ -448,13 +457,15 @@ function SubmissionPrimaryAction({
     canSubmitForReview &&
     completionDecision.action === "submit_for_review" &&
     completionDecision.ok;
-  let actionLabel =
-    submission.status === "ready_for_export" ? "К выгрузке" : "Открыть";
+  let actionLabel = "Открыть";
   if (canSubmit) {
-    actionLabel = submitting ? "Отправляем…" : "К выгрузке";
+    actionLabel = submitting ? "Отправляем…" : "Отправить на проверку";
   }
   return (
     <button
+      {...agentInteractionProps(
+        canSubmit ? "submissions.submit-review" : "submissions.open",
+      )}
       aria-label={`${actionLabel}: ${label}`}
       aria-hidden={!visible || undefined}
       className={`v19-applicant-status-action${visible ? " is-visible" : ""}`}
@@ -510,6 +521,7 @@ function FamilySubmissionCard({
 
   return (
     <V19QueueCard
+      {...agentInteractionProps("submissions.open")}
       as="article"
       aria-label={`Подача ${title}`}
       className="v19-agent-shared-card group"
@@ -612,6 +624,7 @@ function IndividualSubmissionCard({
 
   return (
     <V19QueueCard
+      {...agentInteractionProps("submissions.open")}
       as="article"
       aria-label={`Подача ${name}`}
       className="v19-agent-shared-card group"
@@ -972,6 +985,7 @@ export function ApplicantsScreen({
           active={summaryFilter === "all"}
           detail={profileNoun(metrics.queue)}
           icon={FileStack}
+          interactionId="submissions.summary-filter"
           label="В очереди"
           value={metrics.queue}
           onClick={() => setSummaryFilter("all")}
@@ -980,6 +994,7 @@ export function ApplicantsScreen({
           active={summaryFilter === "review"}
           detail="ревью"
           icon={AlertCircle}
+          interactionId="submissions.summary-filter"
           label="Проверить"
           tone="amber"
           value={metrics.review}
@@ -989,6 +1004,7 @@ export function ApplicantsScreen({
           active={summaryFilter === "ready"}
           detail="экспорт"
           icon={CheckCircle2}
+          interactionId="submissions.summary-filter"
           label="К выгрузке"
           tone="green"
           value={metrics.exportReady}
@@ -1002,6 +1018,7 @@ export function ApplicantsScreen({
           actionLabel="Все"
           className="v19-admin-export-list-head-v2"
           countLabel={`${displayedSubmissions.length}`}
+          interactionId="submissions.reset-filters"
           onAction={resetFilters}
           title="Мои подачи"
         />
@@ -1016,6 +1033,7 @@ export function ApplicantsScreen({
                 ariaLabel="Тип подачи"
                 className={typeFilter !== "all" ? "is-active" : ""}
                 icon={UsersRound}
+                interactionId="submissions.type-filter"
                 label="Тип"
                 options={[
                   { label: "Все", value: "all" },
@@ -1029,6 +1047,7 @@ export function ApplicantsScreen({
                 ariaLabel="Фильтр подач"
                 className={summaryFilter !== "all" ? "is-active" : ""}
                 icon={ListFilter}
+                interactionId="submissions.status-filter"
                 label="Статус"
                 options={[
                   { label: "Все", value: "all" },
@@ -1043,6 +1062,7 @@ export function ApplicantsScreen({
                 ariaLabel="Сортировка подач"
                 className={sortBy !== "createdDesc" ? "is-active" : ""}
                 icon={ArrowUpDown}
+                interactionId="submissions.sort"
                 label="Сортировка"
                 options={[
                   { label: "Сначала новые", value: "createdDesc" },
@@ -1055,6 +1075,11 @@ export function ApplicantsScreen({
             </>
           }
           filterLabel="Сбросить фильтры"
+          interactionIds={{
+            cityFilter: "submissions.city-filter",
+            reset: "submissions.reset-filters",
+            search: "submissions.search",
+          }}
           onCityFilterChange={setCityFilter}
           onFilterClick={resetFilters}
           onSearchChange={setSearchQuery}
@@ -1074,7 +1099,11 @@ export function ApplicantsScreen({
             <div className="v19-applicant-empty-state" role="status">
               <h2>Ничего не найдено</h2>
               <p>Измените поисковый запрос или фильтры.</p>
-              <button type="button" onClick={resetFilters}>
+              <button
+                {...agentInteractionProps("submissions.reset-filters")}
+                type="button"
+                onClick={resetFilters}
+              >
                 Сбросить фильтры
               </button>
             </div>
@@ -1097,8 +1126,10 @@ export function ApplicantsScreen({
           <ConfirmationDialog
             busy={submittingId === pendingReviewSubmission.id}
             cancelLabel="Отмена"
+            cancelInteractionId="submissions.cancel-submit"
             confirmDanger={false}
             confirmLabel="Отправить"
+            confirmInteractionId="submissions.submit-review"
             description="После отправки подача перейдёт в очередь проверки администратора."
             error={
               submissionDialogError ? (

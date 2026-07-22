@@ -1,6 +1,7 @@
 import type { SupabaseRuntimeConfig } from "./config";
 
 export const workspaceRefreshIntervalMs = 10_000;
+export const workspaceMutationQueueDrainTimeoutMs = 2_000;
 
 export type WorkspaceDataStatus =
   | "blocked"
@@ -16,6 +17,24 @@ export type WorkspaceSessionToken = {
 };
 
 type WorkspaceRefreshRun = () => Promise<void>;
+
+export async function waitForWorkspaceMutationQueueDrain(
+  pending: Promise<unknown>,
+  timeoutMs = workspaceMutationQueueDrainTimeoutMs,
+): Promise<"settled" | "timed_out"> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const settled = pending.then(
+    () => "settled" as const,
+    () => "settled" as const,
+  );
+  const timedOut = new Promise<"timed_out">((resolve) => {
+    timeoutId = setTimeout(() => resolve("timed_out"), Math.max(0, timeoutMs));
+  });
+
+  const result = await Promise.race([settled, timedOut]);
+  if (timeoutId !== undefined) clearTimeout(timeoutId);
+  return result;
+}
 
 export class WorkspaceRefreshCoordinator {
   private inFlight: Promise<void> | null = null;

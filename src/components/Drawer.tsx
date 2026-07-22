@@ -24,11 +24,12 @@ import {
 } from "lucide-react";
 
 import { historyTimestampForUser } from "../modules/submissions/historyPresentation";
-import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
-  getPrimaryAction,
-  statusLabelFor,
-} from "../modules/submissions/status";
+  agentInteractionProps,
+  type AgentInteractionId,
+} from "../modules/submissions/agentInteractionContract";
+import { submissionPublicId } from "../modules/submissions/submissionIdentity";
+import { getPrimaryAction, statusLabelFor } from "../modules/submissions/status";
 import type {
   DrawerTab,
   Issue,
@@ -113,11 +114,7 @@ const questionnaireSectionBlueprint: ReadonlyArray<{
 }> = [
   { Icon: User, sectionIds: ["personal", "contacts"], title: "Личные данные" },
   { Icon: FileDigit, sectionIds: ["passport"], title: "Паспортные данные" },
-  {
-    Icon: Briefcase,
-    sectionIds: ["employment"],
-    title: "Место работы / Учебы",
-  },
+  { Icon: Briefcase, sectionIds: ["employment"], title: "Место работы / Учебы" },
   { Icon: CreditCard, sectionIds: ["payment"], title: "Спонсоры и финансы" },
   {
     Icon: Plane,
@@ -143,9 +140,7 @@ function applicantRoleLabel(role: string) {
   return role;
 }
 
-function applicantQuestionnairePercent(
-  applicant: Submission["applicants"][number],
-) {
+function applicantQuestionnairePercent(applicant: Submission["applicants"][number]) {
   if (applicant.questionnaireStatus === "complete") return 100;
   if (applicant.questionnaireStatus === "empty") return 0;
   if (applicant.sections.length === 0) return 0;
@@ -166,12 +161,10 @@ function buildSubmissionDetail(submission: Submission): SubmissionDetail {
     applicantsCount: submission.applicants.length,
     city: submission.city,
     id: submissionPublicId(submission),
-    issuesCount: submission.issues.filter(
-      (issue) => issue.status !== "closed_by_admin",
-    ).length,
-    openIssuesCount: submission.issues.filter(
-      (issue) => issue.status === "open",
-    ).length,
+    issuesCount: submission.issues.filter((issue) => issue.status !== "closed_by_admin")
+      .length,
+    openIssuesCount: submission.issues.filter((issue) => issue.status === "open")
+      .length,
     status: submission.status,
     title: submission.title,
     tripDates: tripDatesForSubmission(submission),
@@ -230,12 +223,8 @@ function questionnaireSectionCandidateProgress(
   const filledFields = requiredFields.filter(
     (field) => field.value.trim().length > 0 && !field.error,
   );
-  const calculated = Math.round(
-    (filledFields.length / requiredFields.length) * 100,
-  );
-  return candidate.status === "needs_fix"
-    ? Math.min(calculated, 90)
-    : calculated;
+  const calculated = Math.round((filledFields.length / requiredFields.length) * 100);
+  return candidate.status === "needs_fix" ? Math.min(calculated, 90) : calculated;
 }
 
 function questionnaireProgressStatus(
@@ -248,11 +237,7 @@ function questionnaireProgressStatus(
 
 function remainingFieldsLabel(count: number) {
   if (count % 10 === 1 && count % 100 !== 11) return `${count} поле`;
-  if (
-    count % 10 >= 2 &&
-    count % 10 <= 4 &&
-    (count % 100 < 12 || count % 100 > 14)
-  ) {
+  if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14)) {
     return `${count} поля`;
   }
   return `${count} полей`;
@@ -263,11 +248,7 @@ function remainingBlocksLabel(count: number) {
   if (count % 10 === 1 && count % 100 !== 11) {
     return `Осталось заполнить ${count} блок данных`;
   }
-  if (
-    count % 10 >= 2 &&
-    count % 10 <= 4 &&
-    (count % 100 < 12 || count % 100 > 14)
-  ) {
+  if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14)) {
     return `Осталось заполнить ${count} блока данных`;
   }
   return `Осталось заполнить ${count} блоков данных`;
@@ -331,9 +312,7 @@ function buildQuestionnaireSections(
       Icon: blueprint.Icon,
       progress,
       remaining:
-        remainingFieldCount > 0
-          ? remainingFieldsLabel(remainingFieldCount)
-          : undefined,
+        remainingFieldCount > 0 ? remainingFieldsLabel(remainingFieldCount) : undefined,
       status: questionnaireProgressStatus(progress),
       target: targetCandidate
         ? {
@@ -353,9 +332,7 @@ function drawerTab(activeTab: DrawerTab | undefined): TabId {
   return "overview";
 }
 
-function questionnaireSectionIconClass(
-  status: QuestionnaireSectionDetail["status"],
-) {
+function questionnaireSectionIconClass(status: QuestionnaireSectionDetail["status"]) {
   if (status === "done") {
     return "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
   }
@@ -440,9 +417,7 @@ const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
 
   return (
     <span
-      className={[statusBadgeBaseClassName, presentation.toneClassName].join(
-        " ",
-      )}
+      className={[statusBadgeBaseClassName, presentation.toneClassName].join(" ")}
       data-testid="drawer-status-badge"
     >
       <StatusIcon className="w-3.5 h-3.5" /> {statusLabelFor(status, "full")}
@@ -477,12 +452,8 @@ const OverviewTab = ({
             <div className="flex gap-4">
               <Calendar className="w-5 h-5 text-white/30 shrink-0" />
               <div>
-                <div className="text-white/90 font-medium">
-                  {data.tripDates}
-                </div>
-                <div className="text-white/40 text-[11px] mt-0.5">
-                  Даты поездки
-                </div>
+                <div className="text-white/90 font-medium">{data.tripDates}</div>
+                <div className="text-white/40 text-[11px] mt-0.5">Даты поездки</div>
               </div>
             </div>
             <div className="flex gap-4">
@@ -554,9 +525,7 @@ const OverviewTab = ({
                 <div className="text-[14px] text-white font-medium truncate group-hover:text-[#8fa3ff] transition-colors">
                   {applicant.name}
                 </div>
-                <div className="text-[11px] text-white/50 mt-0.5">
-                  {applicant.role}
-                </div>
+                <div className="text-[11px] text-white/50 mt-0.5">{applicant.role}</div>
               </div>
               <div className="text-right">
                 <div className="text-[12px] font-mono font-medium text-emerald-400">
@@ -592,14 +561,11 @@ const QuestionnaireTab = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-[16px] font-semibold text-white">
-            Прогресс заполнения
-          </h3>
-          <p className="text-[12px] text-white/50 mt-1">
-            {remainingBlockLabel}
-          </p>
+          <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
+          <p className="text-[12px] text-white/50 mt-1">{remainingBlockLabel}</p>
         </div>
         <button
+          {...agentInteractionProps("drawer.open-questionnaire")}
           onClick={() => onOpenQuestionnaire()}
           className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
           type="button"
@@ -611,6 +577,7 @@ const QuestionnaireTab = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {sections.map((section) => (
           <div
+            {...agentInteractionProps("drawer.open-questionnaire")}
             key={section.title}
             className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
             role="button"
@@ -662,10 +629,7 @@ function issueTargetLabel(issue: Issue) {
     return `${issue.target.applicantName} • ${fileLabel(issue.target.fileType)}`;
   }
 
-  return [
-    issue.target.applicantName,
-    issue.target.field ?? issue.target.section,
-  ]
+  return [issue.target.applicantName, issue.target.field ?? issue.target.section]
     .filter(Boolean)
     .join(" • ");
 }
@@ -799,10 +763,13 @@ const IssuesTab = ({
                 </div>
                 <div className="sm:w-[180px] shrink-0 flex items-center">
                   <button
+                    {...agentInteractionProps(
+                      canUploadReplacement
+                        ? "drawer.upload-file"
+                        : "drawer.open-target",
+                    )}
                     aria-busy={isUploadingThisIssue}
-                    aria-describedby={
-                      isUploadingThisIssue ? uploadStatusId : undefined
-                    }
+                    aria-describedby={isUploadingThisIssue ? uploadStatusId : undefined}
                     disabled={Boolean(uploadingIssueId)}
                     onClick={() => {
                       if (canUploadReplacement) {
@@ -814,9 +781,7 @@ const IssuesTab = ({
                     className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[13px] font-medium text-white transition-colors"
                     type="button"
                   >
-                    {isUploadingThisIssue
-                      ? "Загрузка…"
-                      : issueActionLabel(issue)}
+                    {isUploadingThisIssue ? "Загрузка…" : issueActionLabel(issue)}
                   </button>
                   <span
                     aria-live="polite"
@@ -828,6 +793,7 @@ const IssuesTab = ({
                   </span>
                   {canUploadReplacement ? (
                     <input
+                      {...agentInteractionProps("drawer.upload-file")}
                       accept={
                         issue.target.fileType === "passport_scan"
                           ? "image/jpeg,image/png,image/webp,application/pdf"
@@ -856,8 +822,7 @@ const IssuesTab = ({
             Ошибок не найдено
           </h4>
           <p className="text-[13px] text-white/50 max-w-sm">
-            Все данные проверены администратором. Замечаний к анкете и
-            документам нет.
+            Все данные проверены администратором. Замечаний к анкете и документам нет.
           </p>
         </div>
       )}
@@ -903,13 +868,9 @@ const HistoryTab = ({ submission }: { submission: Submission }) => (
             {historyEventIcon(tone)}
           </div>
           <div className="pt-1.5">
-            <div className="text-[14px] font-medium text-white/90">
-              {event.text}
-            </div>
+            <div className="text-[14px] font-medium text-white/90">{event.text}</div>
             <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
-              <span>
-                {historyTimestampForUser(event.createdAt ?? event.at)}
-              </span>
+              <span>{historyTimestampForUser(event.createdAt ?? event.at)}</span>
               <span className="w-1 h-1 rounded-full bg-white/20" />
               <span>{historySourceLabel(event.source)}</span>
             </div>
@@ -950,15 +911,24 @@ function footerActionLabel(action: SubmissionAction, fallback: string) {
   return fallback;
 }
 
+const primaryActionInteractionByStatus = {
+  corrections_received: "drawer.open-history",
+  draft: "drawer.save-progress",
+  exported: "drawer.open-history",
+  in_progress: "drawer.submit-review",
+  ready_for_export: "drawer.open-history",
+  requires_action: "drawer.submit-corrections",
+  returned: "drawer.submit-corrections",
+  submitted_for_review: "drawer.open-history",
+} satisfies Record<SubmissionStatus, AgentInteractionId>;
+
 const footerInstructions = {
   draft: "Сохраните текущий прогресс, чтобы продолжить позже.",
   in_progress: "Проверьте все данные перед отправкой администратору.",
   requires_action: "Дождитесь синхронизации статуса перед повторной отправкой.",
-  submitted_for_review:
-    "Подача отправлена администратору и доступна для просмотра.",
+  submitted_for_review: "Подача отправлена администратору и доступна для просмотра.",
   returned: "Исправьте замечания перед повторной отправкой.",
-  corrections_received:
-    "Исправления отправлены администратору и ожидают проверки.",
+  corrections_received: "Исправления отправлены администратору и ожидают проверки.",
   ready_for_export: "Подача принята и готова к выгрузке.",
   exported: "Подача выгружена; история статусов доступна для просмотра.",
 } satisfies Record<SubmissionStatus, string>;
@@ -977,9 +947,7 @@ export function Drawer({
   onOpenWorkspaceTarget,
   onUploadApplicantFile,
 }: DrawerProps) {
-  const [activeTab, setActiveTab] = useState<TabId>(() =>
-    drawerTab(requestedTab),
-  );
+  const [activeTab, setActiveTab] = useState<TabId>(() => drawerTab(requestedTab));
   const [actionError, setActionError] = useState("");
   const [actionPending, setActionPending] = useState(false);
   const actionRequestIdRef = useRef(0);
@@ -1006,22 +974,14 @@ export function Drawer({
   const panelTransition = shouldReduceMotion
     ? linearDrawerMotion.reduced
     : linearDrawerMotion.panel;
-  const tabInitial = shouldReduceMotion
-    ? { opacity: 0, y: 0 }
-    : { opacity: 0, y: 10 };
-  const tabExit = shouldReduceMotion
-    ? { opacity: 0, y: 0 }
-    : { opacity: 0, y: -10 };
+  const tabInitial = shouldReduceMotion ? { opacity: 0, y: 0 } : { opacity: 0, y: 10 };
+  const tabExit = shouldReduceMotion ? { opacity: 0, y: 0 } : { opacity: 0, y: -10 };
   const data = buildSubmissionDetail(submission);
   const primaryAction = getPrimaryAction(submission, "agent", "agent");
-  const primaryLabel = footerActionLabel(
-    primaryAction.action,
-    primaryAction.label,
-  );
+  const primaryLabel = footerActionLabel(primaryAction.action, primaryAction.label);
   const footerActionNotice =
     actionError || (primaryAction.disabled ? primaryAction.reason : "");
-  const footerInstruction =
-    footerActionNotice || footerInstructions[data.status];
+  const footerInstruction = footerActionNotice || footerInstructions[data.status];
   let footerInstructionToneClassName = "text-white/40";
   if (footerActionNotice) {
     footerInstructionToneClassName = "text-white/70";
@@ -1075,9 +1035,7 @@ export function Drawer({
     if (!isOpen) return;
 
     previouslyFocusedElementRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -1101,9 +1059,7 @@ export function Drawer({
     if (event.key !== "Tab") return;
 
     const focusableElements = Array.from(
-      dialogRef.current?.querySelectorAll<HTMLElement>(
-        drawerFocusableSelector,
-      ) ?? [],
+      dialogRef.current?.querySelectorAll<HTMLElement>(drawerFocusableSelector) ?? [],
     ).filter((element) => element.offsetParent !== null);
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
@@ -1124,14 +1080,10 @@ export function Drawer({
     }
   }
 
-  function handleTabKeyDown(
-    event: React.KeyboardEvent<HTMLButtonElement>,
-    tab: TabId,
-  ) {
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, tab: TabId) {
     const currentIndex = drawerTabs.findIndex((item) => item.id === tab);
     let nextIndex = currentIndex;
-    if (event.key === "ArrowRight")
-      nextIndex = (currentIndex + 1) % drawerTabs.length;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % drawerTabs.length;
     else if (event.key === "ArrowLeft") {
       nextIndex = (currentIndex - 1 + drawerTabs.length) % drawerTabs.length;
     } else if (event.key === "Home") nextIndex = 0;
@@ -1178,6 +1130,7 @@ export function Drawer({
       {isOpen ? (
         <>
           <motion.div
+            {...agentInteractionProps("drawer.close")}
             aria-hidden="true"
             animate={{ opacity: 1 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
@@ -1244,6 +1197,7 @@ export function Drawer({
                 </div>
 
                 <button
+                  {...agentInteractionProps("drawer.close")}
                   aria-label="Закрыть подачу"
                   className="hidden lg:flex w-10 h-10 items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10"
                   type="button"
@@ -1264,6 +1218,7 @@ export function Drawer({
                     const isActive = activeTab === tab.id;
                     return (
                       <button
+                        {...agentInteractionProps("drawer.navigate-tab")}
                         aria-controls={`submission-drawer-panel-${tab.id}`}
                         aria-selected={isActive}
                         className={`relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap
@@ -1357,6 +1312,7 @@ export function Drawer({
               </div>
               <div className="flex gap-3 w-full sm:w-auto">
                 <button
+                  {...agentInteractionProps("drawer.close")}
                   aria-label="Отменить и закрыть подачу"
                   className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
                   type="button"
@@ -1365,6 +1321,9 @@ export function Drawer({
                   Отмена
                 </button>
                 <button
+                  {...agentInteractionProps(
+                    primaryActionInteractionByStatus[submission.status],
+                  )}
                   aria-busy={actionPending}
                   aria-describedby={
                     footerActionNotice ? footerInstructionId : undefined

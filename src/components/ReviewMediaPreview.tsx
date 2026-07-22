@@ -1,3 +1,4 @@
+import { type SyntheticEvent, useState } from "react";
 import { AlertCircle, ShieldCheck } from "lucide-react";
 
 import type { SubmissionFile } from "../modules/submissions/types";
@@ -16,6 +17,7 @@ type ReviewMediaPreviewProps = {
   transform?: string;
   variant: "active" | "reference" | "single";
   onError: () => void;
+  onRetry?: () => void;
 };
 
 function fileName(file?: SubmissionFile) {
@@ -37,6 +39,18 @@ function needsExternalViewer(file?: SubmissionFile) {
   );
 }
 
+function LoadingPreviewState() {
+  return (
+    <div className="v19-review-preview-state is-loading">
+      <span aria-hidden="true" className="v19-review-preview-skeleton" />
+      <span className="v19-review-preview-loading-copy">
+        <ShieldCheck aria-hidden="true" />
+        <strong>Загружаем оригинал</strong>
+      </span>
+    </div>
+  );
+}
+
 export function ReviewMediaPreview({
   alt,
   file,
@@ -46,8 +60,32 @@ export function ReviewMediaPreview({
   transform,
   variant,
   onError,
+  onRetry,
 }: ReviewMediaPreviewProps) {
   const previewUrl = preview.status === "ready" ? preview.url : undefined;
+  const [loadedMediaUrl, setLoadedMediaUrl] = useState<string | null>(null);
+  const pdfFile = isPdfFile(file);
+  const externalViewer = needsExternalViewer(file);
+  const embeddedMedia = Boolean(previewUrl && !externalViewer && !pdfFile);
+  const mediaReady = Boolean(previewUrl && loadedMediaUrl === previewUrl);
+  const mediaPending = preview.status === "loading" || (embeddedMedia && !mediaReady);
+
+  const handleImageLoad = async (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    const loadedUrl = previewUrl;
+    if (!loadedUrl) return;
+
+    if (typeof image.decode === "function") {
+      try {
+        await image.decode();
+      } catch {
+        // A completed load can still be rendered when optional decoding rejects.
+      }
+    }
+
+    if (image.getAttribute("src") !== loadedUrl) return;
+    setLoadedMediaUrl(loadedUrl);
+  };
 
   return (
     <figure className={`v19-review-preview is-${variant}`}>
@@ -58,20 +96,26 @@ export function ReviewMediaPreview({
         </figcaption>
       )}
 
-      <div className="v19-review-preview-canvas">
+      <span aria-atomic="true" className="sr-only" role="status">
+        {mediaPending ? `Загружаем оригинал: ${label}` : ""}
+      </span>
+
+      <div aria-busy={mediaPending} className="v19-review-preview-canvas">
         {preview.status === "loading" ? (
-          <div className="v19-review-preview-state is-loading" role="status">
-            <ShieldCheck aria-hidden="true" />
-            <strong>Загружаем оригинал</strong>
-          </div>
+          <LoadingPreviewState />
         ) : previewUrl ? (
-          isPdfFile(file) ? (
-            <object aria-label={alt} data={previewUrl} type="application/pdf">
+          pdfFile ? (
+            <object
+              aria-label={alt}
+              className="is-ready"
+              data={previewUrl}
+              type="application/pdf"
+            >
               <a href={previewUrl} rel="noreferrer" target="_blank">
                 Открыть оригинал
               </a>
             </object>
-          ) : needsExternalViewer(file) ? (
+          ) : externalViewer ? (
             <div className="v19-review-preview-state">
               <ShieldCheck aria-hidden="true" />
               <strong>Оригинал готов</strong>
@@ -80,21 +124,36 @@ export function ReviewMediaPreview({
               </a>
             </div>
           ) : (
-            <img
-              alt={alt}
-              data-testid={testId}
-              draggable={false}
-              onError={onError}
-              src={previewUrl}
-              style={transform ? { transform } : undefined}
-            />
+            <>
+              <img
+                alt={alt}
+                className={mediaReady ? "is-ready" : "is-loading"}
+                data-testid={testId}
+                decoding="async"
+                draggable={false}
+                key={previewUrl}
+                onError={onError}
+                onLoad={(event) => void handleImageLoad(event)}
+                src={previewUrl}
+                style={transform ? { transform } : undefined}
+              />
+              {mediaReady ? null : <LoadingPreviewState />}
+            </>
           )
         ) : (
-          <div className="v19-review-preview-state is-unavailable">
+          <div
+            className="v19-review-preview-state is-unavailable"
+            role={file ? "alert" : "status"}
+          >
             <AlertCircle aria-hidden="true" />
             <strong>
               {file ? "Защищённый оригинал недоступен" : "Файл не загружен"}
             </strong>
+            {file && onRetry ? (
+              <button onClick={onRetry} type="button">
+                Повторить загрузку
+              </button>
+            ) : null}
           </div>
         )}
       </div>

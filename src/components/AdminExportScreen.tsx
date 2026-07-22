@@ -266,6 +266,19 @@ export function AdminExportScreen({
   const [archiveDownloadUrl, setArchiveDownloadUrl] = useState("");
   const [archiveDownloadStarted, setArchiveDownloadStarted] = useState(false);
   const [mobileControlOpen, setMobileControlOpen] = useState(false);
+  const exportOperationLockedRef = useRef(false);
+
+  const beginExportOperation = () => {
+    if (exportOperationLockedRef.current) return false;
+    exportOperationLockedRef.current = true;
+    setIsExporting(true);
+    return true;
+  };
+
+  const finishExportOperation = () => {
+    exportOperationLockedRef.current = false;
+    setIsExporting(false);
+  };
 
   const clearPreparedExport = () => {
     setPreparedExport(null);
@@ -616,9 +629,9 @@ export function AdminExportScreen({
     };
 
   const handlePrepareExcel = async () => {
+    if (!beginExportOperation()) return;
     setExportError("");
     setExportNotice("");
-    setIsExporting(true);
     try {
       const prepared = await prepareWorkbookForCurrentSelection();
       if (!prepared) return;
@@ -641,7 +654,7 @@ export function AdminExportScreen({
           : "Не удалось сформировать Excel.",
       );
     } finally {
-      setIsExporting(false);
+      finishExportOperation();
     }
   };
 
@@ -668,9 +681,9 @@ export function AdminExportScreen({
 
   const handlePrepareArchive = async () => {
     if (selectedCount === 0 || hasExportBlockers) return;
+    if (!beginExportOperation()) return;
     setExportError("");
     setExportNotice("");
-    setIsExporting(true);
     try {
       const prepared =
         preparedExport?.archiveInputSignature === selectedArchiveInputSignature
@@ -727,14 +740,14 @@ export function AdminExportScreen({
           : "Не удалось завершить выгрузку.",
       );
     } finally {
-      setIsExporting(false);
+      finishExportOperation();
     }
   };
 
   const commitPreparedArchive = async (archive: PreparedExportArchive) => {
+    if (!beginExportOperation()) return;
     setExportError("");
     setExportNotice("Подтверждаем скачивание и фиксируем пакет…");
-    setIsExporting(true);
     try {
       const { toExportPackageDocumentCommit } = await import(
         "../modules/submissions/exportMediaZip"
@@ -764,14 +777,14 @@ export function AdminExportScreen({
           : "Скачивание ZIP начато, но терминальная фиксация не подтверждена.",
       );
     } finally {
-      setIsExporting(false);
+      finishExportOperation();
     }
   };
 
   const handleArchiveDownloadClick = (
     event: React.MouseEvent<HTMLAnchorElement>,
   ) => {
-    if (isExporting) {
+    if (exportOperationLockedRef.current) {
       event.preventDefault();
       return;
     }
@@ -799,7 +812,7 @@ export function AdminExportScreen({
   };
 
   const handleConfirmArchiveDownload = () => {
-    if (isExporting || !archiveDownloadStarted) return;
+    if (exportOperationLockedRef.current || !archiveDownloadStarted) return;
     const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
     if (
       !preparedArchive ||
@@ -984,6 +997,7 @@ export function AdminExportScreen({
                     as="label"
                     key={item.id}
                     className={`export-row v19-admin-export-row-v2 ${item.selected ? "is-selected" : ""} ${activeId === item.id ? "is-active" : ""} ${item.blockers > 0 ? "is-blocked" : ""}`}
+                    data-testid={`admin-export-row-${item.id}`}
                     onClick={() => setActiveId(item.id)}
                   >
                     <input

@@ -1,6 +1,7 @@
 import {
   V19_AGENT_INTERACTION_CONTRACTS,
   isAgentInteractionId,
+  type AgentInteractionContract,
   type AgentInteractionProof,
   type AgentInteractionRole,
   type AgentInteractionSurface,
@@ -14,7 +15,7 @@ export type AgentInteractionEvidenceAssertion = {
 };
 
 export const V19_AGENT_INTERACTION_EVIDENCE_SCHEMA_VERSION =
-  "v19-agent-interaction-evidence-v1" as const;
+  "v19-agent-interaction-evidence-v2" as const;
 
 export const V19_AGENT_INTERACTION_ARTIFACT_KINDS = [
   "canonical-readback",
@@ -51,10 +52,39 @@ export type AgentInteractionEvidenceExecution = {
   runId: string;
 };
 
+export type AgentInteractionCanonicalValue = string | number | boolean | null;
+
+export type AgentInteractionSyntheticFixture = {
+  actor: {
+    id: string;
+    role: AgentInteractionRole;
+  };
+  entities: readonly {
+    id: string;
+    ownerActorId: string;
+    target: AgentInteractionMutationTarget | "return-package" | "session" | "ui-state";
+  }[];
+  markerSha256: string;
+  operationId: string;
+  primaryEntityId: string;
+};
+
 export type AgentInteractionNetworkResponse = {
+  actorId: string;
+  actorRole: AgentInteractionRole;
+  entityIds: readonly string[];
   method: "DELETE" | "GET" | "HEAD" | "PATCH" | "POST" | "PUT";
+  operationClass: string | null;
+  operationId: string;
   path: string;
+  query: "grant_type=password" | null;
+  resultSha256: string | null;
   status: number;
+  target:
+    | AgentInteractionMutationTarget
+    | "return-package"
+    | "session"
+    | "ui-state";
   write: boolean;
 };
 
@@ -77,14 +107,17 @@ export type AgentInteractionEvidenceRecord = {
       storageBucket: "agent-return-packages";
       storagePath: string;
     };
+    synthetic: AgentInteractionSyntheticFixture;
     submissionStatuses?: readonly SubmissionStatus[];
   };
   id: string;
   interactionId: string;
   mutation?: {
     canonicalReloadReadback?: {
-      assertion: string;
+      before: Readonly<Record<string, AgentInteractionCanonicalValue>>;
+      expectedAfter: Readonly<Record<string, AgentInteractionCanonicalValue>>;
       fields: readonly string[];
+      reloadedAt: string;
     };
     networkResponse?: {
       method: "DELETE" | "PATCH" | "POST" | "PUT";
@@ -92,9 +125,14 @@ export type AgentInteractionEvidenceRecord = {
       status: number;
     };
     unintendedWrites?: {
-      assertion: string;
       changedTargets: readonly AgentInteractionMutationTarget[];
       checkedTargets: readonly AgentInteractionMutationTarget[];
+      targetSnapshots: readonly {
+        afterSha256: string;
+        beforeSha256: string;
+        entityIds: readonly string[];
+        target: AgentInteractionMutationTarget;
+      }[];
     };
   };
   network?: {
@@ -120,9 +158,11 @@ export type AgentInteractionEvidenceManifest = {
   runId: string;
   schemaVersion: typeof V19_AGENT_INTERACTION_EVIDENCE_SCHEMA_VERSION;
   trustedAttestation?: {
+    bundleSha256: string;
     bundlePath: string;
     repository: string;
     signerWorkflow: string;
+    subjectSha256: string;
     subjectPath: string;
   };
 };
@@ -176,6 +216,93 @@ function sameStringSet(left: readonly string[], right: readonly string[]): boole
     left.length === right.length &&
     new Set(left).size === left.length &&
     left.every((value) => right.includes(value))
+  );
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+
+function validSyntheticFixture(
+  record: AgentInteractionEvidenceRecord,
+  contract?: AgentInteractionContract,
+): boolean {
+  const synthetic = record.fixture?.synthetic;
+  if (
+    !synthetic ||
+    synthetic.actor.role !== record.role ||
+    !isNonEmptyString(synthetic.actor.id) ||
+    !isNonEmptyString(synthetic.operationId) ||
+    !isSha256(synthetic.markerSha256) ||
+    !isNonEmptyString(synthetic.primaryEntityId) ||
+    !Array.isArray(synthetic.entities) ||
+    !synthetic.entities.length
+  ) {
+    return false;
+  }
+  const entityIds = synthetic.entities.map((entity) => entity.id);
+  const entityTargets = synthetic.entities.map((entity) => entity.target);
+  const expectedTargets =
+    contract?.kind === "mutation"
+      ? contract.writeScope.requiredCheckedTargets
+      : contract?.kind === "session"
+        ? ["session"]
+        : contract?.kind === "download"
+          ? ["return-package"]
+          : ["ui-state"];
+  const primaryEntity = synthetic.entities.find(
+    (entity) => entity.id === synthetic.primaryEntityId,
+  );
+  return (
+    new Set(entityIds).size === entityIds.length &&
+    new Set(entityTargets).size === entityTargets.length &&
+    sameStringSet(entityTargets, expectedTargets) &&
+    Boolean(primaryEntity) &&
+    (contract?.kind !== "mutation" ||
+      primaryEntity?.target === contract.canonicalEffect.primaryTarget) &&
+    synthetic.entities.every(
+      (entity) =>
+        isNonEmptyString(entity.id) &&
+        entity.ownerActorId === synthetic.actor.id &&
+        isNonEmptyString(entity.target),
+    )
+  );
+}
+
+function resolveCanonicalEffect(
+  contract: Extract<AgentInteractionContract, { kind: "mutation" }>,
+  record: AgentInteractionEvidenceRecord,
+) {
+  const statusFixture = record.fixture?.submissionStatuses?.[0];
+  const markerSha256 = record.fixture?.synthetic?.markerSha256;
+  const resolveValue = (value: AgentInteractionCanonicalValue) => {
+    if (value === "$fixture-status") return statusFixture;
+    if (value === "$marker-sha256") return markerSha256;
+    return value;
+  };
+  const resolveValues = (
+    values: Readonly<Record<string, AgentInteractionCanonicalValue>>,
+  ) =>
+    Object.fromEntries(
+      Object.entries(values).map(([field, value]) => [field, resolveValue(value)]),
+    ) as Readonly<Record<string, AgentInteractionCanonicalValue | undefined>>;
+  return {
+    before: resolveValues(contract.canonicalEffect.before),
+    expectedAfter: resolveValues(contract.canonicalEffect.expectedAfter),
+    fields: Object.keys(contract.canonicalEffect.expectedAfter),
+  };
+}
+
+function sameCanonicalRecord(
+  left: Readonly<Record<string, AgentInteractionCanonicalValue>> | undefined,
+  right: Readonly<Record<string, AgentInteractionCanonicalValue | undefined>>,
+  fields: readonly string[],
+): boolean {
+  return (
+    Boolean(left) &&
+    sameStringSet(Object.keys(left ?? {}), fields) &&
+    sameStringSet(Object.keys(right), fields) &&
+    fields.every((field) => left?.[field] === right[field])
   );
 }
 
@@ -323,7 +450,8 @@ export function auditAgentInteractionEvidence(
       if (
         !record.fixture ||
         typeof record.fixture.id !== "string" ||
-        !record.fixture.id.trim()
+        !record.fixture.id.trim() ||
+        !validSyntheticFixture(record, contract)
       ) {
         findings.push({
           interactionId: contract.id,
@@ -449,25 +577,70 @@ export function auditAgentInteractionEvidence(
       }
 
       if (contract.kind === "mutation") {
+        const canonicalEffect = resolveCanonicalEffect(contract, record);
+        const syntheticEntityIds = new Set(
+          record.fixture.synthetic?.entities.map((entity) => entity.id) ?? [],
+        );
+        const syntheticEntityById = new Map(
+          record.fixture.synthetic?.entities.map((entity) => [entity.id, entity]) ?? [],
+        );
         const hasNetworkResponse =
           Boolean(record.mutation?.networkResponse?.path.trim()) &&
           (record.mutation?.networkResponse?.status ?? 0) >= 200 &&
           (record.mutation?.networkResponse?.status ?? 0) < 300;
         const hasCanonicalReadback =
-          Boolean(record.mutation?.canonicalReloadReadback?.assertion.trim()) &&
-          Boolean(record.mutation?.canonicalReloadReadback?.fields.length);
+          sameStringSet(
+            record.mutation?.canonicalReloadReadback?.fields ?? [],
+            canonicalEffect.fields,
+          ) &&
+          sameCanonicalRecord(
+            record.mutation?.canonicalReloadReadback?.before,
+            canonicalEffect.before,
+            canonicalEffect.fields,
+          ) &&
+          sameCanonicalRecord(
+            record.mutation?.canonicalReloadReadback?.expectedAfter,
+            canonicalEffect.expectedAfter,
+            canonicalEffect.fields,
+          ) &&
+          Number.isFinite(
+            Date.parse(record.mutation?.canonicalReloadReadback?.reloadedAt ?? ""),
+          ) &&
+          canonicalEffect.fields.some(
+            (field) =>
+              canonicalEffect.before[field] !== canonicalEffect.expectedAfter[field],
+          );
         const checkedTargets =
           record.mutation?.unintendedWrites?.checkedTargets ?? [];
         const changedTargets =
           record.mutation?.unintendedWrites?.changedTargets ?? [];
+        const targetSnapshots =
+          record.mutation?.unintendedWrites?.targetSnapshots ?? [];
+        const derivedChangedTargets = targetSnapshots
+          .filter((snapshot) => snapshot.beforeSha256 !== snapshot.afterSha256)
+          .map((snapshot) => snapshot.target);
         const hasUnintendedWriteCheck =
-          Boolean(record.mutation?.unintendedWrites?.assertion.trim()) &&
           sameStringSet(
             checkedTargets,
             contract.writeScope.requiredCheckedTargets,
           ) &&
+          sameStringSet(
+            targetSnapshots.map((snapshot) => snapshot.target),
+            checkedTargets,
+          ) &&
+          targetSnapshots.every(
+            (snapshot) =>
+              isSha256(snapshot.beforeSha256) &&
+              isSha256(snapshot.afterSha256) &&
+              snapshot.entityIds.length > 0 &&
+              snapshot.entityIds.every((entityId) =>
+                syntheticEntityIds.has(entityId) &&
+                syntheticEntityById.get(entityId)?.target === snapshot.target,
+              ),
+          ) &&
           changedTargets.length > 0 &&
           new Set(changedTargets).size === changedTargets.length &&
+          sameStringSet(changedTargets, derivedChangedTargets) &&
           changedTargets.every((target) =>
             contract.writeScope.allowedChangedTargets.includes(target),
           ) &&
@@ -504,11 +677,26 @@ export function auditAgentInteractionEvidence(
         )
       ) {
         const responses = record.network?.responses;
+        const synthetic = record.fixture.synthetic;
+        const syntheticEntityIds = new Set(
+          synthetic?.entities.map((entity) => entity.id) ?? [],
+        );
         const hasValidResponses =
           Array.isArray(responses) &&
           responses.length > 0 &&
           responses.every(
             (response) =>
+              response.actorId === synthetic?.actor.id &&
+              response.actorRole === record.role &&
+              response.operationId === synthetic?.operationId &&
+              response.entityIds.length > 0 &&
+              response.entityIds.every((entityId: string) =>
+                syntheticEntityIds.has(entityId) &&
+                synthetic?.entities.find((entity) => entity.id === entityId)
+                  ?.target === response.target,
+              ) &&
+              (response.query === null || response.query === "grant_type=password") &&
+              (response.resultSha256 === null || isSha256(response.resultSha256)) &&
               Boolean(response.path.trim()) &&
               response.status >= 100 &&
               response.status <= 599 &&
@@ -528,10 +716,26 @@ export function auditAgentInteractionEvidence(
         )
       ) {
         const responses = record.network?.responses;
+        const synthetic = record.fixture.synthetic;
+        const syntheticEntityIds = new Set(
+          synthetic?.entities.map((entity) => entity.id) ?? [],
+        );
         const hasZeroWriteLedger =
           Array.isArray(responses) &&
           responses.every(
             (response) =>
+              response.actorId === synthetic?.actor.id &&
+              response.actorRole === record.role &&
+              response.operationId === synthetic?.operationId &&
+              response.entityIds.length > 0 &&
+              response.entityIds.every((entityId: string) =>
+                syntheticEntityIds.has(entityId) &&
+                synthetic?.entities.find((entity) => entity.id === entityId)
+                  ?.target === response.target,
+              ) &&
+              response.operationClass === null &&
+              response.query === null &&
+              response.resultSha256 === null &&
               Boolean(response.path.trim()) &&
               response.status >= 100 &&
               response.status <= 599 &&

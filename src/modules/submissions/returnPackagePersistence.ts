@@ -61,6 +61,21 @@ export type AdminReturnPackageGroup = {
   submissionCount: number;
 };
 
+type PreparedReturnPackageArtifactUpload = {
+  fileName: string;
+  operationId: string;
+  status: "prepared" | "finalized" | "aborted";
+  storageBucket: typeof agentReturnPackageBucket;
+  storagePath: string;
+};
+
+type FinalizedReturnPackageArtifactUpload = {
+  artifact: AgentReturnPackageArtifactRow;
+  duplicate: boolean;
+  operationId: string;
+  previousStoragePath: string | null;
+};
+
 function mapPackage(row: AgentReturnPackageRow): AgentReturnPackage {
   return {
     agentId: row.agent_id,
@@ -189,6 +204,7 @@ export async function listAdminReturnPackageGroups(): Promise<
       )
       .order("export_batch_id", { ascending: true })
       .order("applicant_order", { ascending: true })
+      .order("applicant_id", { ascending: true })
       .range(from, from + supabasePageSize - 1);
     if (error) {
       throw mapSupabasePersistenceError(error, {
@@ -283,25 +299,30 @@ export async function listReturnPackageArtifacts(
   packageId: string,
 ): Promise<AgentReturnPackageArtifact[]> {
   const client = requireClient();
-  const { data, error } = await client
-    .from("agent_return_package_artifacts")
-    .select(
-      "id,return_package_id,applicant_id,applicant_name,artifact_kind,storage_bucket,storage_path,file_name,sha256,size_bytes,uploaded_by,uploaded_at",
-    )
-    .eq("return_package_id", packageId)
-    .order("artifact_kind", { ascending: true })
-    .order("applicant_id", { ascending: true });
+  const rows: AgentReturnPackageArtifactRow[] = [];
+  for (let from = 0; ; from += supabasePageSize) {
+    const { data, error } = await client
+      .from("agent_return_package_artifacts")
+      .select(
+        "id,return_package_id,applicant_id,applicant_name,artifact_kind,storage_bucket,storage_path,file_name,sha256,size_bytes,uploaded_by,uploaded_at",
+      )
+      .eq("return_package_id", packageId)
+      .order("artifact_kind", { ascending: true })
+      .order("applicant_id", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + supabasePageSize - 1);
 
-  if (error) {
-    throw mapSupabasePersistenceError(error, {
-      operation: "agent_return_package_artifacts.list",
-      fallbackKind: "database",
-    });
+    if (error) {
+      throw mapSupabasePersistenceError(error, {
+        operation: "agent_return_package_artifacts.list",
+        fallbackKind: "database",
+      });
+    }
+    rows.push(...((data ?? []) as AgentReturnPackageArtifactRow[]));
+    if ((data ?? []).length < supabasePageSize) break;
   }
 
-  return (data ?? []).map((row) =>
-    mapArtifact(row as AgentReturnPackageArtifactRow),
-  );
+  return rows.map(mapArtifact);
 }
 
 async function existingArtifact(input: {
@@ -332,6 +353,110 @@ async function existingArtifact(input: {
   return data ? mapArtifact(data as AgentReturnPackageArtifactRow) : null;
 }
 
+function errorRecord(error: unknown): Record<string, unknown> {
+  return error && typeof error === "object"
+    ? (error as Record<string, unknown>)
+    : {};
+}
+
+function isReturnPackageUploadConflict(error: unknown): boolean {
+  const record = errorRecord(error);
+  const message = typeof record.message === "string" ? record.message : "";
+  return (
+    record.code === "40001" ||
+    message.includes("V19_RETURN_PACKAGE_UPLOAD_CONFLICT")
+  );
+}
+
+function isDefinitiveRpcRejection(error: unknown): boolean {
+  const record = errorRecord(error);
+  const status =
+    typeof record.status === "number"
+      ? record.status
+      : typeof record.statusCode === "number"
+        ? record.statusCode
+        : null;
+  if (status !== null && status >= 400 && status < 500) return true;
+  return typeof record.code === "string" && /^[0-9A-Z]{5}$/.test(record.code);
+}
+
+function uploadReconciliationError(message: string, cause: unknown): Error {
+  return new Error(`${message} Manual reconciliation required.`, {
+    cause: cause instanceof Error ? cause : undefined,
+  });
+}
+
+function assertPreparedUpload(
+  data: unknown,
+  operationId: string,
+): PreparedReturnPackageArtifactUpload | null {
+  if (!data || typeof data !== "object") return null;
+  const result = data as Partial<PreparedReturnPackageArtifactUpload>;
+  if (
+    result.operationId !== operationId ||
+    result.storageBucket !== agentReturnPackageBucket ||
+    typeof result.storagePath !== "string" ||
+    !result.storagePath.startsWith("return-package-upload-intents/") ||
+    (result.fileName !== "agent_list.pdf" &&
+      result.fileName !== "visa_application.pdf") ||
+    result.status !== "prepared"
+  ) {
+    return null;
+  }
+  return result as PreparedReturnPackageArtifactUpload;
+}
+
+function assertFinalizedUpload(
+  data: unknown,
+  operationId: string,
+): FinalizedReturnPackageArtifactUpload | null {
+  if (!data || typeof data !== "object") return null;
+  const result = data as Partial<FinalizedReturnPackageArtifactUpload>;
+  const artifact = result.artifact as Partial<AgentReturnPackageArtifactRow> | undefined;
+  if (
+    result.operationId !== operationId ||
+    typeof result.duplicate !== "boolean" ||
+    (result.previousStoragePath !== null &&
+      typeof result.previousStoragePath !== "string") ||
+    !artifact ||
+    typeof artifact.id !== "string" ||
+    typeof artifact.storage_path !== "string" ||
+    typeof artifact.sha256 !== "string" ||
+    typeof artifact.size_bytes !== "number"
+  ) {
+    return null;
+  }
+  return result as FinalizedReturnPackageArtifactUpload;
+}
+
+async function cleanupOrphanUploadPaths(input: {
+  packageId: string;
+  requiredPath?: string | null;
+}): Promise<void> {
+  if (!input.requiredPath) return;
+  const client = requireClient();
+  const packagePrefix = `return-packages/${input.packageId}/`;
+  const intentPrefix = `return-package-upload-intents/${input.packageId}/`;
+  if (
+    !input.requiredPath.startsWith(packagePrefix) &&
+    !input.requiredPath.startsWith(intentPrefix)
+  ) {
+    throw uploadReconciliationError(
+      "Supabase returned an unsafe return-package cleanup path.",
+      new Error("Return-package cleanup path is outside the package scope."),
+    );
+  }
+  const cleanup = await client.storage
+    .from(agentReturnPackageBucket)
+    .remove([input.requiredPath]);
+  if (cleanup.error) {
+    throw uploadReconciliationError(
+      "A replaced return-package PDF is still pending storage cleanup.",
+      cleanup.error,
+    );
+  }
+}
+
 export async function uploadAgentReturnPackageArtifact(input: {
   applicantId?: string | null;
   artifactKind: AgentReturnPackageArtifactKind;
@@ -348,124 +473,155 @@ export async function uploadAgentReturnPackageArtifact(input: {
     throw new Error("PDF-список прикрепляется к пакету агента, а не к туристу.");
   }
 
-  const [sha256, previous] = await Promise.all([
-    sha256Hex(input.file),
-    existingArtifact({
+  const sha256 = await sha256Hex(input.file);
+  const operationId = crypto.randomUUID();
+  let prepared: PreparedReturnPackageArtifactUpload | null = null;
+  let prepareError: unknown = null;
+  for (let attempt = 0; attempt < 2 && !prepared; attempt += 1) {
+    const response = await client.rpc(
+      "prepare_agent_return_package_artifact_upload",
+      {
+        payload: {
+          applicantId,
+          artifactKind: input.artifactKind,
+          operationId,
+          returnPackageId: input.packageId,
+          sha256,
+          sizeBytes: input.file.size,
+        },
+      },
+    );
+    prepared = assertPreparedUpload(response.data, operationId);
+    prepareError = response.error ??
+      (prepared ? null : new Error("Invalid return-package upload intent receipt."));
+  }
+  if (prepareError || !prepared) {
+    throw mapSupabasePersistenceError(
+      prepareError,
+      {
+        operation: "rpc.prepare_agent_return_package_artifact_upload",
+        fallbackKind: "rpc",
+      },
+    );
+  }
+
+  const { error: uploadError } = await client.storage
+    .from(agentReturnPackageBucket)
+    .upload(prepared.storagePath, input.file, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+
+  let finalized: FinalizedReturnPackageArtifactUpload | null = null;
+  let finalizeError: unknown = null;
+  for (let attempt = 0; attempt < 2 && !finalized; attempt += 1) {
+    const response = await client.rpc(
+      "finalize_agent_return_package_artifact_upload",
+      { p_operation_id: operationId },
+    );
+    finalized = assertFinalizedUpload(response.data, operationId);
+    finalizeError = response.error ??
+      (finalized ? null : new Error("Invalid return-package finalize receipt."));
+  }
+
+  const finishCommittedUpload = async (
+    receipt: FinalizedReturnPackageArtifactUpload,
+  ): Promise<AgentReturnPackageArtifact> => {
+    const persisted = mapArtifact(receipt.artifact);
+    if (
+      persisted.storagePath !== prepared.storagePath ||
+      persisted.sha256 !== sha256 ||
+      persisted.sizeBytes !== input.file.size
+    ) {
+      throw uploadReconciliationError(
+        "Supabase committed an unexpected return-package artifact receipt.",
+        finalizeError,
+      );
+    }
+    const previousStoragePath = receipt.previousStoragePath;
+    await cleanupOrphanUploadPaths({
+      packageId: input.packageId,
+      requiredPath:
+        previousStoragePath && previousStoragePath !== persisted.storagePath
+          ? previousStoragePath
+          : null,
+    });
+    return persisted;
+  };
+
+  if (finalized) return finishCommittedUpload(finalized);
+
+  let reconciled: AgentReturnPackageArtifact | null;
+  try {
+    reconciled = await existingArtifact({
       applicantId,
       artifactKind: input.artifactKind,
       packageId: input.packageId,
-    }),
-  ]);
-  const identity = returnPackageArtifactIdentity({
-    applicantId,
-    artifactKind: input.artifactKind,
-    packageId: input.packageId,
-  });
-
-  const payload = {
-    applicant_id: applicantId,
-    artifact_kind: input.artifactKind,
-    file_name: identity.fileName,
-    return_package_id: input.packageId,
-    sha256,
-    size_bytes: input.file.size,
-    storage_bucket: agentReturnPackageBucket,
-    storage_path: identity.path,
-  };
-
-  const write = previous
-    ? client
-        .from("agent_return_package_artifacts")
-        .update(payload)
-        .eq("id", previous.id)
-        .select(
-          "id,return_package_id,applicant_id,applicant_name,artifact_kind,storage_bucket,storage_path,file_name,sha256,size_bytes,uploaded_by,uploaded_at",
-        )
-        .single()
-    : client
-        .from("agent_return_package_artifacts")
-        .insert(payload)
-        .select(
-          "id,return_package_id,applicant_id,applicant_name,artifact_kind,storage_bucket,storage_path,file_name,sha256,size_bytes,uploaded_by,uploaded_at",
-        )
-        .single();
-  const { data, error } = await write;
-  if (error || !data) {
-    throw mapSupabasePersistenceError(error, {
-      operation: "agent_return_package_artifacts.save",
-      fallbackKind: "database",
     });
+  } catch (reconciliationFailure) {
+    throw uploadReconciliationError(
+      "The upload outcome could not be reconciled; the prepared object was preserved.",
+      reconciliationFailure,
+    );
   }
 
-  const persisted = mapArtifact(data as AgentReturnPackageArtifactRow);
-  const { error: uploadError } = await client.storage
+  if (
+    reconciled?.storagePath === prepared.storagePath &&
+    reconciled.sha256 === sha256 &&
+    reconciled.sizeBytes === input.file.size
+  ) {
+    throw uploadReconciliationError(
+      "The PDF is committed, but its idempotency receipt could not be recovered; the committed object was preserved.",
+      finalizeError,
+    );
+  }
+
+  if (!isDefinitiveRpcRejection(finalizeError)) {
+    throw uploadReconciliationError(
+      "The finalize outcome is uncertain; the prepared object was preserved.",
+      finalizeError,
+    );
+  }
+
+  const cleanup = await client.storage
     .from(agentReturnPackageBucket)
-    .upload(identity.path, input.file, {
-      contentType: "application/pdf",
-      upsert: Boolean(previous),
-    });
-
-  if (uploadError) {
-    const rollbackErrors: string[] = [];
-    if (previous) {
-      const { error: rollbackError } = await client
-        .from("agent_return_package_artifacts")
-        .update({
-          applicant_id: previous.applicantId,
-          artifact_kind: previous.artifactKind,
-          file_name: previous.fileName,
-          return_package_id: previous.packageId,
-          sha256: previous.sha256,
-          size_bytes: previous.sizeBytes,
-          storage_bucket: agentReturnPackageBucket,
-          storage_path: previous.storagePath,
-        })
-        .eq("id", previous.id);
-      if (rollbackError) {
-        rollbackErrors.push(
-          `metadata rollback failed: ${rollbackError.message ?? "unknown database error"}`,
-        );
-      }
-    } else {
-      const [metadataRollback, storageRollback] = await Promise.all([
-        client
-          .from("agent_return_package_artifacts")
-          .delete()
-          .eq("id", persisted.id),
-        client.storage.from(agentReturnPackageBucket).remove([identity.path]),
-      ]);
-      if (metadataRollback.error) {
-        rollbackErrors.push(
-          `metadata rollback failed: ${metadataRollback.error.message ?? "unknown database error"}`,
-        );
-      }
-      if (storageRollback.error) {
-        rollbackErrors.push(
-          `storage rollback failed: ${storageRollback.error.message ?? "unknown storage error"}`,
-        );
-      }
-    }
-
-    const uploadFailure = mapSupabasePersistenceError(uploadError, {
-      operation: "storage.upload_agent_return_package_artifact",
-      fallbackKind: "upload",
-    });
-    if (rollbackErrors.length) {
-      throw new Error(
-        `${uploadFailure.message} Manual reconciliation required: ${rollbackErrors.join("; ")}`,
-        { cause: uploadFailure },
-      );
-    }
-    throw uploadFailure;
+    .remove([prepared.storagePath]);
+  if (cleanup.error) {
+    throw uploadReconciliationError(
+      "The upload was rejected, but its prepared storage object could not be removed.",
+      cleanup.error,
+    );
+  }
+  const abort = await client.rpc(
+    "abort_agent_return_package_artifact_upload",
+    { p_operation_id: operationId },
+  );
+  if (abort.error) {
+    throw uploadReconciliationError(
+      "The rejected upload object was removed, but its intent could not be aborted.",
+      abort.error,
+    );
   }
 
-  return persisted;
+  if (isReturnPackageUploadConflict(finalizeError)) {
+    throw new Error(
+      "Этот PDF уже изменён в другой административной сессии. Обновите пакет и повторите загрузку.",
+      { cause: finalizeError instanceof Error ? finalizeError : undefined },
+    );
+  }
+  throw mapSupabasePersistenceError(uploadError ?? finalizeError, {
+    operation: uploadError
+      ? "storage.upload_agent_return_package_artifact"
+      : "rpc.finalize_agent_return_package_artifact_upload",
+    fallbackKind: uploadError ? "upload" : "rpc",
+  });
 }
 
 export async function publishAgentReturnPackage(
   packageId: string,
 ): Promise<AgentReturnPackagePublishResult> {
   const client = requireClient();
+  await cleanupOrphanUploadPaths({ packageId });
   const { data, error } = await client.rpc("publish_agent_return_package", {
     payload: { returnPackageId: packageId },
   });
@@ -553,7 +709,9 @@ export async function createAgentReturnPackageDownloadUrl(
   const client = requireClient();
   const { data, error } = await client.storage
     .from(agentReturnPackageBucket)
-    .createSignedUrl(artifact.storagePath, 60 * 10);
+    .createSignedUrl(artifact.storagePath, 60 * 10, {
+      download: artifact.fileName,
+    });
   if (error || !data?.signedUrl) {
     throw mapSupabasePersistenceError(error, {
       operation: "storage.create_agent_return_package_signed_url",

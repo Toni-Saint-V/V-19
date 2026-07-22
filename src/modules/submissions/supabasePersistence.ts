@@ -3,6 +3,7 @@ import type {
   ApplicantInsert,
   ApplicantRow,
   CorrectionInsert,
+  CorrectionRow,
   ExportBatchRow,
   Json,
   MediaAssetInsert,
@@ -68,13 +69,17 @@ export const cockpitSnapshotKey = "v19CockpitSnapshot";
 export const cockpitSnapshotStorageField =
   "submissions.family_intelligence.v19CockpitSnapshot";
 export const cockpitSnapshotStatus = "unreviewed";
-const submissionListLimit = 100;
+const submissionPageSize = 100;
+const relatedRowPageSize = 1000;
+const relatedSubmissionIdChunkSize = 50;
 const submissionSelect =
+  "id,public_number,case_revision,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
+const preConcurrencySubmissionSelect =
   "id,public_number,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const legacySubmissionSelect =
   "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const applicantSelect =
-  "id,submission_id,full_name,questionnaire_percent,media_percent,created_at,updated_at" as const;
+  "id,submission_id,full_name,role,questionnaire_percent,media_percent,created_at,updated_at" as const;
 const questionnaireAnswerSelect =
   "id,submission_id,applicant_id,section_id,field_id,label,value,updated_by,created_at,updated_at" as const;
 const mediaAssetSelect =
@@ -83,11 +88,21 @@ const exportBatchSelect =
   "id,created_at,file_name,format,content_fingerprint,idempotency_key,row_count,submission_ids" as const;
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,source,note,changed_by,changed_at" as const;
+const correctionSelect =
+  "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at" as const;
 const agentProfileSelect = "id,display_name" as const;
 
 export interface CockpitLoadResult {
+  caseRevisionsBySubmissionId: Map<string, number>;
   ownerIdsBySubmissionId: Map<string, string>;
+  quarantinedSubmissionIds: Set<string>;
   submissions: Submission[];
+}
+
+export interface AdminCockpitSaveResult {
+  caseRevisionsBySubmissionId: Map<string, number>;
+  operationId: string;
+  ownerIdsBySubmissionId: Map<string, string>;
 }
 
 export type PublicNumberAssignment = {
@@ -140,7 +155,27 @@ type SnapshotEnvelope = {
 };
 type CockpitApplicantRow = Pick<
   ApplicantRow,
-  "full_name" | "id" | "media_percent" | "questionnaire_percent" | "submission_id"
+  | "full_name"
+  | "id"
+  | "media_percent"
+  | "questionnaire_percent"
+  | "role"
+  | "submission_id"
+>;
+type CockpitCorrectionRow = Pick<
+  CorrectionRow,
+  | "applicant_id"
+  | "created_at"
+  | "created_by"
+  | "field_key"
+  | "fixed_at"
+  | "id"
+  | "media_type"
+  | "reason"
+  | "scope"
+  | "severity"
+  | "status"
+  | "submission_id"
 >;
 type CockpitQuestionnaireAnswerRow = Pick<
   QuestionnaireAnswerRow,
@@ -211,6 +246,98 @@ type QuestionnaireAnswerValueResult = {
   value: string;
 };
 
+type PagedRowsResult<Row> = {
+  data: Row[];
+  error: unknown | null;
+};
+
+async function collectPagedRows<Row>(
+  fetchPage: (
+    from: number,
+    to: number,
+  ) => Promise<PagedRowsResult<Row>>,
+  pageSize: number,
+): Promise<PagedRowsResult<Row>> {
+  const data: Row[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const page = await fetchPage(from, from + pageSize - 1);
+    if (page.error) return { data: [], error: page.error };
+    data.push(...page.data);
+    if (page.data.length < pageSize) return { data, error: null };
+  }
+}
+
+async function collectIdKeysetPagedRows<Row extends { id: string }>(
+  fetchPage: (
+    afterId: string | null,
+    limit: number,
+  ) => Promise<PagedRowsResult<Row>>,
+  pageSize: number,
+): Promise<PagedRowsResult<Row>> {
+  const data: Row[] = [];
+  const seenIds = new Set<string>();
+  let afterId: string | null = null;
+
+  for (;;) {
+    const page = await fetchPage(afterId, pageSize);
+    if (page.error) return { data: [], error: page.error };
+
+    for (const row of page.data) {
+      if (!row.id || seenIds.has(row.id) || (afterId !== null && row.id <= afterId)) {
+        return {
+          data: [],
+          error: new Error("Supabase submission keyset pagination was not stable."),
+        };
+      }
+      seenIds.add(row.id);
+      data.push(row);
+    }
+
+    if (page.data.length < pageSize) return { data, error: null };
+    afterId = page.data.at(-1)?.id ?? null;
+    if (!afterId) {
+      return {
+        data: [],
+        error: new Error("Supabase submission keyset cursor is missing."),
+      };
+    }
+  }
+}
+
+function chunkedSubmissionIds(submissionIds: readonly string[]) {
+  const chunks: string[][] = [];
+  for (
+    let index = 0;
+    index < submissionIds.length;
+    index += relatedSubmissionIdChunkSize
+  ) {
+    chunks.push(
+      submissionIds.slice(index, index + relatedSubmissionIdChunkSize),
+    );
+  }
+  return chunks;
+}
+
+async function collectRowsForSubmissionIds<Row>(
+  submissionIds: readonly string[],
+  fetchPage: (
+    submissionIdChunk: string[],
+    from: number,
+    to: number,
+  ) => Promise<PagedRowsResult<Row>>,
+): Promise<PagedRowsResult<Row>> {
+  const data: Row[] = [];
+  for (const submissionIdChunk of chunkedSubmissionIds(submissionIds)) {
+    const chunkRows = await collectPagedRows(
+      (from, to) => fetchPage(submissionIdChunk, from, to),
+      relatedRowPageSize,
+    );
+    if (chunkRows.error) return { data: [], error: chunkRows.error };
+    data.push(...chunkRows.data);
+  }
+  return { data, error: null };
+}
+
 const questionnaireAnswerEnvelopeKind = "v19_questionnaire_field";
 const questionnaireAnswerEnvelopeVersion = 1;
 
@@ -263,17 +390,34 @@ function snapshotEnvelope(value: Json | null): SnapshotEnvelope | null {
   return isRecord(envelope) ? envelope : null;
 }
 
-export function readCockpitSnapshot(value: Json | null): Submission | null {
-  const envelope = snapshotEnvelope(value);
-  if (!envelope || envelope.version !== cockpitSnapshotVersion) return null;
+type CockpitSnapshotReadResult =
+  | { kind: "absent" }
+  | { kind: "corrupt" }
+  | { kind: "valid"; submission: Submission };
 
-  if (!isCockpitSubmission(envelope.submission)) return null;
+function cockpitSnapshotReadResult(value: Json | null): CockpitSnapshotReadResult {
+  const envelope = snapshotEnvelope(value);
+  if (!envelope) return { kind: "absent" };
+  if (
+    envelope.version !== cockpitSnapshotVersion ||
+    !isCockpitSubmission(envelope.submission)
+  ) {
+    return { kind: "corrupt" };
+  }
 
   try {
-    return normalizeSubmissionForCanonicalRuntime(envelope.submission);
+    return {
+      kind: "valid",
+      submission: normalizeSubmissionForCanonicalRuntime(envelope.submission),
+    };
   } catch {
-    return null;
+    return { kind: "corrupt" };
   }
+}
+
+export function readCockpitSnapshot(value: Json | null): Submission | null {
+  const result = cockpitSnapshotReadResult(value);
+  return result.kind === "valid" ? result.submission : null;
 }
 
 function attachNormalizedApplicantRows(
@@ -1223,6 +1367,113 @@ function isReviewHandoffCommandWrite(submission: Submission, role: Role): boolea
   return isCurrentLocalHandoffWrite(submission, role);
 }
 
+function applicantRoleFromDurableRow(value: string): Applicant["role"] {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "main" || normalized === "основной заявитель") {
+    return "main";
+  }
+  if (
+    normalized === "spouse" ||
+    normalized === "супруг" ||
+    normalized === "супруга" ||
+    normalized === "супруг(а)" ||
+    normalized === "супруг/супруга"
+  ) {
+    return "spouse";
+  }
+  if (
+    normalized === "child" ||
+    normalized.startsWith("ребёнок") ||
+    normalized.startsWith("ребенок")
+  ) {
+    return "child";
+  }
+  throw new Error(`Неизвестная роль заявителя в Supabase: ${value || "пусто"}.`);
+}
+
+function issueStatusFromCorrectionRow(
+  status: CockpitCorrectionRow["status"],
+): IssueStatus {
+  if (status === "fixed") return "fixed_by_agent";
+  if (status === "closed") return "closed_by_admin";
+  return "open";
+}
+
+function issueFromCorrectionRow(
+  row: CockpitCorrectionRow,
+  applicants: Applicant[],
+): Issue {
+  const applicant =
+    applicants.find((candidate) => candidate.id === row.applicant_id) ??
+    applicants.find((candidate) => candidate.role === "main") ??
+    applicants[0];
+  if (!applicant) {
+    throw new Error(
+      `Коррекция ${row.id} не может быть восстановлена без заявителя.`,
+    );
+  }
+  const fileType =
+    row.media_type && isCanonicalFrontendMediaType(row.media_type)
+      ? row.media_type
+      : undefined;
+
+  return {
+    id: row.id,
+    comment: "",
+    createdAt: row.created_at,
+    createdBy: "admin",
+    reason: row.reason,
+    severity: row.severity === "blocking" ? "blocker" : "warning",
+    status: issueStatusFromCorrectionRow(row.status),
+    target: {
+      applicantId: applicant.id,
+      applicantName: applicant.fullName,
+      field: row.field_key ?? undefined,
+      fileType,
+    },
+    type:
+      row.scope === "media"
+        ? "media"
+        : row.scope === "submission" || row.scope === "applicant"
+          ? "section"
+          : "field",
+  };
+}
+
+export function attachDurableCorrectionRows(
+  submission: Submission,
+  correctionRows: CockpitCorrectionRow[],
+): Submission {
+  if (!correctionRows.length) return submission;
+
+  const correctionByPersistedId = new Map(
+    correctionRows.map((row) => [row.id, row]),
+  );
+  const consumedCorrectionIds = new Set<string>();
+  const snapshotIssues = submission.issues.map((issue): Issue => {
+    const persistedId = stableUuid(
+      `correction:${submission.id}:${issue.id}`,
+    );
+    const durable = correctionByPersistedId.get(persistedId);
+    if (!durable) return issue;
+    consumedCorrectionIds.add(durable.id);
+    return {
+      ...issue,
+      createdAt: durable.created_at,
+      severity: durable.severity === "blocking" ? "blocker" : "warning",
+      status: issueStatusFromCorrectionRow(durable.status),
+    };
+  });
+  const durableOnlyIssues = correctionRows
+    .filter((row) => !consumedCorrectionIds.has(row.id))
+    .map((row) => issueFromCorrectionRow(row, submission.applicants));
+
+  return {
+    ...submission,
+    issues: [...snapshotIssues, ...durableOnlyIssues],
+  };
+}
+
 function fallbackSubmissionFromRows(
   row: SubmissionRow,
   applicants: CockpitApplicantRow[],
@@ -1233,7 +1484,7 @@ function fallbackSubmissionFromRows(
   const applicantItems: Applicant[] = applicants.map((applicant) => ({
     id: applicant.id,
     fullName: applicant.full_name,
-    role: "main",
+    role: applicantRoleFromDurableRow(applicant.role),
     questionnaireStatus:
       applicant.questionnaire_percent >= 100 ? "complete" : "partial",
     fileStatus: applicant.media_percent >= 100 ? "complete" : "partial",
@@ -1276,6 +1527,35 @@ function fallbackSubmissionFromRows(
     updatedAt: row.updated_at,
     history: [],
   });
+}
+
+function attachCorruptCockpitSnapshotIssue(
+  submission: Submission,
+  row: SubmissionRow,
+): Submission {
+  const applicant = submission.applicants[0];
+  return {
+    ...submission,
+    issues: [
+      ...submission.issues,
+      {
+        comment:
+          "Канонические таблицы загружены, но расширенный cockpit snapshot изолирован до восстановления.",
+        createdAt: row.updated_at,
+        createdBy: "system",
+        id: `system-corrupt-cockpit-snapshot-${row.id}`,
+        reason: "Повреждённый cockpit snapshot: требуется восстановление данных",
+        severity: "blocker",
+        status: "open",
+        target: {
+          applicantId: applicant?.id ?? `submission-${row.id}`,
+          applicantName: applicant?.fullName ?? row.title,
+          section: "cockpit_snapshot",
+        },
+        type: "section",
+      },
+    ],
+  };
 }
 
 function questionnaireSectionsFromAnswerRows(
@@ -1413,36 +1693,74 @@ export async function loadCockpitSubmissionsForProfile(
   const client = getSupabaseClient();
   if (!client) {
     return {
+      caseRevisionsBySubmissionId: new Map(),
       ownerIdsBySubmissionId: new Map(),
+      quarantinedSubmissionIds: new Set(),
       submissions: [],
     };
   }
 
-  const runCurrentQuery = () => {
-    const query = client
-      .from("submissions")
-      .select(submissionSelect)
-      .order("updated_at", { ascending: false })
-      .limit(submissionListLimit);
-    return profile.role === "agent" ? query.eq("agent_id", profile.id) : query;
-  };
-  const runLegacyQuery = () => {
-    const query = client
-      .from("submissions")
-      .select(legacySubmissionSelect)
-      .order("updated_at", { ascending: false })
-      .limit(submissionListLimit);
-    return profile.role === "agent" ? query.eq("agent_id", profile.id) : query;
-  };
+  const runCurrentQuery = () =>
+    collectIdKeysetPagedRows<SubmissionRow>(async (afterId, limit) => {
+      let query = client
+        .from("submissions")
+        .select(submissionSelect)
+        .order("id", { ascending: true })
+        .limit(limit);
+      if (profile.role === "agent") query = query.eq("agent_id", profile.id);
+      if (afterId) query = query.gt("id", afterId);
+      const { data, error } = await query;
+      return { data: (data ?? []) as SubmissionRow[], error };
+    }, submissionPageSize);
+  const runPreConcurrencyQuery = () =>
+    collectIdKeysetPagedRows<SubmissionRow>(async (afterId, limit) => {
+      let query = client
+        .from("submissions")
+        .select(preConcurrencySubmissionSelect)
+        .order("id", { ascending: true })
+        .limit(limit);
+      if (profile.role === "agent") query = query.eq("agent_id", profile.id);
+      if (afterId) query = query.gt("id", afterId);
+      const { data, error } = await query;
+      return {
+        data: (data ?? []).map((row) => ({
+          ...row,
+          case_revision: null,
+        })) as SubmissionRow[],
+        error,
+      };
+    }, submissionPageSize);
+  const runLegacyQuery = () =>
+    collectIdKeysetPagedRows<SubmissionRow>(async (afterId, limit) => {
+      let query = client
+        .from("submissions")
+        .select(legacySubmissionSelect)
+        .order("id", { ascending: true })
+        .limit(limit);
+      if (profile.role === "agent") query = query.eq("agent_id", profile.id);
+      if (afterId) query = query.gt("id", afterId);
+      const { data, error } = await query;
+      return {
+        data: (data ?? []).map((row) => ({
+          ...row,
+          case_revision: null,
+          public_number: null,
+        })) as SubmissionRow[],
+        error,
+      };
+    }, submissionPageSize);
   let { data: rows, error } = await runCurrentQuery();
+
+  if (isMissingCaseRevisionColumn(error)) {
+    const preConcurrencyResult = await runPreConcurrencyQuery();
+    error = preConcurrencyResult.error;
+    rows = preConcurrencyResult.data;
+  }
 
   if (isMissingPublicNumberColumn(error)) {
     const legacyResult = await runLegacyQuery();
     error = legacyResult.error;
-    rows = (legacyResult.data ?? []).map((row) => ({
-      ...row,
-      public_number: null,
-    })) as typeof rows;
+    rows = legacyResult.data;
   }
 
   if (error) {
@@ -1452,9 +1770,11 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
-  if (!rows?.length) {
+  if (!rows.length) {
     return {
+      caseRevisionsBySubmissionId: new Map(),
       ownerIdsBySubmissionId: new Map(),
+      quarantinedSubmissionIds: new Set(),
       submissions: [],
     };
   }
@@ -1462,39 +1782,109 @@ export async function loadCockpitSubmissionsForProfile(
   const submissionIds = rows.map((row) => row.id);
   const agentIds = [...new Set(rows.map((row) => row.agent_id))];
   const [
-    { data: applicantRows, error: applicantError },
-    { data: questionnaireRows, error: questionnaireError },
-    { data: mediaRows, error: mediaError },
-    { data: statusHistoryRows, error: statusHistoryError },
+    applicantResult,
+    questionnaireResult,
+    mediaResult,
+    correctionResult,
+    statusHistoryResult,
     exportBatchRows,
     agentProfilesResult,
   ] = await Promise.all([
-    client
-      .from("applicants")
-      .select(applicantSelect)
-      .in("submission_id", submissionIds),
-    client
-      .from("questionnaire_answers")
-      .select(questionnaireAnswerSelect)
-      .in("submission_id", submissionIds),
-    client
-      .from("media_assets")
-      .select(mediaAssetSelect)
-      .in("submission_id", submissionIds),
-    client
-      .from("status_history")
-      .select(statusHistorySelect)
-      .in("entity_id", submissionIds),
+    collectRowsForSubmissionIds<CockpitApplicantRow>(
+      submissionIds,
+      async (submissionIdChunk, from, to) => {
+        const { data, error } = await client
+          .from("applicants")
+          .select(applicantSelect)
+          .in("submission_id", submissionIdChunk)
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: (data ?? []) as CockpitApplicantRow[], error };
+      },
+    ),
+    collectRowsForSubmissionIds<CockpitQuestionnaireAnswerRow>(
+      submissionIds,
+      async (submissionIdChunk, from, to) => {
+        const { data, error } = await client
+          .from("questionnaire_answers")
+          .select(questionnaireAnswerSelect)
+          .in("submission_id", submissionIdChunk)
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: (data ?? []) as CockpitQuestionnaireAnswerRow[], error };
+      },
+    ),
+    collectRowsForSubmissionIds<CockpitMediaAssetRow>(
+      submissionIds,
+      async (submissionIdChunk, from, to) => {
+        const { data, error } = await client
+          .from("media_assets")
+          .select(mediaAssetSelect)
+          .in("submission_id", submissionIdChunk)
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: (data ?? []) as CockpitMediaAssetRow[], error };
+      },
+    ),
+    collectRowsForSubmissionIds<CockpitCorrectionRow>(
+      submissionIds,
+      async (submissionIdChunk, from, to) => {
+        const { data, error } = await client
+          .from("corrections")
+          .select(correctionSelect)
+          .in("submission_id", submissionIdChunk)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: (data ?? []) as CockpitCorrectionRow[], error };
+      },
+    ),
+    collectRowsForSubmissionIds<CockpitStatusHistoryRow>(
+      submissionIds,
+      async (submissionIdChunk, from, to) => {
+        const { data, error } = await client
+          .from("status_history")
+          .select(statusHistorySelect)
+          .eq("entity_type", "submission")
+          .in("entity_id", submissionIdChunk)
+          .order("changed_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: (data ?? []) as CockpitStatusHistoryRow[], error };
+      },
+    ),
     profile.role === "admin"
       ? loadExportBatchRowsForSubmissions(submissionIds)
       : Promise.resolve([]),
     profile.role === "admin"
-      ? client.from("profiles").select(agentProfileSelect).in("id", agentIds)
+      ? collectRowsForSubmissionIds<{ id: string; display_name: string }>(
+          agentIds,
+          async (agentIdChunk, from, to) => {
+            const { data, error } = await client
+              .from("profiles")
+              .select(agentProfileSelect)
+              .in("id", agentIdChunk)
+              .order("id", { ascending: true })
+              .range(from, to);
+            return {
+              data: (data ?? []) as { id: string; display_name: string }[],
+              error,
+            };
+          },
+        )
       : Promise.resolve({
           data: [{ id: profile.id, display_name: profile.displayName }],
           error: null,
         }),
   ]);
+
+  const { data: applicantRows, error: applicantError } = applicantResult;
+  const { data: questionnaireRows, error: questionnaireError } =
+    questionnaireResult;
+  const { data: mediaRows, error: mediaError } = mediaResult;
+  const { data: correctionRows, error: correctionError } = correctionResult;
+  const { data: statusHistoryRows, error: statusHistoryError } =
+    statusHistoryResult;
 
   if (applicantError) {
     throw mapSupabasePersistenceError(applicantError, {
@@ -1517,9 +1907,23 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
+  if (correctionError) {
+    throw mapSupabasePersistenceError(correctionError, {
+      operation: "corrections.list",
+      fallbackKind: "database",
+    });
+  }
+
   if (statusHistoryError) {
     throw mapSupabasePersistenceError(statusHistoryError, {
       operation: "status_history.list",
+      fallbackKind: "database",
+    });
+  }
+
+  if (agentProfilesResult.error) {
+    throw mapSupabasePersistenceError(agentProfilesResult.error, {
+      operation: "profiles.agent-list",
       fallbackKind: "database",
     });
   }
@@ -1530,8 +1934,17 @@ export async function loadCockpitSubmissionsForProfile(
       agentProfile.display_name.trim(),
     ]),
   );
+  const caseRevisionsBySubmissionId = new Map<string, number>();
   const ownerIdsBySubmissionId = new Map<string, string>();
+  const quarantinedSubmissionIds = new Set<string>();
   const submissions = rows.map((row) => {
+    if (
+      typeof row.case_revision === "number" &&
+      Number.isSafeInteger(row.case_revision) &&
+      row.case_revision >= 0
+    ) {
+      caseRevisionsBySubmissionId.set(row.id, row.case_revision);
+    }
     ownerIdsBySubmissionId.set(row.id, row.agent_id);
     const submissionApplicants = (applicantRows ?? []).filter(
       (applicant) => applicant.submission_id === row.id,
@@ -1545,49 +1958,77 @@ export async function loadCockpitSubmissionsForProfile(
     const submissionMediaRows = (mediaRows ?? []).filter(
       (media) => media.submission_id === row.id,
     );
+    const submissionCorrectionRows = (correctionRows ?? []).filter(
+      (correction) => correction.submission_id === row.id,
+    );
     const submissionStatusHistoryRows = (statusHistoryRows ?? []).filter(
       (history) => history.entity_type === "submission" && history.entity_id === row.id,
     );
-    const snapshot = readCockpitSnapshot(row.family_intelligence);
-    const submission = snapshot
-      ? attachDurableStatusHistoryRows(
-        attachDurableMediaAssetRows(
-          reconcileCockpitSnapshotWithSubmissionRow(
+    const snapshotResult = cockpitSnapshotReadResult(row.family_intelligence);
+    if (snapshotResult.kind === "corrupt") {
+      quarantinedSubmissionIds.add(row.id);
+    }
+    const snapshotOrFallback =
+      snapshotResult.kind === "valid"
+        ? reconcileCockpitSnapshotWithSubmissionRow(
             row,
-            snapshot,
+            snapshotResult.submission,
             submissionApplicants,
             submissionQuestionnaireAnswers,
             submissionExportBatches,
-          ),
-          submissionMediaRows,
-        ),
-        submissionStatusHistoryRows,
-      )
-      : attachDurableStatusHistoryRows(
-          attachDurableMediaAssetRows(
-            attachExportPackageRow(
-              fallbackSubmissionFromRows(
-                row,
-                submissionApplicants,
-                submissionQuestionnaireAnswers,
-                latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
-              ),
-              fromSupabaseSubmissionRowStatus(row),
-              submissionExportBatches,
-            ),
-            submissionMediaRows,
-          ),
-          submissionStatusHistoryRows,
-        );
+          )
+        : attachExportPackageRow(
+            snapshotResult.kind === "corrupt"
+              ? attachCorruptCockpitSnapshotIssue(
+                  fallbackSubmissionFromRows(
+                    row,
+                    submissionApplicants,
+                    submissionQuestionnaireAnswers,
+                    latestSubmissionStatusFromHistoryRows(
+                      submissionStatusHistoryRows,
+                    ),
+                  ),
+                  row,
+                )
+              : fallbackSubmissionFromRows(
+                  row,
+                  submissionApplicants,
+                  submissionQuestionnaireAnswers,
+                  latestSubmissionStatusFromHistoryRows(
+                    submissionStatusHistoryRows,
+                  ),
+                ),
+            fromSupabaseSubmissionRowStatus(row),
+            submissionExportBatches,
+          );
+    const submission = attachDurableStatusHistoryRows(
+      attachDurableCorrectionRows(
+        attachDurableMediaAssetRows(snapshotOrFallback, submissionMediaRows),
+        submissionCorrectionRows,
+      ),
+      submissionStatusHistoryRows,
+    );
 
     const agentDisplayName = agentDisplayNamesById.get(row.agent_id);
     return agentDisplayName ? { ...submission, agentDisplayName } : submission;
   });
 
   return {
+    caseRevisionsBySubmissionId,
     ownerIdsBySubmissionId,
+    quarantinedSubmissionIds,
     submissions,
   };
+}
+
+function isMissingCaseRevisionColumn(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown; message?: unknown };
+  return (
+    record.code === "42703" &&
+    typeof record.message === "string" &&
+    record.message.includes("case_revision")
+  );
 }
 
 function isMissingPublicNumberColumn(error: unknown): boolean {
@@ -1607,19 +2048,176 @@ async function loadExportBatchRowsForSubmissions(
   const client = getSupabaseClient();
   if (!client) return [];
 
-  const { data, error } = await client
-    .from("export_batches")
-    .select(exportBatchSelect)
-    .overlaps("submission_ids", submissionIds);
+  const result = await collectRowsForSubmissionIds<CockpitExportBatchRow>(
+    submissionIds,
+    async (submissionIdChunk, from, to) => {
+      const { data, error } = await client
+        .from("export_batches")
+        .select(exportBatchSelect)
+        .overlaps("submission_ids", submissionIdChunk)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+      return { data: (data ?? []) as CockpitExportBatchRow[], error };
+    },
+  );
 
-  if (error) {
-    throw mapSupabasePersistenceError(error, {
+  if (result.error) {
+    throw mapSupabasePersistenceError(result.error, {
       operation: "export_batches.list",
       fallbackKind: "database",
     });
   }
 
-  return data ?? [];
+  return [...new Map(result.data.map((row) => [row.id, row])).values()];
+}
+
+function adminCaseRevisionsFromRpc(
+  value: unknown,
+  submissionIds: readonly string[],
+  operationId: string,
+): Map<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Supabase вернул некорректный результат admin concurrency RPC.");
+  }
+  const record = value as Record<string, unknown>;
+  if (record.operationId !== operationId) {
+    throw new Error("Supabase вернул результат другой admin mutation operation.");
+  }
+  if (
+    !record.caseRevisions ||
+    typeof record.caseRevisions !== "object" ||
+    Array.isArray(record.caseRevisions)
+  ) {
+    throw new Error("Supabase не вернул новые revision для admin mutation.");
+  }
+
+  const revisionRecord = record.caseRevisions as Record<string, unknown>;
+  const revisions = new Map<string, number>();
+  for (const submissionId of submissionIds) {
+    const revision = revisionRecord[submissionId];
+    if (
+      typeof revision !== "number" ||
+      !Number.isSafeInteger(revision) ||
+      revision < 0
+    ) {
+      throw new Error(
+        `Supabase вернул некорректную revision для подачи ${submissionId}.`,
+      );
+    }
+    revisions.set(submissionId, revision);
+  }
+  return revisions;
+}
+
+export function isAdminSubmissionConcurrencyConflict(error: unknown): boolean {
+  return (
+    error instanceof PersistenceObservableError &&
+    error.diagnostics.operation ===
+      "rpc.save_admin_submission_batch_if_current" &&
+    error.diagnostics.supabaseCode === "40001"
+  );
+}
+
+export async function saveAdminCockpitSubmissionsIfCurrent(
+  profile: AppProfile,
+  submissions: Submission[],
+  ownerIdsBySubmissionId: ReadonlyMap<string, string>,
+  caseRevisionsBySubmissionId: ReadonlyMap<string, number>,
+): Promise<AdminCockpitSaveResult> {
+  if (profile.role !== "admin") {
+    throw new Error("Only administrators can use the admin concurrency writer.");
+  }
+  if (!submissions.length) {
+    throw new Error("Admin concurrency writer requires at least one submission.");
+  }
+
+  const uniqueIds = new Set(submissions.map((submission) => submission.id));
+  if (uniqueIds.size !== submissions.length) {
+    throw new Error("Admin concurrency writer received duplicate submission ids.");
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase admin concurrency writer is unavailable.");
+  }
+
+  const nextOwnerIds = new Map(ownerIdsBySubmissionId);
+  const nextCaseRevisions = new Map(caseRevisionsBySubmissionId);
+  const expectedRevisions: Record<string, number> = {};
+  const payloads = submissions.map((submission) => {
+    assertReviewHandoffPersistenceConsistency(submission, profile.role);
+    const ownerId =
+      nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id;
+    const expectedRevision = caseRevisionsBySubmissionId.get(submission.id);
+    if (expectedRevision === undefined) {
+      throw new Error(
+        `Подача ${submission.id} не имеет server revision. Обновите данные после применения migration.`,
+      );
+    }
+    expectedRevisions[submission.id] = expectedRevision;
+    nextOwnerIds.set(submission.id, ownerId);
+    return toCockpitDraftPersistencePayload(
+      submission,
+      profile.id,
+      ownerId,
+      profile.role,
+    );
+  });
+  const operationId = crypto.randomUUID();
+
+  const invoke = async (): Promise<{ data: unknown; error: unknown | null }> => {
+    try {
+      const response = await client.rpc("save_admin_submission_batch_if_current", {
+        actor_id: profile.id,
+        expected_revisions: expectedRevisions,
+        operation_id: operationId,
+        payloads,
+      });
+      return { data: response.data, error: response.error };
+    } catch (error) {
+      return { data: null, error };
+    }
+  };
+
+  let result = await invoke();
+  if (result.error) {
+    let failure = mapSupabasePersistenceError(result.error, {
+      operation: "rpc.save_admin_submission_batch_if_current",
+      fallbackKind: "save",
+    });
+    if (failure.diagnostics.retryable) {
+      result = await invoke();
+      if (result.error) {
+        failure = mapSupabasePersistenceError(result.error, {
+          operation: "rpc.save_admin_submission_batch_if_current",
+          fallbackKind: "save",
+        });
+      }
+    }
+    if (result.error) throw failure;
+  }
+  if (!result.data) {
+    throw mapSupabasePersistenceError(null, {
+      operation: "rpc.save_admin_submission_batch_if_current",
+      fallbackKind: "save",
+    });
+  }
+
+  const returnedRevisions = adminCaseRevisionsFromRpc(
+    result.data,
+    submissions.map((submission) => submission.id),
+    operationId,
+  );
+  for (const [submissionId, revision] of returnedRevisions) {
+    nextCaseRevisions.set(submissionId, revision);
+  }
+
+  return {
+    caseRevisionsBySubmissionId: nextCaseRevisions,
+    operationId,
+    ownerIdsBySubmissionId: nextOwnerIds,
+  };
 }
 
 export async function saveCockpitSubmissionsForProfile(
@@ -1627,6 +2225,11 @@ export async function saveCockpitSubmissionsForProfile(
   submissions: Submission[],
   ownerIdsBySubmissionId: ReadonlyMap<string, string>,
 ): Promise<Map<string, string>> {
+  if (profile.role === "admin") {
+    throw new Error(
+      "Administrators must use the revision-checked admin concurrency writer.",
+    );
+  }
   const client = getSupabaseClient();
   if (!client) return new Map(ownerIdsBySubmissionId);
 
@@ -1635,10 +2238,7 @@ export async function saveCockpitSubmissionsForProfile(
   for (const submission of submissions) {
     assertReviewHandoffPersistenceConsistency(submission, profile.role);
 
-    const ownerId =
-      profile.role === "admin"
-        ? (nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id)
-        : profile.id;
+    const ownerId = profile.id;
     const payload = toCockpitDraftPersistencePayload(
       submission,
       profile.id,

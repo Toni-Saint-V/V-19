@@ -139,6 +139,7 @@ export default defineConfig({
     video: "off",
   },
   webServer: {
+    cwd: "../..",
     command: productionServerCommand(),
     env: loadProductionEnv(),
     reuseExistingServer: false,

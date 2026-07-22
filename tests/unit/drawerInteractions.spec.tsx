@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { Drawer } from "../../src/components/Drawer";
+import { auditAgentInteractionControls } from "../../src/modules/submissions/agentInteractionContract";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
   createDraftSubmission,
@@ -136,11 +137,7 @@ describe("Drawer interactions", () => {
   test("renders the canonical label and original semantic tone for every lifecycle status", () => {
     const expectations = [
       { label: "Черновик", status: "draft", toneClassName: "text-white/70" },
-      {
-        label: "В работе",
-        status: "in_progress",
-        toneClassName: "text-blue-400",
-      },
+      { label: "В работе", status: "in_progress", toneClassName: "text-blue-400" },
       {
         label: "Действие",
         status: "requires_action",
@@ -151,11 +148,7 @@ describe("Drawer interactions", () => {
         status: "submitted_for_review",
         toneClassName: "text-[#8fa3ff]",
       },
-      {
-        label: "Возвращено",
-        status: "returned",
-        toneClassName: "text-orange-400",
-      },
+      { label: "Возвращено", status: "returned", toneClassName: "text-orange-400" },
       {
         label: "Исправления получены",
         status: "corrections_received",
@@ -190,12 +183,10 @@ describe("Drawer interactions", () => {
   });
 
   test("keeps the visible identity above the tabs and switches every tab", async () => {
-    renderDrawer();
+    const { container } = renderDrawer();
 
     const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
-    const lifecycleContext = within(dialog).getByTestId(
-      "drawer-lifecycle-context",
-    );
+    const lifecycleContext = within(dialog).getByTestId("drawer-lifecycle-context");
     const lifecycleHeader = lifecycleContext.closest("header");
     if (!lifecycleHeader) throw new Error("Expected lifecycle header.");
     expect(within(lifecycleContext).getByText("VF-1048")).toBeInTheDocument();
@@ -204,16 +195,14 @@ describe("Drawer interactions", () => {
       within(dialog).getByRole("button", { name: "Отправить исправления" }),
     ).toBeInTheDocument();
     expect(within(dialog).getByText("Мария Иванова")).toBeInTheDocument();
-    expect(
-      within(dialog).queryByText("Семья Петровых"),
-    ).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Семья Петровых")).not.toBeInTheDocument();
+    expect(auditAgentInteractionControls(container)).toEqual([]);
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Анкета" }));
     await waitFor(() =>
-      expect(
-        within(dialog).getByText("Прогресс заполнения"),
-      ).toBeInTheDocument(),
+      expect(within(dialog).getByText("Прогресс заполнения")).toBeInTheDocument(),
     );
+    expect(auditAgentInteractionControls(container)).toEqual([]);
 
     fireEvent.click(within(dialog).getByRole("tab", { name: /Замечания/ }));
     await waitFor(() =>
@@ -221,6 +210,7 @@ describe("Drawer interactions", () => {
         within(dialog).getByText("Лицо обрезано. Загрузите селфи 1."),
       ).toBeInTheDocument(),
     );
+    expect(auditAgentInteractionControls(container)).toEqual([]);
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "История" }));
     await waitFor(() =>
@@ -228,13 +218,13 @@ describe("Drawer interactions", () => {
         within(dialog).getByText("Подача возвращена: 2 замечания"),
       ).toBeInTheDocument(),
     );
+    expect(auditAgentInteractionControls(container)).toEqual([]);
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Обзор" }));
     await waitFor(() =>
-      expect(
-        within(dialog).getByText("Чеклист документов"),
-      ).toBeInTheDocument(),
+      expect(within(dialog).getByText("Чеклист документов")).toBeInTheDocument(),
     );
+    expect(auditAgentInteractionControls(container)).toEqual([]);
   });
 
   test("routes questionnaire and issue clicks to their exact targets", async () => {
@@ -243,14 +233,10 @@ describe("Drawer interactions", () => {
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Анкета" }));
     await waitFor(() => within(dialog).getByText("Прогресс заполнения"));
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Открыть анкету" }),
-    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Открыть анкету" }));
     expect(onOpenQuestionnaire).toHaveBeenCalledWith();
 
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: /Личные данные/ }),
-    );
+    fireEvent.click(within(dialog).getByRole("button", { name: /Личные данные/ }));
     expect(onOpenQuestionnaire).toHaveBeenLastCalledWith(
       expect.objectContaining({ applicantId: "з-1048-1" }),
     );
@@ -266,9 +252,7 @@ describe("Drawer interactions", () => {
       }),
       {
         target: {
-          files: [
-            new File(["replacement"], "selfie.png", { type: "image/png" }),
-          ],
+          files: [new File(["replacement"], "selfie.png", { type: "image/png" })],
         },
       },
     );
@@ -286,30 +270,21 @@ describe("Drawer interactions", () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
     renderDrawer({ onAction, submission: readySubmission() });
 
-    const submit = screen.getByRole("button", {
-      name: "Отправить на проверку",
-    });
+    const submit = screen.getByRole("button", { name: "Отправить на проверку" });
     expect(submit).toBeEnabled();
     fireEvent.click(submit);
-    await waitFor(() =>
-      expect(onAction).toHaveBeenCalledWith("submit_for_review"),
-    );
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith("submit_for_review"));
 
     cleanup();
     renderDrawer({ submission: returnedSubmission() });
     const disabledAction = screen.getByRole("button", {
       name: "Отправить исправления",
     });
-    const disabledReason = screen.getByText(
-      "Сначала отметьте замечания исправленными",
-    );
+    const disabledReason = screen.getByText("Сначала отметьте замечания исправленными");
     expect(disabledAction).toBeDisabled();
     expect(disabledReason).not.toHaveClass("hidden");
     expect(disabledReason).toHaveAttribute("role", "status");
-    expect(disabledAction).toHaveAttribute(
-      "aria-describedby",
-      disabledReason.id,
-    );
+    expect(disabledAction).toHaveAttribute("aria-describedby", disabledReason.id);
   });
 
   test("keeps rejected primary-action feedback visible and associated with the CTA", async () => {
@@ -344,9 +319,7 @@ describe("Drawer interactions", () => {
       onOpenWorkspaceTarget: vi.fn(),
       onUploadApplicantFile,
     };
-    const { rerender } = render(
-      <Drawer {...drawerProps} submission={submissionA} />,
-    );
+    const { rerender } = render(<Drawer {...drawerProps} submission={submissionA} />);
 
     fireEvent.change(
       screen.getByLabelText("Выбрать файл: Мария Иванова • Селфи 1", {
@@ -407,12 +380,10 @@ describe("Drawer interactions", () => {
     };
     renderDrawer({ activeTab: "issues", submission });
 
-    expect(
-      await screen.findByTestId("drawer-open-issues-count"),
-    ).toHaveTextContent("Требуют исправления: 1");
-    expect(
-      screen.getByRole("tab", { name: /Замечания\s*2/ }),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("drawer-open-issues-count")).toHaveTextContent(
+      "Требуют исправления: 1",
+    );
+    expect(screen.getByRole("tab", { name: /Замечания\s*2/ })).toBeInTheDocument();
   });
 
   test("keeps submission B pending when submission A settles after the drawer switches", async () => {
@@ -432,13 +403,9 @@ describe("Drawer interactions", () => {
       onOpenQuestionnaire: vi.fn(),
       onOpenWorkspaceTarget: vi.fn(),
     };
-    const { rerender } = render(
-      <Drawer {...drawerProps} submission={submissionA} />,
-    );
+    const { rerender } = render(<Drawer {...drawerProps} submission={submissionA} />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Отправить на проверку" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Отправить на проверку" }));
     await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
 
     rerender(<Drawer {...drawerProps} submission={submissionB} />);
@@ -502,9 +469,7 @@ describe("Drawer interactions", () => {
     await waitFor(() => expect(onClearFocusTarget).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Закрыть подачу" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Отменить и закрыть подачу" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Отменить и закрыть подачу" }));
     fireEvent.keyDown(window, { key: "Escape" });
     const overlay = container.querySelector<HTMLElement>(
       '[aria-hidden="true"].fixed.inset-0',

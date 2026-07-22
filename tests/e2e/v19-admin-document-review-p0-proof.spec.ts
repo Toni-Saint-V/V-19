@@ -2,8 +2,6 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
 
-const submissionId = "ПД-1053";
-
 async function expectNoHorizontalOverflow(page: Page) {
   const dimensions = await page.evaluate(() => {
     const browserGlobal = globalThis as unknown as {
@@ -44,7 +42,7 @@ async function isFullyWithinViewport(locator: Locator) {
 }
 
 test.describe("V-19 P0 admin document review", () => {
-  test("mobile review opens Files and blocks the single section confirmation without protected originals", async ({
+  test("mobile review opens the protected-media workspace and blocks section confirmation without originals", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -55,39 +53,34 @@ test.describe("V-19 P0 admin document review", () => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 844, width: 390 });
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Очередь на проверку",
       workspaceEmail: "admin@visaflow.local",
     });
 
     const submission = page
-      .locator(`[data-submission-card][data-submission-id="${submissionId}"]`)
-      .or(page.locator(`[data-submission-id="${submissionId}"]`))
+      .getByRole("button", { name: "Ручная проверка заявки Нина Волкова" })
       .first();
     await expect(submission).toBeVisible();
     await submission.click();
 
-    const reviewDrawer = page.locator(
-      '[role="dialog"][data-admin-review-drawer-surface="workspace"]',
-    );
-    await expect(reviewDrawer).toBeVisible();
+    const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+    await expect(reviewWorkspace).toBeVisible();
+    await expect(
+      reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }),
+    ).toBeFocused();
 
-    const filesTab = reviewDrawer.getByRole("tab", { name: "Файлы", exact: true });
-    await filesTab.click();
-    await expect(filesTab).toHaveAttribute("aria-selected", "true");
-    await expect.poll(() => isFullyWithinViewport(filesTab)).toBe(true);
-
-    const passportRow = reviewDrawer
-      .locator(".v19-drawer-file-item")
-      .filter({ hasText: "Скан паспорта" })
-      .first();
-    const verifyPassport = passportRow.getByRole("button", {
-      name: "Проверить",
+    const passportTab = reviewWorkspace.getByRole("tab", {
+      name: "Паспорт",
       exact: true,
     });
-    await expect(verifyPassport).toBeVisible();
-    const fileActions = reviewDrawer.locator(".v19-drawer-file-item button");
-    expect(await fileActions.count()).toBeGreaterThan(0);
-    for (const action of await fileActions.all()) {
+    await expect(passportTab).toHaveAttribute("aria-selected", "true");
+    await expect.poll(() => isFullyWithinViewport(passportTab)).toBe(true);
+
+    const mediaActions = reviewWorkspace.getByRole("tablist", {
+      name: "Выбор файла для проверки",
+    });
+    await expect(mediaActions.getByRole("tab")).toHaveCount(3);
+    for (const action of await mediaActions.getByRole("tab").all()) {
       await action.scrollIntoViewIfNeeded();
       await expect.poll(() => isFullyWithinViewport(action)).toBe(true);
     }
@@ -97,31 +90,22 @@ test.describe("V-19 P0 admin document review", () => {
       path: testInfo.outputPath("mobile-390-files-entry.png"),
     });
 
-    await verifyPassport.click();
-    const passportWorkspace = page.locator(".v19-admin-passport-workspace");
-    await expect(passportWorkspace).toBeVisible();
-    const backToSubmission = passportWorkspace.getByRole("button", {
-      name: "Вернуться к подаче",
-    });
-    await expect(backToSubmission).toBeFocused();
+    await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
     await expect(
-      passportWorkspace.getByRole("heading", { name: /Паспортная секция/ }),
+      reviewWorkspace.getByText(
+        /Защищённый оригинал недоступен|Файл не загружен/,
+      ),
     ).toBeVisible();
     await expect(
-      passportWorkspace
-        .locator('[data-review-media="passport_scan"]')
-        .getByText(/Защищённый оригинал недоступен|Файл не загружен/),
-    ).toBeVisible();
-    await expect(
-      passportWorkspace.getByRole("img", { name: "Оригинал загранпаспорта" }),
+      reviewWorkspace.getByRole("img", { name: "Оригинал загранпаспорта" }),
     ).toHaveCount(0);
     await expect(
-      passportWorkspace.getByRole("button", {
+      reviewWorkspace.getByRole("button", {
         name: "Подтвердить паспортную секцию",
       }),
     ).toBeDisabled();
     await expect(
-      passportWorkspace.getByRole("button", { name: /^Подтвердить:/ }),
+      reviewWorkspace.getByRole("button", { name: /^Подтвердить:/ }),
     ).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await page.screenshot({
@@ -131,8 +115,8 @@ test.describe("V-19 P0 admin document review", () => {
     });
 
     await page.keyboard.press("Escape");
-    await expect(passportWorkspace).toBeHidden();
-    await expect(reviewDrawer).toBeVisible();
+    await expect(reviewWorkspace).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Очередь на проверку" })).toBeVisible();
 
     expect(browserProblems).toEqual([]);
   });
@@ -143,51 +127,38 @@ test.describe("V-19 P0 admin document review", () => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 900, width: 1440 });
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Очередь на проверку",
       workspaceEmail: "admin@visaflow.local",
     });
 
     const submission = page
-      .locator(`[data-submission-card][data-submission-id="${submissionId}"]`)
-      .or(page.locator(`[data-submission-id="${submissionId}"]`))
+      .getByRole("button", { name: "Ручная проверка заявки Нина Волкова" })
       .first();
     await expect(submission).toBeVisible();
     await submission.click();
 
-    const reviewDrawer = page.locator(
-      '[role="dialog"][data-admin-review-drawer-surface="workspace"]',
-    );
-    await expect(reviewDrawer).toBeVisible();
-    await reviewDrawer.getByRole("tab", { name: "Файлы", exact: true }).click();
-
-    const passportRow = reviewDrawer
-      .locator(".v19-drawer-file-item")
-      .filter({ hasText: "Скан паспорта" })
-      .first();
-    await passportRow.getByRole("button", { name: "Проверить", exact: true }).click();
-
-    const passportWorkspace = page.locator(".v19-admin-passport-workspace");
-    await expect(passportWorkspace).toBeVisible();
-    const backToSubmission = passportWorkspace.getByRole("button", {
-      name: "Вернуться к подаче",
+    const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+    await expect(reviewWorkspace).toBeVisible();
+    const backToQueue = reviewWorkspace.getByRole("button", {
+      name: "Вернуться к очереди",
     });
-    await expect(backToSubmission).toBeFocused();
+    await expect(backToQueue).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect
       .poll(() =>
-        passportWorkspace.evaluate((workspace) =>
+        reviewWorkspace.evaluate((workspace) =>
           workspace.contains(workspace.ownerDocument.activeElement),
         ),
       )
       .toBe(true);
-    await expect(passportWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
-    await expect(passportWorkspace.locator("[data-review-media]")).toHaveCount(3);
+    await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
+    await expect(reviewWorkspace.locator("[data-review-media]")).toHaveCount(3);
     await expect(
-      passportWorkspace.getByRole("button", {
+      reviewWorkspace.getByRole("button", {
         name: "Подтвердить паспортную секцию",
       }),
     ).toHaveCount(1);
-    await passportWorkspace
+    await reviewWorkspace
       .getByRole("button", { name: "Добавить замечание: Номер паспорта" })
       .click();
     const remarkDialog = page.getByRole("dialog", { name: "Добавить замечание" });
@@ -198,7 +169,7 @@ test.describe("V-19 P0 admin document review", () => {
       .poll(() =>
         page.evaluate(() => {
           const workspace = document.querySelector<HTMLElement>(
-            ".v19-admin-passport-workspace",
+            ".v19-review-workspace",
           );
           const backdrop = document.querySelector<HTMLElement>(
             ".v19-remark-form-backdrop",
@@ -224,7 +195,7 @@ test.describe("V-19 P0 admin document review", () => {
       .toBe(true);
     await page.keyboard.press("Escape");
     await expect(remarkDialog).toBeHidden();
-    await expect(passportWorkspace).toBeVisible();
+    await expect(reviewWorkspace).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await page.screenshot({
       animations: "disabled",

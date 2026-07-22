@@ -12,13 +12,25 @@ import { AdminWorkspace } from "../../src/components/AdminWorkspace";
 import { VisaflowBusinessBridgeProvider } from "../../src/integration/visaflowBusinessBridge";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionActions";
-import { saveCockpitSubmissionsForProfile } from "../../src/modules/submissions/supabasePersistence";
+import { saveAdminCockpitSubmissionsIfCurrent } from "../../src/modules/submissions/supabasePersistence";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { AppProfile } from "../../src/types/session";
 import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const persistenceRuntime = vi.hoisted(() => ({
-  rpc: vi.fn(async () => ({ error: null })),
+  rpc: vi.fn(async (_name: string, args: Record<string, unknown>) => {
+    const payloads = args.payloads as Array<{ submission: { id: string } }>;
+    return {
+      data: {
+        caseRevisions: Object.fromEntries(
+          payloads.map((payload) => [payload.submission.id, 1]),
+        ),
+        operationId: args.operation_id,
+        results: [],
+      },
+      error: null,
+    };
+  }),
 }));
 
 vi.mock("../../src/lib/supabase/client", () => ({
@@ -350,10 +362,11 @@ describe("AdminWorkspace production navigation", () => {
     const onAdminIssueAdd = vi.fn(
       async ({ input }: { input: Parameters<typeof addPreciseAdminIssue>[1] }) => {
         submission = addPreciseAdminIssue(submission, input, adminProfile.id);
-        await saveCockpitSubmissionsForProfile(
+        await saveAdminCockpitSubmissionsIfCurrent(
           adminProfile,
           [submission],
           new Map([[submission.id, submission.agentId]]),
+          new Map([[submission.id, 0]]),
         );
       },
     );
@@ -387,8 +400,8 @@ describe("AdminWorkspace production navigation", () => {
     await waitFor(() => expect(persistenceRuntime.rpc).toHaveBeenCalledTimes(1));
     expect(onAdminIssueAdd).toHaveBeenCalledTimes(1);
     expect(persistenceRuntime.rpc).toHaveBeenCalledWith(
-      "save_submission_draft",
-      expect.objectContaining({ payload: expect.any(Object) }),
+      "save_admin_submission_batch_if_current",
+      expect.objectContaining({ payloads: expect.any(Array) }),
     );
     expect(submission.issues).toHaveLength(1);
     expect(submission.issues[0]).toMatchObject({

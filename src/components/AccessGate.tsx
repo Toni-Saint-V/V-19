@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
 import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import type { AccessRequestRegistrationInput, Session } from '../shared/authContract';
+import {
+  agentInteractionProps,
+  type AgentInteractionId,
+} from '../modules/submissions/agentInteractionContract';
 
 type AccessGateMode = 'invite' | 'login' | 'register' | 'reset' | 'pending' | 'recovery';
 
@@ -96,12 +100,20 @@ const registrationFields: RegistrationTextField[] = [
 
 function storedWorkspaceEmail() {
   if (typeof window === 'undefined') return '';
-  return window.localStorage.getItem(workspaceEmailStorageKey) ?? '';
+  try {
+    return window.localStorage.getItem(workspaceEmailStorageKey) ?? '';
+  } catch {
+    return '';
+  }
 }
 
 function rememberWorkspaceEmail(email: string) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(workspaceEmailStorageKey, email.trim().toLowerCase());
+  try {
+    window.localStorage.setItem(workspaceEmailStorageKey, email.trim().toLowerCase());
+  } catch {
+    // Remembering an email is a convenience and must never block authentication.
+  }
 }
 
 function validEmail(email: string) {
@@ -111,12 +123,19 @@ function validEmail(email: string) {
 function PrimaryButton({
   busy,
   children,
+  interactionId,
 }: {
   busy?: boolean;
   children: ReactNode;
+  interactionId: AgentInteractionId;
 }) {
   return (
-    <button className="primary-button access-submit" disabled={busy} type="submit">
+    <button
+      {...agentInteractionProps(interactionId)}
+      className="primary-button access-submit"
+      disabled={busy}
+      type="submit"
+    >
       {children}
     </button>
   );
@@ -175,6 +194,7 @@ export function AccessGate({
   const [invitePasswordConfirmation, setInvitePasswordConfirmation] = useState('');
   const [invitePasswordVisible, setInvitePasswordVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionPendingRef = useRef(false);
   const [localError, setLocalError] = useState('');
   const [success, setSuccess] = useState('');
   const [attempted, setAttempted] = useState(false);
@@ -245,6 +265,18 @@ export function AccessGate({
     setSuccess('');
   }
 
+  function startAction() {
+    if (actionPendingRef.current) return false;
+    actionPendingRef.current = true;
+    setBusy(true);
+    return true;
+  }
+
+  function finishAction() {
+    actionPendingRef.current = false;
+    setBusy(false);
+  }
+
   function returnToLogin() {
     clearMessages();
     setMode('login');
@@ -262,14 +294,14 @@ export function AccessGate({
       return;
     }
 
-    setBusy(true);
+    if (!startAction()) return;
     try {
       rememberWorkspaceEmail(email);
       await onLogin(email, password);
     } catch (caught) {
       setLocalError(caught instanceof Error ? caught.message : 'Не удалось войти.');
     } finally {
-      setBusy(false);
+      finishAction();
     }
   }
 
@@ -287,14 +319,14 @@ export function AccessGate({
       validEmail(registration.email);
     if (!complete) return;
 
-    setBusy(true);
+    if (!startAction()) return;
     try {
       rememberWorkspaceEmail(registration.email);
       await onRegister(registration);
     } catch (caught) {
       setLocalError(caught instanceof Error ? caught.message : 'Не удалось отправить заявку.');
     } finally {
-      setBusy(false);
+      finishAction();
     }
   }
 
@@ -306,14 +338,14 @@ export function AccessGate({
       return;
     }
 
-    setBusy(true);
+    if (!startAction()) return;
     try {
       rememberWorkspaceEmail(resetEmail);
       setSuccess(await onResetPassword(resetEmail));
     } catch (caught) {
       setLocalError(caught instanceof Error ? caught.message : 'Не удалось восстановить доступ.');
     } finally {
-      setBusy(false);
+      finishAction();
     }
   }
 
@@ -329,7 +361,7 @@ export function AccessGate({
       return;
     }
 
-    setBusy(true);
+    if (!startAction()) return;
     try {
       const setupEmail = mode === 'recovery' ? recoverySetupEmail : inviteSetupEmail;
       const completePassword =
@@ -347,7 +379,7 @@ export function AccessGate({
         caught instanceof Error ? caught.message : 'Не удалось сохранить пароль.',
       );
     } finally {
-      setBusy(false);
+      finishAction();
     }
   }
 
@@ -362,6 +394,7 @@ export function AccessGate({
   function renderPasswordToggle(visible: boolean, setVisible: (value: boolean) => void) {
     return (
       <button
+        {...agentInteractionProps('access.toggle-password')}
         className="access-password-toggle"
         type="button"
         aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
@@ -400,6 +433,7 @@ export function AccessGate({
             </label>
             <div className="access-password-control">
               <input
+                {...agentInteractionProps('access.edit-field')}
                 autoComplete="new-password"
                 id="workspace-invite-password"
                 minLength={12}
@@ -416,6 +450,7 @@ export function AccessGate({
               Повторите пароль
             </label>
             <input
+              {...agentInteractionProps('access.edit-field')}
               autoComplete="new-password"
               id="workspace-invite-password-confirmation"
               minLength={12}
@@ -430,7 +465,14 @@ export function AccessGate({
               {localError || error}
             </p>
           ) : null}
-          <PrimaryButton busy={busy}>
+          <PrimaryButton
+            busy={busy}
+            interactionId={
+              isRecovery
+                ? 'access.submit-recovery-password'
+                : 'access.submit-invite-password'
+            }
+          >
             {busy ? 'Сохраняем...' : 'Сохранить пароль'}
           </PrimaryButton>
         </form>
@@ -453,7 +495,27 @@ export function AccessGate({
         <p className="access-success" role="status">
           Статус: pending · роль agent
         </p>
-        <button className="primary-button access-submit" type="button" onClick={() => void onSignOut()}>
+        {localError || error ? (
+          <p className="access-error" role="alert">
+            {localError || error}
+          </p>
+        ) : null}
+        <button
+          {...agentInteractionProps('access.pending-sign-out')}
+          className="primary-button access-submit"
+          disabled={busy}
+          type="button"
+          onClick={() => {
+            if (!startAction()) return;
+            void onSignOut()
+              .catch((caught) => {
+                setLocalError(
+                  caught instanceof Error ? caught.message : 'Не удалось выйти.',
+                );
+              })
+              .finally(finishAction);
+          }}
+        >
           Выйти
         </button>
       </AccessShell>
@@ -479,6 +541,7 @@ export function AccessGate({
               Email
             </label>
             <input
+              {...agentInteractionProps('access.edit-field')}
               autoComplete="email"
               id="workspace-email"
               inputMode="email"
@@ -496,6 +559,7 @@ export function AccessGate({
             </label>
             <div className="access-password-control">
               <input
+                {...agentInteractionProps('access.edit-field')}
                 autoComplete="current-password"
                 id="workspace-password"
                 name="password"
@@ -518,17 +582,23 @@ export function AccessGate({
             </p>
           ) : null}
 
-          <PrimaryButton busy={busy}>
+          <PrimaryButton busy={busy} interactionId="access.submit-login">
             <span>{busy ? 'Входим...' : 'Войти в кабинет'}</span>
             <ArrowRight aria-hidden="true" size={17} strokeWidth={2} />
           </PrimaryButton>
         </form>
 
         <div className="access-secondary-actions">
-          <button className="access-secondary-link" type="button" onClick={openRegisterFromLogin}>
+          <button
+            {...agentInteractionProps('access.open-register')}
+            className="access-secondary-link"
+            type="button"
+            onClick={openRegisterFromLogin}
+          >
             Запросить доступ
           </button>
           <button
+            {...agentInteractionProps('access.open-reset')}
             className="access-secondary-link"
             type="button"
             onClick={() => {
@@ -547,7 +617,12 @@ export function AccessGate({
   if (mode === 'reset') {
     return (
       <AccessShell activeCopyId={activeCopyId} activeTitleId={activeTitleId}>
-        <button className="access-back-button" type="button" onClick={returnToLogin}>
+        <button
+          {...agentInteractionProps('access.back-to-login')}
+          className="access-back-button"
+          type="button"
+          onClick={returnToLogin}
+        >
           <ArrowLeft aria-hidden="true" />
           Вернуться ко входу
         </button>
@@ -567,6 +642,7 @@ export function AccessGate({
               Email
             </label>
             <input
+              {...agentInteractionProps('access.edit-field')}
               autoComplete="email"
               id="workspace-reset-email"
               inputMode="email"
@@ -579,7 +655,9 @@ export function AccessGate({
           </div>
           {localError ? <p className="access-error" role="alert">{localError}</p> : null}
           {success ? <p className="access-success" role="status">{success}</p> : null}
-          <PrimaryButton busy={busy}>{busy ? 'Отправляем...' : 'Отправить инструкции'}</PrimaryButton>
+          <PrimaryButton busy={busy} interactionId="access.submit-reset">
+            {busy ? 'Отправляем...' : 'Отправить инструкции'}
+          </PrimaryButton>
         </form>
       </AccessShell>
     );
@@ -587,7 +665,12 @@ export function AccessGate({
 
   return (
     <AccessShell activeCopyId={activeCopyId} activeTitleId={activeTitleId}>
-      <button className="access-back-button" type="button" onClick={returnToLogin}>
+      <button
+        {...agentInteractionProps('access.open-login')}
+        className="access-back-button"
+        type="button"
+        onClick={returnToLogin}
+      >
         <ArrowLeft aria-hidden="true" />
         Уже есть доступ? Войти
       </button>
@@ -611,6 +694,7 @@ export function AccessGate({
                 {field.label}
               </label>
               <input
+                {...agentInteractionProps('access.edit-field')}
                 aria-describedby={fieldError ? errorId : undefined}
                 aria-invalid={Boolean(fieldError)}
                 autoComplete={field.autoComplete}
@@ -642,6 +726,7 @@ export function AccessGate({
             </label>
             <div className="access-password-control">
               <input
+                {...agentInteractionProps('access.edit-field')}
                 aria-describedby={registerErrors.password ? 'workspace-register-password-error' : undefined}
                 aria-invalid={Boolean(registerErrors.password)}
                 autoComplete="new-password"
@@ -680,7 +765,9 @@ export function AccessGate({
           </p>
         ) : null}
 
-        <PrimaryButton busy={busy}>{busy ? 'Отправляем...' : 'Подать заявку на доступ'}</PrimaryButton>
+        <PrimaryButton busy={busy} interactionId="access.submit-registration">
+          {busy ? 'Отправляем...' : 'Подать заявку на доступ'}
+        </PrimaryButton>
       </form>
     </AccessShell>
   );

@@ -75,6 +75,7 @@ const scopedDiffPaths = [
   "config/playwright/playwright.supabase-production-export-a1-s1.config.ts",
   "config/playwright/playwright.supabase-production-export-a2-s1-abort.config.ts",
   "scripts/prepare-supabase-production-packet.mjs",
+  "scripts/verify-agent-interaction-evidence.mjs",
   "scripts/provision-supabase-pilot-cohort.mjs",
   "scripts/supabase-migration-contract.mjs",
   "scripts/verify-pilot-volume-envelope.mjs",
@@ -602,6 +603,41 @@ function verifyPackageScript() {
   } else {
     block("Package exposes verify:production-readiness", "missing npm script");
   }
+}
+
+function verifyAgentInteractionProductionEvidence() {
+  const verifierPath = resolve(repoRoot, "scripts/verify-agent-interaction-evidence.mjs");
+  let rawResult = "";
+  try {
+    rawResult = execFileSync(process.execPath, [verifierPath], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch (error) {
+    rawResult = typeof error?.stdout === "string" ? error.stdout : "";
+  }
+
+  let result;
+  try {
+    result = JSON.parse(rawResult.trim());
+  } catch {
+    activationBlock(
+      "Exact deployed agent interaction evidence passes",
+      "verifier did not return a valid result",
+    );
+    return;
+  }
+
+  if (result.status === "PASS" && Array.isArray(result.blockers) && !result.blockers.length) {
+    pass("Exact deployed agent interaction evidence passes");
+    return;
+  }
+
+  const detail = Array.isArray(result.blockers)
+    ? result.blockers.slice(0, 8).join("; ")
+    : "interaction evidence is incomplete";
+  activationBlock("Exact deployed agent interaction evidence passes", detail);
 }
 
 function verifyProductionMigrationEvidence(packet) {
@@ -2036,6 +2072,7 @@ if (rawReadiness) {
 verifyPackageScript();
 verifyMigrationOrder(readiness);
 verifyPacket(readiness, rawReadiness);
+verifyAgentInteractionProductionEvidence();
 
 for (const label of passes) console.log(`PASS ${label}`);
 

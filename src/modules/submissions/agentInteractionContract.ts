@@ -65,6 +65,14 @@ export type AgentInteractionNetworkWriteTarget =
   | "rpc:submit_corrections_handoff"
   | "storage:submission-media";
 
+export type AgentInteractionCanonicalValue = string | number | boolean | null;
+
+export type AgentInteractionCanonicalEffect = {
+  before: Readonly<Record<string, AgentInteractionCanonicalValue>>;
+  expectedAfter: Readonly<Record<string, AgentInteractionCanonicalValue>>;
+  primaryTarget: AgentInteractionMutationTarget;
+};
+
 export type AgentInteractionWriteScope = {
   allowedChangedTargets: readonly AgentInteractionMutationTarget[];
   allowedNetworkTargets: readonly AgentInteractionNetworkWriteTarget[];
@@ -86,7 +94,11 @@ type AgentInteractionContractBase = {
 
 export type AgentInteractionContract = AgentInteractionContractBase &
   (
-    | { kind: "mutation"; writeScope: AgentInteractionWriteScope }
+    | {
+        canonicalEffect: AgentInteractionCanonicalEffect;
+        kind: "mutation";
+        writeScope: AgentInteractionWriteScope;
+      }
     | {
         kind: Exclude<AgentInteractionKind, "mutation">;
         writeScope?: never;
@@ -111,6 +123,56 @@ const accessRegistrationWriteScope = mutationWriteScope({
   requiredChangedTargets: ["access_requests"],
   requiredNetworkTargets: ["edge:access-request"],
 });
+
+const accessRegistrationCanonicalEffect = {
+  before: { "access_requests.status": null },
+  expectedAfter: { "access_requests.status": "pending" },
+  primaryTarget: "access_requests",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const uploadCanonicalEffect = {
+  before: { "media_assets.upload_status": "none" },
+  expectedAfter: { "media_assets.upload_status": "uploaded" },
+  primaryTarget: "media_assets",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const createSubmissionCanonicalEffect = {
+  before: { "submissions.status": null },
+  expectedAfter: { "submissions.status": "draft" },
+  primaryTarget: "submissions",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const questionnaireUpdateCanonicalEffect = {
+  before: { "questionnaire_answers.value_sha256": null },
+  expectedAfter: {
+    "questionnaire_answers.value_sha256": "$marker-sha256",
+  },
+  primaryTarget: "questionnaire_answers",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const markIssueFixedCanonicalEffect = {
+  before: { "corrections.status": "open" },
+  expectedAfter: { "corrections.status": "fixed" },
+  primaryTarget: "corrections",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const saveProgressCanonicalEffect = {
+  before: { "submissions.case_revision": 0 },
+  expectedAfter: { "submissions.case_revision": 1 },
+  primaryTarget: "submissions",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const submitReviewCanonicalEffect = {
+  before: { "submissions.status": "$fixture-status" },
+  expectedAfter: { "submissions.status": "submitted_for_review" },
+  primaryTarget: "submissions",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const submitCorrectionsCanonicalEffect = {
+  before: { "submissions.status": "returned" },
+  expectedAfter: { "submissions.status": "corrections_received" },
+  primaryTarget: "submissions",
+} as const satisfies AgentInteractionCanonicalEffect;
 
 export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
   create_submission: mutationWriteScope({
@@ -316,6 +378,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     proof: ["network-readback", "session-transition", "reload-readback"],
   },
   "access.submit-registration": {
+    canonicalEffect: accessRegistrationCanonicalEffect,
     id: "access.submit-registration",
     kind: "mutation",
     surface: "access",
@@ -598,6 +661,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     proof: domProof,
   },
   "submissions.upload-file": {
+    canonicalEffect: uploadCanonicalEffect,
     id: "submissions.upload-file",
     kind: "mutation",
     surface: "agent-submissions",
@@ -609,6 +673,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.upload_required_file,
   },
   "submissions.submit-review": {
+    canonicalEffect: submitReviewCanonicalEffect,
     id: "submissions.submit-review",
     kind: "mutation",
     surface: "agent-submissions",
@@ -669,6 +734,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     proof: domProof,
   },
   "new-submission.save-draft": {
+    canonicalEffect: createSubmissionCanonicalEffect,
     id: "new-submission.save-draft",
     kind: "mutation",
     surface: "new-submission",
@@ -679,6 +745,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.create_submission,
   },
   "new-submission.continue": {
+    canonicalEffect: createSubmissionCanonicalEffect,
     id: "new-submission.continue",
     kind: "mutation",
     surface: "new-submission",
@@ -689,6 +756,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.create_submission,
   },
   "questionnaire.back": {
+    canonicalEffect: questionnaireUpdateCanonicalEffect,
     id: "questionnaire.back",
     kind: "mutation",
     surface: "questionnaire",
@@ -717,6 +785,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     proof: domProof,
   },
   "questionnaire.update-field": {
+    canonicalEffect: questionnaireUpdateCanonicalEffect,
     id: "questionnaire.update-field",
     kind: "mutation",
     surface: "questionnaire",
@@ -729,6 +798,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
       V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
   },
   "questionnaire.copy-family": {
+    canonicalEffect: questionnaireUpdateCanonicalEffect,
     id: "questionnaire.copy-family",
     kind: "mutation",
     surface: "questionnaire",
@@ -757,6 +827,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     proof: domProof,
   },
   "questionnaire.save-exit": {
+    canonicalEffect: questionnaireUpdateCanonicalEffect,
     id: "questionnaire.save-exit",
     kind: "mutation",
     surface: "questionnaire",
@@ -769,6 +840,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
       V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
   },
   "questionnaire.mark-fixed": {
+    canonicalEffect: markIssueFixedCanonicalEffect,
     id: "questionnaire.mark-fixed",
     kind: "mutation",
     surface: "questionnaire",
@@ -812,6 +884,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     proof: domProof,
   },
   "drawer.upload-file": {
+    canonicalEffect: uploadCanonicalEffect,
     id: "drawer.upload-file",
     kind: "mutation",
     surface: "submission-drawer",
@@ -823,6 +896,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.upload_required_file,
   },
   "drawer.save-progress": {
+    canonicalEffect: saveProgressCanonicalEffect,
     id: "drawer.save-progress",
     kind: "mutation",
     surface: "submission-drawer",
@@ -834,6 +908,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.save_progress,
   },
   "drawer.submit-review": {
+    canonicalEffect: submitReviewCanonicalEffect,
     id: "drawer.submit-review",
     kind: "mutation",
     surface: "submission-drawer",
@@ -845,6 +920,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.submit_for_review,
   },
   "drawer.submit-corrections": {
+    canonicalEffect: submitCorrectionsCanonicalEffect,
     disabledStatusFixtures: drawerCorrectionDisabledStatusFixtures,
     id: "drawer.submit-corrections",
     kind: "mutation",

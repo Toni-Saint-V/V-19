@@ -3,47 +3,46 @@ import {
   clearExportSelection,
   clickWorkspaceButton,
   collectBrowserProblems,
-  drawer,
   openFreshWorkspace,
   submissionCardById,
 } from "./v19-pilot-helpers";
 
 test.describe("V-19 release ops lists export flow", () => {
-  test("admin filters lists, opens owner-aware drawer, and forms city-scoped export packages", async ({
+  test("admin filters lists, opens owner-aware review workspace, and forms city-scoped export packages", async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "focused desktop proof");
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Очередь на проверку",
       workspaceEmail: "admin@visaflow.local",
     });
 
     await clickWorkspaceButton(page, /Проверка|Работа/);
     await expect(submissionCardById(page, "ПД-1053")).toBeVisible();
     await expect(submissionCardById(page, "ПД-1053")).toContainText(
-      "local-agent-tony",
+      "Агент VisaFlow",
     );
     await submissionCardById(page, "ПД-1053").click();
-    await expect(drawer(page)).toBeVisible();
-    await expect(drawer(page)).toContainText("Нина Волкова");
-    await expect(drawer(page).getByRole("tab", { name: /Файлы/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+    await expect(reviewWorkspace).toBeVisible();
+    await expect(reviewWorkspace).toContainText("Нина Волкова");
     await expect(
-      drawer(page)
+      reviewWorkspace.getByRole("tab", { name: "Паспорт", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      reviewWorkspace
         .getByText(/Нина Волкова/)
         .first(),
     ).toBeVisible();
-    await drawer(page)
-      .getByRole("button", { name: /Закрыть (подачу|проверку)/ })
+    await reviewWorkspace
+      .getByRole("button", { name: "Вернуться к очереди" })
       .click();
 
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+      page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
     ).toBeVisible();
 
     const cityFilter = page.getByRole("button", { name: /^Фильтр городов:/ });
@@ -51,11 +50,11 @@ test.describe("V-19 release ops lists export flow", () => {
     await page.getByRole("option", { name: "Москва" }).click();
     await expect(cityFilter).toHaveAccessibleName("Фильтр городов: Москва");
     await expect(
-      page.locator(".export-row").filter({ hasText: "ПД-1054" }),
+      page.getByTestId("admin-export-row-ПД-1054"),
     ).toBeVisible();
 
     await cityFilter.click();
-    await page.getByRole("option", { name: "Все города" }).click();
+    await page.getByRole("option", { name: "Города", exact: true }).click();
     const agentFilter = page.getByRole("button", { name: /^Агент:/ });
     await agentFilter.click();
     const firstConcreteAgent = page
@@ -71,13 +70,13 @@ test.describe("V-19 release ops lists export flow", () => {
     await page.getByRole("option", { name: "Все агенты" }).click();
     await page.getByLabel("ID, семья или агент").fill("SUB-1102");
     await expect(
-      page.locator(".export-row").filter({ hasText: "SUB-1102" }),
+      page.getByTestId("admin-export-row-SUB-1102"),
     ).toBeVisible();
     await expect(page.locator(".export-row")).toHaveCount(1);
     await page.getByLabel("ID, семья или агент").fill("");
 
-    const familyRow = page.locator(".export-row").filter({ hasText: "SUB-1102" });
-    const singleRow = page.locator(".export-row").filter({ hasText: "SUB-1101" });
+    const familyRow = page.getByTestId("admin-export-row-SUB-1102");
+    const singleRow = page.getByTestId("admin-export-row-SUB-1101");
     await expect(familyRow).toBeVisible();
     await expect(singleRow).toBeVisible();
 
