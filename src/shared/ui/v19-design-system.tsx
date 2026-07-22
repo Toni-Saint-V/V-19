@@ -38,7 +38,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import visaflowLogo from "../../assets/v-logo-premium-black-style.webp";
 import { cn } from "./cn";
 import { Badge, Button, IconButton } from "./primitives";
@@ -240,6 +240,7 @@ export function V19QueueCard<T extends ElementType = "div">({
  */
 export type V19SideMenuMode = "regular" | "compact";
 export type V19SideMenuTone = "default" | "danger" | "warning" | "success";
+export type V19SideMenuRole = "admin" | "agent";
 export type V19SideMenuItem = {
   active?: boolean;
   count?: number;
@@ -254,150 +255,281 @@ export type V19SideMenuItem = {
   tone?: V19SideMenuTone;
 };
 
-export function V19SideMenu({
-  ariaLabel,
-  brandSubtitle,
-  className,
-  commandInteractionId,
-  displayMode,
-  footer,
-  inactive = false,
-  items,
-  mobileCloseLabel = "Закрыть меню",
-  mobileCloseInteractionId,
-  mobileOpen,
-  mobileTitle,
-  onCommandSearch,
-  onMobileClose,
-  ...props
-}: Omit<ComponentPropsWithoutRef<typeof motion.aside>, "aria-label"> & {
+export const v19SideMenuId = "v19-operational-side-menu";
+export const v19SideMenuDesktopMinWidth = 1025;
+
+export type V19SideMenuProps = {
   ariaLabel: string;
-  brandSubtitle: string;
-  commandInteractionId?: string;
+  className?: string;
+  createAction?: { label: string; onClick: () => void };
   displayMode: V19SideMenuMode;
-  footer: ReactNode;
   inactive?: boolean;
   items: V19SideMenuItem[];
   mobileCloseLabel?: string;
-  mobileCloseInteractionId?: string;
   mobileOpen: boolean;
   mobileTitle: string;
   onCommandSearch?: () => void;
-  onMobileClose: () => void;
-}) {
+  onCloseMobile: () => void;
+  onResetWorkspace: () => void | Promise<void>;
+  role: V19SideMenuRole;
+  sessionDisplayName: string;
+  sessionInitials: string;
+  sessionRoleLabel: string;
+  sidebarId?: string;
+};
+
+export function V19SideMenu({
+  ariaLabel,
+  className,
+  createAction,
+  displayMode,
+  inactive = false,
+  items,
+  mobileCloseLabel = "Закрыть меню",
+  mobileOpen,
+  mobileTitle,
+  onCommandSearch,
+  onCloseMobile,
+  onResetWorkspace,
+  role,
+  sessionDisplayName,
+  sessionInitials,
+  sessionRoleLabel,
+  sidebarId,
+}: V19SideMenuProps) {
+  const signOutPendingRef = useRef(false);
   const reduceMotion = useReducedMotion();
+  const [signOutPending, setSignOutPending] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+  const menuItems =
+    role === "agent" &&
+    createAction &&
+    !items.some((item) => item.id === "agent-create")
+      ? [
+          ...items.slice(0, 2),
+          {
+            active: false,
+            icon: "+",
+            id: "agent-create",
+            interactionId: "shell.create-submission",
+            label: createAction.label,
+            meta: "Создание подачи",
+            onClick: createAction.onClick,
+          },
+          ...items.slice(2),
+        ]
+      : items;
+  const navItems = menuItems.map((item) => ({
+    ...item,
+    onClick: () => {
+      item.onClick();
+      onCloseMobile();
+    },
+  }));
+  const id = sidebarId ?? v19SideMenuId;
+  const settingsItem = items.find((item) => item.id.includes("settings"));
+
+  const handleSignOut = async () => {
+    if (signOutPendingRef.current) return;
+    signOutPendingRef.current = true;
+    setSignOutPending(true);
+    setSignOutError("");
+    try {
+      await onResetWorkspace();
+      onCloseMobile();
+    } catch {
+      setSignOutError("Не удалось выйти из аккаунта. Повторите попытку.");
+    } finally {
+      signOutPendingRef.current = false;
+      setSignOutPending(false);
+    }
+  };
 
   return (
-    <motion.aside
-      {...props}
-      animate={{
-        "--v19-side-menu-motion-opacity": mobileOpen ? 1 : 0,
-        "--v19-side-menu-motion-x": mobileOpen ? "0%" : "-100%",
-      }}
-      aria-hidden={inactive ? "true" : undefined}
-      aria-label={ariaLabel}
-      aria-modal={mobileOpen ? "true" : undefined}
-      className={cn(
-        "v19-ds-side-menu ops-sidebar opsu-sidebar",
-        `is-${displayMode}`,
-        className,
-      )}
-      data-open={mobileOpen ? "true" : "false"}
-      data-side-menu-mode={displayMode}
-      data-v19-component="side-menu"
-      inert={inactive ? true : undefined}
-      initial={false}
-      role={mobileOpen ? "dialog" : undefined}
-      transition={
-        reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-      }
-    >
-      <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
-        <strong>{mobileTitle}</strong>
-        <span aria-hidden="true">VF</span>
-      </div>
-      <div className="ops-brand opsu-brand flex items-center gap-2.5 px-2 pb-4 mb-2">
-        <img
-          src={visaflowLogo}
-          alt="VisaFlow"
-          className="ops-brand-logo h-8 w-8 shrink-0 rounded-lg object-cover"
-        />
-        <div className="ops-brand-copy opsu-brand-copy flex-1 min-w-0">
-          <strong className="opsu-wordmark vf-brand-wordmark text-sm font-semibold tracking-tight">
-            VisaFlow V-19
-          </strong>
-          <small className="v19-ds-side-menu-subtitle text-[11px] text-white/50">
-            {brandSubtitle}
-          </small>
-        </div>
-        <IconButton
-          className="ops-mobile-close opsu-mobile-close"
-          icon={<X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />}
-          label={mobileCloseLabel}
-          data-v19-interaction-id={mobileCloseInteractionId}
-          onClick={onMobileClose}
-        />
-      </div>
-      <button
-        data-v19-interaction-id={commandInteractionId}
-        className="ops-sidebar-search"
-        type="button"
-        aria-label="Открыть командную палитру"
-        onClick={onCommandSearch}
+    <>
+      <motion.aside
+        animate={{
+          "--v19-side-menu-motion-opacity": mobileOpen ? 1 : 0,
+          "--v19-side-menu-motion-x": mobileOpen ? "0%" : "-100%",
+        }}
+        aria-hidden={inactive ? "true" : undefined}
+        aria-label={ariaLabel}
+        aria-modal={mobileOpen ? "true" : undefined}
+        className={cn(
+          "v19-ds-side-menu ops-sidebar opsu-sidebar",
+          `is-${displayMode}`,
+          className,
+        )}
+        data-open={mobileOpen ? "true" : "false"}
+        data-side-menu-mode={displayMode}
+        data-v19-component="side-menu"
+        id={id}
+        inert={inactive ? true : undefined}
+        initial={false}
+        role={mobileOpen ? "dialog" : undefined}
+        transition={
+          reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }
+        }
       >
-        <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
-        <span>Поиск...</span>
-        <kbd>⌘K</kbd>
-      </button>
-      <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
-        <span className="ops-nav-group-label">Работа</span>
-        {items.map((item, index) => (
-          <Button
-            aria-current={item.active ? "page" : undefined}
-            aria-label={item.label}
-            className={cn(
-              "ops-nav-item opsu-nav-item v19-agent-sidebar-nav-item",
-              item.active && "is-active",
-              item.tone && `tone-${item.tone}`,
-            )}
-            data-nav-id={item.id}
-            data-v19-interaction-id={item.interactionId}
-            disabled={item.disabled}
-            key={item.id}
-            variant="ghost"
-            onClick={item.onClick}
-          >
-            <span
+        <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
+          <strong>{mobileTitle}</strong>
+          <span aria-hidden="true">VF</span>
+        </div>
+        <div className="ops-brand opsu-brand flex items-center gap-2.5 px-2 pb-4 mb-2">
+          <img
+            src={visaflowLogo}
+            alt="VisaFlow"
+            className="ops-brand-logo h-8 w-8 shrink-0 rounded-lg object-cover"
+          />
+          <div className="ops-brand-copy opsu-brand-copy flex-1 min-w-0">
+            <strong className="opsu-wordmark vf-brand-wordmark text-sm font-semibold tracking-tight">
+              VisaFlow V-19
+            </strong>
+            <small className="v19-ds-side-menu-subtitle text-[11px] text-white/50">
+              {role === "agent" ? "Кабинет агента" : "Кабинет администратора"}
+            </small>
+          </div>
+          <IconButton
+            className="ops-mobile-close opsu-mobile-close"
+            icon={
+              <X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />
+            }
+            label={mobileCloseLabel}
+            data-v19-interaction-id={
+              role === "agent" ? "shell.toggle-mobile-menu" : undefined
+            }
+            onClick={onCloseMobile}
+          />
+        </div>
+        <button
+          data-v19-interaction-id={
+            role === "agent" ? "shell.open-command-palette" : undefined
+          }
+          className="ops-sidebar-search"
+          type="button"
+          aria-label="Открыть командную палитру"
+          onClick={onCommandSearch}
+        >
+          <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
+          <span>Поиск...</span>
+          <kbd>⌘K</kbd>
+        </button>
+        <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
+          <span className="ops-nav-group-label">Работа</span>
+          {navItems.map((item, index) => (
+            <Button
+              aria-current={item.active ? "page" : undefined}
+              aria-label={item.label}
               className={cn(
-                "ops-nav-icon opsu-nav-icon v19-agent-sidebar-nav-icon",
+                "ops-nav-item opsu-nav-item v19-agent-sidebar-nav-item",
                 item.active && "is-active",
+                item.tone && `tone-${item.tone}`,
               )}
-              aria-hidden="true"
+              data-nav-id={item.id}
+              data-v19-interaction-id={item.interactionId}
+              disabled={item.disabled}
+              key={item.id}
+              variant="ghost"
+              onClick={item.onClick}
             >
-              <V19SideMenuIcon index={index} fallback={item.icon} />
-            </span>
-            <span className="ops-nav-copy opsu-nav-copy">
-              <strong>{item.label}</strong>
-            </span>
-            {typeof item.count === "number" ? (
               <span
                 className={cn(
-                  "ops-nav-count v19-agent-sidebar-nav-count",
+                  "ops-nav-icon opsu-nav-icon v19-agent-sidebar-nav-icon",
                   item.active && "is-active",
                 )}
-                aria-label={`${item.count}`}
+                aria-hidden="true"
               >
-                {item.count}
+                <V19SideMenuIcon index={index} fallback={item.icon} />
               </span>
-            ) : null}
-            {item.quickAction ? (
-              <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
-            ) : null}
+              <span className="ops-nav-copy opsu-nav-copy">
+                <strong>{item.label}</strong>
+              </span>
+              {typeof item.count === "number" ? (
+                <span
+                  className={cn(
+                    "ops-nav-count v19-agent-sidebar-nav-count",
+                    item.active && "is-active",
+                  )}
+                  aria-label={`${item.count}`}
+                >
+                  {item.count}
+                </span>
+              ) : null}
+              {item.quickAction ? (
+                <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
+              ) : null}
+            </Button>
+          ))}
+        </nav>
+        <div className="ops-sidebar-footer opsu-sidebar-footer">
+          <Button
+            data-v19-interaction-id={
+              role === "agent" ? "shell.navigate-settings" : undefined
+            }
+            className="ops-session v19-ds-side-menu-profile v19-agent-sidebar-profile"
+            aria-label="Открыть профиль"
+            variant="ghost"
+            onClick={() => {
+              settingsItem?.onClick();
+              onCloseMobile();
+            }}
+          >
+            <span className="v19-agent-sidebar-avatar">{sessionInitials}</span>
+            <div>
+              <strong>{sessionDisplayName}</strong>
+              <small className="v19-agent-sidebar-profile-meta">
+                {sessionRoleLabel}
+              </small>
+            </div>
+            <SlidersHorizontal
+              className="ops-user-more v19-agent-sidebar-profile-icon"
+              aria-hidden="true"
+            />
           </Button>
-        ))}
-      </nav>
-      <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
-    </motion.aside>
+          {signOutError ? (
+            <p
+              className="m-0 px-2 text-[12px] leading-snug text-[var(--v19b-status-danger-text)]"
+              role="alert"
+            >
+              {signOutError}
+            </p>
+          ) : null}
+          <Button
+            data-v19-interaction-id={role === "agent" ? "shell.sign-out" : undefined}
+            className="v19-ds-side-menu-signout"
+            aria-label="Выйти"
+            aria-busy={signOutPending || undefined}
+            disabled={signOutPending}
+            variant="secondary"
+            onClick={() => void handleSignOut()}
+          >
+            {signOutPending ? "Выходим…" : "Выйти"}
+          </Button>
+        </div>
+      </motion.aside>
+      <AnimatePresence initial={false}>
+        {mobileOpen ? (
+          <motion.button
+            animate={{ opacity: 1 }}
+            aria-controls={id}
+            aria-label="Закрыть меню"
+            className="ops-mobile-menu-backdrop"
+            data-v19-interaction-id={
+              role === "agent" ? "shell.toggle-mobile-menu" : undefined
+            }
+            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+            }
+            type="button"
+            onClick={onCloseMobile}
+          />
+        ) : null}
+      </AnimatePresence>
+    </>
   );
 }
 

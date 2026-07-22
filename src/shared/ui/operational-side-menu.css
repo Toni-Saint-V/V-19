@@ -1,18 +1,21 @@
 /*
- * Canonical late-cascade contract for the shared OperationalSideMenu.
+ * Canonical late-cascade contract for the design-system V19SideMenu.
  * Keep role/screen differences outside this component-level layer.
  */
 
 :root {
   --v19-operational-side-menu-desktop-width: 288px;
-  --v19-operational-side-menu-mobile-width: 280px;
+  --v19-operational-side-menu-mobile-width: 328px;
   --v19-operational-side-menu-background: #161617;
-  --v19-operational-side-menu-border: #202124;
+  --v19-operational-side-menu-border: rgb(255 255 255 / 0.07);
   --v19-operational-side-menu-control: #1e1e21;
-  --v19-operational-side-menu-control-border: #242529;
+  --v19-operational-side-menu-control-hover: #242428;
+  --v19-operational-side-menu-control-border: rgb(255 255 255 / 0.08);
   --v19-operational-side-menu-active: #27272b;
   --v19-operational-side-menu-text: rgb(255 255 255 / 0.7);
   --v19-operational-side-menu-text-muted: rgb(255 255 255 / 0.52);
+  --v19-operational-side-menu-duration: 180ms;
+  --v19-operational-side-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 #root .ops-shell.has-unified-side-menu {
@@ -28,11 +31,11 @@
 #root
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
-  padding: 12px 8px !important;
+  padding: 14px 10px 12px !important;
   border-color: var(--v19-operational-side-menu-border) !important;
   border-radius: 0 !important;
   background: var(--v19-operational-side-menu-background) !important;
-  box-shadow: none !important;
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.025) !important;
   color: var(--v19-operational-side-menu-text) !important;
 }
 
@@ -40,9 +43,9 @@
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-brand {
-  min-height: 48px !important;
-  margin: 0 0 8px !important;
-  padding: 0 8px 16px !important;
+  min-height: 50px !important;
+  margin: 0 0 10px !important;
+  padding: 2px 8px 14px !important;
   border: 0 !important;
 }
 
@@ -54,7 +57,9 @@
   height: 32px !important;
   border: 0 !important;
   border-radius: 8px !important;
-  box-shadow: none !important;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.08),
+    0 8px 20px rgb(0 0 0 / 0.18) !important;
 }
 
 #root
@@ -64,6 +69,8 @@
   color: #fff !important;
   font-size: 14px !important;
   font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.2 !important;
 }
 
 #root
@@ -73,30 +80,42 @@
   color: rgb(255 255 255 / 0.5) !important;
   font-size: 11px !important;
   font-weight: 400 !important;
+  line-height: 1.35 !important;
 }
 
 #root
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-sidebar-search {
-  height: 40px !important;
-  min-height: 40px !important;
-  margin: 0 0 16px !important;
-  padding: 0 12px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  margin: 0 2px 18px !important;
+  padding: 0 11px !important;
   border: 1px solid var(--v19-operational-side-menu-control-border) !important;
-  border-radius: 10px !important;
+  border-radius: 11px !important;
   background: rgb(255 255 255 / 0.05) !important;
-  box-shadow: none !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025) !important;
   color: rgb(255 255 255 / 0.5) !important;
+  font-family: inherit !important;
+  transition:
+    border-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    background-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    box-shadow var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease) !important;
 }
 
 #root
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-sidebar-search:hover {
-  border-color: var(--v19-operational-side-menu-control-border) !important;
-  background: rgb(255 255 255 / 0.1) !important;
-  color: rgb(255 255 255 / 0.72) !important;
+  border-color: rgb(255 255 255 / 0.12) !important;
+  background: var(--v19-operational-side-menu-control-hover) !important;
+  color: rgb(255 255 255 / 0.78) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045) !important;
 }
 
 #root
@@ -105,7 +124,7 @@
   .ops-sidebar-search
   kbd {
   border: 1px solid var(--v19-operational-side-menu-control-border) !important;
-  border-radius: 4px !important;
+  border-radius: 6px !important;
   background: rgb(0 0 0 / 0.4) !important;
   box-shadow: none !important;
   color: rgb(255 255 255 / 0.56) !important;
@@ -115,35 +134,78 @@
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav {
-  gap: 2px !important;
-  padding: 0 !important;
+  gap: 4px !important;
+  padding: 0 2px !important;
 }
 
 #root
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-group-label {
-  padding: 0 8px 4px !important;
+  padding: 0 9px 6px !important;
   color: var(--v19-operational-side-menu-text-muted) !important;
   font-size: 11px !important;
   font-weight: 500 !important;
-  letter-spacing: 0.025em !important;
+  letter-spacing: 0.04em !important;
 }
 
 #root
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item {
-  min-height: 40px !important;
-  padding: 8px 10px !important;
+  min-height: 44px !important;
+  padding: 9px 10px !important;
   gap: 10px !important;
   border: 1px solid transparent !important;
-  border-radius: 8px !important;
+  border-radius: 11px !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--v19-operational-side-menu-text) !important;
   font-size: 14px !important;
-  font-weight: 400 !important;
+  font-family: inherit !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    border-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    box-shadow var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    transform var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  .ops-nav-item
+  .ops-nav-icon {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 8px !important;
+  color: rgb(255 255 255 / 0.62) !important;
+  transition:
+    background-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    transform var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  .ops-nav-item
+  .ops-nav-copy
+  strong {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.005em !important;
 }
 
 #root
@@ -153,8 +215,9 @@
     [aria-current="page"]
   ):is(:hover, :focus-visible) {
   border-color: transparent !important;
-  background: rgb(255 255 255 / 0.05) !important;
+  background: rgb(255 255 255 / 0.055) !important;
   color: #fff !important;
+  transform: translateX(1px) !important;
 }
 
 #root
@@ -163,8 +226,20 @@
   .ops-nav-item:is(.is-active, [aria-current="page"]) {
   border-color: transparent !important;
   background: var(--v19-operational-side-menu-active) !important;
-  box-shadow: none !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.055),
+    0 8px 20px rgb(0 0 0 / 0.1) !important;
   color: #fff !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  .ops-nav-item:is(.is-active, [aria-current="page"])
+  .ops-nav-icon {
+  background: rgb(255 255 255 / 0.065) !important;
+  color: #fff !important;
+  transform: scale(1.02) !important;
 }
 
 #root
@@ -180,7 +255,11 @@
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   :is(.ops-nav-item[data-nav-id="agent-create"], .ops-sidebar-create) {
   border-color: transparent !important;
+  border-radius: 11px !important;
   background: var(--v19-depth-accent) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 10px 24px rgb(64 69 168 / 0.18) !important;
   color: #fff !important;
 }
 
@@ -192,6 +271,9 @@
     :focus-visible
   ) {
   background: var(--v19-depth-accent-hover) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 12px 28px rgb(64 69 168 / 0.24) !important;
   color: #fff !important;
 }
 
@@ -200,17 +282,23 @@
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item
   .ops-nav-count {
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 0 7px !important;
   border-color: rgb(255 255 255 / 0.05) !important;
+  border-radius: 8px !important;
   background: #18181b !important;
   color: rgb(255 255 255 / 0.8) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
 }
 
 #root
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-sidebar-footer {
-  margin: auto 0 0 !important;
-  padding: 12px !important;
+  margin: auto 2px 0 !important;
+  padding: 14px 6px 2px !important;
   gap: 8px !important;
   border-top: 1px solid var(--v19-operational-side-menu-border) !important;
   background: transparent !important;
@@ -220,23 +308,75 @@
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .v19-ds-side-menu-profile {
-  min-height: 40px !important;
-  padding: 4px 0 !important;
+  min-height: 48px !important;
+  padding: 6px 8px !important;
   border-color: transparent !important;
+  border-radius: 11px !important;
   background: transparent !important;
   box-shadow: none !important;
+  transition:
+    background-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  .v19-ds-side-menu-profile:is(:hover, :focus-visible) {
+  background: rgb(255 255 255 / 0.045) !important;
 }
 
 #root
   .ops-shell.has-unified-side-menu
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .v19-ds-side-menu-signout {
-  min-height: 40px !important;
+  min-height: 42px !important;
   border-color: var(--v19-operational-side-menu-control-border) !important;
-  border-radius: 10px !important;
+  border-radius: 11px !important;
   background: var(--v19-operational-side-menu-control) !important;
   box-shadow: none !important;
   color: #fff !important;
+  font-family: inherit !important;
+  font-weight: 500 !important;
+  transition:
+    border-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    background-color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    color var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease),
+    transform var(--v19-operational-side-menu-duration)
+      var(--v19-operational-side-menu-ease) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  .v19-ds-side-menu-signout:is(:hover, :focus-visible) {
+  border-color: rgb(255 255 255 / 0.12) !important;
+  background: var(--v19-operational-side-menu-control-hover) !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  :is(
+    .ops-sidebar-search,
+    .ops-nav-item,
+    .v19-ds-side-menu-profile,
+    .v19-ds-side-menu-signout
+  ):focus-visible {
+  outline: 2px solid rgb(139 145 255 / 0.72) !important;
+  outline-offset: 2px !important;
+}
+
+#root
+  .ops-shell.has-unified-side-menu
+  > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+  :is(.ops-nav-item, .v19-ds-side-menu-signout):active {
+  transform: scale(0.985) !important;
 }
 
 @media (min-width: 1025px) {
@@ -271,10 +411,12 @@
     height: 100dvh !important;
     min-height: 100dvh !important;
     max-height: 100dvh !important;
+    overscroll-behavior: contain !important;
     opacity: var(--v19-side-menu-motion-opacity, 0) !important;
     transform: translate3d(var(--v19-side-menu-motion-x, -100%), 0, 0) !important;
     transition: visibility 0s linear 220ms !important;
     will-change: opacity, transform;
+    box-shadow: 24px 0 64px rgb(0 0 0 / 0.42) !important;
   }
 
   #root
@@ -300,7 +442,9 @@
     width: 100% !important;
     height: 100dvh !important;
     border: 0 !important;
-    background: var(--v19-dialog-backdrop) !important;
+    background: rgb(5 5 7 / 0.68) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    backdrop-filter: blur(4px) !important;
     pointer-events: none !important;
   }
 
@@ -315,5 +459,20 @@
     > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"] {
     transition: none !important;
     will-change: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root
+    .ops-shell.has-unified-side-menu
+    > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
+    :is(
+      .ops-sidebar-search,
+      .ops-nav-item,
+      .ops-nav-icon,
+      .v19-ds-side-menu-profile,
+      .v19-ds-side-menu-signout
+    ) {
+    transition: none !important;
   }
 }

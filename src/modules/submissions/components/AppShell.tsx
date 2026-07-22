@@ -10,7 +10,7 @@ import { Menu, X } from "lucide-react";
 
 import { cn } from "../../../shared/ui/cn";
 import { IconButton } from "../../../shared/ui/primitives";
-import { OperationalSideMenu } from "./OperationalSideMenu";
+import { V19SideMenu } from "../../../shared/ui/v19-design-system";
 
 type AppShellProps = {
   children: ReactNode;
@@ -19,7 +19,7 @@ type AppShellProps = {
   inactive?: boolean;
   mobileNavOpen: boolean;
   role: string;
-  sideMenu: ComponentProps<typeof OperationalSideMenu>;
+  sideMenu: ComponentProps<typeof V19SideMenu>;
   sideMenuMode: "regular" | "compact";
   surface: string;
   collectionSurface?: boolean;
@@ -86,7 +86,7 @@ export function AppShell({
       aria-hidden={shellInactive ? "true" : undefined}
       inert={shellInactive ? true : undefined}
     >
-      <OperationalSideMenu {...sideMenu} />
+      <V19SideMenu {...sideMenu} />
       <section
         className="workspace"
         aria-hidden={workspaceInactive ? "true" : undefined}

@@ -12,9 +12,9 @@ import {
   PageHeaderMenuButton,
 } from "../modules/submissions/components/AppShell";
 import {
-  operationalSideMenuDesktopMinWidth,
-  operationalSideMenuId,
-} from "../modules/submissions/components/OperationalSideMenu";
+  v19SideMenuDesktopMinWidth,
+  v19SideMenuId,
+} from "../shared/ui/v19-design-system";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import type { AccessRequest } from "../shared/authContract";
 import type {
@@ -55,7 +55,6 @@ export function AdminWorkspace({
   onApproveAccessRequest,
   onRejectAccessRequest,
   onSignOut,
-  onSwitchWorkspace,
   submissions,
   usesSupabase = false,
 }: AdminWorkspaceProps) {
@@ -112,7 +111,7 @@ export function AdminWorkspace({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= operationalSideMenuDesktopMinWidth) {
+      if (window.innerWidth >= v19SideMenuDesktopMinWidth) {
         setMobileNavOpen(false);
       }
     };
@@ -143,7 +142,7 @@ export function AdminWorkspace({
 
   useEffect(() => {
     if (!mobileNavOpen) return;
-    const panel = document.getElementById(operationalSideMenuId);
+    const panel = document.getElementById(v19SideMenuId);
     const trigger = mobileNavTriggerRef.current;
     const frame = window.requestAnimationFrame(() => {
       panel
@@ -525,7 +524,7 @@ export function AdminWorkspace({
               menuButton={
                 <PageHeaderMenuButton
                   closedLabel="Открыть меню администратора"
-                  controls={operationalSideMenuId}
+                  controls={v19SideMenuId}
                   onClick={(event) => {
                     mobileNavTriggerRef.current = event.currentTarget;
                     setMobileNavOpen((open) => !open);
@@ -549,7 +548,6 @@ export function AdminWorkspace({
             mobileCloseLabel: "Закрыть меню администратора",
             mobileOpen: mobileNavOpen,
             mobileTitle: pageTitle,
-            onChooseRole: () => onSwitchWorkspace?.(),
             onCloseMobile: () => setMobileNavOpen(false),
             onCommandSearch: openCommandPalette,
             onResetWorkspace: handleSignOut,
@@ -557,7 +555,6 @@ export function AdminWorkspace({
             sessionDisplayName: adminIdentity,
             sessionInitials: adminInitials,
             sessionRoleLabel: "Администратор",
-            showWorkspaceSwitch: Boolean(onSwitchWorkspace),
           }}
           sideMenuMode="regular"
           surface={surface}

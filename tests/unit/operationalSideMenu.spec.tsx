@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { OperationalSideMenu } from "../../src/modules/submissions/components/OperationalSideMenu";
+import { V19SideMenu } from "../../src/shared/ui/v19-design-system";
 
 afterEach(cleanup);
 
@@ -23,7 +23,7 @@ function renderAgentMenu({
   onResetWorkspace: () => void | Promise<void>;
 }) {
   render(
-    <OperationalSideMenu
+    <V19SideMenu
       ariaLabel="Навигация агента"
       displayMode="regular"
       items={[
@@ -38,21 +38,24 @@ function renderAgentMenu({
       ]}
       mobileOpen
       mobileTitle="Меню"
-      onChooseRole={vi.fn()}
       onCloseMobile={onCloseMobile}
       onResetWorkspace={onResetWorkspace}
       role="agent"
       sessionDisplayName="CODEX E2E Agent"
       sessionInitials="CE"
       sessionRoleLabel="Агент"
-      showWorkspaceSwitch={false}
     />,
+  );
+
+  expect(screen.getByRole("dialog", { name: "Навигация агента" })).toHaveAttribute(
+    "data-v19-component",
+    "side-menu",
   );
 
   return { onCloseMobile };
 }
 
-describe("OperationalSideMenu sign out", () => {
+describe("V19SideMenu sign out", () => {
   test("keeps the active workspace open and exposes a retry after rejection", async () => {
     const onResetWorkspace = vi
       .fn()

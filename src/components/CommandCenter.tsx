@@ -26,9 +26,9 @@ import {
   PageHeaderMenuButton,
 } from "../modules/submissions/components/AppShell";
 import {
-  operationalSideMenuDesktopMinWidth,
-  operationalSideMenuId,
-} from "../modules/submissions/components/OperationalSideMenu";
+  v19SideMenuDesktopMinWidth,
+  v19SideMenuId,
+} from "../shared/ui/v19-design-system";
 import { Drawer } from "./Drawer";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
 import {
@@ -190,7 +190,6 @@ export function CommandCenter({
   onSubmissionsChange,
   submissions: canonicalSubmissions,
   onSignOut,
-  onSwitchWorkspace,
   onNavigateSettings,
   usesSupabase = false,
 }: CommandCenterProps) {
@@ -381,7 +380,7 @@ export function CommandCenter({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= operationalSideMenuDesktopMinWidth) {
+      if (window.innerWidth >= v19SideMenuDesktopMinWidth) {
         setMobileNavOpen(false);
       }
     };
@@ -1219,7 +1218,7 @@ export function CommandCenter({
               menuButton={
                 <PageHeaderMenuButton
                   {...agentInteractionProps("shell.toggle-mobile-menu")}
-                  controls={operationalSideMenuId}
+                  controls={v19SideMenuId}
                   onClick={() => setMobileNavOpen((open) => !open)}
                   open={mobileNavOpen}
                 />
@@ -1237,7 +1236,6 @@ export function CommandCenter({
             items: sideMenuItems,
             mobileOpen: mobileNavOpen,
             mobileTitle: title,
-            onChooseRole: () => onSwitchWorkspace?.(),
             onCloseMobile: () => setMobileNavOpen(false),
             onCommandSearch: openCommandPalette,
             onResetWorkspace: () => onSignOut?.(),
@@ -1245,7 +1243,6 @@ export function CommandCenter({
             sessionDisplayName: agentName,
             sessionInitials: agentAvatar,
             sessionRoleLabel: agentAgency,
-            showWorkspaceSwitch: Boolean(onSwitchWorkspace),
           }}
           sideMenuMode="regular"
           surface={surface}
