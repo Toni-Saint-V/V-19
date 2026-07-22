@@ -184,32 +184,29 @@ describe("V-19 domain engine", () => {
     });
   });
 
-  it("fails closed for admin acceptance when required questionnaire data is incomplete", () => {
+  it("accepts a passport-reviewed submission even when a non-passport questionnaire field is incomplete", () => {
     const readyForReview: Submission = {
       ...completeInProgressSubmission(),
       status: "submitted_for_review",
     };
-    const incomplete: Submission = {
+    const incompleteQuestionnaire: Submission = {
       ...readyForReview,
       applicants: readyForReview.applicants.map((applicant) => ({
         ...applicant,
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) =>
-            field.id === "surname" ? { ...field, value: "" } : field,
+            field.id === "hotel-name" ? { ...field, value: "" } : field,
           ),
         })),
       })),
     };
 
-    expect(canAdminApproveForExport(incomplete)).toBe(false);
-    expect(acceptSubmission(incomplete, "admin")).toEqual({
-      ok: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Questionnaire and files must be complete.",
-      },
-    });
+    expect(canAdminApproveForExport(incompleteQuestionnaire)).toBe(true);
+    const accepted = acceptSubmission(incompleteQuestionnaire, "admin");
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) throw new Error(accepted.error.message);
+    expect(accepted.data.status).toBe("ready_for_export");
   });
 
   it("fails closed outside the canonical issue correction and review stages", () => {

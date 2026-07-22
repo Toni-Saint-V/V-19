@@ -1,3 +1,4 @@
+// src/components/ReviewPassportFieldRow.tsx
 import { AlertCircle, CheckCircle2, MessageSquarePlus } from "lucide-react";
 
 import { hasAdminPassportReviewValue } from "../modules/submissions/passportReviewContract";
@@ -51,7 +52,7 @@ export function ReviewPassportFieldRow({
         </strong>
       </div>
 
-      <div className="v19-review-field-actions">
+      {state === "warning" ? null : (
         <span className={`v19-review-field-status is-${state}`}>
           {field.alreadyApproved ? (
             <CheckCircle2 aria-hidden="true" />
@@ -60,19 +61,19 @@ export function ReviewPassportFieldRow({
           )}
           {statusLabel}
         </span>
+      )}
 
-        <button
-          aria-label={`Добавить замечание: ${field.label}`}
-          className="v19-admin-passport-field-remark v19-review-field-remark"
-          onClick={() =>
-            onAddRemark(field.sourceLabel, applicant?.fullName, undefined, applicant?.id)
-          }
-          type="button"
-        >
-          <MessageSquarePlus aria-hidden="true" />
-          <span>Замечание</span>
-        </button>
-      </div>
+      <button
+        aria-label={`Добавить замечание: ${field.label}`}
+        className="v19-admin-passport-field-remark v19-review-field-remark"
+        onClick={() =>
+          onAddRemark(field.sourceLabel, applicant?.fullName, undefined, applicant?.id)
+        }
+        type="button"
+      >
+        <MessageSquarePlus aria-hidden="true" />
+        <span>Замечание</span>
+      </button>
     </article>
   );
 }

@@ -1,3 +1,4 @@
+/* src/shared/ui/tokens/index.css */
 /* VisaFlow V-19 design-system tokens.
    This folder is the only raw visual value owner for reusable UI values:
    colors, typography, spacing, sizes, radii, shadows, motion, opacity, and z-index.
@@ -1588,4 +1589,30 @@
   --v19-polish-empty-icon-shadow: 0 12px 30px rgb(0 0 0 / 0.22);
   --v19-polish-selected-shadow: 0 14px 40px rgb(0 0 0 / 0.24);
   --v19-polish-readable-muted: rgb(242 243 245 / 0.68);
+}
+
+
+/* Passport review semantic tokens keep the workspace themeable without component literals. */
+:root {
+  --v19b-review-ai-surface: var(--v19b-admin-card-bg);
+  --v19b-review-ai-border: var(--v19b-admin-blue-border);
+  --v19b-review-ai-accent: var(--v19b-color-primary-text);
+  --v19b-review-score-track: var(--v19b-color-control);
+  --v19b-review-score-ready: var(--v19b-admin-emerald);
+  --v19b-review-score-warning: var(--v19b-admin-orange);
+  --v19b-review-score-danger: var(--v19b-admin-red);
+  --v19b-review-insight-success-bg: var(--v19b-admin-green-soft);
+  --v19b-review-insight-success-border: var(--v19b-admin-green-border);
+  --v19b-review-insight-warning-bg: var(--v19b-admin-orange-soft);
+  --v19b-review-insight-warning-border: var(--v19b-admin-orange-border);
+  --v19b-review-insight-danger-bg: var(--v19b-admin-red-soft);
+  --v19b-review-insight-danger-border: var(--v19b-admin-red-border);
+  --v19b-review-insight-info-bg: var(--v19b-admin-blue-soft);
+  --v19b-review-insight-info-border: var(--v19b-admin-blue-border);
+  --v19b-review-questionnaire-surface: var(--v19b-color-panel-strong);
+  --v19b-review-questionnaire-border: var(--v19b-color-border-selected);
+  --v19b-review-key-surface: var(--v19b-color-app);
+  --v19b-review-key-border: var(--v19b-color-border-strong);
+  --v19b-review-hover-shadow: var(--v19b-shadow-admin-hover);
+  --v19b-review-card-shadow: var(--v19b-shadow-admin-card);
 }

@@ -312,34 +312,39 @@ describe("V-19 submission status rules", () => {
     });
   });
 
-  it("fails closed for admin acceptance while required questionnaire work is incomplete", () => {
-    const complete = canonicalMediaSubmission(
-      fillRequiredQuestionnaireForTest(byId("ПД-1053")),
+  it("allows passport acceptance while a non-passport questionnaire field is incomplete", () => {
+    const complete = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(
+        canonicalMediaSubmission(fillRequiredQuestionnaireForTest(byId("ПД-1053"))),
+      ),
     );
-    const incomplete: Submission = {
+    const incompleteQuestionnaire: Submission = {
       ...complete,
       applicants: complete.applicants.map((applicant) => ({
         ...applicant,
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) =>
-            field.id === "surname" ? { ...field, value: "" } : field,
+            field.id === "hotel-name" ? { ...field, value: "" } : field,
           ),
         })),
       })),
     };
-    const corrected: Submission = { ...incomplete, status: "corrections_received" };
+    const corrected: Submission = {
+      ...incompleteQuestionnaire,
+      status: "corrections_received",
+    };
 
-    expect(hasMissingRequiredWork(incomplete)).toBe(true);
-    expect(canPerformAction(incomplete, "accept", "admin")).toEqual({
-      ok: false,
-      reason: "Не все обязательные анкеты и файлы готовы",
+    expect(hasMissingRequiredWork(incompleteQuestionnaire)).toBe(true);
+    expect(canPerformAction(incompleteQuestionnaire, "accept", "admin")).toEqual({
+      ok: true,
     });
     expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
-      ok: false,
-      reason: "Не все обязательные анкеты и файлы готовы",
+      ok: true,
     });
-    expect(applySubmissionAction(incomplete, "accept", "admin")).toBe(incomplete);
+    expect(
+      applySubmissionAction(incompleteQuestionnaire, "accept", "admin").status,
+    ).toBe("ready_for_export");
   });
 
   it("keeps the corrected demo family ready for explicit admin closeout", () => {

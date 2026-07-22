@@ -1,3 +1,4 @@
+// src/modules/submissions/status.ts
 import type {
   ActionDecision,
   CommandResult,
@@ -575,10 +576,8 @@ export function canAdminApproveForExport(submission: Submission) {
     (submission.status === "submitted_for_review" ||
       submission.status === "corrections_received") &&
     !hasBlockingIssues(submission) &&
-    !hasMissingRequiredWork(submission) &&
-    adminQuestionnaireReviewReadiness(submission).ok &&
-    canonicalRequiredMediaReadiness(submission, { requireAccepted: true }).ok &&
-    hasUsableTripDateRange(submission)
+    adminPassportReviewReadiness(submission).ok &&
+    canonicalRequiredMediaReadiness(submission, { requireAccepted: true }).ok
   );
 }
 
@@ -622,7 +621,7 @@ export function hasMissingRequiredWork(submission: Submission) {
   );
 }
 
-export function adminQuestionnaireReviewReadiness(submission: Submission): {
+export function adminPassportReviewReadiness(submission: Submission): {
   ok: boolean;
   reason?: string;
 } {
@@ -668,6 +667,9 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
       }
     : { ok: true };
 }
+
+/** @deprecated Use adminPassportReviewReadiness; retained for existing integrations. */
+export const adminQuestionnaireReviewReadiness = adminPassportReviewReadiness;
 
 export function defaultDrawerTab(submission: Submission): DrawerTab {
   if (submission.status === "exported") return "history";
@@ -826,23 +828,9 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
-  if (
-    (action === "accept" || action === "close_issues_accept") &&
-    hasMissingRequiredWork(submission)
-  ) {
-    return { ok: false, reason: "Не все обязательные анкеты и файлы готовы" };
-  }
-
   if (action === "accept" || action === "close_issues_accept") {
-    const questionnaireReview = adminQuestionnaireReviewReadiness(submission);
-    if (!questionnaireReview.ok) return questionnaireReview;
-  }
-
-  if (
-    (action === "accept" || action === "close_issues_accept") &&
-    !hasUsableTripDateRange(submission)
-  ) {
-    return { ok: false, reason: missingTripDateRangeReason };
+    const passportReview = adminPassportReviewReadiness(submission);
+    if (!passportReview.ok) return passportReview;
   }
 
   if (

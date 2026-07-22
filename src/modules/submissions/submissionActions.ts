@@ -1,3 +1,4 @@
+// src/modules/submissions/submissionActions.ts
 import {
   applySubmissionAction,
   applySubmissionActionResult,
@@ -227,7 +228,7 @@ export function approvePassportReviewSectionForAdmin(
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Заполните и исправьте восемь паспортных полей.",
+        message: "Заполните и исправьте все паспортные поля.",
       },
     };
   }

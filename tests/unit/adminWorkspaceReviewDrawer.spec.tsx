@@ -54,23 +54,6 @@ function reviewReadySubmission(submissionId = "ПД-1056"): Submission {
   return submission;
 }
 
-async function revealReviewMedia(
-  targets: Array<"Паспорт" | "Селфи 1" | "Селфи 2">,
-) {
-  const altByTarget = {
-    Паспорт: "Оригинал загранпаспорта",
-    "Селфи 1": "Первое селфи заявителя",
-    "Селфи 2": "Второе селфи заявителя",
-  } as const;
-
-  for (const target of targets) {
-    fireEvent.click(screen.getByRole("tab", { name: target }));
-    const image = await screen.findByRole("img", { name: altByTarget[target] });
-    fireEvent.load(image);
-    await waitFor(() => expect(image).toHaveClass("is-ready"));
-  }
-}
-
 function AdminReviewExportHarness({
   initialSubmission,
   onAction,
@@ -636,7 +619,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       ),
     ).toHaveLength(0);
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Не все обязательные анкеты и файлы готовы",
+      "Заполните паспортные поля перед принятием",
     );
     expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toHaveAttribute(
       "aria-describedby",
@@ -1086,12 +1069,17 @@ describe("ReviewWorkspace passport section contract", () => {
   const passportValues: Record<string, string> = {
     "first-name": "NINA",
     surname: "VOLKOVA",
-    "passport-no": "661053001",
+    gender: "Женский",
     "birth-date": "20.08.1990",
-    "passport-issue-place": "FMS 16001",
-    "passport-expiry-date": "26.02.2032",
     "birth-place": "KAZAN",
     "birth-country": "RUSSIAN FEDERATION",
+    nationality: "RUSSIAN FEDERATION",
+    "passport-type": "Ordinary Passport",
+    "passport-no": "661053001",
+    "passport-issue-date": "26.02.2022",
+    "passport-expiry-date": "26.02.2032",
+    "passport-issue-country": "RUSSIAN FEDERATION",
+    "passport-issue-place": "FMS 16001",
   };
 
   function withPassportValues(applicant: Applicant): Applicant {
@@ -1151,7 +1139,12 @@ describe("ReviewWorkspace passport section contract", () => {
     };
   }
 
-  test("shows exactly eight fields, per-item remarks, and one confirmation", () => {
+  function visitPrimaryIdentityMedia() {
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
+  }
+
+  test("shows all thirteen passport fields, per-item remarks, and one confirmation", () => {
     const submission = singleSubmission();
     const { container } = render(
       <ReviewWorkspace
@@ -1169,7 +1162,7 @@ describe("ReviewWorkspace passport section contract", () => {
       ),
     ).toEqual(Object.keys(passportValues));
     expect(container.querySelectorAll(".v19-admin-passport-field-remark")).toHaveLength(
-      8,
+      Object.keys(passportValues).length,
     );
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(3);
     expect(
@@ -1178,6 +1171,39 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       screen.getAllByRole("button", { name: "Подтвердить паспортную секцию" }),
     ).toHaveLength(1);
+  });
+
+  test("keeps the questionnaire optional and outside the passport decision", async () => {
+    const submission = singleSubmission();
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("region", { name: "Необязательный просмотр анкеты" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Посмотреть" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("region", { name: "Необязательный просмотр анкеты" }),
+      ).toBeVisible(),
+    );
+    expect(
+      screen.getByText(/Не участвует в паспортном решении/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть просмотр анкеты" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: "Необязательный просмотр анкеты" }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   test("keeps media tabs keyboard-operable and disables unavailable preview tools", () => {
@@ -1351,7 +1377,7 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toBeDisabled();
     expect(
       screen.getByText(
-        /Заполнены не все восемь паспортных полей или в данных есть ошибка/,
+        /Заполнены не все паспортные поля или в данных есть ошибка/,
       ),
     ).toBeInTheDocument();
   });
@@ -1405,13 +1431,9 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
-    await revealReviewMedia(["Паспорт"]);
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
-    );
-    fireEvent.load(
-      screen.getByRole("img", { name: "Первое селфи заявителя" }),
     );
     expect(
       screen.getByRole("group", {
@@ -1424,9 +1446,6 @@ describe("ReviewWorkspace passport section contract", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible(),
-    );
-    fireEvent.load(
-      screen.getByRole("img", { name: "Второе селфи заявителя" }),
     );
     const confirmButton = screen.getByRole("button", {
       name: "Подтвердить паспортную секцию",
@@ -1510,17 +1529,17 @@ describe("ReviewWorkspace passport section contract", () => {
           type: "section",
         },
         {
-          comment: "Проверить тип документа.",
+          comment: "Проверить дополнительную информацию.",
           createdAt: "2026-07-17T03:00:00.000Z",
           createdBy: "admin",
           id: "passport-section-non-passport-field",
-          reason: "Уточнить тип паспорта",
+          reason: "Уточнить дополнительную информацию",
           severity: "warning",
           status: "open",
           target: {
             applicantId: applicant.id,
             applicantName: applicant.fullName,
-            field: "Тип паспорта",
+            field: "Дополнительная информация",
             section: "Паспортные данные",
           },
           type: "section",
@@ -1542,8 +1561,7 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    await revealReviewMedia(["Паспорт", "Селфи 1", "Селфи 2"]);
-
+    visitPrimaryIdentityMedia();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
@@ -1587,11 +1605,10 @@ describe("ReviewWorkspace passport section contract", () => {
       await screen.findByRole("dialog", { name: "Сверка паспорта" }),
     ).toBeVisible();
 
-    await revealReviewMedia(["Паспорт", "Селфи 1", "Селфи 2"]);
-
     const confirmButton = await screen.findByRole("button", {
       name: "Подтвердить паспортную секцию",
     });
+    visitPrimaryIdentityMedia();
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
 
@@ -1639,7 +1656,6 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
-    await revealReviewMedia(["Паспорт"]);
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(1);
     expect(
       screen.queryByTestId("protected-media-preview-selfie"),
@@ -1714,7 +1730,6 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
     );
-    await revealReviewMedia(["Паспорт", "Селфи 1"]);
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(2);
     expect(
       screen.queryByTestId("protected-media-preview-selfie_2"),
