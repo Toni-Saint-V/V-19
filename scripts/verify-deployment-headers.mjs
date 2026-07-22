@@ -28,6 +28,9 @@ verifyRule("/", {
 verifyRule("/index.html", {
   "cache-control": "public, max-age=0, must-revalidate",
 });
+verifyRule("/service-worker.js", {
+  "cache-control": "public, max-age=0, must-revalidate",
+});
 verifyRule("/assets/(.*)", {
   "cache-control": "public, max-age=31536000, immutable",
 });
@@ -47,7 +50,7 @@ if (failures.length > 0) {
 }
 
 console.log(
-  "Deployment header guard passed: security baseline, no-index policy, revalidated HTML, immutable hashed assets, refreshable app identity.",
+  "Deployment header guard passed: security baseline, no-index policy, revalidated HTML/service worker, immutable hashed assets, refreshable app identity.",
 );
 
 function verifyRule(source, expectedHeaders) {

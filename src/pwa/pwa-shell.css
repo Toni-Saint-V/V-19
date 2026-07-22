@@ -1,0 +1,121 @@
+:root {
+  --vf-safe-area-top: env(safe-area-inset-top, 0px);
+  --vf-safe-area-right: env(safe-area-inset-right, 0px);
+  --vf-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --vf-safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+#root {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding-top: var(--vf-safe-area-top);
+  padding-right: var(--vf-safe-area-right);
+  padding-left: var(--vf-safe-area-left);
+  scroll-padding-bottom: var(--vf-safe-area-bottom);
+}
+
+#pwa-install-assistant-root {
+  position: relative;
+  z-index: var(--v19b-z-toast, 400);
+}
+
+.vf-pwa-install-assistant {
+  position: fixed;
+  right: max(var(--v19b-size-16), var(--vf-safe-area-right));
+  bottom: max(
+    var(--v19b-size-16),
+    calc(var(--vf-safe-area-bottom) + var(--v19b-size-16))
+  );
+  left: max(var(--v19b-size-16), var(--vf-safe-area-left));
+  z-index: var(--v19b-z-toast, 400);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.vf-pwa-install-card {
+  position: relative;
+  display: flex;
+  width: min(100%, 440px);
+  min-height: var(--v19b-size-64);
+  align-items: center;
+  gap: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-card);
+  background: var(--v19b-color-panel-strong);
+  box-shadow: var(--v19b-shadow-panel);
+  color: var(--v19b-color-text);
+  padding: var(--v19b-size-12) var(--v19b-size-40) var(--v19b-size-12)
+    var(--v19b-size-16);
+  pointer-events: auto;
+}
+
+.vf-pwa-install-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--v19b-size-4);
+  font-size: var(--v19b-size-13);
+  line-height: 1.35;
+}
+
+.vf-pwa-install-copy strong {
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-14);
+}
+
+.vf-pwa-install-copy span {
+  color: var(--v19b-color-text-muted);
+}
+
+.vf-pwa-install-action {
+  min-height: var(--v19b-size-40);
+  flex: 0 0 auto;
+  border: var(--v19b-size-1) solid var(--v19-depth-accent-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19-depth-accent);
+  color: var(--v19b-color-text-strong);
+  padding: 0 var(--v19b-size-16);
+  font-weight: 700;
+}
+
+.vf-pwa-install-action:is(:hover, :focus-visible) {
+  background: var(--v19-depth-accent-hover);
+}
+
+.vf-pwa-install-dismiss {
+  position: absolute;
+  top: var(--v19b-size-8);
+  right: var(--v19b-size-8);
+  width: var(--v19b-size-32);
+  height: var(--v19b-size-32);
+  border: 0;
+  border-radius: var(--v19b-radius-pill);
+  background: transparent;
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-20);
+  line-height: 1;
+}
+
+.vf-pwa-install-dismiss:is(:hover, :focus-visible) {
+  background: var(--v19b-color-control-hover);
+  color: var(--v19b-color-text-strong);
+}
+
+@media (max-width: 980px) {
+  .vf-pwa-install-assistant {
+    bottom: max(
+      calc(var(--vf-safe-area-bottom) + var(--v19b-size-96)),
+      var(--v19b-size-96)
+    );
+  }
+
+  .vf-pwa-install-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vf-pwa-install-action {
+    width: 100%;
+  }
+}

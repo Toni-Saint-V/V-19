@@ -3,17 +3,27 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "@playwright/test";
 
 const workspaceRoot = process.cwd();
-const sourcePath = resolve(workspaceRoot, "public", "v19-app-icon.svg");
 const targets = [
-  { file: "v19-apple-touch-icon-v1.png", size: 180 },
-  { file: "v19-app-icon-192-v1.png", size: 192 },
-  { file: "v19-app-icon-512-v1.png", size: 512 },
+  { file: "v19-apple-touch-icon-v1.png", size: 180, source: "v19-app-icon.svg" },
+  { file: "v19-app-icon-192-v1.png", size: 192, source: "v19-app-icon.svg" },
+  { file: "v19-app-icon-512-v1.png", size: 512, source: "v19-app-icon.svg" },
+  {
+    file: "v19-app-icon-maskable-192-v1.png",
+    size: 192,
+    source: "v19-app-icon-maskable.svg",
+  },
+  {
+    file: "v19-app-icon-maskable-512-v1.png",
+    size: 512,
+    source: "v19-app-icon-maskable.svg",
+  },
 ];
 
 const browser = await chromium.launch({ headless: true });
 
 try {
   for (const target of targets) {
+    const sourcePath = resolve(workspaceRoot, "public", target.source);
     const page = await browser.newPage({
       deviceScaleFactor: 1,
       viewport: { height: target.size, width: target.size },

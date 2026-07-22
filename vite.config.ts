@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { visaflowPwaServiceWorker } from "./config/pwa/visaflowPwaServiceWorker";
 
 export default defineConfig(({ mode }) => {
   const localDemoBuildEnabled =
@@ -12,7 +13,7 @@ export default defineConfig(({ mode }) => {
     // Keep Vite's CSS assets intact. Replacing an emitted CSS file during
     // generateBundle leaves lazy-import preload maps pointing at a file that
     // no longer exists and can break the authenticated workspace at runtime.
-    plugins: [react()],
+    plugins: [react(), visaflowPwaServiceWorker()],
     build: {
       manifest: true,
       rollupOptions: {
