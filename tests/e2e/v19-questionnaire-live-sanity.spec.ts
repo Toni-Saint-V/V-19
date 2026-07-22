@@ -72,7 +72,13 @@ async function openQuestionnaire(page: Page) {
   }
 
   await expect(questionnaireScreen).toBeVisible();
-  await expect(page.getByLabel("Выбрать туриста")).toBeVisible();
+  await expect(
+    page.getByLabel(
+      (page.viewportSize()?.width ?? 1440) < 768
+        ? "Выбрать заявителя"
+        : "Выбрать туриста",
+    ),
+  ).toBeVisible();
 }
 
 async function expectNoDocumentOverflow(page: Page) {
@@ -159,6 +165,9 @@ async function expectMobileQuestionnaireLayout(
         : null;
     };
     const scroll = document.querySelector<HTMLElement>(".v19-questionnaire-scroll");
+    const footer = document.querySelector<HTMLElement>(
+      ".v19-questionnaire-mobile-footer",
+    );
     const workPanel = document.querySelector<HTMLElement>(
       ".v19-questionnaire-work-panel",
     );
@@ -174,11 +183,20 @@ async function expectMobileQuestionnaireLayout(
 
     return {
       backButton: rect(".v19-questionnaire-back-button"),
+      applicantBarDisplay: getComputedStyle(
+        document.querySelector<HTMLElement>(".v19-questionnaire-applicant-bar")!,
+      ).display,
       borderRadius: shell ? getComputedStyle(shell).borderRadius : null,
       contentInset:
         shellBox && frameBox ? frameBox.left - shellBox.left : Number.NEGATIVE_INFINITY,
+      footer: rect(".v19-questionnaire-mobile-footer"),
+      footerDisplay: footer ? getComputedStyle(footer).display : null,
+      footerSave: rect(".v19-questionnaire-mobile-footer-save"),
       header: rect(".v19-questionnaire-screen-header"),
-      saveButton: rect(".v19-questionnaire-save-button"),
+      headerDisplay: getComputedStyle(
+        document.querySelector<HTMLElement>(".v19-questionnaire-screen-header")!,
+      ).display,
+      scroll: rect(".v19-questionnaire-scroll"),
       scrollOverflowY: scroll ? getComputedStyle(scroll).overflowY : null,
       workPanel: rect(".v19-questionnaire-work-panel"),
       workPanelOverflowY: workPanel ? getComputedStyle(workPanel).overflowY : null,
@@ -186,16 +204,20 @@ async function expectMobileQuestionnaireLayout(
   });
 
   expect(geometry.borderRadius).toBe("0px");
-  expect(geometry.header?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
-    viewport.height * 0.15,
+  expect(geometry.headerDisplay).toBe("none");
+  expect(geometry.applicantBarDisplay).toBe("none");
+  expect(geometry.footerDisplay).toBe("grid");
+  expect(geometry.footer?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(72);
+  expect(geometry.scroll?.y ?? 0).toBeLessThanOrEqual(1);
+  expect(geometry.scroll?.height ?? 0).toBeGreaterThan(viewport.height * 0.8);
+  expect((geometry.scroll?.y ?? 0) + (geometry.scroll?.height ?? 0)).toBeLessThanOrEqual(
+    (geometry.footer?.y ?? Number.NEGATIVE_INFINITY) + 1,
   );
   expect(geometry.contentInset).toBeGreaterThanOrEqual(16);
   expect(geometry.workPanel?.height ?? 0).toBeGreaterThanOrEqual(viewport.height * 0.75 - 1);
   expect(geometry.scrollOverflowY).toBe("auto");
   expect(geometry.workPanelOverflowY).toBe("visible");
-  expect(geometry.backButton?.width ?? 0).toBeGreaterThanOrEqual(44);
-  expect(geometry.backButton?.height ?? 0).toBeGreaterThanOrEqual(44);
-  expect(geometry.saveButton?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(geometry.footerSave?.height ?? 0).toBeGreaterThanOrEqual(44);
   await expectMobileControlsAtLeast44(page);
   await expectNoDocumentOverflow(page);
 }
@@ -282,12 +304,9 @@ test.describe("V-19 questionnaire live sanity", () => {
     await openQuestionnaire(page);
     await expectMobileQuestionnaireLayout(page, { height: 844, width: 390 });
 
-    const header = page.locator(".v19-questionnaire-screen-header");
-    const headerBox = await header.boundingBox();
-    expect(headerBox).not.toBeNull();
-    expect(headerBox?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(844 * 0.15);
-
-    await expect(page.locator(".v19-questionnaire-header-actions")).toBeVisible();
+    await expect(page.locator(".v19-questionnaire-screen-header")).toBeHidden();
+    await expect(page.locator(".v19-questionnaire-header-actions")).toBeHidden();
+    await expect(page.getByTestId("questionnaire-mobile-footer")).toBeVisible();
     const selectionPresentation = await page.evaluate(() => {
       const style = (selector: string) => {
         const element = document.querySelector<HTMLElement>(selector);
@@ -328,7 +347,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     await blocker.click();
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Сохранить и выйти" }),
+      page.getByRole("button", { name: "Сохранить и выйти — нижняя панель" }),
     ).toBeVisible();
 
     const applicantNextButtons = page.locator(
@@ -434,8 +453,8 @@ test.describe("V-19 questionnaire live sanity", () => {
             cardBox.right <= scrollerBox.right + 1,
         );
       });
-      const headerBox = document
-        .querySelector<HTMLElement>(".v19-questionnaire-screen-header")
+      const scrollBox = document
+        .querySelector<HTMLElement>(".v19-questionnaire-scroll")
         ?.getBoundingClientRect();
       const workPanelBox = document
         .querySelector<HTMLElement>(".v19-questionnaire-work-panel")
@@ -444,20 +463,24 @@ test.describe("V-19 questionnaire live sanity", () => {
       return {
         visibleSectionCount: visibleSectionCards.length,
         topStackHeight:
-          headerBox && workPanelBox ? workPanelBox.top - headerBox.bottom : 0,
+          scrollBox && workPanelBox ? workPanelBox.top - scrollBox.top : 0,
       };
     });
     expect(topComposition.visibleSectionCount).toBeGreaterThanOrEqual(2);
-    expect(topComposition.topStackHeight).toBeLessThanOrEqual(132);
+    expect(topComposition.topStackHeight).toBeLessThanOrEqual(84);
 
     const [countryBox, cityBox] = await Promise.all([
-      page.locator('[data-field-label="Страна проживания"]').boundingBox(),
-      page.locator('[data-field-label="Город проживания"]').boundingBox(),
+      page.locator('[data-field-label="Страна проживания"]').evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return { width: box.width, y: box.y };
+      }),
+      page.locator('[data-field-label="Город проживания"]').evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return { width: box.width, y: box.y };
+      }),
     ]);
-    expect(countryBox).not.toBeNull();
-    expect(cityBox).not.toBeNull();
-    expect(cityBox?.y ?? 0).toBeGreaterThan((countryBox?.y ?? 0) + 2);
-    expect(Math.abs((countryBox?.width ?? 0) - (cityBox?.width ?? 0))).toBeLessThanOrEqual(2);
+    expect(cityBox.y).toBeGreaterThan(countryBox.y + 2);
+    expect(Math.abs(countryBox.width - cityBox.width)).toBeLessThanOrEqual(2);
 
     const [houseBox, buildingBox] = await Promise.all([
       page.locator('[data-field-label="Дом"]').boundingBox(),
@@ -475,7 +498,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(postalBox).not.toBeNull();
     expect(postalBox?.y ?? 0).toBeGreaterThan((unitBox?.y ?? 0) + 2);
 
-    const touristSelect = page.getByLabel("Выбрать туриста");
+    const touristSelect = page.getByLabel("Выбрать заявителя");
     const touristOptions = touristSelect.locator("option");
     if ((await touristOptions.count()) > 1) {
       const secondValue = await touristOptions.nth(1).getAttribute("value");
@@ -518,6 +541,17 @@ test.describe("V-19 questionnaire live sanity", () => {
       await expectMobileControlsAtLeast44(page);
       await expectNoDocumentOverflow(page);
     }
+
+    const footerNext = page.getByRole("button", {
+      name: "Следующий раздел: Отель / приглашение",
+    });
+    await expect(footerNext).toBeVisible();
+    await footerNext.evaluate((element) => {
+      (element as HTMLButtonElement).click();
+    });
+    await expect(
+      page.getByRole("button", { name: "Предыдущий раздел: Запись" }),
+    ).toBeVisible();
     expect(browserProblems).toEqual([]);
   });
 

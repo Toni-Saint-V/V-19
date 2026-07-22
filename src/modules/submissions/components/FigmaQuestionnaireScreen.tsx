@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Copy,
   Plus,
+  Save,
   UsersRound,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
@@ -3175,6 +3176,7 @@ export function FigmaQuestionnaireScreen({
   const activeSectionIndex = sections.findIndex(
     (section) => section.id === activeSection,
   );
+  const previousSection = sections[activeSectionIndex - 1];
   const nextSection = sections[activeSectionIndex + 1];
   const activeApplicantIndex = applicants.findIndex(
     (applicant) => applicant.id === activeApplicant,
@@ -4222,6 +4224,38 @@ export function FigmaQuestionnaireScreen({
     }
 
     void saveAndExitFromButton().catch(() => undefined);
+  }
+
+  function previousSectionFlow() {
+    if (!previousSection) return;
+
+    navigateQuestionnaire(activeApplicant, previousSection.id);
+    window.setTimeout(() => {
+      const firstField = workPanelRef.current?.querySelector<HTMLElement>(
+        "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
+      );
+      firstField?.focus({ preventScroll: true });
+      workPanelRef.current?.scrollIntoView?.({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 0);
+  }
+
+  function nextSectionFlow() {
+    if (!nextSection) return;
+
+    navigateQuestionnaire(activeApplicant, nextSection.id);
+    window.setTimeout(() => {
+      const firstField = workPanelRef.current?.querySelector<HTMLElement>(
+        "[data-field-label] input, [data-field-label] textarea, [data-field-label] button",
+      );
+      firstField?.focus({ preventScroll: true });
+      workPanelRef.current?.scrollIntoView?.({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    }, 0);
   }
 
   function focusFirstBlocker() {
@@ -5645,6 +5679,91 @@ export function FigmaQuestionnaireScreen({
           </QuestionnaireWorkspaceShell>
         </div>
       </div>
+
+      <footer
+        aria-label="Действия анкеты"
+        className="v19-questionnaire-mobile-footer"
+        data-testid="questionnaire-mobile-footer"
+      >
+        <button
+          {...agentInteractionProps("questionnaire.navigate")}
+          aria-label={
+            previousSection
+              ? `Предыдущий раздел: ${previousSection.title}`
+              : "Предыдущий раздел недоступен"
+          }
+          className="v19-questionnaire-mobile-footer-arrow"
+          disabled={!previousSection || questionnaireInteractionPending}
+          type="button"
+          onClick={previousSectionFlow}
+        >
+          <ArrowLeft aria-hidden="true" />
+        </button>
+
+        <button
+          {...agentInteractionProps(
+            isEditable ? "questionnaire.save-exit" : "questionnaire.back",
+          )}
+          aria-busy={navigationPending || saveStatus === "saving"}
+          aria-label={
+            isEditable
+              ? saveStatus === "saving"
+                ? "Сохраняем анкету в нижней панели"
+                : "Сохранить и выйти — нижняя панель"
+              : "Выйти из анкеты — нижняя панель"
+          }
+          className="v19-questionnaire-mobile-footer-save"
+          disabled={navigationPending || saveStatus === "saving"}
+          type="button"
+          onClick={() =>
+            void (isEditable ? saveAndExitFromButton() : requestBack()).catch(
+              () => undefined,
+            )
+          }
+        >
+          <Save aria-hidden="true" />
+          <span>
+            <strong>{saveStatus === "saving" ? "Сохраняем" : "Сохранить"}</strong>
+            <small>{isEditable ? "и выйти" : "выйти"}</small>
+          </span>
+        </button>
+
+        <label className="v19-questionnaire-mobile-footer-applicant">
+          <UsersRound aria-hidden="true" />
+          <span>{activeApplicantContext?.name ?? "Заявитель"}</span>
+          <ChevronDown aria-hidden="true" />
+          <select
+            {...agentInteractionProps("questionnaire.navigate")}
+            aria-label="Выбрать заявителя"
+            disabled={applicants.length < 2 || questionnaireInteractionPending}
+            value={activeApplicant}
+            onChange={(event) =>
+              navigateQuestionnaire(event.target.value, activeSection)
+            }
+          >
+            {applicants.map((applicant) => (
+              <option key={`mobile-${applicant.id}`} value={applicant.id}>
+                {applicantDropdownLabel(applicant)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          {...agentInteractionProps("questionnaire.navigate")}
+          aria-label={
+            nextSection
+              ? `Следующий раздел: ${nextSection.title}`
+              : "Следующий раздел недоступен"
+          }
+          className="v19-questionnaire-mobile-footer-arrow"
+          disabled={!nextSection || questionnaireInteractionPending}
+          type="button"
+          onClick={nextSectionFlow}
+        >
+          <ArrowRight aria-hidden="true" />
+        </button>
+      </footer>
     </motion.div>
   );
 }
