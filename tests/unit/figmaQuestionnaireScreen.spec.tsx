@@ -3303,7 +3303,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
-  test("routes file blockers through the host recovery callback", () => {
+  test("keeps file remarks out of questionnaire blocker routing", () => {
     const submission = withQuestionnaireFileIssue(
       withReadyQuestionnaireFiles(
         fillEveryQuestionnaireField(
@@ -3331,12 +3331,14 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
-
-    expect(onOpenDocuments).toHaveBeenCalledWith("error");
+    expect(screen.queryByTestId("questionnaire-next-blocker")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /есть блокер/u }),
+    ).not.toBeInTheDocument();
+    expect(onOpenDocuments).not.toHaveBeenCalled();
   });
 
-  test("keeps a file blocker available while required fields are still deferred", () => {
+  test("keeps questionnaire gaps as the only blockers when a file remark exists", () => {
     const submission = withQuestionnaireFileIssue(
       withReadyQuestionnaireFiles(
         createDraftSubmission({
@@ -3351,7 +3353,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "passport_scan",
     );
     const onOpenDocuments = vi.fn();
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -3360,11 +3362,55 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("questionnaire-next-blocker")).toHaveAccessibleName(
-      /Загранпаспорт/u,
+    clickPinnedSection(result.container, "Паспорт");
+    expect(screen.getByTestId("questionnaire-next-blocker")).not.toHaveAccessibleName(
+      /Загранпаспорт|Скан паспорта/u,
     );
     fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
-    expect(onOpenDocuments).toHaveBeenCalledWith("error");
+    expect(onOpenDocuments).not.toHaveBeenCalled();
+  });
+
+  test("keeps passport extraction gates out of questionnaire blocker routing", () => {
+    const ready = withReadyQuestionnaireFiles(
+      fillEveryQuestionnaireField(
+        createDraftSubmission({
+          applicantNames: ["VOLKOV ANTON"],
+          city: "Москва",
+          familyCount: 1,
+          idScheme: "local",
+          submissions: [],
+          type: "single",
+        }),
+      ),
+    );
+    const submission: Submission = {
+      ...ready,
+      files: ready.files.map((file) =>
+        file.type === "passport_scan"
+          ? {
+              ...file,
+              mimeType: "image/jpeg",
+              originalFileName: "passport.jpg",
+              storageBucket: "submission-media",
+              storagePath: `${ready.id}/${file.applicantId}/passport_scan/passport.jpg`,
+            }
+          : file,
+      ),
+    };
+
+    render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    expect(screen.queryByTestId("questionnaire-next-blocker")).not.toBeInTheDocument();
+    expect(screen.queryByText("Скан паспорта не проверен.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /есть блокер/u }),
+    ).not.toBeInTheDocument();
   });
 
   test("keeps an admin field blocker available while required fields are deferred", async () => {

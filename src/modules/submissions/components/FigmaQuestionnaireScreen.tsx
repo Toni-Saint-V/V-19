@@ -41,22 +41,12 @@ import {
   validateBlsQuestionnaireField,
   type BlsFormData,
 } from "../questionnaireBlsRules";
-import {
-  agentQuestionnaireCompletionDecision,
-  agentQuestionnaireStatusPresentation,
-} from "../status";
+import { agentQuestionnaireStatusPresentation } from "../status";
 import { agentInteractionProps } from "../agentInteractionContract";
 import {
   passportReviewMediaTypeForIssue,
-  passportReviewMediaTypesVisibleForApplicant,
   primaryApplicantIdForPassportReview,
-  requiredPassportReviewMediaTypesForApplicant,
-  type PassportReviewMediaType,
 } from "../passportReviewContract";
-import {
-  passportGateIssues,
-  type PassportGateIssue,
-} from "../passportExtractionGuards";
 import { suggestedRussianAddress } from "../russianAddress";
 import {
   composeQuestionnaireHomeAddress,
@@ -94,7 +84,6 @@ type SectionTab = {
   title: string;
 };
 type SectionId =
-  | "files"
   | "appointment"
   | "personal"
   | "passport"
@@ -1449,7 +1438,10 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
         }),
       ) ||
       submission.issues.some(
-        (issue) => issue.status === "open" && issue.target.applicantId === applicant.id,
+        (issue) =>
+          issue.status === "open" &&
+          issue.target.applicantId === applicant.id &&
+          isQuestionnaireFieldIssue(submission, issue),
       );
 
     const questionnaireName = [formData.firstName, formData.surname]
@@ -1605,52 +1597,13 @@ function questionnaireField(
 
 type QuestionnaireModelField = NonNullable<ReturnType<typeof questionnaireField>>;
 
-type RequiredQuestionnaireFileType = PassportReviewMediaType;
-
 type QuestionnaireBlockerTarget = {
   applicantId: string;
-  comment?: string;
   deferredUntilSectionExit?: boolean;
-  fileId?: string;
-  fileType?: RequiredQuestionnaireFileType;
   label?: string;
   reason?: string;
   sectionId: SectionId;
 };
-
-const requiredQuestionnaireFileLabels: Record<RequiredQuestionnaireFileType, string> = {
-  passport_scan: "Загранпаспорт",
-  selfie: "Селфи 1",
-  selfie_2: "Селфи 2",
-};
-
-function requiredQuestionnaireFileTypeForIssue(
-  issue: Submission["issues"][number],
-): RequiredQuestionnaireFileType | undefined {
-  return passportReviewMediaTypeForIssue(issue);
-}
-
-function questionnaireVisibleFileTypes(
-  submission: Submission,
-  applicantId: string,
-): RequiredQuestionnaireFileType[] {
-  return passportReviewMediaTypesVisibleForApplicant(submission, applicantId);
-}
-
-function questionnaireFileIssue(
-  issues: Submission["issues"],
-  applicantId: string,
-  file: Submission["files"][number] | undefined,
-  fileType: RequiredQuestionnaireFileType,
-) {
-  return issues.find(
-    (issue) =>
-      (issue.status === "open" || issue.status === "fixed_by_agent") &&
-      issue.target.applicantId === applicantId &&
-      (file?.linkedIssueId === issue.id ||
-        requiredQuestionnaireFileTypeForIssue(issue) === fileType),
-  );
-}
 
 function questionnaireUpdateKey(
   update: Pick<QuestionnaireFieldUpdate, "applicantId" | "fieldId" | "sectionId">,
@@ -1838,13 +1791,6 @@ function hasActionableFieldProblem(field: QuestionnaireModelField) {
     (field.error && !(field.error === "Обязательное поле" && !field.value.trim())) ||
     (validationMessage && !requiredButEmpty),
   );
-}
-
-function fileIsReadyForQuestionnaire(file: Submission["files"][number] | undefined) {
-  if (!file) return false;
-  if (file.status === "missing" || file.status === "needs_replacement") return false;
-  if (file.uploadStatus && file.uploadStatus !== "uploaded") return false;
-  return !["replace_required", "poor_quality"].includes(file.reviewStatus ?? "");
 }
 
 function riskLabel(count: number) {
@@ -2596,6 +2542,32 @@ function issueFieldMatches(fieldId: string, label: string, target?: string) {
   );
 }
 
+function isQuestionnaireFieldIssue(
+  submission: Submission,
+  issue: Submission["issues"][number],
+) {
+  if (
+    !issue.target.applicantId ||
+    !issue.target.field ||
+    passportReviewMediaTypeForIssue(issue)
+  ) {
+    return false;
+  }
+
+  const applicant = submission.applicants.find(
+    (candidate) => candidate.id === issue.target.applicantId,
+  );
+  if (!applicant) return false;
+
+  return questionnaireFieldBindings.some((binding) =>
+    issueFieldMatches(
+      binding.fieldId,
+      questionnaireField(applicant, binding.fieldId)?.label ?? "",
+      issue.target.field,
+    ),
+  );
+}
+
 function focusableFieldFor(
   field: string | undefined,
   applicant?: Submission["applicants"][number],
@@ -2638,12 +2610,6 @@ function sectionForFocus(
 ): SectionId {
   if (target) return target.sectionId;
   const section = normalizeFocusLabel(focus?.section);
-  if (
-    section.includes("файл") ||
-    section.includes("медиа") ||
-    section.includes("документ")
-  )
-    return "passport";
   if (section.includes("запис")) return "appointment";
   if (section.includes("паспорт")) return "passport";
   if (section.includes("личн")) return "personal";
@@ -2653,46 +2619,6 @@ function sectionForFocus(
   if (section.includes("отел") || section.includes("приглаш")) return "hotel";
   if (section.includes("оплат")) return "trip";
   return "personal";
-}
-
-function questionnaireTargetForPassportIssue(issue: PassportGateIssue): {
-  applicantId: string;
-  label?: string;
-  sectionId: SectionId;
-} {
-  if (issue.code === "passport_not_confirmed") {
-    return { applicantId: issue.applicantId, sectionId: "passport" };
-  }
-  if (issue.code === "passport_type_not_ordinary") {
-    return {
-      applicantId: issue.applicantId,
-      label: "Тип документа",
-      sectionId: "passport",
-    };
-  }
-  if (issue.code === "passport_issued_after_expiry") {
-    return {
-      applicantId: issue.applicantId,
-      label: "Дата выдачи",
-      sectionId: "passport",
-    };
-  }
-  if (
-    issue.code === "passport_expired" ||
-    issue.code === "passport_expires_before_trip"
-  ) {
-    return {
-      applicantId: issue.applicantId,
-      label: "Действителен до",
-      sectionId: "passport",
-    };
-  }
-
-  return {
-    applicantId: issue.applicantId,
-    label: "Номер паспорта",
-    sectionId: "passport",
-  };
 }
 
 function sectionIdMatches(sectionId: string, canonicalId: string) {
@@ -2716,7 +2642,6 @@ export function FigmaQuestionnaireScreen({
   onBack,
   onFieldChange,
   onMarkIssueFixed,
-  onOpenDocuments,
   onSaveDraft,
   onSaveAndExit,
   submission,
@@ -3073,9 +2998,10 @@ export function FigmaQuestionnaireScreen({
       draftSubmission.issues.filter(
         (issue) =>
           (issue.status === "open" || issue.status === "fixed_by_agent") &&
-          issue.target.applicantId === activeApplicant,
+          issue.target.applicantId === activeApplicant &&
+          isQuestionnaireFieldIssue(draftSubmission, issue),
       ),
-    [activeApplicant, draftSubmission.issues],
+    [activeApplicant, draftSubmission],
   );
   const activeBlockingFieldIssues = useMemo(
     () => activeBlockingIssues.filter((issue) => issue.target.field),
@@ -3122,38 +3048,19 @@ export function FigmaQuestionnaireScreen({
       }),
     ).length;
     const openIssueRisks = draftSubmission.issues.filter(
-      (issue) => issue.status === "open",
+      (issue) =>
+        issue.status === "open" &&
+        isQuestionnaireFieldIssue(draftSubmission, issue),
     ).length;
-    const passportRisks = passportGateIssues(draftSubmission);
-    const completionDecision = agentQuestionnaireCompletionDecision(draftSubmission);
-    const requiredFileSlots = draftSubmission.applicants.flatMap((applicant) =>
-      requiredPassportReviewMediaTypesForApplicant(draftSubmission, applicant.id).map(
-        (type) => ({
-          applicantId: applicant.id,
-          type,
-        }),
-      ),
-    );
-    const readyFiles = requiredFileSlots.filter((slot) =>
-      fileIsReadyForQuestionnaire(
-        draftSubmission.files.find(
-          (file) => file.applicantId === slot.applicantId && file.type === slot.type,
-        ),
-      ),
-    );
     const total = requiredFields.length;
     const completed = completedFields.length;
     const percent = total ? Math.round((completed / total) * 100) : 0;
-    const risks = validationRisks + openIssueRisks + passportRisks.length;
+    const risks = validationRisks + openIssueRisks;
 
     return {
-      canSubmit: completionDecision.ok,
-      completionReason: completionDecision.reason,
       completed,
       completedFields: completedFields.length,
-      completedFiles: readyFiles.length,
       fieldTotal: requiredFields.length,
-      fileTotal: requiredFileSlots.length,
       percent,
       risks,
       total,
@@ -4005,12 +3912,9 @@ export function FigmaQuestionnaireScreen({
   }
 
   function focusQuestionnaireTarget(target: QuestionnaireBlockerTarget) {
-    navigateQuestionnaire(
-      target.applicantId,
-      target.sectionId === "files" ? activeSection : target.sectionId,
-      { preserveRequiredErrors: true },
-    );
-    if (target.sectionId === "files") return;
+    navigateQuestionnaire(target.applicantId, target.sectionId, {
+      preserveRequiredErrors: true,
+    });
     focusFieldLabel(target.label);
   }
 
@@ -4117,47 +4021,6 @@ export function FigmaQuestionnaireScreen({
 
     if (sectionId) return deferredRequiredTarget;
 
-    for (const applicant of scopedApplicants) {
-      const requiredFileTypes = questionnaireVisibleFileTypes(
-        draftSubmission,
-        applicant.id,
-      );
-      for (const fileType of requiredFileTypes) {
-        const file = draftSubmission.files.find(
-          (candidate) =>
-            candidate.applicantId === applicant.id && candidate.type === fileType,
-        );
-        if (!fileIsReadyForQuestionnaire(file)) {
-          const issue = questionnaireFileIssue(
-            draftSubmission.issues,
-            applicant.id,
-            file,
-            fileType,
-          );
-          return {
-            applicantId: applicant.id,
-            comment: issue?.comment,
-            fileId: file?.id,
-            fileType,
-            label: requiredQuestionnaireFileLabels[fileType],
-            reason:
-              issue?.reason ??
-              (file?.status === "needs_replacement" ||
-              file?.reviewStatus === "replace_required" ||
-              file?.reviewStatus === "poor_quality"
-                ? "Замените этот файл"
-                : "Добавьте этот файл"),
-            sectionId: "files" as const,
-          } satisfies QuestionnaireBlockerTarget;
-        }
-      }
-    }
-
-    const passportIssue = passportGateIssues(draftSubmission).find(
-      (candidate) => !applicantId || candidate.applicantId === applicantId,
-    );
-    if (passportIssue) return questionnaireTargetForPassportIssue(passportIssue);
-
     const issue = draftSubmission.issues.find((candidate) => {
       if (
         candidate.status !== "open" ||
@@ -4167,34 +4030,9 @@ export function FigmaQuestionnaireScreen({
         return false;
       }
 
-      const candidateFileType = requiredQuestionnaireFileTypeForIssue(candidate);
-      return (
-        !candidateFileType ||
-        questionnaireVisibleFileTypes(
-          draftSubmission,
-          candidate.target.applicantId,
-        ).includes(candidateFileType)
-      );
+      return isQuestionnaireFieldIssue(draftSubmission, candidate);
     });
     if (!issue?.target.applicantId) return deferredRequiredTarget;
-
-    const issueFileType = requiredQuestionnaireFileTypeForIssue(issue);
-    if (issueFileType) {
-      const file = draftSubmission.files.find(
-        (candidate) =>
-          candidate.applicantId === issue.target.applicantId &&
-          candidate.type === issueFileType,
-      );
-      return {
-        applicantId: issue.target.applicantId,
-        comment: issue.comment,
-        fileId: file?.id,
-        fileType: issueFileType,
-        label: requiredQuestionnaireFileLabels[issueFileType],
-        reason: issue.reason,
-        sectionId: "files" as const,
-      } satisfies QuestionnaireBlockerTarget;
-    }
 
     const issueApplicant = draftSubmission.applicants.find(
       (applicant) => applicant.id === issue.target.applicantId,
@@ -4306,26 +4144,10 @@ export function FigmaQuestionnaireScreen({
     if (!target) return;
     setRevealRequiredErrors(true);
     setSaveStatus("idle");
-    if (target.sectionId === "files" && onOpenDocuments) {
-      const targetFile = target.fileId
-        ? draftSubmission.files.find((file) => file.id === target.fileId)
-        : undefined;
-      const filter: QuestionnaireDocumentsFilter =
-        targetFile?.status === "needs_replacement" ||
-        targetFile?.reviewStatus === "replace_required" ||
-        targetFile?.reviewStatus === "poor_quality"
-          ? "error"
-          : "missing";
-      setSaveMessage("Открываем сборку документов…");
-      onOpenDocuments(filter);
-      return;
-    }
     setSaveMessage(
       target.label
         ? `Сначала: ${target.label}`
-        : target.sectionId === "files"
-          ? "Сначала: добавьте обязательный файл"
-          : "Сначала: устраните блокер",
+        : "Сначала: устраните блокер",
     );
     focusQuestionnaireTarget(target);
   }
@@ -5177,7 +4999,6 @@ export function FigmaQuestionnaireScreen({
     : immediateBlockerTarget;
   const mobileBlockerLabel =
     mobileBlockerTarget?.label ??
-    readinessStats.completionReason ??
     sections.find((section) => section.id === mobileBlockerTarget?.sectionId)?.title ??
     "Следующее обязательное поле";
   const mobileBlockerReason = mobileBlockerTarget?.reason?.trim();
