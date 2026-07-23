@@ -21,17 +21,18 @@ test.describe("V-19 privacy-safe passport intake proof", () => {
     await expectAtLeastOneVisible(createButton, "No visible create button matched.");
     await clickFirstVisible(createButton);
 
-    const dialog = page.getByRole("dialog", { name: "Новая подача" });
-    await dialog.getByRole("radio", { name: "Заявитель" }).click();
-    await dialog.getByLabel("Город подачи").selectOption("Самара");
-    await dialog.locator('input[type="file"]').setInputFiles({
+    const workspace = page.locator('[data-agent-screen="create"]');
+    await expect(workspace).toBeVisible();
+    await workspace.getByRole("radio", { name: "Заявитель" }).click();
+    await workspace.getByLabel("Город подачи").selectOption("Самара");
+    await workspace.locator('input[type="file"]').setInputFiles({
       buffer: Buffer.from([0x00, 0x00, 0x00, 0x18]),
       mimeType: "image/heic",
       name: "synthetic-passport.heic",
     });
 
-    await expect(dialog.getByText("Нужна ручная проверка")).toBeVisible();
-    await dialog.getByRole("button", { name: "Создать и открыть анкету" }).click();
+    await expect(workspace.getByText("Вручную", { exact: true })).toBeVisible();
+    await workspace.getByRole("button", { name: "Создать и открыть анкету" }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: /Анкета:/ }),
     ).toBeVisible();

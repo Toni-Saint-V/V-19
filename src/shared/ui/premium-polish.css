@@ -917,7 +917,7 @@ select:-webkit-autofill {
   border-radius: 6px;
   background: var(--v19-polish-canvas);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035);
-  color: var(--v19-fg-tertiary);
+  color: var(--v19-fg-secondary);
   font: inherit;
   font-size: 10px;
   line-height: 1.55;

@@ -56,9 +56,7 @@ test.describe("V-19 UX state proof", () => {
     });
 
     await page.goto("/");
-    await expect(
-      page.getByRole("heading", { name: "Проверяем доступ" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Проверяем доступ" })).toBeVisible();
     await expect(page.getByTestId("app-runtime-state")).toHaveAttribute(
       "role",
       "status",
@@ -131,19 +129,29 @@ test.describe("V-19 UX state proof", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Настройки" }),
     ).toBeVisible();
-    await page.getByLabel("Сводка по действиям").selectOption("daily");
-    await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Сохранить" })).toBeEnabled();
-    await saveScreenshot(page, "settings-dirty");
-    await page.getByRole("button", { name: "Сохранить" }).click();
+    const densitySwitch = page.getByRole("switch", {
+      name: "Компактная плотность",
+    });
+    const densityWasEnabled =
+      (await densitySwitch.getAttribute("aria-checked")) === "true";
+    await densitySwitch.click();
     await expect(page.getByText("Настройки сохранены")).toBeVisible();
+    await saveScreenshot(page, "settings-saved");
+    if (
+      densityWasEnabled !==
+      ((await densitySwitch.getAttribute("aria-checked")) === "true")
+    ) {
+      await densitySwitch.click();
+    }
 
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: /^(Очередь на проверку|Проверка)$/,
       workspaceEmail: "2@2.ru",
     });
     await clickOperationalNav(page, /^Выгрузка/);
-    await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /^(Центр выгрузки|Выгрузка)$/ }),
+    ).toBeVisible();
     const selectedExport = page
       .locator(".export-row")
       .getByRole("checkbox", {

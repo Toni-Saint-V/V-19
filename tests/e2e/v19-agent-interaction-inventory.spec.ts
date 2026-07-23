@@ -45,7 +45,7 @@ type InventoryFinding = {
 async function collectInteractionInventoryFindings(
   page: Page,
   options: {
-    activeAgentScreen?: "actions" | "settings" | "submissions";
+    activeAgentScreen?: "actions" | "create" | "settings" | "submissions";
     role: AgentInteractionRole;
     surfaces: readonly AgentInteractionSurface[];
   },
@@ -123,7 +123,7 @@ async function expectCompleteInteractionInventory(
   page: Page,
   label: string,
   surfaces: readonly AgentInteractionSurface[],
-  activeAgentScreen?: "actions" | "settings" | "submissions",
+  activeAgentScreen?: "actions" | "create" | "settings" | "submissions",
 ) {
   const findings = await collectInteractionInventoryFindings(page, {
     activeAgentScreen,
@@ -168,10 +168,12 @@ async function runCriticalAgentInventorySweep(page: Page) {
   await expect(
     page.getByRole("dialog", { name: "Командная палитра агента" }),
   ).toBeVisible();
-  await expectCompleteInteractionInventory(page, "command palette", [
-    ...actionSurfaces,
-    "command-palette",
-  ], "actions");
+  await expectCompleteInteractionInventory(
+    page,
+    "command palette",
+    [...actionSurfaces, "command-palette"],
+    "actions",
+  );
   await page.keyboard.press("Escape");
 
   await clickWorkspaceButton(page, /Мои подачи/);
@@ -193,10 +195,12 @@ async function runCriticalAgentInventorySweep(page: Page) {
   await submissionCard.click();
   const submissionDrawer = drawer(page);
   await expect(submissionDrawer).toBeVisible();
-  await expectCompleteInteractionInventory(page, "submission drawer overview", [
-    ...submissionSurfaces,
-    "submission-drawer",
-  ], "submissions");
+  await expectCompleteInteractionInventory(
+    page,
+    "submission drawer overview",
+    [...submissionSurfaces, "submission-drawer"],
+    "submissions",
+  );
 
   for (const tab of ["Анкета", /Замечания/, "История", "Обзор"] as const) {
     await submissionDrawer.getByRole("tab", { name: tab }).click();
@@ -214,10 +218,12 @@ async function runCriticalAgentInventorySweep(page: Page) {
   await expect(
     page.getByRole("heading", { level: 1, name: "Настройки" }),
   ).toBeVisible();
-  await expectCompleteInteractionInventory(page, "agent settings", [
-    "agent-shell",
-    "agent-settings",
-  ], "settings");
+  await expectCompleteInteractionInventory(
+    page,
+    "agent settings",
+    ["agent-shell", "agent-settings"],
+    "settings",
+  );
 
   await page
     .locator("header.v19-page-header")
@@ -226,15 +232,19 @@ async function runCriticalAgentInventorySweep(page: Page) {
   await expect(
     page.getByRole("heading", { level: 1, name: "Новая подача" }),
   ).toBeVisible();
-  await expectCompleteInteractionInventory(page, "pre-upload", [
-    "agent-shell",
-    "new-submission",
-  ]);
+  await expectCompleteInteractionInventory(
+    page,
+    "pre-upload",
+    ["agent-shell", "new-submission"],
+    "create",
+  );
 
-  await page.getByRole("button", { name: "Далее" }).click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: /^Анкета:/ }),
-  ).toBeVisible();
+  const createWorkspace = page.locator('[data-agent-screen="create"]');
+  await createWorkspace.getByLabel("Город подачи").selectOption("Казань");
+  await createWorkspace
+    .getByRole("button", { name: "Продолжить без паспорта" })
+    .click();
+  await expect(page.getByRole("heading", { level: 1, name: /^Анкета:/ })).toBeVisible();
   await expectCompleteInteractionInventory(page, "questionnaire", [
     "agent-shell",
     "questionnaire",

@@ -103,7 +103,7 @@
 
 .v19-app-runtime-eyebrow {
   margin-top: var(--v19b-size-20);
-  color: var(--v19b-color-text-muted);
+  color: var(--v19b-color-text-faint);
   font-size: var(--v19b-size-11);
   font-weight: var(--v19b-weight-control);
   letter-spacing: var(--v19b-tracking-wide);
@@ -129,7 +129,7 @@
   margin-top: var(--v19b-size-16);
   padding-top: var(--v19b-size-16);
   border-top: var(--v19b-size-1) solid var(--v19b-color-border);
-  color: var(--v19b-color-text-faint);
+  color: var(--v19b-color-text-muted);
   font-family: var(--v19b-font-mono);
   font-size: var(--v19b-size-11);
   line-height: var(--v19b-line-height-copy);
@@ -38067,7 +38067,7 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
   gap: var(--v19b-size-12);
   padding: var(--v19b-size-0) var(--v19b-size-12);
   border-bottom: var(--v19b-size-1) solid var(--v19b-color-border-strong);
-  color: var(--v19b-color-text-faint);
+  color: var(--v19b-color-text) !important;
   background: var(--v19b-color-app);
   font-family: var(--v19b-font-family);
   font-size: var(--v19b-size-10);
@@ -41031,6 +41031,7 @@ section[data-testid="agent-actions-screen"]
 #root
   .ops-shell.has-unified-side-menu:is(
     .surface-agent-actions,
+    .surface-agent-create,
     .surface-agent-submissions
   )
   > .workspace
@@ -41050,6 +41051,7 @@ section[data-testid="agent-actions-screen"]
 #root
   .ops-shell.has-unified-side-menu:is(
     .surface-agent-actions,
+    .surface-agent-create,
     .surface-agent-submissions
   )
   .v19-agent-workspace-content {
@@ -41138,6 +41140,7 @@ section[data-testid="agent-actions-screen"]
   #root
     .ops-shell.has-unified-side-menu.is-v19-collection-surface:is(
       .surface-agent-actions,
+      .surface-agent-create,
       .surface-agent-submissions
     )
     > .workspace {
@@ -41151,6 +41154,7 @@ section[data-testid="agent-actions-screen"]
   #root
     .ops-shell.has-unified-side-menu:is(
       .surface-agent-actions,
+      .surface-agent-create,
       .surface-agent-submissions
     )
     > .workspace
@@ -41161,6 +41165,12 @@ section[data-testid="agent-actions-screen"]
 }
 
 @media (max-width: 767px) {
+  #root
+    .ops-shell.has-unified-side-menu.role-agent.surface-agent-create
+    > .workspace.workspace {
+    padding-bottom: var(--v19b-size-0) !important;
+  }
+
   #root
     .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
     > .workspace.workspace {

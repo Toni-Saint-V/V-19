@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowUpDown, Plus, RotateCcw } from "lucide-react";
+import { ArrowUpDown, Plus, RotateCcw, X } from "lucide-react";
 import { QuestionnaireScreen } from "./QuestionnaireScreen";
 import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import {
@@ -98,12 +98,22 @@ import { agentInteractionProps } from "../modules/submissions/agentInteractionCo
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
-type ViewState = "main" | "questionnaire" | "upload";
-type AgentShellNavSection = Extract<
+type ViewState = "main" | "questionnaire";
+type NonCreateAgentShellNavSection = Extract<
   LegacyAgentNavSection,
   "actions" | "submissions" | "settings"
 >;
+type AgentShellNavSection = NonCreateAgentShellNavSection | "create";
 type ActionSort = "tripDate" | "createdAt";
+type CreateNavigationState = {
+  busy: boolean;
+  dirty: boolean;
+};
+
+const initialCreateNavigationState: CreateNavigationState = {
+  busy: false,
+  dirty: false,
+};
 
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
@@ -130,6 +140,8 @@ function navLabel(section: AgentShellNavSection) {
   switch (section) {
     case "actions":
       return "Мои действия";
+    case "create":
+      return "Новая подача";
     case "submissions":
       return "Мои подачи";
     case "settings":
@@ -137,7 +149,9 @@ function navLabel(section: AgentShellNavSection) {
   }
 }
 
-function normalizeAgentNav(section: LegacyAgentNavSection): AgentShellNavSection {
+function normalizeAgentNav(
+  section: LegacyAgentNavSection,
+): NonCreateAgentShellNavSection {
   if (section === "applicants") return "submissions";
   if (section === "drafts") return "submissions";
   if (section === "documents" || section === "files" || section === "media") {
@@ -161,6 +175,12 @@ export function CommandCenter({
   const prefersReducedMotion = useReducedMotion();
   const activeNavMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
   const [activeNav, setActiveNav] = useState<AgentShellNavSection>("actions");
+  const [createOriginNav, setCreateOriginNav] =
+    useState<NonCreateAgentShellNavSection>("actions");
+  const [createNavigationState, setCreateNavigationState] =
+    useState<CreateNavigationState>(initialCreateNavigationState);
+  const [pendingCreateExit, setPendingCreateExit] =
+    useState<NonCreateAgentShellNavSection | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [questionnaireInitialFocus, setQuestionnaireInitialFocus] =
@@ -184,6 +204,8 @@ export function CommandCenter({
   const questionnaireOriginSurfaceRef = useRef<"drawer" | "workspace">("workspace");
   const questionnaireSubmissionSnapshotRef = useRef<Submission | undefined>(undefined);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
+  const createExitFocusOriginRef = useRef<HTMLElement | null>(null);
+  const createExitDialogRef = useRef<HTMLElement | null>(null);
   const [canonicalOverrides, setCanonicalOverrides] = useState<
     Record<string, Submission>
   >({});
@@ -347,6 +369,7 @@ export function CommandCenter({
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
 
       event.preventDefault();
+      if (createNavigationState.busy || pendingCreateExit) return;
       commandPaletteFocusOriginRef.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setMobileNavOpen(false);
@@ -355,7 +378,16 @@ export function CommandCenter({
 
     window.addEventListener("keydown", handleCommandPaletteShortcut);
     return () => window.removeEventListener("keydown", handleCommandPaletteShortcut);
-  }, []);
+  }, [createNavigationState.busy, pendingCreateExit]);
+
+  useEffect(() => {
+    if (!pendingCreateExit) return;
+    window.requestAnimationFrame(() => {
+      createExitDialogRef.current
+        ?.querySelector<HTMLButtonElement>("button:not([disabled])")
+        ?.focus({ preventScroll: true });
+    });
+  }, [pendingCreateExit]);
 
   useEffect(() => {
     if (usesSupabase || legacyMigrationStartedRef.current || !onSubmissionsChange) {
@@ -373,8 +405,7 @@ export function CommandCenter({
       .catch(() => undefined);
   }, [agentId, effectiveCanonicalSubmissions, onSubmissionsChange, usesSupabase]);
 
-  const navigateTo = (nav: LegacyAgentNavSection) => {
-    const normalizedNav = normalizeAgentNav(nav);
+  const completeNavigation = (normalizedNav: NonCreateAgentShellNavSection) => {
     const canonicalNav = canonicalBridgeNav(normalizedNav);
     if (canonicalNav) {
       bridge.onAgentNavChange?.(canonicalNav);
@@ -385,10 +416,29 @@ export function CommandCenter({
     setDrawerOpen(false);
     setCurrentView("main");
     setActiveNav(normalizedNav);
+    setCreateNavigationState(initialCreateNavigationState);
+    setPendingCreateExit(null);
     setMobileNavOpen(false);
   };
 
+  const navigateTo = (nav: LegacyAgentNavSection) => {
+    const normalizedNav = normalizeAgentNav(nav);
+    if (activeNav === "create") {
+      if (createNavigationState.busy) return;
+      if (createNavigationState.dirty) {
+        createExitFocusOriginRef.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setCommandPaletteOpen(false);
+        setMobileNavOpen(false);
+        setPendingCreateExit(normalizedNav);
+        return;
+      }
+    }
+    completeNavigation(normalizedNav);
+  };
+
   const openCommandPalette = () => {
+    if (createNavigationState.busy || pendingCreateExit) return;
     commandPaletteFocusOriginRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setMobileNavOpen(false);
@@ -415,6 +465,19 @@ export function CommandCenter({
     setDrawerFocusTarget(undefined);
     setSelectedRow(id);
     setDrawerOpen(true);
+  };
+
+  const handleCommandPaletteSubmissionOpen = (id: string) => {
+    if (activeNav === "create") {
+      if (createNavigationState.busy) return;
+      if (createNavigationState.dirty) {
+        navigateTo("submissions");
+        return;
+      }
+      completeNavigation("submissions");
+    }
+    setCommandPaletteOpen(false);
+    handleRowClick(id);
   };
 
   const handleOpenWorkspaceTarget = (submissionId: string, target: WorkspaceTarget) => {
@@ -508,6 +571,8 @@ export function CommandCenter({
     setDrawerOpen(false);
     setMobileNavOpen(false);
     setActiveNav("submissions");
+    setCreateNavigationState(initialCreateNavigationState);
+    setPendingCreateExit(null);
     setSubmissionTypeFilter(submission.type);
     setSubmissionFocusRequest((current) => ({
       revision: (current?.revision ?? 0) + 1,
@@ -565,9 +630,22 @@ export function CommandCenter({
   };
 
   const createPackage = () => {
+    if (activeNav === "create") {
+      setCommandPaletteOpen(false);
+      setMobileNavOpen(false);
+      return;
+    }
+    setCreateOriginNav(activeNav);
     bridge.onCreatePackage?.();
     emitVisaflowUiEvent(bridge, { type: "package.create" });
-    setCurrentView("upload");
+    setQuestionnaireInitialFocus(undefined);
+    setDrawerOpen(false);
+    setCurrentView("main");
+    setActiveNav("create");
+    setCreateNavigationState(initialCreateNavigationState);
+    setPendingCreateExit(null);
+    setCommandPaletteOpen(false);
+    setMobileNavOpen(false);
   };
 
   const executeCreateCanonicalDraft = async (
@@ -632,6 +710,8 @@ export function CommandCenter({
     setSearchQuery("");
     if (intent.destination === "questionnaire") {
       setActiveNav("submissions");
+      setCreateNavigationState(initialCreateNavigationState);
+      setPendingCreateExit(null);
       setSelectedRow(nextSubmission.id);
       setQuestionnaireInitialFocus({
         applicantId: nextSubmission.applicants[0]?.id,
@@ -977,9 +1057,11 @@ export function CommandCenter({
   const surface =
     activeNav === "actions"
       ? "agent-actions"
-      : activeNav === "submissions"
-        ? "agent-submissions"
-        : "settings";
+      : activeNav === "create"
+        ? "agent-create"
+        : activeNav === "submissions"
+          ? "agent-submissions"
+          : "settings";
 
   return (
     <div className="has-persistent-operational-sidebar relative h-full w-full overflow-hidden bg-[#101011]">
@@ -1011,19 +1093,14 @@ export function CommandCenter({
             }
           />
         )}
-        {currentView === "upload" && (
-          <PreUploadScreen
-            key="upload"
-            onBack={() => setCurrentView("main")}
-            onSubmit={createCanonicalDraft}
-          />
-        )}
       </AnimatePresence>
 
       <div
-        aria-hidden={currentView !== "main" || drawerOpen ? true : undefined}
+        aria-hidden={
+          currentView !== "main" || drawerOpen || pendingCreateExit ? true : undefined
+        }
         className="contents"
-        inert={currentView !== "main" || drawerOpen}
+        inert={currentView !== "main" || drawerOpen || Boolean(pendingCreateExit)}
       >
         <AppShell
           className="is-agent-shell-source-actions"
@@ -1033,21 +1110,36 @@ export function CommandCenter({
             <PageHeader
               actions={
                 <div className="ml-auto flex items-center gap-2">
-                  <button
-                    {...agentInteractionProps("shell.create-submission")}
-                    aria-label="Новая подача"
-                    onClick={createPackage}
-                    className="v19-action-surface-create h-[36px] lg:h-10 px-3.5 bg-[var(--v19-depth-accent)] hover:bg-[var(--v19-depth-accent-hover)] text-[var(--v19-depth-text-strong)] rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[var(--v19-depth-inner-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Новая подача</span>
-                  </button>
+                  {activeNav === "create" ? (
+                    <button
+                      {...agentInteractionProps("new-submission.back")}
+                      aria-label="Отменить создание подачи"
+                      className="v19-create-cancel-action h-[36px] lg:h-10 px-3.5 bg-transparent text-[var(--v19-depth-text-muted)] rounded-[10px] border border-[var(--v19-depth-border-strong)] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={createNavigationState.busy}
+                      onClick={() => navigateTo(createOriginNav)}
+                      type="button"
+                    >
+                      <X aria-hidden="true" className="w-4 h-4" />
+                      <span>Отмена</span>
+                    </button>
+                  ) : (
+                    <button
+                      {...agentInteractionProps("shell.create-submission")}
+                      aria-label="Новая подача"
+                      onClick={createPackage}
+                      className="v19-action-surface-create h-[36px] lg:h-10 px-3.5 bg-[var(--v19-depth-accent)] hover:bg-[var(--v19-depth-accent-hover)] text-[var(--v19-depth-text-strong)] rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[var(--v19-depth-inner-highlight)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="hidden sm:inline">Новая подача</span>
+                    </button>
+                  )}
                 </div>
               }
               menuButton={
                 <PageHeaderMenuButton
                   {...agentInteractionProps("shell.toggle-mobile-menu")}
                   controls={v19SideMenuId}
+                  disabled={createNavigationState.busy}
                   onClick={() => setMobileNavOpen((open) => !open)}
                   open={mobileNavOpen}
                 />
@@ -1060,8 +1152,13 @@ export function CommandCenter({
           role="agent"
           sideMenu={{
             ariaLabel: "Меню агента",
-            createAction: { label: "Новая подача", onClick: createPackage },
+            createAction: {
+              active: activeNav === "create",
+              label: "Новая подача",
+              onClick: createPackage,
+            },
             displayMode: "regular",
+            inactive: createNavigationState.busy,
             items: sideMenuItems,
             mobileOpen: mobileNavOpen,
             mobileTitle: title,
@@ -1094,6 +1191,12 @@ export function CommandCenter({
                   />
                 )}
                 {activeNav === "actions" && renderActionsList()}
+                {activeNav === "create" && (
+                  <PreUploadScreen
+                    onNavigationStateChange={setCreateNavigationState}
+                    onSubmit={createCanonicalDraft}
+                  />
+                )}
                 {activeNav === "submissions" && (
                   <div>
                     <AgentReturnPackagesPanel enabled={usesSupabase} />
@@ -1151,8 +1254,92 @@ export function CommandCenter({
         onNavigateAgentActions={() => navigateTo("actions")}
         onNavigateAgentSubmissions={() => navigateTo("submissions")}
         onNavigateSettings={() => navigateTo("settings")}
-        onOpenSubmission={(submission) => handleRowClick(submission.id)}
+        onOpenSubmission={(submission) =>
+          handleCommandPaletteSubmissionOpen(submission.id)
+        }
       />
+
+      <AnimatePresence>
+        {pendingCreateExit ? (
+          <motion.div
+            animate={{ opacity: 1 }}
+            className="v19-preupload-modal-overlay"
+            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }}
+          >
+            <motion.section
+              aria-labelledby="create-exit-title"
+              aria-modal="true"
+              className="v19-preupload-confirmation-dialog"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setPendingCreateExit(null);
+                  window.requestAnimationFrame(() => {
+                    const origin = createExitFocusOriginRef.current;
+                    if (origin?.isConnected) {
+                      origin.focus({ preventScroll: true });
+                    }
+                  });
+                  return;
+                }
+                if (event.key !== "Tab") return;
+                const focusable = Array.from(
+                  createExitDialogRef.current?.querySelectorAll<HTMLButtonElement>(
+                    "button:not([disabled])",
+                  ) ?? [],
+                );
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (!first || !last) return;
+                if (event.shiftKey && document.activeElement === first) {
+                  event.preventDefault();
+                  last.focus({ preventScroll: true });
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first.focus({ preventScroll: true });
+                }
+              }}
+              ref={createExitDialogRef}
+              role="alertdialog"
+            >
+              <h2 id="create-exit-title">Выйти без сохранения?</h2>
+              <p>Изменения в новой подаче будут потеряны.</p>
+              <footer>
+                <button
+                  {...agentInteractionProps("new-submission.back")}
+                  onClick={() => {
+                    setPendingCreateExit(null);
+                    window.requestAnimationFrame(() => {
+                      const origin = createExitFocusOriginRef.current;
+                      if (origin?.isConnected) {
+                        origin.focus({ preventScroll: true });
+                      } else {
+                        document
+                          .querySelector<HTMLElement>(
+                            '[data-agent-screen="create"] [tabindex="-1"]',
+                          )
+                          ?.focus({ preventScroll: true });
+                      }
+                    });
+                  }}
+                  type="button"
+                >
+                  Вернуться к редактированию
+                </button>
+                <button
+                  {...agentInteractionProps("new-submission.back")}
+                  className="is-danger"
+                  onClick={() => completeNavigation(pendingCreateExit)}
+                  type="button"
+                >
+                  Выйти без сохранения
+                </button>
+              </footer>
+            </motion.section>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

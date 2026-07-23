@@ -3,7 +3,6 @@ import {
   clickWorkspaceButton,
   collectBrowserProblems,
   drawer,
-  e2ePassportFile,
   isVisible,
   openDrawerTab,
   openFreshWorkspace,
@@ -22,7 +21,10 @@ async function expectBodyMatches(page: Page, patterns: RegExp[], timeout = 20_00
   await expect
     .poll(
       async () => {
-        const text = await page.locator("body").innerText().catch(() => "");
+        const text = await page
+          .locator("body")
+          .innerText()
+          .catch(() => "");
         return patterns.some((pattern) => pattern.test(text));
       },
       { timeout },
@@ -30,20 +32,8 @@ async function expectBodyMatches(page: Page, patterns: RegExp[], timeout = 20_00
     .toBe(true);
 }
 
-async function closeVisibleDrawer(page: Page) {
-  const closeButton = drawer(page)
-    .getByRole("button", {
-      name: /Закрыть создание|Закрыть подачу|Отложить|Закрыть/i,
-    })
-    .first();
-
-  if (await isVisible(closeButton)) {
-    await closeButton.click();
-  }
-}
-
 test.describe("V-19 pilot agent click flow", () => {
-  test("agent navigation and create drawer stay wired on active root UI", async ({
+  test("agent navigation and create workspace stay wired on active root UI", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
@@ -71,18 +61,15 @@ test.describe("V-19 pilot agent click flow", () => {
     await expect(newSubmissionButton).toBeVisible();
     await newSubmissionButton.click();
 
-    await expect(drawer(page)).toBeVisible();
+    const createWorkspace = page.locator('[data-agent-screen="create"]');
+    await expect(createWorkspace).toBeVisible();
     await expectBodyMatches(page, [/Новая подача/i, /Заявитель|Семья/i]);
-
-    const intakeFileInput = drawer(page).locator(".pi-file-input").first();
-    if ((await intakeFileInput.count()) > 0) {
-      await intakeFileInput.setInputFiles(e2ePassportFile("Agent_Smoke"));
-    }
-
-    await closeVisibleDrawer(page);
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
-    );
+    await page.getByRole("button", { name: "Отменить создание подачи" }).click();
+    await expect(createWorkspace).toHaveCount(0);
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 
   test("agent can open a submission drawer and reach files/issues surfaces", async ({
@@ -130,8 +117,9 @@ test.describe("V-19 pilot agent click flow", () => {
       await expect(submitCorrectionsButton).toBeVisible();
     }
 
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
-    );
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 });

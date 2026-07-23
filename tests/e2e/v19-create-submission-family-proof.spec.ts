@@ -42,12 +42,16 @@ async function openCreateSubmission(page: Page, mobile: boolean) {
     .getByRole("button", { name: "Новая подача" });
   await expect(createButton).toBeVisible();
   await createButton.click();
-  const dialog = page.getByRole("dialog", { name: "Новая подача" });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  const workspace = page.locator('[data-agent-screen="create"]');
+  await expect(workspace).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Новая подача" }),
+  ).toBeVisible();
+  return workspace;
 }
 
 async function expectActionInViewport(page: Page, button: Locator) {
+  await expect(button).toBeInViewport({ ratio: 1 });
   const box = await button.boundingBox();
   expect(box).not.toBeNull();
   expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
@@ -65,19 +69,21 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
-  const dialog = await openCreateSubmission(page, mobile);
-  const saveButton = dialog.getByRole("button", { name: "Сохранить черновик" });
-  const continueWithoutPassport = dialog.getByRole("button", {
+  const workspace = await openCreateSubmission(page, mobile);
+  const saveButton = workspace.getByRole("button", {
+    name: "Сохранить черновик",
+  });
+  const continueWithoutPassport = workspace.getByRole("button", {
     name: "Продолжить без паспорта",
   });
   await expect(saveButton).toBeDisabled();
   await expect(continueWithoutPassport).toBeDisabled();
-  await expect(dialog.getByText("Выберите город подачи.")).toBeVisible();
+  await expect(workspace.getByText("Выберите город подачи.")).toBeVisible();
 
-  await dialog.getByLabel("Город подачи").selectOption("Казань");
+  await workspace.getByLabel("Город подачи").selectOption("Казань");
   await expect(continueWithoutPassport).toBeEnabled();
 
-  await dialog
+  await workspace
     .locator('input[type="file"]')
     .setInputFiles([e2ePassportFile("main"), e2ePassportFile("spouse")]);
   const assignment = page.getByRole("dialog", { name: "Назначьте паспорта" });
@@ -87,11 +93,11 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   });
   await ownerSelectors.nth(0).selectOption("0");
   await ownerSelectors.nth(1).selectOption("1");
-  await assignment.getByRole("button", { name: "Запустить OCR" }).click();
+  await assignment.getByRole("button", { name: "Распознать паспорта" }).click();
   await expect(assignment).toBeHidden();
 
-  await expect(dialog.getByText("Нужна ручная проверка").first()).toBeVisible();
-  const primary = dialog.getByRole("button", {
+  await expect(workspace.getByText("Вручную").first()).toBeVisible();
+  const primary = workspace.getByRole("button", {
     name: "Создать и открыть анкету",
   });
   await expect(primary).toBeEnabled();
@@ -106,7 +112,7 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
 
   await primary.click();
   await expect(page.getByRole("heading", { level: 1, name: /Анкета:/ })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "Новая подача" })).toHaveCount(0);
+  await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
   await expect(page.getByLabel("Выбрать туриста").locator("option")).toHaveCount(2);
 }
 
@@ -125,5 +131,29 @@ test.describe("V-19 canonical family intake", () => {
     await page.setViewportSize({ height: 844, width: 390 });
     await verifyFamilyCreateFlow(page, true);
     expect(browserProblems).toEqual([]);
+  });
+
+  test("keeps a dirty draft when command-palette navigation is cancelled", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 960, width: 1440 });
+    const workspace = await openCreateSubmission(page, false);
+    await workspace.getByLabel("Город подачи").selectOption("Казань");
+
+    await page.keyboard.press("Control+K");
+    const palette = page.getByRole("dialog", { name: "Командная палитра агента" });
+    await expect(palette).toBeVisible();
+    await palette.getByText("Мои подачи", { exact: true }).click();
+
+    const exitDialog = page.getByRole("alertdialog", {
+      name: "Выйти без сохранения?",
+    });
+    await expect(exitDialog).toBeVisible();
+    await exitDialog
+      .getByRole("button", { name: "Вернуться к редактированию" })
+      .click();
+
+    await expect(workspace).toBeVisible();
+    await expect(workspace.getByLabel("Город подачи")).toHaveValue("Казань");
   });
 });

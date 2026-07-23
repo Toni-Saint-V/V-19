@@ -52,8 +52,14 @@ describe("async UI callers", () => {
       .fn()
       .mockImplementationOnce(() => firstSave)
       .mockResolvedValueOnce(undefined);
+    const onNavigationStateChange = vi.fn();
 
-    render(<PreUploadScreen onBack={vi.fn()} onSubmit={onSubmit} />);
+    render(
+      <PreUploadScreen
+        onNavigationStateChange={onNavigationStateChange}
+        onSubmit={onSubmit}
+      />,
+    );
 
     fireEvent.change(screen.getByLabelText("Город подачи"), {
       target: { value: "Самара" },
@@ -64,8 +70,12 @@ describe("async UI callers", () => {
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(saveButton).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Назад" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Закрыть создание" })).toBeDisabled();
+    await waitFor(() =>
+      expect(onNavigationStateChange).toHaveBeenLastCalledWith({
+        busy: true,
+        dirty: true,
+      }),
+    );
 
     await act(async () => {
       rejectFirstSave?.(new Error("database details must stay private"));
@@ -75,7 +85,9 @@ describe("async UI callers", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Не удалось сохранить подачу.",
     );
-    expect(screen.queryByText("database details must stay private")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("database details must stay private"),
+    ).not.toBeInTheDocument();
     await waitFor(() => expect(saveButton).not.toBeDisabled());
 
     fireEvent.click(saveButton);
@@ -152,8 +164,13 @@ describe("async UI callers", () => {
     tabs.forEach((tab, index) => {
       const tabId = tabIds[index];
       if (!tabId) throw new Error("Missing expected operational Drawer tab id.");
-      expect(tab).toHaveAccessibleName(new RegExp(`^${tabLabels[index]}(?:\\s*\\d+)?$`));
-      expect(tab).toHaveAttribute("aria-controls", `v20-submission-drawer-panel-${tabId}`);
+      expect(tab).toHaveAccessibleName(
+        new RegExp(`^${tabLabels[index]}(?:\\s*\\d+)?$`),
+      );
+      expect(tab).toHaveAttribute(
+        "aria-controls",
+        `v20-submission-drawer-panel-${tabId}`,
+      );
     });
     expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
     expect(tabs[0]).toHaveAttribute(
@@ -176,7 +193,8 @@ describe("async UI callers", () => {
     const mobileMoreButton = container.querySelector<HTMLButtonElement>(
       ".v20-tabbar-more-trigger",
     );
-    if (!mobileMoreButton) throw new Error("Missing operational Drawer mobile tabs trigger.");
+    if (!mobileMoreButton)
+      throw new Error("Missing operational Drawer mobile tabs trigger.");
     fireEvent.click(mobileMoreButton);
 
     const mobileMenu = await screen.findByRole("menu", {
@@ -188,7 +206,9 @@ describe("async UI callers", () => {
     );
     expect(mobileMenuItems).toHaveLength(3);
     ["Файлы", "Замечания", "История"].forEach((label, index) => {
-      expect(mobileMenuItems[index]).toHaveAccessibleName(new RegExp(`^${label}(?:\\s*\\d+)?$`));
+      expect(mobileMenuItems[index]).toHaveAccessibleName(
+        new RegExp(`^${label}(?:\\s*\\d+)?$`),
+      );
     });
 
     fireEvent.click(mobileMenuItems[0]!);
@@ -232,7 +252,9 @@ describe("async UI callers", () => {
     );
 
     expect(await screen.findByText("Все блоки данных заполнены")).toBeInTheDocument();
-    expect(screen.queryByText("Осталось заполнить 2 блока данных")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Осталось заполнить 2 блока данных"),
+    ).not.toBeInTheDocument();
     expect(screen.getAllByText("100%")).toHaveLength(6);
   });
 
@@ -253,7 +275,9 @@ describe("async UI callers", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "Список задач по замечаниям" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Список задач по замечаниям" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Селфи 1" })).toBeInTheDocument();
     expect(screen.getByText("Лицо обрезано. Загрузите селфи 1.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Скан паспорта" })).toBeInTheDocument();
@@ -277,10 +301,7 @@ describe("async UI callers", () => {
     if (!firstIssue || !secondIssue) throw new Error("Expected two correction issues.");
     const submission: Submission = {
       ...source,
-      issues: [
-        { ...firstIssue, status: "fixed_by_agent" },
-        secondIssue,
-      ],
+      issues: [{ ...firstIssue, status: "fixed_by_agent" }, secondIssue],
     };
 
     render(
@@ -302,8 +323,12 @@ describe("async UI callers", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Ждет проверки")).toBeInTheDocument();
     expect(screen.getAllByText("Blocker")).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Перезагрузить файл" })).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: "Отметить исправленным" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Перезагрузить файл" })).toHaveLength(
+      1,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Отметить исправленным" }),
+    ).not.toBeInTheDocument();
   });
 
   test("operational drawer restores a pre-existing body scroll lock", async () => {
@@ -360,9 +385,7 @@ describe("async UI callers", () => {
       },
     });
 
-    expect(
-      await screen.findByText(/Не удалось загрузить файл/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Не удалось загрузить файл/)).toBeInTheDocument();
     expect(onUploadFile).toHaveBeenCalledTimes(1);
   });
 
@@ -373,7 +396,13 @@ describe("async UI callers", () => {
     if (!firstIssue) throw new Error("Missing returned issue fixture.");
     const submission: Submission = {
       ...source,
-      issues: [{ ...firstIssue, type: "section", target: { ...firstIssue.target, fileType: undefined } }],
+      issues: [
+        {
+          ...firstIssue,
+          type: "section",
+          target: { ...firstIssue.target, fileType: undefined },
+        },
+      ],
     };
     let rejectMarkFixed: ((reason?: unknown) => void) | undefined;
     const pendingMarkFixed = new Promise<void>((_resolve, reject) => {

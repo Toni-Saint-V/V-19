@@ -13,6 +13,7 @@ const responsiveViewports: ViewportProof[] = [
   { height: 768, label: "1024", width: 1024 },
   { height: 1024, label: "768", width: 768 },
   { height: 844, label: "390", width: 390 },
+  { height: 812, label: "375", width: 375 },
 ];
 
 function collectBrowserProblems(page: Page) {
@@ -45,6 +46,42 @@ async function expectNoHorizontalDocumentOverflow(page: Page, context: string) {
   });
 
   expect(metrics.scrollWidth, context).toBeLessThanOrEqual(metrics.clientWidth + 1);
+}
+
+async function expectCreateContentFitsWithoutScroll(page: Page, context: string) {
+  const body = page.locator('[data-agent-screen="create"] .v19-preupload-card-body');
+  await expect(body, `${context}: create content body`).toBeVisible();
+  const metrics = await body.evaluate((element) => {
+    const card = element.closest<HTMLElement>(".v19-preupload-card");
+    const rect = card?.getBoundingClientRect();
+    const ancestors: Array<{
+      className: string;
+      height: number;
+      top: number;
+    }> = [];
+    let ancestor = card?.parentElement;
+    while (ancestor && ancestors.length < 6) {
+      const ancestorRect = ancestor.getBoundingClientRect();
+      ancestors.push({
+        className: ancestor.className,
+        height: ancestorRect.height,
+        top: ancestorRect.top,
+      });
+      ancestor = ancestor.parentElement;
+    }
+    return {
+      ancestors,
+      bodyClientHeight: element.clientHeight,
+      bodyScrollHeight: element.scrollHeight,
+      cardBottom: rect?.bottom ?? 0,
+      cardHeight: rect?.height ?? 0,
+      cardTop: rect?.top ?? 0,
+    };
+  });
+  expect(
+    metrics.bodyScrollHeight,
+    `${context}: create content should fit without inner scroll ${JSON.stringify(metrics)}`,
+  ).toBeLessThanOrEqual(metrics.bodyClientHeight + 1);
 }
 
 async function expectAgentNoDocumentScroll(page: Page, context: string) {
@@ -216,9 +253,7 @@ test.describe("V-19 responsive proof", () => {
 
       await clickOperationalNav(page, /^Мои подачи/);
       await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
-      await expect(
-        page.locator('[data-agent-screen="submissions"]'),
-      ).toBeVisible();
+      await expect(page.locator('[data-agent-screen="submissions"]')).toBeVisible();
       await expect(
         page.getByRole("button", { name: "Новая подача" }).first(),
       ).toBeVisible();
@@ -226,27 +261,37 @@ test.describe("V-19 responsive proof", () => {
       await screenshot(page, viewport, "agent-submissions");
 
       await page.getByRole("button", { name: "Новая подача" }).first().click();
-      await expect(page.getByRole("heading", { name: "Новая подача" })).toBeVisible();
-      await expectDrawerFitsViewport(
-        page,
-        `${viewport.label}: create submission drawer`,
-        "Закрыть создание",
-      );
+      const createWorkspace = page.locator('[data-agent-screen="create"]');
+      await expect(createWorkspace).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Новая подача" }),
+      ).toBeVisible();
+      await expect(createWorkspace.getByTestId("preupload-workspace")).toBeVisible();
       await expectNoHorizontalDocumentOverflow(
         page,
-        `${viewport.label}: create drawer`,
+        `${viewport.label}: create workspace`,
       );
-      await screenshot(page, viewport, "create-submission-drawer");
-      const createDialog = page.getByRole("dialog").first();
-      const closeCreateButton = createDialog
-        .getByRole("button", { name: "Закрыть создание" })
-        .first();
-      if (await closeCreateButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
-        await closeCreateButton.click();
-      } else {
-        await page.keyboard.press("Escape");
-      }
-      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await expectCreateContentFitsWithoutScroll(page, viewport.label);
+      await screenshot(page, viewport, "create-submission-workspace");
+
+      await createWorkspace.getByLabel("Город подачи").selectOption("Казань");
+      await page.getByRole("button", { name: "Отменить создание подачи" }).click();
+      const exitConfirmation = page.getByRole("alertdialog", {
+        name: "Выйти без сохранения?",
+      });
+      await expect(exitConfirmation).toBeVisible();
+      await exitConfirmation
+        .getByRole("button", { name: "Вернуться к редактированию" })
+        .click();
+      await expect(createWorkspace).toBeVisible();
+      await expect(createWorkspace.getByLabel("Город подачи")).toHaveValue("Казань");
+      await page.getByRole("button", { name: "Отменить создание подачи" }).click();
+      await page
+        .getByRole("alertdialog", { name: "Выйти без сохранения?" })
+        .getByRole("button", { name: "Выйти без сохранения" })
+        .click();
+      await expect(createWorkspace).toHaveCount(0);
+      await expect(page.locator('[data-agent-screen="submissions"]')).toBeVisible();
 
       const submissionRow = page
         .locator('[data-agent-screen="submissions"]')
@@ -325,9 +370,7 @@ test.describe("V-19 responsive proof", () => {
       await screenshot(page, viewport, "admin-corrections-filter");
 
       await clickOperationalNav(page, /^Выгрузка/);
-      await expect(
-        page.getByRole("heading", { name: "Центр выгрузки" }),
-      ).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
       const generateButton = await selectReadyExportPackage(page);
       await generateButton.scrollIntoViewIfNeeded();

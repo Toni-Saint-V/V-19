@@ -10,7 +10,7 @@ import {
 } from "./v19-pilot-helpers";
 
 test.describe("V-19 pilot mobile clicks", () => {
-  test("390px create drawer and submission drawer tabs are usable", async ({
+  test("390px create workspace and submission drawer tabs are usable", async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "mobile-chromium", "mobile pilot runs once");
@@ -21,18 +21,26 @@ test.describe("V-19 pilot mobile clicks", () => {
     await expectNoHorizontalOverflow(page, "mobile actions");
 
     await clickWorkspaceButton(page, /Мои подачи/);
-    await expect(page.getByRole("heading", { level: 1, name: "Мои подачи" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Мои подачи" }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page, "mobile submissions");
 
-    await page.getByRole("button", { name: "Новая подача" }).first().click();
-    await expect(drawer(page).getByText("Новая подача")).toBeVisible();
-    await expect(drawer(page).getByRole("button", { name: "Сохранить черновик" })).toBeVisible();
-    await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeVisible();
-    await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeDisabled();
-    await expectNoHorizontalOverflow(page, "mobile create drawer");
-    await drawer(page).getByRole("button", { name: "Закрыть создание" }).click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await clickWorkspaceButton(page, /Новая подача/);
+    const createWorkspace = page.locator('[data-agent-screen="create"]');
+    await expect(createWorkspace).toBeVisible();
+    await expect(
+      createWorkspace.getByRole("button", { name: "Сохранить черновик" }),
+    ).toBeVisible();
+    await expect(
+      createWorkspace.getByRole("button", { name: "Продолжить без паспорта" }),
+    ).toBeDisabled();
+    await expectNoHorizontalOverflow(page, "mobile create workspace");
+    await page.getByRole("button", { name: "Отменить создание подачи" }).click();
+    await expect(createWorkspace).toHaveCount(0);
 
+    await page.getByRole("button", { name: /Тип подачи/ }).click();
+    await page.getByRole("option", { name: "Семья" }).click();
     await submissionCardById(page, "ПД-1048").click();
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),

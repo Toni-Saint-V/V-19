@@ -50,7 +50,7 @@ describe("PreUploadScreen canonical intake", () => {
   });
 
   test("does not preload OCR on open and explains why actions are disabled", async () => {
-    render(<PreUploadScreen onBack={() => undefined} />);
+    render(<PreUploadScreen />);
 
     expect(prewarmLocalPassportOcr).not.toHaveBeenCalled();
     expect(screen.getByText("Выберите город подачи.")).toBeVisible();
@@ -58,6 +58,12 @@ describe("PreUploadScreen canonical intake", () => {
     expect(
       screen.getByRole("button", { name: "Продолжить без паспорта" }),
     ).toBeDisabled();
+    const firstApplicant = screen.getAllByRole("listitem")[0];
+    expect(
+      firstApplicant?.querySelectorAll(".v19-preupload-applicant-state"),
+    ).toHaveLength(1);
+    expect(firstApplicant).toHaveTextContent("ОсновнойБез паспорта");
+    expect(screen.queryByText("Паспорт не добавлен")).not.toBeInTheDocument();
 
     fireEvent.focus(screen.getByRole("button", { name: "Выбрать файлы" }));
     await waitFor(() => expect(prewarmLocalPassportOcr).toHaveBeenCalledTimes(1));
@@ -65,7 +71,7 @@ describe("PreUploadScreen canonical intake", () => {
 
   test("creates an explicit passport-free canonical intent", async () => {
     const onSubmit = vi.fn(async () => undefined);
-    render(<PreUploadScreen onBack={() => undefined} onSubmit={onSubmit} />);
+    render(<PreUploadScreen onSubmit={onSubmit} />);
     chooseCity();
 
     fireEvent.click(screen.getByRole("button", { name: "Продолжить без паспорта" }));
@@ -92,11 +98,7 @@ describe("PreUploadScreen canonical intake", () => {
     );
     const onSubmit = vi.fn(async () => undefined);
     const { container } = render(
-      <PreUploadScreen
-        initialPackageType="single"
-        onBack={() => undefined}
-        onSubmit={onSubmit}
-      />,
+      <PreUploadScreen initialPackageType="single" onSubmit={onSubmit} />,
     );
     chooseCity();
 
@@ -106,7 +108,7 @@ describe("PreUploadScreen canonical intake", () => {
 
     await waitFor(() => expect(invokePassportExtraction).toHaveBeenCalledTimes(1));
     expect(
-      screen.getByText("Дождитесь OCR или выберите «Пропустить OCR»."),
+      screen.getByText("Дождитесь распознавания или выберите «Заполнить вручную»."),
     ).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Создать и открыть анкету" }),
@@ -152,9 +154,7 @@ describe("PreUploadScreen canonical intake", () => {
   });
 
   test("rejects unsupported and oversized files before OCR", () => {
-    const { container } = render(
-      <PreUploadScreen initialPackageType="single" onBack={() => undefined} />,
-    );
+    const { container } = render(<PreUploadScreen initialPackageType="single" />);
     const input = inputFor(container);
 
     fireEvent.change(input, {
@@ -175,11 +175,7 @@ describe("PreUploadScreen canonical intake", () => {
   test("accepts HEIC for private persistence and marks it for manual review", async () => {
     const onSubmit = vi.fn(async () => undefined);
     const { container } = render(
-      <PreUploadScreen
-        initialPackageType="single"
-        onBack={() => undefined}
-        onSubmit={onSubmit}
-      />,
+      <PreUploadScreen initialPackageType="single" onSubmit={onSubmit} />,
     );
     chooseCity();
     fireEvent.change(inputFor(container), {
@@ -187,7 +183,7 @@ describe("PreUploadScreen canonical intake", () => {
     });
 
     expect(invokePassportExtraction).not.toHaveBeenCalled();
-    expect(screen.getByText("Нужна ручная проверка")).toBeVisible();
+    expect(screen.getByText("Вручную")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Создать и открыть анкету" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0]?.[0].passportUploads[0]).toMatchObject({
@@ -198,7 +194,7 @@ describe("PreUploadScreen canonical intake", () => {
   });
 
   test("requires explicit applicant assignment for a family batch", async () => {
-    const { container } = render(<PreUploadScreen onBack={() => undefined} />);
+    const { container } = render(<PreUploadScreen />);
     fireEvent.change(inputFor(container), {
       target: {
         files: [passportFile("first.jpg"), passportFile("second.jpg")],
@@ -210,11 +206,11 @@ describe("PreUploadScreen canonical intake", () => {
     const selectors = screen.getAllByRole("combobox", { name: /Заявитель для/ });
     fireEvent.change(selectors[0] as HTMLSelectElement, { target: { value: "0" } });
     fireEvent.change(selectors[1] as HTMLSelectElement, { target: { value: "1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Запустить OCR" }));
+    fireEvent.click(screen.getByRole("button", { name: "Распознать паспорта" }));
 
     await waitFor(() => expect(invokePassportExtraction).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(screen.getAllByText("Нужна ручная проверка")).toHaveLength(2),
+      expect(screen.getAllByText("Вручную")).toHaveLength(2),
     );
     expect(
       vi
@@ -224,7 +220,7 @@ describe("PreUploadScreen canonical intake", () => {
   });
 
   test("caps family intake at six applicants", () => {
-    render(<PreUploadScreen onBack={() => undefined} />);
+    render(<PreUploadScreen />);
     for (let index = 0; index < 4; index += 1) {
       fireEvent.click(
         screen.getByRole("button", { name: "Добавить следующего заявителя" }),
@@ -236,21 +232,23 @@ describe("PreUploadScreen canonical intake", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(7);
   });
 
-  test("guards dirty close and restores the user choice", () => {
-    const onBack = vi.fn();
-    render(<PreUploadScreen onBack={onBack} />);
+  test("reports dirty state to the workspace navigation guard", async () => {
+    const onNavigationStateChange = vi.fn();
+    render(<PreUploadScreen onNavigationStateChange={onNavigationStateChange} />);
+    await waitFor(() =>
+      expect(onNavigationStateChange).toHaveBeenLastCalledWith({
+        busy: false,
+        dirty: false,
+      }),
+    );
+
     chooseCity();
-
-    fireEvent.click(screen.getByRole("button", { name: "Закрыть создание" }));
-    expect(
-      screen.getByRole("alertdialog", { name: "Закрыть без сохранения?" }),
-    ).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Остаться" }));
-    expect(onBack).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Закрыть создание" }));
-    fireEvent.click(screen.getByRole("button", { name: "Продолжить" }));
-    expect(onBack).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(onNavigationStateChange).toHaveBeenLastCalledWith({
+        busy: false,
+        dirty: true,
+      }),
+    );
   });
 
   test("renders real persistence stages instead of fake upload percentages", async () => {
@@ -261,13 +259,7 @@ describe("PreUploadScreen canonical intake", () => {
         resolveSubmit = resolve;
       });
     });
-    render(
-      <PreUploadScreen
-        initialPackageType="single"
-        onBack={() => undefined}
-        onSubmit={onSubmit}
-      />,
-    );
+    render(<PreUploadScreen initialPackageType="single" onSubmit={onSubmit} />);
     chooseCity();
     fireEvent.click(screen.getByRole("button", { name: "Продолжить без паспорта" }));
 

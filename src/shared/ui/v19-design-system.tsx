@@ -261,7 +261,7 @@ export const v19SideMenuDesktopMinWidth = 1025;
 export type V19SideMenuProps = {
   ariaLabel: string;
   className?: string;
-  createAction?: { label: string; onClick: () => void };
+  createAction?: { active?: boolean; label: string; onClick: () => void };
   displayMode: V19SideMenuMode;
   inactive?: boolean;
   items: V19SideMenuItem[];
@@ -308,7 +308,7 @@ export function V19SideMenu({
       ? [
           ...items.slice(0, 2),
           {
-            active: false,
+            active: createAction.active,
             icon: "+",
             id: "agent-create",
             interactionId: "shell.create-submission",
