@@ -1,10 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import {
-  clickWorkspaceButton,
-  openFreshWorkspace as openPilotWorkspace,
-} from "./v19-pilot-helpers";
+import { clickWorkspaceButton, openFreshWorkspace } from "./v19-pilot-helpers";
 
 const sharedMenuEvidenceRoot = process.env.V19_TEST_ARTIFACTS_DIR?.trim() || tmpdir();
 const sharedMenuEvidencePath = (name: string) => resolve(sharedMenuEvidenceRoot, name);
@@ -21,34 +18,6 @@ function collectBrowserProblems(page: Page) {
   });
 
   return problems;
-}
-
-async function openFreshWorkspace(
-  page: Page,
-  options: { heading?: string; workspaceEmail?: string } = {},
-) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    (
-      globalThis as unknown as { localStorage: { clear(): void } }
-    ).localStorage.clear();
-  });
-  if (options.workspaceEmail) {
-    await page.evaluate((workspaceEmail) => {
-      (
-        globalThis as unknown as {
-          localStorage: { setItem(key: string, value: string): void };
-        }
-      ).localStorage.setItem("visaflow.workspaceEmail.v1", workspaceEmail);
-    }, options.workspaceEmail);
-  }
-  await page.reload();
-  await expect(
-    page.getByRole("heading", {
-      level: 1,
-      name: options.heading ?? "Мои действия",
-    }),
-  ).toBeVisible();
 }
 
 async function readAgentShellGeometry(page: Page) {
@@ -85,7 +54,7 @@ test.describe("V-19 motion contract", () => {
     const problems = collectBrowserProblems(page);
 
     await page.setViewportSize({ height: 900, width: 1440 });
-    await openPilotWorkspace(page);
+    await openFreshWorkspace(page);
 
     const baseline = await readAgentShellGeometry(page);
     const actionCellBackgrounds = await page
@@ -216,6 +185,11 @@ test.describe("V-19 motion contract", () => {
     await openFreshWorkspace(page);
     await clickWorkspaceButton(page, /^Мои подачи$/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
+    await expect(
+      page.locator(
+        '[data-testid="agent-screen-transition"][data-agent-screen="submissions"]',
+      ),
+    ).toBeVisible();
 
     const viewTransitionSupported = await page.evaluate(
       () =>
@@ -226,11 +200,15 @@ test.describe("V-19 motion contract", () => {
         ).document.startViewTransition === "function",
     );
 
-    await page.getByRole("tab", { name: /В работе/ }).click();
-    await expect(page.getByRole("tab", { name: /В работе/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    const statusTrigger = page.locator(
+      'button.v19-admin-toolbar-select-trigger[data-v19-interaction-id="submissions.status-filter"]',
     );
+    await statusTrigger.click();
+    await page
+      .getByRole("listbox", { name: "Фильтр подач" })
+      .getByRole("option", { name: "Проверить" })
+      .click();
+    await expect(statusTrigger).toHaveAccessibleName("Фильтр подач: Проверить");
 
     if (viewTransitionSupported) {
       await expect
@@ -250,10 +228,15 @@ test.describe("V-19 motion contract", () => {
         .toBe(false);
     }
 
+    const sortTrigger = page.locator(
+      'button.v19-admin-toolbar-select-trigger[data-v19-interaction-id="submissions.sort"]',
+    );
+    await sortTrigger.click();
     await page
-      .getByLabel("Инструменты подач")
-      .getByRole("button", { name: /Скрыть контекст|Показать контекст/ })
+      .getByRole("listbox", { name: "Сортировка подач" })
+      .getByRole("option", { name: "Сначала старые" })
       .click();
+    await expect(sortTrigger).toHaveAccessibleName("Сортировка подач: Сначала старые");
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -282,12 +265,19 @@ test.describe("V-19 motion contract", () => {
     await openFreshWorkspace(page);
     await clickWorkspaceButton(page, /^Мои подачи$/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
+    await expect(
+      page.locator(
+        '[data-testid="agent-screen-transition"][data-agent-screen="submissions"]',
+      ),
+    ).toBeVisible();
 
-    const tab = page.getByRole("tab", { name: /В работе/ });
-    await tab.hover();
+    const statusTrigger = page.locator(
+      'button.v19-admin-toolbar-select-trigger[data-v19-interaction-id="submissions.status-filter"]',
+    );
+    await statusTrigger.hover();
     await expect
       .poll(() =>
-        tab.evaluate((element) => {
+        statusTrigger.evaluate((element) => {
           const view = (
             element as unknown as {
               ownerDocument: {
@@ -303,13 +293,13 @@ test.describe("V-19 motion contract", () => {
       )
       .toBe("none");
 
-    const tool = page
-      .getByLabel("Инструменты подач")
-      .getByRole("button", { name: /Сортировка: приоритет/ });
-    await tool.hover();
+    const sortTrigger = page.locator(
+      'button.v19-admin-toolbar-select-trigger[data-v19-interaction-id="submissions.sort"]',
+    );
+    await sortTrigger.hover();
     await expect
       .poll(() =>
-        tool.evaluate((element) => {
+        sortTrigger.evaluate((element) => {
           const view = (
             element as unknown as {
               ownerDocument: {
@@ -335,15 +325,19 @@ test.describe("V-19 motion contract", () => {
     const problems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: /^(Очередь на проверку|Проверка)$/,
       workspaceEmail: "admin@visaflow.local",
     });
     await clickWorkspaceButton(page, /^Выгрузка$/);
-    await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
 
-    const queue = page.locator(".magic-export-queue");
-    const row = page.locator(".magic-export-row").filter({ hasText: "Дмитрий Орлов" });
-    const action = row.getByRole("button", { name: "Смотреть пакет" });
+    const queue = page.locator(
+      ".v19-admin-export-workspace-v2 > div.min-h-0.flex-1.overflow-y-auto",
+    );
+    const row = page
+      .locator(".v19-admin-export-row-v2")
+      .filter({ hasText: "Дмитрий Орлов" });
+    const action = row.getByRole("checkbox", { name: "Выбрать Дмитрий Орлов" });
 
     await expect(action).toBeVisible();
 
