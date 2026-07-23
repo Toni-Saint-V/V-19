@@ -455,11 +455,8 @@ function SubmissionPrimaryAction({
   submitting: boolean;
   visible: boolean;
 }) {
-  const completionDecision = agentQuestionnaireCompletionDecision(submission);
-  const canSubmit =
-    canSubmitForReview &&
-    completionDecision.action === "submit_for_review" &&
-    completionDecision.ok;
+  const canSubmit = canSubmitForReviewFromList(submission, canSubmitForReview);
+  const actionVisible = visible || canSubmit;
   let actionLabel = "Открыть";
   if (canSubmit) {
     actionLabel = submitting ? "Отправляем…" : "Отправить на проверку";
@@ -470,10 +467,10 @@ function SubmissionPrimaryAction({
         canSubmit ? "submissions.submit-review" : "submissions.open",
       )}
       aria-label={`${actionLabel}: ${label}`}
-      aria-hidden={!visible || undefined}
-      className={`v19-applicant-status-action${visible ? " is-visible" : ""}`}
+      aria-hidden={!actionVisible || undefined}
+      className={`v19-applicant-status-action${actionVisible ? " is-visible" : ""}`}
       disabled={submitting}
-      tabIndex={visible ? undefined : -1}
+      tabIndex={actionVisible ? undefined : -1}
       type="button"
       onClick={() => onPrimaryAction(submission)}
     >
@@ -499,6 +496,18 @@ function SubmissionWorkflowSwitch({
       {children}
       {action}
     </div>
+  );
+}
+
+function canSubmitForReviewFromList(
+  submission: Submission,
+  canSubmitForReview: boolean,
+) {
+  if (!canSubmitForReview) return false;
+  const completionDecision = agentQuestionnaireCompletionDecision(submission);
+  return (
+    completionDecision.action === "submit_for_review" &&
+    completionDecision.ok
   );
 }
 
@@ -892,10 +901,10 @@ export function ApplicantsScreen({
   };
 
   const handlePrimaryAction = (submission: Submission) => {
-    const completionDecision = agentQuestionnaireCompletionDecision(submission);
-    const canSendToReview =
-      submission.status === "ready_for_export" ||
-      (completionDecision.action === "submit_for_review" && completionDecision.ok);
+    const canSendToReview = canSubmitForReviewFromList(
+      submission,
+      Boolean(onSubmitForReview),
+    );
 
     if (!canSendToReview || !onSubmitForReview) {
       onOpenDrawer(submission.id);

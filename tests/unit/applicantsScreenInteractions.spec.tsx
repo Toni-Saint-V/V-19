@@ -612,6 +612,55 @@ describe("ApplicantsScreen interactions", () => {
     ).toBe(true);
   });
 
+  it("resubmits an accepted legacy package without reopening completed intake gates", async () => {
+    const ready = readySubmission("single");
+    const acceptedLegacy: Submission = {
+      ...ready,
+      applicants: ready.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field, index) =>
+            index === 0 ? { ...field, value: "" } : field,
+          ),
+        })),
+      })),
+      exportState: "ready",
+      files: ready.files.map((file) => ({ ...file, status: "accepted" })),
+      status: "ready_for_export",
+    };
+    const onOpenDrawer = vi.fn();
+    const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
+
+    expect(
+      canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok,
+    ).toBe(true);
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={onOpenDrawer}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[acceptedLegacy]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+    await waitFor(() =>
+      expect(onSubmitForReview).toHaveBeenCalledWith(acceptedLegacy.id),
+    );
+    expect(onOpenDrawer).not.toHaveBeenCalled();
+
+    const transition = applyAgentSubmitForReviewResult(
+      acceptedLegacy,
+      acceptedLegacy.agentId,
+    );
+    expect(transition.ok).toBe(true);
+    if (!transition.ok) return;
+    expect(transition.data.status).toBe("submitted_for_review");
+  });
+
   it("opens an export-ready package from its visible status action", () => {
     const ready = readySubmission("single");
     const accepted: Submission = {

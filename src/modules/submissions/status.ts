@@ -793,33 +793,50 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: packageLevelExportActionReason };
   }
 
+  const isAcceptedPackageResubmission =
+    action === "submit_for_review" && submission.status === "ready_for_export";
+
   if (action === "save_progress" && !hasRequiredBasics(submission)) {
     return { ok: false, reason: "Нужен город и хотя бы один заявитель" };
-  }
-
-  if (action === "submit_for_review" && hasMissingRequiredWork(submission)) {
-    return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
   if (action === "submit_for_review" && hasBlockingIssues(submission)) {
     return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
-  if (requiresPassportGateBeforeAction(submission, action)) {
+  if (
+    action === "submit_for_review" &&
+    !isAcceptedPackageResubmission &&
+    hasMissingRequiredWork(submission)
+  ) {
+    return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
+  }
+
+  if (
+    !isAcceptedPackageResubmission &&
+    requiresPassportGateBeforeAction(submission, action)
+  ) {
     return {
       ok: false,
       reason: passportGateReason(submission),
     };
   }
 
-  if (requiresPassportExtractionReviewBeforeAction(submission, action)) {
+  if (
+    !isAcceptedPackageResubmission &&
+    requiresPassportExtractionReviewBeforeAction(submission, action)
+  ) {
     return {
       ok: false,
       reason: "Проверьте распознанные паспортные данные перед отправкой",
     };
   }
 
-  if (action === "submit_for_review" && !hasUsableTripDateRange(submission)) {
+  if (
+    action === "submit_for_review" &&
+    !isAcceptedPackageResubmission &&
+    !hasUsableTripDateRange(submission)
+  ) {
     return { ok: false, reason: missingTripDateRangeReason };
   }
 
