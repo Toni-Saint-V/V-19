@@ -22,9 +22,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import type {
-  QuestionnaireInitialFocus,
-} from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import { ConfirmationDialog } from "../modules/submissions/components/Primitives";
 import {
   applicantWorkflowActions,
@@ -83,10 +81,7 @@ export type ApplicantFocusRequest = {
 interface ApplicantsScreenProps {
   focusRequest?: ApplicantFocusRequest;
   onOpenDrawer: (id: string) => void;
-  onOpenQuestionnaire?: (
-    id: string,
-    initialFocus?: QuestionnaireInitialFocus,
-  ) => void;
+  onOpenQuestionnaire?: (id: string, initialFocus?: QuestionnaireInitialFocus) => void;
   onOpenWorkspaceTarget?: (id: string, target: WorkspaceTarget) => void;
   onSubmitForReview?: (id: string) => Promise<void>;
   onTypeFilterChange?: (filter: SubmissionTypeFilter) => void;
@@ -209,7 +204,8 @@ function ApplicantWorkflowActionButton({
   const stateLabel = actionStateLabels[action.state];
   const accessibleLabel = `${label}: ${stateLabel}, ${applicant.fullName}`;
   const isQuestionnaire = action.kind === "questionnaire";
-  const canPickFile = canAgentEditSubmission(submission) && Boolean(onUploadApplicantFile);
+  const canPickFile =
+    canAgentEditSubmission(submission) && Boolean(onUploadApplicantFile);
 
   const activate = () => {
     if (action.kind === "questionnaire") {
@@ -252,12 +248,7 @@ function ApplicantWorkflowActionButton({
     if (!file || action.kind === "questionnaire" || !onUploadApplicantFile) return;
     setUploading(true);
     try {
-      await onUploadApplicantFile(
-        submission.id,
-        applicant.id,
-        action.kind,
-        file,
-      );
+      await onUploadApplicantFile(submission.id, applicant.id, action.kind, file);
     } catch (error) {
       window.alert(
         error instanceof Error ? error.message : "Не удалось загрузить файл.",
@@ -363,13 +354,7 @@ function lifecycleStatusTone(status: Submission["status"]) {
   return "is-progress";
 }
 
-function SubmissionCreatedAt({
-  createdAt,
-  now,
-}: {
-  createdAt: string;
-  now: Date;
-}) {
+function SubmissionCreatedAt({ createdAt, now }: { createdAt: string; now: Date }) {
   return (
     <time
       className="v19-applicant-created-at"
@@ -422,19 +407,37 @@ function AssignedPublicId({
         : null
       : submissionPublicId(submission);
 
-  return publicId ? (
-    <span className="v19-applicant-public-id">{publicId}</span>
-  ) : null;
+  return publicId ? <span className="v19-applicant-public-id">{publicId}</span> : null;
 }
 
-function SubmissionStatusLabel({ submission }: { submission: Submission }) {
-  return (
-    <span
-      className={`v19-applicant-card-status ${lifecycleStatusTone(submission.status)}`}
-    >
-      {statusLabelFor(submission.status, "full")}
-    </span>
-  );
+function SubmissionStatusLabel({
+  onOpen,
+  submission,
+}: {
+  onOpen: () => void;
+  submission: Submission;
+}) {
+  const className = `v19-applicant-card-status ${lifecycleStatusTone(
+    submission.status,
+  )}`;
+  if (submission.status === "ready_for_export") {
+    return (
+      <button
+        {...agentInteractionProps("submissions.open")}
+        aria-label="Готово к выгрузке"
+        className={className}
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+      >
+        {statusLabelFor(submission.status, "full")}
+      </button>
+    );
+  }
+
+  return <span className={className}>{statusLabelFor(submission.status, "full")}</span>;
 }
 
 function SubmissionPrimaryAction({
@@ -555,7 +558,10 @@ function FamilySubmissionCard({
             </p>
           </div>
         </div>
-        <SubmissionStatusLabel submission={submission} />
+        <SubmissionStatusLabel
+          onOpen={() => onOpenDrawer(submission.id)}
+          submission={submission}
+        />
       </div>
 
       <div className="v19-applicant-member-list">
@@ -658,7 +664,10 @@ function IndividualSubmissionCard({
             </p>
           </div>
         </div>
-        <SubmissionStatusLabel submission={submission} />
+        <SubmissionStatusLabel
+          onOpen={() => onOpenDrawer(submission.id)}
+          submission={submission}
+        />
       </div>
 
       <div className="v19-applicant-card-footer">
@@ -720,18 +729,15 @@ function profileNoun(count: number) {
   return "профилей";
 }
 
-function sortedSubmissions(
-  submissions: Submission[],
-  sort: ApplicantSort,
-  now: Date,
-) {
+function sortedSubmissions(submissions: Submission[], sort: ApplicantSort, now: Date) {
   return [...submissions].sort((left, right) => {
     if (sort === "tripDate") {
       const tripOrder = left.tripDateFrom.localeCompare(right.tripDateFrom);
       if (tripOrder !== 0) return tripOrder;
     } else {
       const leftTime = resolveSubmissionCreatedAt(left.createdAt, now)?.getTime() ?? 0;
-      const rightTime = resolveSubmissionCreatedAt(right.createdAt, now)?.getTime() ?? 0;
+      const rightTime =
+        resolveSubmissionCreatedAt(right.createdAt, now)?.getTime() ?? 0;
       const createdOrder =
         sort === "createdAsc" ? leftTime - rightTime : rightTime - leftTime;
       if (createdOrder !== 0) return createdOrder;
@@ -755,8 +761,7 @@ export function ApplicantsScreen({
   const [internalTypeFilter, setInternalTypeFilter] =
     useState<SubmissionTypeFilter>("single");
   const typeFilter = controlledTypeFilter ?? internalTypeFilter;
-  const [summaryFilter, setSummaryFilter] =
-    useState<AgentSubmissionQueueFilter>("all");
+  const [summaryFilter, setSummaryFilter] = useState<AgentSubmissionQueueFilter>("all");
   const [cityFilter, setCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<ApplicantSort>("createdDesc");
@@ -890,13 +895,9 @@ export function ApplicantsScreen({
     const completionDecision = agentQuestionnaireCompletionDecision(submission);
     const canSendToReview =
       submission.status === "ready_for_export" ||
-      (completionDecision.action === "submit_for_review" &&
-        completionDecision.ok);
+      (completionDecision.action === "submit_for_review" && completionDecision.ok);
 
-    if (
-      !canSendToReview ||
-      !onSubmitForReview
-    ) {
+    if (!canSendToReview || !onSubmitForReview) {
       onOpenDrawer(submission.id);
       return;
     }
@@ -907,11 +908,7 @@ export function ApplicantsScreen({
 
   const confirmSubmissionForReview = async () => {
     const submission = pendingReviewSubmission;
-    if (
-      !submission ||
-      !onSubmitForReview ||
-      submissionRequestRef.current !== null
-    ) {
+    if (!submission || !onSubmitForReview || submissionRequestRef.current !== null) {
       return;
     }
 

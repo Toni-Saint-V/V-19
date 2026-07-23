@@ -68,6 +68,12 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
+async function chooseCity(page: Page, workspace: Locator, city: string) {
+  await workspace.getByLabel("Город подачи").click();
+  await page.getByRole("option", { exact: true, name: city }).click();
+  await expect(workspace.getByLabel("Город подачи")).toContainText(city);
+}
+
 async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   const workspace = await openCreateSubmission(page, mobile);
   const saveButton = workspace.getByRole("button", {
@@ -80,7 +86,7 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   await expect(continueWithoutPassport).toBeDisabled();
   await expect(workspace.getByText("Выберите город подачи.")).toBeVisible();
 
-  await workspace.getByLabel("Город подачи").selectOption("Казань");
+  await chooseCity(page, workspace, "Казань");
   await expect(continueWithoutPassport).toBeEnabled();
 
   await workspace
@@ -113,7 +119,10 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   await primary.click();
   await expect(page.getByRole("heading", { level: 1, name: /Анкета:/ })).toBeVisible();
   await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
-  await expect(page.getByLabel("Выбрать туриста").locator("option")).toHaveCount(2);
+  await page.getByLabel("Выбрать туриста").click();
+  await expect(
+    page.getByRole("listbox", { name: "Выбрать туриста" }).getByRole("option"),
+  ).toHaveCount(2);
 }
 
 test.describe("V-19 canonical family intake", () => {
@@ -138,7 +147,7 @@ test.describe("V-19 canonical family intake", () => {
   }) => {
     await page.setViewportSize({ height: 960, width: 1440 });
     const workspace = await openCreateSubmission(page, false);
-    await workspace.getByLabel("Город подачи").selectOption("Казань");
+    await chooseCity(page, workspace, "Казань");
 
     await page.keyboard.press("Control+K");
     const palette = page.getByRole("dialog", { name: "Командная палитра агента" });
@@ -154,6 +163,6 @@ test.describe("V-19 canonical family intake", () => {
       .click();
 
     await expect(workspace).toBeVisible();
-    await expect(workspace.getByLabel("Город подачи")).toHaveValue("Казань");
+    await expect(workspace.getByLabel("Город подачи")).toContainText("Казань");
   });
 });

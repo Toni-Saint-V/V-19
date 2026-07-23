@@ -141,7 +141,8 @@ async function openCreateSubmission(page: Page) {
 async function createFamilyAndSubmit(page: Page, family: FamilyDraft) {
   await openCreateSubmission(page);
   await drawer(page).getByRole("button", { name: "Семья" }).click();
-  await drawer(page).locator("#create-submission-city").selectOption(family.city);
+  await drawer(page).getByLabel("Город подачи").click();
+  await page.getByRole("option", { exact: true, name: family.city }).click();
 
   for (let index = 2; index < family.applicants.length; index += 1) {
     await drawer(page)

@@ -31,7 +31,7 @@
   height: auto;
   max-height: min(920px, calc(100dvh - 128px));
   min-width: 0;
-  overflow: hidden;
+  overflow: clip;
   padding: 0;
   position: relative;
 }
@@ -169,22 +169,12 @@
   text-transform: uppercase;
 }
 
-.v19-preupload-city-field select {
-  appearance: none;
-  background: var(--v19-depth-control);
-  border: 1px solid var(--v19-depth-border-strong);
-  border-radius: 10px;
-  color: var(--v19-depth-text);
-  font: inherit;
-  font-size: 13px;
-  min-height: 44px;
-  padding: 0 34px 0 12px;
+.v19-preupload-city-field .v19-select-menu-trigger[aria-invalid="true"] {
+  border-color: var(--v19-depth-border-strong);
 }
 
-.v19-preupload-city-field select:focus-visible {
-  border-color: var(--v19-depth-border-selected);
-  outline: 2px solid var(--v19-depth-focus);
-  outline-offset: 2px;
+.v19-preupload-city-field .v19-select-menu-trigger-label {
+  font-size: 13px;
 }
 
 .v19-preupload-applicant-grid article {

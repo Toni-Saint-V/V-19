@@ -38,6 +38,7 @@ import {
   type City,
   type Submission,
 } from "../modules/submissions/types";
+import { AccessibleSelectMenu } from "../shared/ui/AccessibleSelectMenu";
 import "./PreUploadScreen.css";
 
 interface PreUploadScreenProps {
@@ -61,6 +62,11 @@ type PendingAssignment = {
 type ConfirmationAction =
   | { kind: "remove_applicant"; applicantIndex: number }
   | { kind: "switch_type"; type: Submission["type"] };
+
+const citySelectOptions = CANONICAL_CITIES.map((option) => ({
+  label: option,
+  value: option,
+}));
 
 const focusableSelector = [
   "a[href]",
@@ -140,8 +146,7 @@ function applicantCompactDetails(item?: PassportIntakeItem) {
 
 function statusLabel(item?: PassportIntakeItem) {
   if (!item) return "Без паспорта";
-  if (item.status === "extracting" || item.status === "selected")
-    return "Распознаём";
+  if (item.status === "extracting" || item.status === "selected") return "Распознаём";
   if (item.status === "ready") return "Проверить";
   return "Вручную";
 }
@@ -777,25 +782,23 @@ export function PreUploadScreen({
                       })}
                     </div>
 
-                    <label className="v19-preupload-city-field">
+                    <div className="v19-preupload-city-field">
                       <span>Город подачи</span>
-                      <select
-                        {...agentInteractionProps("new-submission.configure")}
-                        aria-invalid={!city}
+                      <AccessibleSelectMenu
+                        ariaLabel="Город подачи"
                         disabled={actionPending}
-                        onChange={(event) =>
-                          setCity(event.currentTarget.value as City | "")
-                        }
+                        onValueChange={(nextCity) => setCity(nextCity as City)}
+                        options={citySelectOptions}
+                        placeholder="Выберите город"
+                        triggerProps={{
+                          ...agentInteractionProps("new-submission.configure"),
+                          "aria-invalid": !city,
+                          id: "create-submission-city",
+                        }}
                         value={city}
-                      >
-                        <option value="">Выберите город</option>
-                        {CANONICAL_CITIES.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        variant="city"
+                      />
+                    </div>
                   </div>
 
                   <div className="v19-preupload-applicant-controls">
@@ -1057,11 +1060,11 @@ export function PreUploadScreen({
                           ? `Заменить паспорт: ${activeApplicantLabel}`
                           : `Паспорт: ${activeApplicantLabel}`}
                       </h3>
-                  <p className="v19-preupload-dropzone-copy">
-                    {passportScanUploadFormatLabel}, до 50 МБ. Распознаём данные на
-                    этом устройстве. Файл загрузится только после сохранения.
-                  </p>
-                </button>
+                      <p className="v19-preupload-dropzone-copy">
+                        {passportScanUploadFormatLabel}, до 50 МБ. Распознаём данные на
+                        этом устройстве. Файл загрузится только после сохранения.
+                      </p>
+                    </button>
                     <input
                       {...agentInteractionProps("new-submission.choose-files")}
                       accept={passportScanUploadAccept}

@@ -56,6 +56,7 @@ import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
 } from "./QuestionnaireWorkspacePrimitives";
+import { AccessibleSelectMenu } from "../../../shared/ui/AccessibleSelectMenu";
 import "./questionnaire-codex-polish-v1.css";
 
 type FieldState = "normal" | "needs_review" | "invalid";
@@ -69,13 +70,11 @@ type ApplicantTab = {
   total: number;
 };
 
-function applicantDropdownLabel(applicant: ApplicantTab) {
+function applicantDropdownDescription(applicant: ApplicantTab) {
   const progress = `${applicant.completed} из ${applicant.total}`;
-  if (applicant.status === "complete") return `${applicant.name} — готово, ${progress}`;
-  if (applicant.status === "issue") {
-    return `${applicant.name} — есть замечание, ${progress}`;
-  }
-  return `${applicant.name} — ${progress}`;
+  if (applicant.status === "complete") return `Готово · ${progress}`;
+  if (applicant.status === "issue") return `Есть замечание · ${progress}`;
+  return `Заполнено ${progress}`;
 }
 type SectionTab = {
   id: string;
@@ -799,13 +798,16 @@ function FormField({
   const shouldShowError =
     effectiveState === "invalid" &&
     (!isEmptyRequiredField || Boolean(errorMessage) || shouldRevealRequiredError);
+  const isFilled = Boolean(value.trim()) && effectiveState === "normal";
   const baseClasses = "v19-questionnaire-field-control";
   const stateClasses =
     effectiveState === "needs_review"
       ? "is-review"
       : effectiveState === "invalid"
         ? "is-invalid"
-        : "is-normal";
+        : isFilled
+          ? "is-normal is-filled"
+          : "is-normal";
   const visibleQuickOptions =
     collapsesQuickOptions && value && !quickOptionsExpanded
       ? options?.filter((option) => option === value)
@@ -986,6 +988,7 @@ function FormField({
   return (
     <div
       data-field-focused={canonicalFocused ? "true" : undefined}
+      data-field-filled={isFilled ? "true" : undefined}
       data-field-label={label}
       data-model-field-id={modelFieldId}
       data-family-copy-preview={copyPreview ? "true" : undefined}
@@ -2663,6 +2666,21 @@ export function FigmaQuestionnaireScreen({
   );
   const isEditable = questionnaireStatus.canEdit;
   const applicants = useMemo(() => applicantTabs(draftSubmission), [draftSubmission]);
+  const touristSelectOptions = useMemo(
+    () =>
+      applicants.map((applicant) => ({
+        description: applicantDropdownDescription(applicant),
+        label: applicant.name,
+        tone:
+          applicant.status === "complete"
+            ? ("muted" as const)
+            : applicant.status === "issue"
+              ? ("warning" as const)
+              : ("default" as const),
+        value: applicant.id,
+      })),
+    [applicants],
+  );
   const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
   const initialFocusApplicant =
     draftSubmission.applicants.find(
@@ -3172,7 +3190,10 @@ export function FigmaQuestionnaireScreen({
 
     return activeBlockingIssues.find((issue) => {
       if (!issue.target.field) return false;
-      if (issue.target.section === currentSection.title) return true;
+      const declaredSection = sections.find((section) =>
+        sameFieldLabel(section.title, issue.target.section),
+      );
+      if (declaredSection) return declaredSection.id === activeSection;
 
       return questionnaireFieldBindings
         .filter((binding) => binding.sectionId === currentCanonicalSection)
@@ -5002,10 +5023,33 @@ export function FigmaQuestionnaireScreen({
     sections.find((section) => section.id === mobileBlockerTarget?.sectionId)?.title ??
     "Следующее обязательное поле";
   const mobileBlockerReason = mobileBlockerTarget?.reason?.trim();
+  const currentIssueCoversMobileBlocker = Boolean(
+    currentSectionIssue &&
+      mobileBlockerTarget &&
+      currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
+      (!currentSectionIssue.target.section?.trim() ||
+        sameFieldLabel(
+          currentSectionIssue.target.section,
+          activeSectionContext?.title,
+        )) &&
+      questionnaireFieldBindings.some((binding) => {
+        const fieldLabel =
+          questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
+          mobileBlockerLabel;
+        return (
+          issueFieldMatches(
+            binding.fieldId,
+            fieldLabel,
+            currentSectionIssue.target.field,
+          ) &&
+          issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
+        );
+      }),
+  );
   const showWorkToolbar =
     showFamilyCopyControl ||
     Boolean(currentSectionIssue) ||
-    (isEditable && Boolean(mobileBlockerTarget));
+    (isEditable && Boolean(mobileBlockerTarget) && !currentIssueCoversMobileBlocker);
   const questionnaireInteractionPending =
     navigationPending || pendingIssueResolutionId !== null;
 
@@ -5037,25 +5081,18 @@ export function FigmaQuestionnaireScreen({
           <h1 className="sr-only">
             Анкета: {draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}
           </h1>
-          <label className="v19-questionnaire-tourist-switcher">
-            <span className="sr-only">Выбрать туриста</span>
-            <select
-              {...agentInteractionProps("questionnaire.navigate")}
-              aria-label="Выбрать туриста"
-              disabled={applicants.length < 2 || questionnaireInteractionPending}
-              value={activeApplicant}
-              onChange={(event) =>
-                navigateQuestionnaire(event.target.value, activeSection)
-              }
-            >
-              {applicants.map((applicant) => (
-                <option key={applicant.id} value={applicant.id}>
-                  {applicantDropdownLabel(applicant)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown aria-hidden="true" />
-          </label>
+          <AccessibleSelectMenu
+            ariaLabel="Выбрать туриста"
+            className="v19-questionnaire-tourist-switcher"
+            disabled={applicants.length < 2 || questionnaireInteractionPending}
+            onValueChange={(applicantId) =>
+              navigateQuestionnaire(applicantId, activeSection)
+            }
+            options={touristSelectOptions}
+            triggerProps={agentInteractionProps("questionnaire.navigate")}
+            value={activeApplicant}
+            variant="questionnaire-tourist"
+          />
         </div>
 
         <div className="v19-questionnaire-header-actions">
@@ -5398,7 +5435,9 @@ export function FigmaQuestionnaireScreen({
                   }`}
                 >
                   <div className="v19-questionnaire-work-toolbar-notice">
-                    {isEditable && mobileBlockerTarget ? (
+                    {isEditable &&
+                    mobileBlockerTarget &&
+                    !currentIssueCoversMobileBlocker ? (
                       <button
                         {...agentInteractionProps("questionnaire.navigate")}
                         aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
@@ -5434,6 +5473,7 @@ export function FigmaQuestionnaireScreen({
                             ? "is-awaiting"
                             : ""
                         }`}
+                        data-testid="questionnaire-current-issue"
                         role={
                           currentSectionIssue.status === "fixed_by_agent"
                             ? "status"

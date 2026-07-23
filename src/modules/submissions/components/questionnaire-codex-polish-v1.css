@@ -104,8 +104,7 @@
   line-height: var(--v19b-line-height-copy);
 }
 
-.vf-figma-questionnaire-screen.codex-polish-v1
-  .v19-questionnaire-save-error-copy {
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-save-error-copy {
   display: grid;
   min-width: var(--v19b-size-0);
   flex: 1 1 var(--v19b-size-320);
@@ -119,8 +118,7 @@
   font-weight: var(--v19b-weight-title);
 }
 
-.vf-figma-questionnaire-screen.codex-polish-v1
-  .v19-questionnaire-save-error-actions {
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-save-error-actions {
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
@@ -148,21 +146,18 @@
   background: var(--v19b-color-control-hover);
 }
 
-.vf-figma-questionnaire-screen.codex-polish-v1
-  .v19-questionnaire-save-error-warning {
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-save-error-warning {
   flex: 1 1 var(--v19b-size-280);
   color: var(--v19b-color-text-strong);
 }
 
 @media (max-width: 767px) {
-  .vf-figma-questionnaire-screen.codex-polish-v1
-    .v19-questionnaire-save-error {
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-save-error {
     align-items: flex-start;
     flex-wrap: wrap;
   }
 
-  .vf-figma-questionnaire-screen.codex-polish-v1
-    .v19-questionnaire-save-error-actions {
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-save-error-actions {
     width: var(--v19b-size-full);
     justify-content: stretch;
   }
@@ -174,9 +169,7 @@
   }
 }
 
-.vf-figma-questionnaire-screen.codex-polish-v1
-  .v19-questionnaire-save-error
-  svg {
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-save-error svg {
   width: var(--v19b-size-18);
   height: var(--v19b-size-18);
   flex: 0 0 auto;
@@ -574,6 +567,19 @@
   color: var(--v19b-color-text-strong) !important;
   background: var(--v19b-color-app) !important;
   font-size: var(--v19b-size-14) !important;
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-field-control.is-filled {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  box-shadow: inset 0 var(--v19b-size-1) var(--v19b-size-0) rgb(255 255 255 / 0.04) !important;
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-field-control.is-filled:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
 }
 
 .vf-figma-questionnaire-screen.codex-polish-v1
@@ -1083,6 +1089,70 @@
   display: none;
 }
 
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-tourist-switcher
+  .v19-select-menu-trigger {
+  height: var(--v19b-size-full);
+  min-height: var(--v19b-size-44);
+  padding: var(--v19b-size-5) var(--v19b-size-10) var(--v19b-size-5) var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--questionnaire-polish-line);
+  border-radius: var(--v19b-size-12);
+  background: var(--questionnaire-polish-control);
+  box-shadow: inset 0 var(--v19b-size-1) var(--v19b-size-0) rgb(255 255 255 / 0.035);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-tourist-switcher
+  .v19-select-menu-trigger:is(:hover, [aria-expanded="true"]):not(:disabled) {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-tourist-switcher
+  .v19-select-menu-trigger-label {
+  font-size: var(--v19b-size-14);
+  font-weight: var(--v19b-weight-title);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-tourist-switcher
+  .v19-select-menu-trigger-description {
+  font-size: var(--v19b-size-10);
+}
+
+.v19-select-menu-popover.is-questionnaire-tourist
+  .v19-select-menu-option.is-tone-muted {
+  background: color-mix(
+    in srgb,
+    var(--v19-depth-control) 82%,
+    var(--v19-depth-text-faint)
+  );
+}
+
+.v19-select-menu-popover.is-questionnaire-tourist {
+  gap: var(--v19b-size-4);
+  padding: var(--v19b-size-8);
+  border-color: var(--v19b-color-border-strong);
+  border-radius: var(--v19b-size-14);
+  background: var(--v19b-color-panel-strong);
+}
+
+.v19-select-menu-popover.is-questionnaire-tourist .v19-select-menu-option {
+  min-height: var(--v19b-size-56);
+  padding: var(--v19b-size-8) var(--v19b-size-10);
+  border-radius: var(--v19b-size-10);
+}
+
+.v19-select-menu-popover.is-questionnaire-tourist .v19-select-menu-option-label {
+  font-size: var(--v19b-size-13);
+  font-weight: var(--v19b-weight-title);
+}
+
+.v19-select-menu-popover.is-questionnaire-tourist .v19-select-menu-option-description {
+  font-size: var(--v19b-size-11);
+}
+
 .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-applicant-bar {
   display: none !important;
 }
@@ -1296,7 +1366,7 @@
 
   .vf-figma-questionnaire-screen.codex-polish-v1
     .v19-questionnaire-tourist-switcher
-    select {
+    .v19-select-menu-trigger-label {
     font-size: var(--v19b-size-17);
   }
 
@@ -1373,10 +1443,9 @@
     display: grid !important;
     min-height: var(--v19b-size-60) !important;
     flex: 0 0 auto;
-    grid-template-columns: var(--v19b-size-44) minmax(
-        var(--v19b-size-0),
-        var(--v19b-grid-fr)
-      ) auto;
+    grid-template-columns:
+      var(--v19b-size-44) minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto;
     gap: var(--v19b-size-6) !important;
     padding: var(--v19b-size-6) var(--v19b-size-8) !important;
     border-bottom: var(--v19b-size-1) solid var(--questionnaire-polish-line) !important;
@@ -1388,7 +1457,7 @@
 
   .vf-figma-questionnaire-screen.codex-polish-v1
     .v19-questionnaire-tourist-switcher
-    select {
+    .v19-select-menu-trigger-label {
     font-size: var(--v19b-size-14);
   }
 
@@ -1463,13 +1532,8 @@
     padding: var(--v19b-size-6) var(--v19b-size-8)
       max(var(--v19b-size-6), env(safe-area-inset-bottom));
     border-top: var(--v19b-size-1) solid var(--questionnaire-polish-line);
-    background: color-mix(
-      in srgb,
-      var(--questionnaire-polish-canvas) 96%,
-      transparent
-    );
-    box-shadow: 0 calc(var(--v19b-size-12) * -1) var(--v19b-size-28)
-      rgb(0 0 0 / 0.2);
+    background: color-mix(in srgb, var(--questionnaire-polish-canvas) 96%, transparent);
+    box-shadow: 0 calc(var(--v19b-size-12) * -1) var(--v19b-size-28) rgb(0 0 0 / 0.2);
     backdrop-filter: blur(var(--v19b-size-16));
   }
 
@@ -1506,8 +1570,7 @@
     height: var(--v19b-size-18);
   }
 
-  .vf-figma-questionnaire-screen.codex-polish-v1
-    .v19-questionnaire-mobile-footer-save {
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-mobile-footer-save {
     display: flex;
     width: var(--v19b-size-full) !important;
     min-width: var(--v19b-size-0) !important;
@@ -1566,10 +1629,9 @@
     width: var(--v19b-size-full);
     min-width: var(--v19b-size-0);
     height: var(--v19b-size-44);
-    grid-template-columns: var(--v19b-size-16) minmax(
-        var(--v19b-size-0),
-        var(--v19b-grid-fr)
-      ) var(--v19b-size-14);
+    grid-template-columns:
+      var(--v19b-size-16) minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19b-size-14);
     align-items: center;
     gap: var(--v19b-size-5);
     padding-inline: var(--v19b-size-8);
@@ -1630,7 +1692,7 @@
 
   .vf-figma-questionnaire-screen.codex-polish-v1
     .v19-questionnaire-tourist-switcher
-    select {
+    .v19-select-menu-trigger-label {
     font-size: var(--v19b-size-15);
   }
 }

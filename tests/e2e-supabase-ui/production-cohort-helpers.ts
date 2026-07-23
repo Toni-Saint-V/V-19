@@ -1412,9 +1412,8 @@ export async function createOrResumeCohortCase(input: {
     });
     await clickFirstVisible(typeButton);
     await expect(typeButton).toHaveAttribute("aria-pressed", "true");
-    await create
-      .locator("#create-submission-city")
-      .selectOption({ label: cohortCase.city });
+    await create.getByLabel("Город подачи").click();
+    await page.getByRole("option", { exact: true, name: cohortCase.city }).click();
     if (cohortCase.type === "family") {
       const add = create.getByRole("button", {
         name: "Добавить заявителя в семью",

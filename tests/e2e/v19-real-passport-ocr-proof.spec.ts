@@ -24,7 +24,8 @@ test.describe("V-19 privacy-safe passport intake proof", () => {
     const workspace = page.locator('[data-agent-screen="create"]');
     await expect(workspace).toBeVisible();
     await workspace.getByRole("radio", { name: "Заявитель" }).click();
-    await workspace.getByLabel("Город подачи").selectOption("Самара");
+    await workspace.getByLabel("Город подачи").click();
+    await page.getByRole("option", { exact: true, name: "Самара" }).click();
     await workspace.locator('input[type="file"]').setInputFiles({
       buffer: Buffer.from([0x00, 0x00, 0x00, 0x18]),
       mimeType: "image/heic",

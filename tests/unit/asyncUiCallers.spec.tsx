@@ -61,9 +61,8 @@ describe("async UI callers", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Город подачи"), {
-      target: { value: "Самара" },
-    });
+    fireEvent.click(screen.getByLabelText("Город подачи"));
+    fireEvent.click(screen.getByRole("option", { name: "Самара" }));
     const saveButton = screen.getByRole("button", { name: "Сохранить черновик" });
     fireEvent.click(saveButton);
     fireEvent.click(saveButton);

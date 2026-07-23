@@ -35,7 +35,9 @@ async function openQuestionnaire(page: Page) {
     );
   }, ownedByCurrentLocalAgent);
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "Мои действия" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Мои действия" }),
+  ).toBeVisible();
 
   const openQuestionnaireAction = page
     .locator("button:visible")
@@ -47,7 +49,7 @@ async function openQuestionnaire(page: Page) {
     const mobileQuestionnaireAction = page
       .locator(
         'button:visible[aria-label^="Открыть действие:"][aria-label*="Артём Соколов"]',
-    )
+      )
       .first();
     await expect(mobileQuestionnaireAction).toBeVisible();
     await mobileQuestionnaireAction.click();
@@ -119,23 +121,25 @@ async function expectFullscreenQuestionnaireShell(
 }
 
 async function expectMobileControlsAtLeast44(page: Page) {
-  const undersizedControls = await page.locator(
-    ".vf-figma-questionnaire-screen button:visible:not(:disabled), .vf-figma-questionnaire-screen select:visible:not(:disabled), .vf-figma-questionnaire-screen input:visible:not(:disabled)",
-  ).evaluateAll((controls) =>
-    controls
-      .map((control) => {
-        const box = control.getBoundingClientRect();
-        return {
-          height: box.height,
-          label:
-            control.getAttribute("aria-label") ??
-            control.textContent?.replace(/\s+/g, " ").trim() ??
-            control.tagName,
-          width: box.width,
-        };
-      })
-      .filter(({ height, width }) => height < 44 || width < 44),
-  );
+  const undersizedControls = await page
+    .locator(
+      ".vf-figma-questionnaire-screen button:visible:not(:disabled), .vf-figma-questionnaire-screen select:visible:not(:disabled), .vf-figma-questionnaire-screen input:visible:not(:disabled)",
+    )
+    .evaluateAll((controls) =>
+      controls
+        .map((control) => {
+          const box = control.getBoundingClientRect();
+          return {
+            height: box.height,
+            label:
+              control.getAttribute("aria-label") ??
+              control.textContent?.replace(/\s+/g, " ").trim() ??
+              control.tagName,
+            width: box.width,
+          };
+        })
+        .filter(({ height, width }) => height < 44 || width < 44),
+    );
   expect(undersizedControls).toEqual([]);
 }
 
@@ -147,7 +151,9 @@ async function expectMobileQuestionnaireLayout(
 
   const geometry = await page.evaluate(() => {
     const rect = (selector: string) => {
-      const box = document.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+      const box = document
+        .querySelector<HTMLElement>(selector)
+        ?.getBoundingClientRect();
 
       return box
         ? {
@@ -202,11 +208,13 @@ async function expectMobileQuestionnaireLayout(
     (geometry.header?.height ?? 0) - 1,
   );
   expect(geometry.scroll?.height ?? 0).toBeGreaterThan(viewport.height * 0.8);
-  expect((geometry.scroll?.y ?? 0) + (geometry.scroll?.height ?? 0)).toBeLessThanOrEqual(
-    viewport.height + 1,
-  );
+  expect(
+    (geometry.scroll?.y ?? 0) + (geometry.scroll?.height ?? 0),
+  ).toBeLessThanOrEqual(viewport.height + 1);
   expect(geometry.contentInset).toBeGreaterThanOrEqual(16);
-  expect(geometry.workPanel?.height ?? 0).toBeGreaterThanOrEqual(viewport.height * 0.75 - 1);
+  expect(geometry.workPanel?.height ?? 0).toBeGreaterThanOrEqual(
+    viewport.height * 0.75 - 1,
+  );
   expect(geometry.scrollOverflowY).toBe("auto");
   expect(geometry.workPanelOverflowY).toBe("visible");
   expect(geometry.headerSave?.height ?? 0).toBeGreaterThanOrEqual(44);
@@ -227,12 +235,23 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expect(page.locator(".v19-questionnaire-applicant-bar")).toBeHidden();
     await expect(page.locator(".v19-questionnaire-section-nav")).toBeVisible();
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
-    await expect(page.getByRole("button", { exact: true, name: "Следующее поле" })).toHaveCount(0);
-    await expect(page.getByRole("button", { exact: true, name: "Блокер" })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { exact: true, name: "Следующее поле" }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("button", { exact: true, name: "Блокер" })).toHaveCount(
+      0,
+    );
 
-    await page.getByRole("button", { name: /Личные данные/ }).first().click();
-    const reviewField = page.locator(".v19-questionnaire-field-control.is-review:visible").first();
-    const normalField = page.locator(".v19-questionnaire-field-control.is-normal:visible").first();
+    await page
+      .getByRole("button", { name: /Личные данные/ })
+      .first()
+      .click();
+    const reviewField = page
+      .locator(".v19-questionnaire-field-control.is-review:visible")
+      .first();
+    const normalField = page
+      .locator(".v19-questionnaire-field-control.is-normal:visible")
+      .first();
     await expect(reviewField).toBeVisible();
     await expect(normalField).toBeVisible();
     const confirmReview = page.getByRole("button", {
@@ -255,15 +274,18 @@ test.describe("V-19 questionnaire live sanity", () => {
           ((reviewControlBox?.x ?? 0) + (reviewControlBox?.width ?? 0)),
       ),
     ).toBeLessThanOrEqual(1);
-    expect(Math.abs((confirmReviewBox?.y ?? 0) - (reviewControlBox?.y ?? 0))).toBeLessThanOrEqual(
-      1,
-    );
+    expect(
+      Math.abs((confirmReviewBox?.y ?? 0) - (reviewControlBox?.y ?? 0)),
+    ).toBeLessThanOrEqual(1);
     await page.screenshot({
       fullPage: true,
       path: testInfo.outputPath("questionnaire-review-desktop.png"),
     });
 
-    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
+    await page
+      .getByRole("button", { name: /Адрес и контакты/ })
+      .first()
+      .click();
     const street = page.getByRole("combobox", {
       name: "Улица / проспект / переулок",
     });
@@ -275,7 +297,9 @@ test.describe("V-19 questionnaire live sanity", () => {
     });
     await page.getByRole("option", { name: "улица" }).click();
     await expect(street).toHaveValue("улица ");
-    await expect(page.locator("[role='status']:visible").filter({ hasText: "Сохранено" })).toBeVisible({
+    await expect(
+      page.locator("[role='status']:visible").filter({ hasText: "Сохранено" }),
+    ).toBeVisible({
       timeout: 5_000,
     });
 
@@ -287,7 +311,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(browserProblems).toEqual([]);
   });
 
-  test("mobile keeps the header compact and exposes the next blocker", async ({
+  test("mobile keeps the header compact and exposes one current issue surface", async ({
     page,
   }, testInfo) => {
     testInfo.setTimeout(60_000);
@@ -320,7 +344,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       return {
         activeSection: style(".v19-questionnaire-section-tab.is-active"),
         issueSection: style(
-          ".v19-questionnaire-section-tab.status-issue:not(.is-active)",
+          ".v19-questionnaire-section-tab.status-issue.is-active",
         ),
         pendingSection: style(
           ".v19-questionnaire-section-tab.status-pending:not(.is-active)",
@@ -332,15 +356,20 @@ test.describe("V-19 questionnaire live sanity", () => {
     );
     expect(selectionPresentation.activeSection?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(selectionPresentation.activeSection?.boxShadow).toBe("none");
+    expect(selectionPresentation.issueSection).not.toBeNull();
     const blocker = page.getByRole("button", {
       name: /^Перейти к следующему обязательному действию:/,
     });
-    await expect(blocker).toBeVisible();
-    await blocker.click();
-    await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
+    await expect(blocker).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "Сохранить и выйти" }),
+      page.locator(".v19-questionnaire-section-tab.status-issue").first(),
     ).toBeVisible();
+    await expect(
+      page.locator(".v19-questionnaire-field-control.is-review"),
+    ).toBeVisible();
+    await expect(page.getByTestId("questionnaire-current-issue")).toHaveCount(0);
+    await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Сохранить и выйти" })).toBeVisible();
 
     const applicantNextButtons = page.locator(
       '[aria-label^="Следующее незаполненное:"]',
@@ -357,7 +386,10 @@ test.describe("V-19 questionnaire live sanity", () => {
       .locator(".v19-questionnaire-section-title")
       .allTextContents();
 
-    await page.getByRole("button", { name: /Отель \/ приглашение/ }).first().click();
+    await page
+      .getByRole("button", { name: /Отель \/ приглашение/ })
+      .first()
+      .click();
     const invitingPartyOptions = page.locator(
       '.v19-questionnaire-quick-options[data-wrap-options="true"]',
     );
@@ -370,24 +402,23 @@ test.describe("V-19 questionnaire live sanity", () => {
       quickOptionsGeometry.clientWidth,
     );
 
-    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
+    await page
+      .getByRole("button", { name: /Адрес и контакты/ })
+      .first()
+      .click();
 
-    const pinnedSections = page.locator(
-      ".v19-questionnaire-section-list--pinned",
-    );
+    const pinnedSections = page.locator(".v19-questionnaire-section-list--pinned");
     await expect
       .poll(() =>
         pinnedSections.evaluate((element) => {
           const containerBox = element.getBoundingClientRect();
           const activeSectionBox = element
-            .querySelector<HTMLElement>(
-              ".v19-questionnaire-section-tab.is-active",
-            )
+            .querySelector<HTMLElement>(".v19-questionnaire-section-tab.is-active")
             ?.getBoundingClientRect();
           return Boolean(
             activeSectionBox &&
-              activeSectionBox.left >= containerBox.left - 1 &&
-              activeSectionBox.right <= containerBox.right + 1,
+            activeSectionBox.left >= containerBox.left - 1 &&
+            activeSectionBox.right <= containerBox.right + 1,
           );
         }),
       )
@@ -441,8 +472,8 @@ test.describe("V-19 questionnaire live sanity", () => {
         const scrollerBox = sectionScroller?.getBoundingClientRect();
         return Boolean(
           scrollerBox &&
-            cardBox.left >= scrollerBox.left - 1 &&
-            cardBox.right <= scrollerBox.right + 1,
+          cardBox.left >= scrollerBox.left - 1 &&
+          cardBox.right <= scrollerBox.right + 1,
         );
       });
       const scrollBox = document
@@ -490,17 +521,25 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(postalBox).not.toBeNull();
     expect(postalBox?.y ?? 0).toBeGreaterThan((unitBox?.y ?? 0) + 2);
 
-    const touristSelect = page.getByLabel("Выбрать туриста");
-    const touristOptions = touristSelect.locator("option");
-    if ((await touristOptions.count()) > 1) {
-      const secondValue = await touristOptions.nth(1).getAttribute("value");
-      if (secondValue) {
-        await touristSelect.selectOption(secondValue);
-        await expect(touristSelect).toHaveValue(secondValue);
-      }
+    const touristMenu = page.getByLabel("Выбрать туриста");
+    if (await touristMenu.isEnabled()) {
+      await touristMenu.click();
+    const touristListbox = page.getByRole("listbox", {
+      name: "Выбрать туриста",
+    });
+    const touristOptions = touristListbox.getByRole("option");
+      const secondOption = touristOptions.nth(1);
+      const secondLabel = await secondOption.innerText();
+      await secondOption.click();
+      await expect(touristMenu).toContainText(secondLabel.split("\n")[0] ?? "");
+    } else {
+      await expect(touristMenu).toBeDisabled();
     }
 
-    await page.getByRole("button", { name: /Адрес и контакты/ }).first().click();
+    await page
+      .getByRole("button", { name: /Адрес и контакты/ })
+      .first()
+      .click();
     const street = page.getByRole("combobox", {
       name: "Улица / проспект / переулок",
     });
@@ -551,7 +590,9 @@ test.describe("V-19 questionnaire live sanity", () => {
 
       await expectMobileQuestionnaireLayout(page, viewport);
       await page
-        .locator(".v19-questionnaire-section-list--pinned .v19-questionnaire-section-tab")
+        .locator(
+          ".v19-questionnaire-section-list--pinned .v19-questionnaire-section-tab",
+        )
         .filter({ hasText: "Адрес и контакты" })
         .click();
       const [countryBox, cityBox] = await Promise.all([
@@ -561,7 +602,9 @@ test.describe("V-19 questionnaire live sanity", () => {
       expect(countryBox).not.toBeNull();
       expect(cityBox).not.toBeNull();
       expect(cityBox?.y ?? 0).toBeGreaterThan((countryBox?.y ?? 0) + 2);
-      expect(Math.abs((countryBox?.width ?? 0) - (cityBox?.width ?? 0))).toBeLessThanOrEqual(2);
+      expect(
+        Math.abs((countryBox?.width ?? 0) - (cityBox?.width ?? 0)),
+      ).toBeLessThanOrEqual(2);
       await page.screenshot({
         fullPage: true,
         path: testInfo.outputPath(`questionnaire-mobile-${viewport.width}.png`),
@@ -570,7 +613,9 @@ test.describe("V-19 questionnaire live sanity", () => {
     });
   }
 
-  test("tablet keeps the existing fullscreen desktop composition", async ({ page }, testInfo) => {
+  test("tablet keeps the existing fullscreen desktop composition", async ({
+    page,
+  }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
     const viewport = { height: 1024, width: 768 };
     await page.setViewportSize(viewport);

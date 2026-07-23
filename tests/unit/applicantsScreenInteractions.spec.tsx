@@ -33,11 +33,11 @@ function createSubmission(
   createdAt = "2026-07-19T10:00:00.000Z",
 ): Submission {
   const submission = createDraftSubmission({
-      city: "Москва",
-      familyCount: type === "family" ? 2 : 1,
-      submissions: [],
-      type,
-    });
+    city: "Москва",
+    familyCount: type === "family" ? 2 : 1,
+    submissions: [],
+    type,
+  });
   submissionSequence += 1;
   return {
     ...submission,
@@ -101,18 +101,14 @@ describe("ApplicantsScreen interactions", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/% готово/)).not.toBeInTheDocument();
     expect(document.querySelector("time.v19-applicant-created-at")).not.toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /^Открыть:/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Открыть:/ })).not.toBeInTheDocument();
 
     const card = screen.getByRole("article", {
       name: `Подача ${submission.applicants[0]!.fullName}`,
     });
     const footer = card.querySelector(".v19-applicant-card-footer");
     expect(footer).not.toBeNull();
-    expect(
-      within(footer as HTMLElement).getAllByRole("button"),
-    ).toHaveLength(4);
+    expect(within(footer as HTMLElement).getAllByRole("button")).toHaveLength(4);
   });
 
   it("opens the matching drawer from the card without stealing nested actions", () => {
@@ -153,9 +149,7 @@ describe("ApplicantsScreen interactions", () => {
     const card = screen.getByRole("article", {
       name: `Подача ${submission.applicants[0]!.fullName}`,
     });
-    const workflowSwitch = card.querySelector(
-      ".v19-applicant-workflow-switch",
-    );
+    const workflowSwitch = card.querySelector(".v19-applicant-workflow-switch");
     expect(workflowSwitch).toHaveAttribute("data-ready", "false");
     expect(
       within(card).queryByRole("button", { name: /^Открыть:/ }),
@@ -174,18 +168,16 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     expect(workflowSwitch).toHaveAttribute("data-ready", "true");
-    expect(
-      within(card).getByRole("button", { name: /^Открыть:/ }),
-    ).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /^Открыть:/ })).toBeInTheDocument();
     expect(
       within(card).queryByRole("button", { name: /Паспорт: готово/ }),
     ).not.toBeInTheDocument();
-    expect(
-      card.querySelector(".v19-applicant-workflow-actions"),
-    ).toHaveClass("is-replaced");
-    expect(
-      card.querySelector(".v19-applicant-status-action"),
-    ).toHaveClass("is-visible");
+    expect(card.querySelector(".v19-applicant-workflow-actions")).toHaveClass(
+      "is-replaced",
+    );
+    expect(card.querySelector(".v19-applicant-status-action")).toHaveClass(
+      "is-visible",
+    );
   });
 
   it("shows selfies only for the main family applicant", () => {
@@ -199,9 +191,7 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     const documentGroups = screen.getAllByRole("group", { name: /^Документы:/ });
-    expect(
-      document.querySelectorAll(".v19-applicant-member-role"),
-    ).toHaveLength(0);
+    expect(document.querySelectorAll(".v19-applicant-member-role")).toHaveLength(0);
     expect(screen.queryByText(/^Супруг(?:\/супруга)?$/)).not.toBeInTheDocument();
     expect(screen.getByText("Заявитель 2")).toBeInTheDocument();
     expect(screen.getByText("VF—")).toHaveClass("v19-applicant-public-id");
@@ -232,7 +222,9 @@ describe("ApplicantsScreen interactions", () => {
 
     const file = new File(["selfie"], "selfie.jpg", { type: "image/jpeg" });
     fireEvent.change(
-      screen.getByLabelText(`Выбрать файл: Селфи 1, ${submission.applicants[0]!.fullName}`),
+      screen.getByLabelText(
+        `Выбрать файл: Селфи 1, ${submission.applicants[0]!.fullName}`,
+      ),
       { target: { files: [file] } },
     );
 
@@ -320,9 +312,7 @@ describe("ApplicantsScreen interactions", () => {
 
     expect(visibleSubmissionIds()).toEqual([olderSingle.id]);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Тип подачи: Заявитель" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Тип подачи: Заявитель" }));
     fireEvent.click(screen.getByRole("option", { name: "Семья" }));
     expect(visibleSubmissionIds()).toEqual([newerFamily.id]);
 
@@ -411,10 +401,9 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.change(
-      screen.getByRole("textbox", { name: "Поиск по подачам" }),
-      { target: { value: "VF-731" } },
-    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+      target: { value: "VF-731" },
+    });
 
     expect(visibleSubmissionIds()).toEqual([matched.id]);
   });
@@ -510,9 +499,7 @@ describe("ApplicantsScreen interactions", () => {
     expect(
       screen.queryByRole("button", { name: /Отправить на проверку:/ }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Открыть:/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Открыть:/ })).toBeInTheDocument();
   });
 
   it("keeps review confirmation cancel and focus behavior keyboard-safe", () => {
@@ -530,9 +517,7 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Отправить на проверку:/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
 
     const dialog = screen.getByRole("dialog", {
       name: "Отправить на проверку администратору?",
@@ -610,27 +595,43 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Отправить на проверку:/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
-    await waitFor(() =>
-      expect(onSubmitForReview).toHaveBeenCalledWith(accepted.id),
-    );
+    await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(accepted.id));
     expect(onOpenDrawer).not.toHaveBeenCalled();
 
-    const transition = applyAgentSubmitForReviewResult(
-      accepted,
-      accepted.agentId,
-    );
+    const transition = applyAgentSubmitForReviewResult(accepted, accepted.agentId);
     expect(transition.ok).toBe(true);
     if (!transition.ok) {
       return;
     }
     expect(transition.data.status).toBe("submitted_for_review");
     expect(transition.data.exportState).toBe("not_ready");
-    expect(transition.data.files.every((file) => file.status === "pending_review"))
-      .toBe(true);
+    expect(
+      transition.data.files.every((file) => file.status === "pending_review"),
+    ).toBe(true);
+  });
+
+  it("opens an export-ready package from its visible status action", () => {
+    const ready = readySubmission("single");
+    const accepted: Submission = {
+      ...ready,
+      exportState: "ready",
+      files: ready.files.map((file) => ({ ...file, status: "accepted" })),
+      status: "ready_for_export",
+    };
+    const onOpenDrawer = vi.fn();
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={onOpenDrawer}
+        submissions={[accepted]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Готово к выгрузке" }));
+    expect(onOpenDrawer).toHaveBeenCalledWith(accepted.id);
   });
 
   it("submits a ready saved draft through the canonical review handoff", async () => {
@@ -649,16 +650,11 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Отправить на проверку:/ }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
     await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(readyDraft.id));
 
-    const transition = applyAgentSubmitForReviewResult(
-      readyDraft,
-      readyDraft.agentId,
-    );
+    const transition = applyAgentSubmitForReviewResult(readyDraft, readyDraft.agentId);
     expect(transition.ok).toBe(true);
     if (!transition.ok) return;
     expect(transition.data.status).toBe("submitted_for_review");
@@ -707,10 +703,9 @@ describe("ApplicantsScreen interactions", () => {
       }),
     );
     fireEvent.click(screen.getByRole("option", { name: "Сначала старые" }));
-    fireEvent.change(
-      screen.getByRole("textbox", { name: "Поиск по подачам" }),
-      { target: { value: "нет такой подачи" } },
-    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+      target: { value: "нет такой подачи" },
+    });
     expect(screen.getByRole("status")).toHaveTextContent("Ничего не найдено");
 
     view.rerender(

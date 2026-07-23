@@ -627,7 +627,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  test("keeps exactly back and save actions in the compact header", () => {
+  test("keeps exactly back, tourist switcher, and save actions in the compact header", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -649,7 +649,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     expect(headerActions).toHaveTextContent("Изменений нет");
     const header = result.container.querySelector(".v19-questionnaire-screen-header");
-    expect(header?.querySelectorAll("button")).toHaveLength(2);
+    expect(header?.querySelectorAll("button")).toHaveLength(3);
     expect(
       screen.queryByRole("button", { name: /Отправить на проверку|Отправить/ }),
     ).not.toBeInTheDocument();
@@ -1262,13 +1262,17 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    const touristSelect = screen.getByLabelText("Выбрать туриста");
-    expect(within(touristSelect).getAllByRole("option")[1]).toHaveTextContent(
-      new RegExp(`${secondApplicant.fullName} — \\d+ из \\d+`, "iu"),
+    const touristMenu = screen.getByLabelText("Выбрать туриста");
+    fireEvent.click(touristMenu);
+    const touristOptions = within(
+      screen.getByRole("listbox", { name: "Выбрать туриста" }),
+    ).getAllByRole("option");
+    expect(touristOptions[1]).toHaveTextContent(
+      new RegExp(`${secondApplicant.fullName}.*\\d+ из \\d+`, "iu"),
     );
-    fireEvent.change(touristSelect, { target: { value: secondApplicant.id } });
+    fireEvent.click(touristOptions[1] as HTMLElement);
 
-    expect(touristSelect).toHaveValue(secondApplicant.id);
+    expect(touristMenu).toHaveTextContent(/Volkova Maria/iu);
     expect(
       screen.getByText(/Контекст анкеты: заявитель Volkova Maria/u),
     ).toBeInTheDocument();
@@ -4181,9 +4185,12 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Выбрать туриста"), {
-      target: { value: mainApplicant.id },
-    });
+    fireEvent.click(screen.getByLabelText("Выбрать туриста"));
+    fireEvent.click(
+      screen.getByRole("option", {
+        name: new RegExp(mainApplicant.fullName, "iu"),
+      }),
+    );
     clickPinnedSection(result.container, "Адрес и контакты");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
     fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
@@ -4412,6 +4419,62 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.queryByText("Дата рождения не совпадает")).not.toBeInTheDocument();
     expect(screen.queryByText("Не совпадает с PDF")).not.toBeInTheDocument();
     expect(screen.queryByText(/12\.05\.1985|15\.05\.1985/)).not.toBeInTheDocument();
+  });
+
+  test("renders valid filled controls with a quiet gray state", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const submission = setField(draft, "birth-place", "LENINGRAD");
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Личные данные");
+    expect(screen.getByLabelText("Место рождения")).toHaveClass("is-filled");
+    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass(
+      "is-filled",
+    );
+  });
+
+  test("does not duplicate a field issue as the next blocker notice", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const ready = fillEveryQuestionnaireField(draft);
+    const submission = withQuestionnaireIssue(
+      ready,
+      "open",
+      "Место рождения",
+      "Личные данные",
+    );
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Личные данные");
+    expect(screen.getByText("Место рождения: Нужно уточнение")).toBeInTheDocument();
+    expect(screen.queryByTestId("questionnaire-next-blocker")).not.toBeInTheDocument();
   });
 
   test("keeps real PDF mismatch issues visible while needs-review fields only get an outline", () => {

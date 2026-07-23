@@ -7834,6 +7834,26 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   line-height: var(--v19b-line-height-tight);
 }
 
+.v19-agent-submissions-board button.v19-applicant-card-status {
+  display: inline-flex;
+  min-height: var(--v19b-size-44);
+  align-items: center;
+  padding-inline: var(--v19b-size-6);
+  border: 0;
+  border-radius: var(--v19b-radius-control);
+  background: transparent;
+  cursor: pointer;
+}
+
+.v19-agent-submissions-board button.v19-applicant-card-status:hover {
+  background: var(--v19b-color-control-hover);
+}
+
+.v19-agent-submissions-board button.v19-applicant-card-status:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-1);
+}
+
 .v19-agent-submissions-board
   :is(.v19-applicant-card-status, .v19-applicant-individual-status).is-review {
   color: var(--vf-warning);

@@ -1804,3 +1804,74 @@
     transition: none;
   }
 }
+
+/* Keep compact queue metrics optically grouped at tablet and mobile widths. */
+@media (max-width: 1199px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    :is(
+      .v19-agent-action-status-button,
+      .v19-agent-action-status-more
+    ) {
+    grid-template-columns:
+      var(--v19b-size-16)
+      minmax(2ch, auto)
+      minmax(0, 1fr);
+    text-align: left;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    :is(
+      .v19-agent-action-status-button,
+      .v19-agent-action-status-more
+    )
+    > span {
+    justify-self: start;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-button
+    > svg {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-button
+    > strong {
+    grid-column: 2;
+    min-width: 2ch;
+    justify-self: start;
+    text-align: left;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > svg:first-child {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > strong {
+    grid-column: 2;
+    min-width: 2ch;
+    justify-self: start;
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > svg:last-child {
+    grid-column: 3;
+    justify-self: end;
+  }
+}

@@ -240,7 +240,8 @@ async function runCriticalAgentInventorySweep(page: Page) {
   );
 
   const createWorkspace = page.locator('[data-agent-screen="create"]');
-  await createWorkspace.getByLabel("Город подачи").selectOption("Казань");
+  await createWorkspace.getByLabel("Город подачи").click();
+  await page.getByRole("option", { exact: true, name: "Казань" }).click();
   await createWorkspace
     .getByRole("button", { name: "Продолжить без паспорта" })
     .click();

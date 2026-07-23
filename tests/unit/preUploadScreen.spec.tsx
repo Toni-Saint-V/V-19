@@ -26,9 +26,8 @@ function passportFile(
 }
 
 function chooseCity() {
-  fireEvent.change(screen.getByLabelText("Город подачи"), {
-    target: { value: "Казань" },
-  });
+  fireEvent.click(screen.getByLabelText("Город подачи"));
+  fireEvent.click(screen.getByRole("option", { name: "Казань" }));
 }
 
 function inputFor(container: HTMLElement) {
@@ -209,9 +208,7 @@ describe("PreUploadScreen canonical intake", () => {
     fireEvent.click(screen.getByRole("button", { name: "Распознать паспорта" }));
 
     await waitFor(() => expect(invokePassportExtraction).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(screen.getAllByText("Вручную")).toHaveLength(2),
-    );
+    await waitFor(() => expect(screen.getAllByText("Вручную")).toHaveLength(2));
     expect(
       vi
         .mocked(invokePassportExtraction)

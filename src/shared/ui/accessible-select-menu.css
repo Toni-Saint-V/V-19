@@ -1,0 +1,196 @@
+.v19-select-menu {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.v19-select-menu-trigger {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 11px 7px 12px;
+  border: 1px solid var(--v19-depth-border-strong);
+  border-radius: 10px;
+  color: var(--v19-depth-text);
+  background: var(--v19-depth-control);
+  font: inherit;
+  text-align: left;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.v19-select-menu-trigger:not(:disabled) {
+  cursor: pointer;
+}
+
+.v19-select-menu-trigger:is(:hover, [aria-expanded="true"]):not(:disabled) {
+  border-color: var(--v19-depth-border-selected);
+  background: var(--v19-depth-control-hover);
+}
+
+.v19-select-menu-trigger:focus-visible {
+  border-color: var(--v19-depth-border-selected);
+  outline: 2px solid var(--v19-depth-focus);
+  outline-offset: 2px;
+}
+
+.v19-select-menu-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
+.v19-select-menu-trigger-copy,
+.v19-select-menu-option-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.v19-select-menu-trigger-label,
+.v19-select-menu-trigger-description,
+.v19-select-menu-option-label,
+.v19-select-menu-option-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v19-select-menu-trigger-label {
+  color: var(--v19-depth-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.v19-select-menu-trigger-description {
+  color: var(--v19-depth-text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.v19-select-menu-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--v19-depth-text-muted);
+  transition: transform 150ms ease;
+}
+
+.v19-select-menu.is-open .v19-select-menu-chevron {
+  transform: rotate(180deg);
+}
+
+.v19-select-menu-popover {
+  position: fixed;
+  z-index: var(--v19b-z-popover, 360);
+  display: grid;
+  max-height: var(--v19-select-menu-max-height, 320px);
+  gap: 3px;
+  padding: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--v19-depth-border-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--v19-depth-panel-strong) 96%, black);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.42),
+    inset 0 1px 0 rgb(255 255 255 / 0.04);
+  overscroll-behavior: contain;
+}
+
+.v19-select-menu-option {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--v19-depth-text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.v19-select-menu-option:not(:disabled) {
+  cursor: pointer;
+}
+
+.v19-select-menu-option:is(.is-active, :hover):not(:disabled) {
+  border-color: var(--v19-depth-border);
+  background: var(--v19-depth-control-hover);
+}
+
+.v19-select-menu-option.is-selected {
+  border-color: var(--v19-depth-accent-border);
+  background: color-mix(
+    in srgb,
+    var(--v19-depth-accent-soft) 46%,
+    var(--v19-depth-control)
+  );
+}
+
+.v19-select-menu-option-label {
+  color: var(--v19-depth-text-strong);
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.35;
+}
+
+.v19-select-menu-option-description {
+  color: var(--v19-depth-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.v19-select-menu-option.is-tone-muted .v19-select-menu-option-label,
+.v19-select-menu-option.is-tone-muted .v19-select-menu-option-description {
+  color: var(--v19-depth-text-faint);
+}
+
+.v19-select-menu-option.is-tone-warning .v19-select-menu-option-description {
+  color: var(--v19b-status-warning-text);
+}
+
+.v19-select-menu-option-check {
+  width: 16px;
+  height: 16px;
+  color: var(--v19-depth-accent-text);
+  opacity: 0;
+}
+
+.v19-select-menu-option.is-selected .v19-select-menu-option-check {
+  opacity: 1;
+}
+
+.v19-select-menu.is-selected-tone-muted .v19-select-menu-trigger-label,
+.v19-select-menu.is-selected-tone-muted .v19-select-menu-trigger-description {
+  color: var(--v19-depth-text-faint);
+}
+
+@media (max-width: 479px) {
+  .v19-select-menu-popover {
+    right: 12px;
+    left: 12px !important;
+    width: auto !important;
+  }
+
+  .v19-select-menu-option {
+    min-height: 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v19-select-menu-chevron,
+  .v19-select-menu-trigger {
+    transition: none;
+  }
+}

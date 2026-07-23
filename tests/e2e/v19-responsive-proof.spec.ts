@@ -274,7 +274,8 @@ test.describe("V-19 responsive proof", () => {
       await expectCreateContentFitsWithoutScroll(page, viewport.label);
       await screenshot(page, viewport, "create-submission-workspace");
 
-      await createWorkspace.getByLabel("Город подачи").selectOption("Казань");
+      await createWorkspace.getByLabel("Город подачи").click();
+      await page.getByRole("option", { exact: true, name: "Казань" }).click();
       await page.getByRole("button", { name: "Отменить создание подачи" }).click();
       const exitConfirmation = page.getByRole("alertdialog", {
         name: "Выйти без сохранения?",
@@ -284,7 +285,7 @@ test.describe("V-19 responsive proof", () => {
         .getByRole("button", { name: "Вернуться к редактированию" })
         .click();
       await expect(createWorkspace).toBeVisible();
-      await expect(createWorkspace.getByLabel("Город подачи")).toHaveValue("Казань");
+      await expect(createWorkspace.getByLabel("Город подачи")).toContainText("Казань");
       await page.getByRole("button", { name: "Отменить создание подачи" }).click();
       await page
         .getByRole("alertdialog", { name: "Выйти без сохранения?" })
