@@ -1,3 +1,4 @@
+// src/modules/submissions/components/FigmaQuestionnaireScreen.tsx
 import {
   createContext,
   useCallback,
@@ -31,6 +32,10 @@ import {
   type QuestionnaireDateIntent,
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
+import {
+  buildQuestionnaireFamilyCopyPlan,
+  type QuestionnaireFamilyCopyPlan,
+} from "../questionnaireFamilyCopy";
 import {
   blsStayDurationFromDates,
   isBlsQuestionnaireFieldBlockingIssue,
@@ -283,11 +288,6 @@ type QuestionnaireSaveRequest = {
   payload: QuestionnaireCommitPayload;
   revision: number;
   waiters: QuestionnaireSaveWaiter[];
-};
-
-type FamilyCopyPreview = {
-  affectedApplicants: number;
-  updates: QuestionnaireFieldUpdate[];
 };
 
 export type QuestionnaireInitialFocus = {
@@ -2697,7 +2697,8 @@ export function FigmaQuestionnaireScreen({
   const [showGuardianDetails, setShowGuardianDetails] = useState(false);
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [familyCopyMessage, setFamilyCopyMessage] = useState<string>();
-  const [familyCopyPreview, setFamilyCopyPreview] = useState<FamilyCopyPreview>();
+  const [familyCopyPreview, setFamilyCopyPreview] =
+    useState<QuestionnaireFamilyCopyPlan>();
   const [departedSectionKeys, setDepartedSectionKeys] = useState<string[]>([]);
   const [revealRequiredErrors, setRevealRequiredErrors] = useState(false);
   const [issueResolutionError, setIssueResolutionError] = useState("");
@@ -3419,47 +3420,29 @@ export function FigmaQuestionnaireScreen({
       (definition) => definition.id === activeSection,
     )?.canonicalId;
     if (!canonicalSectionId) return;
-    const sectionBindings = questionnaireFieldBindings.filter(
-      (binding) => binding.sectionId === canonicalSectionId,
-    );
-    const updates = familyCopyRecipients.flatMap((applicant) =>
-      sectionBindings.flatMap((binding) => {
-        const { fieldId } = binding;
-        const sourceField = questionnaireField(primaryApplicant, fieldId);
-        const targetField = questionnaireField(applicant, fieldId);
-        if (
-          !sourceField?.value.trim() ||
-          sourceField.reviewSource !== "manual" ||
-          !targetField
-        ) {
-          return [];
-        }
 
-        return [
-          {
-            applicantId: applicant.id,
-            error: validationMessageForQuestionnaireField(
-              targetField,
-              sourceField.value,
-            ),
-            fieldId,
-            reviewOriginSource: "family_shared" as const,
-            reviewSource: "family_shared" as const,
-            reviewState: "confirmed" as const,
-            sectionId: binding.sectionId,
-            value: sourceField.value,
-          } satisfies QuestionnaireFieldUpdate,
-        ];
-      }),
-    );
-    if (!updates.length) {
+    const plan = buildQuestionnaireFamilyCopyPlan({
+      bindings: questionnaireFieldBindings
+        .filter((binding) => binding.sectionId === canonicalSectionId)
+        .map((binding) => ({
+          candidateFieldIds: [
+            binding.fieldId,
+            ...(questionnaireFieldAliasesByFormKey[binding.formKey] ?? []),
+          ],
+          canonicalFieldId: binding.fieldId,
+          sectionId: binding.sectionId,
+        })),
+      recipients: familyCopyRecipients,
+      sourceApplicant: primaryApplicant,
+      validate: validationMessageForQuestionnaireField,
+    });
+    if (!plan.updates.length) {
+      setFamilyCopyPreview(undefined);
       setFamilyCopyMessage(familyCopyUnavailableMessage);
       return;
     }
 
-    const affectedApplicants = new Set(updates.map((update) => update.applicantId))
-      .size;
-    setFamilyCopyPreview({ affectedApplicants, updates });
+    setFamilyCopyPreview(plan);
     setFamilyCopyMessage(undefined);
   }
 
@@ -4992,11 +4975,10 @@ export function FigmaQuestionnaireScreen({
     confirmReview: confirmFieldReview,
     copyPreview: (fieldId) =>
       Boolean(
-        familyCopyPreview?.updates.some(
-          (update) =>
-            update.fieldId === fieldId &&
-            (update.applicantId === activeApplicant ||
-              activeApplicant === primaryApplicant?.id),
+        familyCopyPreview?.previewFields.some(
+          (previewField) =>
+            previewField.applicantId === activeApplicant &&
+            previewField.fieldId === fieldId,
         ),
       ),
     errorMessage: fieldErrorMessage,
