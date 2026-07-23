@@ -200,6 +200,13 @@ test.describe("Linear submission Drawer regression", () => {
       await expect(
         submissionDrawer.getByTestId("drawer-blocker-reason"),
       ).not.toBeEmpty();
+      const persistentFooter = submissionDrawer.locator(
+        ".v19-submission-drawer-footer",
+      );
+      await expect(persistentFooter).toBeVisible();
+      await expect(persistentFooter.getByTestId("drawer-primary-action")).toHaveText(
+        "Загрузить: Мария Иванова • Селфи 1",
+      );
 
       if (viewport.width < 1024) {
         const contextToggle = submissionDrawer.getByRole("button", {
@@ -213,9 +220,6 @@ test.describe("Linear submission Drawer regression", () => {
         await expect(contextDetails).toBeVisible();
         await contextToggle.click();
         await expect(contextDetails).toBeHidden();
-        await expect(
-          submissionDrawer.locator(".v19-submission-drawer-footer"),
-        ).toBeVisible();
         await submissionDrawer.getByRole("tab", { name: /Замечания/ }).click();
         await expect(
           submissionDrawer.getByRole("button", { name: "Перезагрузить файл" }).first(),
@@ -227,9 +231,6 @@ test.describe("Linear submission Drawer regression", () => {
         await expect(
           submissionDrawer.locator(".v19-agent-drawer-context"),
         ).toBeVisible();
-        await expect(
-          submissionDrawer.locator(".v19-submission-drawer-footer"),
-        ).toHaveCount(0);
       }
 
       if (process.env.V19_CAPTURE_DRAWER_EVIDENCE === "1") {

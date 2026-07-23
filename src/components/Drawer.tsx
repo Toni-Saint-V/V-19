@@ -1758,51 +1758,6 @@ export function Drawer({
                     </dd>
                   </div>
                 </dl>
-
-                {isDesktop ? (
-                  <div className="v19-agent-drawer-action-controls">
-                    {submission.status === "ready_for_export" ? (
-                      <button
-                        {...agentInteractionProps("drawer.open-return-review")}
-                        className="v19-agent-drawer-return-review"
-                        disabled={actionPending}
-                        type="button"
-                        onClick={openReviewConfirmation}
-                      >
-                        Вернуть на проверку
-                      </button>
-                    ) : null}
-                    <button
-                      {...agentInteractionProps(primaryIntentInteraction)}
-                      aria-busy={actionPending}
-                      aria-describedby={
-                        footerActionNotice ? footerInstructionId : undefined
-                      }
-                      className={`v19-agent-drawer-primary ${primaryButtonClassName}`}
-                      disabled={primaryIntentDisabled}
-                      type="button"
-                      onClick={() => void handlePrimaryIntent()}
-                    >
-                      <PrimaryIntentIcon
-                        intent={primaryIntent}
-                        pending={actionPending}
-                      />
-                      {primaryIntentLabel}
-                    </button>
-                  </div>
-                ) : null}
-
-                {isDesktop && (actionError || actionAnnouncement) ? (
-                  <p
-                    className={`v19-agent-drawer-inline-feedback ${
-                      actionError ? "is-error" : "is-success"
-                    }`}
-                    id={footerInstructionId}
-                    role={actionError ? "alert" : "status"}
-                  >
-                    {actionError || actionAnnouncement}
-                  </p>
-                ) : null}
               </section>
 
               <div className="v19-submission-drawer-tabs-scroll w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
@@ -1930,48 +1885,44 @@ export function Drawer({
               </AnimatePresence>
             </div>
 
-            {!isDesktop ? (
-              <footer className="v19-submission-drawer-footer">
-                <span aria-live="polite" className="sr-only" role="status">
-                  {actionAnnouncement}
-                </span>
-                <div
-                  className={footerInstructionClassName}
-                  data-testid="drawer-footer-instruction"
-                  id={footerInstructionId}
-                  role={footerInstructionRole}
-                >
-                  {footerInstruction}
-                </div>
-                <div className="v19-agent-drawer-mobile-actions">
-                  {submission.status === "ready_for_export" ? (
-                    <button
-                      {...agentInteractionProps("drawer.open-return-review")}
-                      className="v19-agent-drawer-return-review"
-                      disabled={actionPending}
-                      type="button"
-                      onClick={openReviewConfirmation}
-                    >
-                      Вернуть на проверку
-                    </button>
-                  ) : null}
+            <footer className="v19-submission-drawer-footer">
+              <div
+                className={footerInstructionClassName}
+                data-testid="drawer-footer-instruction"
+                id={footerInstructionId}
+                role={footerInstructionRole}
+              >
+                {footerInstruction}
+              </div>
+              <div className="v19-agent-drawer-footer-actions">
+                {submission.status === "ready_for_export" ? (
                   <button
-                    {...agentInteractionProps(primaryIntentInteraction)}
-                    aria-busy={actionPending}
-                    aria-describedby={
-                      footerActionNotice ? footerInstructionId : undefined
-                    }
-                    className={`v19-agent-drawer-primary ${primaryButtonClassName}`}
-                    disabled={primaryIntentDisabled}
+                    {...agentInteractionProps("drawer.open-return-review")}
+                    className="v19-agent-drawer-return-review"
+                    disabled={actionPending}
                     type="button"
-                    onClick={() => void handlePrimaryIntent()}
+                    onClick={openReviewConfirmation}
                   >
-                    <PrimaryIntentIcon intent={primaryIntent} pending={actionPending} />
-                    {primaryIntentLabel}
+                    Вернуть на проверку
                   </button>
-                </div>
-              </footer>
-            ) : null}
+                ) : null}
+                <button
+                  {...agentInteractionProps(primaryIntentInteraction)}
+                  aria-busy={actionPending}
+                  aria-describedby={
+                    footerActionNotice ? footerInstructionId : undefined
+                  }
+                  className={`v19-agent-drawer-primary ${primaryButtonClassName}`}
+                  data-testid="drawer-primary-action"
+                  disabled={primaryIntentDisabled}
+                  type="button"
+                  onClick={() => void handlePrimaryIntent()}
+                >
+                  <PrimaryIntentIcon intent={primaryIntent} pending={actionPending} />
+                  {primaryIntentLabel}
+                </button>
+              </div>
+            </footer>
 
             <input
               {...agentInteractionProps("drawer.upload-file")}

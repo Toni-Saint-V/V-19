@@ -190,16 +190,19 @@ describe("Drawer interactions", () => {
     const { container } = renderDrawer();
 
     const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
+    const persistentFooter = dialog.querySelector(".v19-submission-drawer-footer");
+    if (!persistentFooter) throw new Error("Expected persistent drawer footer.");
     const lifecycleContext = within(dialog).getByTestId("drawer-lifecycle-context");
     const lifecycleHeader = lifecycleContext.closest("header");
     if (!lifecycleHeader) throw new Error("Expected lifecycle header.");
     expect(within(lifecycleContext).getByText("VF-1048")).toBeInTheDocument();
     expect(within(lifecycleContext).getByText("Семья Ивановых")).toBeVisible();
     expect(
-      within(dialog).getByRole("button", {
+      within(persistentFooter).getByRole("button", {
         name: "Загрузить: Мария Иванова • Селфи 1",
       }),
-    ).toBeInTheDocument();
+    ).toHaveAttribute("data-testid", "drawer-primary-action");
+    expect(within(dialog).getAllByTestId("drawer-primary-action")).toHaveLength(1);
     expect(within(dialog).getByText("Мария Иванова")).toBeInTheDocument();
     expect(within(dialog).queryByText("Семья Петровых")).not.toBeInTheDocument();
     expect(auditAgentInteractionControls(container)).toEqual([]);
