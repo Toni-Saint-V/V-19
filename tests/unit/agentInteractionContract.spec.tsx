@@ -96,10 +96,12 @@ describe("agent interaction contract", () => {
   });
 
   test("matches drawer conditional controls to the exact live status mapping", () => {
-    expect(V19_AGENT_INTERACTION_CONTRACTS["drawer.save-progress"].statusFixtures)
-      .toEqual(["draft"]);
-    expect(V19_AGENT_INTERACTION_CONTRACTS["drawer.submit-review"].statusFixtures)
-      .toEqual(["in_progress"]);
+    expect(
+      V19_AGENT_INTERACTION_CONTRACTS["drawer.save-progress"].statusFixtures,
+    ).toEqual(["draft"]);
+    expect(
+      V19_AGENT_INTERACTION_CONTRACTS["drawer.submit-review"].statusFixtures,
+    ).toEqual(["in_progress", "ready_for_export"]);
     expect(
       V19_AGENT_INTERACTION_CONTRACTS["drawer.submit-corrections"].statusFixtures,
     ).toEqual(["returned"]);
@@ -107,13 +109,14 @@ describe("agent interaction contract", () => {
       V19_AGENT_INTERACTION_CONTRACTS["drawer.submit-corrections"]
         .disabledStatusFixtures,
     ).toEqual(["requires_action"]);
-    expect(V19_AGENT_INTERACTION_CONTRACTS["drawer.open-history"].statusFixtures)
-      .toEqual([
-        "submitted_for_review",
-        "corrections_received",
-        "ready_for_export",
-        "exported",
-      ]);
+    expect(
+      V19_AGENT_INTERACTION_CONTRACTS["drawer.open-history"].statusFixtures,
+    ).toEqual([
+      "submitted_for_review",
+      "corrections_received",
+      "ready_for_export",
+      "exported",
+    ]);
   });
 
   test("fails closed for missing or unknown enabled controls", () => {
@@ -127,10 +130,9 @@ describe("agent interaction contract", () => {
       <div tabindex="0">focus target, not a control</div>
     `;
 
-    expect(auditAgentInteractionControls(root).map((finding) => finding.reason)).toEqual([
-      "missing",
-      "unknown",
-    ]);
+    expect(
+      auditAgentInteractionControls(root).map((finding) => finding.reason),
+    ).toEqual(["missing", "unknown"]);
   });
 
   test("rejects inherited prototype keys as unknown interaction ids", () => {
@@ -144,10 +146,9 @@ describe("agent interaction contract", () => {
       <button data-v19-interaction-id="toString">toString</button>
     `;
 
-    expect(auditAgentInteractionControls(root).map((finding) => finding.reason)).toEqual([
-      "unknown",
-      "unknown",
-    ]);
+    expect(
+      auditAgentInteractionControls(root).map((finding) => finding.reason),
+    ).toEqual(["unknown", "unknown"]);
   });
 
   test("denies a known control rendered for the wrong role", () => {
@@ -193,8 +194,9 @@ describe("agent interaction contract", () => {
       v19Density: "compact",
       v19ReducedMotion: "on",
     });
-    expect(JSON.parse(window.localStorage.getItem(experiencePreferencesStorageKey) ?? "{}"))
-      .toMatchObject({ compactDensity: true, reducedMotion: true });
+    expect(
+      JSON.parse(window.localStorage.getItem(experiencePreferencesStorageKey) ?? "{}"),
+    ).toMatchObject({ compactDensity: true, reducedMotion: true });
     expect(auditAgentInteractionControls(view.container)).toEqual([]);
 
     view.unmount();
@@ -206,10 +208,9 @@ describe("agent interaction contract", () => {
       />,
     );
 
-    expect(screen.getByRole("switch", { name: "Компактная плотность" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    expect(
+      screen.getByRole("switch", { name: "Компактная плотность" }),
+    ).toHaveAttribute("aria-checked", "true");
     expect(document.documentElement.dataset.v19Density).toBe("compact");
   });
 

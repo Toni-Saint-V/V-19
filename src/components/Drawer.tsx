@@ -11,6 +11,7 @@ import {
   Clock,
   CreditCard,
   Edit3,
+  Eye,
   FileDigit,
   FileText,
   History,
@@ -24,12 +25,19 @@ import {
 } from "lucide-react";
 
 import { historyTimestampForUser } from "../modules/submissions/historyPresentation";
+import { ConfirmationDialog } from "../modules/submissions/components/Primitives";
 import {
   agentInteractionProps,
   type AgentInteractionId,
 } from "../modules/submissions/agentInteractionContract";
 import { submissionPublicId } from "../modules/submissions/submissionIdentity";
-import { getPrimaryAction, statusLabelFor } from "../modules/submissions/status";
+import {
+  agentQuestionnaireStatusPresentation,
+  getPrimaryAction,
+  statusLabelFor,
+} from "../modules/submissions/status";
+import { requiredPassportReviewMediaSlots } from "../modules/submissions/passportReviewContract";
+import { buildSubmissionNextStepBrief } from "../modules/submissions/submissionNextStepEngine";
 import type {
   DrawerTab,
   Issue,
@@ -178,31 +186,23 @@ function isFileReady(file: SubmissionFile) {
 }
 
 function documentPackageItems(submission: Submission) {
-  const groupedFiles = new Map<
-    SubmissionFile["type"],
-    { ready: number; total: number; type: SubmissionFile["type"] }
-  >();
+  return requiredPassportReviewMediaSlots(submission).map((slot) => {
+    const applicant = submission.applicants.find(
+      (candidate) => candidate.id === slot.applicantId,
+    );
+    const file = submission.files.find(
+      (candidate) =>
+        candidate.applicantId === slot.applicantId && candidate.type === slot.type,
+    );
 
-  for (const file of submission.files) {
-    const current = groupedFiles.get(file.type) ?? {
-      ready: 0,
-      total: 0,
-      type: file.type,
+    return {
+      label:
+        submission.applicants.length > 1
+          ? `${applicant?.fullName ?? "Заявитель"} • ${fileLabel(slot.type)}`
+          : fileLabel(slot.type),
+      status: file && isFileReady(file) ? "done" : "pending",
     };
-    groupedFiles.set(file.type, {
-      ...current,
-      ready: current.ready + (isFileReady(file) ? 1 : 0),
-      total: current.total + 1,
-    });
-  }
-
-  return Array.from(groupedFiles.values()).map((item) => ({
-    label:
-      item.total > 1
-        ? `${fileLabel(item.type)} (${item.ready}/${item.total})`
-        : fileLabel(item.type),
-    status: item.ready === item.total ? "done" : "pending",
-  }));
+  });
 }
 
 function questionnaireSectionCandidateProgress(
@@ -412,7 +412,8 @@ const statusBadgeBaseClassName =
   "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium uppercase tracking-wide";
 
 const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
-  const presentation = statusBadgePresentation[status];
+  const displayStatus = status === "requires_action" ? "returned" : status;
+  const presentation = statusBadgePresentation[displayStatus];
   const StatusIcon = presentation.Icon;
 
   return (
@@ -420,7 +421,7 @@ const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
       className={[statusBadgeBaseClassName, presentation.toneClassName].join(" ")}
       data-testid="drawer-status-badge"
     >
-      <StatusIcon className="w-3.5 h-3.5" /> {statusLabelFor(status, "full")}
+      <StatusIcon className="w-3.5 h-3.5" /> {statusLabelFor(displayStatus, "full")}
     </span>
   );
 };
@@ -433,14 +434,14 @@ const OverviewTab = ({
   submission: Submission;
 }) => {
   const packageItems = documentPackageItems(submission);
-  const readyFilesCount = submission.files.filter(isFileReady).length;
+  const readyFilesCount = packageItems.filter((item) => item.status === "done").length;
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <section
           aria-labelledby="submission-drawer-route-title"
-          className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors"
+          className="v19-submission-drawer-card bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors"
         >
           <h3
             className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-5"
@@ -470,7 +471,7 @@ const OverviewTab = ({
 
         <section
           aria-labelledby="submission-drawer-documents-title"
-          className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col"
+          className="v19-submission-drawer-card bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col"
         >
           <div className="flex items-center justify-between mb-4">
             <h3
@@ -480,7 +481,7 @@ const OverviewTab = ({
               Чеклист документов
             </h3>
             <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
-              {readyFilesCount}/{submission.files.length}
+              {readyFilesCount}/{packageItems.length}
             </span>
           </div>
           <div className="space-y-3 flex-1 flex flex-col justify-center">
@@ -516,7 +517,7 @@ const OverviewTab = ({
           {data.applicants.map((applicant) => (
             <article
               key={applicant.name}
-              className="flex items-center p-3 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-xl transition-all group"
+              className="v19-submission-drawer-card flex items-center p-3 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-xl transition-all group"
             >
               <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
                 {applicantInitials(applicant.name)}
@@ -530,6 +531,9 @@ const OverviewTab = ({
               <div className="text-right">
                 <div className="text-[12px] font-mono font-medium text-emerald-400">
                   {applicant.completeness}%
+                </div>
+                <div className="text-[10px] text-white/40 mt-0.5">
+                  готовность анкеты
                 </div>
               </div>
             </article>
@@ -548,6 +552,9 @@ const QuestionnaireTab = ({
   submission: Submission;
 }) => {
   const sections = buildQuestionnaireSections(submission);
+  const questionnairePresentation = agentQuestionnaireStatusPresentation(
+    submission.status,
+  );
   const remainingBlockCount = sections.filter(
     (section) => section.progress < 100,
   ).length;
@@ -562,7 +569,10 @@ const QuestionnaireTab = ({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
-          <p className="text-[12px] text-white/50 mt-1">{remainingBlockLabel}</p>
+          <p className="text-[12px] text-white/50 mt-1">
+            {questionnairePresentation.drawerDescription}
+          </p>
+          <p className="text-[11px] text-white/40 mt-1">{remainingBlockLabel}</p>
         </div>
         <button
           {...agentInteractionProps("drawer.open-questionnaire")}
@@ -570,7 +580,12 @@ const QuestionnaireTab = ({
           className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
           type="button"
         >
-          <Edit3 className="w-4 h-4" /> Открыть анкету
+          {questionnairePresentation.canEdit ? (
+            <Edit3 className="w-4 h-4" />
+          ) : (
+            <Eye className="w-4 h-4" />
+          )}
+          {questionnairePresentation.drawerActionLabel}
         </button>
       </div>
 
@@ -648,11 +663,13 @@ function issueActionLabel(issue: Issue) {
 }
 
 const IssuesTab = ({
+  canEdit,
   data,
   onOpenWorkspaceTarget,
   onUploadApplicantFile,
   submission,
 }: {
+  canEdit: boolean;
   data: SubmissionDetail;
   onOpenWorkspaceTarget: (target: WorkspaceTarget) => void;
   onUploadApplicantFile?: DrawerProps["onUploadApplicantFile"];
@@ -730,6 +747,7 @@ const IssuesTab = ({
             const uploadInputId = `${issueElementId}-upload`;
             const uploadStatusId = `${issueElementId}-upload-status`;
             const canUploadReplacement =
+              canEdit &&
               Boolean(issue.target.fileType) &&
               issue.status !== "fixed_by_agent" &&
               Boolean(onUploadApplicantFile);
@@ -781,7 +799,13 @@ const IssuesTab = ({
                     className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[13px] font-medium text-white transition-colors"
                     type="button"
                   >
-                    {isUploadingThisIssue ? "Загрузка…" : issueActionLabel(issue)}
+                    {isUploadingThisIssue
+                      ? "Загрузка…"
+                      : canUploadReplacement
+                        ? issueActionLabel(issue)
+                        : issue.target.fileType
+                          ? "Открыть файл"
+                          : "Открыть анкету"}
                   </button>
                   <span
                     aria-live="polite"
@@ -854,32 +878,39 @@ function historyEventIcon(tone: string) {
   return <FileText className="w-4 h-4 text-white/40" />;
 }
 
-const HistoryTab = ({ submission }: { submission: Submission }) => (
-  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-white/10">
-    {submission.history.map((event) => {
-      const tone = historyEventTone(event.text);
+const HistoryTab = ({ submission }: { submission: Submission }) =>
+  submission.history.length === 0 ? (
+    <div className="v19-agent-drawer-empty" role="status">
+      <History className="w-7 h-7" />
+      <h3>История пока пуста</h3>
+      <p>События появятся после первого сохранения или изменения статуса.</p>
+    </div>
+  ) : (
+    <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-white/10">
+      {submission.history.map((event) => {
+        const tone = historyEventTone(event.text);
 
-      return (
-        <div className="relative flex gap-5" key={event.id}>
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10
+        return (
+          <div className="relative flex gap-5" key={event.id}>
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10
           ${historyEventBorderClass(tone)}`}
-          >
-            {historyEventIcon(tone)}
-          </div>
-          <div className="pt-1.5">
-            <div className="text-[14px] font-medium text-white/90">{event.text}</div>
-            <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
-              <span>{historyTimestampForUser(event.createdAt ?? event.at)}</span>
-              <span className="w-1 h-1 rounded-full bg-white/20" />
-              <span>{historySourceLabel(event.source)}</span>
+            >
+              {historyEventIcon(tone)}
+            </div>
+            <div className="pt-1.5">
+              <div className="text-[14px] font-medium text-white/90">{event.text}</div>
+              <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
+                <span>{historyTimestampForUser(event.createdAt ?? event.at)}</span>
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+                <span>{historySourceLabel(event.source)}</span>
+              </div>
             </div>
           </div>
-        </div>
-      );
-    })}
-  </div>
-);
+        );
+      })}
+    </div>
+  );
 
 const drawerTabs: Array<{
   getCount?: (data: SubmissionDetail) => number;
@@ -904,11 +935,23 @@ const drawerFocusableSelector = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
-function footerActionLabel(action: SubmissionAction, fallback: string) {
+function footerActionLabel(
+  action: SubmissionAction,
+  fallback: string,
+  status: SubmissionStatus,
+) {
   if (action === "submit_for_review") return "Отправить на проверку";
   if (action === "submit_corrections") return "Отправить исправления";
-  if (action === "save_progress") return "Сохранить черновик";
+  if (status === "draft" && action === "save_progress") return "Начать работу";
+  if (action === "open_history") return "Открыть историю";
   return fallback;
+}
+
+function ownerLabel(status: SubmissionStatus, owner: "agent" | "admin" | "system") {
+  if (status === "exported") return "Нет";
+  if (owner === "agent") return "Агент";
+  if (owner === "admin") return "Администратор";
+  return "Система";
 }
 
 const primaryActionInteractionByStatus = {
@@ -949,11 +992,17 @@ export function Drawer({
 }: DrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>(() => drawerTab(requestedTab));
   const [actionError, setActionError] = useState("");
+  const [actionAnnouncement, setActionAnnouncement] = useState("");
   const [actionPending, setActionPending] = useState(false);
+  const [missingTargetMessage, setMissingTargetMessage] = useState("");
+  const [reviewConfirmationOpen, setReviewConfirmationOpen] = useState(false);
   const actionRequestIdRef = useRef(0);
   const actionPendingRef = useRef(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const reviewConfirmationTriggerRef = useRef<HTMLButtonElement>(null);
+  const tabScrollPositionsRef = useRef(new Map<TabId, number>());
   const isDesktop = useDrawerDesktopQuery();
   const prefersReducedMotion = useReducedMotion();
   const shouldReduceMotion = Boolean(prefersReducedMotion);
@@ -978,7 +1027,32 @@ export function Drawer({
   const tabExit = shouldReduceMotion ? { opacity: 0, y: 0 } : { opacity: 0, y: -10 };
   const data = buildSubmissionDetail(submission);
   const primaryAction = getPrimaryAction(submission, "agent", "agent");
-  const primaryLabel = footerActionLabel(primaryAction.action, primaryAction.label);
+  const nextStepBrief = buildSubmissionNextStepBrief({
+    role: "agent",
+    submission,
+    surface: "agent",
+  });
+  const nextStepTarget = nextStepBrief.primaryAction.target;
+  const nextStepLabel =
+    submission.status === "exported"
+      ? "Подача завершена; доступна только история"
+      : nextStepBrief.primaryAction.id === "open_first_queue_item" &&
+          nextStepTarget?.tab === "questionnaire" &&
+          nextStepTarget.section
+        ? `Заполнить раздел «${nextStepTarget.section}»`
+        : nextStepBrief.primaryAction.label;
+  const questionnairePresentation = agentQuestionnaireStatusPresentation(
+    submission.status,
+  );
+  const primaryLabel = footerActionLabel(
+    primaryAction.action,
+    primaryAction.label,
+    submission.status,
+  );
+  const blockerReason =
+    primaryAction.reason ??
+    nextStepBrief.primaryAction.reason ??
+    nextStepBrief.blockers[0];
   const footerActionNotice =
     actionError || (primaryAction.disabled ? primaryAction.reason : "");
   const footerInstruction = footerActionNotice || footerInstructions[data.status];
@@ -1007,7 +1081,10 @@ export function Drawer({
     actionRequestIdRef.current += 1;
     actionPendingRef.current = false;
     setActionError("");
+    setActionAnnouncement("");
     setActionPending(false);
+    setMissingTargetMessage("");
+    setReviewConfirmationOpen(false);
     if (isOpen) setActiveTab(drawerTab(requestedTab));
 
     return () => {
@@ -1017,19 +1094,46 @@ export function Drawer({
   }, [isOpen, requestedTab, submission.id]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (bodyRef.current) {
+        bodyRef.current.scrollTop = tabScrollPositionsRef.current.get(activeTab) ?? 0;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, isOpen]);
+
+  useEffect(() => {
     if (!isOpen || focusTarget?.tab !== "issues") return;
 
     setActiveTab("issues");
     const timer = window.setTimeout(() => {
-      document.getElementById(targetElementId(focusTarget))?.scrollIntoView({
-        behavior: shouldReduceMotion ? "auto" : "smooth",
-        block: "center",
-      });
+      const target = document.getElementById(targetElementId(focusTarget));
+      if (target) {
+        target.scrollIntoView({
+          behavior: shouldReduceMotion ? "auto" : "smooth",
+          block: "center",
+        });
+        setMissingTargetMessage("");
+      } else {
+        setMissingTargetMessage(
+          "Точный объект замечания не найден. Откройте список замечаний и выберите доступную задачу.",
+        );
+      }
       onClearFocusTarget?.();
     }, 0);
 
     return () => window.clearTimeout(timer);
   }, [focusTarget, isOpen, onClearFocusTarget, shouldReduceMotion]);
+
+  function selectTab(nextTab: TabId) {
+    if (bodyRef.current) {
+      tabScrollPositionsRef.current.set(activeTab, bodyRef.current.scrollTop);
+    }
+    setActiveTab(nextTab);
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1093,36 +1197,67 @@ export function Drawer({
     const nextTab = drawerTabs[nextIndex]?.id;
     if (!nextTab) return;
     event.preventDefault();
-    setActiveTab(nextTab);
+    selectTab(nextTab);
     window.requestAnimationFrame(() => {
       document.getElementById(`submission-drawer-tab-${nextTab}`)?.focus();
     });
   }
 
-  async function handlePrimaryAction() {
-    if (primaryAction.disabled || actionPendingRef.current) return;
-    if (primaryAction.action === "open_history") {
-      setActiveTab("history");
-      return;
-    }
-
+  async function runAction(action: SubmissionAction, successMessage: string) {
+    if (actionPendingRef.current) return false;
     const requestId = ++actionRequestIdRef.current;
     setActionPending(true);
     actionPendingRef.current = true;
     setActionError("");
+    setActionAnnouncement("");
     try {
-      await onAction(primaryAction.action);
+      await onAction(action);
+      if (requestId !== actionRequestIdRef.current) return false;
+      setActionAnnouncement(successMessage);
+      return true;
     } catch {
-      if (requestId !== actionRequestIdRef.current) return;
+      if (requestId !== actionRequestIdRef.current) return false;
       setActionError(
         "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
       );
+      return false;
     } finally {
       if (requestId === actionRequestIdRef.current) {
         actionPendingRef.current = false;
         setActionPending(false);
       }
     }
+  }
+
+  async function handlePrimaryAction() {
+    if (primaryAction.disabled || actionPendingRef.current) return;
+    if (primaryAction.action === "open_history") {
+      selectTab("history");
+      return;
+    }
+
+    await runAction(
+      primaryAction.action,
+      "Действие выполнено. Статус подачи обновлён.",
+    );
+  }
+
+  async function handleReturnToReview() {
+    const succeeded = await runAction(
+      "submit_for_review",
+      "Подача возвращена на проверку администратору.",
+    );
+    if (succeeded) {
+      closeReviewConfirmation();
+    }
+  }
+
+  function closeReviewConfirmation() {
+    setReviewConfirmationOpen(false);
+    window.requestAnimationFrame(() => {
+      const focusTarget = reviewConfirmationTriggerRef.current ?? dialogRef.current;
+      focusTarget?.focus({ preventScroll: true });
+    });
   }
 
   return (
@@ -1133,7 +1268,7 @@ export function Drawer({
             {...agentInteractionProps("drawer.close")}
             aria-hidden="true"
             animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            className="v19-submission-drawer-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
             exit={{ opacity: 0 }}
             initial={{ opacity: 0 }}
             transition={
@@ -1146,14 +1281,16 @@ export function Drawer({
 
           <motion.div
             aria-labelledby="submission-drawer-heading"
+            aria-hidden={reviewConfirmationOpen || undefined}
             aria-modal="true"
             animate={{ opacity: 1, x: 0, y: 0 }}
-            className="fixed z-50 flex flex-col bg-[#111113] border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.6)]
+            className="v19-submission-drawer v19-agent-drawer fixed z-50 flex flex-col bg-[#111113] border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.6)]
               lg:inset-y-2 lg:right-2 lg:left-auto lg:w-[840px] lg:rounded-2xl lg:border lg:overflow-hidden
               inset-x-0 bottom-0 top-12 rounded-t-[28px] border-t border-x overflow-y-auto"
             exit={panelExit}
             initial={panelInitial}
             data-v19-linear-drawer="true"
+            inert={reviewConfirmationOpen}
             ref={dialogRef}
             role="dialog"
             tabIndex={-1}
@@ -1164,7 +1301,7 @@ export function Drawer({
               <div className="w-12 h-1.5 rounded-full bg-white/20" />
             </div>
 
-            <header className="px-5 lg:px-8 pt-4 pb-0 bg-[#111113]/95 backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-white/5">
+            <header className="v19-submission-drawer-header px-5 lg:px-8 pt-4 pb-0 bg-[#111113]/95 backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-white/5">
               <div
                 className="flex items-start justify-between gap-4 mb-6"
                 data-testid="drawer-lifecycle-context"
@@ -1194,11 +1331,33 @@ export function Drawer({
                       <Clock className="w-3 h-3" /> Обновлено {data.updated}
                     </span>
                   </div>
+                  <dl
+                    aria-label="Следующий шаг по подаче"
+                    className="v19-agent-drawer-context"
+                    data-testid="drawer-next-step-context"
+                  >
+                    <div>
+                      <dt>Следующий owner</dt>
+                      <dd data-testid="drawer-next-owner">
+                        {ownerLabel(submission.status, nextStepBrief.owner)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Следующий шаг</dt>
+                      <dd data-testid="drawer-next-step">{nextStepLabel}</dd>
+                    </div>
+                    <div className={blockerReason ? "is-blocked" : "is-clear"}>
+                      <dt>Готовность</dt>
+                      <dd data-testid="drawer-blocker-reason">
+                        {blockerReason ?? "Канонических блокеров нет"}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
 
                 <button
                   {...agentInteractionProps("drawer.close")}
-                  aria-label="Закрыть подачу"
+                  aria-label="Закрыть"
                   className="hidden lg:flex w-10 h-10 items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10"
                   type="button"
                   onClick={onClose}
@@ -1207,9 +1366,9 @@ export function Drawer({
                 </button>
               </div>
 
-              <div className="w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
+              <div className="v19-submission-drawer-tabs-scroll w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
                 <div
-                  className="flex items-center gap-1.5 w-max mb-[-1px]"
+                  className="v19-submission-drawer-tabs flex items-center gap-1.5 w-max mb-[-1px]"
                   role="tablist"
                   aria-label="Разделы подачи"
                 >
@@ -1221,7 +1380,7 @@ export function Drawer({
                         {...agentInteractionProps("drawer.navigate-tab")}
                         aria-controls={`submission-drawer-panel-${tab.id}`}
                         aria-selected={isActive}
-                        className={`relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap
+                        className={`v19-submission-drawer-tab relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap
                           ${isActive ? "text-white" : "text-white/50 hover:text-white/80"}
                         `}
                         id={`submission-drawer-tab-${tab.id}`}
@@ -1229,20 +1388,20 @@ export function Drawer({
                         role="tab"
                         tabIndex={isActive ? 0 : -1}
                         type="button"
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => selectTab(tab.id)}
                         onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
                       >
                         <span>{tab.label}</span>
                         {count > 0 ? (
                           <span
-                            className={`px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${tab.isWarning ? "bg-orange-500/20 text-orange-400" : "bg-white/10 text-white/70"}`}
+                            className={`v19-submission-drawer-tab-count px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${tab.isWarning ? "bg-orange-500/20 text-orange-400" : "bg-white/10 text-white/70"}`}
                           >
                             {count}
                           </span>
                         ) : null}
                         {isActive ? (
                           <motion.div
-                            className="absolute bottom-0 inset-x-0 h-0.5 bg-white"
+                            className="v19-submission-drawer-tab-indicator absolute bottom-0 inset-x-0 h-0.5 bg-white"
                             initial={false}
                             layoutId="drawerAgentActiveTab"
                             transition={
@@ -1259,7 +1418,22 @@ export function Drawer({
               </div>
             </header>
 
-            <div className="lg:flex-1 lg:overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10">
+            <div
+              className="v19-submission-drawer-body p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10"
+              ref={bodyRef}
+            >
+              {missingTargetMessage ? (
+                <div className="v19-agent-drawer-target-notice" role="status">
+                  <span>{missingTargetMessage}</span>
+                  <button
+                    aria-label="Скрыть сообщение"
+                    type="button"
+                    onClick={() => setMissingTargetMessage("")}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : null}
               <AnimatePresence mode="wait">
                 <motion.div
                   aria-labelledby={`submission-drawer-tab-${activeTab}`}
@@ -1287,6 +1461,7 @@ export function Drawer({
                   ) : null}
                   {activeTab === "issues" ? (
                     <IssuesTab
+                      canEdit={questionnairePresentation.canEdit}
                       data={data}
                       key={submission.id}
                       onOpenWorkspaceTarget={onOpenWorkspaceTarget}
@@ -1301,7 +1476,10 @@ export function Drawer({
               </AnimatePresence>
             </div>
 
-            <footer className="p-4 lg:px-8 lg:py-5 border-t border-white/10 bg-[#111113]/95 backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
+            <footer className="v19-submission-drawer-footer p-4 lg:px-8 lg:py-5 border-t border-white/10 bg-[#111113]/95 backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
+              <span aria-live="polite" className="sr-only" role="status">
+                {actionAnnouncement}
+              </span>
               <div
                 className={footerInstructionClassName}
                 data-testid="drawer-footer-instruction"
@@ -1313,13 +1491,27 @@ export function Drawer({
               <div className="flex gap-3 w-full sm:w-auto">
                 <button
                   {...agentInteractionProps("drawer.close")}
-                  aria-label="Отменить и закрыть подачу"
+                  aria-label="Закрыть подачу"
                   className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
                   type="button"
                   onClick={onClose}
                 >
-                  Отмена
+                  Закрыть
                 </button>
+                {submission.status === "ready_for_export" ? (
+                  <button
+                    className="v19-agent-drawer-return-review flex-1 sm:flex-none h-11 px-5 text-[13px] font-medium rounded-xl transition-colors"
+                    disabled={actionPending}
+                    ref={reviewConfirmationTriggerRef}
+                    type="button"
+                    onClick={() => {
+                      setActionError("");
+                      setReviewConfirmationOpen(true);
+                    }}
+                  >
+                    Вернуть на проверку
+                  </button>
+                ) : null}
                 <button
                   {...agentInteractionProps(
                     primaryActionInteractionByStatus[submission.status],
@@ -1328,7 +1520,7 @@ export function Drawer({
                   aria-describedby={
                     footerActionNotice ? footerInstructionId : undefined
                   }
-                  className={`flex-1 sm:flex-none h-11 px-8 ${primaryButtonClassName} text-white font-medium text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
+                  className={`v19-submission-drawer-primary flex-1 sm:flex-none h-11 px-8 ${primaryButtonClassName} text-white font-medium text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                   disabled={primaryAction.disabled || actionPending}
                   type="button"
                   onClick={() => void handlePrimaryAction()}
@@ -1344,6 +1536,26 @@ export function Drawer({
               </div>
             </footer>
           </motion.div>
+          {reviewConfirmationOpen ? (
+            <ConfirmationDialog
+              busy={actionPending}
+              cancelLabel="Оставить готовой к выгрузке"
+              confirmDanger={false}
+              confirmInteractionId="drawer.submit-review"
+              confirmLabel="Вернуть на проверку"
+              description="Подача снова перейдёт в очередь администратора, а готовность к выгрузке будет сброшена канонической командой."
+              error={actionError || undefined}
+              kicker="Повторная проверка"
+              title="Вернуть подачу на проверку?"
+              onCancel={() => {
+                if (!actionPending) {
+                  setActionError("");
+                  closeReviewConfirmation();
+                }
+              }}
+              onConfirm={() => void handleReturnToReview()}
+            />
+          ) : null}
         </>
       ) : null}
     </AnimatePresence>

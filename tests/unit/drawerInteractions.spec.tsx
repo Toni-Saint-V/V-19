@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Drawer } from "../../src/components/Drawer";
 import { auditAgentInteractionControls } from "../../src/modules/submissions/agentInteractionContract";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { requiredPassportReviewMediaSlots } from "../../src/modules/submissions/passportReviewContract";
 import {
   createDraftSubmission,
   uploadRequiredFiles,
@@ -139,7 +140,7 @@ describe("Drawer interactions", () => {
       { label: "Черновик", status: "draft", toneClassName: "text-white/70" },
       { label: "В работе", status: "in_progress", toneClassName: "text-blue-400" },
       {
-        label: "Действие",
+        label: "Возвращено",
         status: "requires_action",
         toneClassName: "text-orange-400",
       },
@@ -227,13 +228,76 @@ describe("Drawer interactions", () => {
     expect(auditAgentInteractionControls(container)).toEqual([]);
   });
 
+  test("supports keyboard tab navigation and restores each tab scroll position", async () => {
+    const { container } = renderDrawer();
+    const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
+    const body = container.querySelector<HTMLElement>(".v19-submission-drawer-body");
+    if (!body) throw new Error("Expected drawer scroll body.");
+
+    const overviewTab = within(dialog).getByRole("tab", { name: "Обзор" });
+    body.scrollTop = 180;
+    fireEvent.keyDown(overviewTab, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(within(dialog).getByRole("tab", { name: "Анкета" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+
+    body.scrollTop = 72;
+    fireEvent.keyDown(within(dialog).getByRole("tab", { name: "Анкета" }), {
+      key: "Home",
+    });
+    await waitFor(() => expect(overviewTab).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(body.scrollTop).toBe(180));
+
+    fireEvent.keyDown(overviewTab, { key: "End" });
+    await waitFor(() =>
+      expect(within(dialog).getByRole("tab", { name: "История" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+  });
+
+  test("traps focus inside the drawer and returns it to the opener", async () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Открыть подачу";
+    document.body.append(opener);
+    opener.focus();
+
+    const { unmount } = renderDrawer();
+    const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
+    await waitFor(() => expect(dialog).toHaveFocus());
+
+    const first = within(dialog).getByRole("tab", { name: "Обзор" });
+    const last = within(dialog).getByRole("button", { name: "Закрыть подачу" });
+    for (const element of [first, last]) {
+      Object.defineProperty(element, "offsetParent", {
+        configurable: true,
+        get: () => document.body,
+      });
+    }
+
+    first.focus();
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(last).toHaveFocus();
+
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(first).toHaveFocus();
+
+    unmount();
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
   test("routes questionnaire and issue clicks to their exact targets", async () => {
     const { onOpenQuestionnaire, onUploadApplicantFile } = renderDrawer();
     const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Анкета" }));
     await waitFor(() => within(dialog).getByText("Прогресс заполнения"));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Открыть анкету" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Исправить анкету" }));
     expect(onOpenQuestionnaire).toHaveBeenCalledWith();
 
     fireEvent.click(within(dialog).getByRole("button", { name: /Личные данные/ }));
@@ -280,7 +344,7 @@ describe("Drawer interactions", () => {
     const disabledAction = screen.getByRole("button", {
       name: "Отправить исправления",
     });
-    const disabledReason = screen.getByText("Сначала отметьте замечания исправленными");
+    const disabledReason = screen.getByTestId("drawer-footer-instruction");
     expect(disabledAction).toBeDisabled();
     expect(disabledReason).not.toHaveClass("hidden");
     expect(disabledReason).toHaveAttribute("role", "status");
@@ -443,7 +507,7 @@ describe("Drawer interactions", () => {
       submission: { ...readySubmission(), status: "submitted_for_review" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Смотреть статус" }));
+    fireEvent.click(screen.getByRole("button", { name: "Открыть историю" }));
     await waitFor(() =>
       expect(screen.getByRole("tab", { name: "История" })).toHaveAttribute(
         "aria-selected",
@@ -451,6 +515,86 @@ describe("Drawer interactions", () => {
       ),
     );
     expect(onAction).not.toHaveBeenCalled();
+  });
+
+  test("uses canonical family media slots and labels questionnaire percentages", () => {
+    const submission = returnedSubmission();
+    const requiredSlotCount = requiredPassportReviewMediaSlots(submission).length;
+    renderDrawer({ submission });
+
+    expect(
+      screen.getByText(new RegExp(`\\d/${requiredSlotCount}`)),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("готовность анкеты")).toHaveLength(
+      submission.applicants.length,
+    );
+    expect(screen.queryByText(/^Фото/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Видео/)).not.toBeInTheDocument();
+  });
+
+  test("keeps read-only questionnaire and issue controls navigational", async () => {
+    renderDrawer({
+      activeTab: "questionnaire",
+      submission: { ...returnedSubmission(), status: "submitted_for_review" },
+    });
+
+    expect(screen.getByRole("button", { name: "Смотреть анкету" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /Замечания/ }));
+    await screen.findByText("Список задач по замечаниям");
+    expect(
+      screen.queryByRole("button", { name: "Перезагрузить файл" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Открыть файл" })).toHaveLength(2);
+  });
+
+  test("confirms, cancels and retries ready-for-export resubmission", async () => {
+    const onAction = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("temporary failure"))
+      .mockResolvedValueOnce(undefined);
+    const { container } = renderDrawer({
+      onAction,
+      submission: { ...readySubmission(), status: "ready_for_export" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Вернуть на проверку" }));
+    const confirmation = screen.getByRole("dialog", {
+      name: "Вернуть подачу на проверку?",
+    });
+    expect(
+      within(confirmation).getByRole("button", {
+        name: "Оставить готовой к выгрузке",
+      }),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".v19-agent-drawer")).toHaveAttribute("inert");
+
+    fireEvent.click(
+      within(confirmation).getByRole("button", {
+        name: "Оставить готовой к выгрузке",
+      }),
+    );
+    expect(onAction).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Вернуть на проверку" })).toHaveFocus(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Вернуть на проверку" }));
+    fireEvent.click(screen.getByRole("button", { name: "Вернуть на проверку" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Состояние подачи не изменено",
+    );
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Вернуть на проверку" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Вернуть подачу на проверку?" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText("Подача возвращена на проверку администратору."),
+    ).toBeInTheDocument();
   });
 
   test("supports every close path and focuses a requested issue", async () => {
@@ -469,7 +613,7 @@ describe("Drawer interactions", () => {
     await waitFor(() => expect(onClearFocusTarget).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole("button", { name: "Закрыть подачу" }));
-    fireEvent.click(screen.getByRole("button", { name: "Отменить и закрыть подачу" }));
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть" }));
     fireEvent.keyDown(window, { key: "Escape" });
     const overlay = container.querySelector<HTMLElement>(
       '[aria-hidden="true"].fixed.inset-0',
@@ -478,5 +622,22 @@ describe("Drawer interactions", () => {
     fireEvent.click(overlay);
 
     expect(onClose).toHaveBeenCalledTimes(4);
+  });
+
+  test("reports a missing requested issue target without breaking navigation", async () => {
+    const { onClearFocusTarget } = renderDrawer({
+      focusTarget: { issueId: "missing-issue", tab: "issues" },
+    });
+
+    expect(
+      await screen.findByText(
+        "Точный объект замечания не найден. Откройте список замечаний и выберите доступную задачу.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Замечания/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(onClearFocusTarget).toHaveBeenCalledOnce();
   });
 });

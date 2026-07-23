@@ -3116,6 +3116,143 @@
   background: var(--v19b-color-control) !important;
 }
 
+.v19-agent-drawer .v19-agent-drawer-context {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 0.75fr) minmax(12rem, 1.4fr) minmax(
+      12rem,
+      1.4fr
+    );
+  gap: var(--v19b-size-8);
+  margin-top: var(--v19b-size-16);
+}
+
+.v19-agent-drawer .v19-agent-drawer-context > div {
+  min-width: var(--v19b-size-0);
+  padding: var(--v19b-size-10) var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+}
+
+.v19-agent-drawer .v19-agent-drawer-context dt {
+  margin-bottom: var(--v19b-size-4);
+  color: var(--v19b-color-text-faint);
+  font-size: var(--v19b-size-10);
+  font-weight: var(--v19b-weight-control);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.v19-agent-drawer .v19-agent-drawer-context dd {
+  min-width: var(--v19b-size-0);
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-12);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.v19-agent-drawer .v19-agent-drawer-context .is-blocked {
+  border-color: var(--v19b-admin-drawer-orange-border);
+  background: var(--v19b-admin-drawer-orange-bg);
+}
+
+.v19-agent-drawer .v19-agent-drawer-context .is-blocked dd {
+  color: var(--v19b-admin-drawer-orange-text);
+}
+
+.v19-agent-drawer .v19-agent-drawer-target-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--v19b-size-12);
+  margin-bottom: var(--v19b-size-16);
+  padding: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-orange-border);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-admin-drawer-orange-text);
+  background: var(--v19b-admin-drawer-orange-bg);
+  font-size: var(--v19b-size-12);
+}
+
+.v19-agent-drawer .v19-agent-drawer-target-notice button {
+  display: inline-grid;
+  min-width: var(--v19b-size-40);
+  min-height: var(--v19b-size-40);
+  place-items: center;
+  border-radius: var(--v19b-radius-control);
+}
+
+.v19-agent-drawer .v19-agent-drawer-empty {
+  display: grid;
+  min-height: 16rem;
+  place-items: center;
+  align-content: center;
+  gap: var(--v19b-size-8);
+  padding: var(--v19b-size-24);
+  color: var(--v19b-color-text-muted);
+  text-align: center;
+}
+
+.v19-agent-drawer .v19-agent-drawer-empty h3,
+.v19-agent-drawer .v19-agent-drawer-empty p {
+  margin: var(--v19b-size-0);
+}
+
+.v19-agent-drawer .v19-agent-drawer-empty h3 {
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-16);
+}
+
+.v19-agent-drawer .v19-agent-drawer-empty p {
+  max-width: 28rem;
+  font-size: var(--v19b-size-12);
+  line-height: 1.55;
+}
+
+.v19-agent-drawer .v19-agent-drawer-return-review {
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  color: var(--v19b-color-text);
+  background: var(--v19b-color-control);
+}
+
+.v19-agent-drawer .v19-agent-drawer-return-review:hover:not(:disabled) {
+  border-color: var(--v19b-color-primary-deep-border);
+  color: var(--v19b-color-primary-text);
+  background: var(--vf-accent-soft);
+}
+
+@media (max-width: 767px) {
+  .v19-agent-drawer .v19-agent-drawer-context {
+    grid-template-columns: 1fr;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-header {
+    padding-inline: var(--v19b-size-20) !important;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-body {
+    padding: var(--v19b-size-20) !important;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-footer {
+    align-items: stretch !important;
+    padding: var(--v19b-size-12) var(--v19b-size-20)
+      max(var(--v19b-size-12), env(safe-area-inset-bottom)) !important;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-footer > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-footer button {
+    width: 100%;
+    min-height: var(--v19b-size-44) !important;
+  }
+}
+
 .v19-submission-drawer-demo-badge {
   display: inline-flex;
   min-height: var(--v19b-size-24);
@@ -5686,7 +5823,6 @@
     align-self: end;
   }
 }
-
 
 [data-admin-review-drawer-surface="workspace"]
   .admin-review-traveler-summary
@@ -41763,4 +41899,56 @@ section[data-testid="agent-actions-screen"]
   background: var(--v19b-color-primary-soft-10) !important;
   box-shadow: inset var(--v19b-size-3) var(--v19b-size-0) var(--v19b-size-0)
     var(--vf-info) !important;
+}
+
+/* Agent Drawer is the final owner of tablet/mobile tab touch targets. */
+@media (max-width: 1023px) {
+  .v19-agent-drawer .v19-submission-drawer-tab {
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
+    max-height: none !important;
+  }
+}
+
+/* Agent Drawer is the final owner of its compact four-tab mobile layout. */
+@media (max-width: 767px) {
+  .v19-agent-drawer .v19-submission-drawer-tabs-scroll {
+    overflow-x: hidden !important;
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-tabs {
+    width: 100% !important;
+    min-width: var(--v19b-size-0) !important;
+    gap: var(--v19b-size-2) !important;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-tab {
+    min-width: var(--v19b-size-0) !important;
+    min-height: var(--v19b-size-44) !important;
+    flex: 1 1 25%;
+    justify-content: center;
+    gap: var(--v19b-size-4) !important;
+    padding-inline: var(--v19b-size-4) !important;
+    font-size: var(--v19b-size-12) !important;
+  }
+
+  .v19-agent-drawer .v19-submission-drawer-tab-count {
+    margin-left: var(--v19b-size-0) !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .v19-agent-drawer .v19-submission-drawer-tab-count {
+    display: none !important;
+  }
+}
+
+@media (max-width: 359px) {
+  .v19-agent-drawer .v19-submission-drawer-tab {
+    gap: var(--v19b-size-0) !important;
+    padding-inline: var(--v19b-size-0) !important;
+    font-size: var(--v19b-size-11) !important;
+  }
 }

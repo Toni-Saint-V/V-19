@@ -1010,9 +1010,9 @@ export function CommandCenter({
       </AnimatePresence>
 
       <div
-        aria-hidden={currentView !== "main" ? true : undefined}
+        aria-hidden={currentView !== "main" || drawerOpen ? true : undefined}
         className="contents"
-        inert={currentView !== "main"}
+        inert={currentView !== "main" || drawerOpen}
       >
         <AppShell
           className="is-agent-shell-source-actions"
@@ -1110,38 +1110,38 @@ export function CommandCenter({
             </AnimatePresence>
           </div>
         </AppShell>
-
-        {selectedCanonicalSubmission ? (
-          <Drawer
-            activeTab={drawerActiveTab}
-            focusTarget={drawerFocusTarget}
-            isOpen={drawerOpen}
-            submission={selectedCanonicalSubmission}
-            onAction={executeAgentSubmissionAction}
-            onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
-            onClose={() => setDrawerOpen(false)}
-            onOpenQuestionnaire={(target) =>
-              handleOpenQuestionnaire(selectedCanonicalSubmission.id, target)
-            }
-            onOpenWorkspaceTarget={(target) =>
-              handleOpenWorkspaceTarget(selectedCanonicalSubmission.id, target)
-            }
-            onUploadApplicantFile={uploadCanonicalApplicantFile}
-          />
-        ) : null}
-
-        <CommandPalette
-          open={commandPaletteOpen}
-          role="agent"
-          submissions={submissionCards}
-          onOpenChange={handleCommandPaletteOpenChange}
-          onCreateSubmission={createPackage}
-          onNavigateAgentActions={() => navigateTo("actions")}
-          onNavigateAgentSubmissions={() => navigateTo("submissions")}
-          onNavigateSettings={() => navigateTo("settings")}
-          onOpenSubmission={(submission) => handleRowClick(submission.id)}
-        />
       </div>
+
+      {selectedCanonicalSubmission ? (
+        <Drawer
+          activeTab={drawerActiveTab}
+          focusTarget={drawerFocusTarget}
+          isOpen={drawerOpen}
+          submission={selectedCanonicalSubmission}
+          onAction={executeAgentSubmissionAction}
+          onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
+          onClose={() => setDrawerOpen(false)}
+          onOpenQuestionnaire={(target) =>
+            handleOpenQuestionnaire(selectedCanonicalSubmission.id, target)
+          }
+          onOpenWorkspaceTarget={(target) =>
+            handleOpenWorkspaceTarget(selectedCanonicalSubmission.id, target)
+          }
+          onUploadApplicantFile={uploadCanonicalApplicantFile}
+        />
+      ) : null}
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        role="agent"
+        submissions={submissionCards}
+        onOpenChange={handleCommandPaletteOpenChange}
+        onCreateSubmission={createPackage}
+        onNavigateAgentActions={() => navigateTo("actions")}
+        onNavigateAgentSubmissions={() => navigateTo("submissions")}
+        onNavigateSettings={() => navigateTo("settings")}
+        onOpenSubmission={(submission) => handleRowClick(submission.id)}
+      />
     </div>
   );
 }

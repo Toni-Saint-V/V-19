@@ -184,15 +184,9 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "status_history",
       "submission-media",
     ],
-    allowedNetworkTargets: [
-      "rpc:save_submission_draft",
-      "storage:submission-media",
-    ],
+    allowedNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
     requiredChangedTargets: ["submissions", "applicants", "submission-media"],
-    requiredNetworkTargets: [
-      "rpc:save_submission_draft",
-      "storage:submission-media",
-    ],
+    requiredNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
   }),
   mark_issue_fixed: mutationWriteScope({
     allowedChangedTargets: [
@@ -282,24 +276,14 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "status_history",
       "submission-media",
     ],
-    allowedNetworkTargets: [
-      "rpc:save_submission_draft",
-      "storage:submission-media",
-    ],
+    allowedNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
     requiredChangedTargets: ["media_assets", "submission-media"],
-    requiredNetworkTargets: [
-      "rpc:save_submission_draft",
-      "storage:submission-media",
-    ],
+    requiredNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
   }),
 } as const satisfies Partial<Record<BusinessClickIntent, AgentInteractionWriteScope>>;
 
 const domProof = ["dom-state", "no-network-write"] as const;
-const persistedUiProof = [
-  "dom-state",
-  "reload-readback",
-  "no-network-write",
-] as const;
+const persistedUiProof = ["dom-state", "reload-readback", "no-network-write"] as const;
 const mutationProof = ["network-readback", "reload-readback"] as const;
 const lifecycleProof = [
   "network-readback",
@@ -310,7 +294,7 @@ const editableStatusFixtures = ["draft", "in_progress", "returned"] as const;
 const initialReviewStatusFixtures = ["draft", "in_progress"] as const;
 const returnedStatusFixtures = ["returned"] as const;
 const drawerDraftStatusFixtures = ["draft"] as const;
-const drawerReviewStatusFixtures = ["in_progress"] as const;
+const drawerReviewStatusFixtures = ["in_progress", "ready_for_export"] as const;
 const drawerCorrectionStatusFixtures = ["returned"] as const;
 const drawerCorrectionDisabledStatusFixtures = ["requires_action"] as const;
 const drawerHistoryStatusFixtures = [
@@ -392,7 +376,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "session",
     surface: "access",
     role: "anonymous",
-    expectedEffect: "Request one recovery message without promising delivery before server acknowledgement.",
+    expectedEffect:
+      "Request one recovery message without promising delivery before server acknowledgement.",
     proof: ["network-readback", "dom-state"],
   },
   "access.submit-invite-password": {
@@ -400,7 +385,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "session",
     surface: "access",
     role: "anonymous",
-    expectedEffect: "Persist the invited user's password and establish the authorized session.",
+    expectedEffect:
+      "Persist the invited user's password and establish the authorized session.",
     proof: ["network-readback", "session-transition", "reload-readback"],
   },
   "access.submit-recovery-password": {
@@ -408,7 +394,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "session",
     surface: "access",
     role: "anonymous",
-    expectedEffect: "Persist the recovered password and establish the authorized session.",
+    expectedEffect:
+      "Persist the recovered password and establish the authorized session.",
     proof: ["network-readback", "session-transition", "reload-readback"],
   },
   "access.pending-sign-out": {
@@ -465,7 +452,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "navigation",
     surface: "agent-shell",
     role: "agent",
-    expectedEffect: "Open the new-submission intake without creating a remote record yet.",
+    expectedEffect:
+      "Open the new-submission intake without creating a remote record yet.",
     proof: domProof,
   },
   "shell.open-command-palette": {
@@ -529,7 +517,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "navigation",
     surface: "agent-actions",
     role: "agent",
-    expectedEffect: "Retry loading the canonical action queue and show its resulting state.",
+    expectedEffect:
+      "Retry loading the canonical action queue and show its resulting state.",
     proof: ["network-readback", "dom-state", "no-network-write"],
   },
   "actions.select-task": {
@@ -577,7 +566,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "navigation",
     surface: "agent-ai",
     role: "agent",
-    expectedEffect: "Open the cited submission or workspace target without applying the AI suggestion.",
+    expectedEffect:
+      "Open the cited submission or workspace target without applying the AI suggestion.",
     proof: domProof,
   },
   "ai.copy-plan": {
@@ -585,7 +575,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "clipboard",
     surface: "agent-ai",
     role: "agent",
-    expectedEffect: "Copy the displayed AI brief and report success or a retry-safe failure without a write.",
+    expectedEffect:
+      "Copy the displayed AI brief and report success or a retry-safe failure without a write.",
     proof: ["clipboard", "dom-state", "no-network-write"],
   },
   "submissions.summary-filter": {
@@ -657,7 +648,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "navigation",
     surface: "agent-submissions",
     role: "agent",
-    expectedEffect: "Open the selected submission questionnaire at the requested target.",
+    expectedEffect:
+      "Open the selected submission questionnaire at the requested target.",
     proof: domProof,
   },
   "submissions.upload-file": {
@@ -666,7 +658,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "agent-submissions",
     role: "agent",
-    expectedEffect: "Upload one required applicant file and read back its canonical slot.",
+    expectedEffect:
+      "Upload one required applicant file and read back its canonical slot.",
     proof: ["storage-readback", "network-readback", "reload-readback"],
     businessIntent: "upload_required_file",
     statusFixtures: editableStatusFixtures,
@@ -682,8 +675,7 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     proof: lifecycleProof,
     businessIntent: "prepare_and_submit_for_review",
     statusFixtures: initialReviewStatusFixtures,
-    writeScope:
-      V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.prepare_and_submit_for_review,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.prepare_and_submit_for_review,
   },
   "submissions.cancel-submit": {
     id: "submissions.cancel-submit",
@@ -722,7 +714,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "navigation",
     surface: "new-submission",
     role: "agent",
-    expectedEffect: "Assign, rotate, reorder, or remove only the staged synthetic file.",
+    expectedEffect:
+      "Assign, rotate, reorder, or remove only the staged synthetic file.",
     proof: domProof,
   },
   "new-submission.toggle-prefill": {
@@ -730,7 +723,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "dialog",
     surface: "new-submission",
     role: "agent",
-    expectedEffect: "Open or close the local OCR prefill preview without a remote write.",
+    expectedEffect:
+      "Open or close the local OCR prefill preview without a remote write.",
     proof: domProof,
   },
   "new-submission.save-draft": {
@@ -739,7 +733,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "new-submission",
     role: "agent",
-    expectedEffect: "Create one draft from the staged package and read it back after reload.",
+    expectedEffect:
+      "Create one draft from the staged package and read it back after reload.",
     proof: mutationProof,
     businessIntent: "create_submission",
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.create_submission,
@@ -750,7 +745,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "new-submission",
     role: "agent",
-    expectedEffect: "Create one draft from the staged package and open its questionnaire.",
+    expectedEffect:
+      "Create one draft from the staged package and open its questionnaire.",
     proof: mutationProof,
     businessIntent: "create_submission",
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.create_submission,
@@ -761,12 +757,12 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "questionnaire",
     role: "agent",
-    expectedEffect: "Flush pending questionnaire changes once, then return; remain in place on save failure.",
+    expectedEffect:
+      "Flush pending questionnaire changes once, then return; remain in place on save failure.",
     proof: mutationProof,
     businessIntent: "update_questionnaire_field",
     statusFixtures: editableStatusFixtures,
-    writeScope:
-      V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
   },
   "questionnaire.navigate": {
     id: "questionnaire.navigate",
@@ -781,7 +777,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "filter",
     surface: "questionnaire",
     role: "agent",
-    expectedEffect: "Filter or focus questionnaire fields without changing their values.",
+    expectedEffect:
+      "Filter or focus questionnaire fields without changing their values.",
     proof: domProof,
   },
   "questionnaire.update-field": {
@@ -790,12 +787,12 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "questionnaire",
     role: "agent",
-    expectedEffect: "Persist the edited questionnaire field and read it back after reload.",
+    expectedEffect:
+      "Persist the edited questionnaire field and read it back after reload.",
     proof: mutationProof,
     businessIntent: "update_questionnaire_field",
     statusFixtures: editableStatusFixtures,
-    writeScope:
-      V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
   },
   "questionnaire.copy-family": {
     canonicalEffect: questionnaireUpdateCanonicalEffect,
@@ -803,19 +800,20 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "questionnaire",
     role: "agent",
-    expectedEffect: "Copy the chosen shared fields to the selected family members only.",
+    expectedEffect:
+      "Copy the chosen shared fields to the selected family members only.",
     proof: mutationProof,
     businessIntent: "update_questionnaire_field",
     statusFixtures: editableStatusFixtures,
-    writeScope:
-      V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
   },
   "questionnaire.preview-family-copy": {
     id: "questionnaire.preview-family-copy",
     kind: "dialog",
     surface: "questionnaire",
     role: "agent",
-    expectedEffect: "Preview the exact family fields and recipients without changing data.",
+    expectedEffect:
+      "Preview the exact family fields and recipients without changing data.",
     proof: domProof,
   },
   "questionnaire.cancel-family-copy": {
@@ -832,12 +830,12 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "questionnaire",
     role: "agent",
-    expectedEffect: "Persist current progress exactly once and return to My submissions.",
+    expectedEffect:
+      "Persist current progress exactly once and return to My submissions.",
     proof: mutationProof,
     businessIntent: "update_questionnaire_field",
     statusFixtures: editableStatusFixtures,
-    writeScope:
-      V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
   },
   "questionnaire.mark-fixed": {
     canonicalEffect: markIssueFixedCanonicalEffect,
@@ -845,7 +843,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "questionnaire",
     role: "agent",
-    expectedEffect: "Mark one resolved admin issue fixed and read back the issue state.",
+    expectedEffect:
+      "Mark one resolved admin issue fixed and read back the issue state.",
     proof: lifecycleProof,
     businessIntent: "mark_issue_fixed",
     statusFixtures: returnedStatusFixtures,
@@ -880,7 +879,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "navigation",
     surface: "submission-drawer",
     role: "agent",
-    expectedEffect: "Open the exact issue target in its owning questionnaire or file workspace without a write.",
+    expectedEffect:
+      "Open the exact issue target in its owning questionnaire or file workspace without a write.",
     proof: domProof,
   },
   "drawer.upload-file": {
@@ -889,7 +889,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "submission-drawer",
     role: "agent",
-    expectedEffect: "Upload one required applicant file and read back its canonical slot.",
+    expectedEffect:
+      "Upload one required applicant file and read back its canonical slot.",
     proof: ["storage-readback", "network-readback", "reload-readback"],
     businessIntent: "upload_required_file",
     statusFixtures: editableStatusFixtures,
@@ -913,7 +914,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "submission-drawer",
     role: "agent",
-    expectedEffect: "Submit one complete submission for admin review exactly once from the drawer.",
+    expectedEffect:
+      "Submit one complete submission for admin review exactly once from the drawer.",
     proof: lifecycleProof,
     businessIntent: "submit_for_review",
     statusFixtures: drawerReviewStatusFixtures,
@@ -926,7 +928,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "mutation",
     surface: "submission-drawer",
     role: "agent",
-    expectedEffect: "Resubmit corrected data exactly once from the drawer after all blockers are fixed.",
+    expectedEffect:
+      "Resubmit corrected data exactly once from the drawer after all blockers are fixed.",
     proof: lifecycleProof,
     businessIntent: "submit_corrections",
     statusFixtures: drawerCorrectionStatusFixtures,
@@ -962,7 +965,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "clipboard",
     surface: "command-palette",
     role: "agent",
-    expectedEffect: "Copy the visible AI queue plan and report success or a retry-safe failure without a write.",
+    expectedEffect:
+      "Copy the visible AI queue plan and report success or a retry-safe failure without a write.",
     proof: ["clipboard", "dom-state", "no-network-write"],
   },
   "returned-documents.download": {
@@ -970,7 +974,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "download",
     surface: "returned-documents",
     role: "agent",
-    expectedEffect: "Download the authorized non-empty returned PDF for the selected submission.",
+    expectedEffect:
+      "Download the authorized non-empty returned PDF for the selected submission.",
     proof: ["network-readback", "download", "no-network-write"],
     statusFixtures: ["exported"],
   },
@@ -989,7 +994,8 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     kind: "device_preference",
     surface: "agent-settings",
     role: "agent",
-    expectedEffect: "Apply the selected preference to the DOM and persist it in this browser.",
+    expectedEffect:
+      "Apply the selected preference to the DOM and persist it in this browser.",
     proof: persistedUiProof,
   },
   "settings.reset-preferences": {
@@ -1009,8 +1015,7 @@ export type AgentInteractionBusinessIntentFinding = {
   reason: "wrong-role" | "wrong-status" | "wrong-surface" | "wrong-write-scope";
 };
 
-export function auditAgentInteractionBusinessIntentCompatibility():
-  AgentInteractionBusinessIntentFinding[] {
+export function auditAgentInteractionBusinessIntentCompatibility(): AgentInteractionBusinessIntentFinding[] {
   const findings: AgentInteractionBusinessIntentFinding[] = [];
 
   for (const contract of Object.values(
@@ -1025,27 +1030,22 @@ export function auditAgentInteractionBusinessIntentCompatibility():
     if (businessContract.ownerRole !== contract.role) {
       findings.push({ interactionId, reason: "wrong-role" });
     }
-    if (
-      !(businessContract.surfaces as readonly string[]).includes(contract.surface)
-    ) {
+    if (!(businessContract.surfaces as readonly string[]).includes(contract.surface)) {
       findings.push({ interactionId, reason: "wrong-surface" });
     }
     if (
       transition &&
       "statusFixtures" in contract &&
-      contract.statusFixtures?.some(
-        (status) => !transition.from.includes(status),
-      )
+      contract.statusFixtures?.some((status) => !transition.from.includes(status))
     ) {
       findings.push({ interactionId, reason: "wrong-status" });
     }
     if (contract.kind === "mutation") {
-      const expectedWriteScope =
-        (
-          V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES as Partial<
-            Record<BusinessClickIntent, AgentInteractionWriteScope>
-          >
-        )[contract.businessIntent];
+      const expectedWriteScope = (
+        V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES as Partial<
+          Record<BusinessClickIntent, AgentInteractionWriteScope>
+        >
+      )[contract.businessIntent];
       if (
         !expectedWriteScope ||
         JSON.stringify(contract.writeScope) !== JSON.stringify(expectedWriteScope)
