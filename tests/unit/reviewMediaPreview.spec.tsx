@@ -209,6 +209,39 @@ describe("ReviewMediaPreview", () => {
     );
   });
 
+  test("reports an embedded PDF load failure so the workspace can retry safely", () => {
+    const onError = vi.fn();
+    const { container } = render(
+      <ReviewMediaPreview
+        alt="Оригинал паспорта PDF"
+        file={
+          {
+            applicantId: "applicant-1",
+            generatedFileName: "passport.pdf",
+            id: "passport-pdf",
+            mimeType: "application/pdf",
+            status: "pending_review",
+            type: "passport_scan",
+          } satisfies SubmissionFile
+        }
+        label="Паспорт"
+        preview={{ status: "ready", url: "blob:passport-pdf" }}
+        testId="protected-media-preview-passport_scan"
+        variant="single"
+        onError={onError}
+      />,
+    );
+
+    const embeddedPdf = container.querySelector("object");
+    expect(embeddedPdf).not.toBeNull();
+    fireEvent.error(embeddedPdf);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("link", { name: "Открыть оригинал" })).toHaveAttribute(
+      "href",
+      "blob:passport-pdf",
+    );
+  });
+
   test("uses a positioned containing block so 100 percent media fits before zoom", () => {
     expect(ruleBodies(".v19-review-preview-canvas")).toContainEqual(
       expect.stringContaining("position: relative"),

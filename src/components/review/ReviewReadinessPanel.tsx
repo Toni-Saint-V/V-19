@@ -1,169 +1,140 @@
-// src/components/review/ReviewReadinessPanel.tsx
-import type { CSSProperties } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronRight,
-  Eye,
   FileSpreadsheet,
   ScanSearch,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
-import type {
-  PassportReviewInsightModel,
-  PassportReviewInsightTone,
-} from "../../modules/submissions/passportReviewInsights";
-
 type ReviewReadinessPanelProps = {
+  closedIssueCount: number;
   filledFieldCount: number;
+  fixedIssueCount: number;
   mediaReadyCount: number;
   mediaTotal: number;
-  mediaVisitedCount: number;
-  model: PassportReviewInsightModel;
+  mediaLoadingCount: number;
+  mediaUnavailableCount: number;
   onNextStep: () => void;
-  onToggleQuestionnaire: () => void;
   openIssueCount: number;
-  questionnaireOpen: boolean;
+  packageGuardReason: string;
+  readOnly: boolean;
   totalFieldCount: number;
 };
 
-const toneIcons: Record<
-  PassportReviewInsightTone,
-  typeof CheckCircle2
-> = {
-  danger: AlertCircle,
-  info: ScanSearch,
-  success: CheckCircle2,
-  warning: Eye,
-};
-
-export function ReviewReadinessPanel({
+function readinessHeadline({
   filledFieldCount,
   mediaReadyCount,
   mediaTotal,
-  mediaVisitedCount,
-  model,
-  onNextStep,
-  onToggleQuestionnaire,
   openIssueCount,
-  questionnaireOpen,
+  readOnly,
+  totalFieldCount,
+}: Pick<
+  ReviewReadinessPanelProps,
+  | "filledFieldCount"
+  | "mediaReadyCount"
+  | "mediaTotal"
+  | "openIssueCount"
+  | "readOnly"
+  | "totalFieldCount"
+>) {
+  if (readOnly) return "Просмотр без изменений";
+  if (openIssueCount > 0) return "Ждём исправление от агента";
+  if (mediaReadyCount < mediaTotal) return "Нужны защищённые оригиналы";
+  if (filledFieldCount < totalFieldCount) return "Есть неполные паспортные данные";
+  return "Паспортная секция готова к подтверждению";
+}
+
+export function ReviewReadinessPanel({
+  closedIssueCount,
+  filledFieldCount,
+  fixedIssueCount,
+  mediaReadyCount,
+  mediaTotal,
+  mediaLoadingCount,
+  mediaUnavailableCount,
+  onNextStep,
+  openIssueCount,
+  packageGuardReason,
+  readOnly,
   totalFieldCount,
 }: ReviewReadinessPanelProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const headline = readinessHeadline({
+    filledFieldCount,
+    mediaReadyCount,
+    mediaTotal,
+    openIssueCount,
+    readOnly,
+    totalFieldCount,
+  });
+  const mediaStatusLabel = [
+    mediaUnavailableCount > 0 ? `недоступно ${mediaUnavailableCount}` : "",
+    mediaLoadingCount > 0 ? `загружается ${mediaLoadingCount}` : "",
+    `доступно ${mediaReadyCount} из ${mediaTotal}`,
+  ]
+    .filter(Boolean)
+    .join("; ");
 
   return (
     <section
       aria-label="Готовность паспортной проверки"
-      className={`v19-review-readiness is-${model.mode}`}
+      className={`v19-review-readiness${readOnly ? " is-read-only" : ""}`}
     >
       <div className="v19-review-readiness-primary">
-        <div
-          aria-label={`Готовность ${model.score}%`}
-          className="v19-review-score"
-          role="img"
-          style={{ "--v19-review-score": `${model.score}%` } as CSSProperties}
-        >
-          <span>{model.score}</span>
-          <small>%</small>
-        </div>
-
+        <span aria-hidden="true" className="v19-review-readiness-icon">
+          <ScanSearch />
+        </span>
         <div className="v19-review-readiness-copy">
-          <span className="v19-review-ai-label">
-            <motion.span
-              animate={
-                prefersReducedMotion
-                  ? undefined
-                  : { rotate: [0, 8, -6, 0], scale: [1, 1.08, 1] }
-              }
-              transition={{
-                duration: 2.6,
-                ease: "easeInOut",
-                repeat: Number.POSITIVE_INFINITY,
-                repeatDelay: 1.8,
-              }}
+          <span className="v19-review-guard-label">Контроль проверки</span>
+          <h2>{headline}</h2>
+          <p>Показаны только факты из паспортного и пакетного guard.</p>
+          {readOnly ? null : (
+            <button
+              className="v19-review-next-step"
+              onClick={onNextStep}
+              type="button"
             >
-              <Sparkles aria-hidden="true" />
-            </motion.span>
-            AI-подсказка
-          </span>
-          <h2>{model.headline}</h2>
-          <p>{model.summary}</p>
-          <button
-            className="v19-review-next-step"
-            onClick={onNextStep}
-            type="button"
-          >
-            <span>{model.recommendation}</span>
-            <ChevronRight aria-hidden="true" />
-          </button>
+              Перейти к следующему незавершённому шагу
+            </button>
+          )}
         </div>
       </div>
 
       <div aria-label="Состояние проверки" className="v19-review-status-strip" role="status">
         <span className={filledFieldCount < totalFieldCount ? "has-warning" : undefined}>
           <CheckCircle2 aria-hidden="true" />
-          Поля{" "}
-          <strong>
-            {filledFieldCount}/{totalFieldCount}
-          </strong>
+          Поля <strong>{filledFieldCount}/{totalFieldCount}</strong>
         </span>
         <span className={openIssueCount ? "has-warning" : undefined}>
           <AlertCircle aria-hidden="true" />
-          Замечания <strong>{openIssueCount}</strong>
+          Открыто <strong>{openIssueCount}</strong>
         </span>
-        <span className={mediaReadyCount < mediaTotal ? "has-warning" : undefined}>
+        <span
+          aria-label={`Оригиналы: ${mediaStatusLabel}`}
+          className={
+            mediaUnavailableCount > 0
+              ? "has-warning"
+              : mediaLoadingCount > 0
+                ? "is-loading"
+                : undefined
+          }
+        >
           <ShieldCheck aria-hidden="true" />
-          Оригиналы{" "}
-          <strong>
-            {mediaReadyCount}/{mediaTotal}
-          </strong>
-        </span>
-        <span className={mediaVisitedCount < mediaTotal ? "has-warning" : undefined}>
-          <Eye aria-hidden="true" />
-          Просмотрено{" "}
-          <strong>
-            {mediaVisitedCount}/{mediaTotal}
-          </strong>
+          Оригиналы <strong>{mediaReadyCount}/{mediaTotal}</strong>
         </span>
       </div>
 
-      <div className="v19-review-insights">
-        {model.insights.slice(0, 3).map((insight) => {
-          const Icon = toneIcons[insight.tone];
-          return (
-            <div className={`is-${insight.tone}`} key={insight.id}>
-              <Icon aria-hidden="true" />
-              <span>
-                <strong>{insight.title}</strong>
-                <small>{insight.message}</small>
-              </span>
-            </div>
-          );
-        })}
+      <div aria-label="Lifecycle замечаний" className="v19-review-issue-lifecycle">
+        <span><strong>{openIssueCount}</strong> открыто</span>
+        <span><strong>{fixedIssueCount}</strong> исправлено агентом</span>
+        <span><strong>{closedIssueCount}</strong> закрыто администратором</span>
       </div>
 
       <div className="v19-review-questionnaire-entry">
+        <FileSpreadsheet aria-hidden="true" />
         <span>
-          <FileSpreadsheet aria-hidden="true" />
-          <span>
-            <strong>Анкета для Excel</strong>
-            <small>Не влияет на положительное решение по паспорту.</small>
-          </span>
+          <strong>Пакетный guard</strong>
+          <small>{packageGuardReason}</small>
         </span>
-        <button
-          aria-controls="v19-review-questionnaire-peek"
-          aria-expanded={questionnaireOpen}
-          aria-keyshortcuts="Q"
-          onClick={onToggleQuestionnaire}
-          title="Горячая клавиша: Q"
-          type="button"
-        >
-          <span>{questionnaireOpen ? "Скрыть" : "Посмотреть"}</span>
-          <kbd aria-hidden="true">Q</kbd>
-        </button>
       </div>
     </section>
   );

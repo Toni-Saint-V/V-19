@@ -1,4 +1,3 @@
-// src/modules/submissions/status.ts
 import type {
   ActionDecision,
   CommandResult,
@@ -35,6 +34,8 @@ import {
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
   hasAdminPassportReviewValue,
+  isAdminPassportReviewIssueInScope,
+  passportReviewMediaTypesVisibleForApplicant,
   requiredPassportReviewMediaSlots,
 } from "./passportReviewContract";
 import {
@@ -406,6 +407,22 @@ export function fixedIssueCount(submission: Submission) {
   return submission.issues.filter((issue) => isFixedIssueStatus(issue.status)).length;
 }
 
+function isIssueInAdminPassportReviewScope(
+  submission: Submission,
+  issue: Issue,
+): boolean {
+  return submission.applicants.some((applicant) =>
+    isAdminPassportReviewIssueInScope(issue, {
+      applicantId: applicant.id,
+      fields: applicant.sections.flatMap((section) => section.fields),
+      mediaTypes: passportReviewMediaTypesVisibleForApplicant(
+        submission,
+        applicant.id,
+      ),
+    }),
+  );
+}
+
 export function isFixedIssueStatus(status: Issue["status"]) {
   return status === "fixed_by_agent";
 }
@@ -576,8 +593,14 @@ export function canAdminApproveForExport(submission: Submission) {
     (submission.status === "submitted_for_review" ||
       submission.status === "corrections_received") &&
     !hasBlockingIssues(submission) &&
-    adminPassportReviewReadiness(submission).ok &&
-    canonicalRequiredMediaReadiness(submission, { requireAccepted: true }).ok
+    !hasMissingRequiredWork(submission) &&
+    adminQuestionnaireReviewReadiness(submission).ok &&
+    canonicalRequiredMediaReadiness(submission, {
+      requireAccepted: true,
+      requireReviewMetadata: true,
+      requireStorageIdentity: true,
+    }).ok &&
+    hasUsableTripDateRange(submission)
   );
 }
 
@@ -621,7 +644,7 @@ export function hasMissingRequiredWork(submission: Submission) {
   );
 }
 
-export function adminPassportReviewReadiness(submission: Submission): {
+export function adminQuestionnaireReviewReadiness(submission: Submission): {
   ok: boolean;
   reason?: string;
 } {
@@ -668,8 +691,7 @@ export function adminPassportReviewReadiness(submission: Submission): {
     : { ok: true };
 }
 
-/** @deprecated Use adminPassportReviewReadiness; retained for existing integrations. */
-export const adminQuestionnaireReviewReadiness = adminPassportReviewReadiness;
+export const adminPassportReviewReadiness = adminQuestionnaireReviewReadiness;
 
 export function defaultDrawerTab(submission: Submission): DrawerTab {
   if (submission.status === "exported") return "history";
@@ -828,14 +850,46 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
-  if (action === "accept" || action === "close_issues_accept") {
-    const passportReview = adminPassportReviewReadiness(submission);
-    if (!passportReview.ok) return passportReview;
+  if (
+    action === "close_issues_accept" &&
+    submission.issues.some(
+      (issue) =>
+        issue.status === "fixed_by_agent" &&
+        !isIssueInAdminPassportReviewScope(submission, issue),
+    )
+  ) {
+    return {
+      ok: false,
+      reason: "Есть исправленные замечания вне паспортной проверки",
+    };
   }
 
   if (
     (action === "accept" || action === "close_issues_accept") &&
-    !canonicalRequiredMediaReadiness(submission, { requireAccepted: true }).ok
+    hasMissingRequiredWork(submission)
+  ) {
+    return { ok: false, reason: "Не все обязательные анкеты и файлы готовы" };
+  }
+
+  if (action === "accept" || action === "close_issues_accept") {
+    const questionnaireReview = adminQuestionnaireReviewReadiness(submission);
+    if (!questionnaireReview.ok) return questionnaireReview;
+  }
+
+  if (
+    (action === "accept" || action === "close_issues_accept") &&
+    !hasUsableTripDateRange(submission)
+  ) {
+    return { ok: false, reason: missingTripDateRangeReason };
+  }
+
+  if (
+    (action === "accept" || action === "close_issues_accept") &&
+    !canonicalRequiredMediaReadiness(submission, {
+      requireAccepted: true,
+      requireReviewMetadata: true,
+      requireStorageIdentity: true,
+    }).ok
   ) {
     return { ok: false, reason: "Подтвердите обязательные файлы перед принятием" };
   }
@@ -1053,6 +1107,8 @@ function validatePreparedTransitionSnapshot(
   if (
     !canonicalRequiredMediaReadiness(submission, {
       requireAccepted: true,
+      requireReviewMetadata: true,
+      requireStorageIdentity: true,
     }).ok
   ) {
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
@@ -1310,7 +1366,8 @@ export function applySubmissionActionResult(
       ...submission,
       exportState: "ready",
       issues: submission.issues.map((issue) =>
-        isIssueTransitionAllowed(issue.status, "closed_by_admin")
+        isIssueTransitionAllowed(issue.status, "closed_by_admin") &&
+        isIssueInAdminPassportReviewScope(submission, issue)
           ? { ...issue, status: "closed_by_admin" }
           : issue,
       ),

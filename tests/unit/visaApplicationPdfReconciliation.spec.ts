@@ -416,7 +416,11 @@ destino, si procede)/
 
   test("does not block acceptance because returned PDF review is post-export", () => {
     const submitted = adminAcceptRequiredMediaForTest(
-      adminApprovePassportFieldsForTest(submittedFixture()),
+      adminApprovePassportFieldsForTest(
+        submittedFixture([
+          { ...matchingReference, passportExpiresAt: "2029-08-08" },
+        ]),
+      ),
     );
     const withPdfReview = applyVisaApplicationPdfReview(
       submitted,

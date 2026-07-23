@@ -1,9 +1,11 @@
-import { type SyntheticEvent, useState } from "react";
+import { type SyntheticEvent, useEffect, useRef, useState } from "react";
 import { AlertCircle, ShieldCheck } from "lucide-react";
 
 import type { SubmissionFile } from "../modules/submissions/types";
 
 export type ReviewMediaPreviewState = {
+  reason?: "expired_or_error" | "missing" | "rejected";
+  retryable?: boolean;
   status: "loading" | "ready" | "unavailable";
   url?: string;
 };
@@ -39,6 +41,28 @@ function needsExternalViewer(file?: SubmissionFile) {
   );
 }
 
+function unavailableCopy(
+  file: SubmissionFile | undefined,
+  preview: ReviewMediaPreviewState,
+) {
+  if (!file || preview.reason === "missing") {
+    return {
+      detail: "Агент должен загрузить обязательный файл.",
+      title: "Файл не загружен",
+    };
+  }
+  if (preview.reason === "rejected") {
+    return {
+      detail: "Файл отклонён или требует замены. Новый оригинал загружает агент.",
+      title: "Оригинал нельзя принять",
+    };
+  }
+  return {
+    detail: "Ссылка истекла или сервис временно недоступен. Повторите загрузку.",
+    title: "Защищённый оригинал недоступен",
+  };
+}
+
 function LoadingPreviewState() {
   return (
     <div className="v19-review-preview-state is-loading">
@@ -64,11 +88,20 @@ export function ReviewMediaPreview({
 }: ReviewMediaPreviewProps) {
   const previewUrl = preview.status === "ready" ? preview.url : undefined;
   const [loadedMediaUrl, setLoadedMediaUrl] = useState<string | null>(null);
+  const pdfObjectRef = useRef<HTMLObjectElement | null>(null);
   const pdfFile = isPdfFile(file);
   const externalViewer = needsExternalViewer(file);
   const embeddedMedia = Boolean(previewUrl && !externalViewer && !pdfFile);
   const mediaReady = Boolean(previewUrl && loadedMediaUrl === previewUrl);
   const mediaPending = preview.status === "loading" || (embeddedMedia && !mediaReady);
+  const unavailable = unavailableCopy(file, preview);
+
+  useEffect(() => {
+    const object = pdfObjectRef.current;
+    if (!object || !pdfFile) return;
+    object.addEventListener("error", onError);
+    return () => object.removeEventListener("error", onError);
+  }, [onError, pdfFile, previewUrl]);
 
   const handleImageLoad = async (event: SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget;
@@ -109,6 +142,7 @@ export function ReviewMediaPreview({
               aria-label={alt}
               className="is-ready"
               data={previewUrl}
+              ref={pdfObjectRef}
               type="application/pdf"
             >
               <a href={previewUrl} rel="noreferrer" target="_blank">
@@ -146,10 +180,9 @@ export function ReviewMediaPreview({
             role={file ? "alert" : "status"}
           >
             <AlertCircle aria-hidden="true" />
-            <strong>
-              {file ? "Защищённый оригинал недоступен" : "Файл не загружен"}
-            </strong>
-            {file && onRetry ? (
+            <strong>{unavailable.title}</strong>
+            <span>{unavailable.detail}</span>
+            {file && onRetry && preview.retryable !== false ? (
               <button onClick={onRetry} type="button">
                 Повторить загрузку
               </button>

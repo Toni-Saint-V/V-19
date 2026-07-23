@@ -1,20 +1,14 @@
-// src/modules/submissions/passportReviewContract.ts
 import { questionnaireFieldMatchesTarget } from "./questionnaire";
 
 export const ADMIN_PASSPORT_REVIEW_FIELD_IDS = [
   "first-name",
   "surname",
-  "gender",
+  "passport-no",
   "birth-date",
+  "passport-issue-place",
+  "passport-expiry-date",
   "birth-place",
   "birth-country",
-  "nationality",
-  "passport-type",
-  "passport-no",
-  "passport-issue-date",
-  "passport-expiry-date",
-  "passport-issue-country",
-  "passport-issue-place",
 ] as const;
 
 export type AdminPassportReviewFieldId =
@@ -26,17 +20,12 @@ export const ADMIN_PASSPORT_REVIEW_FIELD_LABELS: Record<
 > = {
   "first-name": "Имя",
   surname: "Фамилия",
-  gender: "Пол",
-  "birth-date": "Дата рождения",
-  "birth-place": "Место рождения",
-  "birth-country": "Страна рождения",
-  nationality: "Гражданство",
-  "passport-type": "Тип документа",
   "passport-no": "Номер паспорта",
-  "passport-issue-date": "Дата выдачи",
-  "passport-expiry-date": "Действителен до",
-  "passport-issue-country": "Страна выдачи",
+  "birth-date": "Дата рождения",
   "passport-issue-place": "Кем / где выдан",
+  "passport-expiry-date": "Срок действия",
+  "birth-place": "Город рождения",
+  "birth-country": "Страна рождения",
 };
 
 export const PRIMARY_APPLICANT_REQUIRED_MEDIA_TYPES = [

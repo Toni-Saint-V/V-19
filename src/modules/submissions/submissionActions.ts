@@ -1,4 +1,3 @@
-// src/modules/submissions/submissionActions.ts
 import {
   applySubmissionAction,
   applySubmissionActionResult,
@@ -228,7 +227,7 @@ export function approvePassportReviewSectionForAdmin(
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Заполните и исправьте все паспортные поля.",
+        message: "Заполните и исправьте восемь паспортных полей.",
       },
     };
   }
@@ -280,20 +279,26 @@ export function approvePassportReviewSectionForAdmin(
       (file) => file.applicantId === applicant.id && file.type === fileType,
     ),
   );
-  const protectedReviewFiles = protectedReviewMediaTypes.map((fileType) =>
-    submission.files.find(
-      (file) => file.applicantId === applicant.id && file.type === fileType,
+  const protectedReviewFiles = protectedReviewMediaTypes.map((fileType) => ({
+    file: submission.files.find(
+      (candidate) =>
+        candidate.applicantId === applicant.id && candidate.type === fileType,
     ),
-  );
+    fileType,
+  }));
   if (
     protectedReviewFiles.some(
-      (file, index) =>
+      ({ file, fileType }) =>
         !file ||
         !isPersistablePrivateFileAssetAtSubmissionTarget(file, {
           applicantId: applicant.id,
-          fileType: protectedReviewMediaTypes[index]!,
+          fileType,
           submissionId: submission.id,
-        }),
+        }) ||
+        (file.status !== "pending_review" && file.status !== "accepted") ||
+        file.uploadStatus !== "uploaded" ||
+        file.reviewStatus === "replace_required" ||
+        file.reviewStatus === "poor_quality",
     )
   ) {
     return {
@@ -1105,16 +1110,14 @@ export function addPreciseAdminIssue(
     snapshot: issueSnapshot(submission, issueInput),
   };
 
-  const withTargetFlag =
-    newIssue.target.fileType &&
-    (newIssue.target.section === "Файлы" || newIssue.target.section === "Медиа")
-      ? markIssueFileForReplacement(submission, newIssue, actorId)
-      : flagQuestionnaireField(
+  const withTargetFlag = newIssue.target.fileType
+    ? markIssueFileForReplacement(submission, newIssue, actorId)
+    : flagQuestionnaireField(
           submission,
           applicant.id,
           newIssue.target.field ?? "Маршрут поездки",
           newIssue.reason,
-        );
+      );
 
   return {
     ...withTargetFlag,

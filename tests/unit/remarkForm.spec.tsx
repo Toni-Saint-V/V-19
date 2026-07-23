@@ -118,4 +118,96 @@ describe("RemarkForm", () => {
     });
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  test.each([
+    {
+      error: new Error("revision conflict"),
+      expected:
+        "Данные уже изменены другим администратором. Обновите подачу и проверьте её заново.",
+    },
+    {
+      error: new Error("permission lost for current session"),
+      expected:
+        "Сессия или права доступа изменились. Войдите снова; подача не была изменена.",
+    },
+  ])("preserves exact persistence feedback: $expected", async ({ error, expected }) => {
+    const onClose = vi.fn();
+    const onSubmit = vi.fn().mockRejectedValue(error);
+
+    render(
+      <RemarkForm
+        isOpen
+        onClose={onClose}
+        onSubmit={onSubmit}
+        submissionId="ПД-1053"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("remark-form-submit"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(expected);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test("protects dirty text from accidental close until discard is confirmed", () => {
+    const onClose = vi.fn();
+    render(
+      <RemarkForm
+        defaultApplicant="Нина Волкова"
+        defaultApplicantId="з-1053-1"
+        defaultField="Номер паспорта"
+        isOpen
+        onClose={onClose}
+        submissionId="ПД-1053"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Текст для клиента"), {
+      target: { value: "Номер не совпадает с оригиналом." },
+    });
+    expect(screen.getByText("Есть несохранённые изменения")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("group", { name: "Несохранённое замечание" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть без сохранения" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("submits an exact target only once on a rapid double click", async () => {
+    const pending = new Promise<boolean>(() => undefined);
+    const onSubmit = vi.fn(() => pending);
+    render(
+      <RemarkForm
+        defaultApplicant="Нина Волкова"
+        defaultApplicantId="з-1053-1"
+        defaultField="Номер паспорта"
+        defaultFileType="passport_scan"
+        isOpen
+        onClose={() => undefined}
+        onSubmit={onSubmit}
+        submissionId="ПД-1053"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Текст для клиента"), {
+      target: { value: "Проверьте номер в загранпаспорте." },
+    });
+    const submit = screen.getByTestId("remark-form-submit");
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith({
+      applicant: "Нина Волкова",
+      applicantId: "з-1053-1",
+      field: "Номер паспорта",
+      fileType: "passport_scan",
+      message: "Проверьте номер в загранпаспорте.",
+      severity: "warning",
+    });
+    expect(submit).toBeDisabled();
+  });
 });

@@ -17,6 +17,17 @@ export type PersistablePrivateFileAsset = SubmissionFile & {
   uploadStatus: "uploaded";
 };
 
+type PrivateFileAssetIdentityCandidate = {
+  applicantId: string;
+  generatedFileName?: string;
+  status: string;
+  storageAdapter?: string;
+  storageBucket?: string;
+  storagePath?: string;
+  type: unknown;
+  uploadStatus?: string;
+};
+
 export function isFileAssetUploadMissing(file: SubmissionFile): boolean {
   return file.status === "missing" || file.status === "needs_replacement";
 }
@@ -36,20 +47,22 @@ export function isPersistablePrivateFileAsset(
   );
 }
 
-/**
- * An admin can review an asset only if the private storage object belongs to
- * the exact submission, applicant, and document slot currently on screen.
- */
-export function isPersistablePrivateFileAssetAtSubmissionTarget(
-  file: SubmissionFile,
+export function hasCanonicalPrivateStorageIdentityAtSubmissionTarget(
+  file: PrivateFileAssetIdentityCandidate,
   input: {
     applicantId: string;
     fileType: SubmissionFileType;
     submissionId: string;
   },
-): file is PersistablePrivateFileAsset {
+): boolean {
   if (
-    !isPersistablePrivateFileAsset(file) ||
+    file.status === "missing" ||
+    file.status === "needs_replacement" ||
+    file.uploadStatus !== "uploaded" ||
+    file.storageAdapter !== "supabase-private" ||
+    file.storageBucket !== mediaStorageBucket ||
+    !file.generatedFileName ||
+    !file.storagePath ||
     file.applicantId !== input.applicantId ||
     file.type !== input.fileType
   ) {
@@ -70,6 +83,24 @@ export function isPersistablePrivateFileAssetAtSubmissionTarget(
   } catch {
     return false;
   }
+}
+
+/**
+ * An admin can review an asset only if the private storage object belongs to
+ * the exact submission, applicant, and document slot currently on screen.
+ */
+export function isPersistablePrivateFileAssetAtSubmissionTarget(
+  file: SubmissionFile,
+  input: {
+    applicantId: string;
+    fileType: SubmissionFileType;
+    submissionId: string;
+  },
+): file is PersistablePrivateFileAsset {
+  return (
+    isPersistablePrivateFileAsset(file) &&
+    hasCanonicalPrivateStorageIdentityAtSubmissionTarget(file, input)
+  );
 }
 
 export function fileCompletenessPercent(files: SubmissionFile[]): number {

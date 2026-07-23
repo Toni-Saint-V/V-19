@@ -11,7 +11,8 @@ import {
 } from "../../src/modules/submissions/passportReviewContract";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
 import { canonicalRequiredMediaReadiness } from "../../src/modules/submissions/domainContract";
-import type { Submission } from "../../src/modules/submissions/types";
+import { canReplaceDocument } from "../../src/modules/submissions/status";
+import type { Submission, SubmissionFile } from "../../src/modules/submissions/types";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function reviewableSubmission(
@@ -134,6 +135,34 @@ describe("admin passport review section approval", () => {
     },
   );
 
+  test("marks an exact file target for replacement independent of its presentation section label", () => {
+    const submission = reviewableSubmission();
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+
+    const withIssue = addPreciseAdminIssue(submission, {
+      applicantId: applicant.id,
+      comment: "Загрузите новый скан паспорта.",
+      fileType: "passport_scan",
+      reason: "Скан требует замены",
+      section: "Паспорт",
+      severity: "blocker",
+      type: "file",
+    });
+    const flagged = withIssue.files.find(
+      (file) => file.applicantId === applicant.id && file.type === "passport_scan",
+    );
+
+    expect(flagged).toMatchObject({
+      linkedIssueId: withIssue.issues[0]?.id,
+      reviewStatus: "replace_required",
+      status: "needs_replacement",
+    });
+    expect(
+      flagged && canReplaceDocument({ ...withIssue, status: "returned" }, flagged),
+    ).toBe(true);
+  });
+
   test("approves exactly eight passport fields and the protected single-applicant media", () => {
     const submission = reviewableSubmission();
     const applicant = submission.applicants[0];
@@ -176,6 +205,60 @@ describe("admin passport review section approval", () => {
     );
     expect(repeated).toEqual({ ok: true, data: approved });
   });
+
+  test.each([
+    "draft",
+    "in_progress",
+    "returned",
+    "ready_for_export",
+    "exported",
+  ] as const)("rejects passport confirmation in the read-only %s status", (status) => {
+    const source = reviewableSubmission();
+    const submission: Submission = { ...source, status };
+    const before = structuredClone(submission);
+
+    expect(
+      approvePassportReviewSectionForAdmin(
+        submission,
+        { applicantId: submission.applicants[0]?.id ?? "" },
+        "admin-reviewer",
+      ),
+    ).toMatchObject({ ok: false });
+    expect(submission).toEqual(before);
+  });
+
+  test.each([
+    ["missing", { status: "missing" }],
+    ["needs replacement", { status: "needs_replacement" }],
+    ["rejected", { reviewStatus: "replace_required" }],
+    ["poor quality", { reviewStatus: "poor_quality" }],
+    ["non-canonical storage", { storageAdapter: "local-dev" }],
+  ] satisfies Array<[string, Partial<SubmissionFile>]>)(
+    "rejects %s protected media without mutation",
+    (_label, filePatch) => {
+      const source = reviewableSubmission();
+      const applicant = source.applicants[0];
+      if (!applicant) throw new Error("Expected applicant.");
+      const submission: Submission = {
+        ...source,
+        files: source.files.map((file) =>
+          file.applicantId === applicant.id && file.type === "passport_scan"
+            ? { ...file, ...filePatch }
+            : file,
+        ),
+      };
+      const before = structuredClone(submission);
+
+      expect(
+        approvePassportReviewSectionForAdmin(
+          submission,
+          { applicantId: applicant.id },
+          "admin-reviewer",
+        ),
+      ).toMatchObject({ ok: false });
+      expect(submission).toEqual(before);
+    },
+  );
 
   test("accepts only passport_scan for a secondary family applicant", () => {
     const submission = reviewableSubmission("family", 3);

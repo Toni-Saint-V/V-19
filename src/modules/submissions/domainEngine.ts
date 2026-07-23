@@ -1,4 +1,3 @@
-// src/modules/submissions/domainEngine.ts
 import {
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
@@ -7,12 +6,13 @@ import {
 } from "./exportRules";
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
 import {
-  adminPassportReviewReadiness,
+  adminQuestionnaireReviewReadiness,
   canPerformAction,
   blockerCount,
   calculateSubmissionProgress,
   defaultDrawerTab,
   hasBlockingIssues,
+  hasMissingRequiredWork,
   hasUsableTripDateRange,
   isFixedIssueStatus,
   isSubmissionIssueResolved,
@@ -116,6 +116,9 @@ export function submitForReview(
     !canonicalRequiredMediaReadiness(submission).ok
   ) {
     return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
+  }
+  if (!hasUsableTripDateRange(submission)) {
+    return failure("VALIDATION_ERROR", "Trip dates must be complete.");
   }
   return transitionSubmissionStatus(
     withDerivedState({
@@ -319,15 +322,20 @@ export function acceptSubmission(
       "Acceptance is blocked until all issues are closed by admin.",
     );
   }
-  const passportReview = adminPassportReviewReadiness(submission);
-  if (!passportReview.ok) {
+  if (hasMissingRequiredWork(submission)) {
+    return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
+  }
+  const questionnaireReview = adminQuestionnaireReviewReadiness(submission);
+  if (!questionnaireReview.ok) {
     return failure(
       "VALIDATION_ERROR",
-      passportReview.reason ?? "Passport review must be complete.",
+      questionnaireReview.reason ?? "Questionnaire review must be complete.",
     );
   }
   const mediaReview = canonicalRequiredMediaReadiness(submission, {
     requireAccepted: true,
+    requireReviewMetadata: true,
+    requireStorageIdentity: true,
   });
   if (!mediaReview.ok) {
     return failure(

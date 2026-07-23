@@ -551,13 +551,10 @@ function statusForExportDecision(
 }
 
 function canonicalMediaReadyForExport(submission: Submission): boolean {
-  return canonicalRequiredMediaReadiness(
-    {
-      applicants: submission.applicants,
-      files: submission.files,
-    },
-    { requireAccepted: true },
-  ).ok;
+  return canonicalRequiredMediaReadiness(submission, {
+    requireAccepted: true,
+    requireStorageIdentity: true,
+  }).ok;
 }
 
 function exportedAtForDecision(submission: Submission): unknown {

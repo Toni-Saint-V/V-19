@@ -43,7 +43,10 @@ import type {
   ExportPackageIdentity,
   Submission,
 } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  fillRequiredQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
+} from "./helpers/questionnaireTestFill";
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -153,7 +156,7 @@ function withSubmissionIdentity(
   id: string,
   title: string,
 ): Submission {
-  return {
+  return withCanonicalPrivateMediaIdentityForTest({
     ...submission,
     applicants: submission.applicants.map((applicant, index) => ({
       ...applicant,
@@ -168,7 +171,7 @@ function withSubmissionIdentity(
     })),
     id,
     title,
-  };
+  });
 }
 
 function withFirstApplicantNameOnly(
@@ -940,7 +943,7 @@ describe("V-19 export workbook contract", () => {
   test("allows same-city mixed-agent export with warning and no external Agent column", () => {
     const primary = readySubmission();
     const alternateApplicantId = "з-mixed-agent-1";
-    const alternate = withQuestionnaireFieldValues(
+    const alternate = withCanonicalPrivateMediaIdentityForTest(withQuestionnaireFieldValues(
       {
         ...primary,
         agentId: "local-agent-partner",
@@ -963,7 +966,7 @@ describe("V-19 export workbook contract", () => {
         "passport-no": "675450001",
         surname: "MOROZOVA",
       },
-    );
+    ));
     const plan = exportSummary([primary, alternate]);
 
     expect(plan.ready, JSON.stringify(plan.blockers)).toBe(true);
@@ -1084,7 +1087,7 @@ describe("V-19 export workbook contract", () => {
   test("keeps generated multi-row package members selectable while blocker rows are hidden", () => {
     const primary = readySubmission();
     const alternateApplicantId = "з-generated-selection-2";
-    const secondary = withQuestionnaireFieldValues(
+    const secondary = withCanonicalPrivateMediaIdentityForTest(withQuestionnaireFieldValues(
       {
         ...primary,
         applicants: primary.applicants.map((applicant) => ({
@@ -1106,7 +1109,7 @@ describe("V-19 export workbook contract", () => {
         "passport-no": "675450002",
         surname: "PETROV",
       },
-    );
+    ));
     const generated = applyExportStateToSelection(
       [primary, secondary],
       [primary.id, secondary.id],

@@ -31,7 +31,11 @@ import type {
   Submission,
   SubmissionFile,
 } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminAcceptRequiredMediaForTest,
+  fillRequiredQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
+} from "./helpers/questionnaireTestFill";
 
 const canonicalMediaTypes = ["passport_scan", "selfie", "selfie_2"] as const;
 
@@ -54,7 +58,7 @@ function canonicalMediaSubmission(submission: Submission): Submission {
 }
 
 function readyClone(patch: Partial<Submission> = {}): Submission {
-  return {
+  return withCanonicalPrivateMediaIdentityForTest({
     ...fillRequiredQuestionnaireForTest(
       canonicalMediaSubmission(byId("ПД-1056")),
     ),
@@ -65,7 +69,7 @@ function readyClone(patch: Partial<Submission> = {}): Submission {
     status: "ready_for_export",
     title: patch.title ?? "Stress submission",
     ...patch,
-  };
+  });
 }
 
 function issue({
@@ -92,7 +96,7 @@ function issue({
 }
 
 function submittedForAcceptance(patch: Partial<Submission> = {}): Submission {
-  return {
+  return adminAcceptRequiredMediaForTest(withCanonicalPrivateMediaIdentityForTest({
     ...canonicalMediaSubmission(byId("ПД-1053")),
     completeness: { files: 100, questionnaire: 100, total: 100 },
     files: canonicalMediaSubmission(byId("ПД-1053")).files.map((file) => ({
@@ -104,7 +108,7 @@ function submittedForAcceptance(patch: Partial<Submission> = {}): Submission {
     tripDateFrom: "2026-08-11",
     tripDateTo: "2026-08-20",
     ...patch,
-  };
+  }));
 }
 
 function familyWithApplicants(total: number): Submission {
@@ -138,11 +142,11 @@ function familyWithApplicants(total: number): Submission {
     })),
   );
 
-  return {
+  return withCanonicalPrivateMediaIdentityForTest({
     ...base,
     applicants,
     files,
-  };
+  });
 }
 
 function catalogRuleIds(): string[] {

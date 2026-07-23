@@ -15,7 +15,11 @@ import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionAc
 import { saveAdminCockpitSubmissionsIfCurrent } from "../../src/modules/submissions/supabasePersistence";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { AppProfile } from "../../src/types/session";
-import { adminApproveQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminAcceptRequiredMediaForTest,
+  adminApproveQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
+} from "./helpers/questionnaireTestFill";
 
 const persistenceRuntime = vi.hoisted(() => ({
   rpc: vi.fn(async (_name: string, args: Record<string, unknown>) => {
@@ -50,7 +54,7 @@ function submissionFixture(
   );
   if (!source) throw new Error("Missing admin review fixture.");
 
-  return {
+  const fixture: Submission = {
     ...source,
     completeness:
       status === "ready_for_export"
@@ -69,6 +73,11 @@ function submissionFixture(
     title,
     exportState: status === "ready_for_export" ? "ready" : "not_ready",
   };
+  return status === "ready_for_export"
+    ? adminAcceptRequiredMediaForTest(
+        withCanonicalPrivateMediaIdentityForTest(fixture),
+      )
+    : fixture;
 }
 
 function acceptableReviewSubmission(): Submission {

@@ -755,12 +755,15 @@ export function ReviewScreen({
             ) : (
               <div className="v19-review-queue-empty">
                 <ListChecks aria-hidden="true" />
-                <strong>По текущим условиям пакетов нет</strong>
+                <strong>
+                  {reviewSource.length === 0 ? "Очередь пуста" : "Ничего не найдено"}
+                </strong>
                 <p>
-                  Измените фокус очереди или сбросьте фильтры, чтобы вернуться к полному
-                  списку.
+                  {reviewSource.length === 0
+                    ? "Подачи появятся здесь после отправки агентом на первичную или повторную проверку."
+                    : "Измените фокус очереди или сбросьте фильтры, чтобы вернуться к полному списку."}
                 </p>
-                {hasActiveFilters ? (
+                {reviewSource.length > 0 && hasActiveFilters ? (
                   <button type="button" onClick={resetQueueView}>
                     Показать всю очередь
                   </button>

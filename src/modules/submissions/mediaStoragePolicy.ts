@@ -1,8 +1,8 @@
 import {
   isRejectedLegacyMediaType,
   toCanonicalStorageMediaType,
-} from "./domainContract";
-import type { CanonicalFrontendMediaType } from "./domainContract";
+} from "./canonicalMediaContract";
+import type { CanonicalFrontendMediaType } from "./canonicalMediaContract";
 import type { MediaSlot } from "../../types/domain";
 import { maxVisaApplicationPdfBytes } from "./visaApplicationPdfReviewTypes";
 

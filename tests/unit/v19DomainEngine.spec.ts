@@ -28,6 +28,7 @@ import {
   hasRequiredDocuments,
   transitionSubmissionStatus,
 } from "../../src/modules/submissions/status";
+import { reviewHandoffPersistenceIssues } from "../../src/modules/submissions/supabasePersistence";
 import type {
   CommandResult,
   IssueInput,
@@ -99,7 +100,6 @@ function completeInProgressSubmission(): Submission {
   return adminAcceptRequiredMediaForTest(
     adminApprovePassportFieldsForTest({
       ...fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
-      id: "ПД-DOMAIN-READY",
       status: "in_progress",
       exportState: "not_ready",
     }),
@@ -184,7 +184,7 @@ describe("V-19 domain engine", () => {
     });
   });
 
-  it("accepts a passport-reviewed submission even when a non-passport questionnaire field is incomplete", () => {
+  it("keeps acceptance fail-closed while any required questionnaire field is incomplete", () => {
     const readyForReview: Submission = {
       ...completeInProgressSubmission(),
       status: "submitted_for_review",
@@ -202,11 +202,16 @@ describe("V-19 domain engine", () => {
       })),
     };
 
-    expect(canAdminApproveForExport(incompleteQuestionnaire)).toBe(true);
+    expect(canAdminApproveForExport(incompleteQuestionnaire)).toBe(false);
     const accepted = acceptSubmission(incompleteQuestionnaire, "admin");
-    expect(accepted.ok).toBe(true);
-    if (!accepted.ok) throw new Error(accepted.error.message);
-    expect(accepted.data.status).toBe("ready_for_export");
+    expect(accepted).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Questionnaire and files must be complete.",
+      },
+    });
+    expect(incompleteQuestionnaire.status).toBe("submitted_for_review");
   });
 
   it("fails closed outside the canonical issue correction and review stages", () => {
@@ -380,12 +385,13 @@ describe("V-19 domain engine", () => {
       reason: "Действие недоступно в текущем статусе",
     });
     expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
-      ok: true,
+      ok: false,
+      reason: "Есть исправленные замечания вне паспортной проверки",
     });
     expect(
       applySubmissionAction(corrected, "close_issues_accept", "admin").issues[0]
         ?.status,
-    ).toBe("closed_by_admin");
+    ).toBe("fixed_by_agent");
   });
 
   it("blocks acceptance for any open issue, not only blockers", () => {
@@ -484,6 +490,45 @@ describe("V-19 domain engine", () => {
     );
   });
 
+  it.each([
+    ["wrong adapter", { storageAdapter: "local-dev" as const }],
+    ["wrong bucket", { storageBucket: "other-bucket" }],
+    ["wrong target", { storagePath: "submissions/wrong/applicants/wrong/passport_scan/file.jpg" }],
+    ["unfinished upload", { uploadStatus: "pending" as const }],
+  ])("fails every acceptance boundary for %s media identity", (_label, filePatch) => {
+    const ready: Submission = {
+      ...completeInProgressSubmission(),
+      status: "submitted_for_review",
+    };
+    const invalid: Submission = {
+      ...ready,
+      files: ready.files.map((file) =>
+        file.type === "passport_scan" ? { ...file, ...filePatch } : file,
+      ),
+    };
+    const before = structuredClone(invalid);
+
+    expect(canAdminApproveForExport(invalid)).toBe(false);
+    expect(canPerformAction(invalid, "accept", "admin")).toMatchObject({
+      ok: false,
+    });
+    expect(acceptSubmission(invalid, "admin")).toMatchObject({
+      ok: false,
+      error: { code: "VALIDATION_ERROR" },
+    });
+    expect(
+      reviewHandoffPersistenceIssues(
+        { ...invalid, exportState: "ready", status: "ready_for_export" },
+        "admin",
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("requires accepted canonical media"),
+      ]),
+    );
+    expect(invalid).toEqual(before);
+  });
+
   it("treats exported as terminal for mutation commands", () => {
     const exported = byId("ПД-1057");
 
@@ -498,8 +543,8 @@ describe("V-19 domain engine", () => {
   });
 
   it("uses fail-closed export guards and marks exported only after download", () => {
-    const ready = fillRequiredQuestionnaireForTest(
-      canonicalMediaSubmission(byId("ПД-1056")),
+    const ready = adminAcceptRequiredMediaForTest(
+      fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
     );
     const notReady = completeInProgressSubmission();
 

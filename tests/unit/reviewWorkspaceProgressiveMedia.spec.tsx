@@ -261,6 +261,85 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
   });
 
+  test("does not sign or retry rejected media and explains the replacement state", async () => {
+    const source = reviewSubmission();
+    const submission: Submission = {
+      ...source,
+      files: source.files.map((file) =>
+        file.type === "passport_scan"
+          ? {
+              ...file,
+              reviewStatus: "poor_quality",
+              status: "needs_replacement",
+            }
+          : file,
+      ),
+    };
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://media.test/protected.jpg",
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(screen.getByText("Оригинал нельзя принять")).toBeVisible();
+    expect(
+      screen.getByText(
+        "Файл отклонён или требует замены. Новый оригинал загружает агент.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
+    await waitFor(() =>
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
+    );
+    expect(
+      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+    ).toBeDisabled();
+  });
+
+  test("does not retry media with a noncanonical private-storage identity", async () => {
+    const source = reviewSubmission();
+    const submission: Submission = {
+      ...source,
+      files: source.files.map((file) =>
+        file.type === "passport_scan"
+          ? {
+              ...file,
+              storagePath: `submissions/another-case/${file.applicantId}/passport_scan/${file.generatedFileName}`,
+            }
+          : file,
+      ),
+    };
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://media.test/protected.jpg",
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(screen.getByText("Оригинал нельзя принять")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
+    await waitFor(() =>
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
+    );
+  });
+
   test("ignores signed URLs from the previously selected applicant", async () => {
     const firstSubmission = reviewSubmission("з-1053-1");
     const nextSubmission = reviewSubmission("з-2053-1");
@@ -373,6 +452,54 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(
       await screen.findByRole("img", { name: "Оригинал загранпаспорта" }),
     ).toHaveAttribute("src", "https://media.test/replacement-passport.jpg");
+  });
+
+  test("drops a ready preview when the same file loses its protected storage identity", async () => {
+    const submission = reviewSubmission();
+    const requests = Array.from({ length: 5 }, () => deferred<string>());
+    let requestIndex = 0;
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
+      () => requests[requestIndex++]?.promise ?? Promise.resolve(""),
+    );
+    const props = {
+      applicantId: submission.applicants[0]?.id,
+      onAddRemark: () => undefined,
+      onBack: () => undefined,
+      submissionId: submission.id,
+    };
+    const { rerender } = render(<ReviewWorkspace {...props} submission={submission} />);
+    await waitFor(() =>
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+    );
+
+    await act(async () => {
+      requests[0]?.resolve("https://media.test/old-passport.jpg");
+      await requests[0]?.promise;
+    });
+    expect(
+      await screen.findByRole("img", { name: "Оригинал загранпаспорта" }),
+    ).toHaveAttribute("src", "https://media.test/old-passport.jpg");
+
+    rerender(
+      <ReviewWorkspace
+        {...props}
+        submission={{
+          ...submission,
+          files: submission.files.map((file) =>
+            file.type === "passport_scan"
+              ? { ...file, storageAdapter: "local-dev" }
+              : file,
+          ),
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("img", { name: "Оригинал загранпаспорта" })).toBeNull();
+    expect(screen.getByText("Оригинал нельзя принять")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
+    await waitFor(() =>
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(5),
+    );
   });
 
   test("does not refetch unchanged media for a new submission object", async () => {
@@ -575,5 +702,43 @@ describe("ReviewWorkspace perceived feedback", () => {
 
     await waitFor(() => expect(decision).not.toHaveClass("is-pending"));
     expect(decision).toHaveAttribute("aria-busy", "false");
+  });
+
+  test.each([
+    {
+      error: new Error("revision conflict"),
+      expected:
+        "Данные уже изменены другим администратором. Обновите подачу и проверьте её заново.",
+    },
+    {
+      error: new Error("permission lost for current session"),
+      expected:
+        "Сессия или права доступа изменились. Войдите снова; подача не была изменена.",
+    },
+  ])("keeps the decision unchanged after $expected", async ({ error, expected }) => {
+    const submission = decisionReadySubmission();
+    const onReviewAction = vi.fn().mockRejectedValue(error);
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        onReviewAction={onReviewAction}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+    const acceptButton = screen.getByRole("button", { name: "Принять на выгрузку" });
+    fireEvent.click(acceptButton);
+    fireEvent.click(acceptButton);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(expected));
+    expect(onReviewAction).toHaveBeenCalledTimes(1);
+    expect(submission.status).toBe("submitted_for_review");
+    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeEnabled();
   });
 });

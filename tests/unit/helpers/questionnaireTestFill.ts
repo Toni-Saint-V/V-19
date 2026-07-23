@@ -1,11 +1,17 @@
 import {
   completeQuestionnaire,
+  generatedCockpitMediaFileName,
   updateQuestionnaireField,
 } from "../../../src/modules/submissions/submissionActions";
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
   requiredPassportReviewMediaSlots,
 } from "../../../src/modules/submissions/passportReviewContract";
+import { isCanonicalFrontendMediaType } from "../../../src/modules/submissions/domainContract";
+import {
+  buildMediaStoragePath,
+  mediaStorageBucket,
+} from "../../../src/modules/submissions/mediaStoragePolicy";
 import type {
   QuestionnaireField,
   Submission,
@@ -171,19 +177,103 @@ export function adminAcceptRequiredMediaForTest(
     ),
   );
 
-  return {
-    ...submission,
-    files: submission.files.map((file) =>
-      requiredKeys.has(`${file.applicantId}:${file.type}`)
-        ? {
+  const files = submission.files.map((file) => {
+      if (!requiredKeys.has(`${file.applicantId}:${file.type}`)) return file;
+      const generatedFileName =
+        file.generatedFileName ??
+        generatedCockpitMediaFileName({
+          applicantId: file.applicantId,
+          fileType: file.type,
+          mimeType: file.mimeType ?? "image/jpeg",
+          submissionId: submission.id,
+        });
+      const target = buildMediaStoragePath(
+        submission.id,
+        file.applicantId,
+        file.type,
+        generatedFileName,
+      );
+
+      return {
             ...file,
+            generatedFileName,
             status: "accepted" as const,
             reviewStatus: "accepted" as const,
             reviewedAtIso: "2026-07-17T00:00:00.000Z",
             reviewedBy: "admin-reviewer-test",
+            storageAdapter: "supabase-private" as const,
+            storageBucket: mediaStorageBucket,
+            storagePath: target.path,
+            uploadStatus: "uploaded" as const,
+      };
+    });
+
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => {
+      const passportFile = files.find(
+        (file) =>
+          file.applicantId === applicant.id && file.type === "passport_scan",
+      );
+      return passportFile
+        ? {
+            ...applicant,
+            passportExtraction: {
+              appliedFieldKeys: [],
+              dismissedAtIso: "2026-07-17T00:00:00.000Z",
+              extractedFields: [],
+              sourceFileId: passportFile.id,
+              sourceFileName:
+                passportFile.generatedFileName ?? passportFile.originalFileName,
+              sourceStoragePath: passportFile.storagePath,
+              status: "unavailable" as const,
+              summary: "Паспортные поля проверены вручную в тесте.",
+            },
           }
-        : file,
-    ),
+        : applicant;
+    }),
+    files,
+  };
+}
+
+export function withCanonicalPrivateMediaIdentityForTest(
+  submission: Submission,
+): Submission {
+  return {
+    ...submission,
+    files: submission.files.map((file) => {
+      if (
+        !isCanonicalFrontendMediaType(file.type) ||
+        file.status === "missing" ||
+        file.status === "needs_replacement"
+      ) {
+        return file;
+      }
+
+      const mimeType = file.mimeType ?? "image/jpeg";
+      const generatedFileName = generatedCockpitMediaFileName({
+        applicantId: file.applicantId,
+        fileType: file.type,
+        mimeType,
+        submissionId: submission.id,
+      });
+      const target = buildMediaStoragePath(
+        submission.id,
+        file.applicantId,
+        file.type,
+        generatedFileName,
+      );
+
+      return {
+        ...file,
+        generatedFileName,
+        mimeType,
+        storageAdapter: "supabase-private" as const,
+        storageBucket: mediaStorageBucket,
+        storagePath: target.path,
+        uploadStatus: "uploaded" as const,
+      };
+    }),
   };
 }
 

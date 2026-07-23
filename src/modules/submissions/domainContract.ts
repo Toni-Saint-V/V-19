@@ -2,6 +2,26 @@ import {
   hasUnambiguousPrimaryApplicantForPassportReview,
   requiredPassportReviewMediaSlots,
 } from "./passportReviewContract";
+import {
+  CANONICAL_FRONTEND_MEDIA_TYPES,
+  isCanonicalFrontendMediaType,
+  isRejectedLegacyMediaType,
+} from "./canonicalMediaContract";
+import { hasCanonicalPrivateStorageIdentityAtSubmissionTarget } from "./fileAsset";
+
+export {
+  CANONICAL_FRONTEND_MEDIA_TYPES,
+  CANONICAL_STORAGE_MEDIA_TYPES,
+  isCanonicalFrontendMediaType,
+  isRejectedLegacyMediaType,
+  REJECTED_LEGACY_MEDIA_TYPES,
+  toCanonicalStorageMediaType,
+} from "./canonicalMediaContract";
+export type {
+  CanonicalFrontendMediaType,
+  RejectedLegacyMediaType,
+} from "./canonicalMediaContract";
+import type { CanonicalFrontendMediaType } from "./canonicalMediaContract";
 
 export const CANONICAL_SUBMISSION_STATUSES = [
   "draft",
@@ -31,29 +51,6 @@ export const LEGACY_SUBMISSION_STATUSES = [
 ] as const;
 
 export type LegacySubmissionStatus = (typeof LEGACY_SUBMISSION_STATUSES)[number];
-
-export const CANONICAL_FRONTEND_MEDIA_TYPES = [
-  "passport_scan",
-  "selfie",
-  "selfie_2",
-] as const;
-
-export type CanonicalFrontendMediaType =
-  (typeof CANONICAL_FRONTEND_MEDIA_TYPES)[number];
-
-export const REJECTED_LEGACY_MEDIA_TYPES = [
-  "photo",
-  "photo_white",
-  "video",
-] as const;
-
-export type RejectedLegacyMediaType = (typeof REJECTED_LEGACY_MEDIA_TYPES)[number];
-
-export const CANONICAL_STORAGE_MEDIA_TYPES = {
-  passport_scan: "passport_scan",
-  selfie: "selfie",
-  selfie_2: "selfie_2",
-} as const satisfies Record<CanonicalFrontendMediaType, CanonicalFrontendMediaType>;
 
 export const CANONICAL_ISSUE_STATUSES = [
   "open",
@@ -191,28 +188,6 @@ export function normalizeLegacySubmissionStatus(
   return { ok: false, reason: "Unmapped legacy submission status." };
 }
 
-export function isCanonicalFrontendMediaType(
-  value: unknown,
-): value is CanonicalFrontendMediaType {
-  return CANONICAL_FRONTEND_MEDIA_TYPES.includes(value as CanonicalFrontendMediaType);
-}
-
-export function isRejectedLegacyMediaType(
-  value: unknown,
-): value is RejectedLegacyMediaType {
-  return REJECTED_LEGACY_MEDIA_TYPES.includes(value as RejectedLegacyMediaType);
-}
-
-export function toCanonicalStorageMediaType(
-  value: unknown,
-): ContractResult<CanonicalFrontendMediaType> {
-  if (!isCanonicalFrontendMediaType(value)) {
-    return { ok: false, reason: "Media type is not canonical for Package 1." };
-  }
-
-  return { ok: true, data: CANONICAL_STORAGE_MEDIA_TYPES[value] };
-}
-
 export function rejectLegacyMediaType(value: unknown): ContractResult<never> {
   if (isRejectedLegacyMediaType(value)) {
     return { ok: false, reason: `${value} is rejected by Package 1.` };
@@ -287,13 +262,19 @@ export function isCanonicalIssueStatus(
 export type MediaReadinessFile = {
   applicantId: string;
   generatedFileName?: string;
+  reviewedAtIso?: string;
+  reviewedBy?: string;
+  reviewStatus?: string;
   status: string;
+  storageAdapter?: string;
   storageBucket?: string;
   storagePath?: string;
   type: unknown;
+  uploadStatus?: string;
 };
 
 export type MediaReadinessSubmission = {
+  id?: string;
   applicants: Array<{ id: string; role?: string }>;
   files: MediaReadinessFile[];
 };
@@ -320,7 +301,11 @@ export function canonicalRequiredMediaTypesForApplicant(
 
 export function canonicalRequiredMediaReadiness(
   submission: MediaReadinessSubmission,
-  options: { requireAccepted?: boolean; requireStorageIdentity?: boolean } = {},
+  options: {
+    requireAccepted?: boolean;
+    requireReviewMetadata?: boolean;
+    requireStorageIdentity?: boolean;
+  } = {},
 ): ContractResult<true> {
   if (!hasUnambiguousPrimaryApplicantForPassportReview(submission)) {
     return {
@@ -347,10 +332,29 @@ export function canonicalRequiredMediaReadiness(
       return { ok: false, reason: `Required ${slot.type} is not accepted.` };
     }
     if (
-      options.requireStorageIdentity &&
-      (!file.storageBucket || !file.storagePath || !file.generatedFileName)
+      options.requireReviewMetadata &&
+      (file.reviewStatus !== "accepted" ||
+        !hasValidPersistedTimestamp(file.reviewedAtIso) ||
+        !file.reviewedBy?.trim())
     ) {
-      return { ok: false, reason: `Required ${slot.type} has no storage identity.` };
+      return {
+        ok: false,
+        reason: `Required ${slot.type} has no accepted admin review.`,
+      };
+    }
+    if (
+      options.requireStorageIdentity &&
+      (!submission.id ||
+        !hasCanonicalPrivateStorageIdentityAtSubmissionTarget(file, {
+          applicantId: slot.applicantId,
+          fileType: slot.type,
+          submissionId: submission.id,
+        }))
+    ) {
+      return {
+        ok: false,
+        reason: `Required ${slot.type} has no canonical private storage identity.`,
+      };
     }
   }
 

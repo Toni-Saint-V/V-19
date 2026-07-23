@@ -4,6 +4,7 @@ import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
 import { RemarkForm } from "./RemarkForm";
 import { ReviewWorkspace } from "./ReviewWorkspace";
+import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { AdminUsersAccessScreen } from "./AdminUsersAccessScreen";
 import { AdminSystemSettingsScreen } from "./AdminSystemSettingsScreen";
 import {
@@ -258,9 +259,14 @@ export function AdminWorkspace({
       await bridge.onAdminIssueAdd(payload);
       emitVisaflowUiEvent(bridge, { type: "admin.issue.add", payload });
       return true;
-    } catch {
-      setAdminAsyncError("Не удалось добавить замечание. Подача не была изменена.");
-      return false;
+    } catch (error) {
+      setAdminAsyncError(
+        persistenceFailureMessage(
+          error,
+          "Не удалось добавить замечание. Подача не была изменена.",
+        ),
+      );
+      throw error;
     } finally {
       adminIssuePendingRef.current = false;
     }
@@ -287,11 +293,11 @@ export function AdminWorkspace({
         payload,
       });
       return true;
-    } catch {
+    } catch (error) {
       setAdminAsyncError(
         "Не удалось подтвердить паспортную секцию. Состояние не изменено.",
       );
-      return false;
+      throw error;
     } finally {
       adminPassportApprovalPendingRef.current = false;
     }
@@ -327,7 +333,7 @@ export function AdminWorkspace({
         : input.field
           ? `Требуется исправить поле «${input.field}»`
           : "Требуется исправить паспортные данные",
-      section: "Паспорт",
+      section: input.fileType ? "Файлы" : "Паспорт",
       severity: input.severity === "critical" ? "blocker" : "warning",
       type: input.fileType ? "file" : input.field ? "field" : "section",
     });
@@ -380,20 +386,14 @@ export function AdminWorkspace({
         payload,
       });
 
-      const acceptedForExport = action === "accept" || action === "close_issues_accept";
-      setRemarkFormOpen(false);
-      setCurrentView("main");
-      setSelectedRow(null);
-      setReviewApplicantId(undefined);
-      navigateTo(acceptedForExport ? "export" : "review");
       return true;
-    } catch {
+    } catch (error) {
       setAdminAsyncError(
         action === "accept" || action === "close_issues_accept"
           ? "Не удалось принять подачу. Состояние не изменено."
           : "Не удалось вернуть подачу. Состояние не изменено.",
       );
-      return false;
+      throw error;
     } finally {
       adminReviewActionPendingRef.current = false;
     }

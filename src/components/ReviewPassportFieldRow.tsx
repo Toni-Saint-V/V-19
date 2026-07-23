@@ -18,6 +18,7 @@ export type PassportReviewField = {
 type ReviewPassportFieldRowProps = {
   applicant?: Applicant;
   field: PassportReviewField;
+  readOnly?: boolean;
   onAddRemark: (
     field?: string,
     applicant?: string,
@@ -29,6 +30,7 @@ type ReviewPassportFieldRowProps = {
 export function ReviewPassportFieldRow({
   applicant,
   field,
+  readOnly = false,
   onAddRemark,
 }: ReviewPassportFieldRowProps) {
   const valid = hasAdminPassportReviewValue(field.value) && !field.hasError;
@@ -63,17 +65,19 @@ export function ReviewPassportFieldRow({
         </span>
       )}
 
-      <button
-        aria-label={`Добавить замечание: ${field.label}`}
-        className="v19-admin-passport-field-remark v19-review-field-remark"
-        onClick={() =>
-          onAddRemark(field.sourceLabel, applicant?.fullName, undefined, applicant?.id)
-        }
-        type="button"
-      >
-        <MessageSquarePlus aria-hidden="true" />
-        <span>Замечание</span>
-      </button>
+      {readOnly ? null : (
+        <button
+          aria-label={`Добавить замечание: ${field.label}`}
+          className="v19-admin-passport-field-remark v19-review-field-remark"
+          onClick={() =>
+            onAddRemark(field.sourceLabel, applicant?.fullName, undefined, applicant?.id)
+          }
+          type="button"
+        >
+          <MessageSquarePlus aria-hidden="true" />
+          <span>Замечание</span>
+        </button>
+      )}
     </article>
   );
 }

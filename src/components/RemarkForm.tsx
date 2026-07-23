@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
@@ -13,6 +13,7 @@ import {
   useVisaflowBusinessBridge,
 } from "../integration/visaflowBusinessBridge";
 import type { SubmissionFileType } from "../modules/submissions/types";
+import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 
 interface RemarkFormProps {
   defaultApplicant?: string;
@@ -61,20 +62,33 @@ export function RemarkForm({
   const bridge = useVisaflowBusinessBridge();
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
-  const [message, setMessage] = useState(
-    defaultField ? `Проверьте «${defaultField}».` : templates[0],
-  );
+  const submitRunRef = useRef(false);
+  const initialMessage = defaultField ? `Проверьте «${defaultField}».` : templates[0];
+  const [message, setMessage] = useState(initialMessage);
   const [severity, setSeverity] = useState<"warning" | "critical">("warning");
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
+  const isDirty = message !== initialMessage || severity !== "warning";
+
+  const handleRequestClose = useCallback(() => {
+    if (isSubmitting) return;
+    if (isDirty) {
+      setDiscardConfirmationOpen(true);
+      return;
+    }
+    onClose();
+  }, [isDirty, isSubmitting, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
-    setMessage(defaultField ? `Проверьте «${defaultField}».` : templates[0]);
+    setMessage(initialMessage);
     setSeverity("warning");
     setSubmitError("");
     setIsSubmitting(false);
-  }, [defaultField, isOpen]);
+    setDiscardConfirmationOpen(false);
+    submitRunRef.current = false;
+  }, [initialMessage, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -89,7 +103,7 @@ export function RemarkForm({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (!isSubmitting) onClose();
+        handleRequestClose();
         return;
       }
       if (event.key !== "Tab") return;
@@ -116,7 +130,7 @@ export function RemarkForm({
       window.cancelAnimationFrame(animationFrame);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, isSubmitting, onClose]);
+  }, [handleRequestClose, isOpen]);
 
   const restoreReturnFocus = () => {
     const trigger = returnFocusRef.current;
@@ -140,7 +154,7 @@ export function RemarkForm({
       );
       return;
     }
-    if (isSubmitting) return;
+    if (isSubmitting || submitRunRef.current) return;
 
     const payload = {
       applicant: defaultApplicant,
@@ -152,6 +166,8 @@ export function RemarkForm({
       submissionId: submissionId || null,
     };
     setSubmitError("");
+    setDiscardConfirmationOpen(false);
+    submitRunRef.current = true;
     setIsSubmitting(true);
     try {
       const submitted = await onSubmit({
@@ -167,11 +183,15 @@ export function RemarkForm({
       void Promise.resolve(bridge.onRemarkSubmit?.(payload)).catch(() => undefined);
       emitVisaflowUiEvent(bridge, { type: "remark.submit", payload });
       onClose();
-    } catch {
+    } catch (error) {
       setSubmitError(
-        "Не удалось сохранить замечание. Подача не была изменена. Повторите попытку.",
+        persistenceFailureMessage(
+          error,
+          "Не удалось сохранить замечание. Подача не была изменена. Повторите попытку.",
+        ),
       );
     } finally {
+      submitRunRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -186,7 +206,7 @@ export function RemarkForm({
             className="v19-remark-form-backdrop fixed inset-0 bg-black/65 backdrop-blur-sm"
             exit={{ opacity: 0 }}
             initial={{ opacity: 0 }}
-            onClick={isSubmitting ? undefined : onClose}
+            onClick={isSubmitting ? undefined : handleRequestClose}
           />
           <motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -214,12 +234,19 @@ export function RemarkForm({
                 >
                   Добавить замечание
                 </h2>
+                <span
+                  aria-live="polite"
+                  className="v19-remark-form-dirty"
+                  role="status"
+                >
+                  {isDirty ? "Есть несохранённые изменения" : "Изменений нет"}
+                </span>
               </div>
               <button
                 aria-label="Закрыть форму замечания"
                 className="v19-remark-form-close w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors disabled:opacity-40"
                 disabled={isSubmitting}
-                onClick={onClose}
+                onClick={handleRequestClose}
                 type="button"
               >
                 <X className="w-4 h-4" />
@@ -257,7 +284,10 @@ export function RemarkForm({
                     aria-pressed={severity === "warning"}
                     className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === "warning" ? "bg-white/[0.045] border-white/10 text-white/62" : "bg-[#161617] border-[#242529] text-white/60 hover:text-white"}`}
                     disabled={isSubmitting}
-                    onClick={() => setSeverity("warning")}
+                    onClick={() => {
+                      setSeverity("warning");
+                      setDiscardConfirmationOpen(false);
+                    }}
                     type="button"
                   >
                     <AlertTriangle className="w-4 h-4" />
@@ -267,7 +297,10 @@ export function RemarkForm({
                     aria-pressed={severity === "critical"}
                     className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === "critical" ? "bg-[#24191b]/60 border-[#5b2b32]/45 text-[#d59aa3]" : "bg-[#161617] border-[#242529] text-white/60 hover:text-white"}`}
                     disabled={isSubmitting}
-                    onClick={() => setSeverity("critical")}
+                    onClick={() => {
+                      setSeverity("critical");
+                      setDiscardConfirmationOpen(false);
+                    }}
                     type="button"
                   >
                     <AlertTriangle className="w-4 h-4" />
@@ -291,6 +324,7 @@ export function RemarkForm({
                   id="remark-message"
                   onChange={(event) => {
                     setMessage(event.target.value);
+                    setDiscardConfirmationOpen(false);
                     if (submitError) setSubmitError("");
                   }}
                   placeholder="Опишите, что именно нужно исправить..."
@@ -316,7 +350,10 @@ export function RemarkForm({
                     className="w-full text-left p-3 rounded-xl bg-[#161617] hover:bg-[#1e1e21] border border-[#242529] text-[12px] text-white/65 hover:text-white transition-colors"
                     disabled={isSubmitting}
                     key={template}
-                    onClick={() => setMessage(template)}
+                    onClick={() => {
+                      setMessage(template);
+                      setDiscardConfirmationOpen(false);
+                    }}
                     type="button"
                   >
                     {template}
@@ -326,10 +363,28 @@ export function RemarkForm({
             </div>
 
             <footer className="v19-remark-form-footer sticky bottom-0 p-4 border-t border-white/10 bg-[#111113]/95 flex justify-end gap-3">
+              {discardConfirmationOpen ? (
+                <div
+                  aria-label="Несохранённое замечание"
+                  className="v19-remark-form-discard"
+                  role="group"
+                >
+                  <p>Текст не сохранён. Закрыть форму и потерять изменения?</p>
+                  <button
+                    onClick={() => setDiscardConfirmationOpen(false)}
+                    type="button"
+                  >
+                    Продолжить редактирование
+                  </button>
+                  <button onClick={onClose} type="button">
+                    Закрыть без сохранения
+                  </button>
+                </div>
+              ) : null}
               <button
                 className="h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[13px] font-medium text-white/70 hover:text-white transition-colors disabled:opacity-40"
                 disabled={isSubmitting}
-                onClick={onClose}
+                onClick={handleRequestClose}
                 type="button"
               >
                 Отмена

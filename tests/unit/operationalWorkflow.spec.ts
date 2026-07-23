@@ -37,7 +37,11 @@ import type {
   Submission,
   VisaApplicationPdfReviewState,
 } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminAcceptRequiredMediaForTest,
+  fillRequiredQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
+} from "./helpers/questionnaireTestFill";
 
 type ApplicantFieldValues = Record<string, string>;
 
@@ -465,7 +469,7 @@ describe("operational workflow logic spine", () => {
     const kazan = batches.find((batch) => batch.city === "Казань");
 
     expect(batches.map((batch) => batch.city)).toEqual(["Москва", "Казань"]);
-    expect(moscow?.ready).toBe(true);
+    expect(moscow?.ready, JSON.stringify(moscow?.blockers)).toBe(true);
     expect(moscow?.blockers).toEqual([]);
     expect(moscow?.contractValid).toBe(true);
     expect(moscow?.packageIdentity).toMatchObject({
@@ -1174,7 +1178,7 @@ function readySubmission(input: {
   type: Submission["type"];
 }): Submission {
   const completed = completedWithReference(input);
-  return {
+  return adminAcceptRequiredMediaForTest(withCanonicalPrivateMediaIdentityForTest({
     ...completed,
     exportState: "ready",
     files: completed.files.map((file) => ({ ...file, status: "accepted" })),
@@ -1187,7 +1191,7 @@ function readySubmission(input: {
       input.type === "family"
         ? `Семейная подача ${surnameFromName(input.names[0])}`
         : `Подача ${input.names[0]}`,
-  };
+  }));
 }
 
 function exportedSubmission(): Submission {

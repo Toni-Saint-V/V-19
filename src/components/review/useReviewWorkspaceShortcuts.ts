@@ -7,7 +7,7 @@ type ReviewWorkspaceShortcutInput = {
   disabled?: boolean;
   mediaTypes: readonly PassportReviewMediaType[];
   onMedia: (mediaType: PassportReviewMediaType) => void;
-  onToggleQuestionnaire: () => void;
+  onToggleQuestionnaire?: () => void;
 };
 
 function isEditableTarget(target: EventTarget | null) {
@@ -31,7 +31,10 @@ export function useReviewWorkspaceShortcuts({
       if (event.defaultPrevented || isEditableTarget(event.target)) return;
 
       const normalizedKey = event.key.toLocaleLowerCase("ru-RU");
-      if (event.code === "KeyQ" || normalizedKey === "q" || normalizedKey === "й") {
+      if (
+        onToggleQuestionnaire &&
+        (event.code === "KeyQ" || normalizedKey === "q" || normalizedKey === "й")
+      ) {
         event.preventDefault();
         onToggleQuestionnaire();
         return;

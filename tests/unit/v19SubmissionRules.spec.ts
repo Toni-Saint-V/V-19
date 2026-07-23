@@ -145,14 +145,16 @@ function testStorage() {
 }
 
 function readyClone(patch: Partial<Submission>): Submission {
-  return adminApproveQuestionnaireForTest({
-    ...fillRequiredQuestionnaireForTest(
-      canonicalMediaSubmission(byId("ПД-1056")),
-    ),
-    id: patch.id ?? "ПД-ТЕСТ",
-    title: patch.title ?? "Тестовая подача",
-    ...patch,
-  });
+  return adminAcceptRequiredMediaForTest(
+    adminApproveQuestionnaireForTest({
+      ...fillRequiredQuestionnaireForTest(
+        canonicalMediaSubmission(byId("ПД-1056")),
+      ),
+      id: patch.id ?? "ПД-ТЕСТ",
+      title: patch.title ?? "Тестовая подача",
+      ...patch,
+    }),
+  );
 }
 
 function datedPreliminaryIntake() {
@@ -312,7 +314,7 @@ describe("V-19 submission status rules", () => {
     });
   });
 
-  it("allows passport acceptance while a non-passport questionnaire field is incomplete", () => {
+  it("blocks acceptance while a required non-passport questionnaire field is incomplete", () => {
     const complete = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(
         canonicalMediaSubmission(fillRequiredQuestionnaireForTest(byId("ПД-1053"))),
@@ -337,28 +339,93 @@ describe("V-19 submission status rules", () => {
 
     expect(hasMissingRequiredWork(incompleteQuestionnaire)).toBe(true);
     expect(canPerformAction(incompleteQuestionnaire, "accept", "admin")).toEqual({
-      ok: true,
+      ok: false,
+      reason: "Не все обязательные анкеты и файлы готовы",
     });
     expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
-      ok: true,
+      ok: false,
+      reason: "Не все обязательные анкеты и файлы готовы",
     });
     expect(
       applySubmissionAction(incompleteQuestionnaire, "accept", "admin").status,
-    ).toBe("ready_for_export");
+    ).toBe("submitted_for_review");
+    expect(incompleteQuestionnaire.status).toBe("submitted_for_review");
   });
 
-  it("keeps the corrected demo family ready for explicit admin closeout", () => {
+  it("does not close or accept a corrected issue outside passport review scope", () => {
     const corrected = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(byId("ПД-1055")),
     );
+    const applicant = corrected.applicants[0];
+    if (!applicant) throw new Error("Expected corrected family applicant.");
+    const foreignIssueId = "foreign-questionnaire-section-issue";
+    const correctedWithForeignIssue: Submission = {
+      ...corrected,
+      issues: [
+        ...corrected.issues,
+        {
+          comment: "Компания исправлена агентом.",
+          createdAt: "2026-07-20T12:00:00.000Z",
+          createdBy: "admin",
+          id: foreignIssueId,
+          reason: "Проверьте данные о работе",
+          severity: "warning",
+          status: "fixed_by_agent",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Компания",
+            section: "Работа / учеба",
+          },
+          type: "section",
+        },
+      ],
+    };
 
-    expect(hasMissingRequiredWork(corrected)).toBe(false);
-    expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
-      ok: true,
+    expect(hasMissingRequiredWork(correctedWithForeignIssue)).toBe(false);
+    expect(
+      canPerformAction(correctedWithForeignIssue, "close_issues_accept", "admin"),
+    ).toEqual({
+      ok: false,
+      reason: "Есть исправленные замечания вне паспортной проверки",
     });
 
     const accepted = applySubmissionAction(
-      corrected,
+      correctedWithForeignIssue,
+      "close_issues_accept",
+      "admin",
+      "local-demo-admin",
+    );
+
+    expect(accepted).toEqual(correctedWithForeignIssue);
+    expect(accepted.status).toBe("corrections_received");
+    expect(accepted.issues.every((issue) => issue.status === "fixed_by_agent")).toBe(
+      true,
+    );
+  });
+
+  it("closes only an exact fixed passport issue during corrected acceptance", () => {
+    const source = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(byId("ПД-1055")),
+    );
+    const exactPassportIssue: Submission = {
+      ...source,
+      issues: source.issues.map((issue) => ({
+        ...issue,
+        target: {
+          ...issue.target,
+          field: "Номер паспорта",
+          section: "Паспорт",
+        },
+      })),
+    };
+
+    expect(
+      canPerformAction(exactPassportIssue, "close_issues_accept", "admin"),
+    ).toEqual({ ok: true });
+
+    const accepted = applySubmissionAction(
+      exactPassportIssue,
       "close_issues_accept",
       "admin",
       "local-demo-admin",
@@ -368,6 +435,33 @@ describe("V-19 submission status rules", () => {
     expect(accepted.issues.every((issue) => issue.status === "closed_by_admin")).toBe(
       true,
     );
+  });
+
+  it("rejects accepted media without accepted review metadata", () => {
+    const complete = adminAcceptRequiredMediaForTest(
+      adminApprovePassportFieldsForTest(
+        canonicalMediaSubmission(fillRequiredQuestionnaireForTest(byId("ПД-1053"))),
+      ),
+    );
+    const corrupted: Submission = {
+      ...complete,
+      files: complete.files.map((file, index) =>
+        index === 0
+          ? {
+              ...file,
+              reviewStatus: "not_reviewed",
+              reviewedAtIso: undefined,
+              reviewedBy: undefined,
+            }
+          : file,
+      ),
+    };
+
+    expect(canPerformAction(corrupted, "accept", "admin")).toEqual({
+      ok: false,
+      reason: "Подтвердите обязательные файлы перед принятием",
+    });
+    expect(applySubmissionAction(corrupted, "accept", "admin")).toEqual(corrupted);
   });
 
   it("blocks review submission while trip dates are missing", () => {

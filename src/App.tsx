@@ -740,12 +740,16 @@ export default function App({
       mutationFence?.assertCurrent();
       if (!supabaseEnabled) {
         if (!localDemoEnabled) return undefined;
+        if (__V19_LOCAL_DEMO_BUILD__) {
+          const { saveSubmissions } = await import("./modules/submissions/persistence");
+          mutationFence?.assertCurrent();
+          const saveResult = saveSubmissions(nextSubmissions);
+          if (!saveResult.ok) throw new Error(saveResult.message);
+        } else {
+          mutationFence?.assertCurrent();
+        }
         submissionsRef.current = nextSubmissions;
         setSubmissions(nextSubmissions);
-        if (!__V19_LOCAL_DEMO_BUILD__) return undefined;
-        const { saveSubmissions } = await import("./modules/submissions/persistence");
-        mutationFence?.assertCurrent();
-        saveSubmissions(nextSubmissions);
         return undefined;
       }
 
@@ -1009,9 +1013,9 @@ export default function App({
               ? { ...submission, publicNumber: assignment.publicNumber }
               : submission,
           );
-          submissionsRef.current = nextSubmissions;
-          setSubmissions(nextSubmissions);
           if (supabaseEnabled) {
+            submissionsRef.current = nextSubmissions;
+            setSubmissions(nextSubmissions);
             void refreshCanonicalSubmissions();
           } else {
             await persistSubmissions(nextSubmissions, fence);

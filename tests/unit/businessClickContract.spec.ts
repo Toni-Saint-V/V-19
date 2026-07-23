@@ -317,12 +317,24 @@ function successFixtureFor(action: SubmissionAction): Submission {
       return submittedWithOpenIssueFixture();
     case "accept":
       return approvedSubmittedFixture();
-    case "close_issues_accept":
-      return adminAcceptRequiredMediaForTest(
+    case "close_issues_accept": {
+      const corrected = adminAcceptRequiredMediaForTest(
         adminApprovePassportFieldsForTest(
           correctionsReceivedWithFixedIssueFixture(),
         ),
       );
+      return {
+        ...corrected,
+        issues: corrected.issues.map((issue) => ({
+          ...issue,
+          target: {
+            ...issue.target,
+            field: "Номер паспорта",
+            section: "Паспорт",
+          },
+        })),
+      };
+    }
     case "return_again":
       return correctionsReceivedWithOpenIssueFixture();
     case "generate_export":
