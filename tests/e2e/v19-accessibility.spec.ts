@@ -46,6 +46,26 @@ async function waitForAgentRowsToSettle(page: Page) {
     .toBe(true);
 }
 
+async function waitForAgentScreenToSettle(
+  page: Page,
+  screen: "actions" | "submissions",
+) {
+  const surface = page.locator(
+    `[data-testid="agent-screen-transition"][data-agent-screen="${screen}"]`,
+  );
+  await expect(surface).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        surface.evaluate((element) => {
+          const styles = getComputedStyle(element);
+          return styles.opacity === "1" && styles.transform === "none";
+        }),
+      { message: `${screen} screen finishes entering before accessibility analysis` },
+    )
+    .toBe(true);
+}
+
 async function openAgentActionsTab(page: Page) {
   await expect(
     page.getByRole("heading", { level: 1, name: "Мои действия" }),
@@ -59,6 +79,7 @@ test.describe("V-19 accessibility contract", () => {
   }) => {
     await openFreshWorkspace(page);
     await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
+    await waitForAgentScreenToSettle(page, "actions");
     await waitForAgentRowsToSettle(page);
     await expectNoAxeViolations(page, "agent actions");
 
@@ -67,6 +88,7 @@ test.describe("V-19 accessibility contract", () => {
       page.getByRole("heading", { level: 1, name: "Мои действия" }),
     ).toBeVisible();
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
+    await waitForAgentScreenToSettle(page, "actions");
     await waitForAgentRowsToSettle(page);
     await expectNoAxeViolations(page, "agent actions");
 
@@ -74,6 +96,8 @@ test.describe("V-19 accessibility contract", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Мои подачи" }),
     ).toBeVisible();
+    await expect(page.getByTestId("agent-actions-screen")).toHaveCount(0);
+    await waitForAgentScreenToSettle(page, "submissions");
     await expectNoAxeViolations(page, "agent submissions");
 
     await page.getByRole("button", { name: "Новая подача" }).first().click();

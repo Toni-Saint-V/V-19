@@ -1,3 +1,5 @@
+import { ChevronDown } from "lucide-react";
+
 import { Badge, Button } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
 import { OperationalTableHeader } from "../../../shared/ui/OperationalTableHeader";
@@ -25,6 +27,8 @@ type EmptyState = {
   title: string;
 };
 
+type DesktopContextMode = "inline" | "rail";
+
 export type AgentActionsSummaryFilter =
   | "done"
   | "in_correction"
@@ -34,11 +38,11 @@ export type AgentActionsSummaryFilter =
 type AgentActionsCommandCockpitProps = {
   actionGroupLabel: string;
   activeSummaryFilter?: AgentActionsSummaryFilter | null;
+  desktopContextMode?: DesktopContextMode;
   emptyState: EmptyState;
   errorMessage?: string;
   loading?: boolean;
   selectedTask?: AgentActionTask;
-  showDesktopContext?: boolean;
   showSummary?: boolean;
   summary: AgentActionTaskSummary;
   summaryTasks?: AgentActionTask[];
@@ -55,11 +59,11 @@ type AgentActionsCommandCockpitProps = {
 export function AgentActionsCommandCockpit({
   actionGroupLabel,
   activeSummaryFilter = null,
+  desktopContextMode = "rail",
   emptyState,
   errorMessage = "",
   loading = false,
   selectedTask,
-  showDesktopContext = true,
   showSummary = true,
   summary,
   summaryTasks,
@@ -143,6 +147,7 @@ export function AgentActionsCommandCockpit({
   }
 
   const activeTask = selectedTask ?? tasks[0];
+  const usesInlineContext = desktopContextMode === "inline";
   const intelligenceTasks = summaryTasks ?? tasks;
   const intelligenceSubmissions = Array.from(
     new Map(
@@ -181,7 +186,7 @@ export function AgentActionsCommandCockpit({
       <div
         className={cn(
           "v19-actions-desktop-grid",
-          !showDesktopContext && "is-queue-only",
+          usesInlineContext && "is-inline-context",
         )}
       >
         <section
@@ -192,26 +197,66 @@ export function AgentActionsCommandCockpit({
           <PanelEyebrow label="Очередь" />
           <OperationalTableHeader
             className="v19-actions-table-head"
-            columns={[
-              { key: "submission", label: "Подача" },
-              { key: "task", label: "Заявитель / задача" },
-              { key: "dates", label: "Даты поездки" },
-              { key: "status", label: "Статус" },
-            ]}
+            columns={
+              usesInlineContext
+                ? [
+                    { key: "rank", label: "№" },
+                    { key: "priority", label: "Приоритет" },
+                    { key: "submission", label: "ID" },
+                    { key: "task", label: "Заявитель / задача" },
+                    { key: "city", label: "Город" },
+                    { key: "dates", label: "Даты поездки" },
+                    { key: "status", label: "Статус" },
+                  ]
+                : [
+                    { key: "submission", label: "Подача" },
+                    { key: "task", label: "Заявитель / задача" },
+                    { key: "dates", label: "Даты поездки" },
+                    { key: "status", label: "Статус" },
+                  ]
+            }
           />
           <div className="v19-actions-queue-list">
-            {tasks.map((task) => (
-              <ActionTaskCard
-                key={task.id}
-                selected={activeTask.id === task.id}
-                task={task}
-                onSelect={() => onSelectTask(task)}
-              />
-            ))}
+            {tasks.map((task, index) => {
+              const selected = activeTask.id === task.id;
+              const rowId = `agent-action-row-${stableDomId(task.id)}`;
+              const detailId = `agent-action-detail-${stableDomId(task.id)}`;
+
+              return (
+                <div
+                  className={cn(
+                    "v19-actions-queue-entry",
+                    selected && "is-selected",
+                  )}
+                  data-agent-action-id={task.id}
+                  key={task.id}
+                >
+                  <ActionTaskCard
+                    detailId={usesInlineContext ? detailId : undefined}
+                    inlineContext={usesInlineContext}
+                    rank={index + 1}
+                    rowId={rowId}
+                    selected={selected}
+                    task={task}
+                    onSelect={() => onSelectTask(task)}
+                  />
+                  {usesInlineContext && selected ? (
+                    <AgentActionInlineDetail
+                      detailId={detailId}
+                      rowId={rowId}
+                      task={task}
+                      onOpenPrimary={() => onOpenPrimary(task)}
+                      onOpenSecondary={() => onOpenSecondary(task)}
+                      onOpenTab={(tab) => onOpenTab(task, tab)}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </section>
 
-        {showDesktopContext ? (
+        {desktopContextMode === "rail" ? (
           <AgentActionContextPanel
             task={activeTask}
             onOpenIssue={(issue) => onOpenIssue(activeTask, issue)}
@@ -364,10 +409,18 @@ function PanelEyebrow({ label }: { label: string }) {
 }
 
 function ActionTaskCard({
+  detailId,
+  inlineContext,
+  rank,
+  rowId,
   selected,
   task,
   onSelect,
 }: {
+  detailId?: string;
+  inlineContext: boolean;
+  rank: number;
+  rowId: string;
   selected: boolean;
   task: AgentActionTask;
   onSelect: () => void;
@@ -380,36 +433,153 @@ function ActionTaskCard({
       className={cn(
         "v19-actions-queue-item",
         "v19-actions-table-row",
+        inlineContext && "is-inline-context",
         `status-${task.status}`,
         selected && "is-selected",
       )}
+      aria-controls={inlineContext ? detailId : undefined}
       aria-current={selected ? "true" : undefined}
+      aria-expanded={inlineContext ? selected : undefined}
       aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. ${task.problem}. Следующее действие: ${task.nextAction.label}${task.priority.reason ? `. ${task.priority.label}: ${task.priority.reason}` : ""}`}
       data-action-status={task.status}
+      data-agent-action-id={task.id}
       data-submission-id={task.submission.id}
       data-testid="agent-action-queue-item"
+      id={rowId}
       type="button"
       onClick={onSelect}
     >
       <span className="v19-actions-queue-strip" aria-hidden="true" />
-      <span className="v19-actions-table-submission">
-        <span>
-          <strong>{submissionPublicId(task.submission)}</strong>
-          <small>{safeCity(task.submission.city)}</small>
-        </span>
-      </span>
-      <span className="v19-actions-table-task">
-        <strong>
-          {task.applicantName || formatSubmissionListTitle(task.submission)}
-        </strong>
-        <small>{task.problem}</small>
-      </span>
-      <span className="v19-actions-table-dates">{dateLabel}</span>
-      <span className="v19-actions-table-status">
-        <StatusBadge status={task.status} label={task.statusLabel} />
-        <small>{task.nextAction.label}</small>
-      </span>
+
+      {inlineContext ? (
+        <>
+          <span className="v19-actions-table-rank">{rank}</span>
+          <span
+            className={`v19-actions-table-priority priority-${task.priority.level}`}
+          >
+            <span aria-hidden="true" />
+            <strong>{priorityDisplayLabel(task)}</strong>
+          </span>
+          <span className="v19-actions-table-submission">
+            <strong>{submissionPublicId(task.submission)}</strong>
+          </span>
+          <span className="v19-actions-table-task">
+            <strong>
+              {task.applicantName || formatSubmissionListTitle(task.submission)}
+            </strong>
+            <small>{task.problem}</small>
+          </span>
+          <span className="v19-actions-table-city">
+            {safeCity(task.submission.city)}
+          </span>
+          <span className="v19-actions-table-dates">{dateLabel}</span>
+          <span className="v19-actions-table-status">
+            <StatusBadge status={task.status} label={task.statusLabel} />
+            <small>{task.nextAction.label}</small>
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className="v19-actions-table-chevron"
+          />
+        </>
+      ) : (
+        <>
+          <span className="v19-actions-table-submission">
+            <span>
+              <strong>{submissionPublicId(task.submission)}</strong>
+              <small>{safeCity(task.submission.city)}</small>
+            </span>
+          </span>
+          <span className="v19-actions-table-task">
+            <strong>
+              {task.applicantName || formatSubmissionListTitle(task.submission)}
+            </strong>
+            <small>{task.problem}</small>
+          </span>
+          <span className="v19-actions-table-dates">{dateLabel}</span>
+          <span className="v19-actions-table-status">
+            <StatusBadge status={task.status} label={task.statusLabel} />
+            <small>{task.nextAction.label}</small>
+          </span>
+        </>
+      )}
     </button>
+  );
+}
+
+function AgentActionInlineDetail({
+  detailId,
+  rowId,
+  task,
+  onOpenPrimary,
+  onOpenSecondary,
+  onOpenTab,
+}: {
+  detailId: string;
+  rowId: string;
+  task: AgentActionTask;
+  onOpenPrimary: () => void;
+  onOpenSecondary: () => void;
+  onOpenTab: (tab: DrawerTab) => void;
+}) {
+  const disabledReason = primaryActionDisabledReason(task);
+  const disabledReasonId = `${stableDomId(task.id)}-inline-primary-disabled-reason`;
+
+  return (
+    <section
+      aria-labelledby={rowId}
+      className="v19-actions-inline-detail"
+      data-action-status={task.status}
+      data-agent-action-id={task.id}
+      data-testid="agent-action-inline-detail"
+      id={detailId}
+      role="region"
+    >
+      <div className="v19-actions-inline-why">
+        <p>Почему сейчас</p>
+        <strong>{task.problem}</strong>
+        <span>{task.reason}</span>
+      </div>
+
+      <div className="v19-actions-inline-readiness">
+        <div className="v19-actions-inline-readiness-head">
+          <p>Готовность подачи</p>
+          <strong>{task.readiness.overallPercent}%</strong>
+        </div>
+        <progress max={100} value={task.readiness.overallPercent} />
+        <ReadinessGrid readiness={task.readiness} onOpenTab={onOpenTab} />
+      </div>
+
+      <div className="v19-actions-inline-next">
+        <p>Следующее действие</p>
+        <strong>{task.nextAction.label}</strong>
+        <span>{task.nextAction.detail}</span>
+        {disabledReason ? (
+          <small className="v19-actions-disabled-reason" id={disabledReasonId}>
+            {disabledReason}
+          </small>
+        ) : null}
+        <div className="v19-actions-inline-actions">
+          <Button
+            {...agentInteractionProps("actions.open-primary")}
+            aria-describedby={disabledReason ? disabledReasonId : undefined}
+            disabled={Boolean(disabledReason)}
+            title={disabledReason || undefined}
+            variant="primary"
+            onClick={onOpenPrimary}
+          >
+            {task.nextAction.primaryLabel}
+          </Button>
+          <Button
+            {...agentInteractionProps("actions.open-secondary")}
+            variant="secondary"
+            onClick={onOpenSecondary}
+          >
+            {task.secondaryAction.label}
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -698,7 +868,15 @@ function TimelineEvent({
       >
         <span className="v19-actions-mobile-cell-top">
           <small>{submissionId}</small>
-          <span>{task.statusLabel}</span>
+          <span className="v19-actions-mobile-cell-signals">
+            <span
+              className={`v19-actions-mobile-priority priority-${task.priority.level}`}
+            >
+              <span aria-hidden="true" />
+              {priorityDisplayLabel(task)}
+            </span>
+            <span className="v19-actions-mobile-status">{task.statusLabel}</span>
+          </span>
         </span>
         <strong className="v19-actions-mobile-cell-title">
           {formatSubmissionListTitle(task.submission)}
@@ -738,6 +916,26 @@ function primaryActionDisabledReason(task: AgentActionTask) {
 
 function safeCity(city: string) {
   return city.trim() || "Город не указан";
+}
+
+function priorityDisplayLabel(task: AgentActionTask) {
+  if (task.priority.label.trim()) {
+    return task.priority.label;
+  }
+
+  if (task.priority.level === "urgent") {
+    return "Срочно";
+  }
+
+  if (task.priority.level === "high") {
+    return "Высокий";
+  }
+
+  if (task.priority.level === "medium") {
+    return "Средний";
+  }
+
+  return "Низкий";
 }
 
 function stableDomId(value: string) {

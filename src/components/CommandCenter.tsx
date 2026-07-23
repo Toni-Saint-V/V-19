@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import {
-  ArrowUpDown,
-  CheckCircle2,
-  Clock,
-  ListChecks,
-  Plus,
-  RotateCcw,
-  Shapes,
-} from "lucide-react";
+import { ArrowUpDown, Plus, RotateCcw } from "lucide-react";
 import { QuestionnaireScreen } from "./QuestionnaireScreen";
 import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import {
@@ -38,8 +30,6 @@ import {
 } from "../integration/visaflowBusinessBridge";
 import {
   V19ListHeader,
-  V19MetricCard,
-  V19MetricStrip,
   V19QueueToolbar,
   V19ToolbarSelect,
 } from "../shared/ui/v19-design-system";
@@ -73,10 +63,12 @@ import {
   type AgentActionItem,
   type AgentActionTask,
 } from "../modules/submissions/agentActions";
+import { AgentActionsCommandCockpit } from "../modules/submissions/components/AgentActionsCommandCockpit";
 import {
-  AgentActionContextPanel,
-  AgentActionsCommandCockpit,
-} from "../modules/submissions/components/AgentActionsCommandCockpit";
+  AgentActionStatusStrip,
+  type AgentActionFilter,
+  type AgentActionFilterCounts,
+} from "../modules/submissions/components/AgentActionStatusStrip";
 import {
   agentAgencyLabel,
   agentDisplayName,
@@ -111,7 +103,6 @@ type AgentShellNavSection = Extract<
   LegacyAgentNavSection,
   "actions" | "submissions" | "settings"
 >;
-type ActionSummaryFilter = "blockers" | "open" | "today" | "week" | "completed";
 type ActionSort = "tripDate" | "createdAt";
 
 type CommandCenterProps = {
@@ -184,7 +175,7 @@ export function CommandCenter({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
-    useState<ActionSummaryFilter>("open");
+    useState<AgentActionFilter>("open");
   const [actionCityFilter, setActionCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
@@ -237,6 +228,15 @@ export function CommandCenter({
     () => agentActionQueue(effectiveCanonicalSubmissions),
     [effectiveCanonicalSubmissions],
   );
+  const actionFilterCounts: AgentActionFilterCounts = {
+    blockers: actionQueue.open.filter((action) => action.severity === "blocker").length,
+    completed: actionQueue.completed.length,
+    open: actionQueue.open.length,
+    today: actionQueue.open.filter((action) => action.due === "today").length,
+    week: actionQueue.open.filter(
+      (action) => action.due === "today" || action.due === "week",
+    ).length,
+  };
   const actionCityOptions = useMemo(
     () => cityFilterValuesForSubmissions(effectiveCanonicalSubmissions),
     [effectiveCanonicalSubmissions],
@@ -292,11 +292,24 @@ export function CommandCenter({
     actionCityFilter !== "Все города" ||
     Boolean(searchQuery.trim());
   const actionControlsAreDefault = !actionFiltersActive && actionSort === "tripDate";
+  const handleActionFilterChange = (filter: AgentActionFilter) => {
+    setActionSummaryFilter(filter);
+    setSelectedActionTaskId(null);
+  };
+  const handleActionCityFilterChange = (city: string) => {
+    setActionCityFilter(city);
+    setSelectedActionTaskId(null);
+  };
+  const handleActionSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setSelectedActionTaskId(null);
+  };
   const resetActionFilters = () => {
     setActionSummaryFilter("open");
     setActionCityFilter("Все города");
     setSearchQuery("");
     setActionSort("tripDate");
+    setSelectedActionTaskId(null);
   };
   const agentName = agentDisplayName(agentId);
   const agentAgency = agentAgencyLabel(agentId);
@@ -832,150 +845,88 @@ export function CommandCenter({
     <section
       aria-label="Мои действия"
       className="v19-legacy-actions-screen v19-agent-shared-screen ops-shell surface-agent-actions"
-      data-ui-pattern="operational-table-with-context"
+      data-ui-pattern="operational-queue-with-inline-context"
       data-testid="agent-actions-screen"
     >
-      <div className="v19-agent-actions-layout-v2">
-        <div className="v19-agent-actions-main-v2">
-          <V19MetricStrip>
-            <V19MetricCard
-              active={actionSummaryFilter === "open"}
-              detail="в работе"
-              icon={ListChecks}
-              interactionId="actions.summary-filter"
-              label="Открыто"
-              tone="neutral"
-              value={actionQueue.summary.open}
-              onClick={() => setActionSummaryFilter("open")}
-            />
-            <V19MetricCard
-              active={actionSummaryFilter === "today"}
-              detail="сегодня"
-              icon={Clock}
-              interactionId="actions.summary-filter"
-              label="Сегодня"
-              tone="amber"
-              value={actionQueue.summary.today}
-              onClick={() => setActionSummaryFilter("today")}
-            />
-            <V19MetricCard
-              active={actionSummaryFilter === "completed"}
-              detail="закрыто"
-              icon={CheckCircle2}
-              interactionId="actions.summary-filter"
-              label="Закрыто"
-              tone="green"
-              value={actionQueue.summary.completed}
-              onClick={() => setActionSummaryFilter("completed")}
-            />
-          </V19MetricStrip>
+      <div className="v19-agent-actions-main-v2">
+        <AgentActionStatusStrip
+          counts={actionFilterCounts}
+          value={actionSummaryFilter}
+          onChange={handleActionFilterChange}
+        />
 
-          <div className="v19-admin-review-board v19-agent-actions-board">
-            <V19ListHeader
-              actionDisabled={actionControlsAreDefault}
-              actionLabel="Все"
-              className="v19-admin-review-list-head"
-              countLabel={`${visibleActions.length}`}
-              interactionId="actions.reset-filters"
-              onAction={resetActionFilters}
-              title="Очередь действий"
-            />
-            <V19QueueToolbar
-              actionDisabled={actionControlsAreDefault}
-              actionIcon={RotateCcw}
-              cityFilter={actionCityFilter}
-              cityOptions={actionCityOptions}
-              controls={
-                <>
-                  <V19ToolbarSelect<ActionSummaryFilter>
-                    ariaLabel="Фильтр действий"
-                    className={actionSummaryFilter !== "open" ? "is-active" : ""}
-                    icon={Shapes}
-                    interactionId="actions.status-filter"
-                    label="Статус"
-                    options={[
-                      { label: "Открыто", value: "open" },
-                      { label: "Блокеры", value: "blockers" },
-                      { label: "Сегодня", value: "today" },
-                      { label: "На неделе", value: "week" },
-                      { label: "Закрыто", value: "completed" },
-                    ]}
-                    value={actionSummaryFilter}
-                    onChange={setActionSummaryFilter}
-                  />
-                  <V19ToolbarSelect<ActionSort>
-                    ariaLabel="Сортировка действий"
-                    className={actionSort !== "tripDate" ? "is-active" : ""}
-                    icon={ArrowUpDown}
-                    interactionId="actions.sort"
-                    label="Сортировка"
-                    options={[
-                      { label: "По дате вылета", value: "tripDate" },
-                      { label: "По дате создания", value: "createdAt" },
-                    ]}
-                    value={actionSort}
-                    onChange={setActionSort}
-                  />
-                </>
-              }
-              filterLabel="Сбросить фильтры"
-              interactionIds={{
-                cityFilter: "actions.city-filter",
-                reset: "actions.reset-filters",
-                search: "actions.search",
-              }}
-              onCityFilterChange={setActionCityFilter}
-              onFilterClick={resetActionFilters}
-              onSearchChange={setSearchQuery}
-              searchPlaceholder="ID, семья или город"
-              searchValue={searchQuery}
-            />
-            <AgentActionsCommandCockpit
-              actionGroupLabel={
-                actionSummaryFilter === "completed"
-                  ? "Закрытые действия"
-                  : "Открытые действия"
-              }
-              emptyState={{
-                action: actionFiltersActive ? "Сбросить фильтры" : "Новая подача",
-                body: actionFiltersActive
-                  ? "Измените поисковый запрос или сбросьте выбранные фильтры."
-                  : "Создайте подачу — следующие шаги появятся здесь автоматически.",
-                title: actionFiltersActive
-                  ? "Ничего не найдено"
-                  : "Очередь действий пуста",
-              }}
-              selectedTask={selectedActionTask}
-              showDesktopContext={false}
-              showSummary={false}
-              summary={actionTaskSummary}
-              tasks={actionTasks}
-              onEmptyAction={actionFiltersActive ? resetActionFilters : createPackage}
-              onOpenIssue={(task, issue) =>
-                handleOpenWorkspaceTarget(task.submission.id, targetForIssue(issue))
-              }
-              onOpenPrimary={(task) => handleActionOpen(task.action)}
-              onOpenSecondary={(task) => handleActionTaskTab(task, "overview")}
-              onOpenTab={handleActionTaskTab}
-              onSelectTask={(task) => setSelectedActionTaskId(task.id)}
-            />
-          </div>
-        </div>
-
-        {selectedActionTask ? (
-          <AgentActionContextPanel
-            task={selectedActionTask}
-            onOpenIssue={(issue) =>
-              handleOpenWorkspaceTarget(
-                selectedActionTask.submission.id,
-                targetForIssue(issue),
-              )
-            }
-            onOpenPrimary={() => handleActionOpen(selectedActionTask.action)}
-            onOpenSecondary={() => handleActionTaskTab(selectedActionTask, "overview")}
-            onOpenTab={(tab) => handleActionTaskTab(selectedActionTask, tab)}
+        <div className="v19-admin-review-board v19-agent-actions-board">
+          <V19ListHeader
+            actionDisabled={actionControlsAreDefault}
+            actionLabel="Все"
+            className="v19-admin-review-list-head"
+            countLabel={`${visibleActions.length}`}
+            interactionId="actions.reset-filters"
+            onAction={resetActionFilters}
+            title="Очередь действий"
           />
-        ) : null}
+          <V19QueueToolbar
+            actionDisabled={actionControlsAreDefault}
+            actionIcon={RotateCcw}
+            cityFilter={actionCityFilter}
+            cityOptions={actionCityOptions}
+            controls={
+              <V19ToolbarSelect<ActionSort>
+                ariaLabel="Сортировка действий"
+                className={actionSort !== "tripDate" ? "is-active" : ""}
+                icon={ArrowUpDown}
+                interactionId="actions.sort"
+                label="Сортировка"
+                options={[
+                  { label: "По дате вылета", value: "tripDate" },
+                  { label: "По дате создания", value: "createdAt" },
+                ]}
+                value={actionSort}
+                onChange={setActionSort}
+              />
+            }
+            filterLabel="Сбросить фильтры"
+            interactionIds={{
+              cityFilter: "actions.city-filter",
+              reset: "actions.reset-filters",
+              search: "actions.search",
+            }}
+            onCityFilterChange={handleActionCityFilterChange}
+            onFilterClick={resetActionFilters}
+            onSearchChange={handleActionSearchChange}
+            searchPlaceholder="ID, семья или город"
+            searchValue={searchQuery}
+          />
+          <AgentActionsCommandCockpit
+            actionGroupLabel={
+              actionSummaryFilter === "completed"
+                ? "Закрытые действия"
+                : "Открытые действия"
+            }
+            desktopContextMode="inline"
+            emptyState={{
+              action: actionFiltersActive ? "Сбросить фильтры" : "Новая подача",
+              body: actionFiltersActive
+                ? "Измените поисковый запрос или сбросьте выбранные фильтры."
+                : "Создайте подачу — следующие шаги появятся здесь автоматически.",
+              title: actionFiltersActive
+                ? "Ничего не найдено"
+                : "Очередь действий пуста",
+            }}
+            selectedTask={selectedActionTask}
+            showSummary={false}
+            summary={actionTaskSummary}
+            tasks={actionTasks}
+            onEmptyAction={actionFiltersActive ? resetActionFilters : createPackage}
+            onOpenIssue={(task, issue) =>
+              handleOpenWorkspaceTarget(task.submission.id, targetForIssue(issue))
+            }
+            onOpenPrimary={(task) => handleActionOpen(task.action)}
+            onOpenSecondary={(task) => handleActionTaskTab(task, "overview")}
+            onOpenTab={handleActionTaskTab}
+            onSelectTask={(task) => setSelectedActionTaskId(task.id)}
+          />
+        </div>
       </div>
     </section>
   );

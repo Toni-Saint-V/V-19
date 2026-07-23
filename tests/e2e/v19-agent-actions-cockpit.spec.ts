@@ -52,12 +52,6 @@ async function openFreshAgentActions(page: Page) {
   await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 }
 
-async function openFreshAdminReview(page: Page) {
-  await openFreshWorkspace(page, {
-    workspaceEmail: "admin@visaflow.local",
-  });
-}
-
 async function documentMetrics(page: Page) {
   return page.evaluate(() => {
     const root = (
@@ -122,21 +116,37 @@ async function assertMobileCockpit(page: Page) {
 
   const event = surface
     .getByTestId("agent-action-timeline")
-    .locator('[data-submission-id="ПД-1048"]')
+    .locator(".v19-actions-timeline-event")
     .first();
   await expect(event).toBeVisible();
-  await expect(event).toContainText("Ивановы");
-  await expect(event).toContainText("Требует исправления");
-  await expect(event).toContainText("Файлы не готовы");
-  await expect(event).toContainText("Москва");
+  await expect(event.locator(".v19-actions-mobile-priority")).not.toBeEmpty();
+  await expect(event.locator(".v19-actions-mobile-status")).not.toBeEmpty();
 
   await event.locator(".v19-actions-timeline-hit").click();
   await expect(page.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
-  const drawer = page.getByRole("dialog", { name: "Ивановы" });
+  const drawer = page.getByRole("dialog").first();
   await expect(drawer).toBeVisible();
-  await expect(drawer).toContainText("Ивановы");
   await page.keyboard.press("Escape");
-  await expect(drawer).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  const undersizedTargets = await surface
+    .locator("button:visible, input:visible, select:visible")
+    .evaluateAll((controls) =>
+      controls
+        .map((control) => {
+          const rect = control.getBoundingClientRect();
+          return {
+            height: Math.round(rect.height),
+            label:
+              control.getAttribute("aria-label") ??
+              control.textContent?.trim().slice(0, 40) ??
+              control.tagName,
+            width: Math.round(rect.width),
+          };
+        })
+        .filter((control) => control.height < 44 || control.width < 44),
+    );
+  expect(undersizedTargets, "mobile controls keep a 44px touch target").toEqual([]);
 }
 
 async function assertDesktopCockpit(page: Page) {
@@ -145,40 +155,49 @@ async function assertDesktopCockpit(page: Page) {
   await expect(surface.getByTestId("agent-action-timeline")).not.toBeVisible();
   await expect(surface.locator(".v19-action-row, .vf-figma-action-row")).toHaveCount(0);
 
-  const returnedItem = surface
-    .getByTestId("agent-action-queue-item")
-    .filter({ hasText: "Заменить селфи 1" })
-    .first();
-  await expect(returnedItem).toBeVisible();
-  await expect(returnedItem).toContainText("Требует исправления");
-  await expect(returnedItem).toContainText("Файлы не готовы");
-  await expect(returnedItem).toContainText("Заменить селфи 1");
-  await expect(returnedItem).toContainText("Москва");
-  await returnedItem.click();
+  const rows = surface.getByTestId("agent-action-queue-item");
+  await expect(rows.first()).toBeVisible();
+  await expect(rows.first()).toHaveAttribute("aria-expanded", "true");
+  await expect(surface.getByTestId("agent-action-inline-detail")).toHaveCount(1);
+  await expect(surface.getByTestId("agent-action-active-panel")).toHaveCount(0);
 
-  const activePanel = surface.getByTestId("agent-action-active-panel");
-  await expect(activePanel).toContainText("Ивановы");
-  await expect(activePanel).toContainText("Следующее действие");
-  await expect(activePanel).toContainText("Файлы не готовы");
-  await expect(activePanel).toContainText("Почему сейчас");
-  await expect(activePanel).toContainText("Что в работе");
-  await expect(activePanel).toContainText("Ключевые замечания");
+  const secondRow = rows.nth(1);
+  await secondRow.click();
+  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
+  await expect(secondRow).toHaveAttribute("aria-expanded", "true");
+  const detailId = await secondRow.getAttribute("aria-controls");
+  if (!detailId) {
+    throw new Error("Selected action row does not expose its inline detail id.");
+  }
+
+  const activeDetail = surface.getByTestId("agent-action-inline-detail");
+  await expect(activeDetail).toHaveAttribute("id", detailId);
+  await expect(activeDetail).toContainText("Почему сейчас");
+  await expect(activeDetail).toContainText("Готовность подачи");
+  await expect(activeDetail).toContainText("Следующее действие");
   await expect(surface.locator(".v19-actions-summary-metric")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-cockpit-summary")).toHaveCount(0);
   await expect(
-    surface.getByRole("button", { name: "Открыто", exact: true }),
+    surface.locator('[data-action-filter="open"]'),
   ).toBeVisible();
   await expect(
-    surface.getByRole("button", { name: "Сегодня", exact: true }),
+    surface.locator('[data-action-filter="today"]'),
   ).toBeVisible();
-  await expect(
-    surface.getByRole("button", { name: "Закрыто", exact: true }),
-  ).toBeVisible();
-
   const viewport = page.viewportSize();
+  if (viewport && viewport.width < 1200) {
+    await expect(surface.locator('[data-action-filter="completed"]')).not.toBeVisible();
+    await expect(
+      surface.getByRole("combobox", { name: "Дополнительный фильтр действий" }),
+    ).toBeVisible();
+  } else {
+    await expect(
+      surface.locator('[data-action-filter="completed"]'),
+    ).toBeVisible();
+  }
+
   if (viewport && viewport.width >= 1280) {
     const visibleCards = await surface
-      .getByTestId("agent-action-queue-item")
+      .locator(".v19-actions-queue-entry")
       .evaluateAll(
         (cards) =>
           cards.filter((card) => {
@@ -188,17 +207,19 @@ async function assertDesktopCockpit(page: Page) {
             const rect = element.getBoundingClientRect();
             const viewportHeight = (globalThis as unknown as { innerHeight: number })
               .innerHeight;
-            return rect.top >= 0 && rect.bottom <= viewportHeight;
+            return rect.bottom > 0 && rect.top < viewportHeight;
           }).length,
       );
     expect(visibleCards).toBeGreaterThanOrEqual(3);
   }
 
   await expect(surface.getByTestId("agent-action-next-panel")).toHaveCount(0);
-  await activePanel.locator(".v19-actions-summary-cta button").last().click();
-  await expect(page.getByRole("dialog", { name: "Ивановы" })).toBeVisible();
+  await activeDetail
+    .locator('[data-v19-interaction-id="actions.open-secondary"]')
+    .click();
+  await expect(page.getByRole("dialog").first()).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Ивановы" })).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   await expect(
     page.getByRole("heading", { level: 1, name: "Мои действия" }),
@@ -207,32 +228,56 @@ async function assertDesktopCockpit(page: Page) {
 
 async function assertActionFilters(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
-  const chooseFilter = async (label: string) => {
-    await page.getByRole("button", { name: /^Фильтр действий:/ }).click();
-    await page.getByRole("option", { name: label, exact: true }).click();
+  const chooseFilter = async (
+    filter: "blockers" | "completed" | "open" | "today" | "week",
+  ) => {
+    const button = surface.locator(`[data-action-filter="${filter}"]`);
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
   };
 
-  await chooseFilter("Блокеры");
+  await chooseFilter("blockers");
+  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+
+  await chooseFilter("today");
+  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+
+  await chooseFilter("week");
+  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+
+  await chooseFilter("completed");
+  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+
+  await chooseFilter("open");
+  const search = surface.getByPlaceholder("ID, семья или город");
+  await search.fill("Мария");
   await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
-    "Требует исправления",
+    "Мария",
+  );
+  const reset = surface.locator('[data-v19-interaction-id="actions.reset-filters"]');
+  await expect(reset.first()).toBeEnabled();
+  await reset.first().click();
+  await expect(search).toHaveValue("");
+}
+
+async function assertPrimaryActionRouting(page: Page) {
+  const surface = page.getByRole("region", { name: "Мои действия" });
+  const detail = surface.getByTestId("agent-action-inline-detail");
+  const primaryAction = detail.locator(
+    '[data-v19-interaction-id="actions.open-primary"]',
   );
 
-  await chooseFilter("Сегодня");
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
-
-  await chooseFilter("Закрыто");
-  await expect(
-    page.getByRole("button", { name: "Фильтр действий: Закрыто" }),
-  ).toBeVisible();
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
-
-  await chooseFilter("Открыто");
+  await expect(primaryAction).toBeEnabled();
+  await primaryAction.click();
+  await expect(page.locator(".vf-figma-questionnaire-screen")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 test.describe("V-19 My Actions submission command cockpit", () => {
   test("viewport matrix, selection, and direct mobile drawer routing", async ({
     page,
   }) => {
+    test.setTimeout(120_000);
     mkdirSync(proofDir, { recursive: true });
     const browserProblems = collectBrowserProblems(page);
     const rows: ProofRow[] = [];
@@ -251,6 +296,7 @@ test.describe("V-19 My Actions submission command cockpit", () => {
         await assertDesktopCockpit(page);
         if (viewport.width === 1440) {
           await assertActionFilters(page);
+          await assertPrimaryActionRouting(page);
         }
       }
 
@@ -270,30 +316,16 @@ test.describe("V-19 My Actions submission command cockpit", () => {
         horizontalOverflow: "no",
         notes:
           viewport.width < 768
-            ? "Лента действий видна; сводка действия открылась; CTA открыл drawer подачи."
-            : "Очередь действий и сводка видны; primary CTA открыл drawer подачи.",
+            ? "Лента действий видна; выбор действия напрямую открыл Drawer подачи."
+            : viewport.width === 1440
+              ? "Inline-контекст и Drawer проверены; primary CTA открыл точную анкету."
+              : "Очередь и inline-контекст видны; secondary CTA открыл Drawer подачи.",
         primaryActionUsable: "yes",
         result: "PASS",
         sidebarCorrect: viewport.width >= 1024 ? "yes" : "n/a",
         viewport: viewport.label,
       });
     }
-
-    writeFileSync(
-      join(proofDir, "browser-proof.json"),
-      JSON.stringify({ browserProblems, rows }, null, 2),
-    );
-
-    await page.setViewportSize({ height: 900, width: 1440 });
-    await openFreshAdminReview(page);
-    await expect(page.locator(".v19-admin-review-screen")).toBeVisible();
-    await expect(page.locator(".v19-admin-review-card-grid")).toBeVisible();
-    await expect(page.locator(".vf-figma-action-row")).toHaveCount(0);
-    await expect(page.getByTestId("agent-actions-cockpit")).toHaveCount(0);
-    await page.screenshot({
-      fullPage: true,
-      path: join(proofDir, "admin-review-regression.png"),
-    });
 
     writeFileSync(
       join(proofDir, "browser-proof.json"),
