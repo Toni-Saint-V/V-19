@@ -5,9 +5,11 @@ import { useDrawerDesktopQuery } from "../shared/ui/drawer/drawerMotion";
 import { linearDrawerMotion } from "../shared/ui/drawer/linearDrawerMotion";
 import {
   AlertCircle,
+  ArrowRight,
   Briefcase,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Clock,
   CreditCard,
   Edit3,
@@ -16,6 +18,7 @@ import {
   FileText,
   History,
   Image as ImageIcon,
+  LoaderCircle,
   MapPin,
   Plane,
   ShieldAlert,
@@ -33,6 +36,7 @@ import {
 import { submissionPublicId } from "../modules/submissions/submissionIdentity";
 import {
   agentQuestionnaireStatusPresentation,
+  canAgentEditSubmission,
   getPrimaryAction,
   statusLabelFor,
 } from "../modules/submissions/status";
@@ -60,9 +64,11 @@ import {
 } from "./v19BusinessScreenAdapter";
 
 interface ApplicantDetail {
-  completeness: number;
+  completedSections: number;
+  id: string;
   name: string;
   role: string;
+  sectionsCount: number;
 }
 
 interface SubmissionDetail {
@@ -107,12 +113,43 @@ type QuestionnaireFocusTarget = {
 
 type QuestionnaireSectionDetail = {
   Icon: LucideIcon;
-  progress: number;
+  completedApplicants: number;
+  progress: number | null;
   remaining?: string;
+  targetApplicantName?: string;
   status: "done" | "in_progress" | "pending";
   target?: QuestionnaireFocusTarget;
   title: string;
+  totalApplicants: number;
 };
+
+type DrawerActionIntent =
+  | {
+      action: SubmissionAction;
+      kind: "submission";
+      label: string;
+      reason?: string;
+    }
+  | {
+      kind: "navigate";
+      label: string;
+      target: WorkspaceTarget;
+    }
+  | {
+      applicantId: string;
+      fileType: SubmissionFileType;
+      kind: "upload";
+      label: string;
+    }
+  | {
+      kind: "history";
+      label: string;
+    }
+  | {
+      kind: "wait";
+      label: string;
+      reason: string;
+    };
 
 const questionnaireSectionBlueprint: ReadonlyArray<{
   Icon: LucideIcon;
@@ -148,23 +185,16 @@ function applicantRoleLabel(role: string) {
   return role;
 }
 
-function applicantQuestionnairePercent(applicant: Submission["applicants"][number]) {
-  if (applicant.questionnaireStatus === "complete") return 100;
-  if (applicant.questionnaireStatus === "empty") return 0;
-  if (applicant.sections.length === 0) return 0;
-
-  const completeCount = applicant.sections.filter(
-    (section) => section.status === "complete",
-  ).length;
-  return Math.round((completeCount / applicant.sections.length) * 100);
-}
-
 function buildSubmissionDetail(submission: Submission): SubmissionDetail {
   return {
     applicants: submission.applicants.map((applicant) => ({
-      completeness: applicantQuestionnairePercent(applicant),
+      completedSections: applicant.sections.filter(
+        (section) => section.status === "complete",
+      ).length,
+      id: applicant.id,
       name: applicant.fullName,
       role: applicantRoleLabel(applicant.role ?? "main"),
+      sectionsCount: applicant.sections.length,
     })),
     applicantsCount: submission.applicants.length,
     city: submission.city,
@@ -196,6 +226,8 @@ function documentPackageItems(submission: Submission) {
     );
 
     return {
+      applicantId: slot.applicantId,
+      fileType: slot.type,
       label:
         submission.applicants.length > 1
           ? `${applicant?.fullName ?? "Заявитель"} • ${fileLabel(slot.type)}`
@@ -205,33 +237,53 @@ function documentPackageItems(submission: Submission) {
   });
 }
 
-function questionnaireSectionCandidateProgress(
+function questionnaireSectionCandidateStats(
   candidate: Submission["applicants"][number]["sections"][number],
   fieldIds: readonly string[] | undefined,
 ) {
-  if (candidate.status === "complete") return 100;
-  if (candidate.status === "empty") return 0;
-
   const fields = fieldIds
     ? candidate.fields.filter((field) => fieldIds.includes(field.id))
     : candidate.fields;
   const requiredFields = fields.filter((field) => field.required);
-  if (requiredFields.length === 0) {
-    return candidate.status === "needs_fix" ? 65 : 40;
-  }
-
   const filledFields = requiredFields.filter(
     (field) => field.value.trim().length > 0 && !field.error,
   );
-  const calculated = Math.round((filledFields.length / requiredFields.length) * 100);
-  return candidate.status === "needs_fix" ? Math.min(calculated, 90) : calculated;
+
+  if (candidate.status === "complete") {
+    return {
+      exactProgress: 100,
+      filledRequired: requiredFields.length,
+      required: requiredFields.length,
+    };
+  }
+  if (candidate.status === "empty") {
+    return {
+      exactProgress: 0,
+      filledRequired: 0,
+      required: requiredFields.length,
+    };
+  }
+  if (requiredFields.length === 0) {
+    return {
+      exactProgress: null,
+      filledRequired: 0,
+      required: 0,
+    };
+  }
+
+  return {
+    exactProgress: Math.round((filledFields.length / requiredFields.length) * 100),
+    filledRequired: filledFields.length,
+    required: requiredFields.length,
+  };
 }
 
 function questionnaireProgressStatus(
-  progress: number,
+  progress: number | null,
+  hasStarted: boolean,
 ): QuestionnaireSectionDetail["status"] {
-  if (progress >= 100) return "done";
-  if (progress > 0) return "in_progress";
+  if (progress !== null && progress >= 100) return "done";
+  if (hasStarted || (progress !== null && progress > 0)) return "in_progress";
   return "pending";
 }
 
@@ -272,22 +324,33 @@ function buildQuestionnaireSections(
         )
         .map((section) => ({ applicant, section })),
     );
-    let progress = 0;
-    if (allApplicantsComplete) {
-      progress = 100;
-    } else if (relevantSections.length > 0) {
-      progress = Math.round(
-        relevantSections.reduce(
-          (sum, candidate) =>
-            sum +
-            questionnaireSectionCandidateProgress(
-              candidate.section,
-              blueprint.fieldIds,
-            ),
-          0,
-        ) / relevantSections.length,
-      );
-    }
+    const candidateStats = relevantSections.map((candidate) => ({
+      ...candidate,
+      stats: questionnaireSectionCandidateStats(candidate.section, blueprint.fieldIds),
+    }));
+    const progressIsExact = candidateStats.every(
+      (candidate) => candidate.stats.exactProgress !== null,
+    );
+    const totalRequired = candidateStats.reduce(
+      (sum, candidate) => sum + candidate.stats.required,
+      0,
+    );
+    const totalFilledRequired = candidateStats.reduce(
+      (sum, candidate) => sum + candidate.stats.filledRequired,
+      0,
+    );
+    const progress = allApplicantsComplete
+      ? 100
+      : progressIsExact && totalRequired > 0
+        ? Math.round((totalFilledRequired / totalRequired) * 100)
+        : progressIsExact && candidateStats.length > 0
+          ? Math.round(
+              candidateStats.reduce(
+                (sum, candidate) => sum + (candidate.stats.exactProgress ?? 0),
+                0,
+              ) / candidateStats.length,
+            )
+          : null;
     const remainingFieldCount = allApplicantsComplete
       ? 0
       : relevantSections.reduce((sum, candidate) => {
@@ -307,22 +370,50 @@ function buildQuestionnaireSections(
     const targetCandidate =
       relevantSections.find(({ section }) => section.status !== "complete") ??
       relevantSections[0];
+    const completedApplicants = submission.applicants.filter((applicant) => {
+      const sections = relevantSections.filter(
+        (candidate) => candidate.applicant.id === applicant.id,
+      );
+      return (
+        sections.length > 0 &&
+        sections.every((candidate) => candidate.section.status === "complete")
+      );
+    }).length;
+    const hasStarted = relevantSections.some(
+      ({ section }) => section.status !== "empty",
+    );
 
     return {
       Icon: blueprint.Icon,
+      completedApplicants,
       progress,
       remaining:
         remainingFieldCount > 0 ? remainingFieldsLabel(remainingFieldCount) : undefined,
-      status: questionnaireProgressStatus(progress),
+      status: questionnaireProgressStatus(progress, hasStarted),
       target: targetCandidate
         ? {
             applicantId: targetCandidate.applicant.id,
             section: targetCandidate.section.title,
           }
         : undefined,
+      targetApplicantName:
+        targetCandidate?.section.status === "complete"
+          ? undefined
+          : targetCandidate?.applicant.fullName,
       title: blueprint.title,
+      totalApplicants: submission.applicants.length,
     };
   });
+}
+
+function acceptedFileTypes(fileType: SubmissionFileType) {
+  return fileType === "passport_scan"
+    ? "image/jpeg,image/png,image/webp,application/pdf"
+    : "image/jpeg,image/png,image/webp";
+}
+
+function uploadTargetKey(applicantId: string, fileType: SubmissionFileType) {
+  return `${applicantId}:${fileType}`;
 }
 
 function drawerTab(activeTab: DrawerTab | undefined): TabId {
@@ -358,14 +449,12 @@ function historyEventBorderClass(tone: string) {
   return "border-white/10";
 }
 
-function primaryButtonToneClass(action: SubmissionAction) {
-  if (action === "submit_corrections") {
-    return "bg-orange-500 hover:bg-orange-600 shadow-[0_0_20px_rgba(249,115,22,0.2)]";
+function primaryIntentToneClass(intent: DrawerActionIntent) {
+  if (intent.kind === "submission" && intent.action === "submit_corrections") {
+    return "is-warning";
   }
-  if (action === "submit_for_review" || action === "open_history") {
-    return "bg-[#3a45b4] hover:bg-[#4855d4] shadow-[0_0_20px_rgba(58,69,180,0.3)]";
-  }
-  return "bg-white/10 hover:bg-white/15";
+  if (intent.kind === "wait") return "is-waiting";
+  return "is-primary";
 }
 
 type StatusBadgePresentation = {
@@ -427,18 +516,26 @@ const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
 };
 
 const OverviewTab = ({
+  canEdit,
   data,
+  onOpenQuestionnaire,
+  onSelectUploadTarget,
   submission,
+  uploadingTargetKey,
 }: {
+  canEdit: boolean;
   data: SubmissionDetail;
+  onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
+  onSelectUploadTarget: (applicantId: string, fileType: SubmissionFileType) => void;
   submission: Submission;
+  uploadingTargetKey: string | null;
 }) => {
   const packageItems = documentPackageItems(submission);
   const readyFilesCount = packageItems.filter((item) => item.status === "done").length;
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="v19-agent-drawer-overview-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
         <section
           aria-labelledby="submission-drawer-route-title"
           className="v19-submission-drawer-card bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors"
@@ -484,21 +581,49 @@ const OverviewTab = ({
               {readyFilesCount}/{packageItems.length}
             </span>
           </div>
-          <div className="space-y-3 flex-1 flex flex-col justify-center">
-            {packageItems.map((doc) => (
-              <div key={doc.label} className="flex items-center gap-3">
-                {doc.status === "done" ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full border border-white/20" />
-                )}
-                <span
-                  className={`text-[13px] ${doc.status === "done" ? "text-white/70" : "text-white"}`}
+          <div className="v19-agent-drawer-document-list">
+            {packageItems.map((doc) => {
+              const targetKey = uploadTargetKey(doc.applicantId, doc.fileType);
+              const isUploading = uploadingTargetKey === targetKey;
+              const content = (
+                <>
+                  {doc.status === "done" ? (
+                    <CheckCircle2 aria-hidden="true" className="w-4 h-4" />
+                  ) : isUploading ? (
+                    <LoaderCircle aria-hidden="true" className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <UploadCloud aria-hidden="true" className="w-4 h-4" />
+                  )}
+                  <span>{doc.label}</span>
+                  {doc.status === "pending" && canEdit ? (
+                    <span className="v19-agent-drawer-document-action">
+                      {isUploading ? "Загрузка…" : "Загрузить"}
+                    </span>
+                  ) : null}
+                </>
+              );
+
+              return doc.status === "pending" && canEdit ? (
+                <button
+                  {...agentInteractionProps("drawer.upload-file")}
+                  aria-busy={isUploading}
+                  className="v19-agent-drawer-document-row is-actionable"
+                  disabled={Boolean(uploadingTargetKey)}
+                  key={targetKey}
+                  type="button"
+                  onClick={() => onSelectUploadTarget(doc.applicantId, doc.fileType)}
                 >
-                  {doc.label}
-                </span>
-              </div>
-            ))}
+                  {content}
+                </button>
+              ) : (
+                <div
+                  className="v19-agent-drawer-document-row is-complete"
+                  key={targetKey}
+                >
+                  {content}
+                </div>
+              );
+            })}
           </div>
         </section>
       </div>
@@ -515,28 +640,31 @@ const OverviewTab = ({
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data.applicants.map((applicant) => (
-            <article
-              key={applicant.name}
-              className="v19-submission-drawer-card flex items-center p-3 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-xl transition-all group"
+            <button
+              {...agentInteractionProps("drawer.open-questionnaire")}
+              aria-label={`Открыть анкету: ${applicant.name}`}
+              key={applicant.id}
+              className="v19-submission-drawer-card v19-agent-drawer-applicant"
+              type="button"
+              onClick={() => onOpenQuestionnaire({ applicantId: applicant.id })}
             >
               <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
                 {applicantInitials(applicant.name)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[14px] text-white font-medium truncate group-hover:text-[#8fa3ff] transition-colors">
+                <div className="text-[14px] text-white font-medium truncate">
                   {applicant.name}
                 </div>
                 <div className="text-[11px] text-white/50 mt-0.5">{applicant.role}</div>
               </div>
               <div className="text-right">
                 <div className="text-[12px] font-mono font-medium text-emerald-400">
-                  {applicant.completeness}%
+                  {applicant.completedSections}/{applicant.sectionsCount}
                 </div>
-                <div className="text-[10px] text-white/40 mt-0.5">
-                  готовность анкеты
-                </div>
+                <div className="text-[11px] text-white/50 mt-0.5">разделов готово</div>
               </div>
-            </article>
+              <ArrowRight aria-hidden="true" className="w-4 h-4 ml-3" />
+            </button>
           ))}
         </div>
       </section>
@@ -556,7 +684,7 @@ const QuestionnaireTab = ({
     submission.status,
   );
   const remainingBlockCount = sections.filter(
-    (section) => section.progress < 100,
+    (section) => section.status !== "done",
   ).length;
   const remainingBlockLabel = remainingBlocksLabel(remainingBlockCount);
 
@@ -566,7 +694,7 @@ const QuestionnaireTab = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="v19-agent-drawer-section-heading">
         <div>
           <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
           <p className="text-[12px] text-white/50 mt-1">
@@ -577,7 +705,7 @@ const QuestionnaireTab = ({
         <button
           {...agentInteractionProps("drawer.open-questionnaire")}
           onClick={() => onOpenQuestionnaire()}
-          className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
+          className="v19-agent-drawer-section-primary"
           type="button"
         >
           {questionnairePresentation.canEdit ? (
@@ -591,18 +719,19 @@ const QuestionnaireTab = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {sections.map((section) => (
-          <div
+          <button
             {...agentInteractionProps("drawer.open-questionnaire")}
+            aria-label={`${section.title}: ${
+              section.targetApplicantName
+                ? `следующий заявитель ${section.targetApplicantName}`
+                : section.status === "done"
+                  ? "готово"
+                  : "открыть раздел"
+            }`}
             key={section.title}
-            className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
-            role="button"
-            tabIndex={0}
+            className="v19-agent-drawer-questionnaire-card"
+            type="button"
             onClick={() => openSection(section.target)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              openSection(section.target);
-            }}
           >
             <div
               className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border
@@ -616,23 +745,34 @@ const QuestionnaireTab = ({
                   {section.title}
                 </span>
                 <span className="text-[11px] font-mono text-white/50">
-                  {section.progress}%
+                  {section.progress !== null
+                    ? `${section.progress}%`
+                    : section.status === "in_progress"
+                      ? "В процессе"
+                      : "Не начато"}
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  aria-hidden="true"
-                  className={`h-full rounded-full ${questionnaireSectionProgressClass(section.status)}`}
-                  style={{ width: `${section.progress}%` }}
-                />
-              </div>
-              {section.remaining ? (
-                <div className="text-[10px] text-white/40 mt-1.5">
-                  Осталось: {section.remaining}
+              {section.progress !== null ? (
+                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    aria-hidden="true"
+                    className={`h-full rounded-full ${questionnaireSectionProgressClass(section.status)}`}
+                    style={{ width: `${section.progress}%` }}
+                  />
                 </div>
               ) : null}
+              <div className="v19-agent-drawer-questionnaire-meta">
+                <span>
+                  {section.completedApplicants}/{section.totalApplicants} заявителей
+                </span>
+                {section.targetApplicantName ? (
+                  <span>{section.targetApplicantName}</span>
+                ) : null}
+                {section.remaining ? <span>Осталось: {section.remaining}</span> : null}
+              </div>
             </div>
-          </div>
+            <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
+          </button>
         ))}
       </div>
     </div>
@@ -651,7 +791,7 @@ function issueTargetLabel(issue: Issue) {
 
 function issueBadgeLabel(issue: Issue) {
   if (issue.status === "fixed_by_agent") return "Исправлено";
-  if (issue.severity === "blocker") return "Blocker";
+  if (issue.severity === "blocker") return "Блокирующее";
   return "Замечание";
 }
 
@@ -676,10 +816,15 @@ const IssuesTab = ({
   submission: Submission;
 }) => {
   const [uploadingIssueId, setUploadingIssueId] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState("");
+  const [uploadFeedback, setUploadFeedback] = useState<{
+    issueId: string;
+    message: string;
+    tone: "error" | "success";
+  } | null>(null);
   const uploadingIssueIdsRef = useRef(new Set<string>());
-  const unresolvedIssues = submission.issues.filter(
-    (issue) => issue.status !== "closed_by_admin",
+  const openIssues = submission.issues.filter((issue) => issue.status === "open");
+  const fixedIssues = submission.issues.filter(
+    (issue) => issue.status === "fixed_by_agent",
   );
 
   const uploadIssueFile = async (
@@ -692,7 +837,7 @@ const IssuesTab = ({
     if (uploadingIssueIdsRef.current.size > 0) return;
 
     uploadingIssueIdsRef.current.add(issue.id);
-    setUploadError("");
+    setUploadFeedback(null);
     setUploadingIssueId(issue.id);
     try {
       await onUploadApplicantFile(
@@ -701,155 +846,174 @@ const IssuesTab = ({
         issue.target.fileType,
         file,
       );
+      setUploadFeedback({
+        issueId: issue.id,
+        message: "Файл загружен. Исправление ожидает проверки администратора.",
+        tone: "success",
+      });
     } catch (error) {
-      setUploadError(
-        error instanceof Error ? error.message : "Не удалось загрузить файл.",
-      );
+      setUploadFeedback({
+        issueId: issue.id,
+        message: `${
+          error instanceof Error ? error.message : "Не удалось загрузить файл."
+        } Состояние файла не изменено. Повторите попытку.`,
+        tone: "error",
+      });
     } finally {
       uploadingIssueIdsRef.current.delete(issue.id);
       setUploadingIssueId(null);
     }
   };
 
+  const renderIssue = (issue: Issue) => {
+    const IssueIcon = issue.target.fileType ? ImageIcon : FileText;
+    const issueElementId = targetElementId({
+      issueId: issue.id,
+      tab: "issues",
+    });
+    const uploadInputId = `${issueElementId}-upload`;
+    const uploadStatusId = `${issueElementId}-upload-status`;
+    const canUploadReplacement =
+      canEdit &&
+      Boolean(issue.target.fileType) &&
+      issue.status === "open" &&
+      Boolean(onUploadApplicantFile);
+    const isUploadingThisIssue = uploadingIssueId === issue.id;
+    const feedback = uploadFeedback?.issueId === issue.id ? uploadFeedback : null;
+
+    return (
+      <article
+        aria-labelledby={`${issueElementId}-title`}
+        className={`v19-agent-drawer-issue ${
+          issue.status === "fixed_by_agent" ? "is-fixed" : "is-open"
+        }`}
+        id={issueElementId}
+        key={issue.id}
+        tabIndex={-1}
+      >
+        <div className="v19-agent-drawer-issue-icon">
+          <IssueIcon aria-hidden="true" className="w-5 h-5" />
+        </div>
+        <div className="v19-agent-drawer-issue-copy">
+          <div className="v19-agent-drawer-issue-title-row">
+            <h4 id={`${issueElementId}-title`}>{issue.reason}</h4>
+            <span>{issueBadgeLabel(issue)}</span>
+          </div>
+          <div className="v19-agent-drawer-issue-target">{issueTargetLabel(issue)}</div>
+          <p>{issue.comment || issue.reason}</p>
+          {feedback ? (
+            <p
+              className={`v19-agent-drawer-inline-feedback is-${feedback.tone}`}
+              role={feedback.tone === "error" ? "alert" : "status"}
+            >
+              {feedback.message}
+            </p>
+          ) : null}
+        </div>
+        <div className="v19-agent-drawer-issue-action">
+          <button
+            {...agentInteractionProps(
+              canUploadReplacement ? "drawer.upload-file" : "drawer.open-target",
+            )}
+            aria-busy={isUploadingThisIssue}
+            aria-describedby={isUploadingThisIssue ? uploadStatusId : undefined}
+            disabled={Boolean(uploadingIssueId)}
+            type="button"
+            onClick={() => {
+              if (canUploadReplacement) {
+                document.getElementById(uploadInputId)?.click();
+                return;
+              }
+              onOpenWorkspaceTarget(targetForIssue(issue));
+            }}
+          >
+            {isUploadingThisIssue ? (
+              <>
+                <LoaderCircle aria-hidden="true" className="w-4 h-4 animate-spin" />
+                Загрузка…
+              </>
+            ) : canUploadReplacement ? (
+              issueActionLabel(issue)
+            ) : issue.target.fileType ? (
+              "Открыть файл"
+            ) : (
+              "Открыть анкету"
+            )}
+          </button>
+          <span
+            aria-live="polite"
+            className="sr-only"
+            id={uploadStatusId}
+            role="status"
+          >
+            {isUploadingThisIssue ? "Файл загружается." : ""}
+          </span>
+          {canUploadReplacement && issue.target.fileType ? (
+            <input
+              {...agentInteractionProps("drawer.upload-file")}
+              accept={acceptedFileTypes(issue.target.fileType)}
+              aria-hidden="true"
+              aria-label={`Выбрать файл: ${issueTargetLabel(issue)}`}
+              hidden
+              id={uploadInputId}
+              tabIndex={-1}
+              type="file"
+              onChange={(event) => void uploadIssueFile(issue, event)}
+            />
+          ) : null}
+        </div>
+      </article>
+    );
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-white/5 pb-4">
+    <div className="v19-agent-drawer-issues">
+      <div className="v19-agent-drawer-section-heading">
         <div>
           <h3 className="text-[16px] font-semibold text-white">
-            Список задач по замечаниям
+            Замечания администратора
           </h3>
           <p className="text-[12px] text-white/50 mt-1">
-            Ошибки, выявленные администратором при проверке
+            Исправляйте открытые задачи по одной — готовые останутся в истории проверки.
           </p>
         </div>
         <div
-          className="px-3 py-1 bg-orange-500/10 text-orange-400 rounded-lg text-[12px] font-medium border border-orange-500/20"
+          className="v19-agent-drawer-issue-count"
           data-testid="drawer-open-issues-count"
         >
-          Требуют исправления: {data.openIssuesCount}
+          Открыто: {data.openIssuesCount}
         </div>
       </div>
 
-      {uploadError ? (
-        <p className="text-[12px] text-orange-400" role="alert">
-          {uploadError} Состояние файла не изменено. Повторите попытку.
-        </p>
-      ) : null}
-
-      {unresolvedIssues.length > 0 ? (
-        <div className="space-y-4">
-          {unresolvedIssues.map((issue) => {
-            const IssueIcon = issue.target.fileType ? ImageIcon : FileText;
-            const issueElementId = targetElementId({
-              issueId: issue.id,
-              tab: "issues",
-            });
-            const uploadInputId = `${issueElementId}-upload`;
-            const uploadStatusId = `${issueElementId}-upload-status`;
-            const canUploadReplacement =
-              canEdit &&
-              Boolean(issue.target.fileType) &&
-              issue.status !== "fixed_by_agent" &&
-              Boolean(onUploadApplicantFile);
-            const isUploadingThisIssue = uploadingIssueId === issue.id;
-
-            return (
-              <div
-                id={issueElementId}
-                key={issue.id}
-                className="p-4 bg-[#1a1a1d] border border-orange-500/20 rounded-xl relative overflow-hidden flex flex-col sm:flex-row gap-4"
-              >
-                <div className="absolute top-0 left-0 w-1 h-full bg-orange-500" />
-                <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
-                  <IssueIcon className="w-5 h-5 text-orange-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="text-[14px] font-semibold text-white">
-                      {issue.reason}
-                    </h4>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400 font-medium">
-                      {issueBadgeLabel(issue)}
-                    </span>
-                  </div>
-                  <div className="text-[11px] font-medium text-orange-400/80 uppercase tracking-wider mb-2">
-                    {issueTargetLabel(issue)}
-                  </div>
-                  <p className="text-[13px] text-white/60 leading-relaxed max-w-xl">
-                    {issue.comment || issue.reason}
-                  </p>
-                </div>
-                <div className="sm:w-[180px] shrink-0 flex items-center">
-                  <button
-                    {...agentInteractionProps(
-                      canUploadReplacement
-                        ? "drawer.upload-file"
-                        : "drawer.open-target",
-                    )}
-                    aria-busy={isUploadingThisIssue}
-                    aria-describedby={isUploadingThisIssue ? uploadStatusId : undefined}
-                    disabled={Boolean(uploadingIssueId)}
-                    onClick={() => {
-                      if (canUploadReplacement) {
-                        document.getElementById(uploadInputId)?.click();
-                        return;
-                      }
-                      onOpenWorkspaceTarget(targetForIssue(issue));
-                    }}
-                    className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[13px] font-medium text-white transition-colors"
-                    type="button"
-                  >
-                    {isUploadingThisIssue
-                      ? "Загрузка…"
-                      : canUploadReplacement
-                        ? issueActionLabel(issue)
-                        : issue.target.fileType
-                          ? "Открыть файл"
-                          : "Открыть анкету"}
-                  </button>
-                  <span
-                    aria-live="polite"
-                    className="sr-only"
-                    id={uploadStatusId}
-                    role="status"
-                  >
-                    {isUploadingThisIssue ? "Файл загружается." : ""}
-                  </span>
-                  {canUploadReplacement ? (
-                    <input
-                      {...agentInteractionProps("drawer.upload-file")}
-                      accept={
-                        issue.target.fileType === "passport_scan"
-                          ? "image/jpeg,image/png,image/webp,application/pdf"
-                          : "image/jpeg,image/png,image/webp"
-                      }
-                      aria-hidden="true"
-                      aria-label={`Выбрать файл: ${issueTargetLabel(issue)}`}
-                      hidden
-                      id={uploadInputId}
-                      tabIndex={-1}
-                      type="file"
-                      onChange={(event) => void uploadIssueFile(issue, event)}
-                    />
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/20">
-            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+      {openIssues.length > 0 ? (
+        <section aria-labelledby="drawer-open-issues-title">
+          <div className="v19-agent-drawer-issue-group-heading">
+            <h4 id="drawer-open-issues-title">Нужно исправить</h4>
+            <span>{openIssues.length}</span>
           </div>
-          <h4 className="text-[16px] font-semibold text-white mb-2">
-            Ошибок не найдено
-          </h4>
-          <p className="text-[13px] text-white/50 max-w-sm">
-            Все данные проверены администратором. Замечаний к анкете и документам нет.
-          </p>
+          <div className="v19-agent-drawer-issue-list">
+            {openIssues.map(renderIssue)}
+          </div>
+        </section>
+      ) : (
+        <div className="v19-agent-drawer-empty is-compact" role="status">
+          <CheckCircle2 className="w-7 h-7" />
+          <h4>Открытых замечаний нет</h4>
+          <p>Все доступные исправления уже выполнены.</p>
         </div>
       )}
+
+      {fixedIssues.length > 0 ? (
+        <section aria-labelledby="drawer-fixed-issues-title">
+          <div className="v19-agent-drawer-issue-group-heading is-fixed">
+            <h4 id="drawer-fixed-issues-title">Исправлено, ждёт проверки</h4>
+            <span>{fixedIssues.length}</span>
+          </div>
+          <div className="v19-agent-drawer-issue-list">
+            {fixedIssues.map(renderIssue)}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 };
@@ -921,7 +1085,7 @@ const drawerTabs: Array<{
   { id: "overview", label: "Обзор" },
   { id: "questionnaire", label: "Анкета" },
   {
-    getCount: (data) => data.issuesCount,
+    getCount: (data) => data.openIssuesCount,
     id: "issues",
     isWarning: true,
     label: "Замечания",
@@ -948,22 +1112,11 @@ function footerActionLabel(
 }
 
 function ownerLabel(status: SubmissionStatus, owner: "agent" | "admin" | "system") {
-  if (status === "exported") return "Нет";
+  if (status === "exported") return "Завершено";
   if (owner === "agent") return "Агент";
   if (owner === "admin") return "Администратор";
   return "Система";
 }
-
-const primaryActionInteractionByStatus = {
-  corrections_received: "drawer.open-history",
-  draft: "drawer.save-progress",
-  exported: "drawer.open-history",
-  in_progress: "drawer.submit-review",
-  ready_for_export: "drawer.open-history",
-  requires_action: "drawer.submit-corrections",
-  returned: "drawer.submit-corrections",
-  submitted_for_review: "drawer.open-history",
-} satisfies Record<SubmissionStatus, AgentInteractionId>;
 
 const footerInstructions = {
   draft: "Сохраните текущий прогресс, чтобы продолжить позже.",
@@ -977,6 +1130,55 @@ const footerInstructions = {
 } satisfies Record<SubmissionStatus, string>;
 
 const footerInstructionId = "submission-drawer-primary-action-notice";
+
+function interactionForIntent(intent: DrawerActionIntent): AgentInteractionId {
+  if (intent.kind === "history") return "drawer.open-history";
+  if (intent.kind === "navigate") {
+    return intent.target.tab === "questionnaire"
+      ? "drawer.open-questionnaire"
+      : "drawer.open-target";
+  }
+  if (intent.kind === "upload") return "drawer.upload-file";
+  if (intent.kind === "submission") {
+    if (intent.action === "save_progress") return "drawer.save-progress";
+    if (intent.action === "submit_corrections") {
+      return "drawer.submit-corrections";
+    }
+    return "drawer.submit-review";
+  }
+  return "drawer.open-target";
+}
+
+function pendingLabelForIntent(intent: DrawerActionIntent) {
+  if (intent.kind === "upload") return "Загрузка…";
+  if (intent.kind === "submission" && intent.action === "save_progress") {
+    return "Начинаем…";
+  }
+  if (intent.kind === "submission") return "Отправляем…";
+  return "Выполняем…";
+}
+
+function PrimaryIntentIcon({
+  intent,
+  pending,
+}: {
+  intent: DrawerActionIntent;
+  pending: boolean;
+}) {
+  if (pending) {
+    return <LoaderCircle aria-hidden="true" className="w-4 h-4 animate-spin" />;
+  }
+  if (
+    intent.kind === "upload" ||
+    (intent.kind === "submission" && intent.action === "submit_corrections")
+  ) {
+    return <UploadCloud aria-hidden="true" className="w-4 h-4" />;
+  }
+  if (intent.kind === "submission" && intent.action === "submit_for_review") {
+    return <CheckCircle2 aria-hidden="true" className="w-4 h-4" />;
+  }
+  return <ArrowRight aria-hidden="true" className="w-4 h-4" />;
+}
 
 export function Drawer({
   activeTab: requestedTab = "overview",
@@ -994,18 +1196,28 @@ export function Drawer({
   const [actionError, setActionError] = useState("");
   const [actionAnnouncement, setActionAnnouncement] = useState("");
   const [actionPending, setActionPending] = useState(false);
+  const [contextExpanded, setContextExpanded] = useState(false);
   const [missingTargetMessage, setMissingTargetMessage] = useState("");
   const [reviewConfirmationOpen, setReviewConfirmationOpen] = useState(false);
+  const [selectedUploadTarget, setSelectedUploadTarget] = useState<{
+    applicantId: string;
+    fileType: SubmissionFileType;
+    label: string;
+  } | null>(null);
   const actionRequestIdRef = useRef(0);
   const actionPendingRef = useRef(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const primaryUploadInputRef = useRef<HTMLInputElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const reviewConfirmationTriggerRef = useRef<HTMLButtonElement>(null);
+  const reviewConfirmationOpenRef = useRef(false);
+  const scrollSubmissionIdRef = useRef(submission.id);
   const tabScrollPositionsRef = useRef(new Map<TabId, number>());
   const isDesktop = useDrawerDesktopQuery();
   const prefersReducedMotion = useReducedMotion();
   const shouldReduceMotion = Boolean(prefersReducedMotion);
+  reviewConfirmationOpenRef.current = reviewConfirmationOpen;
   const panelInitial = shouldReduceMotion
     ? { opacity: 1, x: 0, y: 0 }
     : {
@@ -1044,27 +1256,103 @@ export function Drawer({
   const questionnairePresentation = agentQuestionnaireStatusPresentation(
     submission.status,
   );
-  const primaryLabel = footerActionLabel(
-    primaryAction.action,
-    primaryAction.label,
-    submission.status,
-  );
+  const packageItems = documentPackageItems(submission);
+  const firstMissingMedia = packageItems.find((item) => item.status === "pending");
+  const canEditSubmission = canAgentEditSubmission(submission);
+  let primaryIntent: DrawerActionIntent;
+  if (submission.status === "draft") {
+    primaryIntent = {
+      action: primaryAction.action,
+      kind: "submission",
+      label: footerActionLabel(
+        primaryAction.action,
+        primaryAction.label,
+        submission.status,
+      ),
+      reason: primaryAction.reason,
+    };
+  } else if (!canEditSubmission) {
+    primaryIntent = {
+      kind: "history",
+      label: "Открыть историю",
+    };
+  } else if (nextStepBrief.primaryAction.kind === "wait") {
+    primaryIntent = {
+      kind: "wait",
+      label: nextStepBrief.primaryAction.label,
+      reason:
+        nextStepBrief.primaryAction.reason ?? "Дождитесь завершения текущей операции.",
+    };
+  } else if (nextStepTarget?.tab === "files") {
+    const uploadTargetLabel =
+      packageItems.find(
+        (item) =>
+          item.applicantId === nextStepTarget.applicantId &&
+          item.fileType === nextStepTarget.fileType,
+      )?.label ?? fileLabel(nextStepTarget.fileType);
+    primaryIntent = {
+      applicantId: nextStepTarget.applicantId,
+      fileType: nextStepTarget.fileType,
+      kind: "upload",
+      label: `Загрузить: ${uploadTargetLabel}`,
+    };
+  } else if (nextStepTarget) {
+    primaryIntent = {
+      kind: "navigate",
+      label: nextStepLabel,
+      target: nextStepTarget,
+    };
+  } else if (primaryAction.disabled && firstMissingMedia) {
+    primaryIntent = {
+      applicantId: firstMissingMedia.applicantId,
+      fileType: firstMissingMedia.fileType,
+      kind: "upload",
+      label: `Загрузить: ${firstMissingMedia.label}`,
+    };
+  } else if (!primaryAction.disabled && primaryAction.action !== "open_history") {
+    primaryIntent = {
+      action: primaryAction.action,
+      kind: "submission",
+      label: footerActionLabel(
+        primaryAction.action,
+        primaryAction.label,
+        submission.status,
+      ),
+      reason: primaryAction.reason,
+    };
+  } else if (primaryAction.action === "open_history") {
+    primaryIntent = {
+      kind: "history",
+      label: "Открыть историю",
+    };
+  } else {
+    primaryIntent = {
+      kind: "wait",
+      label: "Проверьте готовность подачи",
+      reason:
+        primaryAction.reason ??
+        nextStepBrief.primaryAction.reason ??
+        nextStepBrief.blockers[0] ??
+        "Для продолжения требуется проверить данные подачи.",
+    };
+  }
   const blockerReason =
-    primaryAction.reason ??
     nextStepBrief.primaryAction.reason ??
+    primaryAction.reason ??
     nextStepBrief.blockers[0];
   const footerActionNotice =
-    actionError || (primaryAction.disabled ? primaryAction.reason : "");
-  const footerInstruction = footerActionNotice || footerInstructions[data.status];
+    actionError || (primaryIntent.kind === "wait" ? primaryIntent.reason : "");
+  const footerInstruction =
+    footerActionNotice || actionAnnouncement || footerInstructions[data.status];
   let footerInstructionToneClassName = "text-white/40";
-  if (footerActionNotice) {
+  if (footerActionNotice || actionAnnouncement) {
     footerInstructionToneClassName = "text-white/70";
   }
   if (actionError) {
     footerInstructionToneClassName = "text-orange-400";
   }
   let footerInstructionRole: "alert" | "status" | undefined;
-  if (footerActionNotice) {
+  if (footerActionNotice || actionAnnouncement) {
     footerInstructionRole = "status";
   }
   if (actionError) {
@@ -1072,19 +1360,34 @@ export function Drawer({
   }
   const footerInstructionClassName = [
     "text-[12px]",
-    footerActionNotice ? "block" : "hidden sm:block",
+    footerActionNotice || actionAnnouncement ? "block" : "hidden sm:block",
     footerInstructionToneClassName,
   ].join(" ");
-  const primaryButtonClassName = primaryButtonToneClass(primaryAction.action);
+  const primaryButtonClassName = primaryIntentToneClass(primaryIntent);
+  const primaryIntentDisabled = actionPending || primaryIntent.kind === "wait";
+  const primaryIntentLabel = actionPending
+    ? pendingLabelForIntent(primaryIntent)
+    : primaryIntent.label;
+  const primaryIntentInteraction = interactionForIntent(primaryIntent);
+  const uploadingTargetKey =
+    actionPending && selectedUploadTarget
+      ? uploadTargetKey(selectedUploadTarget.applicantId, selectedUploadTarget.fileType)
+      : null;
 
   useEffect(() => {
+    if (scrollSubmissionIdRef.current !== submission.id) {
+      tabScrollPositionsRef.current.clear();
+      scrollSubmissionIdRef.current = submission.id;
+    }
     actionRequestIdRef.current += 1;
     actionPendingRef.current = false;
     setActionError("");
     setActionAnnouncement("");
     setActionPending(false);
+    setContextExpanded(false);
     setMissingTargetMessage("");
     setReviewConfirmationOpen(false);
+    setSelectedUploadTarget(null);
     if (isOpen) setActiveTab(drawerTab(requestedTab));
 
     return () => {
@@ -1109,24 +1412,48 @@ export function Drawer({
     if (!isOpen || focusTarget?.tab !== "issues") return;
 
     setActiveTab("issues");
-    const timer = window.setTimeout(() => {
+  }, [focusTarget, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== "issues" || focusTarget?.tab !== "issues") {
+      return;
+    }
+
+    let cancelled = false;
+    let frame = 0;
+    let attempt = 0;
+    const focusRequestedTarget = () => {
+      if (cancelled) return;
       const target = document.getElementById(targetElementId(focusTarget));
       if (target) {
         target.scrollIntoView({
           behavior: shouldReduceMotion ? "auto" : "smooth",
           block: "center",
         });
+        target.focus({ preventScroll: true });
         setMissingTargetMessage("");
-      } else {
-        setMissingTargetMessage(
-          "Точный объект замечания не найден. Откройте список замечаний и выберите доступную задачу.",
-        );
+        onClearFocusTarget?.();
+        return;
       }
-      onClearFocusTarget?.();
-    }, 0);
 
-    return () => window.clearTimeout(timer);
-  }, [focusTarget, isOpen, onClearFocusTarget, shouldReduceMotion]);
+      if (attempt < 20) {
+        attempt += 1;
+        frame = window.requestAnimationFrame(focusRequestedTarget);
+        return;
+      }
+
+      setMissingTargetMessage(
+        "Точный объект замечания не найден. Откройте список замечаний и выберите доступную задачу.",
+      );
+      onClearFocusTarget?.();
+    };
+    frame = window.requestAnimationFrame(focusRequestedTarget);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [activeTab, focusTarget, isOpen, onClearFocusTarget, shouldReduceMotion]);
 
   function selectTab(nextTab: TabId) {
     if (bodyRef.current) {
@@ -1142,7 +1469,7 @@ export function Drawer({
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !reviewConfirmationOpenRef.current) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     document.body.style.overflow = "hidden";
@@ -1203,7 +1530,11 @@ export function Drawer({
     });
   }
 
-  async function runAction(action: SubmissionAction, successMessage: string) {
+  async function runPendingOperation(
+    operation: () => void | Promise<unknown>,
+    successMessage: string,
+    errorMessage = "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
+  ) {
     if (actionPendingRef.current) return false;
     const requestId = ++actionRequestIdRef.current;
     setActionPending(true);
@@ -1211,15 +1542,13 @@ export function Drawer({
     setActionError("");
     setActionAnnouncement("");
     try {
-      await onAction(action);
+      await operation();
       if (requestId !== actionRequestIdRef.current) return false;
       setActionAnnouncement(successMessage);
       return true;
     } catch {
       if (requestId !== actionRequestIdRef.current) return false;
-      setActionError(
-        "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
-      );
+      setActionError(errorMessage);
       return false;
     } finally {
       if (requestId === actionRequestIdRef.current) {
@@ -1229,15 +1558,62 @@ export function Drawer({
     }
   }
 
-  async function handlePrimaryAction() {
-    if (primaryAction.disabled || actionPendingRef.current) return;
-    if (primaryAction.action === "open_history") {
-      selectTab("history");
+  async function runAction(action: SubmissionAction, successMessage: string) {
+    return runPendingOperation(() => onAction(action), successMessage);
+  }
+
+  function selectUploadTarget(
+    applicantId: string,
+    fileType: SubmissionFileType,
+    label = `Загрузить ${fileLabel(fileType)}`,
+  ) {
+    if (!onUploadApplicantFile || actionPendingRef.current) return;
+    setActionError("");
+    setActionAnnouncement("");
+    setSelectedUploadTarget({ applicantId, fileType, label });
+    window.requestAnimationFrame(() => primaryUploadInputRef.current?.click());
+  }
+
+  async function uploadSelectedTarget(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    const target = selectedUploadTarget;
+    if (!file || !target || !onUploadApplicantFile) {
+      setSelectedUploadTarget(null);
       return;
     }
 
+    await runPendingOperation(
+      () =>
+        onUploadApplicantFile(submission.id, target.applicantId, target.fileType, file),
+      `${fileLabel(target.fileType)} загружен. Готовность подачи обновлена.`,
+      "Не удалось загрузить файл. Состояние подачи не изменено. Повторите попытку.",
+    );
+    setSelectedUploadTarget(null);
+  }
+
+  async function handlePrimaryIntent() {
+    if (primaryIntentDisabled || actionPendingRef.current) return;
+    if (primaryIntent.kind === "history") {
+      selectTab("history");
+      return;
+    }
+    if (primaryIntent.kind === "navigate") {
+      onOpenWorkspaceTarget(primaryIntent.target);
+      return;
+    }
+    if (primaryIntent.kind === "upload") {
+      selectUploadTarget(
+        primaryIntent.applicantId,
+        primaryIntent.fileType,
+        primaryIntent.label,
+      );
+      return;
+    }
+    if (primaryIntent.kind !== "submission") return;
+
     await runAction(
-      primaryAction.action,
+      primaryIntent.action,
       "Действие выполнено. Статус подачи обновлён.",
     );
   }
@@ -1258,6 +1634,12 @@ export function Drawer({
       const focusTarget = reviewConfirmationTriggerRef.current ?? dialogRef.current;
       focusTarget?.focus({ preventScroll: true });
     });
+  }
+
+  function openReviewConfirmation(trigger: React.MouseEvent<HTMLButtonElement>) {
+    reviewConfirmationTriggerRef.current = trigger.currentTarget;
+    setActionError("");
+    setReviewConfirmationOpen(true);
   }
 
   return (
@@ -1284,9 +1666,7 @@ export function Drawer({
             aria-hidden={reviewConfirmationOpen || undefined}
             aria-modal="true"
             animate={{ opacity: 1, x: 0, y: 0 }}
-            className="v19-submission-drawer v19-agent-drawer fixed z-50 flex flex-col bg-[#111113] border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.6)]
-              lg:inset-y-2 lg:right-2 lg:left-auto lg:w-[840px] lg:rounded-2xl lg:border lg:overflow-hidden
-              inset-x-0 bottom-0 top-12 rounded-t-[28px] border-t border-x overflow-y-auto"
+            className="v19-submission-drawer v19-agent-drawer fixed z-50 flex flex-col"
             exit={panelExit}
             initial={panelInitial}
             data-v19-linear-drawer="true"
@@ -1297,74 +1677,133 @@ export function Drawer({
             transition={panelTransition}
             onKeyDown={handleDialogKeyDown}
           >
-            <div className="lg:hidden sticky top-0 z-30 w-full flex items-center justify-center py-3 bg-[#111113]/90 backdrop-blur-md">
-              <div className="w-12 h-1.5 rounded-full bg-white/20" />
-            </div>
-
-            <header className="v19-submission-drawer-header px-5 lg:px-8 pt-4 pb-0 bg-[#111113]/95 backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-white/5">
+            <header className="v19-submission-drawer-header">
               <div
-                className="flex items-start justify-between gap-4 mb-6"
+                className="v19-agent-drawer-heading"
                 data-testid="drawer-lifecycle-context"
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[11px] lg:text-xs text-white/50 mb-2">
+                <div className="v19-agent-drawer-titlecopy">
+                  <div className="v19-agent-drawer-eyebrow">
                     <span className="font-mono font-medium tracking-wider text-white/70">
                       {data.id}
                     </span>
-                    <span className="w-1 h-1 rounded-full bg-white/20" />
+                    <span aria-hidden="true">•</span>
                     <span className="uppercase tracking-wider">
                       {data.type === "family" ? "Семейная" : "Индивидуальная"}
                     </span>
                   </div>
-                  <h2
-                    className="text-[24px] font-semibold text-white leading-tight tracking-tight mb-4"
-                    id="submission-drawer-heading"
-                  >
-                    {data.title}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 id="submission-drawer-heading">{data.title}</h2>
+                  <div className="v19-agent-drawer-status-row">
                     <StatusBadge status={data.status} />
-                    <span
-                      className="text-[12px] text-white/40 flex items-center gap-1.5"
-                      data-testid="drawer-updated-at"
-                    >
-                      <Clock className="w-3 h-3" /> Обновлено {data.updated}
+                    <span data-testid="drawer-updated-at">
+                      <Clock aria-hidden="true" className="w-3.5 h-3.5" />
+                      Обновлено {data.updated}
                     </span>
                   </div>
-                  <dl
-                    aria-label="Следующий шаг по подаче"
-                    className="v19-agent-drawer-context"
-                    data-testid="drawer-next-step-context"
-                  >
-                    <div>
-                      <dt>Следующий owner</dt>
-                      <dd data-testid="drawer-next-owner">
-                        {ownerLabel(submission.status, nextStepBrief.owner)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Следующий шаг</dt>
-                      <dd data-testid="drawer-next-step">{nextStepLabel}</dd>
-                    </div>
-                    <div className={blockerReason ? "is-blocked" : "is-clear"}>
-                      <dt>Готовность</dt>
-                      <dd data-testid="drawer-blocker-reason">
-                        {blockerReason ?? "Канонических блокеров нет"}
-                      </dd>
-                    </div>
-                  </dl>
                 </div>
 
                 <button
                   {...agentInteractionProps("drawer.close")}
-                  aria-label="Закрыть"
-                  className="hidden lg:flex w-10 h-10 items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10"
+                  aria-label="Закрыть подачу"
+                  className="v19-agent-drawer-close"
                   type="button"
                   onClick={onClose}
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              <section
+                aria-label="Следующий шаг по подаче"
+                className={`v19-agent-drawer-action-card ${
+                  blockerReason ? "is-blocked" : "is-clear"
+                }`}
+                data-testid="drawer-next-step-context"
+              >
+                <div className="v19-agent-drawer-action-copy">
+                  <span>Что сделать сейчас</span>
+                  <strong data-testid="drawer-next-step">{primaryIntent.label}</strong>
+                </div>
+
+                {!isDesktop ? (
+                  <button
+                    {...agentInteractionProps("drawer.toggle-context")}
+                    aria-expanded={contextExpanded}
+                    className="v19-agent-drawer-context-toggle"
+                    type="button"
+                    onClick={() => setContextExpanded((expanded) => !expanded)}
+                  >
+                    Подробнее
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={contextExpanded ? "is-expanded" : undefined}
+                    />
+                  </button>
+                ) : null}
+
+                <dl
+                  className="v19-agent-drawer-context"
+                  hidden={!isDesktop && !contextExpanded}
+                >
+                  <div>
+                    <dt>Ответственный сейчас</dt>
+                    <dd data-testid="drawer-next-owner">
+                      {ownerLabel(submission.status, nextStepBrief.owner)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{blockerReason ? "Что мешает" : "Готовность"}</dt>
+                    <dd data-testid="drawer-blocker-reason">
+                      {blockerReason ?? "Можно переходить к следующему действию"}
+                    </dd>
+                  </div>
+                </dl>
+
+                {isDesktop ? (
+                  <div className="v19-agent-drawer-action-controls">
+                    {submission.status === "ready_for_export" ? (
+                      <button
+                        {...agentInteractionProps("drawer.open-return-review")}
+                        className="v19-agent-drawer-return-review"
+                        disabled={actionPending}
+                        type="button"
+                        onClick={openReviewConfirmation}
+                      >
+                        Вернуть на проверку
+                      </button>
+                    ) : null}
+                    <button
+                      {...agentInteractionProps(primaryIntentInteraction)}
+                      aria-busy={actionPending}
+                      aria-describedby={
+                        footerActionNotice ? footerInstructionId : undefined
+                      }
+                      className={`v19-agent-drawer-primary ${primaryButtonClassName}`}
+                      disabled={primaryIntentDisabled}
+                      type="button"
+                      onClick={() => void handlePrimaryIntent()}
+                    >
+                      <PrimaryIntentIcon
+                        intent={primaryIntent}
+                        pending={actionPending}
+                      />
+                      {primaryIntentLabel}
+                    </button>
+                  </div>
+                ) : null}
+
+                {isDesktop && (actionError || actionAnnouncement) ? (
+                  <p
+                    className={`v19-agent-drawer-inline-feedback ${
+                      actionError ? "is-error" : "is-success"
+                    }`}
+                    id={footerInstructionId}
+                    role={actionError ? "alert" : "status"}
+                  >
+                    {actionError || actionAnnouncement}
+                  </p>
+                ) : null}
+              </section>
 
               <div className="v19-submission-drawer-tabs-scroll w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
                 <div
@@ -1392,6 +1831,13 @@ export function Drawer({
                         onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
                       >
                         <span>{tab.label}</span>
+                        {tab.id === "issues" &&
+                        data.issuesCount > data.openIssuesCount ? (
+                          <span className="sr-only">
+                            , исправлено и ждёт проверки:{" "}
+                            {data.issuesCount - data.openIssuesCount}
+                          </span>
+                        ) : null}
                         {count > 0 ? (
                           <span
                             className={`v19-submission-drawer-tab-count px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${tab.isWarning ? "bg-orange-500/20 text-orange-400" : "bg-white/10 text-white/70"}`}
@@ -1426,6 +1872,7 @@ export function Drawer({
                 <div className="v19-agent-drawer-target-notice" role="status">
                   <span>{missingTargetMessage}</span>
                   <button
+                    {...agentInteractionProps("drawer.dismiss-notice")}
                     aria-label="Скрыть сообщение"
                     type="button"
                     onClick={() => setMissingTargetMessage("")}
@@ -1451,7 +1898,14 @@ export function Drawer({
                   }
                 >
                   {activeTab === "overview" ? (
-                    <OverviewTab data={data} submission={submission} />
+                    <OverviewTab
+                      canEdit={canEditSubmission}
+                      data={data}
+                      onOpenQuestionnaire={onOpenQuestionnaire}
+                      onSelectUploadTarget={selectUploadTarget}
+                      submission={submission}
+                      uploadingTargetKey={uploadingTargetKey}
+                    />
                   ) : null}
                   {activeTab === "questionnaire" ? (
                     <QuestionnaireTab
@@ -1476,69 +1930,73 @@ export function Drawer({
               </AnimatePresence>
             </div>
 
-            <footer className="v19-submission-drawer-footer p-4 lg:px-8 lg:py-5 border-t border-white/10 bg-[#111113]/95 backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
-              <span aria-live="polite" className="sr-only" role="status">
-                {actionAnnouncement}
-              </span>
-              <div
-                className={footerInstructionClassName}
-                data-testid="drawer-footer-instruction"
-                id={footerInstructionId}
-                role={footerInstructionRole}
-              >
-                {footerInstruction}
-              </div>
-              <div className="flex gap-3 w-full sm:w-auto">
-                <button
-                  {...agentInteractionProps("drawer.close")}
-                  aria-label="Закрыть подачу"
-                  className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
-                  type="button"
-                  onClick={onClose}
+            {!isDesktop ? (
+              <footer className="v19-submission-drawer-footer">
+                <span aria-live="polite" className="sr-only" role="status">
+                  {actionAnnouncement}
+                </span>
+                <div
+                  className={footerInstructionClassName}
+                  data-testid="drawer-footer-instruction"
+                  id={footerInstructionId}
+                  role={footerInstructionRole}
                 >
-                  Закрыть
-                </button>
-                {submission.status === "ready_for_export" ? (
+                  {footerInstruction}
+                </div>
+                <div className="v19-agent-drawer-mobile-actions">
+                  {submission.status === "ready_for_export" ? (
+                    <button
+                      {...agentInteractionProps("drawer.open-return-review")}
+                      className="v19-agent-drawer-return-review"
+                      disabled={actionPending}
+                      type="button"
+                      onClick={openReviewConfirmation}
+                    >
+                      Вернуть на проверку
+                    </button>
+                  ) : null}
                   <button
-                    className="v19-agent-drawer-return-review flex-1 sm:flex-none h-11 px-5 text-[13px] font-medium rounded-xl transition-colors"
-                    disabled={actionPending}
-                    ref={reviewConfirmationTriggerRef}
+                    {...agentInteractionProps(primaryIntentInteraction)}
+                    aria-busy={actionPending}
+                    aria-describedby={
+                      footerActionNotice ? footerInstructionId : undefined
+                    }
+                    className={`v19-agent-drawer-primary ${primaryButtonClassName}`}
+                    disabled={primaryIntentDisabled}
                     type="button"
-                    onClick={() => {
-                      setActionError("");
-                      setReviewConfirmationOpen(true);
-                    }}
+                    onClick={() => void handlePrimaryIntent()}
                   >
-                    Вернуть на проверку
+                    <PrimaryIntentIcon intent={primaryIntent} pending={actionPending} />
+                    {primaryIntentLabel}
                   </button>
-                ) : null}
-                <button
-                  {...agentInteractionProps(
-                    primaryActionInteractionByStatus[submission.status],
-                  )}
-                  aria-busy={actionPending}
-                  aria-describedby={
-                    footerActionNotice ? footerInstructionId : undefined
-                  }
-                  className={`v19-submission-drawer-primary flex-1 sm:flex-none h-11 px-8 ${primaryButtonClassName} text-white font-medium text-[14px] rounded-xl transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
-                  disabled={primaryAction.disabled || actionPending}
-                  type="button"
-                  onClick={() => void handlePrimaryAction()}
-                >
-                  {primaryAction.action === "submit_corrections" ? (
-                    <UploadCloud className="w-4 h-4" />
-                  ) : null}
-                  {primaryAction.action === "submit_for_review" ? (
-                    <CheckCircle2 className="w-4 h-4" />
-                  ) : null}
-                  {primaryLabel}
-                </button>
-              </div>
-            </footer>
+                </div>
+              </footer>
+            ) : null}
+
+            <input
+              {...agentInteractionProps("drawer.upload-file")}
+              accept={
+                selectedUploadTarget
+                  ? acceptedFileTypes(selectedUploadTarget.fileType)
+                  : undefined
+              }
+              aria-hidden="true"
+              aria-label={
+                selectedUploadTarget
+                  ? `Выбрать файл: ${selectedUploadTarget.label}`
+                  : "Выбрать файл для подачи"
+              }
+              hidden
+              ref={primaryUploadInputRef}
+              tabIndex={-1}
+              type="file"
+              onChange={(event) => void uploadSelectedTarget(event)}
+            />
           </motion.div>
           {reviewConfirmationOpen ? (
             <ConfirmationDialog
               busy={actionPending}
+              cancelInteractionId="drawer.cancel-return-review"
               cancelLabel="Оставить готовой к выгрузке"
               confirmDanger={false}
               confirmInteractionId="drawer.submit-review"

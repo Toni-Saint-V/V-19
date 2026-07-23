@@ -181,6 +181,7 @@ export function CommandCenter({
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
   const [selectedActionTaskId, setSelectedActionTaskId] = useState<string | null>(null);
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
+  const questionnaireOriginSurfaceRef = useRef<"drawer" | "workspace">("workspace");
   const questionnaireSubmissionSnapshotRef = useRef<Submission | undefined>(undefined);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
   const [canonicalOverrides, setCanonicalOverrides] = useState<
@@ -464,6 +465,7 @@ export function CommandCenter({
     }
     questionnaireOriginFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    questionnaireOriginSurfaceRef.current = drawerOpen ? "drawer" : "workspace";
     bridge.onQuestionnaireOpen?.(id);
     emitVisaflowUiEvent(bridge, { type: "questionnaire.open", submissionId: id });
     setSelectedRow(id);
@@ -473,8 +475,17 @@ export function CommandCenter({
   };
 
   const handleQuestionnaireBack = () => {
+    const shouldReopenDrawer =
+      questionnaireOriginSurfaceRef.current === "drawer" && Boolean(selectedRow);
+    questionnaireOriginSurfaceRef.current = "workspace";
     setQuestionnaireInitialFocus(undefined);
     setCurrentView("main");
+    if (shouldReopenDrawer) {
+      setDrawerActiveTab("questionnaire");
+      setDrawerFocusTarget(undefined);
+      setDrawerOpen(true);
+      return;
+    }
     window.requestAnimationFrame(() => {
       const origin = questionnaireOriginFocusRef.current;
       if (origin?.isConnected) {

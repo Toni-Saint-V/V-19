@@ -11,6 +11,7 @@ import "./shared/ui/admin-review-operations.css";
 import "./shared/ui/figma-all-screens-v1.css";
 import "./shared/ui/operational-side-menu.css";
 import "./shared/ui/agent-actions-v2.css";
+import "./shared/ui/agent-drawer-v2.css";
 import { initializeExperiencePreferences } from "./shared/ui/experiencePreferences";
 import { createVisaflowRuntimeBridge } from "./integration/createVisaflowRuntimeBridge";
 import { getSupabaseClient } from "./lib/supabase/client";

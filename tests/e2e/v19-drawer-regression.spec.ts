@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
 import {
@@ -13,7 +14,7 @@ const viewports = [
   { height: 844, label: "mobile", width: 390 },
 ] as const;
 
-const compactViewportWidths = [320, 375, 430, 768] as const;
+const responsiveViewportWidths = [320, 375, 430, 768, 1023, 1024] as const;
 
 const lifecycleFixtures = [
   {
@@ -24,7 +25,7 @@ const lifecycleFixtures = [
   },
   {
     id: "ПД-1051",
-    primary: "Отправить на проверку",
+    primary: "Заполнить раздел «Адрес и контакты»",
     status: "В работе",
     type: "single",
   },
@@ -37,7 +38,7 @@ const lifecycleFixtures = [
   },
   {
     id: "ПД-1048",
-    primary: "Отправить исправления",
+    primary: "Загрузить: Мария Иванова • Селфи 1",
     status: "Возвращено",
     type: "family",
   },
@@ -65,8 +66,8 @@ const lifecycleFixtures = [
 ] as const;
 
 test.describe("Linear submission Drawer regression", () => {
-  for (const width of compactViewportWidths) {
-    test(`${width}px keeps all four tabs operable without horizontal overflow`, async ({
+  for (const width of responsiveViewportWidths) {
+    test(`${width}px keeps the Drawer bounded and all four tabs operable`, async ({
       page,
     }) => {
       await page.setViewportSize({ height: 844, width });
@@ -91,42 +92,57 @@ test.describe("Linear submission Drawer regression", () => {
       const tabs = submissionDrawer.getByRole("tab");
       await expect(tabs).toHaveCount(4);
       await expect
-        .poll(() =>
-          submissionDrawer.evaluate(
-            (element) => element.scrollWidth - element.clientWidth,
-          ),
-        )
-        .toBeLessThanOrEqual(1);
+        .poll(async () => {
+          const box = await submissionDrawer.boundingBox();
+          return box ? box.x + box.width : Number.POSITIVE_INFINITY;
+        })
+        .toBeLessThanOrEqual(width);
+      const drawerBox = await submissionDrawer.boundingBox();
+      expect(drawerBox).not.toBeNull();
+      expect(drawerBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+      expect((drawerBox?.x ?? width) + (drawerBox?.width ?? 1)).toBeLessThanOrEqual(
+        width,
+      );
+      if (width <= 1023) {
+        expect(drawerBox?.width ?? 0).toBeGreaterThanOrEqual(width - 1);
+        expect(drawerBox?.y ?? 0).toBeGreaterThanOrEqual(47.9);
+        await expect(submissionDrawer).toHaveCSS("border-top-left-radius", "15px");
+      } else {
+        expect(drawerBox?.width ?? 0).toBeLessThan(width);
+      }
 
-      const tabLabelBoxes: Array<{ width: number; x: number }> = [];
       for (const tab of await tabs.all()) {
+        await tab.scrollIntoViewIfNeeded();
+        await tab.click();
+        await expect(tab).toHaveAttribute("aria-selected", "true");
         const box = await tab.boundingBox();
         const labelBox = await tab.locator("span").first().boundingBox();
         expect(box).not.toBeNull();
         expect(labelBox).not.toBeNull();
-        expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
-        expect((box?.x ?? width) + (box?.width ?? 1)).toBeLessThanOrEqual(width);
-        expect(box?.height ?? 0).toBeGreaterThanOrEqual(43.9);
+        expect(box?.x ?? -1).toBeGreaterThanOrEqual(drawerBox?.x ?? 0);
+        expect((box?.x ?? width) + (box?.width ?? 1)).toBeLessThanOrEqual(
+          (drawerBox?.x ?? 0) + (drawerBox?.width ?? width),
+        );
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(width <= 1023 ? 43.9 : 39.9);
         expect(labelBox?.x ?? -1).toBeGreaterThanOrEqual(0);
         expect((labelBox?.x ?? width) + (labelBox?.width ?? 1)).toBeLessThanOrEqual(
           width,
         );
-        if (labelBox) tabLabelBoxes.push(labelBox);
       }
 
-      for (let index = 1; index < tabLabelBoxes.length; index += 1) {
-        const previous = tabLabelBoxes[index - 1];
-        const current = tabLabelBoxes[index];
-        if (!previous || !current) continue;
-        expect(previous.x + previous.width).toBeLessThanOrEqual(current.x);
-      }
+      const closeButton = submissionDrawer.getByRole("button", {
+        name: "Закрыть подачу",
+      });
+      const closeBox = await closeButton.boundingBox();
+      expect(closeBox?.width ?? 0).toBeGreaterThanOrEqual(43.9);
+      expect(closeBox?.height ?? 0).toBeGreaterThanOrEqual(43.9);
     });
   }
 
   for (const viewport of viewports) {
     test(`${viewport.label} keeps semantic colors, tabs and action feedback`, async ({
       page,
-    }) => {
+    }, testInfo) => {
       const browserProblems = collectBrowserProblems(page);
       await page.setViewportSize({ height: viewport.height, width: viewport.width });
       await openFreshWorkspace(page);
@@ -164,8 +180,7 @@ test.describe("Linear submission Drawer regression", () => {
       const statusBadge = submissionDrawer.getByTestId("drawer-status-badge");
       await expect(statusBadge).toHaveText("Возвращено");
       await expect(statusBadge).toHaveCSS("color", "rgb(251, 146, 60)");
-      const updatedAt = submissionDrawer.getByTestId("drawer-updated-at");
-      await expect(updatedAt).toHaveCSS("color", "rgba(255, 255, 255, 0.4)");
+      await expect(submissionDrawer.getByTestId("drawer-updated-at")).toBeAttached();
 
       for (const tabName of ["Обзор", "Анкета", /Замечания/, "История"]) {
         const tab = submissionDrawer.getByRole("tab", { name: tabName });
@@ -175,93 +190,202 @@ test.describe("Linear submission Drawer regression", () => {
       }
 
       const primaryAction = submissionDrawer.getByRole("button", {
-        name: "Отправить исправления",
+        name: "Загрузить: Мария Иванова • Селфи 1",
       });
-      const actionNotice = submissionDrawer.getByTestId("drawer-footer-instruction");
-      await expect(primaryAction).toBeDisabled();
-      await expect(actionNotice).toBeVisible();
+      await expect(primaryAction).toBeEnabled();
       await expect(primaryAction).toHaveAttribute(
-        "aria-describedby",
-        "submission-drawer-primary-action-notice",
+        "data-v19-interaction-id",
+        "drawer.upload-file",
       );
+      await expect(
+        submissionDrawer.getByTestId("drawer-blocker-reason"),
+      ).not.toBeEmpty();
+
+      if (viewport.width < 1024) {
+        const contextToggle = submissionDrawer.getByRole("button", {
+          name: "Подробнее",
+        });
+        const contextDetails = submissionDrawer.locator(".v19-agent-drawer-context");
+        await expect(contextToggle).toBeVisible();
+        await expect(contextDetails).toBeHidden();
+        await contextToggle.click();
+        await expect(contextToggle).toHaveAttribute("aria-expanded", "true");
+        await expect(contextDetails).toBeVisible();
+        await contextToggle.click();
+        await expect(contextDetails).toBeHidden();
+        await expect(
+          submissionDrawer.locator(".v19-submission-drawer-footer"),
+        ).toBeVisible();
+        await submissionDrawer.getByRole("tab", { name: /Замечания/ }).click();
+        await expect(
+          submissionDrawer.getByRole("button", { name: "Перезагрузить файл" }).first(),
+        ).toBeInViewport();
+      } else {
+        await expect(
+          submissionDrawer.getByRole("button", { name: "Подробнее" }),
+        ).toHaveCount(0);
+        await expect(
+          submissionDrawer.locator(".v19-agent-drawer-context"),
+        ).toBeVisible();
+        await expect(
+          submissionDrawer.locator(".v19-submission-drawer-footer"),
+        ).toHaveCount(0);
+      }
+
+      if (process.env.V19_CAPTURE_DRAWER_EVIDENCE === "1") {
+        const evidenceDirectory = process.env.V19_DRAWER_EVIDENCE_DIR;
+        const evidencePath = (fileName: string) =>
+          evidenceDirectory
+            ? join(evidenceDirectory, fileName)
+            : testInfo.outputPath(fileName);
+        await submissionDrawer.getByRole("tab", { name: "Обзор" }).click();
+        await expect(
+          submissionDrawer.getByRole("heading", { name: "Маршрут и подача" }),
+        ).toBeVisible();
+        await submissionDrawer.screenshot({
+          path: evidencePath(`agent-drawer-${viewport.label}-overview.png`),
+        });
+        await submissionDrawer.getByRole("tab", { name: /Замечания/ }).click();
+        await expect(
+          submissionDrawer.getByRole("heading", {
+            name: "Замечания администратора",
+          }),
+        ).toBeVisible();
+        await submissionDrawer.screenshot({
+          path: evidencePath(`agent-drawer-${viewport.label}-issues.png`),
+        });
+      }
 
       expect(failedRequests).toEqual([]);
       expect(browserProblems).toEqual([]);
     });
   }
 
-  for (const fixture of lifecycleFixtures) {
-    test(`${fixture.id} exposes the canonical lifecycle context`, async ({ page }) => {
-      await page.setViewportSize({ height: 900, width: 1440 });
-      await openFreshWorkspace(
-        page,
-        fixture.id === "ПД-1057"
-          ? { workspaceEmail: "agent2@visaflow.local" }
-          : undefined,
-      );
+  for (const viewport of viewports) {
+    test(`${viewport.label} returns from questionnaire to the originating Drawer`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        height: viewport.height,
+        width: viewport.width,
+      });
+      await openFreshWorkspace(page);
       await clickWorkspaceButton(page, /^Мои подачи$/);
 
       const submissionsScreen = page.locator(
         '[data-testid="agent-screen-transition"][data-agent-screen="submissions"]',
       );
-      await expect(submissionsScreen).toBeVisible();
-      if (fixture.type === "family") {
-        const typeFilter = submissionsScreen.locator(
-          'button[data-v19-interaction-id="submissions.type-filter"][aria-haspopup="listbox"]',
-        );
-        await typeFilter.click();
-        await submissionsScreen
-          .getByRole("option", { exact: true, name: "Семья" })
-          .click();
-      }
-      if (fixture.id === "ПД-1057") {
-        await selectSubmissionStatus(page, "Выгружено");
-      }
-
-      await submissionsScreen
-        .locator(`.v19-agent-shared-card[data-submission-id="${fixture.id}"]`)
-        .click();
-      const submissionDrawer = drawer(page);
-      await expect(submissionDrawer.getByTestId("drawer-status-badge")).toHaveText(
-        fixture.status,
+      const typeFilter = submissionsScreen.locator(
+        'button[data-v19-interaction-id="submissions.type-filter"][aria-haspopup="listbox"]',
       );
-      await expect(
-        submissionDrawer.getByTestId("drawer-next-step-context"),
-      ).toBeVisible();
-      await expect(
-        submissionDrawer.getByRole("button", { name: fixture.primary }),
-      ).toBeVisible();
-      await expect(page.locator(".contents[inert]")).toHaveCount(1);
-
-      if ("readOnly" in fixture && fixture.readOnly) {
-        await submissionDrawer.getByRole("tab", { name: "Анкета" }).click();
-        await expect(
-          submissionDrawer.getByRole("button", { name: "Смотреть анкету" }),
-        ).toBeVisible();
-      }
-
-      if (fixture.id === "ПД-1054") {
-        await submissionDrawer
-          .getByRole("button", { name: "Вернуть на проверку" })
-          .click();
-        const confirmation = page.getByRole("dialog", {
-          name: "Вернуть подачу на проверку?",
-        });
-        await expect(confirmation).toBeVisible();
-        await expect(submissionDrawer).toHaveAttribute("inert");
-        await confirmation
-          .getByRole("button", { name: "Оставить готовой к выгрузке" })
-          .click();
-        await expect(confirmation).toBeHidden();
-        await expect(submissionDrawer.getByTestId("drawer-status-badge")).toHaveText(
-          "Готово к выгрузке",
-        );
-      }
-
-      await submissionDrawer
-        .getByRole("button", { exact: true, name: "Закрыть подачу" })
+      await typeFilter.click();
+      await submissionsScreen
+        .getByRole("option", { exact: true, name: "Семья" })
         .click();
+      await submissionsScreen
+        .locator('.v19-agent-shared-card[data-submission-id="ПД-1048"]')
+        .click();
+
+      const submissionDrawer = drawer(page);
+      const questionnaireTab = submissionDrawer.getByRole("tab", {
+        name: "Анкета",
+      });
+      await questionnaireTab.click();
+      await submissionDrawer.getByRole("button", { name: "Исправить анкету" }).click();
+
+      const questionnaireScreen = page
+        .locator(".vf-figma-questionnaire-screen")
+        .first();
+      await expect(questionnaireScreen).toBeVisible();
       await expect(submissionDrawer).toBeHidden();
+      await questionnaireScreen.getByRole("button", { name: "Назад" }).click();
+
+      await expect(submissionDrawer).toBeVisible();
+      await expect(
+        submissionDrawer.getByRole("tab", { name: "Анкета" }),
+      ).toHaveAttribute("aria-selected", "true");
     });
+  }
+
+  for (const fixture of lifecycleFixtures) {
+    for (const viewport of viewports) {
+      test(`${fixture.id} exposes the canonical lifecycle context on ${viewport.label}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({
+          height: viewport.height,
+          width: viewport.width,
+        });
+        await openFreshWorkspace(
+          page,
+          fixture.id === "ПД-1057"
+            ? { workspaceEmail: "agent2@visaflow.local" }
+            : undefined,
+        );
+        await clickWorkspaceButton(page, /^Мои подачи$/);
+
+        const submissionsScreen = page.locator(
+          '[data-testid="agent-screen-transition"][data-agent-screen="submissions"]',
+        );
+        await expect(submissionsScreen).toBeVisible();
+        if (fixture.type === "family") {
+          const typeFilter = submissionsScreen.locator(
+            'button[data-v19-interaction-id="submissions.type-filter"][aria-haspopup="listbox"]',
+          );
+          await typeFilter.click();
+          await submissionsScreen
+            .getByRole("option", { exact: true, name: "Семья" })
+            .click();
+        }
+        if (fixture.id === "ПД-1057") {
+          await selectSubmissionStatus(page, "Выгружено");
+        }
+
+        await submissionsScreen
+          .locator(`.v19-agent-shared-card[data-submission-id="${fixture.id}"]`)
+          .click();
+        const submissionDrawer = drawer(page);
+        await expect(submissionDrawer.getByTestId("drawer-status-badge")).toHaveText(
+          fixture.status,
+        );
+        await expect(
+          submissionDrawer.getByTestId("drawer-next-step-context"),
+        ).toBeVisible();
+        await expect(
+          submissionDrawer.getByRole("button", { name: fixture.primary }),
+        ).toBeVisible();
+        await expect(page.locator(".contents[inert]")).toHaveCount(1);
+
+        if ("readOnly" in fixture && fixture.readOnly) {
+          await submissionDrawer.getByRole("tab", { name: "Анкета" }).click();
+          await expect(
+            submissionDrawer.getByRole("button", { name: "Смотреть анкету" }),
+          ).toBeVisible();
+        }
+
+        if (fixture.id === "ПД-1054") {
+          await submissionDrawer
+            .getByRole("button", { name: "Вернуть на проверку" })
+            .click();
+          const confirmation = page.getByRole("dialog", {
+            name: "Вернуть подачу на проверку?",
+          });
+          await expect(confirmation).toBeVisible();
+          await expect(submissionDrawer).toHaveAttribute("inert");
+          await confirmation
+            .getByRole("button", { name: "Оставить готовой к выгрузке" })
+            .click();
+          await expect(confirmation).toBeHidden();
+          await expect(submissionDrawer.getByTestId("drawer-status-badge")).toHaveText(
+            "Готово к выгрузке",
+          );
+        }
+
+        await submissionDrawer
+          .getByRole("button", { exact: true, name: "Закрыть подачу" })
+          .click();
+        await expect(submissionDrawer).toBeHidden();
+      });
+    }
   }
 });

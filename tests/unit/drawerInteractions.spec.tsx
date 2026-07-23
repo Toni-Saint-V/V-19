@@ -23,7 +23,10 @@ import type {
   SubmissionAction,
   SubmissionStatus,
 } from "../../src/modules/submissions/types";
-import type { WorkspaceTarget } from "../../src/modules/submissions/workspaceModel";
+import {
+  targetElementId,
+  type WorkspaceTarget,
+} from "../../src/modules/submissions/workspaceModel";
 import { linearDrawerMotion } from "../../src/shared/ui/drawer/linearDrawerMotion";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
@@ -193,7 +196,9 @@ describe("Drawer interactions", () => {
     expect(within(lifecycleContext).getByText("VF-1048")).toBeInTheDocument();
     expect(within(lifecycleContext).getByText("Семья Ивановых")).toBeVisible();
     expect(
-      within(dialog).getByRole("button", { name: "Отправить исправления" }),
+      within(dialog).getByRole("button", {
+        name: "Загрузить: Мария Иванова • Селфи 1",
+      }),
     ).toBeInTheDocument();
     expect(within(dialog).getByText("Мария Иванова")).toBeInTheDocument();
     expect(within(dialog).queryByText("Семья Петровых")).not.toBeInTheDocument();
@@ -270,9 +275,15 @@ describe("Drawer interactions", () => {
     const dialog = screen.getByRole("dialog", { name: "Семья Ивановых" });
     await waitFor(() => expect(dialog).toHaveFocus());
 
-    const first = within(dialog).getByRole("tab", { name: "Обзор" });
-    const last = within(dialog).getByRole("button", { name: "Закрыть подачу" });
-    for (const element of [first, last]) {
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        "button:not([disabled]),[href],[tabindex]:not([tabindex='-1'])",
+      ),
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) throw new Error("Expected drawer focus targets.");
+    for (const element of focusable) {
       Object.defineProperty(element, "offsetParent", {
         configurable: true,
         get: () => document.body,
@@ -330,7 +341,7 @@ describe("Drawer interactions", () => {
     );
   });
 
-  test("executes the real primary action and blocks an invalid correction send", async () => {
+  test("executes a ready lifecycle action and routes blocked corrections to the exact upload", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
     renderDrawer({ onAction, submission: readySubmission() });
 
@@ -340,15 +351,22 @@ describe("Drawer interactions", () => {
     await waitFor(() => expect(onAction).toHaveBeenCalledWith("submit_for_review"));
 
     cleanup();
-    renderDrawer({ submission: returnedSubmission() });
-    const disabledAction = screen.getByRole("button", {
-      name: "Отправить исправления",
+    const returnedAction = vi.fn();
+    renderDrawer({
+      onAction: returnedAction,
+      submission: returnedSubmission(),
     });
-    const disabledReason = screen.getByTestId("drawer-footer-instruction");
-    expect(disabledAction).toBeDisabled();
-    expect(disabledReason).not.toHaveClass("hidden");
-    expect(disabledReason).toHaveAttribute("role", "status");
-    expect(disabledAction).toHaveAttribute("aria-describedby", disabledReason.id);
+    const exactUpload = screen.getByRole("button", {
+      name: "Загрузить: Мария Иванова • Селфи 1",
+    });
+    expect(exactUpload).toBeEnabled();
+    expect(exactUpload).toHaveAttribute(
+      "data-v19-interaction-id",
+      "drawer.upload-file",
+    );
+    expect(screen.getByTestId("drawer-blocker-reason")).not.toBeEmptyDOMElement();
+    fireEvent.click(exactUpload);
+    expect(returnedAction).not.toHaveBeenCalled();
   });
 
   test("keeps rejected primary-action feedback visible and associated with the CTA", async () => {
@@ -445,9 +463,16 @@ describe("Drawer interactions", () => {
     renderDrawer({ activeTab: "issues", submission });
 
     expect(await screen.findByTestId("drawer-open-issues-count")).toHaveTextContent(
-      "Требуют исправления: 1",
+      "Открыто: 1",
     );
-    expect(screen.getByRole("tab", { name: /Замечания\s*2/ })).toBeInTheDocument();
+    const issuesTab = screen.getByRole("tab", {
+      name: /Замечания.*исправлено и ждёт проверки: 1.*1/i,
+    });
+    expect(
+      issuesTab.querySelector(".v19-submission-drawer-tab-count"),
+    ).toHaveTextContent("1");
+    expect(screen.getByText("Нужно исправить")).toBeInTheDocument();
+    expect(screen.getByText("Исправлено, ждёт проверки")).toBeInTheDocument();
   });
 
   test("keeps submission B pending when submission A settles after the drawer switches", async () => {
@@ -517,7 +542,7 @@ describe("Drawer interactions", () => {
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  test("uses canonical family media slots and labels questionnaire percentages", () => {
+  test("uses canonical family media slots and honest applicant-aware questionnaire progress", async () => {
     const submission = returnedSubmission();
     const requiredSlotCount = requiredPassportReviewMediaSlots(submission).length;
     renderDrawer({ submission });
@@ -525,11 +550,18 @@ describe("Drawer interactions", () => {
     expect(
       screen.getByText(new RegExp(`\\d/${requiredSlotCount}`)),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("готовность анкеты")).toHaveLength(
+    expect(screen.getAllByText("разделов готово")).toHaveLength(
       submission.applicants.length,
     );
+    expect(screen.queryByText("готовность анкеты")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Фото/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Видео/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Анкета" }));
+    await screen.findByText("Прогресс заполнения");
+    expect(screen.queryByText("40%")).not.toBeInTheDocument();
+    expect(screen.queryByText("65%")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/заявителей$/).length).toBeGreaterThan(0);
   });
 
   test("keeps read-only questionnaire and issue controls navigational", async () => {
@@ -540,7 +572,7 @@ describe("Drawer interactions", () => {
 
     expect(screen.getByRole("button", { name: "Смотреть анкету" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: /Замечания/ }));
-    await screen.findByText("Список задач по замечаниям");
+    await screen.findByText("Замечания администратора");
     expect(
       screen.queryByRole("button", { name: "Перезагрузить файл" }),
     ).not.toBeInTheDocument();
@@ -598,7 +630,9 @@ describe("Drawer interactions", () => {
   });
 
   test("supports every close path and focuses a requested issue", async () => {
-    const issue = returnedSubmission().issues[0];
+    const issue = returnedSubmission().issues.find(
+      (candidate) => candidate.status !== "closed_by_admin",
+    );
     if (!issue) throw new Error("Expected issue fixture.");
     const { container, onClearFocusTarget, onClose } = renderDrawer({
       focusTarget: { issueId: issue.id, tab: "issues" as const },
@@ -611,9 +645,12 @@ describe("Drawer interactions", () => {
       ),
     );
     await waitFor(() => expect(onClearFocusTarget).toHaveBeenCalled());
+    const focusedIssue = document.getElementById(
+      targetElementId({ issueId: issue.id, tab: "issues" }),
+    );
+    expect(focusedIssue).toHaveFocus();
 
     fireEvent.click(screen.getByRole("button", { name: "Закрыть подачу" }));
-    fireEvent.click(screen.getByRole("button", { name: "Закрыть" }));
     fireEvent.keyDown(window, { key: "Escape" });
     const overlay = container.querySelector<HTMLElement>(
       '[aria-hidden="true"].fixed.inset-0',
@@ -621,7 +658,7 @@ describe("Drawer interactions", () => {
     if (!overlay) throw new Error("Expected drawer overlay.");
     fireEvent.click(overlay);
 
-    expect(onClose).toHaveBeenCalledTimes(4);
+    expect(onClose).toHaveBeenCalledTimes(3);
   });
 
   test("reports a missing requested issue target without breaking navigation", async () => {

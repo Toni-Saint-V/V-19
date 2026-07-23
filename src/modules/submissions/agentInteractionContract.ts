@@ -866,6 +866,22 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     expectedEffect: "Show the selected drawer tab without a write.",
     proof: domProof,
   },
+  "drawer.toggle-context": {
+    id: "drawer.toggle-context",
+    kind: "navigation",
+    surface: "submission-drawer",
+    role: "agent",
+    expectedEffect: "Expand or collapse secondary lifecycle context without a write.",
+    proof: domProof,
+  },
+  "drawer.dismiss-notice": {
+    id: "drawer.dismiss-notice",
+    kind: "navigation",
+    surface: "submission-drawer",
+    role: "agent",
+    expectedEffect: "Dismiss a recoverable Drawer notice without a write.",
+    proof: domProof,
+  },
   "drawer.open-questionnaire": {
     id: "drawer.open-questionnaire",
     kind: "navigation",
@@ -920,6 +936,24 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     businessIntent: "submit_for_review",
     statusFixtures: drawerReviewStatusFixtures,
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.submit_for_review,
+  },
+  "drawer.open-return-review": {
+    id: "drawer.open-return-review",
+    kind: "dialog",
+    surface: "submission-drawer",
+    role: "agent",
+    expectedEffect:
+      "Open the ready-for-export return confirmation without changing submission state.",
+    proof: domProof,
+  },
+  "drawer.cancel-return-review": {
+    id: "drawer.cancel-return-review",
+    kind: "dialog",
+    surface: "submission-drawer",
+    role: "agent",
+    expectedEffect:
+      "Cancel the ready-for-export return confirmation without changing submission state.",
+    proof: domProof,
   },
   "drawer.submit-corrections": {
     canonicalEffect: submitCorrectionsCanonicalEffect,
