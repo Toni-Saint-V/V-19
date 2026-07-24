@@ -629,6 +629,10 @@
   padding: var(--v19b-size-0) var(--v19b-size-24) var(--v19b-size-16);
 }
 
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-mobile-footer {
+  display: none;
+}
+
 .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-next-button {
   width: auto !important;
   min-width: var(--v19b-size-112) !important;
@@ -1440,15 +1444,7 @@
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-screen-header {
-    display: grid !important;
-    min-height: var(--v19b-size-60) !important;
-    flex: 0 0 auto;
-    grid-template-columns:
-      var(--v19b-size-44) minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      auto;
-    gap: var(--v19b-size-6) !important;
-    padding: var(--v19b-size-6) var(--v19b-size-8) !important;
-    border-bottom: var(--v19b-size-1) solid var(--questionnaire-polish-line) !important;
+    display: none !important;
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-tourist-switcher {
@@ -1468,7 +1464,7 @@
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-scroll {
     padding-top: var(--v19b-size-8) !important;
-    scroll-padding-block: var(--v19b-size-60) var(--v19b-size-16) !important;
+    scroll-padding-block: var(--v19b-size-16) var(--v19b-size-16) !important;
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-scroll-frame {
@@ -1624,17 +1620,22 @@
 
   .vf-figma-questionnaire-screen.codex-polish-v1
     .v19-questionnaire-mobile-footer-applicant {
-    position: relative;
-    display: grid;
+    display: block;
     width: var(--v19b-size-full);
     min-width: var(--v19b-size-0);
     height: var(--v19b-size-44);
-    grid-template-columns:
-      var(--v19b-size-16) minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      var(--v19b-size-14);
-    align-items: center;
-    gap: var(--v19b-size-5);
-    padding-inline: var(--v19b-size-8);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-mobile-footer-applicant
+    .v19-select-menu-trigger {
+    height: var(--v19b-size-44);
+    min-height: var(--v19b-size-44);
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(
+        --v19b-size-14
+      );
+    gap: var(--v19b-size-4);
+    padding: var(--v19b-size-4) var(--v19b-size-7) var(--v19b-size-4) var(--v19b-size-8);
     border: var(--v19b-size-1) solid var(--questionnaire-polish-line);
     border-radius: var(--v19b-size-12);
     color: var(--v19b-color-text-strong);
@@ -1643,45 +1644,41 @@
 
   .vf-figma-questionnaire-screen.codex-polish-v1
     .v19-questionnaire-mobile-footer-applicant
-    > svg {
-    width: var(--v19b-size-16);
-    height: var(--v19b-size-16);
-    color: var(--v19b-color-text-muted);
+    .v19-select-menu-trigger-copy {
+    gap: var(--v19b-size-0);
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1
     .v19-questionnaire-mobile-footer-applicant
-    > svg:last-of-type {
+    .v19-select-menu-trigger-label {
+    font-size: var(--v19b-size-11);
+    font-weight: var(--v19b-weight-title);
+    line-height: var(--v19b-line-height-control);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-mobile-footer-applicant
+    .v19-select-menu-trigger-description {
+    font-size: var(--v19b-size-9);
+    line-height: var(--v19b-line-height-control);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-mobile-footer-applicant
+    .v19-select-menu-chevron {
     width: var(--v19b-size-14);
     height: var(--v19b-size-14);
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1
     .v19-questionnaire-mobile-footer-applicant
-    > span {
-    overflow: hidden;
-    font-size: var(--v19b-size-11);
-    font-weight: var(--v19b-weight-control);
-    line-height: var(--v19b-line-height-control);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    .v19-select-menu-trigger:focus-visible {
+    border-color: var(--v19b-color-border-selected);
   }
 
-  .vf-figma-questionnaire-screen.codex-polish-v1
-    .v19-questionnaire-mobile-footer-applicant
-    > select {
-    position: absolute;
-    inset: var(--v19b-size-0);
-    width: var(--v19b-size-full);
-    height: var(--v19b-size-full);
-    cursor: pointer;
-    opacity: 0;
-  }
-
-  .vf-figma-questionnaire-screen.codex-polish-v1
-    .v19-questionnaire-mobile-footer-applicant:has(select:focus-visible) {
-    outline: var(--v19b-size-2) solid var(--v19b-color-primary-bright);
-    outline-offset: var(--v19b-size-2);
+  /* The listbox portal is a body child; keep it above the legacy fullscreen shell. */
+  .v19-select-menu-popover.is-questionnaire-tourist[aria-label="Выбрать заявителя — нижняя панель"] {
+    z-index: 2147483100;
   }
 }
 
@@ -1694,6 +1691,29 @@
     .v19-questionnaire-tourist-switcher
     .v19-select-menu-trigger-label {
     font-size: var(--v19b-size-15);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-mobile-footer {
+    gap: var(--v19b-size-4);
+    padding-inline: var(--v19b-size-6);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-mobile-footer-save {
+    gap: var(--v19b-size-3);
+    padding-inline: var(--v19b-size-4);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-mobile-footer-save
+    > svg {
+    display: none;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-mobile-footer-applicant
+    .v19-select-menu-trigger {
+    padding-inline: var(--v19b-size-6);
   }
 }
 

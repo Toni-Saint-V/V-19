@@ -3,13 +3,14 @@ import { expect, test, type Page } from "@playwright/test";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
 
-async function openQuestionnaire(page: Page) {
+async function openQuestionnaire(
+  page: Page,
+  options: { withSpouse?: boolean } = {},
+) {
   await openFreshWorkspace(page, { heading: "Мои действия" });
 
-  const ownedByCurrentLocalAgent = initialSubmissions.map((submission) => ({
-    ...submission,
-    agentId: "local-agent-tony",
-    applicants: submission.applicants.map((applicant) => ({
+  const ownedByCurrentLocalAgent = initialSubmissions.map((submission) => {
+    const applicants = submission.applicants.map((applicant) => ({
       ...applicant,
       sections: applicant.sections.map((section) => ({
         ...section,
@@ -23,8 +24,28 @@ async function openQuestionnaire(page: Page) {
             : field,
         ),
       })),
-    })),
-  }));
+    }));
+    const primaryApplicant = applicants[0];
+    const withSpouse =
+      options.withSpouse && submission.id === "ПД-1051" && primaryApplicant
+        ? [
+            ...applicants,
+            {
+              ...primaryApplicant,
+              fullName: "Анна Соколова",
+              id: "з-1051-e2e-spouse",
+              role: "spouse" as const,
+            },
+          ]
+        : applicants;
+
+    return {
+      ...submission,
+      agentId: "local-agent-tony",
+      applicants: withSpouse,
+      type: withSpouse.length > 1 ? ("family" as const) : submission.type,
+    };
+  });
   await page.evaluate((submissions) => {
     const browserGlobal = globalThis as unknown as {
       localStorage: { setItem(key: string, value: string): void };
@@ -74,7 +95,15 @@ async function openQuestionnaire(page: Page) {
   }
 
   await expect(questionnaireScreen).toBeVisible();
-  await expect(page.getByLabel("Выбрать туриста")).toBeVisible();
+  await expect(
+    questionnaireScreen.locator('[role="combobox"]:visible').first(),
+  ).toBeVisible();
+}
+
+function mobileQuestionnaireSection(page: Page, title: string) {
+  return page
+    .locator(".v19-questionnaire-section-list--pinned .v19-questionnaire-section-tab")
+    .filter({ hasText: title });
 }
 
 async function expectNoDocumentOverflow(page: Page) {
@@ -187,7 +216,10 @@ async function expectMobileQuestionnaireLayout(
       contentInset:
         shellBox && frameBox ? frameBox.left - shellBox.left : Number.NEGATIVE_INFINITY,
       footer: rect(".v19-questionnaire-mobile-footer"),
-      headerSave: rect(".v19-questionnaire-save-button"),
+      footerApplicant: rect(
+        ".v19-questionnaire-mobile-footer-applicant .v19-select-menu-trigger",
+      ),
+      footerSave: rect(".v19-questionnaire-mobile-footer-save"),
       header: rect(".v19-questionnaire-screen-header"),
       headerDisplay: getComputedStyle(
         document.querySelector<HTMLElement>(".v19-questionnaire-screen-header")!,
@@ -200,16 +232,19 @@ async function expectMobileQuestionnaireLayout(
   });
 
   expect(geometry.borderRadius).toBe("0px");
-  expect(geometry.headerDisplay).toBe("grid");
+  expect(geometry.headerDisplay).toBe("none");
   expect(geometry.applicantBarDisplay).toBe("none");
-  expect(geometry.footer).toBeNull();
-  expect(geometry.header?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(64);
-  expect(geometry.scroll?.y ?? 0).toBeGreaterThanOrEqual(
-    (geometry.header?.height ?? 0) - 1,
-  );
+  expect(geometry.footer).not.toBeNull();
+  expect(geometry.footer?.height ?? 0).toBeGreaterThanOrEqual(56);
+  expect(geometry.footer?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(96);
+  expect(geometry.header?.height ?? Number.POSITIVE_INFINITY).toBe(0);
+  expect(geometry.scroll?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(1);
   expect(geometry.scroll?.height ?? 0).toBeGreaterThan(viewport.height * 0.8);
   expect(
     (geometry.scroll?.y ?? 0) + (geometry.scroll?.height ?? 0),
+  ).toBeLessThanOrEqual((geometry.footer?.y ?? viewport.height) + 1);
+  expect(
+    (geometry.footer?.y ?? 0) + (geometry.footer?.height ?? 0),
   ).toBeLessThanOrEqual(viewport.height + 1);
   expect(geometry.contentInset).toBeGreaterThanOrEqual(16);
   expect(geometry.workPanel?.height ?? 0).toBeGreaterThanOrEqual(
@@ -217,7 +252,8 @@ async function expectMobileQuestionnaireLayout(
   );
   expect(geometry.scrollOverflowY).toBe("auto");
   expect(geometry.workPanelOverflowY).toBe("visible");
-  expect(geometry.headerSave?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(geometry.footerSave?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(geometry.footerApplicant?.height ?? 0).toBeGreaterThanOrEqual(44);
   await expectMobileControlsAtLeast44(page);
   await expectNoDocumentOverflow(page);
 }
@@ -232,6 +268,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expectFullscreenQuestionnaireShell(page, { height: 900, width: 1440 });
 
     await expect(page.locator(".v19-questionnaire-screen-header")).toBeVisible();
+    await expect(page.getByTestId("questionnaire-mobile-footer")).toBeHidden();
     await expect(page.locator(".v19-questionnaire-applicant-bar")).toBeHidden();
     await expect(page.locator(".v19-questionnaire-section-nav")).toBeVisible();
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
@@ -311,18 +348,34 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(browserProblems).toEqual([]);
   });
 
-  test("mobile keeps the header compact and exposes one current issue surface", async ({
+  test("mobile keeps footer-first navigation and exposes one current issue surface", async ({
     page,
   }, testInfo) => {
     testInfo.setTimeout(60_000);
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 844, width: 390 });
-    await openQuestionnaire(page);
+    await openQuestionnaire(page, { withSpouse: true });
     await expectMobileQuestionnaireLayout(page, { height: 844, width: 390 });
 
-    await expect(page.locator(".v19-questionnaire-screen-header")).toBeVisible();
-    await expect(page.locator(".v19-questionnaire-header-actions")).toBeVisible();
-    await expect(page.getByTestId("questionnaire-mobile-footer")).toHaveCount(0);
+    await expect(page.locator(".v19-questionnaire-screen-header")).toBeHidden();
+    await expect(page.locator(".v19-questionnaire-header-actions")).toBeHidden();
+    const mobileFooter = page.getByTestId("questionnaire-mobile-footer");
+    await expect(mobileFooter).toBeVisible();
+    await expect(
+      mobileFooter.getByRole("button", {
+        name: "Предыдущий раздел недоступен",
+      }),
+    ).toBeDisabled();
+    await expect(
+      mobileFooter.getByRole("button", {
+        name: "Сохранить и выйти — нижняя панель",
+      }),
+    ).toBeVisible();
+    await expect(
+      mobileFooter.getByRole("combobox", {
+        name: "Выбрать заявителя — нижняя панель",
+      }),
+    ).toBeVisible();
     const selectionPresentation = await page.evaluate(() => {
       const style = (selector: string) => {
         const element = document.querySelector<HTMLElement>(selector);
@@ -369,7 +422,26 @@ test.describe("V-19 questionnaire live sanity", () => {
     ).toBeVisible();
     await expect(page.getByTestId("questionnaire-current-issue")).toHaveCount(0);
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Сохранить и выйти" })).toBeVisible();
+    await expect(
+      mobileFooter.getByRole("button", {
+        name: "Следующий раздел: Паспорт",
+      }),
+    ).toBeEnabled();
+
+    await mobileFooter
+      .getByRole("button", { name: "Следующий раздел: Паспорт" })
+      .click();
+    await expect(mobileQuestionnaireSection(page, "Паспорт")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await mobileFooter
+      .getByRole("button", { name: "Предыдущий раздел: Личные данные" })
+      .click();
+    await expect(mobileQuestionnaireSection(page, "Личные данные")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     const applicantNextButtons = page.locator(
       '[aria-label^="Следующее незаполненное:"]',
@@ -390,6 +462,11 @@ test.describe("V-19 questionnaire live sanity", () => {
       .getByRole("button", { name: /Отель \/ приглашение/ })
       .first()
       .click();
+    await expect(
+      mobileFooter.getByRole("button", {
+        name: "Следующий раздел недоступен",
+      }),
+    ).toBeDisabled();
     const invitingPartyOptions = page.locator(
       '.v19-questionnaire-quick-options[data-wrap-options="true"]',
     );
@@ -521,13 +598,27 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(postalBox).not.toBeNull();
     expect(postalBox?.y ?? 0).toBeGreaterThan((unitBox?.y ?? 0) + 2);
 
-    const touristMenu = page.getByLabel("Выбрать туриста");
+    const touristMenu = mobileFooter.getByLabel("Выбрать заявителя — нижняя панель");
     if (await touristMenu.isEnabled()) {
       await touristMenu.click();
-    const touristListbox = page.getByRole("listbox", {
-      name: "Выбрать туриста",
-    });
-    const touristOptions = touristListbox.getByRole("option");
+      const touristListbox = page.getByRole("listbox", {
+        name: "Выбрать заявителя — нижняя панель",
+      });
+      const touristOptions = touristListbox.getByRole("option");
+      await expect(touristListbox).toBeVisible();
+      const listboxHitTargetIsOption = await touristListbox.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const hitTarget = document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + Math.min(box.height / 2, 72),
+        );
+        return Boolean(hitTarget && element.contains(hitTarget));
+      });
+      expect(listboxHitTargetIsOption).toBe(true);
+      await page.screenshot({
+        fullPage: true,
+        path: testInfo.outputPath("questionnaire-mobile-applicant-menu.png"),
+      });
       const secondOption = touristOptions.nth(1);
       const secondLabel = await secondOption.innerText();
       await secondOption.click();
@@ -547,6 +638,21 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expect(page.getByRole("option", { name: "улица" })).toBeVisible();
     await page.getByRole("option", { name: "улица" }).click();
     await expect(street).toHaveValue("улица ");
+
+    const continueAction = page.locator(
+      ".v19-questionnaire-next-action-bar .v19-questionnaire-next-button",
+    );
+    await continueAction.scrollIntoViewIfNeeded();
+    await expect(continueAction).toBeVisible();
+    const [continueActionBox, footerBox] = await Promise.all([
+      continueAction.boundingBox(),
+      mobileFooter.boundingBox(),
+    ]);
+    expect(continueActionBox).not.toBeNull();
+    expect(footerBox).not.toBeNull();
+    expect(
+      (continueActionBox?.y ?? 0) + (continueActionBox?.height ?? 0),
+    ).toBeLessThanOrEqual((footerBox?.y ?? Number.POSITIVE_INFINITY) + 1);
 
     await expectNoDocumentOverflow(page);
     await page.screenshot({
@@ -613,21 +719,27 @@ test.describe("V-19 questionnaire live sanity", () => {
     });
   }
 
-  test("tablet keeps the existing fullscreen desktop composition", async ({
-    page,
-  }, testInfo) => {
-    const browserProblems = collectBrowserProblems(page);
-    const viewport = { height: 1024, width: 768 };
-    await page.setViewportSize(viewport);
-    await openQuestionnaire(page);
+  for (const viewport of [
+    { height: 1024, width: 768 },
+    { height: 900, width: 1024 },
+  ]) {
+    test(`viewport ${viewport.width} keeps the existing desktop composition`, async ({
+      page,
+    }, testInfo) => {
+      const browserProblems = collectBrowserProblems(page);
+      await page.setViewportSize(viewport);
+      await openQuestionnaire(page);
 
-    await expectFullscreenQuestionnaireShell(page, viewport);
-    await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
-    await expectNoDocumentOverflow(page);
-    await page.screenshot({
-      fullPage: true,
-      path: testInfo.outputPath("questionnaire-tablet-768.png"),
+      await expectFullscreenQuestionnaireShell(page, viewport);
+      await expect(page.locator(".v19-questionnaire-screen-header")).toBeVisible();
+      await expect(page.getByTestId("questionnaire-mobile-footer")).toBeHidden();
+      await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
+      await expectNoDocumentOverflow(page);
+      await page.screenshot({
+        fullPage: true,
+        path: testInfo.outputPath(`questionnaire-desktop-${viewport.width}.png`),
+      });
+      expect(browserProblems).toEqual([]);
     });
-    expect(browserProblems).toEqual([]);
-  });
+  }
 });

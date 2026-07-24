@@ -656,6 +656,86 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByRole("button", { name: "Сохранить и выйти" })).toBeEnabled();
   });
 
+  test("keeps four mobile footer actions bounded to the active applicant sections", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+    const footer = screen.getByTestId("questionnaire-mobile-footer");
+    const footerQueries = within(footer);
+    const previous = footerQueries.getByRole("button", {
+      name: "Предыдущий раздел недоступен",
+    });
+    const next = footerQueries.getByRole("button", {
+      name: "Следующий раздел: Паспорт",
+    });
+
+    expect(footer.querySelectorAll("button")).toHaveLength(4);
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
+    expect(
+      footerQueries.getByRole("button", {
+        name: "Сохранить и выйти — нижняя панель",
+      }),
+    ).toBeEnabled();
+    expect(
+      footerQueries.getByRole("combobox", {
+        name: "Выбрать заявителя — нижняя панель",
+      }),
+    ).toBeEnabled();
+
+    fireEvent.click(next);
+    expect(
+      footerQueries.getByRole("button", {
+        name: "Предыдущий раздел: Личные данные",
+      }),
+    ).toBeEnabled();
+    expect(
+      result.container.querySelector(
+        '.v19-questionnaire-section-list--pinned [aria-pressed="true"]',
+      ),
+    ).toHaveTextContent("Паспорт");
+
+    fireEvent.click(
+      footerQueries.getByRole("button", {
+        name: "Предыдущий раздел: Личные данные",
+      }),
+    );
+    clickPinnedSection(result.container, "Отель / приглашение");
+    expect(
+      footerQueries.getByRole("button", {
+        name: "Следующий раздел недоступен",
+      }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Далее: Ivanov Anton" }),
+    ).toBeInTheDocument();
+
+    const applicantMenu = footerQueries.getByRole("combobox", {
+      name: "Выбрать заявителя — нижняя панель",
+    });
+    fireEvent.click(applicantMenu);
+    fireEvent.click(
+      screen.getByRole("option", {
+        name: new RegExp(submission.applicants[1]?.fullName ?? "", "iu"),
+      }),
+    );
+    expect(
+      screen.getByText(/Контекст анкеты: заявитель Ivanov Anton/u),
+    ).toBeInTheDocument();
+  });
+
   test("preserves the production section navigation under Codex Polish v1", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON", "VOLKOVA MARIA"],
