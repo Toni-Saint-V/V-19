@@ -5,6 +5,7 @@ import {
   ArrowUpDown,
   ArrowRight,
   Bot,
+  CalendarDays,
   CheckCircle2,
   CheckSquare,
   ChevronRight,
@@ -14,6 +15,7 @@ import {
   FileSpreadsheet,
   FolderCheck,
   History,
+  IdCard,
   Lock,
   MapPin,
   PackageCheck,
@@ -69,6 +71,7 @@ import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
 interface ExportItem {
   id: string;
   publicId: string;
+  applicantName: string;
   title: string;
   type: "single" | "family";
   applicantsCount: number;
@@ -166,10 +169,14 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
       if (submission.status !== "ready_for_export") {
         return [];
       }
+      const mainApplicant =
+        submission.applicants.find((applicant) => applicant.role === "main") ??
+        submission.applicants[0];
 
       return [{
         id: submission.id,
         publicId: submissionPublicId(submission),
+        applicantName: mainApplicant?.fullName ?? submission.title,
         title: submission.listTitle ?? submission.title,
         type: submission.type,
         applicantsCount: submission.applicants.length,
@@ -367,7 +374,7 @@ export function AdminExportScreen({
         const typeMatches = typeFilter === "all" || item.type === typeFilter;
         const searchMatches =
           !searchNeedle ||
-          [item.id, item.title, item.agent, item.city]
+          [item.id, item.applicantName, item.title, item.agent, item.city]
             .join(" ")
             .toLowerCase()
             .includes(searchNeedle);
@@ -955,9 +962,9 @@ export function AdminExportScreen({
           <OperationalTableHeader
             className="v19-admin-export-table-head-v2"
             columns={[
-              { key: "applicant", label: "Заявитель" },
-              { key: "city", label: "Город" },
+              { key: "applicant", label: "ID / имя и фамилия" },
               { key: "dates", label: "Даты поездки" },
+              { key: "city", label: "Город" },
               { key: "agent", label: "Агент" },
             ]}
             leadingControl={
@@ -1010,42 +1017,65 @@ export function AdminExportScreen({
                     />
 
                     <div className="v19-admin-export-row-identity-v2 min-w-0">
-                      <div className="v19-admin-export-row-identity-meta-v2">
+                      <span
+                        aria-hidden="true"
+                        className="v19-admin-export-row-icon-v2"
+                      >
+                        <IdCard />
+                      </span>
+                      <div className="v19-admin-export-row-copy-v2">
                         <span className="v19-admin-export-row-public-id-v2">
                           {item.publicId}
                         </span>
-                        {item.applicantsCount > 1 ? (
-                          <span
-                            aria-label={`${item.applicantsCount} ${applicantCountLabel(item.applicantsCount)}`}
-                            className="v19-admin-export-row-family-count-v2"
-                          >
-                            <Users aria-hidden="true" />
-                            {item.applicantsCount}
-                          </span>
-                        ) : null}
+                        <strong className="v19-admin-export-row-title-v2">
+                          {item.applicantName}
+                        </strong>
                       </div>
-                      <strong className="v19-admin-export-row-title-v2">
-                        {item.title}
-                      </strong>
-                      {item.blockerReasons[0] ? (
-                        <div className="v19-admin-export-row-reason-v2">
-                          {item.blockerReasons[0]}
-                        </div>
-                      ) : null}
+                    </div>
+
+                    <div className="v19-admin-export-row-dates-v2">
+                      <span
+                        aria-hidden="true"
+                        className="v19-admin-export-row-icon-v2"
+                      >
+                        <CalendarDays />
+                      </span>
+                      <small className="v19-admin-export-row-label-v2">
+                        Даты поездки
+                      </small>
+                      <span className="v19-admin-export-row-value-v2">
+                        {item.appointmentDate}
+                      </span>
                     </div>
 
                     <div className="v19-admin-export-row-city-v2">
-                      <MapPin aria-hidden="true" />
-                      <span>{item.city}</span>
+                      <span
+                        aria-hidden="true"
+                        className="v19-admin-export-row-icon-v2"
+                      >
+                        <MapPin />
+                      </span>
+                      <small className="v19-admin-export-row-label-v2">
+                        Город
+                      </small>
+                      <span className="v19-admin-export-row-value-v2">
+                        {item.city}
+                      </span>
                     </div>
 
-                    <div className="v19-admin-export-row-dates-v2 text-[12px] text-white/65 lg:text-[13px]">
-                      {item.appointmentDate}
-                    </div>
-
-                    <div className="v19-admin-export-row-agent-v2 flex items-center gap-2 text-[12px] text-white/65 lg:text-[13px]">
-                      <User className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                      <span>{exportAgentName(item.agent)}</span>
+                    <div className="v19-admin-export-row-agent-v2">
+                      <span
+                        aria-hidden="true"
+                        className="v19-admin-export-row-icon-v2"
+                      >
+                        <User />
+                      </span>
+                      <small className="v19-admin-export-row-label-v2">
+                        Агент
+                      </small>
+                      <span className="v19-admin-export-row-value-v2">
+                        {exportAgentName(item.agent)}
+                      </span>
                     </div>
                   </V19QueueCard>
                 ))}

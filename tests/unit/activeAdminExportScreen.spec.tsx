@@ -89,8 +89,20 @@ describe("active admin export screen", () => {
     expect(
       container.querySelector(".v19-admin-export-row-city-v2"),
     ).toBeInTheDocument();
+    expect(
+      container.querySelector(".v19-admin-export-row-dates-v2"),
+    ).toBeInTheDocument();
     expect(container.querySelector(".v19-admin-export-row-agent-v2"))
       .toBeInTheDocument();
+    expect(
+      container.querySelectorAll(".v19-admin-export-row-icon-v2"),
+    ).toHaveLength(4);
+    expect(
+      container.querySelector(".v19-admin-export-row-family-count-v2"),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector(".v19-admin-export-row-identity-v2"),
+    ).toHaveTextContent(submission.applicants[0]?.fullName ?? "");
 
     const packageCheckbox = screen.getByRole("checkbox", {
       name: `Выбрать ${submission.listTitle ?? submission.title}`,
