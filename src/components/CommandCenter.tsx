@@ -484,7 +484,9 @@ export function CommandCenter({
       handleOpenQuestionnaire(submissionId, {
         applicantId: target.applicantId,
         field: target.field,
+        fieldId: target.fieldId,
         section: target.section,
+        sectionId: target.sectionId,
       });
       return;
     }

@@ -25,6 +25,7 @@ import {
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
+import { PersistenceObservableError } from "../../src/services/persistenceObservability";
 
 afterEach(() => {
   cleanup();
@@ -52,6 +53,44 @@ test("preserves an exact safe Russian questionnaire validation error", () => {
     "Сервис не подтвердил сохранение. Введённые данные остаются в анкете — повторите попытку или продолжите редактирование.",
   );
 });
+
+test.each([
+  [
+    {
+      operation: "rpc.save_submission_draft" as const,
+      kind: "save" as const,
+      safeCode: "rpc.save_submission_draft:save:40001",
+      retryable: true,
+      supabaseCode: "40001",
+    },
+    "Подача была изменена в другом окне. Введённые данные остаются в анкете; обновите подачу и повторите сохранение.",
+  ],
+  [
+    {
+      operation: "rpc.save_submission_draft" as const,
+      kind: "rls" as const,
+      safeCode: "rpc.save_submission_draft:rls:42501",
+      retryable: false,
+      supabaseCode: "42501",
+    },
+    "Нет доступа к этой подаче. Введённые данные остаются в анкете; обновите список подач или обратитесь к администратору.",
+  ],
+  [
+    {
+      operation: "rpc.save_submission_draft" as const,
+      kind: "save" as const,
+      safeCode: "rpc.save_submission_draft:save:NETWORK",
+      retryable: true,
+    },
+    "Нет соединения с сервером. Проверьте интернет и повторите сохранение — введённые данные остаются в анкете.",
+  ],
+])(
+  "maps persistence diagnostics to safe questionnaire copy",
+  (diagnostics, expected) => {
+    const error = new PersistenceObservableError("internal detail", diagnostics);
+    expect(questionnaireSaveFailureMessage(error)).toBe(expected);
+  },
+);
 
 function deferred() {
   let resolve!: () => void;
@@ -584,6 +623,71 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
+  test("opens the exact hotel Email instead of the duplicate contact Email", async () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicant = draft.applicants[0];
+    const hotelSection = applicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "hotel-email"),
+    );
+    if (!applicant || !hotelSection) throw new Error("expected hotel email");
+    const submission: Submission = {
+      ...draft,
+      issues: [
+        {
+          comment: "Уточните email отеля.",
+          createdAt: "2026-07-25T00:00:00.000Z",
+          createdBy: "admin",
+          id: "issue-hotel-email",
+          reason: "Email отеля требует исправления",
+          severity: "blocker",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Email",
+            fieldId: "hotel-email",
+            section: hotelSection.title,
+            sectionId: hotelSection.id,
+          },
+          type: "field",
+        },
+      ],
+    };
+
+    render(
+      <FigmaQuestionnaireScreen
+        initialFocus={{
+          applicantId: applicant.id,
+          field: "Email",
+          fieldId: "hotel-email",
+          section: hotelSection.title,
+          sectionId: hotelSection.id,
+        }}
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    const hotelEmail = screen.getByLabelText("Email");
+    await waitFor(() => expect(hotelEmail).toHaveFocus());
+    expect(hotelEmail.closest("[data-field-label]")).toHaveAttribute(
+      "data-field-focused",
+      "true",
+    );
+    expect(screen.getAllByRole("button", { name: /Отель/ })[0]).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
   test("shows questionnaire answer options from the submission field model", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -875,11 +979,13 @@ describe("FigmaQuestionnaireScreen", () => {
         .sort(),
     );
     expect(
-      [...new Set(
-        bindings
-          .filter((binding) => blueprintFieldIds.has(binding.fieldId))
-          .map((binding) => binding.sectionId),
-      )].sort(),
+      [
+        ...new Set(
+          bindings
+            .filter((binding) => blueprintFieldIds.has(binding.fieldId))
+            .map((binding) => binding.sectionId),
+        ),
+      ].sort(),
     ).toEqual([...blueprintSectionIds].sort());
 
     const draft = fillEveryQuestionnaireField(
@@ -924,13 +1030,9 @@ describe("FigmaQuestionnaireScreen", () => {
       .sort();
     expect(missingFields).toEqual(Object.keys(dispositions).sort());
     expect(
-      [...renderedFieldIds]
-        .filter((fieldId) => !blueprintFieldIds.has(fieldId))
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => !blueprintFieldIds.has(fieldId)).sort(),
     ).toEqual(
-      [...renderedFieldIds]
-        .filter((fieldId) => fieldId in legacyBindings)
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => fieldId in legacyBindings).sort(),
     );
   });
 
@@ -1907,9 +2009,9 @@ describe("FigmaQuestionnaireScreen", () => {
       fireEvent.change(screen.getByLabelText("Имя"), {
         target: { value: "MUST NOT WRITE" },
       });
-      expect(
-        onFieldChange.mock.calls.map(([update]) => update.fieldId),
-      ).toEqual(["surname"]);
+      expect(onFieldChange.mock.calls.map(([update]) => update.fieldId)).toEqual([
+        "surname",
+      ]);
 
       await act(async () => {
         save.resolve();
@@ -1962,7 +2064,9 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
       "Не удалось сохранить и выйти",
     );
-    expect(screen.queryByText("Подача недоступна текущему агенту.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Подача недоступна текущему агенту."),
+    ).not.toBeInTheDocument();
     expect(onBack).not.toHaveBeenCalled();
     expect(onSaveDraft).toHaveBeenCalledWith(
       expect.objectContaining({ saveIntent: "navigation" }),
@@ -1973,9 +2077,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       screen.getByText(/Последние несохранённые изменения будут потеряны/),
     ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Да, выйти без сохранения" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Да, выйти без сохранения" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
@@ -2079,9 +2181,7 @@ describe("FigmaQuestionnaireScreen", () => {
       expect.objectContaining({ saveIntent: "autosave" }),
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).not.toHaveBeenCalled();
 
@@ -2136,9 +2236,7 @@ describe("FigmaQuestionnaireScreen", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
 
     await act(async () => {
       autosave.reject(new Error("temporary autosave failure"));
@@ -4344,7 +4442,9 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "family",
     });
-    const mainApplicant = draft.applicants.find((applicant) => applicant.role === "main");
+    const mainApplicant = draft.applicants.find(
+      (applicant) => applicant.role === "main",
+    );
     const secondaryApplicant = draft.applicants.find(
       (applicant) => applicant.role !== "main",
     );
@@ -4628,9 +4728,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Место рождения")).toHaveClass("is-filled");
-    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass(
-      "is-filled",
-    );
+    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass("is-filled");
   });
 
   test("does not duplicate a field issue as the next blocker notice", () => {
@@ -4933,9 +5031,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Повторить сохранение" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Повторить сохранение" }));
 
     await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(2));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);

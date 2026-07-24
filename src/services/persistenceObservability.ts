@@ -93,8 +93,7 @@ const userMessages: Record<PersistenceFailureKind, string> = {
   database: "Не удалось загрузить данные. Обновите страницу и повторите действие.",
   rls: "Недостаточно прав для этого действия. Обратитесь к администратору.",
   rpc: "Не удалось выполнить запрос. Обновите страницу и повторите действие.",
-  save:
-    "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие.",
+  save: "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие.",
   storage: "Не удалось выполнить действие с файлом. Повторите попытку.",
   upload: "Не удалось загрузить файл. Он не был отмечен как загруженный.",
   unknown: "Не удалось выполнить запрос. Обновите страницу и повторите действие.",
@@ -213,11 +212,7 @@ function safeCodeFor(
 ): string {
   const code =
     supabaseCode ??
-    (status
-      ? `HTTP_${status}`
-      : networkOrTimeoutFailure
-        ? "NETWORK"
-        : "UNKNOWN");
+    (status ? `HTTP_${status}` : networkOrTimeoutFailure ? "NETWORK" : "UNKNOWN");
   return `${operation}:${kind}:${code}`;
 }
 
@@ -276,11 +271,7 @@ export function formatPersistenceFailureForUser(
   error: unknown,
   fallback: string,
 ): string {
-  const message = userMessageForPersistenceError(error, fallback);
-  const diagnostics = safeDiagnosticsForPersistenceError(error);
-
-  if (!diagnostics) return message;
-  return `${message} Код ошибки: ${diagnostics.safeCode}.`;
+  return userMessageForPersistenceError(error, fallback);
 }
 
 export function logPersistenceDiagnostics(label: string, error: unknown): void {

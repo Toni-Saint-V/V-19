@@ -14,7 +14,7 @@ import type {
 import {
   clearOpenQuestionnaireIssueErrors,
   clearQuestionnaireIssueError,
-  questionnaireFieldMatchesTarget,
+  resolveQuestionnaireTargetField,
   validateQuestionnaireFieldValue,
 } from "./questionnaire";
 import { currentIssueTargetRevision } from "./correctionRevision";
@@ -269,8 +269,7 @@ export function agentQuestionnaireStatusPresentation(
       canEdit: false,
       completionLabel: "Отправить на проверку",
       drawerActionLabel: "Смотреть анкету",
-      drawerDescription:
-        "Подача принята к выгрузке и доступна только для просмотра.",
+      drawerDescription: "Подача принята к выгрузке и доступна только для просмотра.",
       readOnly: {
         label: "Готово к выгрузке",
         mobileLabel: "К выгрузке",
@@ -288,7 +287,8 @@ export function agentQuestionnaireStatusPresentation(
       readOnly: {
         label: "Выгружено",
         mobileLabel: "Выгружено",
-        message: "Подача уже выгружена. История и данные остаются доступны для просмотра.",
+        message:
+          "Подача уже выгружена. История и данные остаются доступны для просмотра.",
       },
     };
   }
@@ -418,10 +418,7 @@ function isIssueInAdminPassportReviewScope(
     isAdminPassportReviewIssueInScope(issue, {
       applicantId: applicant.id,
       fields: applicant.sections.flatMap((section) => section.fields),
-      mediaTypes: passportReviewMediaTypesVisibleForApplicant(
-        submission,
-        applicant.id,
-      ),
+      mediaTypes: passportReviewMediaTypesVisibleForApplicant(submission, applicant.id),
     }),
   );
 }
@@ -448,10 +445,7 @@ export function hasRequiredDocuments(submission: Submission) {
   return canonicalRequiredMediaReadiness(submission).ok;
 }
 
-export type ApplicantChecklistStatus =
-  | "ready"
-  | "missing_docs"
-  | "in_progress";
+export type ApplicantChecklistStatus = "ready" | "missing_docs" | "in_progress";
 
 export function applicantChecklistStatus(
   submission: Submission,
@@ -503,9 +497,8 @@ export function calculateSubmissionProgress(
       (file) => file.applicantId === slot.applicantId && file.type === slot.type,
     ),
   );
-  const readyFiles = requiredFiles.filter(
-    (file): file is Submission["files"][number] =>
-      Boolean(file && isFileReadyForProgress(file)),
+  const readyFiles = requiredFiles.filter((file): file is Submission["files"][number] =>
+    Boolean(file && isFileReadyForProgress(file)),
   );
   const files = percent(readyFiles.length, requiredFiles.length);
   let total = Math.round((questionnaire + files) / 2);
@@ -538,9 +531,7 @@ function percent(ready: number, total: number) {
   return Math.round((ready / total) * 100);
 }
 
-export function withRecalculatedSubmissionProgress(
-  submission: Submission,
-): Submission {
+export function withRecalculatedSubmissionProgress(submission: Submission): Submission {
   return {
     ...submission,
     applicants: submission.applicants.map((applicant) => ({
@@ -567,17 +558,13 @@ export function canAgentSubmitForReview(submission: Submission) {
   );
 }
 
-export function agentQuestionnaireCompletionDecision(
-  submission: Submission,
-): {
+export function agentQuestionnaireCompletionDecision(submission: Submission): {
   action: "submit_corrections" | "submit_for_review";
   ok: boolean;
   reason?: string;
 } {
   const action =
-    submission.status === "returned"
-      ? "submit_corrections"
-      : "submit_for_review";
+    submission.status === "returned" ? "submit_corrections" : "submit_for_review";
   const candidate =
     submission.status === "draft"
       ? { ...submission, status: "in_progress" as const }
@@ -588,7 +575,9 @@ export function agentQuestionnaireCompletionDecision(
 }
 
 export function canAdminReturnSubmission(submission: Submission) {
-  return adminIssueStatuses.includes(submission.status) && openIssueCount(submission) > 0;
+  return (
+    adminIssueStatuses.includes(submission.status) && openIssueCount(submission) > 0
+  );
 }
 
 export function canAdminApproveForExport(submission: Submission) {
@@ -640,11 +629,7 @@ export function hasMissingRequiredWork(submission: Submission) {
   const progress = calculateSubmissionProgress(submission);
   const questionnaire = blsQuestionnaireReadiness(submission);
 
-  return (
-    !questionnaire.ready ||
-    progress.files < 100 ||
-    !media.ok
-  );
+  return !questionnaire.ready || progress.files < 100 || !media.ok;
 }
 
 export function adminQuestionnaireReviewReadiness(submission: Submission): {
@@ -658,9 +643,7 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
         .map((field) => [field.id, field] as const),
     );
 
-    return ADMIN_PASSPORT_REVIEW_FIELD_IDS.map((fieldId) =>
-      fieldsById.get(fieldId),
-    );
+    return ADMIN_PASSPORT_REVIEW_FIELD_IDS.map((fieldId) => fieldsById.get(fieldId));
   });
 
   if (fields.some((field) => !field || !hasAdminPassportReviewValue(field.value))) {
@@ -670,8 +653,8 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
     };
   }
 
-  const passportFields = fields.filter(
-    (field): field is NonNullable<typeof field> => Boolean(field),
+  const passportFields = fields.filter((field): field is NonNullable<typeof field> =>
+    Boolean(field),
   );
 
   if (passportFields.some((field) => Boolean(field.error))) {
@@ -682,8 +665,7 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
   }
 
   const hasUnapprovedValue = passportFields.some(
-    (field) =>
-      (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
+    (field) => !field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy,
   );
 
   return hasUnapprovedValue
@@ -843,10 +825,7 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: missingTripDateRangeReason };
   }
 
-  if (
-    action === "submit_corrections" &&
-    fixedIssueCount(submission) === 0
-  ) {
+  if (action === "submit_corrections" && fixedIssueCount(submission) === 0) {
     return { ok: false, reason: "Сохраните исправления по всем замечаниям" };
   }
 
@@ -933,10 +912,7 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: "Подтвердите обязательные файлы перед принятием" };
   }
 
-  if (
-    action === "mark_exported" &&
-    !canAdminMarkExported(submission)
-  ) {
+  if (action === "mark_exported" && !canAdminMarkExported(submission)) {
     return { ok: false, reason: "Сначала сформируйте и скачайте пакет выгрузки" };
   }
 
@@ -946,10 +922,7 @@ function validateSubmissionActionPolicy(
 const directStatusTransitionActions = Object.entries(transitionMatrix).filter(
   ([action]) => action !== "generate_export" && action !== "open_history",
 ) as Array<
-  [
-    SubmissionAction,
-    { from: SubmissionStatus[]; to: SubmissionStatus; role: Role },
-  ]
+  [SubmissionAction, { from: SubmissionStatus[]; to: SubmissionStatus; role: Role }]
 >;
 
 function submissionActionForStatusTransition(
@@ -1167,13 +1140,7 @@ export function markSubmissionIssueFixedResult(
   role: Role,
   nowIso = new Date().toISOString(),
 ): CommandResult<Submission> {
-  return confirmAgentCorrectionResult(
-    submission,
-    issueId,
-    role,
-    undefined,
-    nowIso,
-  );
+  return confirmAgentCorrectionResult(submission, issueId, role, undefined, nowIso);
 }
 
 export function confirmAgentCorrectionResult(
@@ -1215,8 +1182,7 @@ export function confirmAgentCorrectionResult(
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message:
-          "Подача уже перешла в другой статус. Обновите данные и повторите.",
+        message: "Подача уже перешла в другой статус. Обновите данные и повторите.",
       },
     };
   }
@@ -1283,9 +1249,7 @@ export function confirmAgentCorrectionResult(
     ],
   };
 
-  const openIssues = withConfirmation.issues.filter(
-    (item) => item.status === "open",
-  );
+  const openIssues = withConfirmation.issues.filter((item) => item.status === "open");
   const allCorrectionsConfirmed =
     openIssues.length > 0 &&
     openIssues.every(
@@ -1310,8 +1274,7 @@ export function confirmAgentCorrectionResult(
   const preparedForHandoff = clearOpenQuestionnaireIssueErrors({
     ...withConfirmation,
     issues: withConfirmation.issues.map((item) =>
-      item.status === "open" &&
-      isIssueTransitionAllowed(item.status, "fixed_by_agent")
+      item.status === "open" && isIssueTransitionAllowed(item.status, "fixed_by_agent")
         ? {
             ...item,
             fixedAtIso: nowIso,
@@ -1331,13 +1294,10 @@ export function confirmAgentCorrectionResult(
   });
 }
 
-export function isAgentIssueCorrectionConfirmed(
-  submission: Submission,
-  issue: Issue,
-) {
+export function isAgentIssueCorrectionConfirmed(submission: Submission, issue: Issue) {
   return Boolean(
     issue.agentConfirmation &&
-      issue.agentConfirmation.targetRevision === currentIssueTargetRevision(issue),
+    issue.agentConfirmation.targetRevision === currentIssueTargetRevision(issue),
   );
 }
 
@@ -1351,11 +1311,9 @@ function correctionValidationMessage(submission: Submission, issue: Issue) {
   const applicant = submission.applicants.find(
     (candidate) => candidate.id === issue.target.applicantId,
   );
-  const field = applicant?.sections
-    .flatMap((section) => section.fields)
-    .find((candidate) =>
-      questionnaireFieldMatchesTarget(candidate, issue.target.field),
-    );
+  const field = applicant
+    ? resolveQuestionnaireTargetField(applicant, issue.target)?.field
+    : undefined;
   const fieldValidationError =
     field?.error ??
     (field ? validateQuestionnaireFieldValue(field) : undefined) ??
@@ -1456,9 +1414,7 @@ export function getAdminReviewActions(
   }
 
   const acceptAction =
-    submission.status === "corrections_received"
-      ? "close_issues_accept"
-      : "accept";
+    submission.status === "corrections_received" ? "close_issues_accept" : "accept";
   const returnAction =
     submission.status === "corrections_received"
       ? "return_again"
@@ -1606,12 +1562,7 @@ export function applyAgentSubmitForReviewResult(
 ): CommandResult<Submission> {
   const preparedResult =
     submission.status === "draft"
-      ? applySubmissionActionResult(
-          submission,
-          "save_progress",
-          "agent",
-          actorId,
-        )
+      ? applySubmissionActionResult(submission, "save_progress", "agent", actorId)
       : { ok: true as const, data: submission };
 
   if (!preparedResult.ok) {
@@ -1677,17 +1628,20 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
   if (!applicant) return false;
 
   if (issue.type === "section") {
-    const section = applicant.sections.find(
-      (item) =>
-        item.title === issue.target.field || item.title === issue.target.section,
-    );
+    const resolved = resolveQuestionnaireTargetField(applicant, issue.target);
+    const legacySections = resolved
+      ? []
+      : applicant.sections.filter(
+          (item) =>
+            item.title === issue.target.field || item.title === issue.target.section,
+        );
+    const section =
+      resolved?.section ??
+      (legacySections.length === 1 ? legacySections[0] : undefined);
     return Boolean(section && section.status === "complete");
   }
 
-  const fields = applicant.sections.flatMap((section) => section.fields);
-  const field = fields.find((item) =>
-    questionnaireFieldMatchesTarget(item, issue.target.field),
-  );
+  const field = resolveQuestionnaireTargetField(applicant, issue.target)?.field;
   if (!field) return false;
 
   const value = field.value.trim();

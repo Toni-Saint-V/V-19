@@ -25,7 +25,10 @@ import {
   isIssueTransitionAllowed,
 } from "./domainContract";
 import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
-import { questionnaireFieldMatchesTarget } from "./questionnaire";
+import {
+  resolveQuestionnaireIssueInputIdentity,
+  resolveQuestionnaireTargetField,
+} from "./questionnaire";
 import { requiredPassportReviewMediaTypesForApplicant } from "./passportReviewContract";
 import type {
   ActionDecision,
@@ -291,10 +294,7 @@ export function acceptSubmission(
   const terminal = ensureNotTerminal(submission);
   if (terminal) return terminal;
   if (role !== "admin") {
-    return failure(
-      "PERMISSION_DENIED",
-      "Принять подачу может только администратор.",
-    );
+    return failure("PERMISSION_DENIED", "Принять подачу может только администратор.");
   }
   if (!["submitted_for_review", "corrections_received"].includes(submission.status)) {
     return failure("INVALID_TRANSITION", "Подача сейчас недоступна для принятия.");
@@ -361,10 +361,7 @@ export function generateExport(
   const summary = exportSummary(submissions, "xlsx");
   const packageIdentity = buildExportPackageIdentity(submissions, "xlsx");
   if (!summary.canGenerate || !packageIdentity) {
-    return failure(
-      "EXPORT_NOT_READY",
-      "Выбранные подачи ещё не готовы к выгрузке.",
-    );
+    return failure("EXPORT_NOT_READY", "Выбранные подачи ещё не готовы к выгрузке.");
   }
 
   return success({ packageIdentity, summary });
@@ -401,13 +398,12 @@ export function markExported(
   }
 
   const transitioned = transitionSubmissionStatus(withDerivedState(submission), {
-      actorRole: role,
-      nextStatus: "exported",
-      note: "Подача отмечена выгруженной",
-      nowIso: "сейчас",
-      source: "admin",
-    },
-  );
+    actorRole: role,
+    nextStatus: "exported",
+    note: "Подача отмечена выгруженной",
+    nowIso: "сейчас",
+    source: "admin",
+  });
   return transitioned.ok
     ? {
         ok: true,
@@ -576,7 +572,7 @@ function createIssueFromInput(
   if (!applicant) {
     throw new Error("Не удалось найти выбранный объект замечания.");
   }
-  const targetIdentity = issueQuestionnaireTargetIdentity(applicant, input);
+  const targetIdentity = resolveQuestionnaireIssueInputIdentity(applicant, input);
 
   return {
     id: `зм-${submission.id}-domain-${submission.issues.length + index + 1}`,
@@ -600,50 +596,6 @@ function createIssueFromInput(
   };
 }
 
-function issueQuestionnaireTargetIdentity(
-  applicant: Submission["applicants"][number],
-  input: IssueInput,
-) {
-  if (input.fileType) return undefined;
-  if (input.sectionId && input.fieldId) {
-    return { sectionId: input.sectionId, fieldId: input.fieldId };
-  }
-  if (input.type === "section") {
-    const targetSection = applicant.sections.find(
-      (section) =>
-        section.id === input.sectionId ||
-        section.title === input.field ||
-        section.title === input.section,
-    );
-    const targetField =
-      targetSection?.fields.find((field) => Boolean(field.error)) ??
-      targetSection?.fields.find(
-        (field) => field.required && !field.value.trim(),
-      ) ??
-      targetSection?.fields[0];
-    if (targetSection && targetField) {
-      return { sectionId: targetSection.id, fieldId: targetField.id };
-    }
-  }
-
-  for (const section of applicant.sections) {
-    if (
-      input.section &&
-      section.id !== input.section &&
-      section.title !== input.section
-    ) {
-      continue;
-    }
-    const field = section.fields.find(
-      (candidate) =>
-        candidate.id === input.fieldId ||
-        questionnaireFieldMatchesTarget(candidate, input.field),
-    );
-    if (field) return { sectionId: section.id, fieldId: field.id };
-  }
-  return undefined;
-}
-
 function isValidIssueInput(submission: Submission, input: IssueInput) {
   const applicant = submission.applicants.find((item) => item.id === input.applicantId);
   return Boolean(
@@ -662,9 +614,8 @@ function issueTargetSnapshot(submission: Submission, input: IssueInput) {
   }
 
   const applicant = submission.applicants.find((item) => item.id === input.applicantId);
-  return applicant?.sections
-    .flatMap((section) => section.fields)
-    .find((field) => questionnaireFieldMatchesTarget(field, input.field))?.value;
+  if (!applicant) return undefined;
+  return resolveQuestionnaireTargetField(applicant, input)?.field.value;
 }
 
 function isValidIssueTarget(
@@ -682,19 +633,9 @@ function isValidIssueTarget(
   }
 
   if (input.fileType) return false;
-  if (input.type === "section") {
-    const target = (input.section ?? input.field ?? "").trim();
-    return Boolean(
-      target && applicant.sections.some((section) => section.title === target),
-    );
-  }
-
   return Boolean(
-    input.type === "field" &&
-    input.field &&
-    applicant.sections
-      .flatMap((section) => section.fields)
-      .some((field) => questionnaireFieldMatchesTarget(field, input.field)),
+    (input.type === "field" || input.type === "section") &&
+    resolveQuestionnaireIssueInputIdentity(applicant, input),
   );
 }
 

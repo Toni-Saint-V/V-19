@@ -35,10 +35,10 @@ describe("Supabase persistence observability", () => {
     });
 
     const message = formatPersistenceFailureForUser(error, "fallback");
-    expect(message).toContain("Недостаточно прав для этого действия.");
-    expect(message).toContain(
-      "Код ошибки: rpc.save_submission_draft:rls:42501.",
+    expect(message).toBe(
+      "Недостаточно прав для этого действия. Обратитесь к администратору.",
     );
+    expect(message).not.toContain("42501");
     expect(message).not.toContain("private SQL predicate");
     expect(message).not.toContain("internal policy name");
   });
@@ -66,7 +66,7 @@ describe("Supabase persistence observability", () => {
       supabaseCode: "S3Error",
     });
     expect(formatPersistenceFailureForUser(error, "fallback")).toBe(
-      "Не удалось загрузить файл. Он не был отмечен как загруженный. Код ошибки: storage.upload_media:upload:S3Error.",
+      "Не удалось загрузить файл. Он не был отмечен как загруженный.",
     );
   });
 
@@ -91,7 +91,7 @@ describe("Supabase persistence observability", () => {
       httpStatus: 400,
     });
     expect(formatPersistenceFailureForUser(error, "fallback")).toBe(
-      "Не удалось войти. Проверьте email и пароль. Код ошибки: auth.sign_in_password:auth:HTTP_400.",
+      "Не удалось войти. Проверьте email и пароль.",
     );
   });
 
@@ -115,7 +115,7 @@ describe("Supabase persistence observability", () => {
       sourceName: "AuthRetryableFetchError",
     });
     expect(formatPersistenceFailureForUser(error, "fallback")).toBe(
-      "Не удалось войти. Проверьте email и пароль. Код ошибки: auth.sign_in_password:auth:NETWORK.",
+      "Не удалось войти. Проверьте email и пароль.",
     );
   });
 });

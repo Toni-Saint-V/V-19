@@ -40,7 +40,7 @@ import {
   historyTimestampForUser,
 } from "../modules/submissions/historyPresentation";
 import { blsApplicantQuestionnaireStatus } from "../modules/submissions/questionnaireBlsRules";
-import { questionnaireFieldMatchesTarget } from "../modules/submissions/questionnaire";
+import { resolveQuestionnaireTargetField } from "../modules/submissions/questionnaire";
 import type {
   ActionDecision,
   Applicant,
@@ -137,8 +137,14 @@ function fileStatusTone(file: SubmissionFile) {
   return "text-white/55";
 }
 
-function fieldMatchesIssue(field: QuestionnaireField, issue: Issue) {
-  return questionnaireFieldMatchesTarget(field, issue.target.field);
+function fieldMatchesIssue(
+  applicant: Applicant,
+  field: QuestionnaireField,
+  issue: Issue,
+) {
+  return (
+    resolveQuestionnaireTargetField(applicant, issue.target)?.field.id === field.id
+  );
 }
 
 function questionnaireFieldDomId(applicantId: string, fieldId: string) {
@@ -170,11 +176,16 @@ function issueTargetsFile(issue: Issue) {
   );
 }
 
-function fieldStatus(field: QuestionnaireField, issues: Issue[]): FieldReviewStatus {
+function fieldStatus(
+  applicant: Applicant,
+  field: QuestionnaireField,
+  issues: Issue[],
+): FieldReviewStatus {
   if (
     field.error ||
     issues.some(
-      (issue) => issue.status === "open" && fieldMatchesIssue(field, issue),
+      (issue) =>
+        issue.status === "open" && fieldMatchesIssue(applicant, field, issue),
     )
   )
     return "error";
@@ -429,7 +440,7 @@ function ApplicantsTab({
     hasReviewValue(field.value),
   );
   const approvedQuestionnaireFields = filledQuestionnaireFields.filter(
-    (field) => fieldStatus(field, applicantIssues) === "approved",
+    (field) => fieldStatus(applicant, field, applicantIssues) === "approved",
   ).length;
   const applicantQuestionnaireStatus = applicantIssues.some(
     (issue) => issue.status === "open" && !issueTargetsFile(issue),
@@ -777,13 +788,12 @@ function QuestionnaireTab({
       return;
     }
 
-    const targetField = targetApplicant.sections
-      .flatMap((section) => section.fields)
-      .find((field) => questionnaireFieldMatchesTarget(field, issue.target.field));
-    const targetSection = targetApplicant.sections.find(
-      (section) =>
-        section.id === issue.target.section || section.title === issue.target.section,
+    const resolved = resolveQuestionnaireTargetField(
+      targetApplicant,
+      issue.target,
     );
+    const targetField = resolved?.field;
+    const targetSection = resolved?.section;
     const targetId = targetField
       ? questionnaireFieldDomId(targetApplicant.id, targetField.id)
       : targetSection
@@ -832,7 +842,7 @@ function QuestionnaireTab({
   const fields = applicant.sections.flatMap((section) => section.fields);
   const reviewableFields = fields.filter((field) => hasReviewValue(field.value));
   const approvedCount = reviewableFields.filter(
-    (field) => fieldStatus(field, applicantIssues) === "approved",
+    (field) => fieldStatus(applicant, field, applicantIssues) === "approved",
   ).length;
   const focusFirstField = (predicate: (field: QuestionnaireField) => boolean) => {
     const target = fields.find(predicate);
@@ -936,7 +946,8 @@ function QuestionnaireTab({
             disabled={!applicantIssues.length}
             onClick={() =>
               focusFirstField(
-                (field) => fieldStatus(field, applicantIssues) === "error",
+                (field) =>
+                  fieldStatus(applicant, field, applicantIssues) === "error",
               )
             }
             type="button"
@@ -957,10 +968,11 @@ function QuestionnaireTab({
           );
 
           const approvedInSection = reviewableFields.filter(
-            (field) => fieldStatus(field, applicantIssues) === "approved",
+            (field) =>
+              fieldStatus(applicant, field, applicantIssues) === "approved",
           ).length;
           const fieldsToApprove = reviewableFields.filter((field) => {
-            const status = fieldStatus(field, applicantIssues);
+            const status = fieldStatus(applicant, field, applicantIssues);
             return status !== "approved" && status !== "error";
           });
           const isSectionComplete =
@@ -968,7 +980,7 @@ function QuestionnaireTab({
             approvedInSection === reviewableFields.length;
 
           const unresolvedInSection = visibleFields.some(
-            (field) => fieldStatus(field, applicantIssues) === "error",
+            (field) => fieldStatus(applicant, field, applicantIssues) === "error",
           );
 
           return (
@@ -1043,7 +1055,7 @@ function QuestionnaireTab({
               </div>
               <div className="admin-review-field-table mt-3 space-y-2">
                 {visibleFields.map((field) => {
-                  const status = fieldStatus(field, applicantIssues);
+                  const status = fieldStatus(applicant, field, applicantIssues);
                   const approvalKey = `${applicant.id}:${section.id}:${field.id}`;
                   const approveDisabled =
                     !hasReviewValue(field.value) || status === "error";

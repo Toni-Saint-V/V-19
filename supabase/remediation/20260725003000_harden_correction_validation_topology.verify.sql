@@ -44,6 +44,7 @@ begin
       select 1
       from pg_catalog.pg_trigger as trigger_info
       where trigger_info.tgname = 'corrections_agent_parent_status_guard'
+        and trigger_info.tgrelid = 'public.corrections'::regclass
         and trigger_info.tgenabled = 'O'
         and not trigger_info.tgisinternal
     )

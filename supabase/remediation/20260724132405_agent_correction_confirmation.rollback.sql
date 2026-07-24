@@ -1,5 +1,23 @@
 begin;
 
+do $rollback_guard$
+begin
+  if exists (
+    select 1
+    from supabase_migrations.schema_migrations as migration
+    where migration.version in ('20260724200418', '20260724204041')
+      or migration.name in (
+        '20260724234200_server_owned_correction_targets',
+        '20260725003000_harden_correction_validation_topology'
+      )
+  ) then
+    raise exception
+      'FORWARD_ONLY: later server-owned correction migrations are installed; use a forward repair instead of this rollback'
+      using errcode = '55000';
+  end if;
+end;
+$rollback_guard$;
+
 create or replace function public.save_submission_draft(payload jsonb)
 returns jsonb
 language plpgsql

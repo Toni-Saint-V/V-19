@@ -1,4 +1,11 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { SignOutCurrentSessionResult } from "../../src/services/authService";
 import { mapSupabasePersistenceError } from "../../src/services/persistenceObservability";
@@ -106,21 +113,18 @@ const exportRuleMocks = vi.hoisted(() => {
     },
   );
   const exportPackageIdentityMatches = vi.fn(
-    (
-      left: typeof preparedIdentity,
-      right: typeof preparedIdentity | null,
-    ) =>
+    (left: typeof preparedIdentity, right: typeof preparedIdentity | null) =>
       Boolean(
         right &&
-          left.contentFingerprint === right.contentFingerprint &&
-          left.fileName === right.fileName &&
-          left.format === right.format &&
-          left.idempotencyKey === right.idempotencyKey &&
-          left.rowCount === right.rowCount &&
-          left.submissionIds.length === right.submissionIds.length &&
-          left.submissionIds.every(
-            (value, index) => value === right.submissionIds[index],
-          ),
+        left.contentFingerprint === right.contentFingerprint &&
+        left.fileName === right.fileName &&
+        left.format === right.format &&
+        left.idempotencyKey === right.idempotencyKey &&
+        left.rowCount === right.rowCount &&
+        left.submissionIds.length === right.submissionIds.length &&
+        left.submissionIds.every(
+          (value, index) => value === right.submissionIds[index],
+        ),
       ),
   );
 
@@ -194,7 +198,8 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
       const bridge = useVisaflowBusinessBridge();
       const capture = (promise: void | Promise<void> | undefined) => {
         runtime.lastMutationPromise = Promise.resolve(promise).catch((error) => {
-          runtime.lastMutationError = error instanceof Error ? error : new Error(String(error));
+          runtime.lastMutationError =
+            error instanceof Error ? error : new Error(String(error));
         });
       };
 
@@ -362,8 +367,7 @@ vi.mock("../../src/modules/submissions/aiSuggestions", () => ({
 vi.mock("../../src/modules/submissions/exportWorkflow", () => exportMocks);
 
 vi.mock("../../src/modules/submissions/exportRules", () => ({
-  buildExportArchiveInputSignature:
-    exportRuleMocks.buildExportArchiveInputSignature,
+  buildExportArchiveInputSignature: exportRuleMocks.buildExportArchiveInputSignature,
   buildExportPackageIdentity: exportRuleMocks.buildExportPackageIdentity,
   exportPackageIdentityMatches: exportRuleMocks.exportPackageIdentityMatches,
 }));
@@ -559,9 +563,7 @@ describe("App production workspace runtime", () => {
       render(<App />);
       await screen.findByTestId("admin-workspace");
       expect(
-        await screen.findByTestId(
-          `access-request-${pendingAccessRequest.id}-status`,
-        ),
+        await screen.findByTestId(`access-request-${pendingAccessRequest.id}-status`),
       ).toHaveTextContent("pending");
 
       fireEvent.click(screen.getByRole("button", { name: buttonName }));
@@ -722,7 +724,9 @@ describe("App production workspace runtime", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
     await waitFor(() =>
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      ),
     );
     const staleMutation = runtime.lastMutationPromise;
 
@@ -845,7 +849,9 @@ describe("App production workspace runtime", () => {
     fireEvent.click(screen.getByRole("button", { name: "Accept submission" }));
     await waitFor(() => {
       expect(runtime.actionActorId).toBe("admin-production-uuid");
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      );
     });
     expect(externalAction).not.toHaveBeenCalled();
 
@@ -858,7 +864,9 @@ describe("App production workspace runtime", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
     await waitFor(() => {
       expect(runtime.issueActorId).toBe("admin-production-uuid");
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        2,
+      );
       expect(externalIssue).toHaveBeenCalledTimes(1);
     });
   });
@@ -879,12 +887,12 @@ describe("App production workspace runtime", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Approve passport section" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Approve passport section" }));
 
     await waitFor(() =>
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      ),
     );
     expect(runtime.passportSectionActorId).toBe("");
 
@@ -935,7 +943,9 @@ describe("App production workspace runtime", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
     await waitFor(() =>
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      ),
     );
 
     persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValue({
@@ -1000,7 +1010,9 @@ describe("App production workspace runtime", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
     await waitFor(() =>
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      ),
     );
     const adminAMutation = runtime.lastMutationPromise;
 
@@ -1138,7 +1150,9 @@ describe("App production workspace runtime", () => {
     fireEvent.click(screen.getByRole("button", { name: "Approve passport section" }));
     await waitFor(() => {
       expect(runtime.passportSectionActorId).toBe("admin-production-uuid");
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      );
     });
     expect(externalPassportSectionApprove).not.toHaveBeenCalled();
     expect(
@@ -1212,7 +1226,9 @@ describe("App production workspace runtime", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept submission" }));
     await waitFor(() =>
-      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      ),
     );
     await act(async () => {
       runtime.rejectSave(persistenceFailure);
@@ -1221,7 +1237,7 @@ describe("App production workspace runtime", () => {
 
     expect(
       await screen.findByText(
-        "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие. Код ошибки: rpc.save_submission_draft:save:42703.",
+        "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(persistenceFailure.message)).not.toBeInTheDocument();
@@ -1331,9 +1347,9 @@ describe("App production workspace runtime", () => {
       window.dispatchEvent(new Event("focus"));
     });
     await waitFor(() =>
-      expect(
-        persistenceMocks.loadCockpitSubmissionsForProfile,
-      ).toHaveBeenCalledTimes(1),
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      ),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
@@ -1342,9 +1358,7 @@ describe("App production workspace runtime", () => {
     });
 
     expect(runtime.exportStateCalls).toEqual([]);
-    expect(
-      persistenceMocks.saveCockpitSubmissionsForProfile,
-    ).not.toHaveBeenCalled();
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
     expect(exportMocks.completeExportPackage).not.toHaveBeenCalled();
     expect(runtime.lastMutationError?.message).toBe(
       "Export artifact is stale; regenerate Excel and ZIP before retrying.",
@@ -1379,9 +1393,9 @@ describe("App production workspace runtime", () => {
       window.dispatchEvent(new Event("focus"));
     });
     await waitFor(() =>
-      expect(
-        persistenceMocks.loadCockpitSubmissionsForProfile,
-      ).toHaveBeenCalledTimes(1),
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        1,
+      ),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
@@ -1390,9 +1404,7 @@ describe("App production workspace runtime", () => {
     });
 
     expect(runtime.exportStateCalls).toEqual([]);
-    expect(
-      persistenceMocks.saveCockpitSubmissionsForProfile,
-    ).not.toHaveBeenCalled();
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
     expect(exportMocks.completeExportPackage).not.toHaveBeenCalled();
     expect(runtime.lastMutationError?.message).toBe(
       "Export artifact is stale; regenerate Excel and ZIP before retrying.",
@@ -1478,7 +1490,9 @@ describe("App production workspace runtime", () => {
       expect(exportMocks.completeExportPackage).toHaveBeenCalledTimes(1),
     );
     await waitFor(() =>
-      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2),
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(
+        2,
+      ),
     );
 
     await act(async () => {

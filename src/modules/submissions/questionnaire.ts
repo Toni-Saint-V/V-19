@@ -1,6 +1,8 @@
 import type {
   Applicant,
   Issue,
+  IssueInput,
+  IssueTarget,
   QuestionnaireField,
   QuestionnaireReviewSource,
   QuestionnaireReviewState,
@@ -116,20 +118,72 @@ const questionnaireBlueprint: Array<{
     title: "Адрес и контакты",
     stepLabel: "1 из 7",
     fields: [
-      { id: "home-country", label: "Страна проживания", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Russian Federation" },
-      { id: "home-city", label: "Город проживания", placeholder: "Например, Санкт-Петербург" },
-      { id: "home-street", label: "Улица / проспект / переулок", placeholder: "Например, Улица Ленина" },
+      {
+        id: "home-country",
+        label: "Страна проживания",
+        placeholder: "Выберите страну",
+        control: "select",
+        options: blsCountryOptions,
+        value: "Russian Federation",
+      },
+      {
+        id: "home-city",
+        label: "Город проживания",
+        placeholder: "Например, Санкт-Петербург",
+      },
+      {
+        id: "home-street",
+        label: "Улица / проспект / переулок",
+        placeholder: "Например, Улица Ленина",
+      },
       { id: "home-house", label: "Дом", placeholder: "Например, 15" },
-      { id: "home-building", label: "Корпус / строение", placeholder: "Например, Корпус 2", required: false },
-      { id: "home-unit", label: "Квартира / офис / помещение", placeholder: "Например, Квартира 12", required: false },
+      {
+        id: "home-building",
+        label: "Корпус / строение",
+        placeholder: "Например, Корпус 2",
+        required: false,
+      },
+      {
+        id: "home-unit",
+        label: "Квартира / офис / помещение",
+        placeholder: "Например, Квартира 12",
+        required: false,
+      },
       { id: "postal-code", label: "Почтовый индекс", placeholder: "Например, 101000" },
       { id: "email", label: "Email", placeholder: "name@example.com" },
       { id: "contact-number", label: "Телефон", placeholder: "+7 900 000-00-00" },
-      { id: "lives-outside-citizenship", label: "Есть вид на жительство в другой стране", placeholder: "Выберите ответ", control: "select", options: yesNoOptions, value: "Нет" },
-      { id: "residence-permit-type", label: "Вид на жительство / документ", placeholder: "Например, Вид на жительство", required: false },
-      { id: "residence-permit-number", label: "Номер документа", placeholder: "Например, AB123456", required: false },
-      { id: "residence-permit-valid-until", label: "Действителен до", placeholder: "ДД.ММ.ГГГГ", required: false },
-      { id: "home-address", label: "Домашний адрес", placeholder: "Собирается автоматически", required: false },
+      {
+        id: "lives-outside-citizenship",
+        label: "Есть вид на жительство в другой стране",
+        placeholder: "Выберите ответ",
+        control: "select",
+        options: yesNoOptions,
+        value: "Нет",
+      },
+      {
+        id: "residence-permit-type",
+        label: "Вид на жительство / документ",
+        placeholder: "Например, Вид на жительство",
+        required: false,
+      },
+      {
+        id: "residence-permit-number",
+        label: "Номер документа",
+        placeholder: "Например, AB123456",
+        required: false,
+      },
+      {
+        id: "residence-permit-valid-until",
+        label: "Действителен до",
+        placeholder: "ДД.ММ.ГГГГ",
+        required: false,
+      },
+      {
+        id: "home-address",
+        label: "Домашний адрес",
+        placeholder: "Собирается автоматически",
+        required: false,
+      },
     ],
   },
   {
@@ -137,23 +191,119 @@ const questionnaireBlueprint: Array<{
     title: "Поездка",
     stepLabel: "2 из 7",
     fields: [
-      { id: "purpose", label: "Цель поездки", placeholder: "Выберите цель", control: "select", options: ["TOURISM", "BUSINESS", "VISITING FAMILY OR FRIENDS", "STUDY", "MEDICAL TREATMENT", "OFFICIAL VISIT", "CULTURAL", "SPORTS", "TRANSIT", "OTHER"], value: "TOURISM" },
-      { id: "stay-purpose-details", label: "Дополнительные сведения о цели", placeholder: "Например, Участие в конференции", required: false, span: "full" },
-      { id: "main-destination", label: "Основная страна назначения", placeholder: "Выберите или введите страну", control: "select", options: blsCountryOptions, value: "Spain" },
-      { id: "first-entry-country", label: "Страна первого въезда", placeholder: "Выберите или введите страну", control: "select", options: blsCountryOptions, value: "Spain" },
-      { id: "entry-count", label: "Количество въездов", placeholder: "Выберите количество въездов", control: "select", options: ["Однократная", "Двукратная", "Многократная"] },
+      {
+        id: "purpose",
+        label: "Цель поездки",
+        placeholder: "Выберите цель",
+        control: "select",
+        options: [
+          "TOURISM",
+          "BUSINESS",
+          "VISITING FAMILY OR FRIENDS",
+          "STUDY",
+          "MEDICAL TREATMENT",
+          "OFFICIAL VISIT",
+          "CULTURAL",
+          "SPORTS",
+          "TRANSIT",
+          "OTHER",
+        ],
+        value: "TOURISM",
+      },
+      {
+        id: "stay-purpose-details",
+        label: "Дополнительные сведения о цели",
+        placeholder: "Например, Участие в конференции",
+        required: false,
+        span: "full",
+      },
+      {
+        id: "main-destination",
+        label: "Основная страна назначения",
+        placeholder: "Выберите или введите страну",
+        control: "select",
+        options: blsCountryOptions,
+        value: "Spain",
+      },
+      {
+        id: "first-entry-country",
+        label: "Страна первого въезда",
+        placeholder: "Выберите или введите страну",
+        control: "select",
+        options: blsCountryOptions,
+        value: "Spain",
+      },
+      {
+        id: "entry-count",
+        label: "Количество въездов",
+        placeholder: "Выберите количество въездов",
+        control: "select",
+        options: ["Однократная", "Двукратная", "Многократная"],
+      },
       { id: "arrival-date", label: "Дата въезда", placeholder: "ДД.ММ.ГГГГ" },
       { id: "departure-date", label: "Дата выезда", placeholder: "ДД.ММ.ГГГГ" },
-      { id: "stay-duration", label: "Длительность пребывания", placeholder: "Рассчитывается автоматически" },
-      { id: "previous-biometrics", label: "Отпечатки ранее сдавались", placeholder: "Выберите ответ", control: "select", options: yesNoOptions },
-      { id: "previous-biometrics-date", label: "Дата сдачи отпечатков", placeholder: "ДД.ММ.ГГГГ", required: false },
-      { id: "previous-visa-number", label: "Номер визы", placeholder: "Например, ESP123456789", required: false },
-      { id: "final-entry-permit", label: "Разрешение на въезд в конечную страну", placeholder: "Например, Виза США", required: false },
-      { id: "final-entry-permit-issued-by", label: "Кем выдано", placeholder: "Например, Консульство США", required: false },
-      { id: "final-entry-permit-valid-from", label: "Действительно с", placeholder: "ДД.ММ.ГГГГ", required: false },
-      { id: "final-entry-permit-valid-to", label: "Действительно до", placeholder: "ДД.ММ.ГГГГ", required: false },
-      { id: "cost-covered-by", label: "Кто оплачивает поездку", placeholder: "Служебное значение", required: false, value: "Сам заявитель" },
-      { id: "means-of-support", label: "Средства заявителя", placeholder: "Служебное значение", required: false, value: "Наличные" },
+      {
+        id: "stay-duration",
+        label: "Длительность пребывания",
+        placeholder: "Рассчитывается автоматически",
+      },
+      {
+        id: "previous-biometrics",
+        label: "Отпечатки ранее сдавались",
+        placeholder: "Выберите ответ",
+        control: "select",
+        options: yesNoOptions,
+      },
+      {
+        id: "previous-biometrics-date",
+        label: "Дата сдачи отпечатков",
+        placeholder: "ДД.ММ.ГГГГ",
+        required: false,
+      },
+      {
+        id: "previous-visa-number",
+        label: "Номер визы",
+        placeholder: "Например, ESP123456789",
+        required: false,
+      },
+      {
+        id: "final-entry-permit",
+        label: "Разрешение на въезд в конечную страну",
+        placeholder: "Например, Виза США",
+        required: false,
+      },
+      {
+        id: "final-entry-permit-issued-by",
+        label: "Кем выдано",
+        placeholder: "Например, Консульство США",
+        required: false,
+      },
+      {
+        id: "final-entry-permit-valid-from",
+        label: "Действительно с",
+        placeholder: "ДД.ММ.ГГГГ",
+        required: false,
+      },
+      {
+        id: "final-entry-permit-valid-to",
+        label: "Действительно до",
+        placeholder: "ДД.ММ.ГГГГ",
+        required: false,
+      },
+      {
+        id: "cost-covered-by",
+        label: "Кто оплачивает поездку",
+        placeholder: "Служебное значение",
+        required: false,
+        value: "Сам заявитель",
+      },
+      {
+        id: "means-of-support",
+        label: "Средства заявителя",
+        placeholder: "Служебное значение",
+        required: false,
+        value: "Наличные",
+      },
     ],
   },
   {
@@ -161,17 +311,74 @@ const questionnaireBlueprint: Array<{
     title: "Отель / приглашающая сторона",
     stepLabel: "3 из 7",
     fields: [
-      { id: "inviting-party-type", label: "Тип принимающей стороны", placeholder: "Выберите тип", control: "select", options: ["Приглашающая компания/организация", "Гостиница/временное жилье", "Приглашающее лицо"] },
-      { id: "hotel-name", label: "ФИО приглашающего лица или название отеля/компании", placeholder: "Например, Hotel Europa" },
-      { id: "hotel-address", label: "Адрес", placeholder: "Например, Calle de Atocha, 23", span: "full" },
-      { id: "hotel-country", label: "Страна", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Spain" },
+      {
+        id: "inviting-party-type",
+        label: "Тип принимающей стороны",
+        placeholder: "Выберите тип",
+        control: "select",
+        options: [
+          "Приглашающая компания/организация",
+          "Гостиница/временное жилье",
+          "Приглашающее лицо",
+        ],
+      },
+      {
+        id: "hotel-name",
+        label: "ФИО приглашающего лица или название отеля/компании",
+        placeholder: "Например, Hotel Europa",
+      },
+      {
+        id: "hotel-address",
+        label: "Адрес",
+        placeholder: "Например, Calle de Atocha, 23",
+        span: "full",
+      },
+      {
+        id: "hotel-country",
+        label: "Страна",
+        placeholder: "Выберите страну",
+        control: "select",
+        options: blsCountryOptions,
+        value: "Spain",
+      },
       { id: "hotel-city", label: "Город", placeholder: "Например, Madrid" },
-      { id: "hotel-postal-code", label: "Почтовый индекс", placeholder: "Например, 28001" },
-      { id: "hotel-email", label: "Email", placeholder: "name@example.com", required: false },
-      { id: "hotel-contact", label: "Телефон", placeholder: "Номер с кодом страны", required: false },
-      { id: "company-org-details", label: "Название и адрес компании/организации", placeholder: "Например, Acme SL, Calle Mayor, 10", required: false, span: "full" },
-      { id: "company-contact-person", label: "Контактное лицо компании", placeholder: "Например, Maria Garcia", required: false, span: "full" },
-      { id: "company-phone", label: "Телефон компании", placeholder: "Номер с кодом страны", required: false },
+      {
+        id: "hotel-postal-code",
+        label: "Почтовый индекс",
+        placeholder: "Например, 28001",
+      },
+      {
+        id: "hotel-email",
+        label: "Email",
+        placeholder: "name@example.com",
+        required: false,
+      },
+      {
+        id: "hotel-contact",
+        label: "Телефон",
+        placeholder: "Номер с кодом страны",
+        required: false,
+      },
+      {
+        id: "company-org-details",
+        label: "Название и адрес компании/организации",
+        placeholder: "Например, Acme SL, Calle Mayor, 10",
+        required: false,
+        span: "full",
+      },
+      {
+        id: "company-contact-person",
+        label: "Контактное лицо компании",
+        placeholder: "Например, Maria Garcia",
+        required: false,
+        span: "full",
+      },
+      {
+        id: "company-phone",
+        label: "Телефон компании",
+        placeholder: "Номер с кодом страны",
+        required: false,
+      },
     ],
   },
   {
@@ -179,11 +386,37 @@ const questionnaireBlueprint: Array<{
     title: "Запись",
     stepLabel: "4 из 7",
     fields: [
-      { id: "appointment-city", label: "Город подачи", placeholder: "Выберите город", control: "select", options: BLS_CITY_OPTIONS },
-      { id: "desired-date-1", label: "Желаемый интервал — с", placeholder: "ДД.ММ.ГГГГ" },
-      { id: "desired-date-2", label: "Желаемый интервал — по", placeholder: "ДД.ММ.ГГГГ" },
-      { id: "visa-type", label: "Тип визы", placeholder: "Служебное значение", required: false, value: "Шенгенская" },
-      { id: "category", label: "Категория обслуживания", placeholder: "Служебное значение", required: false, value: "Normal" },
+      {
+        id: "appointment-city",
+        label: "Город подачи",
+        placeholder: "Выберите город",
+        control: "select",
+        options: BLS_CITY_OPTIONS,
+      },
+      {
+        id: "desired-date-1",
+        label: "Желаемый интервал — с",
+        placeholder: "ДД.ММ.ГГГГ",
+      },
+      {
+        id: "desired-date-2",
+        label: "Желаемый интервал — по",
+        placeholder: "ДД.ММ.ГГГГ",
+      },
+      {
+        id: "visa-type",
+        label: "Тип визы",
+        placeholder: "Служебное значение",
+        required: false,
+        value: "Шенгенская",
+      },
+      {
+        id: "category",
+        label: "Категория обслуживания",
+        placeholder: "Служебное значение",
+        required: false,
+        value: "Normal",
+      },
     ],
   },
   {
@@ -192,16 +425,66 @@ const questionnaireBlueprint: Array<{
     stepLabel: "5 из 7",
     fields: [
       { id: "surname", label: "Фамилия", placeholder: "Например, Volkov" },
-      { id: "previous-surname", label: "Фамилия при рождении / предыдущие фамилии", placeholder: "Например, Petrova или нет", required: false },
+      {
+        id: "previous-surname",
+        label: "Фамилия при рождении / предыдущие фамилии",
+        placeholder: "Например, Petrova или нет",
+        required: false,
+      },
       { id: "first-name", label: "Имя", placeholder: "Например, Anton" },
       { id: "birth-date", label: "Дата рождения", placeholder: "ДД.ММ.ГГГГ" },
       { id: "birth-place", label: "Место рождения", placeholder: "Например, Moscow" },
-      { id: "birth-country", label: "Страна рождения", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Russian Federation" },
-      { id: "gender", label: "Пол", placeholder: "Выберите пол", control: "select", options: ["Мужской", "Женский"] },
-      { id: "marital-status", label: "Семейное положение", placeholder: "Выберите статус", control: "select", options: ["Холост/не замужем", "Женат/замужем", "Зарегистрированное партнерство", "Раздельно", "Разведен(а)", "Вдовец/вдова", "Иное"] },
-      { id: "guardian-info", label: "Родитель/опекун несовершеннолетнего", placeholder: "Например, Ivan Volkov, отец", required: false, span: "full" },
-      { id: "nationality", label: "Текущее гражданство", placeholder: "Служебное значение", required: false, value: "Russian Federation" },
-      { id: "birth-citizenship", label: "Гражданство при рождении", placeholder: "Служебное значение", required: false, value: "Russian Federation" },
+      {
+        id: "birth-country",
+        label: "Страна рождения",
+        placeholder: "Выберите страну",
+        control: "select",
+        options: blsCountryOptions,
+        value: "Russian Federation",
+      },
+      {
+        id: "gender",
+        label: "Пол",
+        placeholder: "Выберите пол",
+        control: "select",
+        options: ["Мужской", "Женский"],
+      },
+      {
+        id: "marital-status",
+        label: "Семейное положение",
+        placeholder: "Выберите статус",
+        control: "select",
+        options: [
+          "Холост/не замужем",
+          "Женат/замужем",
+          "Зарегистрированное партнерство",
+          "Раздельно",
+          "Разведен(а)",
+          "Вдовец/вдова",
+          "Иное",
+        ],
+      },
+      {
+        id: "guardian-info",
+        label: "Родитель/опекун несовершеннолетнего",
+        placeholder: "Например, Ivan Volkov, отец",
+        required: false,
+        span: "full",
+      },
+      {
+        id: "nationality",
+        label: "Текущее гражданство",
+        placeholder: "Служебное значение",
+        required: false,
+        value: "Russian Federation",
+      },
+      {
+        id: "birth-citizenship",
+        label: "Гражданство при рождении",
+        placeholder: "Служебное значение",
+        required: false,
+        value: "Russian Federation",
+      },
     ],
   },
   {
@@ -209,12 +492,45 @@ const questionnaireBlueprint: Array<{
     title: "Паспорт",
     stepLabel: "6 из 7",
     fields: [
-      { id: "passport-type", label: "Тип документа", placeholder: "Выберите тип документа", control: "select", options: ["Ordinary Passport", "Diplomatic Passport", "Service Passport", "Official Passport", "Special Passport", "Travel Document", "Other"] },
-      { id: "passport-no", label: "Номер паспорта", placeholder: "Например, 76 1234567" },
+      {
+        id: "passport-type",
+        label: "Тип документа",
+        placeholder: "Выберите тип документа",
+        control: "select",
+        options: [
+          "Ordinary Passport",
+          "Diplomatic Passport",
+          "Service Passport",
+          "Official Passport",
+          "Special Passport",
+          "Travel Document",
+          "Other",
+        ],
+      },
+      {
+        id: "passport-no",
+        label: "Номер паспорта",
+        placeholder: "Например, 76 1234567",
+      },
       { id: "passport-issue-date", label: "Дата выдачи", placeholder: "ДД.ММ.ГГГГ" },
-      { id: "passport-expiry-date", label: "Действителен до", placeholder: "ДД.ММ.ГГГГ" },
-      { id: "passport-issue-country", label: "Страна выдачи", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Russian Federation" },
-      { id: "passport-issue-place", label: "Место выдачи", placeholder: "Например, МВД 780-001" },
+      {
+        id: "passport-expiry-date",
+        label: "Действителен до",
+        placeholder: "ДД.ММ.ГГГГ",
+      },
+      {
+        id: "passport-issue-country",
+        label: "Страна выдачи",
+        placeholder: "Выберите страну",
+        control: "select",
+        options: blsCountryOptions,
+        value: "Russian Federation",
+      },
+      {
+        id: "passport-issue-place",
+        label: "Место выдачи",
+        placeholder: "Например, МВД 780-001",
+      },
     ],
   },
   {
@@ -223,15 +539,33 @@ const questionnaireBlueprint: Array<{
     stepLabel: "7 из 7",
     fields: [
       { id: "occupation", label: "Должность", placeholder: "Например, Менеджер" },
-      { id: "employer-name", label: "Работодатель / учебное заведение", placeholder: "Например, ООО «Спектр» или МГУ", span: "full" },
-      { id: "employer-contact", label: "Телефон работодателя / учебного заведения", placeholder: "+7 900 000-00-00", required: false },
-      { id: "employer-address", label: "Адрес работодателя / учебного заведения", placeholder: "Проспект Мира, 10, офис 4", required: false, span: "full" },
+      {
+        id: "employer-name",
+        label: "Работодатель / учебное заведение",
+        placeholder: "Например, ООО «Спектр» или МГУ",
+        span: "full",
+      },
+      {
+        id: "employer-contact",
+        label: "Телефон работодателя / учебного заведения",
+        placeholder: "+7 900 000-00-00",
+        required: false,
+      },
+      {
+        id: "employer-address",
+        label: "Адрес работодателя / учебного заведения",
+        placeholder: "Проспект Мира, 10, офис 4",
+        required: false,
+        span: "full",
+      },
     ],
   },
 ];
 
-
-type QuestionnaireValidationField = Pick<QuestionnaireField, "id" | "label" | "required"> &
+type QuestionnaireValidationField = Pick<
+  QuestionnaireField,
+  "id" | "label" | "required"
+> &
   Partial<Pick<QuestionnaireField, "value">>;
 
 function parseQuestionnaireDateValue(value: string) {
@@ -401,9 +735,11 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
       const sections = normalizeApplicantSections(applicant);
       const fields = sections.flatMap((section) => section.fields);
       const birthCountry = fields
-        .find((field) => field.id === "birth-country")?.value.trim();
+        .find((field) => field.id === "birth-country")
+        ?.value.trim();
       const passportIssueCountry = fields
-        .find((field) => field.id === "passport-issue-country")?.value.trim();
+        .find((field) => field.id === "passport-issue-country")
+        ?.value.trim();
       const passportIssueCountryField = fields.find(
         (field) => field.id === "passport-issue-country",
       );
@@ -420,8 +756,7 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
             ) {
               return {
                 ...field,
-                error:
-                  field.error === "Обязательное поле" ? undefined : field.error,
+                error: field.error === "Обязательное поле" ? undefined : field.error,
                 value: submission.city,
               };
             }
@@ -445,7 +780,10 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
             if (field.id === "birth-citizenship") {
               return {
                 ...field,
-                value: birthCountry?.toUpperCase() === "USSR" ? "USSR" : "Russian Federation",
+                value:
+                  birthCountry?.toUpperCase() === "USSR"
+                    ? "USSR"
+                    : "Russian Federation",
               };
             }
             if (field.id === "cost-covered-by") {
@@ -520,16 +858,27 @@ export function updateQuestionnaireField(
   };
 
   const recalculated = recalculateQuestionnaire(next);
-  const nextField = recalculated.applicants
-    .find((applicant) => applicant.id === update.applicantId)
-    ?.sections.find((section) => sectionMatchesUpdate(section.id, update.sectionId))
-    ?.fields.find((field) => field.id === update.fieldId);
+  const nextApplicant = recalculated.applicants.find(
+    (applicant) => applicant.id === update.applicantId,
+  );
+  const nextSection = nextApplicant?.sections.find((section) =>
+    sectionMatchesUpdate(section.id, update.sectionId),
+  );
+  const nextField = nextSection?.fields.find((field) => field.id === update.fieldId);
   const targetChanged =
     Boolean(previousField && nextField) &&
     (previousField?.value !== nextField?.value ||
       previousField?.reviewState !== nextField?.reviewState);
 
-  if (!targetChanged || !previousSection || !nextField) return recalculated;
+  if (
+    !targetChanged ||
+    !previousSection ||
+    !nextApplicant ||
+    !nextSection ||
+    !nextField
+  ) {
+    return recalculated;
+  }
 
   return bumpOpenIssueTargetRevisions(recalculated, (issue) => {
     if (issue.target.applicantId !== update.applicantId) return false;
@@ -545,12 +894,7 @@ export function updateQuestionnaireField(
         issue.target.field === previousSection.title
       );
     }
-    return questionnaireIssueMatchesField(
-      issue,
-      update.applicantId,
-      previousSection.title,
-      nextField,
-    );
+    return questionnaireIssueMatchesField(issue, nextApplicant, nextSection, nextField);
   });
 }
 
@@ -575,16 +919,15 @@ export function completeQuestionnaireSections(submission: Submission): Submissio
   });
 }
 
-export function flagQuestionnaireField(
+export function flagQuestionnaireIssueField(
   submission: Submission,
-  applicantId: string,
-  fieldLabel: string,
+  issue: Issue,
   reason: string,
 ): Submission {
   return recalculateQuestionnaire({
     ...submission,
     applicants: submission.applicants.map((applicant) => {
-      if (applicant.id !== applicantId) return applicant;
+      if (applicant.id !== issue.target.applicantId) return applicant;
 
       return {
         ...applicant,
@@ -593,7 +936,7 @@ export function flagQuestionnaireField(
           sections: applicant.sections.map((section) => ({
             ...section,
             fields: normalizeFields(section).map((field) =>
-              questionnaireFieldMatchesTarget(field, fieldLabel)
+              questionnaireIssueTargetsField(issue, applicant, section, field)
                 ? {
                     ...field,
                     adminReviewApprovedAtIso: undefined,
@@ -619,12 +962,7 @@ export function clearOpenQuestionnaireIssueErrors(submission: Submission): Submi
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: normalizeFields(section).map((field) =>
-            hasOpenQuestionnaireFieldIssue(
-              submission,
-              applicant.id,
-              section.title,
-              field,
-            )
+            hasOpenQuestionnaireFieldIssue(submission, applicant, section, field)
               ? { ...field, error: undefined }
               : field,
           ),
@@ -653,12 +991,7 @@ export function clearQuestionnaireIssueError(
           ...section,
           fields: normalizeFields(section).map((field) => {
             if (
-              !questionnaireIssueMatchesField(
-                targetIssue,
-                applicant.id,
-                section.title,
-                field,
-              )
+              !questionnaireIssueMatchesField(targetIssue, applicant, section, field)
             ) {
               return field;
             }
@@ -667,12 +1000,7 @@ export function clearQuestionnaireIssueError(
               (issue) =>
                 issue.id !== issueId &&
                 issue.status === "open" &&
-                questionnaireIssueMatchesField(
-                  issue,
-                  applicant.id,
-                  section.title,
-                  field,
-                ),
+                questionnaireIssueMatchesField(issue, applicant, section, field),
             );
 
             return { ...field, error: remainingOpenIssue?.reason };
@@ -725,30 +1053,24 @@ export function questionnaireProblemCount(submission: Submission) {
 
 function hasOpenQuestionnaireFieldIssue(
   submission: Submission,
-  applicantId: string,
-  sectionTitle: string,
+  applicant: Applicant,
+  section: QuestionnaireSection,
   field: QuestionnaireField,
 ) {
   return submission.issues.some(
     (issue) =>
       issue.status === "open" &&
-      questionnaireIssueMatchesField(issue, applicantId, sectionTitle, field),
+      questionnaireIssueMatchesField(issue, applicant, section, field),
   );
 }
 
 function questionnaireIssueMatchesField(
   issue: Issue,
-  applicantId: string,
-  sectionTitle: string,
+  applicant: Applicant,
+  section: QuestionnaireSection,
   field: QuestionnaireField,
 ) {
-  return (
-    issue.target.applicantId === applicantId &&
-    questionnaireFieldMatchesTarget(field, issue.target.field) &&
-    (issue.target.section === sectionTitle ||
-      issue.target.section === "Анкета" ||
-      issue.target.section === "Данные")
-  );
+  return questionnaireIssueTargetsField(issue, applicant, section, field);
 }
 
 const questionnaireFieldLabelAliases: Record<string, string[]> = {
@@ -765,6 +1087,7 @@ const questionnaireFieldLabelAliases: Record<string, string[]> = {
   "form-filler-contact": ["Адрес или email"],
   "form-filler-name": ["Кто заполнил"],
   "guardian-info": ["Родитель / опекун"],
+  "hotel-address": ["Адрес отеля"],
   "hotel-name": ["Отель / приглашающий"],
   "inviting-party-type": ["Принимающая сторона"],
   "lives-outside-citizenship": ["Живет не в стране гражданства"],
@@ -801,11 +1124,120 @@ export function questionnaireFieldMatchesTarget(
   );
 }
 
+const genericQuestionnaireSectionTargets = new Set(["Анкета", "Данные"]);
+const questionnaireSectionAliases: Record<string, string[]> = {
+  appointment: ["Запись"],
+  contact: ["Адрес и контакты"],
+  employment: ["Работа / учеба"],
+  hotel: ["Отель / приглашение", "Отель / приглашающая сторона"],
+  passport: ["Паспорт"],
+  personal: ["Личные данные"],
+  trip: ["Поездка", "Маршрут", "Оплата поездки"],
+};
+
+function questionnaireSectionMatchesTarget(
+  section: QuestionnaireSection,
+  sectionTarget?: string,
+) {
+  if (!sectionTarget || genericQuestionnaireSectionTargets.has(sectionTarget)) {
+    return true;
+  }
+  const canonicalId =
+    Object.keys(questionnaireSectionAliases).find(
+      (candidate) =>
+        section.id === candidate || section.id.endsWith(`-${candidate}`),
+    ) ?? section.id;
+  const normalizedTarget = normalizeQuestionnaireFieldLabel(sectionTarget);
+  return [section.id, section.title, ...(questionnaireSectionAliases[canonicalId] ?? [])]
+    .map(normalizeQuestionnaireFieldLabel)
+    .includes(normalizedTarget);
+}
+
+export function resolveQuestionnaireTargetField(
+  applicant: Applicant,
+  target: Pick<IssueTarget, "field" | "fieldId" | "section" | "sectionId">,
+): { field: QuestionnaireField; section: QuestionnaireSection } | null {
+  const hasPersistedIdentity = Boolean(target.sectionId || target.fieldId);
+  if (hasPersistedIdentity) {
+    if (!target.sectionId || !target.fieldId) return null;
+    const candidates = applicant.sections.flatMap((section) => {
+      if (
+        section.id !== target.sectionId &&
+        !section.id.endsWith(`-${target.sectionId}`)
+      ) {
+        return [];
+      }
+      const field = section.fields.find((item) => item.id === target.fieldId);
+      return field ? [{ field, section }] : [];
+    });
+    return candidates.length === 1 ? (candidates[0] ?? null) : null;
+  }
+
+  if (!target.field) return null;
+  const candidates = applicant.sections.flatMap((section) =>
+    section.fields
+      .filter((field) => questionnaireFieldMatchesTarget(field, target.field))
+      .map((field) => ({ field, section })),
+  );
+  const sectionCandidates = candidates.filter(({ section }) =>
+    questionnaireSectionMatchesTarget(section, target.section),
+  );
+  if (sectionCandidates.length === 1) return sectionCandidates[0] ?? null;
+  if (sectionCandidates.length > 1) return null;
+  return candidates.length === 1 ? (candidates[0] ?? null) : null;
+}
+
+export function resolveQuestionnaireIssueInputIdentity(
+  applicant: Applicant,
+  input: Pick<
+    IssueInput,
+    "field" | "fieldId" | "fileType" | "section" | "sectionId" | "type"
+  >,
+): { fieldId: string; sectionId: string } | null {
+  if (input.fileType) return null;
+
+  if (input.sectionId || input.fieldId) {
+    const resolved = resolveQuestionnaireTargetField(applicant, input);
+    return resolved
+      ? { fieldId: resolved.field.id, sectionId: resolved.section.id }
+      : null;
+  }
+
+  if (input.type === "section") {
+    const sectionTarget = (input.section ?? input.field ?? "").trim();
+    const targetSections = applicant.sections.filter((section) =>
+      questionnaireSectionMatchesTarget(section, sectionTarget),
+    );
+    if (!sectionTarget || targetSections.length !== 1) return null;
+    const targetSection = targetSections[0];
+    const targetField =
+      targetSection?.fields.find((field) => Boolean(field.error)) ??
+      targetSection?.fields.find((field) => field.required && !field.value.trim()) ??
+      targetSection?.fields[0];
+    return targetSection && targetField
+      ? { fieldId: targetField.id, sectionId: targetSection.id }
+      : null;
+  }
+
+  const resolved = resolveQuestionnaireTargetField(applicant, input);
+  return resolved
+    ? { fieldId: resolved.field.id, sectionId: resolved.section.id }
+    : null;
+}
+
+function questionnaireIssueTargetsField(
+  issue: Issue,
+  applicant: Applicant,
+  section: QuestionnaireSection,
+  field: QuestionnaireField,
+) {
+  if (issue.target.applicantId !== applicant.id) return false;
+  const resolved = resolveQuestionnaireTargetField(applicant, issue.target);
+  return resolved?.section.id === section.id && resolved.field.id === field.id;
+}
+
 function normalizeQuestionnaireFieldLabel(value?: string) {
-  return (value ?? "")
-    .trim()
-    .toLocaleLowerCase("ru-RU")
-    .replace(/ё/g, "е");
+  return (value ?? "").trim().toLocaleLowerCase("ru-RU").replace(/ё/g, "е");
 }
 
 function normalizeApplicantSections(applicant: Applicant): QuestionnaireSection[] {
@@ -945,7 +1377,9 @@ function seedField(
   missing?: string,
 ): QuestionnaireField {
   const shouldFlag =
-    status === "needs_fix" && sectionId === "trip" && field.id === "first-entry-country";
+    status === "needs_fix" &&
+    sectionId === "trip" &&
+    field.id === "first-entry-country";
 
   return {
     id: field.id,
@@ -963,7 +1397,9 @@ function seedField(
 function normalizeSection(section: QuestionnaireSection): QuestionnaireSection {
   const fields = normalizeFields(section);
   const status = sectionStatus(fields);
-  const firstInvalidField = fields.find((field) => validateQuestionnaireFieldValue(field));
+  const firstInvalidField = fields.find((field) =>
+    validateQuestionnaireFieldValue(field),
+  );
   const firstError = fields.find((field) => field.error);
 
   return {
@@ -973,8 +1409,8 @@ function normalizeSection(section: QuestionnaireSection): QuestionnaireSection {
     missing:
       firstError?.error ??
       (firstInvalidField
-        ? validateQuestionnaireFieldValue(firstInvalidField) ??
-          `Нужно заполнить: ${firstInvalidField.label}`
+        ? (validateQuestionnaireFieldValue(firstInvalidField) ??
+          `Нужно заполнить: ${firstInvalidField.label}`)
         : undefined),
   };
 }
@@ -1012,8 +1448,7 @@ function sectionStatus(fields: QuestionnaireField[]): QuestionnaireStatus {
   if (
     fields.some(
       (field) =>
-        field.error ||
-        (field.value.trim() && validateQuestionnaireFieldValue(field)),
+        field.error || (field.value.trim() && validateQuestionnaireFieldValue(field)),
     )
   ) {
     return "needs_fix";

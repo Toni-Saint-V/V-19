@@ -19,7 +19,9 @@ export type WorkspaceTarget =
   | {
       applicantId: string;
       field?: string;
+      fieldId?: string;
       section?: string;
+      sectionId?: string;
       tab: "questionnaire";
     }
   | {
@@ -91,7 +93,8 @@ export function targetElementId(target: WorkspaceTarget): string {
     return `workspace-media-${target.applicantId}-${target.fileType}`;
   }
   if (target.tab === "questionnaire") {
-    const suffix = target.field ?? target.section ?? "profile";
+    const suffix =
+      target.fieldId ?? target.sectionId ?? target.field ?? target.section ?? "profile";
     return `workspace-data-${target.applicantId}-${stableDomToken(suffix)}`;
   }
   return target.issueId ? `workspace-issue-${target.issueId}` : "workspace-issues";
@@ -249,7 +252,9 @@ export function targetForIssue(issue: Issue): WorkspaceTarget {
   return {
     applicantId: issue.target.applicantId,
     field: issue.target.field,
+    ...(issue.target.fieldId ? { fieldId: issue.target.fieldId } : {}),
     section: issue.target.section,
+    ...(issue.target.sectionId ? { sectionId: issue.target.sectionId } : {}),
     tab: "questionnaire",
   };
 }

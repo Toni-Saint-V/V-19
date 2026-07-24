@@ -612,20 +612,20 @@ describe("ApplicantsScreen interactions", () => {
     expect(alert).toHaveTextContent(
       "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие.",
     );
-    expect(alert).toHaveTextContent(
-      "Код ошибки: rpc.save_submission_draft:save:42703.",
-    );
+    expect(alert).not.toHaveTextContent("42703");
     expect(alert).not.toHaveTextContent("failed safely");
     expect(alert).not.toHaveTextContent("public_number");
   });
 
   it("does not trust a Russian-looking infrastructure error as domain validation", async () => {
     const submission = readySubmission("single");
-    const onSubmitForReview = vi.fn().mockRejectedValue(
-      new Error(
-        'Ошибка SQL: update public.submissions set status = "waiting_review"',
-      ),
-    );
+    const onSubmitForReview = vi
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          'Ошибка SQL: update public.submissions set status = "waiting_review"',
+        ),
+      );
 
     render(
       <ApplicantsScreen
@@ -704,9 +704,9 @@ describe("ApplicantsScreen interactions", () => {
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
-    expect(
-      canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok,
-    ).toBe(true);
+    expect(canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok).toBe(
+      true,
+    );
 
     render(
       <ApplicantsScreen

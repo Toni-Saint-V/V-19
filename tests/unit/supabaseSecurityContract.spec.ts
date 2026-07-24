@@ -1147,18 +1147,12 @@ describe("Supabase security contract", () => {
     expect(confirmationMigration).toContain(
       "matching_open_payload_count <> open_correction_count",
     );
-    expect(confirmationMigration).toContain(
-      "requested.item ->> 'status' = 'fixed'",
-    );
+    expect(confirmationMigration).toContain("requested.item ->> 'status' = 'fixed'");
     expect(confirmationMigration).toContain(
       "requested.item ->> 'agent_confirmed_revision' is not null",
     );
-    expect(confirmationMigration).toContain(
-      "V19_AGENT_SUBMISSION_CONFLICT",
-    );
-    expect(confirmationMigration).toContain(
-      "clock_timestamp()",
-    );
+    expect(confirmationMigration).toContain("V19_AGENT_SUBMISSION_CONFLICT");
+    expect(confirmationMigration).toContain("clock_timestamp()");
 
     const migrationContract = readProjectFile(
       "scripts/supabase-migration-contract.mjs",
@@ -1175,9 +1169,7 @@ describe("Supabase security contract", () => {
     expect(migrationContract).toContain(
       "20260724132405_agent_correction_confirmation.sql",
     );
-    expect(migrationContract).toContain(
-      "20260724132405_agent_correction_confirmation",
-    );
+    expect(migrationContract).toContain("20260724132405_agent_correction_confirmation");
     expect(promotionRunbook).toContain(
       "20260724132405_agent_correction_confirmation.rollback.sql",
     );
@@ -1189,16 +1181,21 @@ describe("Supabase security contract", () => {
     );
     expect(rollback).not.toContain("drop column if exists target_revision");
     expect(rollback).not.toContain("drop column if exists agent_confirmed_at");
-    expect(rollback).not.toContain(
-      "drop column if exists agent_confirmed_revision",
-    );
-    expect(rollback).toContain(
-      "Retained by rollback to preserve lifecycle audit data",
-    );
+    expect(rollback).not.toContain("drop column if exists agent_confirmed_revision");
+    expect(rollback).toContain("Retained by rollback to preserve lifecycle audit data");
     expect(rollback).toContain("V19_AGENT_SUBMISSION_CONFLICT");
     expect(rollback).toContain("for update");
     expect(rollback).toContain("to_jsonb('returned'::text)");
     expect(rollback).toContain("'{corrections}'");
+    expect(rollback).toContain("FORWARD_ONLY");
+    expect(rollback).toContain("'20260724200418'");
+    expect(rollback).toContain("'20260724204041'");
+    expect(rollback).toContain(
+      "'20260724234200_server_owned_correction_targets'",
+    );
+    expect(rollback).toContain(
+      "'20260725003000_harden_correction_validation_topology'",
+    );
   });
 
   test("rejects a partial correction handoff payload under the submission lock", () => {
@@ -1206,7 +1203,10 @@ describe("Supabase security contract", () => {
       "supabase/migrations/20260724132405_agent_correction_confirmation.sql",
     );
 
-    expectSqlStatement(migration, "where submission.id = target_submission_id for update");
+    expectSqlStatement(
+      migration,
+      "where submission.id = target_submission_id for update",
+    );
     expectSqlStatement(
       migration,
       "where correction.submission_id = target_submission_id order by correction.id for update",
@@ -1215,10 +1215,7 @@ describe("Supabase security contract", () => {
       migration,
       "if matching_open_payload_count <> open_correction_count then",
     );
-    expectSqlStatement(
-      migration,
-      "requested.item ->> 'status' = 'fixed'",
-    );
+    expectSqlStatement(migration, "requested.item ->> 'status' = 'fixed'");
     expectSqlStatement(
       migration,
       "requested.item ->> 'agent_confirmed_at' is not null",
@@ -1243,10 +1240,7 @@ describe("Supabase security contract", () => {
       migration,
       "perform app_private.dispatch_submission_draft_with_revision_context( preparation_payload )",
     );
-    expectSqlStatement(
-      migration,
-      "update public.corrections set status = 'fixed'",
-    );
+    expectSqlStatement(migration, "update public.corrections set status = 'fixed'");
     expectSqlStatement(
       migration,
       "persisted_result := app_private.dispatch_submission_draft_with_revision_context( final_payload )",
@@ -1282,9 +1276,7 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(
       "Исправленные замечания отправляются только через handoff",
     );
-    expect(migration).not.toContain(
-      "(requested.item ->> 'created_by')::uuid",
-    );
+    expect(migration).not.toContain("(requested.item ->> 'created_by')::uuid");
   });
 
   test("keeps a versioned expand-contract window without allowing legacy confirmations", () => {
@@ -1346,21 +1338,13 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(
       "create trigger questionnaire_answers_refresh_correction_targets",
     );
-    expect(migration).toContain(
-      "target_revision = correction.target_revision + 1",
-    );
+    expect(migration).toContain("target_revision = correction.target_revision + 1");
     expect(migration).toContain(
       "new.target_revision is distinct from old.target_revision",
     );
-    expect(migration).toContain(
-      "revision цели назначается сервером",
-    );
-    expect(migration).toContain(
-      "old.target_projection = old.target_baseline",
-    );
-    expect(migration).toContain(
-      "app_private.questionnaire_field_validation_error(",
-    );
+    expect(migration).toContain("revision цели назначается сервером");
+    expect(migration).toContain("old.target_projection = old.target_baseline");
+    expect(migration).toContain("app_private.questionnaire_field_validation_error(");
     expect(migration).toContain("new.agent_confirmed_at := clock_timestamp()");
     expect(migration).toContain(
       "app_private.submission_questionnaire_validation_error(new.id)",
@@ -1401,27 +1385,17 @@ describe("Supabase security contract", () => {
     );
     const packageJson = JSON.parse(readProjectFile("package.json"));
 
-    expect(migration).toContain(
-      "app_private.questionnaire_field_is_required(",
-    );
+    expect(migration).toContain("app_private.questionnaire_field_is_required(");
     expect(migration).toContain("return 'Обязательное поле'");
-    expect(migration).toContain(
-      "answer_json ->> 'reviewState' = 'needs_review'",
-    );
-    expect(migration).toContain(
-      "return 'Подтвердите значение поля перед сохранением'",
-    );
-    expect(migration).toContain(
-      "create trigger corrections_agent_parent_status_guard",
-    );
+    expect(migration).toContain("answer_json ->> 'reviewState' = 'needs_review'");
+    expect(migration).toContain("return 'Подтвердите значение поля перед сохранением'");
+    expect(migration).toContain("create trigger corrections_agent_parent_status_guard");
     expect(migration).toContain("if parent_status <> 'returned' then");
     expect(migration).toContain(
       "Исправления можно подтверждать только после возврата подачи",
     );
     expect(migration).toContain("if correction_status = 'open' then");
-    expect(migration).toContain(
-      "sync_correction_targets_from_payload_all_rows_v1",
-    );
+    expect(migration).toContain("sync_correction_targets_from_payload_all_rows_v1");
     expect(migration).toContain(
       "revoke all on function app_private.save_submission_draft_without_questionnaire_rows(jsonb)",
     );
@@ -1451,9 +1425,7 @@ describe("Supabase security contract", () => {
     const migrationContract = readProjectFile(
       "scripts/supabase-migration-contract.mjs",
     );
-    const releaseVerifier = readProjectFile(
-      "scripts/verify-supabase-release.mjs",
-    );
+    const releaseVerifier = readProjectFile("scripts/verify-supabase-release.mjs");
     const readinessVerifier = readProjectFile(
       "scripts/verify-production-readiness.mjs",
     );
@@ -1542,9 +1514,7 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("target_submission_id text;");
     expect(migration).toContain("id text,");
     expect(migration).not.toContain("target_submission_id uuid");
-    expect(migration).not.toContain(
-      "(payload -> 'submission' ->> 'id')::uuid",
-    );
+    expect(migration).not.toContain("(payload -> 'submission' ->> 'id')::uuid");
     expect(rollback).toContain(
       "target_submission_id text := payload -> 'submission' ->> 'id'",
     );

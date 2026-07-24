@@ -125,14 +125,17 @@ V19_SUPABASE_LIVE_REGISTRY_ARTIFACT="$V19_TEST_ARTIFACTS_DIR/supabase-live-regis
 Run the printed read-only query through the allow-listed Supabase connector or
 SQL editor for the checked-in production project. Store the resulting raw
 catalog facts outside the repository using format
-`v19.supabase-live-registry.v1`; add the connector-selected `projectRef`,
+`v19.supabase-live-registry.v2`; add the connector-selected `projectRef`,
 collector timestamp, and hashes printed by
 `--print-query-metadata`. The gate rejects snapshots older than 15 minutes,
 wrong projects/query/contract hashes, missing or extra migration rows, unsafe
-public/private RPC grants and topology, absent columns, and disabled lifecycle
-triggers. `verify:full` is intentionally blocked unless the fresh artifact path
-is supplied through `V19_SUPABASE_LIVE_REGISTRY_ARTIFACT`. A checked-in
-packet or local constant comparison never substitutes for this live gate.
+public/private RPC grants and topology, incorrect column types/nullability/defaults,
+missing correction constraints, and lifecycle triggers attached to the wrong
+table or disabled. The contract hash includes the checked-in bytes of every
+ordered migration. `verify:full` is intentionally blocked unless the fresh
+artifact path is supplied through `V19_SUPABASE_LIVE_REGISTRY_ARTIFACT`. A
+checked-in packet or local constant comparison never substitutes for this live
+gate.
 
 ## Auth Security Advisor Gate
 
@@ -213,9 +216,15 @@ that contract step with this migration-first release.
 The rollback template removes the new trigger/RPC enforcement behavior but
 intentionally retains `target_revision`, `agent_confirmed_at`, and
 `agent_confirmed_revision` plus their data and a `caseRevision`-compatible RPC
-response. Its version-2 save path still locks the submission and checks
-`expected_case_revision`; legacy writes are allowed only for the rolled-back
-client contract. Rollback uses the same mandatory mutation-maintenance gate:
+response. It raises `FORWARD_ONLY` once migration `20260724234200` or
+`20260725003000` is present, because those migrations replace and depend on the
+same correction trigger/function topology. The guard recognizes their
+production registry versions `20260724200418` and `20260724204041` as well as
+their exact migration names. In that state, prepare a new forward-repair
+migration; do not execute the older rollback template. Its version-2 save path
+still locks the submission and checks `expected_case_revision`; legacy writes
+are allowed only for the rolled-back client contract. Rollback uses the same
+mandatory mutation-maintenance gate:
 block writes, drain in-flight mutations, deploy the rollback client, promote
 the timestamped rollback migration, verify canonical readback, then reopen
 writes. Never drop these audit columns in an emergency rollback. Rollback must

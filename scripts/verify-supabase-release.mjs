@@ -37,6 +37,11 @@ const pilotVolumeEnvelopePath = resolve(
   "scripts/verify-pilot-volume-envelope.mjs",
 );
 const packagePath = resolve(repoRoot, "package.json");
+const ciWorkflowPath = resolve(repoRoot, ".github/workflows/ci.yml");
+const confirmationRollbackPath = resolve(
+  repoRoot,
+  "supabase/remediation/20260724132405_agent_correction_confirmation.rollback.sql",
+);
 const smokeEnvPath = resolve(repoRoot, ".env.supabase-smoke.local");
 const allowedSandboxProjectId = "oevvaowoklqttqkraxho";
 
@@ -380,10 +385,7 @@ function verifyWorkspaceMediaSlotContract() {
 
 function verifyAdminPassportReviewMediaPolicy() {
   const migration = readProjectFile(
-    resolve(
-      migrationsDir,
-      "20260717050000_admin_passport_review_media_policy.sql",
-    ),
+    resolve(migrationsDir, "20260717050000_admin_passport_review_media_policy.sql"),
     "Admin passport review media-policy migration exists",
   );
 
@@ -781,11 +783,7 @@ function verifySmokeGuard() {
     "passport_scan",
     "Live smoke uses canonical passport_scan media",
   );
-  expectContains(
-    liveSmoke,
-    "selfie_2",
-    "Live smoke uses canonical selfie_2 media",
-  );
+  expectContains(liveSmoke, "selfie_2", "Live smoke uses canonical selfie_2 media");
   expectContains(
     productionWorkflowSmoke,
     "waiting_review",
@@ -944,12 +942,52 @@ function verifyDocsAndScripts() {
     productionApprovalChecklistPath,
     "Supabase production approval checklist exists",
   );
+  const ciWorkflow = readProjectFile(ciWorkflowPath, "CI workflow exists");
+  const confirmationRollback = readProjectFile(
+    confirmationRollbackPath,
+    "Correction confirmation rollback exists",
+  );
 
   if (packageJson.scripts?.["verify:supabase-release"]) {
     pass("Package exposes verify:supabase-release");
   } else {
     fail("Package exposes verify:supabase-release", "Missing npm script");
   }
+  expectContains(
+    ciWorkflow,
+    "run: npm run verify:supabase-release",
+    "CI runs the Supabase release contract",
+  );
+  expectContains(
+    runbook,
+    "v19.supabase-live-registry.v2",
+    "Production runbook documents live registry v2",
+  );
+  expectContains(
+    runbook,
+    "FORWARD_ONLY",
+    "Production runbook documents the forward-only rollback boundary",
+  );
+  expectContains(
+    confirmationRollback,
+    "migration.version in ('20260724200418', '20260724204041')",
+    "Correction confirmation rollback blocks later topology",
+  );
+  expectContains(
+    confirmationRollback,
+    "'20260724234200_server_owned_correction_targets'",
+    "Correction confirmation rollback recognizes the server-owned target migration",
+  );
+  expectContains(
+    confirmationRollback,
+    "'20260725003000_harden_correction_validation_topology'",
+    "Correction confirmation rollback recognizes the validation topology migration",
+  );
+  expectContains(
+    confirmationRollback,
+    "FORWARD_ONLY",
+    "Correction confirmation rollback fails closed",
+  );
 
   if (packageJson.scripts?.["verify:local-readiness"]) {
     pass("Package exposes verify:local-readiness");
@@ -1029,12 +1067,7 @@ function verifyDocsAndScripts() {
     );
   }
 
-  if (
-    hasScriptCommand(
-      verifyFullCommands,
-      "npm run verify:supabase-live-registry",
-    )
-  ) {
+  if (hasScriptCommand(verifyFullCommands, "npm run verify:supabase-live-registry")) {
     pass("verify:full includes live Supabase registry gate");
   } else {
     fail(

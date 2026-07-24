@@ -32,7 +32,7 @@ import {
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import {
   normalizeSubmissionQuestionnaire,
-  questionnaireFieldMatchesTarget,
+  resolveQuestionnaireTargetField,
 } from "./questionnaire";
 import {
   isCity,
@@ -119,9 +119,7 @@ export interface AgentCockpitSaveResult {
   ownerIdsBySubmissionId: Map<string, string>;
 }
 
-type CockpitCanonicalLoader = (
-  profile: AppProfile,
-) => Promise<CockpitLoadResult>;
+type CockpitCanonicalLoader = (profile: AppProfile) => Promise<CockpitLoadResult>;
 
 function canonicalTargetJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalTargetJson);
@@ -167,11 +165,18 @@ function correctionTargetProjection(submission: Submission, issue: Issue) {
   if (issue.type === "section") {
     const targetSections =
       applicant?.sections
-        .filter(
-          (section) =>
+        .filter((section) => {
+          if (issue.target.sectionId) {
+            return (
+              section.id === issue.target.sectionId ||
+              section.id.endsWith(`-${issue.target.sectionId}`)
+            );
+          }
+          return (
             section.title === issue.target.section ||
-            section.title === issue.target.field,
-        )
+            section.title === issue.target.field
+          );
+        })
         .map((section) => ({
           ...section,
           fields: [...section.fields].sort((left, right) =>
@@ -181,14 +186,262 @@ function correctionTargetProjection(submission: Submission, issue: Issue) {
         .sort((left, right) => left.id.localeCompare(right.id)) ?? [];
     return JSON.stringify(canonicalTargetJson(targetSections));
   }
-  const targetFields =
-    applicant?.sections
-      .flatMap((section) => section.fields)
-      .filter((field) =>
-        questionnaireFieldMatchesTarget(field, issue.target.field),
-      )
-      .sort((left, right) => left.id.localeCompare(right.id)) ?? [];
-  return JSON.stringify(canonicalTargetJson(targetFields));
+  const targetField = applicant
+    ? resolveQuestionnaireTargetField(applicant, issue.target)?.field
+    : undefined;
+  return JSON.stringify(canonicalTargetJson(targetField ?? null));
+}
+
+function correctionHandoffSnapshotIntent(submission: Submission) {
+  return canonicalTargetJson({
+    ...submission,
+    agentDisplayName: undefined,
+    createdAt: undefined,
+    files: submission.files.map((file) => ({
+      ...file,
+      reviewedAtIso: undefined,
+      uploadedAt: undefined,
+      uploadedAtIso: undefined,
+    })),
+    history: submission.history.map((item) => ({
+      ...item,
+      at: undefined,
+      createdAt: undefined,
+    })),
+    issues: submission.issues.map((issue) => ({
+      ...issue,
+      agentConfirmation: issue.agentConfirmation
+        ? {
+            ...issue.agentConfirmation,
+            confirmedAtIso: undefined,
+          }
+        : undefined,
+      createdAt: undefined,
+      fixedAtIso: undefined,
+    })),
+    updatedAt: undefined,
+  });
+}
+
+function correctionHandoffIntentProjection(
+  submission: Submission,
+  actorId: string,
+  ownerId: string,
+) {
+  const payload = toCockpitDraftPersistencePayload(
+    submission,
+    actorId,
+    ownerId,
+    "agent",
+  );
+  const submissionFact = {
+    agent_id: payload.submission.agent_id,
+    appointment_status: payload.submission.appointment_status,
+    city: payload.submission.city,
+    country: payload.submission.country,
+    id: payload.submission.id,
+    priority: payload.submission.priority,
+    readiness_percent: payload.submission.readiness_percent,
+    status: payload.submission.status,
+    title: payload.submission.title,
+    travel_date: payload.submission.travel_date,
+    trip_date_from: payload.submission.trip_date_from,
+    trip_date_to: payload.submission.trip_date_to,
+    type: payload.submission.type,
+  };
+  const applicantFacts = payload.applicants
+    .map((applicant) => ({
+      address: applicant.address,
+      birth_date: applicant.birth_date,
+      citizenship: applicant.citizenship,
+      city: applicant.city,
+      country: applicant.country,
+      email: applicant.email,
+      full_name: applicant.full_name,
+      hotel_address: applicant.hotel_address,
+      hotel_name: applicant.hotel_name,
+      id: applicant.id,
+      media_percent: applicant.media_percent,
+      passport_expires_at: applicant.passport_expires_at,
+      passport_issued_at: applicant.passport_issued_at,
+      passport_number: applicant.passport_number,
+      patronymic: applicant.patronymic,
+      phone: applicant.phone,
+      questionnaire_percent: applicant.questionnaire_percent,
+      role: applicant.role,
+      role_confirmed: applicant.role_confirmed,
+      submission_id: applicant.submission_id,
+      suggested_role: applicant.suggested_role,
+      trip_dates: applicant.trip_dates,
+    }))
+    .sort((left, right) =>
+      String(left.id ?? "").localeCompare(String(right.id ?? "")),
+    );
+  const questionnaireFacts = (payload.questionnaire_answers ?? [])
+    .map((answer) => ({
+      applicant_id: answer.applicant_id,
+      field_id: answer.field_id,
+      label: answer.label,
+      section_id: answer.section_id,
+      submission_id: answer.submission_id,
+      value: answer.value,
+    }))
+    .sort((left, right) =>
+      `${left.applicant_id}:${left.section_id}:${left.field_id}`.localeCompare(
+        `${right.applicant_id}:${right.section_id}:${right.field_id}`,
+      ),
+    );
+  const mediaFacts = payload.media_assets
+    .map((media) => ({
+      applicant_id: media.applicant_id,
+      generated_file_name: media.generated_file_name,
+      id: media.id,
+      mime_type: media.mime_type,
+      original_file_name: media.original_file_name,
+      review_status: media.review_status,
+      reviewed_by: media.reviewed_by,
+      size_bytes: media.size_bytes,
+      storage_bucket: media.storage_bucket,
+      storage_path: media.storage_path,
+      submission_id: media.submission_id,
+      type: media.type,
+      upload_status: media.upload_status,
+    }))
+    .sort((left, right) =>
+      String(left.id ?? "").localeCompare(String(right.id ?? "")),
+    );
+  const correctionFacts = payload.corrections
+    .map((correction) => ({
+      agent_confirmed_revision: correction.agent_confirmed_revision,
+      applicant_id: correction.applicant_id,
+      field_key: correction.field_key,
+      id: correction.id,
+      media_type: correction.media_type,
+      reason: correction.reason,
+      scope: correction.scope,
+      severity: correction.severity,
+      status: correction.status,
+      submission_id: correction.submission_id,
+      target_field_id: correction.target_field_id,
+      target_revision: correction.target_revision,
+      target_section_id: correction.target_section_id,
+    }))
+    .sort((left, right) =>
+      String(left.id ?? "").localeCompare(String(right.id ?? "")),
+    );
+  const historyFacts = payload.status_history
+    .map((history) => ({
+      changed_by: history.changed_by,
+      comment: history.comment,
+      entity_id: history.entity_id,
+      entity_type: history.entity_type,
+      from_status: history.from_status,
+      id: history.id,
+      note: history.note,
+      source: history.source,
+      to_status: history.to_status,
+    }))
+    .sort((left, right) =>
+      String(left.id ?? "").localeCompare(String(right.id ?? "")),
+    );
+
+  return JSON.stringify(
+    canonicalTargetJson({
+      applicants: applicantFacts,
+      cockpit_snapshot: correctionHandoffSnapshotIntent(submission),
+      corrections: correctionFacts,
+      media_assets: mediaFacts,
+      questionnaire_answers: questionnaireFacts,
+      status_history: historyFacts,
+      submission: submissionFact,
+    }),
+  );
+}
+
+function canonicalSaveProvesDurable(
+  canonical: CockpitLoadResult,
+  submission: Submission,
+  expectedRevision: number | undefined,
+  correctionHandoff: boolean,
+  actorId: string,
+  ownerId: string,
+): boolean {
+  const canonicalSubmission = canonical.submissions.find(
+    (item) => item.id === submission.id,
+  );
+  const canonicalRevision = canonical.caseRevisionsBySubmissionId.get(submission.id);
+  if (!canonicalSubmission || canonicalRevision === undefined) return false;
+
+  const revisionAdvanced =
+    expectedRevision === undefined || canonicalRevision > expectedRevision;
+  if (!revisionAdvanced) return false;
+
+  const canonicalIssuesById = new Map(
+    canonicalSubmission.issues.map((issue) => [issue.id, issue]),
+  );
+  const issueIsDurable = (issue: Issue) => {
+    const persistedIssue = canonicalIssuesById.get(issue.id);
+    return Boolean(
+      persistedIssue &&
+      persistedIssue.status === issue.status &&
+      currentIssueTargetRevision(persistedIssue) ===
+        currentIssueTargetRevision(issue) &&
+      correctionTargetProjection(canonicalSubmission, persistedIssue) ===
+        correctionTargetProjection(submission, issue) &&
+      isAgentIssueCorrectionConfirmed(canonicalSubmission, persistedIssue),
+    );
+  };
+
+  if (correctionHandoff) {
+    const intendedFixedIssues = submission.issues.filter(
+      (issue) => issue.status === "fixed_by_agent",
+    );
+    return (
+      canonicalSubmission.status === "corrections_received" &&
+      !canonicalSubmission.issues.some((issue) => issue.status === "open") &&
+      intendedFixedIssues.length > 0 &&
+      intendedFixedIssues.every(issueIsDurable) &&
+      correctionHandoffIntentProjection(
+        canonicalSubmission,
+        actorId,
+        ownerId,
+      ) === correctionHandoffIntentProjection(submission, actorId, ownerId)
+    );
+  }
+
+  const intendedConfirmedIssues = submission.issues.filter(
+    (issue) => issue.agentConfirmation,
+  );
+  return (
+    canonicalSubmission.status === submission.status &&
+    intendedConfirmedIssues.length > 0 &&
+    intendedConfirmedIssues.every(issueIsDurable)
+  );
+}
+
+function canonicalRevisionAdvancedPastIntent(
+  canonical: CockpitLoadResult,
+  submissionId: string,
+  expectedRevision: number | undefined,
+) {
+  const canonicalRevision =
+    canonical.caseRevisionsBySubmissionId.get(submissionId);
+  return (
+    expectedRevision !== undefined &&
+    canonicalRevision !== undefined &&
+    canonicalRevision > expectedRevision
+  );
+}
+
+function correctionHandoffConcurrencyFailure() {
+  return mapSupabasePersistenceError(
+    {
+      code: "40001",
+      message: "Correction handoff intent changed in another window",
+      status: 409,
+    },
+    { operation: "rpc.submit_corrections_handoff", fallbackKind: "save" },
+  );
 }
 
 export type PublicNumberAssignment = {
@@ -345,10 +598,7 @@ type PagedRowsResult<Row> = {
 };
 
 async function collectPagedRows<Row>(
-  fetchPage: (
-    from: number,
-    to: number,
-  ) => Promise<PagedRowsResult<Row>>,
+  fetchPage: (from: number, to: number) => Promise<PagedRowsResult<Row>>,
   pageSize: number,
 ): Promise<PagedRowsResult<Row>> {
   const data: Row[] = [];
@@ -361,10 +611,7 @@ async function collectPagedRows<Row>(
 }
 
 async function collectIdKeysetPagedRows<Row extends { id: string }>(
-  fetchPage: (
-    afterId: string | null,
-    limit: number,
-  ) => Promise<PagedRowsResult<Row>>,
+  fetchPage: (afterId: string | null, limit: number) => Promise<PagedRowsResult<Row>>,
   pageSize: number,
 ): Promise<PagedRowsResult<Row>> {
   const data: Row[] = [];
@@ -404,9 +651,7 @@ function chunkedSubmissionIds(submissionIds: readonly string[]) {
     index < submissionIds.length;
     index += relatedSubmissionIdChunkSize
   ) {
-    chunks.push(
-      submissionIds.slice(index, index + relatedSubmissionIdChunkSize),
-    );
+    chunks.push(submissionIds.slice(index, index + relatedSubmissionIdChunkSize));
   }
   return chunks;
 }
@@ -730,7 +975,9 @@ function latestSubmissionStatusFromHistoryRows(
     .sort((left, right) => right.changed_at.localeCompare(left.changed_at))
     .find((row) => submissionStatusFromHistoryValue(row.to_status));
 
-  return latest ? (submissionStatusFromHistoryValue(latest.to_status) ?? undefined) : undefined;
+  return latest
+    ? (submissionStatusFromHistoryValue(latest.to_status) ?? undefined)
+    : undefined;
 }
 
 function exportPackageFromBatchRow(
@@ -820,7 +1067,12 @@ function attachExportPackageRow(
 function reconcileCockpitSnapshotWithSubmissionRow(
   row: Pick<
     SubmissionRow,
-    "agent_id" | "created_at" | "exported_at" | "public_number" | "status" | "updated_at"
+    | "agent_id"
+    | "created_at"
+    | "exported_at"
+    | "public_number"
+    | "status"
+    | "updated_at"
   >,
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
@@ -926,9 +1178,7 @@ function stableUuid(seed: string): string {
  * remains idempotent instead of generating a second audit event.
  */
 function isDurableUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function timestampOrNow(value: string | undefined): string {
@@ -1101,11 +1351,10 @@ function toCorrectionInsert(
     created_at: timestampOrNow(issue.createdAt),
     fixed_at:
       issue.status === "fixed_by_agent" || issue.status === "closed_by_admin"
-        ? issue.fixedAtIso ?? issue.agentConfirmation?.confirmedAtIso ?? null
+        ? (issue.fixedAtIso ?? issue.agentConfirmation?.confirmedAtIso ?? null)
         : null,
     agent_confirmed_at: issue.agentConfirmation?.confirmedAtIso ?? null,
-    agent_confirmed_revision:
-      issue.agentConfirmation?.targetRevision ?? null,
+    agent_confirmed_revision: issue.agentConfirmation?.targetRevision ?? null,
     target_revision: currentIssueTargetRevision(issue),
     target_baseline: null,
     target_projection: null,
@@ -1204,8 +1453,10 @@ export function toCockpitDraftPersistencePayload(
   submission: Submission,
   actorId: string,
   ownerId: string,
-  actorHistorySource: Extract<SubmissionHistorySource, "agent" | "admin"> =
-    actorId === ownerId ? "agent" : "admin",
+  actorHistorySource: Extract<SubmissionHistorySource, "agent" | "admin"> = actorId ===
+  ownerId
+    ? "agent"
+    : "admin",
 ): SubmissionDraftPersistencePayload {
   const ownedSubmission = assignSubmissionOwner(
     ensureSubmissionOwner(submission, ownerId),
@@ -1234,19 +1485,14 @@ export function toCockpitDraftPersistencePayload(
       family_intelligence: cockpitSnapshotFamilyIntelligence(ownedSubmission),
       appointment_status: appointmentStatusForSubmission(ownedSubmission),
       submitted_at:
-        ownedSubmission.status === "submitted_for_review"
-          ? persistenceTimestamp
-          : null,
+        ownedSubmission.status === "submitted_for_review" ? persistenceTimestamp : null,
       review_started_at: null,
       accepted_at:
         ownedSubmission.status === "ready_for_export" ||
         ownedSubmission.status === "exported"
           ? persistenceTimestamp
           : null,
-      exported_at:
-        ownedSubmission.status === "exported"
-          ? persistenceTimestamp
-          : null,
+      exported_at: ownedSubmission.status === "exported" ? persistenceTimestamp : null,
       updated_at: persistenceTimestamp,
     },
     applicants: ownedSubmission.applicants.map((applicant) =>
@@ -1461,11 +1707,14 @@ function isCurrentLocalHandoffWrite(submission: Submission, role: Role): boolean
     return role === "agent";
   }
   if (submission.status === "returned") {
-    return role === "admin" && submission.issues.some(
-      (issue) =>
-        issue.status === "open" &&
-        issue.createdAt === "сейчас" &&
-        issue.createdBy === "admin",
+    return (
+      role === "admin" &&
+      submission.issues.some(
+        (issue) =>
+          issue.status === "open" &&
+          issue.createdAt === "сейчас" &&
+          issue.createdBy === "admin",
+      )
     );
   }
   if (submission.status === "corrections_received") {
@@ -1528,9 +1777,7 @@ function issueFromCorrectionRow(
     applicants.find((candidate) => candidate.role === "main") ??
     applicants[0];
   if (!applicant) {
-    throw new Error(
-      `Коррекция ${row.id} не может быть восстановлена без заявителя.`,
-    );
+    throw new Error(`Коррекция ${row.id} не может быть восстановлена без заявителя.`);
   }
   const fileType =
     row.media_type && isCanonicalFrontendMediaType(row.media_type)
@@ -1577,14 +1824,10 @@ export function attachDurableCorrectionRows(
 ): Submission {
   if (!correctionRows.length) return submission;
 
-  const correctionByPersistedId = new Map(
-    correctionRows.map((row) => [row.id, row]),
-  );
+  const correctionByPersistedId = new Map(correctionRows.map((row) => [row.id, row]));
   const consumedCorrectionIds = new Set<string>();
   const snapshotIssues = submission.issues.map((issue): Issue => {
-    const persistedId = stableUuid(
-      `correction:${submission.id}:${issue.id}`,
-    );
+    const persistedId = stableUuid(`correction:${submission.id}:${issue.id}`);
     const durable = correctionByPersistedId.get(persistedId);
     if (!durable) return issue;
     consumedCorrectionIds.add(durable.id);
@@ -2024,12 +2267,10 @@ export async function loadCockpitSubmissionsForProfile(
   ]);
 
   const { data: applicantRows, error: applicantError } = applicantResult;
-  const { data: questionnaireRows, error: questionnaireError } =
-    questionnaireResult;
+  const { data: questionnaireRows, error: questionnaireError } = questionnaireResult;
   const { data: mediaRows, error: mediaError } = mediaResult;
   const { data: correctionRows, error: correctionError } = correctionResult;
-  const { data: statusHistoryRows, error: statusHistoryError } =
-    statusHistoryResult;
+  const { data: statusHistoryRows, error: statusHistoryError } = statusHistoryResult;
 
   if (applicantError) {
     throw mapSupabasePersistenceError(applicantError, {
@@ -2129,9 +2370,7 @@ export async function loadCockpitSubmissionsForProfile(
                     row,
                     submissionApplicants,
                     submissionQuestionnaireAnswers,
-                    latestSubmissionStatusFromHistoryRows(
-                      submissionStatusHistoryRows,
-                    ),
+                    latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
                   ),
                   row,
                 )
@@ -2139,9 +2378,7 @@ export async function loadCockpitSubmissionsForProfile(
                   row,
                   submissionApplicants,
                   submissionQuestionnaireAnswers,
-                  latestSubmissionStatusFromHistoryRows(
-                    submissionStatusHistoryRows,
-                  ),
+                  latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
                 ),
             fromSupabaseSubmissionRowStatus(row),
             submissionExportBatches,
@@ -2258,8 +2495,7 @@ function adminCaseRevisionsFromRpc(
 export function isAdminSubmissionConcurrencyConflict(error: unknown): boolean {
   return (
     error instanceof PersistenceObservableError &&
-    error.diagnostics.operation ===
-      "rpc.save_admin_submission_batch_if_current" &&
+    error.diagnostics.operation === "rpc.save_admin_submission_batch_if_current" &&
     error.diagnostics.supabaseCode === "40001"
   );
 }
@@ -2268,8 +2504,7 @@ export function isSubmissionConcurrencyConflict(error: unknown): boolean {
   return (
     error instanceof PersistenceObservableError &&
     error.diagnostics.supabaseCode === "40001" &&
-    (error.diagnostics.operation ===
-      "rpc.save_admin_submission_batch_if_current" ||
+    (error.diagnostics.operation === "rpc.save_admin_submission_batch_if_current" ||
       error.diagnostics.operation === "rpc.save_submission_draft" ||
       error.diagnostics.operation === "rpc.submit_corrections_handoff")
   );
@@ -2303,8 +2538,7 @@ export async function saveAdminCockpitSubmissionsIfCurrent(
   const expectedRevisions: Record<string, number> = {};
   const payloads = submissions.map((submission) => {
     assertReviewHandoffPersistenceConsistency(submission, profile.role);
-    const ownerId =
-      nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id;
+    const ownerId = nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id;
     const expectedRevision = caseRevisionsBySubmissionId.get(submission.id);
     if (expectedRevision === undefined) {
       throw new Error(
@@ -2406,10 +2640,10 @@ export async function saveCockpitSubmissionsForProfile(
     const expectedRevision = caseRevisionsBySubmissionId.get(submission.id);
     const payload: SubmissionDraftPersistencePayload = {
       ...toCockpitDraftPersistencePayload(
-      submission,
-      profile.id,
-      ownerId,
-      profile.role,
+        submission,
+        profile.id,
+        ownerId,
+        profile.role,
       ),
       client_contract_version: 2,
       ...(expectedRevision === undefined
@@ -2420,6 +2654,50 @@ export async function saveCockpitSubmissionsForProfile(
     const operation = correctionHandoff
       ? "rpc.submit_corrections_handoff"
       : "rpc.save_submission_draft";
+
+    if (correctionHandoff) {
+      let canonical: CockpitLoadResult | undefined;
+      try {
+        canonical = await loadCanonical(profile);
+      } catch {
+        // A preflight read is advisory. The atomic RPC remains the source of
+        // truth when canonical state cannot be loaded.
+      }
+      if (canonical) {
+        if (
+          canonicalSaveProvesDurable(
+            canonical,
+            submission,
+            expectedRevision,
+            true,
+            profile.id,
+            ownerId,
+          )
+        ) {
+          const canonicalRevision = canonical.caseRevisionsBySubmissionId.get(
+            submission.id,
+          );
+          if (canonicalRevision !== undefined) {
+            nextCaseRevisions.set(submission.id, canonicalRevision);
+          }
+          nextOwnerIds.set(
+            submission.id,
+            canonical.ownerIdsBySubmissionId.get(submission.id) ?? ownerId,
+          );
+          continue;
+        }
+        if (
+          canonicalRevisionAdvancedPastIntent(
+            canonical,
+            submission.id,
+            expectedRevision,
+          )
+        ) {
+          throw correctionHandoffConcurrencyFailure();
+        }
+      }
+    }
+
     const invokeSave = async (): Promise<{
       data: unknown;
       error: unknown | null;
@@ -2441,91 +2719,53 @@ export async function saveCockpitSubmissionsForProfile(
         fallbackKind: "save",
       });
       if (failure.diagnostics.retryable) {
+        let canonical: CockpitLoadResult | undefined;
         try {
-          const canonical = await loadCanonical(profile);
-          const canonicalSubmission = canonical.submissions.find(
-            (item) => item.id === submission.id,
-          );
-          const canonicalRevision =
-            canonical.caseRevisionsBySubmissionId.get(submission.id);
-          const intendedFixedIssues = submission.issues.filter(
-            (issue) => issue.status === "fixed_by_agent",
-          );
-          const intendedConfirmedIssues = submission.issues.filter(
-            (issue) => issue.agentConfirmation,
-          );
-          const canonicalIssuesById = new Map(
-            canonicalSubmission?.issues.map((issue) => [issue.id, issue]) ?? [],
-          );
-          const revisionAdvanced =
-            canonicalRevision !== undefined &&
-            (expectedRevision === undefined ||
-              canonicalRevision > expectedRevision);
-          const intendedConfirmationsAreDurable =
-            intendedConfirmedIssues.length > 0 &&
-            intendedConfirmedIssues.every((issue) => {
-              const persistedIssue = canonicalIssuesById.get(issue.id);
-              return (
-                persistedIssue?.status === issue.status &&
-                currentIssueTargetRevision(persistedIssue) ===
-                  currentIssueTargetRevision(issue) &&
-                correctionTargetProjection(
-                  canonicalSubmission ?? submission,
-                  persistedIssue,
-                ) ===
-                  correctionTargetProjection(submission, issue) &&
-                isAgentIssueCorrectionConfirmed(
-                  canonicalSubmission ?? submission,
-                  persistedIssue,
-                )
-              );
-            });
-          const handoffIsDurable =
-            canonicalSubmission?.status === "corrections_received" &&
-            !canonicalSubmission.issues.some((issue) => issue.status === "open") &&
-            intendedFixedIssues.length > 0 &&
-            intendedFixedIssues.every((issue) => {
-              const persistedIssue = canonicalIssuesById.get(issue.id);
-              return (
-                persistedIssue?.status === "fixed_by_agent" &&
-                currentIssueTargetRevision(persistedIssue) ===
-                  currentIssueTargetRevision(issue) &&
-                correctionTargetProjection(
-                  canonicalSubmission,
-                  persistedIssue,
-                ) === correctionTargetProjection(submission, issue) &&
-                isAgentIssueCorrectionConfirmed(
-                  canonicalSubmission,
-                  persistedIssue,
-                )
-              );
-            }) &&
-            revisionAdvanced;
-          const confirmationSaveIsDurable =
-            !correctionHandoff &&
-            canonicalSubmission?.status === submission.status &&
-            intendedConfirmationsAreDurable &&
-            revisionAdvanced;
-
-          if (handoffIsDurable || confirmationSaveIsDurable) {
-            return {
-              caseRevisionsBySubmissionId:
-                canonical.caseRevisionsBySubmissionId,
-              ownerIdsBySubmissionId: canonical.ownerIdsBySubmissionId,
-            };
-          }
+          canonical = await loadCanonical(profile);
         } catch {
-          // Preserve the original observable transport failure unless canonical
-          // readback proves that the handoff committed.
+          // Preserve the original observable transport failure when canonical
+          // readback is unavailable.
+        }
+        if (canonical) {
+          if (
+            canonicalSaveProvesDurable(
+              canonical,
+              submission,
+              expectedRevision,
+              correctionHandoff,
+              profile.id,
+              ownerId,
+            )
+          ) {
+            const canonicalRevision = canonical.caseRevisionsBySubmissionId.get(
+              submission.id,
+            );
+            if (canonicalRevision !== undefined) {
+              nextCaseRevisions.set(submission.id, canonicalRevision);
+            }
+            nextOwnerIds.set(
+              submission.id,
+              canonical.ownerIdsBySubmissionId.get(submission.id) ?? ownerId,
+            );
+            continue;
+          }
+          if (
+            correctionHandoff &&
+            canonicalRevisionAdvancedPastIntent(
+              canonical,
+              submission.id,
+              expectedRevision,
+            )
+          ) {
+            throw correctionHandoffConcurrencyFailure();
+          }
         }
       }
       throw failure;
     }
 
     if (!result.data || typeof result.data !== "object") {
-      throw new Error(
-        `Supabase не вернул новую revision для подачи ${submission.id}.`,
-      );
+      throw new Error(`Supabase не вернул новую revision для подачи ${submission.id}.`);
     }
     const revision = (result.data as { caseRevision?: unknown }).caseRevision;
     if (

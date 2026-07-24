@@ -30,15 +30,16 @@ begin
     select required_trigger.name
     from (
       values
-        ('corrections_agent_target_revision_guard'),
-        ('questionnaire_answers_refresh_correction_targets'),
-        ('media_assets_refresh_correction_targets'),
-        ('submissions_returned_questionnaire_readiness_guard')
-    ) as required_trigger(name)
+        ('corrections_agent_target_revision_guard', 'public.corrections'::regclass),
+        ('questionnaire_answers_refresh_correction_targets', 'public.questionnaire_answers'::regclass),
+        ('media_assets_refresh_correction_targets', 'public.media_assets'::regclass),
+        ('submissions_returned_questionnaire_readiness_guard', 'public.submissions'::regclass)
+    ) as required_trigger(name, table_oid)
     where not exists (
       select 1
       from pg_catalog.pg_trigger as trigger_info
       where trigger_info.tgname = required_trigger.name
+        and trigger_info.tgrelid = required_trigger.table_oid
         and trigger_info.tgenabled = 'O'
         and not trigger_info.tgisinternal
     )

@@ -5,6 +5,7 @@ import {
   fileLabel,
   sectionNavigationTarget,
   targetElementId,
+  targetForIssue,
 } from "../../src/modules/submissions/workspaceModel";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 
@@ -26,6 +27,45 @@ describe("operator workspace model", () => {
     expect(fileLabel("passport_scan")).toBe("Скан паспорта");
     expect(fileLabel("selfie")).toBe("Селфи 1");
     expect(fileLabel("selfie_2")).toBe("Селфи 2");
+  });
+
+  test("preserves exact questionnaire identity in workspace navigation", () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1053");
+    const applicant = submission?.applicants[0];
+    const hotelSection = applicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "hotel-email"),
+    );
+    if (!submission || !applicant || !hotelSection) {
+      throw new Error("expected hotel email fixture");
+    }
+
+    const target = targetForIssue({
+      comment: "Уточните email отеля.",
+      createdAt: "2026-07-25T00:00:00.000Z",
+      createdBy: "admin",
+      id: "issue-hotel-email",
+      reason: "Email отеля требует исправления",
+      severity: "blocker",
+      status: "open",
+      target: {
+        applicantId: applicant.id,
+        applicantName: applicant.fullName,
+        field: "Email",
+        fieldId: "hotel-email",
+        section: hotelSection.title,
+        sectionId: hotelSection.id,
+      },
+      type: "field",
+    });
+
+    expect(target).toEqual({
+      applicantId: applicant.id,
+      field: "Email",
+      fieldId: "hotel-email",
+      section: hotelSection.title,
+      sectionId: hotelSection.id,
+      tab: "questionnaire",
+    });
   });
 
   test("opens section navigation on the applicant that actually has work", () => {

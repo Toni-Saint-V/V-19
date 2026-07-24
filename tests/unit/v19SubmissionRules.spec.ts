@@ -149,9 +149,7 @@ function testStorage() {
 function readyClone(patch: Partial<Submission>): Submission {
   return adminAcceptRequiredMediaForTest(
     adminApproveQuestionnaireForTest({
-      ...fillRequiredQuestionnaireForTest(
-        canonicalMediaSubmission(byId("ПД-1056")),
-      ),
+      ...fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
       id: patch.id ?? "ПД-ТЕСТ",
       title: patch.title ?? "Тестовая подача",
       ...patch,
@@ -296,9 +294,7 @@ describe("V-19 submission status rules", () => {
   it("blocks role-incompatible actions", () => {
     const submitted = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(
-        canonicalMediaSubmission(
-          fillRequiredQuestionnaireForTest(byId("ПД-1053")),
-        ),
+        canonicalMediaSubmission(fillRequiredQuestionnaireForTest(byId("ПД-1053"))),
       ),
     );
 
@@ -571,9 +567,7 @@ describe("V-19 export rules", () => {
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) =>
-            field.id === "main-destination"
-              ? { ...field, value: "Portugal" }
-              : field,
+            field.id === "main-destination" ? { ...field, value: "Portugal" } : field,
           ),
         })),
       })),
@@ -1003,13 +997,10 @@ describe("V-19 export rules", () => {
       throw new Error("Expected export persistence timestamp.");
     }
     expect(Date.parse(persistedUpdatedAt)).not.toBeNaN();
-    expect(exportDraftPayload.submission.accepted_at).toBe(
-      persistedUpdatedAt,
-    );
+    expect(exportDraftPayload.submission.accepted_at).toBe(persistedUpdatedAt);
     expect(
-      readCockpitSnapshot(
-        exportDraftPayload.submission.family_intelligence as Json,
-      )?.updatedAt,
+      readCockpitSnapshot(exportDraftPayload.submission.family_intelligence as Json)
+        ?.updatedAt,
     ).toBe("сейчас");
     expect(generated[0]?.history).toEqual(submissions[0]?.history);
     expect(downloaded[0]?.history).toEqual(submissions[0]?.history);
@@ -1136,9 +1127,7 @@ describe("V-19 submission actions", () => {
         id: `queue-matrix-${status}`,
         status,
         applicants: source.applicants.map((applicant, index) =>
-          index === 0
-            ? { ...applicant, questionnaireStatus: "partial" }
-            : applicant,
+          index === 0 ? { ...applicant, questionnaireStatus: "partial" } : applicant,
         ),
         files: source.files.map((file, index) =>
           index === 0 ? { ...file, status: "missing" } : file,
@@ -1149,9 +1138,7 @@ describe("V-19 submission actions", () => {
       expect(queue.open).toHaveLength(openCount);
       expect(queue.completed).toHaveLength(completedCount);
       expect(queue.open.every((action) => action.completed === false)).toBe(true);
-      expect(queue.completed.every((action) => action.completed === true)).toBe(
-        true,
-      );
+      expect(queue.completed.every((action) => action.completed === true)).toBe(true);
       if (status === "exported") {
         expect(queue.completed[0]).toMatchObject({
           context: "Пакет выгружен",
@@ -1197,11 +1184,11 @@ describe("V-19 submission actions", () => {
     expect(fileErrorTask?.importanceText).toBe("Без этого подачу нельзя продолжить.");
     expect(fileErrorTask?.reason).toContain("файл требует замены");
     expect(fileErrorTask?.readiness.files.label).toContain("Файлы:");
-    expect(fileErrorTask?.readiness.finalResult.label).toBe(
-      "Итог: нельзя продолжить",
-    );
+    expect(fileErrorTask?.readiness.finalResult.label).toBe("Итог: нельзя продолжить");
 
-    const questionnaireTask = tasks.find((task) => task.id.startsWith("questionnaire-"));
+    const questionnaireTask = tasks.find((task) =>
+      task.id.startsWith("questionnaire-"),
+    );
     expect(questionnaireTask).toMatchObject({
       nextAction: { label: "Открыть анкету", tab: "questionnaire", target: "form" },
       priority: { label: "Срочно", reason: "Дедлайн сегодня" },
@@ -1402,9 +1389,7 @@ describe("V-19 submission actions", () => {
     expect(Number.isNaN(Date.parse(draft.createdAt))).toBe(false);
     expect(draft.applicants).toHaveLength(3);
     expect(draft.files).toHaveLength(5);
-    expect(
-      draft.files.map((file) => [file.applicantId, file.type]),
-    ).toEqual([
+    expect(draft.files.map((file) => [file.applicantId, file.type])).toEqual([
       [draft.applicants[0]?.id, "passport_scan"],
       [draft.applicants[0]?.id, "selfie"],
       [draft.applicants[0]?.id, "selfie_2"],
@@ -1793,7 +1778,10 @@ describe("V-19 submission actions", () => {
     const firstFile = draft.files[0];
     if (!firstFile) throw new Error("Missing draft file");
 
-    const updated = uploadRequiredFile(fillRequiredQuestionnaireForTest(draft), firstFile.id);
+    const updated = uploadRequiredFile(
+      fillRequiredQuestionnaireForTest(draft),
+      firstFile.id,
+    );
 
     expect(updated.files[0]?.status).toBe("uploaded");
     expect(updated.completeness.files).toBe(33);
@@ -1996,12 +1984,13 @@ describe("V-19 submission actions", () => {
         }),
       ]),
     );
-    expect(autofilled.applicants[0]?.sections.flatMap((section) => section.fields)).not
-      .toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: "passport-no", value: "752869613" }),
-        ]),
-      );
+    expect(
+      autofilled.applicants[0]?.sections.flatMap((section) => section.fields),
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "passport-no", value: "752869613" }),
+      ]),
+    );
   });
 
   it("blocks file uploads after the submission leaves editable agent states", () => {
@@ -2140,12 +2129,54 @@ describe("V-19 submission actions", () => {
     expect(updated.history[0].source).toBe("admin");
   });
 
+  it("fails closed for an ambiguous legacy label and flags only an exact field id", () => {
+    const submission = canonicalMediaSubmission(byId("ПД-1053"));
+    const applicant = submission.applicants[0];
+    const hotelSection = applicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "hotel-email"),
+    );
+    if (!applicant || !hotelSection) throw new Error("Missing hotel email field");
+
+    const ambiguous = addPreciseAdminIssue(submission, {
+      applicantId: applicant.id,
+      comment: "Уточните email.",
+      field: "Email",
+      reason: "Нужен корректный email",
+      section: "Анкета",
+      severity: "blocker",
+      type: "field",
+    });
+    expect(ambiguous).toBe(submission);
+
+    const exact = addPreciseAdminIssue(submission, {
+      applicantId: applicant.id,
+      comment: "Уточните email отеля.",
+      field: "Email",
+      fieldId: "hotel-email",
+      reason: "Нужен корректный email отеля",
+      section: hotelSection.title,
+      sectionId: hotelSection.id,
+      severity: "blocker",
+      type: "field",
+    });
+    const emailFields = exact.applicants[0]?.sections.flatMap((section) =>
+      section.fields.filter((field) => field.label === "Email"),
+    );
+
+    expect(exact.issues[0]?.target).toMatchObject({
+      fieldId: "hotel-email",
+      sectionId: hotelSection.id,
+    });
+    expect(emailFields?.find((field) => field.id === "hotel-email")?.error).toBe(
+      "Нужен корректный email отеля",
+    );
+    expect(emailFields?.find((field) => field.id === "email")?.error).toBeUndefined();
+  });
+
   it("requires reviewed media before acceptance and preserves its reviewer", () => {
     const adminProfileId = "00000000-0000-4000-8000-000000000002";
     const submission = adminApprovePassportFieldsForTest(
-      canonicalMediaSubmission(
-        fillRequiredQuestionnaireForTest(byId("ПД-1053")),
-      ),
+      canonicalMediaSubmission(fillRequiredQuestionnaireForTest(byId("ПД-1053"))),
     );
     const blocked = applySubmissionAction(
       submission,
@@ -2156,16 +2187,9 @@ describe("V-19 submission actions", () => {
     expect(blocked).toBe(submission);
 
     const reviewed = adminAcceptRequiredMediaForTest(submission);
-    const reviewableFiles = reviewed.files.filter((file) =>
-      file.status === "accepted",
-    );
+    const reviewableFiles = reviewed.files.filter((file) => file.status === "accepted");
 
-    const accepted = applySubmissionAction(
-      reviewed,
-      "accept",
-      "admin",
-      adminProfileId,
-    );
+    const accepted = applySubmissionAction(reviewed, "accept", "admin", adminProfileId);
 
     expect(accepted.status).toBe("ready_for_export");
     expect(reviewableFiles.length).toBeGreaterThan(0);
@@ -2270,11 +2294,7 @@ describe("V-19 submission actions", () => {
       "agent",
     );
     if (!fixed.ok) throw new Error(fixed.error.code);
-    const corrected = applySubmissionAction(
-      fixed.data,
-      "submit_corrections",
-      "agent",
-    );
+    const corrected = applySubmissionAction(fixed.data, "submit_corrections", "agent");
 
     expect(corrected.issues[0]).toMatchObject({
       status: "open",
@@ -2332,14 +2352,14 @@ describe("V-19 submission actions", () => {
     if (!fixed.ok) throw new Error(fixed.error.code);
 
     expect(fixed.data.status).toBe("returned");
-    expect(
-      fixed.data.issues.find((issue) => issue.id === routeIssue.id),
-    ).toMatchObject({
-      status: "open",
-      agentConfirmation: {
-        targetRevision: expect.any(Number),
+    expect(fixed.data.issues.find((issue) => issue.id === routeIssue.id)).toMatchObject(
+      {
+        status: "open",
+        agentConfirmation: {
+          targetRevision: expect.any(Number),
+        },
       },
-    });
+    );
     expect(
       fixed.data.issues.find(
         (issue) => issue.target.field === "Основная страна назначения",
@@ -2348,8 +2368,7 @@ describe("V-19 submission actions", () => {
     expect(
       fixed.data.applicants[0]?.sections
         .find((section) => section.title === "Поездка")
-        ?.fields.find((field) => field.label === "Основная страна назначения")
-        ?.error,
+        ?.fields.find((field) => field.label === "Основная страна назначения")?.error,
     ).toBe("Нужно подтвердить основную страну назначения");
   });
 
@@ -2373,11 +2392,7 @@ describe("V-19 submission actions", () => {
   it("blocks marking a returned issue fixed until its target changes", () => {
     const submission = byId("ПД-1053");
     const withIssue = addPreciseAdminIssue(submission, routeIssueInput(submission));
-    const returned = applySubmissionAction(
-      withIssue,
-      "return_with_issues",
-      "admin",
-    );
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
     const issueId = returned.issues[0]?.id;
     if (!issueId) throw new Error("Missing issue");
 
@@ -2419,11 +2434,7 @@ describe("V-19 submission actions", () => {
         type: "field",
       },
     );
-    const returned = applySubmissionAction(
-      reviewed,
-      "return_with_issues",
-      "admin",
-    );
+    const returned = applySubmissionAction(reviewed, "return_with_issues", "admin");
     const invalidEmail = updateQuestionnaireField(returned, {
       applicantId: applicant.id,
       fieldId: emailField.id,
@@ -2524,11 +2535,7 @@ describe("V-19 submission actions", () => {
       { ...incomplete, status: "submitted_for_review" },
       routeIssueInput(incomplete),
     );
-    const returned = applySubmissionAction(
-      withIssue,
-      "return_with_issues",
-      "admin",
-    );
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
     const applicant = returned.applicants[0];
     const routeSection = applicant?.sections.find((section) =>
       section.fields.some((field) => field.id === "first-entry-country"),
@@ -2579,9 +2586,7 @@ describe("V-19 submission actions", () => {
       {
         ...readyReturned,
         files: readyReturned.files.map((file) =>
-          file.id === missingFile.id
-            ? { ...file, status: "missing" as const }
-            : file,
+          file.id === missingFile.id ? { ...file, status: "missing" as const } : file,
         ),
       },
       {
@@ -2608,11 +2613,7 @@ describe("V-19 submission actions", () => {
       { ...source, status: "submitted_for_review" },
       routeIssueInput(source),
     );
-    const returned = applySubmissionAction(
-      withIssue,
-      "return_with_issues",
-      "admin",
-    );
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
     const applicant = returned.applicants[0];
     const routeSection = applicant?.sections.find((section) =>
       section.fields.some((field) => field.id === "first-entry-country"),
@@ -2651,9 +2652,7 @@ describe("V-19 submission actions", () => {
     const revertedIssue = reverted.issues[0];
     if (!revertedIssue) throw new Error("Missing reverted issue");
 
-    expect(revertedIssue.targetRevision).toBe(
-      (confirmedIssue.targetRevision ?? 0) + 2,
-    );
+    expect(revertedIssue.targetRevision).toBe((confirmedIssue.targetRevision ?? 0) + 2);
     expect(revertedIssue.agentConfirmation).toBeUndefined();
     expect(isAgentIssueCorrectionConfirmed(reverted, revertedIssue)).toBe(false);
   });
@@ -2664,11 +2663,7 @@ describe("V-19 submission actions", () => {
       { ...source, status: "submitted_for_review" },
       routeIssueInput(source),
     );
-    const returned = applySubmissionAction(
-      withIssue,
-      "return_with_issues",
-      "admin",
-    );
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
     const applicant = returned.applicants[0];
     const routeSection = applicant?.sections.find((section) =>
       section.fields.some((field) => field.id === "first-entry-country"),
@@ -2758,9 +2753,7 @@ describe("V-19 submission actions", () => {
     };
 
     expect(isAgentIssueCorrectionConfirmed(first, issue)).toBe(true);
-    expect(isAgentIssueCorrectionConfirmed(reordered, reordered.issues[0]!)).toBe(
-      true,
-    );
+    expect(isAgentIssueCorrectionConfirmed(reordered, reordered.issues[0]!)).toBe(true);
   });
 
   it("keeps the compatibility confirmation timestamp ISO-compatible", () => {
@@ -2769,11 +2762,7 @@ describe("V-19 submission actions", () => {
       { ...source, status: "submitted_for_review" },
       routeIssueInput(source),
     );
-    const returned = applySubmissionAction(
-      withIssue,
-      "return_with_issues",
-      "admin",
-    );
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
     const applicant = returned.applicants[0];
     const section = applicant?.sections.find((candidate) =>
       candidate.fields.some((field) => field.id === "first-entry-country"),
@@ -2791,11 +2780,8 @@ describe("V-19 submission actions", () => {
       "agent",
     );
     if (!confirmed.ok) throw new Error(confirmed.error.message);
-    const confirmedAtIso =
-      confirmed.data.issues[0]?.agentConfirmation?.confirmedAtIso;
-    expect(confirmedAtIso).toMatch(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-    );
+    const confirmedAtIso = confirmed.data.issues[0]?.agentConfirmation?.confirmedAtIso;
+    expect(confirmedAtIso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(confirmedAtIso).not.toBe("сейчас");
   });
 
@@ -2928,8 +2914,7 @@ describe("V-19 ББ helper suggestions", () => {
     const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const passportFile = filled.files.find(
       (file) =>
-        file.type === "passport_scan" &&
-        file.applicantId === filled.applicants[0]?.id,
+        file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
     );
     if (!passportFile) throw new Error("Missing passport file");
 
@@ -2968,7 +2953,8 @@ describe("V-19 ББ helper suggestions", () => {
         suggestion.target.section === "Паспорт" &&
         suggestion.target.field === "Распознанные данные паспорта",
     );
-    if (!passportReviewSuggestion) throw new Error("Missing passport review suggestion");
+    if (!passportReviewSuggestion)
+      throw new Error("Missing passport review suggestion");
 
     const withIssue = acceptAiSuggestionAsIssue(
       reviewed,
@@ -3279,9 +3265,7 @@ describe("V-19 persistence boundary", () => {
 
     const uploaded = uploadRequiredFile(normalized, targetFile.id);
 
-    expect(uploaded.issues.find((item) => item.id === issue.id)?.status).toBe(
-      "open",
-    );
+    expect(uploaded.issues.find((item) => item.id === issue.id)?.status).toBe("open");
   });
 
   it("builds a Supabase draft payload from the current cockpit model", () => {

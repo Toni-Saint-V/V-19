@@ -46,6 +46,9 @@ jobs:
       - name: Boundary verifier
         run: npm run verify:v19-boundary
 
+      - name: Supabase release contract
+        run: npm run verify:supabase-release
+
       - name: Agent screen runtime contract
         run: npm run verify:agent-screen-runtime
 

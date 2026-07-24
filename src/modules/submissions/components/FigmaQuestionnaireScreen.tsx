@@ -28,6 +28,7 @@ import {
   POPULAR_RUSSIAN_CITY_OPTIONS,
   isQuestionnaireDateField,
   questionnaireDateIntent,
+  resolveQuestionnaireTargetField,
   updateQuestionnaireField,
   validateQuestionnaireFieldValue,
   type QuestionnaireDateIntent,
@@ -271,7 +272,9 @@ export type QuestionnaireInitialFocus = {
   applicantId?: string;
   fileId?: string;
   field?: string;
+  fieldId?: string;
   section?: string;
+  sectionId?: string;
 };
 
 export type QuestionnaireDocumentsFilter = "error" | "missing";
@@ -1580,6 +1583,7 @@ type QuestionnaireModelField = NonNullable<ReturnType<typeof questionnaireField>
 type QuestionnaireBlockerTarget = {
   applicantId: string;
   deferredUntilSectionExit?: boolean;
+  fieldId?: string;
   label?: string;
   reason?: string;
   sectionId: SectionId;
@@ -2539,33 +2543,63 @@ function isQuestionnaireFieldIssue(
   );
   if (!applicant) return false;
 
-  return questionnaireFieldBindings.some((binding) =>
-    issueFieldMatches(
-      binding.fieldId,
-      questionnaireField(applicant, binding.fieldId)?.label ?? "",
-      issue.target.field,
-    ),
+  const resolved = resolveQuestionnaireTargetField(applicant, issue.target);
+  return Boolean(
+    resolved &&
+      questionnaireFieldBindings.some(
+        (binding) =>
+          questionnaireField(applicant, binding.fieldId)?.id === resolved.field.id,
+      ),
   );
 }
 
 function focusableFieldFor(
-  field: string | undefined,
+  focus: QuestionnaireInitialFocus | undefined,
   applicant?: Submission["applicants"][number],
 ) {
-  const explicitTarget = focusableQuestionnaireFields.find(
-    (target) =>
-      sameFieldLabel(target.fieldId, field) ||
-      target.labels.some((label) => sameFieldLabel(label, field)),
-  );
-  if (explicitTarget) return explicitTarget;
+  if (applicant && (focus?.fieldId || focus?.sectionId)) {
+    const resolved = resolveQuestionnaireTargetField(applicant, {
+      field: focus.field,
+      fieldId: focus.fieldId,
+      section: focus.section,
+      sectionId: focus.sectionId,
+    });
+    if (!resolved) return undefined;
+    const exactBinding = questionnaireFieldBindings.find(
+      (binding) =>
+        questionnaireField(applicant, binding.fieldId)?.id === resolved.field.id,
+    );
+    const exactSection = exactBinding
+      ? sectionDefinitions.find(
+          (definition) => definition.canonicalId === exactBinding.sectionId,
+        )
+      : undefined;
+    if (!exactBinding || !exactSection) return undefined;
+    return {
+      fieldId: exactBinding.fieldId,
+      formKey: exactBinding.formKey,
+      labels: [resolved.field.label],
+      sectionId: exactSection.id,
+    } satisfies FocusableQuestionnaireField;
+  }
 
-  const binding = questionnaireFieldBindings.find((candidate) =>
+  const explicitTargets = focusableQuestionnaireFields.filter(
+    (target) =>
+      sameFieldLabel(target.fieldId, focus?.field) ||
+      target.labels.some((label) => sameFieldLabel(label, focus?.field)),
+  );
+  if (explicitTargets.length === 1) return explicitTargets[0];
+  if (explicitTargets.length > 1) return undefined;
+
+  const bindings = questionnaireFieldBindings.filter((candidate) =>
     issueFieldMatches(
       candidate.fieldId,
       questionnaireField(applicant, candidate.fieldId)?.label ?? "",
-      field,
+      focus?.field,
     ),
   );
+  if (bindings.length !== 1) return undefined;
+  const binding = bindings[0];
   if (!binding) return undefined;
 
   const section = sectionDefinitions.find(
@@ -2589,6 +2623,12 @@ function sectionForFocus(
   target: FocusableQuestionnaireField | undefined,
 ): SectionId {
   if (target) return target.sectionId;
+  const exactSection = sectionDefinitions.find(
+    (definition) =>
+      focus?.sectionId &&
+      sectionIdMatches(focus.sectionId, definition.canonicalId),
+  );
+  if (exactSection) return exactSection.id;
   const section = normalizeFocusLabel(focus?.section);
   if (section.includes("запис")) return "appointment";
   if (section.includes("паспорт")) return "passport";
@@ -2663,10 +2703,7 @@ export function FigmaQuestionnaireScreen({
     draftSubmission.applicants.find(
       (applicant) => applicant.id === initialApplicantId,
     ) ?? draftSubmission.applicants[0];
-  const initialFieldTarget = focusableFieldFor(
-    initialFocus?.field,
-    initialFocusApplicant,
-  );
+  const initialFieldTarget = focusableFieldFor(initialFocus, initialFocusApplicant);
   const [activeApplicant, setActiveApplicant] = useState(initialApplicantId);
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
@@ -3170,22 +3207,16 @@ export function FigmaQuestionnaireScreen({
     )?.canonicalId;
 
     return activeBlockingIssues.find((issue) => {
-      if (!issue.target.field) return false;
-      const declaredSection = sections.find((section) =>
-        sameFieldLabel(section.title, issue.target.section),
+      if (!activeApplicantModel) return false;
+      const resolved = resolveQuestionnaireTargetField(
+        activeApplicantModel,
+        issue.target,
       );
-      if (declaredSection) return declaredSection.id === activeSection;
-
-      return questionnaireFieldBindings
-        .filter((binding) => binding.sectionId === currentCanonicalSection)
-        .some((binding) => {
-          const field = questionnaireField(activeApplicantModel, binding.fieldId);
-          return issueFieldMatches(
-            binding.fieldId,
-            field?.label ?? issue.target.field ?? "",
-            issue.target.field,
-          );
-        });
+      if (!resolved) return false;
+      return (
+        resolved.section.id === currentCanonicalSection ||
+        resolved.section.id.endsWith(`-${currentCanonicalSection}`)
+      );
     });
   }, [activeApplicantModel, activeBlockingIssues, activeSection, sections]);
   const currentIssueCorrectionConfirmed = Boolean(
@@ -3472,15 +3503,22 @@ export function FigmaQuestionnaireScreen({
     setFamilyCopyMessage("Копирование отменено; данные не изменены.");
   }
 
-  function fieldIssue(fieldId: string, label: string) {
-    return openFieldIssues.find((issue) =>
-      issueFieldMatches(fieldId, label, issue.target.field),
-    );
+  function fieldIssue(fieldId: string) {
+    const renderedField = questionnaireField(activeApplicantModel, fieldId);
+    return openFieldIssues.find((issue) => {
+      if (!activeApplicantModel) return false;
+      const resolved = resolveQuestionnaireTargetField(
+        activeApplicantModel,
+        issue.target,
+      );
+      return resolved?.field.id === (renderedField?.id ?? fieldId);
+    });
   }
 
-  function fieldReviewState(fieldId: string, label: string): FieldState {
+  function fieldReviewState(fieldId: string, _label: string): FieldState {
+    void _label;
     if (fieldId === "stay-duration") return "normal";
-    if (fieldIssue(fieldId, label)) return "invalid";
+    if (fieldIssue(fieldId)) return "invalid";
 
     const field = questionnaireField(activeApplicantModel, fieldId);
     const validationMessage = field
@@ -3549,9 +3587,10 @@ export function FigmaQuestionnaireScreen({
     onFieldChange?.(update);
   }
 
-  function fieldErrorMessage(fieldId: string, label: string) {
+  function fieldErrorMessage(fieldId: string, _label: string) {
+    void _label;
     if (fieldId === "stay-duration") return undefined;
-    const issue = fieldIssue(fieldId, label);
+    const issue = fieldIssue(fieldId);
     if (issue) return issue.comment ?? issue.reason;
     const field = questionnaireField(activeApplicantModel, fieldId);
     return (
@@ -3979,6 +4018,7 @@ export function FigmaQuestionnaireScreen({
       const target = {
         applicantId: validationRisk.applicant.id,
         deferredUntilSectionExit: requiredButEmpty,
+        fieldId: validationRisk.field.id,
         label: validationRisk.field.label,
         reason:
           validateBlsQuestionnaireField({
@@ -4015,6 +4055,7 @@ export function FigmaQuestionnaireScreen({
       deferredRequiredTarget = {
         applicantId: requiredEmpty.applicant.id,
         deferredUntilSectionExit: true,
+        fieldId: requiredEmpty.field.id,
         label: requiredEmpty.field.label,
         reason:
           quickOptions && quickOptions.length >= 2 && quickOptions.length <= 3
@@ -4045,40 +4086,42 @@ export function FigmaQuestionnaireScreen({
     const issueApplicant = draftSubmission.applicants.find(
       (applicant) => applicant.id === issue.target.applicantId,
     );
-    const hasIssueSection = Boolean(issue.target.section?.trim());
-    const issueSectionId = sectionForFocus(
-      { section: issue.target.section },
-      undefined,
-    );
-    const issueCanonicalSection = sectionDefinitions.find(
-      (definition) => definition.id === issueSectionId,
-    )?.canonicalId;
-    const matchingBindings = questionnaireFieldBindings.filter((binding) => {
-      const field = questionnaireField(issueApplicant, binding.fieldId);
-      return issueFieldMatches(binding.fieldId, field?.label ?? "", issue.target.field);
-    });
-    const normalizedIssueField = normalizeFocusLabel(issue.target.field).replace(
-      /ё/g,
-      "е",
-    );
-    const exactIdBinding = matchingBindings.find(
-      (binding) =>
-        normalizeFocusLabel(binding.fieldId).replace(/ё/g, "е") ===
-        normalizedIssueField,
-    );
-    const sectionBinding =
-      hasIssueSection && issueCanonicalSection
-        ? matchingBindings.find(
-            (binding) => binding.sectionId === issueCanonicalSection,
-          )
-        : undefined;
-    const issueBinding = exactIdBinding ?? sectionBinding ?? matchingBindings[0];
+    const resolved = issueApplicant
+      ? resolveQuestionnaireTargetField(issueApplicant, issue.target)
+      : null;
+    const issueBinding = resolved
+      ? questionnaireFieldBindings.find(
+          (binding) =>
+            questionnaireField(issueApplicant, binding.fieldId)?.id ===
+            resolved.field.id,
+        )
+      : undefined;
     const issueField = issueBinding
       ? questionnaireField(issueApplicant, issueBinding.fieldId)
       : undefined;
+    const issueSectionId = sectionForFocus(
+      {
+        field: issue.target.field,
+        fieldId: issue.target.fieldId,
+        section: issue.target.section,
+        sectionId: issue.target.sectionId,
+      },
+      issueBinding
+        ? focusableFieldFor(
+            {
+              field: issue.target.field,
+              fieldId: issue.target.fieldId,
+              section: issue.target.section,
+              sectionId: issue.target.sectionId,
+            },
+            issueApplicant,
+          )
+        : undefined,
+    );
 
     return {
       applicantId: issue.target.applicantId,
+      fieldId: issueField?.id,
       label: issueField?.label ?? issue.target.field,
       sectionId: issueBinding
         ? sectionIdForQuestionnaireField(issueBinding.sectionId, issueBinding.fieldId)
@@ -5027,25 +5070,14 @@ export function FigmaQuestionnaireScreen({
   const currentIssueCoversMobileBlocker = Boolean(
     currentSectionIssue &&
       mobileBlockerTarget &&
+      mobileBlockerTarget.fieldId &&
       currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
-      (!currentSectionIssue.target.section?.trim() ||
-        sameFieldLabel(
-          currentSectionIssue.target.section,
-          activeSectionContext?.title,
-        )) &&
-      questionnaireFieldBindings.some((binding) => {
-        const fieldLabel =
-          questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
-          mobileBlockerLabel;
-        return (
-          issueFieldMatches(
-            binding.fieldId,
-            fieldLabel,
-            currentSectionIssue.target.field,
-          ) &&
-          issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
-        );
-      }),
+      (activeApplicantModel
+        ? resolveQuestionnaireTargetField(
+            activeApplicantModel,
+            currentSectionIssue.target,
+          )?.field.id
+        : undefined) === mobileBlockerTarget.fieldId,
   );
   const showWorkToolbar =
     showFamilyCopyControl ||
