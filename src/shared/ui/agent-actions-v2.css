@@ -2123,6 +2123,16 @@
   min-height: var(--v19b-size-64) !important;
 }
 
+@media (min-width: 768px) and (max-width: 1279px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-table-head
+    > span:nth-child(2) {
+    display: block;
+  }
+}
+
 #root
   .v19-legacy-actions-screen.surface-agent-actions
   :is(.v19-actions-cell-identity, .v19-actions-mobile-identity) {

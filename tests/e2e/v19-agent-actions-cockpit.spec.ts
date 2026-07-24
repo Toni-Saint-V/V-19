@@ -182,6 +182,40 @@ async function assertDesktopCockpit(page: Page) {
   await expect(surface.locator(".v19-actions-table-city")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-table-dates")).toHaveCount(0);
 
+  const headerCells = surface.locator(".v19-actions-table-head > span");
+  await expect(headerCells).toHaveCount(3);
+  await expect(headerCells).toHaveText(["Заявитель / ID", "Следующий шаг", "Статус"]);
+
+  const firstRowCells = [
+    rows.first().locator(".v19-actions-cell-identity"),
+    rows.first().locator(".v19-actions-cell-next"),
+    rows.first().locator(".v19-actions-cell-status"),
+  ];
+
+  for (let index = 0; index < firstRowCells.length; index += 1) {
+    const header = headerCells.nth(index);
+    const rowCell = firstRowCells[index];
+    await expect(header).toBeVisible();
+    await expect(rowCell).toBeVisible();
+
+    const [headerBox, rowCellBox] = await Promise.all([
+      header.boundingBox(),
+      rowCell.boundingBox(),
+    ]);
+
+    if (!headerBox || !rowCellBox) {
+      throw new Error(`Column ${index + 1} does not expose measurable geometry.`);
+    }
+
+    const horizontalOverlap =
+      Math.min(headerBox.x + headerBox.width, rowCellBox.x + rowCellBox.width) -
+      Math.max(headerBox.x, rowCellBox.x);
+    expect(
+      horizontalOverlap,
+      `Column ${index + 1} header aligns with its row value`,
+    ).toBeGreaterThan(0);
+  }
+
   const queue = surface.locator(".v19-actions-queue-list");
   const initialOrder = await rows.evaluateAll((items) =>
     items.map((item) => item.getAttribute("data-agent-action-id")),
