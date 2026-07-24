@@ -23,13 +23,23 @@ export type PassportGateIssue = {
   message: string;
 };
 
-const passportQuestionnaireFieldIds: Partial<
-  Record<PassportExtractedFieldKey, string>
+const passportQuestionnaireFieldIds: Record<
+  PassportExtractedFieldKey,
+  string
 > = {
+  birthCountry: "birth-country",
+  birthDate: "birth-date",
+  birthPlace: "birth-place",
+  citizenship: "nationality",
+  firstName: "first-name",
+  gender: "gender",
   passportExpiresAt: "passport-expiry-date",
+  passportIssueCountry: "passport-issue-country",
+  passportIssuePlace: "passport-issue-place",
   passportIssuedAt: "passport-issue-date",
   passportNumber: "passport-no",
   passportType: "passport-type",
+  surname: "surname",
 };
 
 const passportGateActions = new Set<SubmissionAction>([
@@ -48,7 +58,8 @@ export function hasPassportExtractionReviewPending(submission: Submission) {
       state?.status === "ready" &&
       state.extractedFields.length > 0 &&
       !state.verifiedAtIso &&
-      !state.dismissedAtIso
+      !state.dismissedAtIso &&
+      !hasPersistedPassportExtractionReview(applicant)
     );
   });
 }
@@ -229,7 +240,8 @@ function applicantPassportGateIssues(
     issues.length === 0 &&
     state.status === "ready" &&
     !state.verifiedAtIso &&
-    !state.dismissedAtIso
+    !state.dismissedAtIso &&
+    !hasPersistedPassportExtractionReview(applicant)
   ) {
     issues.push(
       issue(
@@ -241,6 +253,41 @@ function applicantPassportGateIssues(
   }
 
   return issues;
+}
+
+function hasPersistedPassportExtractionReview(applicant: Applicant) {
+  const state = applicant.passportExtraction;
+  if (state?.status !== "ready" || state.extractedFields.length === 0) {
+    return false;
+  }
+
+  const appliedFieldKeys = new Set(state.appliedFieldKeys);
+  if (
+    state.extractedFields.some(
+      (extractedField) => !appliedFieldKeys.has(extractedField.key),
+    )
+  ) {
+    return false;
+  }
+
+  const questionnaireFields = new Map(
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .map((field) => [field.id, field]),
+  );
+
+  return state.extractedFields.every((extractedField) => {
+    const field = questionnaireFields.get(
+      passportQuestionnaireFieldIds[extractedField.key],
+    );
+    const reviewOrigin = field?.reviewOriginSource ?? field?.reviewSource;
+    return (
+      reviewOrigin === "passport_ocr" &&
+      field?.reviewState === "confirmed" &&
+      Boolean(field.reviewConfirmedAtIso) &&
+      Boolean(field.reviewConfirmedBy)
+    );
+  });
 }
 
 function passportNumberForDuplicateCheck(applicant: Applicant, submission: Submission) {

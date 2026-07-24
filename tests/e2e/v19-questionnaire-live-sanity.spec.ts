@@ -376,6 +376,7 @@ test.describe("V-19 questionnaire live sanity", () => {
         name: "Выбрать заявителя — нижняя панель",
       }),
     ).toBeVisible();
+    const touristMenu = mobileFooter.getByLabel("Выбрать заявителя — нижняя панель");
     const selectionPresentation = await page.evaluate(() => {
       const style = (selector: string) => {
         const element = document.querySelector<HTMLElement>(selector);
@@ -467,6 +468,52 @@ test.describe("V-19 questionnaire live sanity", () => {
         name: "Следующий раздел недоступен",
       }),
     ).toBeDisabled();
+    const nextApplicantAction = page.locator(
+      ".v19-questionnaire-next-action-bar .v19-questionnaire-next-button",
+    );
+    await nextApplicantAction.scrollIntoViewIfNeeded();
+    await expect(nextApplicantAction).toHaveAccessibleName("Далее: Анна Соколова");
+    await nextApplicantAction.click();
+    await expect(
+      page.getByText("Контекст анкеты: заявитель Анна Соколова; раздел Личные данные."),
+    ).toBeVisible();
+    await expect(touristMenu).toContainText("Анна Соколова");
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("questionnaire-mobile-next-applicant.png"),
+    });
+
+    await touristMenu.click();
+    const touristListbox = page.getByRole("listbox", {
+      name: "Выбрать заявителя — нижняя панель",
+    });
+    const touristOptions = touristListbox.getByRole("option");
+    await expect(touristListbox).toBeVisible();
+    const listboxHitTargetIsOption = await touristListbox.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const hitTarget = document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + Math.min(box.height / 2, 72),
+      );
+      return Boolean(hitTarget && element.contains(hitTarget));
+    });
+    expect(listboxHitTargetIsOption).toBe(true);
+    await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("questionnaire-mobile-applicant-menu.png"),
+    });
+    const firstOption = touristOptions.first();
+    const firstLabel = await firstOption.innerText();
+    await firstOption.click();
+    await expect(touristMenu).toContainText(firstLabel.split("\n")[0] ?? "");
+    await expect(
+      page.getByText("Контекст анкеты: заявитель Артём Соколов; раздел Личные данные."),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: /Отель \/ приглашение/ })
+      .first()
+      .click();
+
     const invitingPartyOptions = page.locator(
       '.v19-questionnaire-quick-options[data-wrap-options="true"]',
     );
@@ -597,35 +644,6 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(unitBox).not.toBeNull();
     expect(postalBox).not.toBeNull();
     expect(postalBox?.y ?? 0).toBeGreaterThan((unitBox?.y ?? 0) + 2);
-
-    const touristMenu = mobileFooter.getByLabel("Выбрать заявителя — нижняя панель");
-    if (await touristMenu.isEnabled()) {
-      await touristMenu.click();
-      const touristListbox = page.getByRole("listbox", {
-        name: "Выбрать заявителя — нижняя панель",
-      });
-      const touristOptions = touristListbox.getByRole("option");
-      await expect(touristListbox).toBeVisible();
-      const listboxHitTargetIsOption = await touristListbox.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        const hitTarget = document.elementFromPoint(
-          box.left + box.width / 2,
-          box.top + Math.min(box.height / 2, 72),
-        );
-        return Boolean(hitTarget && element.contains(hitTarget));
-      });
-      expect(listboxHitTargetIsOption).toBe(true);
-      await page.screenshot({
-        fullPage: true,
-        path: testInfo.outputPath("questionnaire-mobile-applicant-menu.png"),
-      });
-      const secondOption = touristOptions.nth(1);
-      const secondLabel = await secondOption.innerText();
-      await secondOption.click();
-      await expect(touristMenu).toContainText(secondLabel.split("\n")[0] ?? "");
-    } else {
-      await expect(touristMenu).toBeDisabled();
-    }
 
     await page
       .getByRole("button", { name: /Адрес и контакты/ })

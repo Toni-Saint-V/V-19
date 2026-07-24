@@ -538,6 +538,72 @@ describe("passport extraction state", () => {
     expect(reviewed.history[0]?.text).toContain("проверил");
   });
 
+  test("reconciles persisted confirmed OCR fields when the aggregate review timestamp is missing", () => {
+    const draft = draftSubmission();
+    const ready = finishPassportExtraction(
+      draft,
+      passportFile(draft),
+      extractedPassportNumber,
+    );
+    const applicantId = ready.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+    const applied = applyPassportExtractionField(ready, applicantId, "passportNumber");
+    const persisted = {
+      ...applied,
+      applicants: applied.applicants.map((applicant) => ({
+        ...applicant,
+        passportExtraction: applicant.passportExtraction
+          ? {
+              ...applicant.passportExtraction,
+              verifiedAtIso: undefined,
+            }
+          : undefined,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.reviewOriginSource === "passport_ocr"
+              ? {
+                  ...field,
+                  reviewConfirmedAtIso: "2026-07-24T08:00:00.000Z",
+                  reviewConfirmedBy: "agent-reviewer",
+                  reviewSource: "manual" as const,
+                  reviewState: "confirmed" as const,
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    expect(hasPassportExtractionReviewPending(persisted)).toBe(false);
+    expect(passportGateIssues(persisted).map((issue) => issue.code)).not.toContain(
+      "passport_extraction_not_reviewed",
+    );
+
+    const incompleteProof = {
+      ...persisted,
+      applicants: persisted.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.reviewOriginSource === "passport_ocr"
+              ? {
+                  ...field,
+                  reviewConfirmedBy: undefined,
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    expect(hasPassportExtractionReviewPending(incompleteProof)).toBe(true);
+    expect(passportGateIssues(incompleteProof).map((issue) => issue.code)).toContain(
+      "passport_extraction_not_reviewed",
+    );
+  });
+
   test("allows an explicit manual passport review when OCR state is absent", () => {
     const base = fillRequiredQuestionnaireForTest(draftSubmission());
     const file = passportFile(base);

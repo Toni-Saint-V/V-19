@@ -12,6 +12,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { Drawer } from "../../src/components/Drawer";
 import { auditAgentInteractionControls } from "../../src/modules/submissions/agentInteractionContract";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import {
+  applySafePassportExtractionFields,
+  finishPassportExtraction,
+} from "../../src/modules/submissions/passportExtraction";
+import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import { requiredPassportReviewMediaSlots } from "../../src/modules/submissions/passportReviewContract";
 import {
   createDraftSubmission,
@@ -77,6 +82,70 @@ function readySubmission(): Submission {
   return {
     ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
     status: "in_progress",
+  };
+}
+
+function persistedReviewedPassportSubmission(): Submission {
+  const draft = createDraftSubmission({
+    applicantNames: ["Мария Иванова"],
+    city: "Москва",
+    familyCount: 1,
+    idScheme: "supabase",
+    submissions: [],
+    type: "single",
+  });
+  const applicantId = draft.applicants[0]?.id;
+  const passportFile = draft.files.find(
+    (file) => file.applicantId === applicantId && file.type === "passport_scan",
+  );
+  if (!applicantId || !passportFile) {
+    throw new Error("Expected applicant passport slot.");
+  }
+
+  const extraction: PassportExtractionResult = {
+    fields: [
+      {
+        confidence: "high",
+        key: "passportNumber",
+        needsManualReview: true,
+        value: "765432100",
+      },
+    ],
+    guardrails: [],
+    source: "local-ocr",
+    status: "extracted",
+    summary: "Паспортные данные подготовлены.",
+  };
+  const extracted = finishPassportExtraction(draft, passportFile, extraction);
+  const applied = applySafePassportExtractionFields(extracted, applicantId);
+  const complete = uploadRequiredFiles(fillRequiredQuestionnaireForTest(applied));
+
+  return {
+    ...complete,
+    status: "in_progress",
+    applicants: complete.applicants.map((applicant) => ({
+      ...applicant,
+      passportExtraction: applicant.passportExtraction
+        ? {
+            ...applicant.passportExtraction,
+            verifiedAtIso: undefined,
+          }
+        : undefined,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.reviewOriginSource === "passport_ocr"
+            ? {
+                ...field,
+                reviewConfirmedAtIso: "2026-07-24T08:00:00.000Z",
+                reviewConfirmedBy: "agent-reviewer",
+                reviewSource: "manual" as const,
+                reviewState: "confirmed" as const,
+              }
+            : field,
+        ),
+      })),
+    })),
   };
 }
 
@@ -370,6 +439,17 @@ describe("Drawer interactions", () => {
     expect(screen.getByTestId("drawer-blocker-reason")).not.toBeEmptyDOMElement();
     fireEvent.click(exactUpload);
     expect(returnedAction).not.toHaveBeenCalled();
+  });
+
+  test("does not repeat passport review after persisted OCR confirmations", () => {
+    renderDrawer({ submission: persistedReviewedPassportSubmission() });
+
+    expect(
+      screen.queryByText("Подтвердите ручную проверку паспортных данных"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Отправить на проверку" }),
+    ).toBeEnabled();
   });
 
   test("keeps rejected primary-action feedback visible and associated with the CTA", async () => {

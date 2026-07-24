@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { applySubmissionAction } from "../../src/modules/submissions/status";
 import {
+  applySafePassportExtractionFields,
   finishPassportExtraction,
   startPassportExtraction,
 } from "../../src/modules/submissions/passportExtraction";
@@ -169,6 +170,57 @@ describe("submission next-step engine", () => {
       id: "wait_passport_extraction",
       kind: "wait",
     });
+  });
+
+  test("does not repeat passport review after confirmed OCR fields survive without aggregate metadata", () => {
+    const draft = draftSubmission();
+    const withPassport = finishPassportExtraction(
+      draft,
+      passportFile(draft),
+      extractedPassport,
+    );
+    const applied = applySafePassportExtractionFields(
+      withPassport,
+      applicantId(withPassport),
+    );
+    const persisted = {
+      ...applied,
+      applicants: applied.applicants.map((applicant) => ({
+        ...applicant,
+        passportExtraction: applicant.passportExtraction
+          ? {
+              ...applicant.passportExtraction,
+              verifiedAtIso: undefined,
+            }
+          : undefined,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.reviewOriginSource === "passport_ocr"
+              ? {
+                  ...field,
+                  reviewConfirmedAtIso: "2026-07-24T08:00:00.000Z",
+                  reviewConfirmedBy: "agent-reviewer",
+                  reviewSource: "manual" as const,
+                  reviewState: "confirmed" as const,
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: persisted,
+      surface: "agent",
+    });
+
+    expect(brief.primaryAction.id).not.toBe("verify_passport_review");
+    expect(brief.primaryAction.kind).not.toBe("passport_review");
+    expect(visibleCopy(brief)).not.toContain(
+      "Подтвердите ручную проверку паспортных данных",
+    );
   });
 
   test("opens the first actionable queue target before generic lifecycle action", () => {
