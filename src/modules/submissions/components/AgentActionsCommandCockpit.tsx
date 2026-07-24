@@ -76,11 +76,6 @@ export function AgentActionsCommandCockpit({
   onSelectTask,
   onSummaryFilterChange,
 }: AgentActionsCommandCockpitProps) {
-  function openMobileDrawer(task: AgentActionTask) {
-    onSelectTask(task);
-    onOpenSecondary(task);
-  }
-
   if (errorMessage) {
     return (
       <div className="v19-actions-cockpit-empty" data-testid="agent-actions-cockpit">
@@ -146,7 +141,7 @@ export function AgentActionsCommandCockpit({
     );
   }
 
-  const activeTask = selectedTask ?? tasks[0];
+  const railTask = selectedTask ?? tasks[0];
   const usesInlineContext = desktopContextMode === "inline";
   const intelligenceTasks = summaryTasks ?? tasks;
   const intelligenceSubmissions = Array.from(
@@ -200,12 +195,8 @@ export function AgentActionsCommandCockpit({
             columns={
               usesInlineContext
                 ? [
-                    { key: "rank", label: "№" },
-                    { key: "priority", label: "Приоритет" },
-                    { key: "submission", label: "ID" },
-                    { key: "task", label: "Заявитель / задача" },
-                    { key: "city", label: "Город" },
-                    { key: "dates", label: "Даты поездки" },
+                    { key: "identity", label: "Заявитель / ID" },
+                    { key: "next", label: "Следующий шаг" },
                     { key: "status", label: "Статус" },
                   ]
                 : [
@@ -217,24 +208,20 @@ export function AgentActionsCommandCockpit({
             }
           />
           <div className="v19-actions-queue-list">
-            {tasks.map((task, index) => {
-              const selected = activeTask.id === task.id;
+            {tasks.map((task) => {
+              const selected = selectedTask?.id === task.id;
               const rowId = `agent-action-row-${stableDomId(task.id)}`;
               const detailId = `agent-action-detail-${stableDomId(task.id)}`;
 
               return (
                 <div
-                  className={cn(
-                    "v19-actions-queue-entry",
-                    selected && "is-selected",
-                  )}
+                  className={cn("v19-actions-queue-entry", selected && "is-selected")}
                   data-agent-action-id={task.id}
                   key={task.id}
                 >
                   <ActionTaskCard
                     detailId={usesInlineContext ? detailId : undefined}
                     inlineContext={usesInlineContext}
-                    rank={index + 1}
                     rowId={rowId}
                     selected={selected}
                     task={task}
@@ -258,11 +245,11 @@ export function AgentActionsCommandCockpit({
 
         {desktopContextMode === "rail" ? (
           <AgentActionContextPanel
-            task={activeTask}
-            onOpenIssue={(issue) => onOpenIssue(activeTask, issue)}
-            onOpenPrimary={() => onOpenPrimary(activeTask)}
-            onOpenSecondary={() => onOpenSecondary(activeTask)}
-            onOpenTab={(tab) => onOpenTab(activeTask, tab)}
+            task={railTask}
+            onOpenIssue={(issue) => onOpenIssue(railTask, issue)}
+            onOpenPrimary={() => onOpenPrimary(railTask)}
+            onOpenSecondary={() => onOpenSecondary(railTask)}
+            onOpenTab={(tab) => onOpenTab(railTask, tab)}
           />
         ) : null}
       </div>
@@ -277,9 +264,12 @@ export function AgentActionsCommandCockpit({
           {tasks.map((task) => (
             <TimelineEvent
               key={task.id}
-              selected={activeTask.id === task.id}
+              selected={selectedTask?.id === task.id}
               task={task}
-              onSelect={() => openMobileDrawer(task)}
+              onOpenPrimary={() => onOpenPrimary(task)}
+              onOpenSecondary={() => onOpenSecondary(task)}
+              onOpenTab={(tab) => onOpenTab(task, tab)}
+              onSelect={() => onSelectTask(task)}
             />
           ))}
         </div>
@@ -411,7 +401,6 @@ function PanelEyebrow({ label }: { label: string }) {
 function ActionTaskCard({
   detailId,
   inlineContext,
-  rank,
   rowId,
   selected,
   task,
@@ -419,7 +408,6 @@ function ActionTaskCard({
 }: {
   detailId?: string;
   inlineContext: boolean;
-  rank: number;
   rowId: string;
   selected: boolean;
   task: AgentActionTask;
@@ -453,34 +441,19 @@ function ActionTaskCard({
 
       {inlineContext ? (
         <>
-          <span className="v19-actions-table-rank">{rank}</span>
-          <span
-            className={`v19-actions-table-priority priority-${task.priority.level}`}
-          >
-            <span aria-hidden="true" />
-            <strong>{priorityDisplayLabel(task)}</strong>
-          </span>
-          <span className="v19-actions-table-submission">
-            <strong>{submissionPublicId(task.submission)}</strong>
-          </span>
-          <span className="v19-actions-table-task">
+          <span className="v19-actions-cell-identity">
             <strong>
               {task.applicantName || formatSubmissionListTitle(task.submission)}
             </strong>
-            <small>{task.problem}</small>
+            <small>{submissionPublicId(task.submission)}</small>
           </span>
-          <span className="v19-actions-table-city">
-            {safeCity(task.submission.city)}
+          <span className="v19-actions-cell-next">
+            <strong>{task.nextAction.label}</strong>
           </span>
-          <span className="v19-actions-table-dates">{dateLabel}</span>
-          <span className="v19-actions-table-status">
+          <span className="v19-actions-cell-status">
             <StatusBadge status={task.status} label={task.statusLabel} />
-            <small>{task.nextAction.label}</small>
           </span>
-          <ChevronDown
-            aria-hidden="true"
-            className="v19-actions-table-chevron"
-          />
+          <ChevronDown aria-hidden="true" className="v19-actions-table-chevron" />
         </>
       ) : (
         <>
@@ -510,6 +483,7 @@ function ActionTaskCard({
 function AgentActionInlineDetail({
   detailId,
   rowId,
+  surface = "desktop",
   task,
   onOpenPrimary,
   onOpenSecondary,
@@ -517,21 +491,29 @@ function AgentActionInlineDetail({
 }: {
   detailId: string;
   rowId: string;
+  surface?: "desktop" | "mobile";
   task: AgentActionTask;
   onOpenPrimary: () => void;
   onOpenSecondary: () => void;
   onOpenTab: (tab: DrawerTab) => void;
 }) {
   const disabledReason = primaryActionDisabledReason(task);
-  const disabledReasonId = `${stableDomId(task.id)}-inline-primary-disabled-reason`;
+  const disabledReasonId = `${stableDomId(task.id)}-${surface}-inline-primary-disabled-reason`;
 
   return (
     <section
       aria-labelledby={rowId}
-      className="v19-actions-inline-detail"
+      className={cn(
+        "v19-actions-inline-detail",
+        surface === "mobile" && "v19-actions-mobile-detail",
+      )}
       data-action-status={task.status}
       data-agent-action-id={task.id}
-      data-testid="agent-action-inline-detail"
+      data-testid={
+        surface === "mobile"
+          ? "agent-action-mobile-detail"
+          : "agent-action-inline-detail"
+      }
       id={detailId}
       role="region"
     >
@@ -839,14 +821,21 @@ function ReadinessLine({
 function TimelineEvent({
   selected,
   task,
+  onOpenPrimary,
+  onOpenSecondary,
+  onOpenTab,
   onSelect,
 }: {
   selected: boolean;
   task: AgentActionTask;
+  onOpenPrimary: () => void;
+  onOpenSecondary: () => void;
+  onOpenTab: (tab: DrawerTab) => void;
   onSelect: () => void;
 }) {
   const submissionId = submissionPublicId(task.submission);
-  const dateLabel = tripDates(task.submission);
+  const rowId = `agent-action-mobile-row-${stableDomId(task.id)}`;
+  const detailId = `agent-action-mobile-detail-${stableDomId(task.id)}`;
 
   return (
     <article
@@ -862,32 +851,39 @@ function TimelineEvent({
       <button
         {...agentInteractionProps("actions.select-task")}
         className="v19-actions-timeline-hit"
-        aria-label={`Открыть действие: ${task.statusLabel}. ${formatSubmissionListTitle(task.submission)}. ${task.problem}`}
+        aria-controls={detailId}
+        aria-expanded={selected}
+        aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. ${task.problem}. Следующее действие: ${task.nextAction.label}${task.priority.reason ? `. ${task.priority.label}: ${task.priority.reason}` : ""}`}
+        id={rowId}
         type="button"
         onClick={onSelect}
       >
-        <span className="v19-actions-mobile-cell-top">
+        <span className="v19-actions-mobile-identity">
+          <strong>
+            {task.applicantName || formatSubmissionListTitle(task.submission)}
+          </strong>
           <small>{submissionId}</small>
-          <span className="v19-actions-mobile-cell-signals">
-            <span
-              className={`v19-actions-mobile-priority priority-${task.priority.level}`}
-            >
-              <span aria-hidden="true" />
-              {priorityDisplayLabel(task)}
-            </span>
-            <span className="v19-actions-mobile-status">{task.statusLabel}</span>
-          </span>
         </span>
-        <strong className="v19-actions-mobile-cell-title">
-          {formatSubmissionListTitle(task.submission)}
-        </strong>
-        <span className="v19-actions-mobile-cell-route">
-          <span>{safeCity(task.submission.city)}</span>
-          <i aria-hidden="true" />
-          <span>{dateLabel}</span>
+        <span className="v19-actions-mobile-next">
+          <small>Следующий шаг</small>
+          <strong>{task.nextAction.label}</strong>
         </span>
-        <span className="v19-actions-mobile-cell-reason">{task.problem}</span>
+        <span className="v19-actions-mobile-status-row">
+          <StatusBadge status={task.status} label={task.statusLabel} />
+          <ChevronDown aria-hidden="true" className="v19-actions-table-chevron" />
+        </span>
       </button>
+      {selected ? (
+        <AgentActionInlineDetail
+          detailId={detailId}
+          rowId={rowId}
+          surface="mobile"
+          task={task}
+          onOpenPrimary={onOpenPrimary}
+          onOpenSecondary={onOpenSecondary}
+          onOpenTab={onOpenTab}
+        />
+      ) : null}
     </article>
   );
 }

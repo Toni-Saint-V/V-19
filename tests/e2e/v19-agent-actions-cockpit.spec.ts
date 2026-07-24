@@ -119,11 +119,28 @@ async function assertMobileCockpit(page: Page) {
     .locator(".v19-actions-timeline-event")
     .first();
   await expect(event).toBeVisible();
-  await expect(event.locator(".v19-actions-mobile-priority")).not.toBeEmpty();
-  await expect(event.locator(".v19-actions-mobile-status")).not.toBeEmpty();
+  await expect(event.locator(".v19-actions-mobile-priority")).toHaveCount(0);
+  await expect(event.locator(".v19-actions-mobile-cell-route")).toHaveCount(0);
+  await expect(event.locator(".v19-actions-mobile-cell-reason")).toHaveCount(0);
 
-  await event.locator(".v19-actions-timeline-hit").click();
+  const disclosure = event.locator(".v19-actions-timeline-hit");
+  await expect(disclosure).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
+
+  await disclosure.click();
+  await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+  const mobileDetail = page.getByTestId("agent-action-mobile-detail");
+  await expect(mobileDetail).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await disclosure.click();
+  await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
+
+  await disclosure.click();
+  await mobileDetail
+    .locator('[data-v19-interaction-id="actions.open-secondary"]')
+    .click();
   const drawer = page.getByRole("dialog").first();
   await expect(drawer).toBeVisible();
   await page.keyboard.press("Escape");
@@ -157,9 +174,33 @@ async function assertDesktopCockpit(page: Page) {
 
   const rows = surface.getByTestId("agent-action-queue-item");
   await expect(rows.first()).toBeVisible();
+  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
+  await expect(surface.getByTestId("agent-action-inline-detail")).toHaveCount(0);
+  await expect(surface.getByTestId("agent-action-active-panel")).toHaveCount(0);
+  await expect(surface.locator(".v19-actions-table-rank")).toHaveCount(0);
+  await expect(surface.locator(".v19-actions-table-priority")).toHaveCount(0);
+  await expect(surface.locator(".v19-actions-table-city")).toHaveCount(0);
+  await expect(surface.locator(".v19-actions-table-dates")).toHaveCount(0);
+
+  const queue = surface.locator(".v19-actions-queue-list");
+  const initialOrder = await rows.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-agent-action-id")),
+  );
+  const initialScrollTop = await queue.evaluate((element) => element.scrollTop);
+
+  await rows.first().click();
   await expect(rows.first()).toHaveAttribute("aria-expanded", "true");
   await expect(surface.getByTestId("agent-action-inline-detail")).toHaveCount(1);
-  await expect(surface.getByTestId("agent-action-active-panel")).toHaveCount(0);
+
+  await rows.first().click();
+  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
+  await expect(surface.getByTestId("agent-action-inline-detail")).toHaveCount(0);
+  expect(await queue.evaluate((element) => element.scrollTop)).toBe(initialScrollTop);
+  expect(
+    await rows.evaluateAll((items) =>
+      items.map((item) => item.getAttribute("data-agent-action-id")),
+    ),
+  ).toEqual(initialOrder);
 
   const secondRow = rows.nth(1);
   await secondRow.click();
@@ -177,12 +218,8 @@ async function assertDesktopCockpit(page: Page) {
   await expect(activeDetail).toContainText("Следующее действие");
   await expect(surface.locator(".v19-actions-summary-metric")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-cockpit-summary")).toHaveCount(0);
-  await expect(
-    surface.locator('[data-action-filter="open"]'),
-  ).toBeVisible();
-  await expect(
-    surface.locator('[data-action-filter="today"]'),
-  ).toBeVisible();
+  await expect(surface.locator('[data-action-filter="open"]')).toBeVisible();
+  await expect(surface.locator('[data-action-filter="today"]')).toBeVisible();
   const viewport = page.viewportSize();
   if (viewport && viewport.width < 1200) {
     await expect(surface.locator('[data-action-filter="completed"]')).not.toBeVisible();
@@ -190,26 +227,22 @@ async function assertDesktopCockpit(page: Page) {
       surface.getByRole("combobox", { name: "Дополнительный фильтр действий" }),
     ).toBeVisible();
   } else {
-    await expect(
-      surface.locator('[data-action-filter="completed"]'),
-    ).toBeVisible();
+    await expect(surface.locator('[data-action-filter="completed"]')).toBeVisible();
   }
 
   if (viewport && viewport.width >= 1280) {
-    const visibleCards = await surface
-      .locator(".v19-actions-queue-entry")
-      .evaluateAll(
-        (cards) =>
-          cards.filter((card) => {
-            const element = card as unknown as {
-              getBoundingClientRect(): { bottom: number; top: number };
-            };
-            const rect = element.getBoundingClientRect();
-            const viewportHeight = (globalThis as unknown as { innerHeight: number })
-              .innerHeight;
-            return rect.bottom > 0 && rect.top < viewportHeight;
-          }).length,
-      );
+    const visibleCards = await surface.locator(".v19-actions-queue-entry").evaluateAll(
+      (cards) =>
+        cards.filter((card) => {
+          const element = card as unknown as {
+            getBoundingClientRect(): { bottom: number; top: number };
+          };
+          const rect = element.getBoundingClientRect();
+          const viewportHeight = (globalThis as unknown as { innerHeight: number })
+            .innerHeight;
+          return rect.bottom > 0 && rect.top < viewportHeight;
+        }).length,
+    );
     expect(visibleCards).toBeGreaterThanOrEqual(3);
   }
 
@@ -262,6 +295,9 @@ async function assertActionFilters(page: Page) {
 
 async function assertPrimaryActionRouting(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
+  if ((await surface.getByTestId("agent-action-inline-detail").count()) === 0) {
+    await surface.getByTestId("agent-action-queue-item").first().click();
+  }
   const detail = surface.getByTestId("agent-action-inline-detail");
   const primaryAction = detail.locator(
     '[data-v19-interaction-id="actions.open-primary"]',
@@ -274,9 +310,7 @@ async function assertPrimaryActionRouting(page: Page) {
 }
 
 test.describe("V-19 My Actions submission command cockpit", () => {
-  test("viewport matrix, selection, and direct mobile drawer routing", async ({
-    page,
-  }) => {
+  test("viewport matrix and controlled single-open disclosure", async ({ page }) => {
     test.setTimeout(120_000);
     mkdirSync(proofDir, { recursive: true });
     const browserProblems = collectBrowserProblems(page);
@@ -316,9 +350,9 @@ test.describe("V-19 My Actions submission command cockpit", () => {
         horizontalOverflow: "no",
         notes:
           viewport.width < 768
-            ? "Лента действий видна; выбор действия напрямую открыл Drawer подачи."
+            ? "Вертикальная ячейка раскрылась inline; secondary CTA открыл Drawer."
             : viewport.width === 1440
-              ? "Inline-контекст и Drawer проверены; primary CTA открыл точную анкету."
+              ? "Accordion и primary CTA проверены; открыта точная анкета."
               : "Очередь и inline-контекст видны; secondary CTA открыл Drawer подачи.",
         primaryActionUsable: "yes",
         result: "PASS",

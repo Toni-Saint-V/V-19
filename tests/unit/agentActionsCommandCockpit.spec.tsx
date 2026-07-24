@@ -10,9 +10,12 @@ import {
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 
 describe("AgentActionsCommandCockpit", () => {
-  it("keeps exactly one desktop task expanded and moves detail with selection", () => {
+  it("opens, closes, and transfers the single desktop disclosure", () => {
     const queue = agentActionQueue(initialSubmissions);
-    const tasks = buildAgentActionTasks([...queue.open, ...queue.completed]).slice(0, 2);
+    const tasks = buildAgentActionTasks([...queue.open, ...queue.completed]).slice(
+      0,
+      2,
+    );
     const firstTask = tasks[0];
     const secondTask = tasks[1];
 
@@ -37,22 +40,35 @@ describe("AgentActionsCommandCockpit", () => {
       onSelectTask,
     };
 
-    const { rerender } = render(
-      <AgentActionsCommandCockpit {...props} selectedTask={firstTask} />,
-    );
+    const { rerender } = render(<AgentActionsCommandCockpit {...props} />);
 
     const rows = screen.getAllByTestId("agent-action-queue-item");
-    expect(rows[0]).toHaveAttribute("aria-expanded", "true");
+    expect(rows[0]).toHaveAttribute("aria-expanded", "false");
     expect(rows[1]).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getAllByTestId("agent-action-inline-detail")).toHaveLength(1);
+    expect(screen.queryByTestId("agent-action-inline-detail")).not.toBeInTheDocument();
 
+    fireEvent.click(rows[0]);
+    expect(onSelectTask).toHaveBeenLastCalledWith(firstTask);
+    rerender(<AgentActionsCommandCockpit {...props} selectedTask={firstTask} />);
+
+    const firstOpenRows = screen.getAllByTestId("agent-action-queue-item");
     const firstDetail = screen.getByTestId("agent-action-inline-detail");
+    expect(firstOpenRows[0]).toHaveAttribute("aria-expanded", "true");
     expect(firstDetail).toHaveAttribute("data-agent-action-id", firstTask.id);
-    expect(rows[0]?.nextElementSibling).toBe(firstDetail);
+    expect(firstOpenRows[0]?.nextElementSibling).toBe(firstDetail);
 
-    fireEvent.click(rows[1]);
+    fireEvent.click(firstOpenRows[0]);
+    expect(onSelectTask).toHaveBeenLastCalledWith(firstTask);
+    rerender(<AgentActionsCommandCockpit {...props} />);
+    expect(screen.getAllByTestId("agent-action-queue-item")[0]).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByTestId("agent-action-inline-detail")).not.toBeInTheDocument();
 
-    expect(onSelectTask).toHaveBeenCalledWith(secondTask);
+    fireEvent.click(screen.getAllByTestId("agent-action-queue-item")[1]);
+
+    expect(onSelectTask).toHaveBeenLastCalledWith(secondTask);
     expect(onOpenPrimary).not.toHaveBeenCalled();
     expect(onOpenSecondary).not.toHaveBeenCalled();
 
@@ -65,7 +81,9 @@ describe("AgentActionsCommandCockpit", () => {
     expect(secondDetail).toHaveAttribute("data-agent-action-id", secondTask.id);
     expect(updatedRows[1]?.nextElementSibling).toBe(secondDetail);
 
-    fireEvent.click(within(secondDetail).getByRole("button", { name: /Открыть подачу/ }));
+    fireEvent.click(
+      within(secondDetail).getByRole("button", { name: /Открыть подачу/ }),
+    );
     expect(onOpenSecondary).toHaveBeenCalledWith(secondTask);
   });
 
@@ -107,7 +125,7 @@ describe("AgentActionsCommandCockpit", () => {
     );
   });
 
-  it("opens the submission drawer directly from a mobile action card", () => {
+  it("opens mobile detail first and routes through its existing action", () => {
     const queue = agentActionQueue(initialSubmissions);
     const task = buildAgentActionTasks([...queue.open, ...queue.completed])[0];
 
@@ -118,7 +136,7 @@ describe("AgentActionsCommandCockpit", () => {
     const onOpenSecondary = vi.fn();
     const onSelectTask = vi.fn();
 
-    render(
+    const { rerender } = render(
       <AgentActionsCommandCockpit
         actionGroupLabel="Открытые действия"
         emptyState={{ action: "Новая подача", body: "Нет действий", title: "Пусто" }}
@@ -134,12 +152,44 @@ describe("AgentActionsCommandCockpit", () => {
     );
 
     const mobileTimeline = screen.getByTestId("agent-action-timeline");
-    fireEvent.click(
-      within(mobileTimeline).getByRole("button", { name: /Открыть действие:/ }),
-    );
+    const disclosure = within(mobileTimeline).getByRole("button", {
+      name: /Выбрать действие:/,
+    });
+    expect(disclosure).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(disclosure);
 
     expect(onSelectTask).toHaveBeenCalledWith(task);
+    expect(onOpenSecondary).not.toHaveBeenCalled();
+
+    rerender(
+      <AgentActionsCommandCockpit
+        actionGroupLabel="Открытые действия"
+        emptyState={{ action: "Новая подача", body: "Нет действий", title: "Пусто" }}
+        selectedTask={task}
+        summary={summarizeAgentActionTasks([task])}
+        tasks={[task]}
+        onEmptyAction={vi.fn()}
+        onOpenIssue={vi.fn()}
+        onOpenPrimary={vi.fn()}
+        onOpenSecondary={onOpenSecondary}
+        onOpenTab={vi.fn()}
+        onSelectTask={onSelectTask}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId("agent-action-timeline")).getByRole("button", {
+        name: /Выбрать действие:/,
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
+    const mobileDetail = screen.getByTestId("agent-action-mobile-detail");
+    expect(mobileDetail).toHaveAttribute("data-agent-action-id", task.id);
+
+    fireEvent.click(
+      within(mobileDetail).getByRole("button", {
+        name: task.secondaryAction.label,
+      }),
+    );
     expect(onOpenSecondary).toHaveBeenCalledWith(task);
-    expect(screen.queryByTestId("agent-action-mobile-detail")).not.toBeInTheDocument();
   });
 });

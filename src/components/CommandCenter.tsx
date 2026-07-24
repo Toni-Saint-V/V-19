@@ -306,8 +306,7 @@ export function CommandCenter({
     [actionTasks],
   );
   const selectedActionTask = useMemo(
-    () =>
-      actionTasks.find((task) => task.id === selectedActionTaskId) ?? actionTasks[0],
+    () => actionTasks.find((task) => task.id === selectedActionTaskId),
     [actionTasks, selectedActionTaskId],
   );
   const actionFiltersActive =
@@ -1015,7 +1014,11 @@ export function CommandCenter({
             onOpenPrimary={(task) => handleActionOpen(task.action)}
             onOpenSecondary={(task) => handleActionTaskTab(task, "overview")}
             onOpenTab={handleActionTaskTab}
-            onSelectTask={(task) => setSelectedActionTaskId(task.id)}
+            onSelectTask={(task) =>
+              setSelectedActionTaskId((current) =>
+                current === task.id ? null : task.id,
+              )
+            }
           />
         </div>
       </div>
