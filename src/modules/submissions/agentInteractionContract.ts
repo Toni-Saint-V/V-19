@@ -488,14 +488,6 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     expectedEffect: "Filter visible actions by city without a write.",
     proof: domProof,
   },
-  "actions.status-filter": {
-    id: "actions.status-filter",
-    kind: "filter",
-    surface: "agent-actions",
-    role: "agent",
-    expectedEffect: "Filter visible actions by operational status without a write.",
-    proof: domProof,
-  },
   "actions.sort": {
     id: "actions.sort",
     kind: "filter",

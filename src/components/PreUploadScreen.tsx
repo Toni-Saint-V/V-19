@@ -978,6 +978,7 @@ export function PreUploadScreen({
                         (activeItem.status === "extracting" ||
                           activeItem.status === "selected") ? (
                           <button
+                            {...agentInteractionProps("new-submission.manage-file")}
                             className="v19-preupload-inline-action"
                             onClick={() => skipOcr(activeItem)}
                             type="button"
@@ -991,7 +992,11 @@ export function PreUploadScreen({
                         activeItem.status === "unavailable") ? (
                       <div className="v19-preupload-manual-state" role="status">
                         <span>{activeItem.summary}</span>
-                        <button onClick={() => retryOcr(activeItem)} type="button">
+                        <button
+                          {...agentInteractionProps("new-submission.manage-file")}
+                          onClick={() => retryOcr(activeItem)}
+                          type="button"
+                        >
                           Распознать снова
                         </button>
                       </div>
@@ -1166,6 +1171,7 @@ export function PreUploadScreen({
                 initial={reduceMotion ? false : { opacity: 0 }}
               >
                 <button
+                  {...agentInteractionProps("new-submission.toggle-prefill")}
                   aria-label="Закрыть данные из паспорта"
                   className="v19-preupload-prefill-backdrop"
                   onClick={closePrefill}
@@ -1199,7 +1205,12 @@ export function PreUploadScreen({
                       <p>{activeApplicantLabel}</p>
                     </div>
                     <span>{previewFields.length} полей</span>
-                    <button aria-label="Закрыть" onClick={closePrefill} type="button">
+                    <button
+                      {...agentInteractionProps("new-submission.toggle-prefill")}
+                      aria-label="Закрыть"
+                      onClick={closePrefill}
+                      type="button"
+                    >
                       <X aria-hidden="true" />
                     </button>
                   </header>
@@ -1240,6 +1251,7 @@ export function PreUploadScreen({
                       <p>Для каждого файла явно выберите владельца.</p>
                     </div>
                     <button
+                      {...agentInteractionProps("new-submission.manage-file")}
                       aria-label="Закрыть назначение"
                       onClick={() => setPendingAssignments([])}
                       type="button"
@@ -1293,10 +1305,15 @@ export function PreUploadScreen({
                     ))}
                   </div>
                   <footer>
-                    <button onClick={() => setPendingAssignments([])} type="button">
+                    <button
+                      {...agentInteractionProps("new-submission.manage-file")}
+                      onClick={() => setPendingAssignments([])}
+                      type="button"
+                    >
                       Отмена
                     </button>
                     <button
+                      {...agentInteractionProps("new-submission.manage-file")}
                       disabled={!assignmentsComplete}
                       onClick={confirmAssignments}
                       type="button"
@@ -1342,10 +1359,19 @@ export function PreUploadScreen({
                       : "Паспорт и распознанные данные заявителя будут удалены из текущей подачи."}
                   </p>
                   <footer>
-                    <button onClick={() => setConfirmation(null)} type="button">
+                    <button
+                      {...agentInteractionProps("new-submission.configure")}
+                      onClick={() => setConfirmation(null)}
+                      type="button"
+                    >
                       Отмена
                     </button>
-                    <button className="is-danger" onClick={confirmAction} type="button">
+                    <button
+                      {...agentInteractionProps("new-submission.configure")}
+                      className="is-danger"
+                      onClick={confirmAction}
+                      type="button"
+                    >
                       {confirmation.kind === "switch_type"
                         ? "Сменить тип"
                         : "Удалить заявителя"}
