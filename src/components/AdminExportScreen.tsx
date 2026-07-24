@@ -107,6 +107,13 @@ type ExportQueueTab = "ready" | "selected" | "blocked";
 type ExportSort = "tripDate" | "createdAt";
 type ExportTypeFilter = "all" | "family" | "single";
 
+const opaqueAgentIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function isOpaqueAgentId(agentId: string) {
+  return opaqueAgentIdPattern.test(agentId.trim());
+}
+
 function StatusPill({
   tone,
   children,
@@ -236,12 +243,25 @@ function fileCountLabel(count: number) {
 }
 
 function exportAgentName(agentId: string) {
+  const normalizedAgentId = agentId.trim();
+  if (isOpaqueAgentId(normalizedAgentId)) {
+    return normalizedAgentId.slice(0, 4).toUpperCase();
+  }
+
   const displayName = agentDisplayName(agentId);
   if (displayName === "Агент не указан") return "Не указан";
 
   return displayName
     .replace(/^Агент\s+/u, "")
     .replace(/^Local Agent\s+/u, "");
+}
+
+function exportAgentFilterLabel(agentId: string) {
+  if (agentId === "Все агенты") {
+    return agentId;
+  }
+
+  return `Агент ${exportAgentName(agentId)}`;
 }
 
 export function AdminExportScreen({
@@ -940,7 +960,7 @@ export function AdminExportScreen({
                   onChange={setAgentFilter}
                   options={agentOptions.map((agent) => ({
                     value: agent,
-                    label: agent,
+                    label: exportAgentFilterLabel(agent),
                   }))}
                 />
               </>
@@ -1063,7 +1083,13 @@ export function AdminExportScreen({
                       </span>
                     </div>
 
-                    <div className="v19-admin-export-row-agent-v2">
+                    <div
+                      className={
+                        isOpaqueAgentId(item.agent)
+                          ? "v19-admin-export-row-agent-v2 is-opaque-agent"
+                          : "v19-admin-export-row-agent-v2"
+                      }
+                    >
                       <span
                         aria-hidden="true"
                         className="v19-admin-export-row-icon-v2"

@@ -169,6 +169,23 @@ describe("active admin export screen", () => {
     expect(screen.queryByText(/Excel \+ \d+/)).not.toBeInTheDocument();
   });
 
+  test("shows a compact agent reference instead of a raw UUID", () => {
+    const submission = {
+      ...readySubmission(),
+      agentId: "8d17d610-50bc-4015-88c5-2deda1d48631",
+    };
+
+    render(<AdminExportScreen submissions={[submission]} />);
+
+    const row = screen.getByTestId(`admin-export-row-${submission.id}`);
+    expect(within(row).getByText("8D17")).toBeInTheDocument();
+    expect(
+      row.querySelector(".v19-admin-export-row-agent-v2.is-opaque-agent"),
+    ).toBeInTheDocument();
+    expect(row).not.toHaveTextContent("50bc");
+    expect(row).not.toHaveTextContent("2deda1d48631");
+  });
+
   test("prepares Excel before exposing a real browser download link", async () => {
     const submission = readySubmission();
     const createObjectURL = vi.fn(() => "blob:verified-export-workbook");
