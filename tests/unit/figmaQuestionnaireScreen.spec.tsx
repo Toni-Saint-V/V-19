@@ -1634,6 +1634,84 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(replacementSave).toHaveBeenCalledTimes(1);
   });
 
+  test("does not loop a rejected autosave while focused on a questionnaire field", async () => {
+    vi.useFakeTimers();
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicantId = submission.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+    const initialFocus = {
+      applicantId,
+      field: "Место рождения",
+      section: "Личные данные",
+    };
+    const onBack = vi.fn();
+    const onComplete = vi.fn();
+    const onSaveDraft = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          window.setTimeout(() => reject(new Error("network failure")), 100);
+        }),
+    );
+    const renderScreen = (currentSubmission: Submission) => (
+      <FigmaQuestionnaireScreen
+        initialFocus={initialFocus}
+        onBack={onBack}
+        onComplete={onComplete}
+        onSaveDraft={onSaveDraft}
+        submission={currentSubmission}
+      />
+    );
+    const result = render(renderScreen(submission));
+
+    fireEvent.change(screen.getByLabelText("Место рождения"), {
+      target: { value: "LENINGRAD" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("questionnaire-save-error")).toBeInTheDocument();
+
+    result.rerender(renderScreen({ ...submission }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event("pagehide"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Повторить сохранение" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+
+    result.rerender(renderScreen({ ...submission }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+
+    fireEvent.change(screen.getByLabelText("Место рождения"), {
+      target: { value: "LENINGRAD REGION" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(onSaveDraft).toHaveBeenCalledTimes(3);
+  });
+
   test("flushes the pending revision before leaving the questionnaire", async () => {
     const save = deferred();
     const submission = createDraftSubmission({

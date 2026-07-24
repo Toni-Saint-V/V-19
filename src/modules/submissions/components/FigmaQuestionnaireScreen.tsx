@@ -2716,6 +2716,7 @@ export function FigmaQuestionnaireScreen({
   const familyCopyStatusId = useId();
   const prefersReducedMotion = useReducedMotion();
   const autosaveRevisionRef = useRef(0);
+  const failedSaveRevisionRef = useRef<number | undefined>(undefined);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const completionInFlightRef = useRef(false);
   const issueResolutionPendingRef = useRef(false);
@@ -2761,6 +2762,7 @@ export function FigmaQuestionnaireScreen({
     setDiscardExitArmed(false);
     navigationPendingRef.current = false;
     saveAndExitDraftReadyRef.current = false;
+    failedSaveRevisionRef.current = undefined;
     issueResolutionPendingRef.current = false;
     issueResolutionPromiseRef.current = undefined;
     setNavigationPending(false);
@@ -3225,6 +3227,7 @@ export function FigmaQuestionnaireScreen({
 
   function updateDirtyState(next: Record<string, QuestionnaireFieldUpdate>) {
     autosaveRevisionRef.current += 1;
+    failedSaveRevisionRef.current = undefined;
     saveAndExitDraftReadyRef.current = false;
     setSaveFailureAction(undefined);
     setDiscardExitArmed(false);
@@ -3714,6 +3717,7 @@ export function FigmaQuestionnaireScreen({
         await onSaveDraftRef.current?.(request.payload);
         if (autosaveRevisionRef.current === request.revision) {
           clearAutosaveTimer();
+          failedSaveRevisionRef.current = undefined;
           replacePendingFieldUpdates({});
           setSaveStatus("saved");
           setSaveMessage("Сохранено");
@@ -3724,6 +3728,8 @@ export function FigmaQuestionnaireScreen({
       } catch (error) {
         failed = true;
         if (autosaveRevisionRef.current === request.revision) {
+          clearAutosaveTimer();
+          failedSaveRevisionRef.current = request.revision;
           setSaveStatus("error");
           setSaveFailureAction("draft");
           setDiscardExitArmed(false);
@@ -3820,9 +3826,11 @@ export function FigmaQuestionnaireScreen({
       return;
     }
     const revision = autosaveRevisionRef.current;
+    if (failedSaveRevisionRef.current === revision) return;
     const payload = completionPayload("autosave");
     const timer = window.setTimeout(() => {
       if (autosaveTimerRef.current === timer) autosaveTimerRef.current = undefined;
+      if (failedSaveRevisionRef.current === revision) return;
       void enqueueDraftSave(payload, revision).catch(() => undefined);
     }, 900);
     autosaveTimerRef.current = timer;
@@ -3861,6 +3869,7 @@ export function FigmaQuestionnaireScreen({
       if (navigationPendingRef.current || issueResolutionPendingRef.current) return;
       clearAutosaveTimer();
       const revision = autosaveRevisionRef.current;
+      if (failedSaveRevisionRef.current === revision) return;
       void enqueueDraftSave(completionPayload("autosave"), revision).catch(
         () => undefined,
       );
