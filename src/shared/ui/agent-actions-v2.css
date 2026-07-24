@@ -1945,12 +1945,12 @@
 }
 
 /*
- * The Actions-owned shell keeps navigation feedback chromatic. Removing
+ * The shared operational shell keeps navigation feedback chromatic. Removing
  * transform from both the item and icon prevents active-route changes from
  * moving the persistent sidebar while the content surface reveals.
  */
 #root
-  .ops-shell.has-unified-side-menu.is-agent-shell-source-actions
+  .ops-shell.has-unified-side-menu.is-operational-shell-source-actions
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item {
   transform: none !important;
@@ -1966,7 +1966,7 @@
 }
 
 #root
-  .ops-shell.has-unified-side-menu.is-agent-shell-source-actions
+  .ops-shell.has-unified-side-menu.is-operational-shell-source-actions
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item
   .ops-nav-icon {
@@ -1979,13 +1979,13 @@
 }
 
 #root
-  .ops-shell.has-unified-side-menu.is-agent-shell-source-actions
+  .ops-shell.has-unified-side-menu.is-operational-shell-source-actions
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item:not([data-nav-id="agent-create"]):not(.is-active):not(
     [aria-current="page"]
   ):is(:hover, :focus-visible),
 #root
-  .ops-shell.has-unified-side-menu.is-agent-shell-source-actions
+  .ops-shell.has-unified-side-menu.is-operational-shell-source-actions
   > .v19-ds-side-menu.ops-sidebar.opsu-sidebar[data-v19-component="side-menu"]
   .ops-nav-item:active {
   transform: none !important;
