@@ -90,7 +90,7 @@ import {
   applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
   canReplaceDocument,
-  markSubmissionIssueFixedResult,
+  confirmAgentCorrectionResult,
 } from "../modules/submissions/status";
 import { persistCreatedSubmissionWithPassports } from "../modules/submissions/createSubmissionPassportUseCase";
 import type { PublicNumberAssignment } from "../modules/submissions/supabasePersistence";
@@ -820,25 +820,46 @@ export function CommandCenter({
       if (uploadedSubmission === latestPrepared.submission) {
         throw new Error("Файл нельзя загрузить в текущем статусе подачи.");
       }
+      let preparedSubmission = uploadedSubmission;
       if (
-        latestPrepared.file.type !== "passport_scan" ||
-        latestPrepared.file.status === "needs_replacement"
+        latestPrepared.file.type === "passport_scan" &&
+        latestPrepared.file.status !== "needs_replacement"
       ) {
-        return uploadedSubmission;
+        preparedSubmission = {
+          ...uploadedSubmission,
+          applicants: uploadedSubmission.applicants.map((applicant) =>
+            applicant.id === latestPrepared.file.applicantId
+              ? {
+                  ...applicant,
+                  passportExtraction: latestSubmission.applicants.find(
+                    (candidate) => candidate.id === applicant.id,
+                  )?.passportExtraction,
+                }
+              : applicant,
+          ),
+        };
       }
-      return {
-        ...uploadedSubmission,
-        applicants: uploadedSubmission.applicants.map((applicant) =>
-          applicant.id === latestPrepared.file.applicantId
-            ? {
-                ...applicant,
-                passportExtraction: latestSubmission.applicants.find(
-                  (candidate) => candidate.id === applicant.id,
-                )?.passportExtraction,
-              }
-            : applicant,
-        ),
-      };
+
+      const matchingIssueIds = preparedSubmission.issues
+        .filter(
+          (issue) =>
+            issue.status === "open" &&
+            issue.target.applicantId === applicantId &&
+            issue.target.fileType === fileType,
+        )
+        .map((issue) => issue.id);
+      for (const issueId of matchingIssueIds) {
+        const confirmation = confirmAgentCorrectionResult(
+          preparedSubmission,
+          issueId,
+          "agent",
+          agentId ?? preparedSubmission.agentId,
+          uploadedAtIso,
+        );
+        if (!confirmation.ok) throw new Error(confirmation.error.message);
+        preparedSubmission = confirmation.data;
+      }
+      return preparedSubmission;
     };
 
     const nextSubmission = onSubmissionUpdate
@@ -904,27 +925,6 @@ export function CommandCenter({
   const executeAgentSubmissionAction = async (action: SubmissionAction) => {
     if (!selectedCanonicalSubmission) return;
     await executeAgentSubmissionActionFor(selectedCanonicalSubmission.id, action);
-  };
-
-  const markAgentIssueFixed = async (issueId: string) => {
-    if (!selectedCanonicalSubmission) {
-      throw new Error("Не удалось определить подачу для исправления замечания.");
-    }
-
-    const markFixedOnLatest = (latestSubmission: Submission) => {
-      const result = markSubmissionIssueFixedResult(latestSubmission, issueId, "agent");
-      if (!result.ok) throw new Error(result.error.message);
-      return result.data;
-    };
-    const nextSubmission = onSubmissionUpdate
-      ? await onSubmissionUpdate(selectedCanonicalSubmission.id, markFixedOnLatest)
-      : markFixedOnLatest(selectedCanonicalSubmission);
-    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({
-      ...current,
-      [nextSubmission.id]: nextSubmission,
-    }));
-    return nextSubmission;
   };
 
   const persistQuestionnaireSubmission = (nextSubmission: Submission) => {
@@ -1086,7 +1086,6 @@ export function CommandCenter({
                 : undefined
             }
             onSubmissionChange={persistQuestionnaireSubmission}
-            onMarkIssueFixed={markAgentIssueFixed}
             onUploadFile={
               selectedRow
                 ? async (fileId, file) => {

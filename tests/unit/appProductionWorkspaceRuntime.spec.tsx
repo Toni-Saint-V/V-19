@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { SignOutCurrentSessionResult } from "../../src/services/authService";
+import { mapSupabasePersistenceError } from "../../src/services/persistenceObservability";
 import type { AccessRequest } from "../../src/shared/authContract";
 
 function deferred<T>() {
@@ -378,6 +379,7 @@ const persistenceMocks = vi.hoisted(() => {
   });
   return {
     isAdminSubmissionConcurrencyConflict: vi.fn(() => false),
+    isSubmissionConcurrencyConflict: vi.fn(() => false),
     loadCockpitSubmissionsForProfile: vi.fn(() => runtime.loadPromise),
     saveAdminCockpitSubmissionsIfCurrent: saveCockpitSubmissionsForProfile,
     saveCockpitSubmissionsForProfile,
@@ -797,7 +799,11 @@ describe("App production workspace runtime", () => {
         name: "Не удалось загрузить данные Supabase",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Supabase read failed safely")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Не удалось загрузить данные. Обновите страницу и повторите действие.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("app-runtime-state")).toHaveClass("is-error");
     expect(screen.queryByTestId("admin-workspace")).not.toBeInTheDocument();
 
@@ -1184,6 +1190,16 @@ describe("App production workspace runtime", () => {
   });
 
   test("keeps the canonical workspace and surfaces a rejected Supabase mutation", async () => {
+    const persistenceFailure = mapSupabasePersistenceError(
+      {
+        code: "42703",
+        message: "column submissions.public_number does not exist",
+      },
+      {
+        fallbackKind: "save",
+        operation: "rpc.save_submission_draft",
+      },
+    );
     render(<App />);
     await screen.findByText("Загрузка данных Supabase...");
     await act(async () => {
@@ -1199,13 +1215,18 @@ describe("App production workspace runtime", () => {
       expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
     );
     await act(async () => {
-      runtime.rejectSave(new Error("Supabase mutation failed safely"));
+      runtime.rejectSave(persistenceFailure);
       await runtime.lastMutationPromise;
     });
 
-    expect(await screen.findByText("Supabase mutation failed safely")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие. Код ошибки: rpc.save_submission_draft:save:42703.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(persistenceFailure.message)).not.toBeInTheDocument();
     expect(screen.getByTestId("admin-workspace")).toBeInTheDocument();
-    expect(runtime.lastMutationError?.message).toBe("Supabase mutation failed safely");
+    expect(runtime.lastMutationError?.message).toBe(persistenceFailure.message);
   });
 
   test("persists file_downloaded before the atomic export RPC and refreshes canonical state without a terminal draft save", async () => {

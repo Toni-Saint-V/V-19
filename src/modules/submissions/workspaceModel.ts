@@ -3,6 +3,7 @@ import {
   fileStatusLabels,
   fileTypeLabels,
   fixedIssueCount,
+  isAgentIssueCorrectionConfirmed,
   openIssueCount,
 } from "./status";
 import type {
@@ -59,11 +60,23 @@ export const activeMediaFileTypes: SubmissionFileType[] = [
 ];
 
 export function buildReadinessQueue(submission: Submission): ReadinessQueueItem[] {
+  const confirmedOpenIssues = submission.issues.filter(
+    (issue) =>
+      issue.status === "open" &&
+      isAgentIssueCorrectionConfirmed(submission, issue),
+  );
   return [
-    ...submission.issues.filter((issue) => issue.status === "open").map(issueQueueItem),
+    ...submission.issues
+      .filter(
+        (issue) =>
+          issue.status === "open" &&
+          !isAgentIssueCorrectionConfirmed(submission, issue),
+      )
+      .map(issueQueueItem),
+    ...confirmedOpenIssues.map((issue) => fixedIssueQueueItem(issue, true)),
     ...submission.issues
       .filter((issue) => issue.status === "fixed_by_agent")
-      .map(fixedIssueQueueItem),
+      .map((issue) => fixedIssueQueueItem(issue)),
     ...activeAiSuggestions(submission).map(aiSuggestionQueueItem),
     ...systemMissingQueueItems(submission),
   ].sort(queueSort);
@@ -115,6 +128,7 @@ export function sectionNavigationTarget(
   const issueTarget = submission.issues.find(
     (issue) =>
       issue.status === "open" &&
+      !isAgentIssueCorrectionConfirmed(submission, issue) &&
       !issue.target.fileType &&
       (issue.target.section === sectionTitle || issue.target.field === sectionTitle),
   );
@@ -150,10 +164,15 @@ function issueQueueItem(issue: Issue): ReadinessQueueItem {
   };
 }
 
-function fixedIssueQueueItem(issue: Issue): ReadinessQueueItem {
+function fixedIssueQueueItem(
+  issue: Issue,
+  savedButNotSubmitted = false,
+): ReadinessQueueItem {
   return {
     actionLabel: "Открыть замечание",
-    body: "Исправление отправлено и ждёт закрытия администратором.",
+    body: savedButNotSubmitted
+      ? "Исправление сохранено и будет отправлено автоматически вместе с остальными."
+      : "Исправление отправлено и ждёт закрытия администратором.",
     id: `fixed:${issue.id}`,
     source: "admin",
     status: "fixed",
@@ -188,6 +207,7 @@ function systemMissingQueueItems(submission: Submission): ReadinessQueueItem[] {
         submission.issues.some(
           (issue) =>
             issue.status === "open" &&
+            !isAgentIssueCorrectionConfirmed(submission, issue) &&
             issue.target.applicantId === applicant.id &&
             (issue.target.section === section.title ||
               issue.target.field === section.title),

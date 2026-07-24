@@ -66,7 +66,7 @@ describe("returned PDF handoff persistence", () => {
         safeCode: "rpc.publish_returned_pdf_handoff:rls:42501",
       },
       userMessage:
-        "Access was denied by Supabase policy. Ask an operator to confirm access.",
+        "Недостаточно прав для этого действия. Обратитесь к администратору.",
     });
   });
 });

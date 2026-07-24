@@ -89,15 +89,15 @@ interface SupabaseErrorShape {
 }
 
 const userMessages: Record<PersistenceFailureKind, string> = {
-  auth: "Unable to sign in. Check email, password, and Supabase profile.",
-  database:
-    "Supabase data could not be loaded. No private details were exposed.",
-  rls: "Access was denied by Supabase policy. Ask an operator to confirm access.",
-  rpc: "Supabase could not complete the save request. Try again after reload.",
-  save: "Remote save failed. Last saved Supabase data was reloaded.",
-  storage: "Supabase storage could not complete the file action.",
-  upload: "Media upload failed. No uploaded file was marked complete.",
-  unknown: "Supabase request failed. Try again after reload.",
+  auth: "Не удалось войти. Проверьте email и пароль.",
+  database: "Не удалось загрузить данные. Обновите страницу и повторите действие.",
+  rls: "Недостаточно прав для этого действия. Обратитесь к администратору.",
+  rpc: "Не удалось выполнить запрос. Обновите страницу и повторите действие.",
+  save:
+    "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие.",
+  storage: "Не удалось выполнить действие с файлом. Повторите попытку.",
+  upload: "Не удалось загрузить файл. Он не был отмечен как загруженный.",
+  unknown: "Не удалось выполнить запрос. Обновите страницу и повторите действие.",
 };
 
 export class PersistenceObservableError extends Error {
@@ -280,7 +280,7 @@ export function formatPersistenceFailureForUser(
   const diagnostics = safeDiagnosticsForPersistenceError(error);
 
   if (!diagnostics) return message;
-  return `${message} Reference: ${diagnostics.safeCode}.`;
+  return `${message} Код ошибки: ${diagnostics.safeCode}.`;
 }
 
 export function logPersistenceDiagnostics(label: string, error: unknown): void {

@@ -14,6 +14,7 @@ import {
   blockerCount,
   fixedIssueCount,
   getPrimaryAction,
+  isAgentIssueCorrectionConfirmed,
   openIssueCount,
   typeLabels,
   unresolvedOpenIssueCount,
@@ -228,6 +229,23 @@ function agentWaitingPrimaryAction(
   surface: "agent" | "review" | "export",
 ): SubmissionNextStepAction | null {
   if (role !== "agent" || surface !== "agent") return null;
+
+  if (
+    submission.status === "returned" &&
+    submission.issues.some((issue) => issue.status === "open") &&
+    submission.issues
+      .filter((issue) => issue.status === "open")
+      .every((issue) => isAgentIssueCorrectionConfirmed(submission, issue))
+  ) {
+    return {
+      disabled: true,
+      id: "wait_automatic_correction_handoff",
+      kind: "wait",
+      label: "Повторная отправка выполняется автоматически",
+      reason:
+        "Все исправления сохранены. Если статус не обновился, обновите данные подачи и повторите последнее исправление.",
+    };
+  }
 
   if (submission.status === "submitted_for_review") {
     return {

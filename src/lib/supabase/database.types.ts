@@ -191,6 +191,7 @@ export type Database = {
           questionnaireAnswers?: number;
           mediaAssets: number;
           statusHistory: number;
+          caseRevision: number;
         };
       };
       save_admin_submission_batch_if_current: {
@@ -243,6 +244,7 @@ export type Database = {
           mediaAssets: number;
           statusHistory: number;
           idempotent?: boolean;
+          caseRevision: number;
         };
       };
       upsert_questionnaire_answers: {
@@ -483,15 +485,38 @@ export interface CorrectionRow extends DbRecord {
   created_by: string;
   created_at: string;
   fixed_at: string | null;
+  agent_confirmed_at: string | null;
+  agent_confirmed_revision: number | null;
+  target_baseline: Json | null;
+  target_field_id: string | null;
+  target_projection: Json | null;
+  target_revision: number;
+  target_section_id: string | null;
 }
 
 export type CorrectionInsert = Omit<
   CorrectionRow,
-  "id" | "created_at" | "fixed_at"
+  | "id"
+  | "created_at"
+  | "fixed_at"
+  | "agent_confirmed_at"
+  | "agent_confirmed_revision"
+  | "target_baseline"
+  | "target_field_id"
+  | "target_projection"
+  | "target_revision"
+  | "target_section_id"
 > & {
   id?: string;
   created_at?: string;
   fixed_at?: string | null;
+  agent_confirmed_at?: string | null;
+  agent_confirmed_revision?: number | null;
+  target_baseline?: Json | null;
+  target_field_id?: string | null;
+  target_projection?: Json | null;
+  target_revision?: number;
+  target_section_id?: string | null;
 };
 
 export interface QuestionnaireAnswerRow extends DbRecord {
@@ -838,6 +863,8 @@ export type StatusHistoryInsert = Omit<
 };
 
 export interface SubmissionDraftPersistencePayload extends DbRecord {
+  client_contract_version?: 2;
+  expected_case_revision?: number;
   submission: SubmissionInsert;
   applicants: ApplicantInsert[];
   questionnaire_answers?: QuestionnaireAnswerInsert[];

@@ -1154,7 +1154,12 @@ describe("production lifecycle mutation audit", () => {
       { ...addIntent, mode: "mark_issue_fixed" },
     );
     if (!markMutation) throw new Error("Expected source-derived mark-fixed mutation.");
-    const fixed = markSubmissionIssueFixedResult(returned, addedIssue.id, "agent");
+    const fixed = markSubmissionIssueFixedResult(
+      returned,
+      addedIssue.id,
+      "agent",
+      "2026-07-24T00:00:00.000Z",
+    );
     if (!fixed.ok) throw new Error(fixed.error.message);
     expect(productionDraftSnapshotFullContentDigest(persistedEnvelope(fixed.data))).toBe(
       markMutation.expectedContentDigest,

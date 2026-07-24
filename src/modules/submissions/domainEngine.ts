@@ -15,7 +15,7 @@ import {
   hasMissingRequiredWork,
   hasUsableTripDateRange,
   isFixedIssueStatus,
-  isSubmissionIssueResolved,
+  markSubmissionIssueFixedResult,
   transitionSubmissionStatus,
 } from "./status";
 import {
@@ -57,7 +57,7 @@ export function createDraft(input: CreateDraftInput): CommandResult<Submission> 
   if (input.type !== "single" && input.type !== "family") {
     return failure(
       "INVALID_SUBMISSION_KIND",
-      "Submission type must be single or family.",
+      "Выберите индивидуальную или семейную подачу.",
     );
   }
 
@@ -74,13 +74,13 @@ export function updateSubmission(
   if (role !== "agent") {
     return failure(
       "PERMISSION_DENIED",
-      "Admin cannot edit agent-owned submission data.",
+      "Администратор не может изменять данные, которые заполняет агент.",
     );
   }
   if (!["draft", "in_progress", "returned"].includes(submission.status)) {
     return failure(
       "INVALID_TRANSITION",
-      "Submission data is not editable in this status.",
+      "В текущем статусе данные подачи доступны только для просмотра.",
     );
   }
 
@@ -101,11 +101,13 @@ export function submitForReview(
 ): CommandResult<Submission> {
   const terminal = ensureNotTerminal(submission);
   if (terminal) return terminal;
-  if (role !== "agent") return failure("PERMISSION_DENIED", "Only agent can submit.");
+  if (role !== "agent") {
+    return failure("PERMISSION_DENIED", "Отправить подачу может только агент.");
+  }
   if (submission.status !== "in_progress") {
     return failure(
       "INVALID_TRANSITION",
-      "Only in-progress submissions can be submitted.",
+      "Отправить на проверку можно только подачу в работе.",
     );
   }
 
@@ -115,10 +117,13 @@ export function submitForReview(
     completeness.total < 100 ||
     !canonicalRequiredMediaReadiness(submission).ok
   ) {
-    return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
+    return failure(
+      "VALIDATION_ERROR",
+      "Заполните обязательные поля анкеты и загрузите все нужные файлы.",
+    );
   }
   if (!hasUsableTripDateRange(submission)) {
-    return failure("VALIDATION_ERROR", "Trip dates must be complete.");
+    return failure("VALIDATION_ERROR", "Укажите даты начала и окончания поездки.");
   }
   return transitionSubmissionStatus(
     withDerivedState({
@@ -145,19 +150,25 @@ export function returnWithIssues(
   const terminal = ensureNotTerminal(submission);
   if (terminal) return terminal;
   if (role !== "admin") {
-    return failure("PERMISSION_DENIED", "Only admin can return with issues.");
+    return failure(
+      "PERMISSION_DENIED",
+      "Вернуть подачу с замечаниями может только администратор.",
+    );
   }
   if (!["submitted_for_review", "corrections_received"].includes(submission.status)) {
-    return failure("INVALID_TRANSITION", "Submission is not in admin review.");
+    return failure("INVALID_TRANSITION", "Подача сейчас не находится на проверке.");
   }
   if (issues.length === 0) {
-    return failure("VALIDATION_ERROR", "At least one issue is required.");
+    return failure(
+      "VALIDATION_ERROR",
+      "Добавьте хотя бы одно точное замечание перед возвратом.",
+    );
   }
   const invalidIssue = issues.find((issue) => !isValidIssueInput(submission, issue));
   if (invalidIssue) {
     return failure(
       "VALIDATION_ERROR",
-      "Issue target, reason, and comment must be valid.",
+      "Укажите корректное поле или файл, причину и понятный комментарий.",
     );
   }
 
@@ -185,50 +196,7 @@ export function markIssueFixed(
   role: Role,
   issueId: string,
 ): CommandResult<Submission> {
-  const terminal = ensureNotTerminal(submission);
-  if (terminal) return terminal;
-  if (role !== "agent") {
-    return failure("PERMISSION_DENIED", "Only agent can mark issue fixed.");
-  }
-  if (submission.status !== "returned") {
-    return failure(
-      "INVALID_TRANSITION",
-      "Issues can be marked fixed only after admin return.",
-    );
-  }
-  const issue = submission.issues.find((item) => item.id === issueId);
-  if (!issue) return failure("ISSUE_NOT_FOUND", "Issue not found.");
-  if (issue.status !== "open") {
-    return failure("ISSUE_NOT_FIXABLE", "Only open issues can be marked fixed.");
-  }
-  if (!isSubmissionIssueResolved(submission, issue)) {
-    return failure(
-      "VALIDATION_ERROR",
-      "Issue target must be corrected before it can be marked fixed.",
-    );
-  }
-
-  return success(
-    withDerivedState({
-      ...submission,
-      issues: submission.issues.map((item) =>
-        item.id === issueId && isIssueTransitionAllowed(item.status, "fixed_by_agent")
-          ? { ...item, status: "fixed_by_agent" }
-          : item,
-      ),
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-${issueId}-исправлено`,
-          text: "Агент отметил замечание исправленным",
-          at: "сейчас",
-          detail: issue.reason,
-          source: "agent",
-        },
-        ...submission.history,
-      ],
-    }),
-  );
+  return markSubmissionIssueFixedResult(submission, issueId, role);
 }
 
 export function resubmitCorrections(
@@ -238,15 +206,21 @@ export function resubmitCorrections(
   const terminal = ensureNotTerminal(submission);
   if (terminal) return terminal;
   if (role !== "agent") {
-    return failure("PERMISSION_DENIED", "Only agent can resubmit corrections.");
+    return failure(
+      "PERMISSION_DENIED",
+      "Повторно отправить исправления может только агент.",
+    );
   }
   if (submission.status !== "returned") {
-    return failure("INVALID_TRANSITION", "Submission is not waiting for corrections.");
+    return failure(
+      "INVALID_TRANSITION",
+      "Подача уже перешла в другой статус. Обновите данные и повторите.",
+    );
   }
   if (submission.issues.some((issue) => issue.status === "open")) {
     return failure(
       "VALIDATION_ERROR",
-      "Open issues must be fixed before resubmission.",
+      "Сохраните все открытые исправления — после этого подача отправится автоматически.",
     );
   }
 
@@ -267,18 +241,24 @@ export function closeIssue(
   const terminal = ensureNotTerminal(submission);
   if (terminal) return terminal;
   if (role !== "admin") {
-    return failure("PERMISSION_DENIED", "Only admin can close issues.");
+    return failure(
+      "PERMISSION_DENIED",
+      "Закрыть замечание может только администратор.",
+    );
   }
   if (submission.status !== "corrections_received") {
     return failure(
       "INVALID_TRANSITION",
-      "Issues can be closed only during corrections review.",
+      "Закрыть замечание можно только во время проверки исправлений.",
     );
   }
   const issue = submission.issues.find((item) => item.id === issueId);
-  if (!issue) return failure("ISSUE_NOT_FOUND", "Issue not found.");
+  if (!issue) return failure("ISSUE_NOT_FOUND", "Замечание не найдено.");
   if (!isFixedIssueStatus(issue.status)) {
-    return failure("ISSUE_NOT_FIXABLE", "Only fixed issues can be closed.");
+    return failure(
+      "ISSUE_NOT_FIXABLE",
+      "Сначала агент должен сохранить и отправить это исправление.",
+    );
   }
 
   return success(
@@ -311,25 +291,31 @@ export function acceptSubmission(
   const terminal = ensureNotTerminal(submission);
   if (terminal) return terminal;
   if (role !== "admin") {
-    return failure("PERMISSION_DENIED", "Only admin can accept submissions.");
+    return failure(
+      "PERMISSION_DENIED",
+      "Принять подачу может только администратор.",
+    );
   }
   if (!["submitted_for_review", "corrections_received"].includes(submission.status)) {
-    return failure("INVALID_TRANSITION", "Submission is not in admin acceptance.");
+    return failure("INVALID_TRANSITION", "Подача сейчас недоступна для принятия.");
   }
   if (hasBlockingIssues(submission)) {
     return failure(
       "ACCEPTANCE_BLOCKED",
-      "Acceptance is blocked until all issues are closed by admin.",
+      "Сначала закройте все замечания, затем примите подачу.",
     );
   }
   if (hasMissingRequiredWork(submission)) {
-    return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
+    return failure(
+      "VALIDATION_ERROR",
+      "Заполните обязательные поля анкеты и подготовьте все файлы.",
+    );
   }
   const questionnaireReview = adminQuestionnaireReviewReadiness(submission);
   if (!questionnaireReview.ok) {
     return failure(
       "VALIDATION_ERROR",
-      questionnaireReview.reason ?? "Questionnaire review must be complete.",
+      questionnaireReview.reason ?? "Завершите проверку анкеты.",
     );
   }
   const mediaReview = canonicalRequiredMediaReadiness(submission, {
@@ -340,11 +326,11 @@ export function acceptSubmission(
   if (!mediaReview.ok) {
     return failure(
       "VALIDATION_ERROR",
-      mediaReview.reason ?? "Required media must be accepted before acceptance.",
+      mediaReview.reason ?? "Примите обязательные файлы перед принятием подачи.",
     );
   }
   if (!hasUsableTripDateRange(submission)) {
-    return failure("VALIDATION_ERROR", "Trip dates must be complete.");
+    return failure("VALIDATION_ERROR", "Укажите даты начала и окончания поездки.");
   }
 
   return transitionSubmissionStatus(
@@ -367,12 +353,18 @@ export function generateExport(
   role: Role,
 ): CommandResult<ExportGuardResult> {
   if (role !== "admin") {
-    return failure("PERMISSION_DENIED", "Only admin can generate export.");
+    return failure(
+      "PERMISSION_DENIED",
+      "Сформировать выгрузку может только администратор.",
+    );
   }
   const summary = exportSummary(submissions, "xlsx");
   const packageIdentity = buildExportPackageIdentity(submissions, "xlsx");
   if (!summary.canGenerate || !packageIdentity) {
-    return failure("EXPORT_NOT_READY", "Export guard blocked this selection.");
+    return failure(
+      "EXPORT_NOT_READY",
+      "Выбранные подачи ещё не готовы к выгрузке.",
+    );
   }
 
   return success({ packageIdentity, summary });
@@ -384,10 +376,16 @@ export function markExported(
   packageIdentity?: ExportPackageIdentity,
 ): CommandResult<Submission> {
   if (role !== "admin") {
-    return failure("PERMISSION_DENIED", "Only admin can mark exported.");
+    return failure(
+      "PERMISSION_DENIED",
+      "Отметить подачу выгруженной может только администратор.",
+    );
   }
   if (submission.status === "exported") {
-    return failure("EXPORTED_TERMINAL", "Exported is terminal for V-19.");
+    return failure(
+      "EXPORTED_TERMINAL",
+      "Подача уже выгружена, дальнейшие изменения недоступны.",
+    );
   }
   if (
     submission.status !== "ready_for_export" ||
@@ -398,7 +396,7 @@ export function markExported(
   ) {
     return failure(
       "EXPORT_NOT_READY",
-      "Submission must have a downloaded export package before marking exported.",
+      "Сначала сформируйте и скачайте пакет выгрузки.",
     );
   }
 
@@ -546,13 +544,19 @@ function withDerivedState(submission: Submission): Submission {
 
 function ensureNotTerminal(submission: Submission): CommandResult<Submission> | null {
   if (!isCanonicalSubmissionStatus(submission.status)) {
-    return failure("INVALID_TRANSITION", "Submission status is not canonical.");
+    return failure(
+      "INVALID_TRANSITION",
+      "Статус подачи не распознан. Обновите данные и повторите.",
+    );
   }
   if (
     terminalStatuses.has(submission.status) ||
     isExportedTerminal(submission.status)
   ) {
-    return failure("EXPORTED_TERMINAL", "Exported is terminal for V-19.");
+    return failure(
+      "EXPORTED_TERMINAL",
+      "Подача уже выгружена, дальнейшие изменения недоступны.",
+    );
   }
   return null;
 }
@@ -570,8 +574,9 @@ function createIssueFromInput(
 ): Issue {
   const applicant = submission.applicants.find((item) => item.id === input.applicantId);
   if (!applicant) {
-    throw new Error("Validated issue target is missing.");
+    throw new Error("Не удалось найти выбранный объект замечания.");
   }
+  const targetIdentity = issueQuestionnaireTargetIdentity(applicant, input);
 
   return {
     id: `зм-${submission.id}-domain-${submission.issues.length + index + 1}`,
@@ -580,8 +585,10 @@ function createIssueFromInput(
       applicantId: applicant.id,
       applicantName: applicant.fullName,
       field: input.field,
+      fieldId: targetIdentity?.fieldId,
       fileType: input.fileType,
       section: input.section,
+      sectionId: targetIdentity?.sectionId,
     },
     reason: input.reason.trim(),
     comment: input.comment.trim(),
@@ -591,6 +598,50 @@ function createIssueFromInput(
     createdAt: "сейчас",
     snapshot: issueTargetSnapshot(submission, input),
   };
+}
+
+function issueQuestionnaireTargetIdentity(
+  applicant: Submission["applicants"][number],
+  input: IssueInput,
+) {
+  if (input.fileType) return undefined;
+  if (input.sectionId && input.fieldId) {
+    return { sectionId: input.sectionId, fieldId: input.fieldId };
+  }
+  if (input.type === "section") {
+    const targetSection = applicant.sections.find(
+      (section) =>
+        section.id === input.sectionId ||
+        section.title === input.field ||
+        section.title === input.section,
+    );
+    const targetField =
+      targetSection?.fields.find((field) => Boolean(field.error)) ??
+      targetSection?.fields.find(
+        (field) => field.required && !field.value.trim(),
+      ) ??
+      targetSection?.fields[0];
+    if (targetSection && targetField) {
+      return { sectionId: targetSection.id, fieldId: targetField.id };
+    }
+  }
+
+  for (const section of applicant.sections) {
+    if (
+      input.section &&
+      section.id !== input.section &&
+      section.title !== input.section
+    ) {
+      continue;
+    }
+    const field = section.fields.find(
+      (candidate) =>
+        candidate.id === input.fieldId ||
+        questionnaireFieldMatchesTarget(candidate, input.field),
+    );
+    if (field) return { sectionId: section.id, fieldId: field.id };
+  }
+  return undefined;
 }
 
 function isValidIssueInput(submission: Submission, input: IssueInput) {

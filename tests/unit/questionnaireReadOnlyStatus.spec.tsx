@@ -90,7 +90,7 @@ describe("agent questionnaire read-only status", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Следующее поле" })).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Пометить исправленным" }),
+      screen.queryByRole("button", { name: "Сохранить исправление" }),
     ).not.toBeInTheDocument();
     expect(onComplete).not.toHaveBeenCalled();
     expect(onMarkIssueFixed).not.toHaveBeenCalled();

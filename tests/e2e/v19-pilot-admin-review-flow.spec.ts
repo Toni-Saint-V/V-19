@@ -149,7 +149,7 @@ async function verifyRemarkSubmitActionability(
   await expect(reviewWorkspace).toBeVisible();
   await expect(
     reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-  ).toContainText(/Замечания\s+1/);
+  ).toContainText(/Открыто\s+1/);
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
@@ -400,7 +400,9 @@ test.describe("V-19 pilot admin review click flow", () => {
     await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
     await expect(
       reviewWorkspace
-        .getByText(/Защищённый оригинал недоступен|Файл не загружен/)
+        .getByText(
+          /Защищённый оригинал недоступен|Файл не загружен|Паспорт не загружен/,
+        )
         .first(),
     ).toBeVisible();
     await expect(

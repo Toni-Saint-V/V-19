@@ -47,13 +47,17 @@ import {
   validateBlsQuestionnaireField,
   type BlsFormData,
 } from "../questionnaireBlsRules";
-import { agentQuestionnaireStatusPresentation } from "../status";
+import {
+  agentQuestionnaireStatusPresentation,
+  isAgentIssueCorrectionConfirmed,
+} from "../status";
 import { agentInteractionProps } from "../agentInteractionContract";
 import {
   passportReviewMediaTypeForIssue,
   primaryApplicantIdForPassportReview,
 } from "../passportReviewContract";
 import { suggestedRussianAddress } from "../russianAddress";
+import { questionnaireSaveFailureMessage } from "../questionnaireSaveError";
 import {
   composeQuestionnaireHomeAddress,
   structuredQuestionnaireHomeAddressFromText,
@@ -206,7 +210,10 @@ type FigmaQuestionnaireScreenProps = {
   onComplete: (values: QuestionnaireCommitPayload) => void | Promise<void>;
   onConfirmPassportReview?: (applicantId: string) => void | Promise<void>;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
-  onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
+  onMarkIssueFixed?: (
+    issueId: string,
+    values: QuestionnaireCommitPayload,
+  ) => Submission | void | Promise<Submission | void>;
   onOpenDocuments?: (filter?: QuestionnaireDocumentsFilter) => void;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onSaveDraft?: (values: QuestionnaireCommitPayload) => void | Promise<void>;
@@ -231,37 +238,6 @@ type QuestionnaireReviewConfirmation = {
 type QuestionnaireSaveIntent = "autosave" | "completion" | "manual" | "navigation";
 
 type QuestionnaireSaveFailureAction = "back" | "draft" | "save-exit";
-
-function questionnaireSaveFailureMessage(error: unknown) {
-  const rawMessage = error instanceof Error ? error.message.trim() : "";
-  const normalized = rawMessage.toLocaleLowerCase("ru-RU");
-
-  if (
-    /failed to fetch|load failed|network|networkerror|offline|соединени|сеть/.test(
-      normalized,
-    )
-  ) {
-    return "Нет соединения с сервером. Проверьте интернет и повторите сохранение — введённые данные остаются в анкете.";
-  }
-
-  if (/jwt|token|session|unauth|401|сесси/.test(normalized)) {
-    return "Сессия завершилась. Введённые данные остаются в анкете; повторите сохранение после восстановления доступа.";
-  }
-
-  if (
-    /forbidden|permission|row.level|not authorized|403|недоступна текущему агенту|нет доступа/.test(
-      normalized,
-    )
-  ) {
-    return "Нет доступа к этой подаче. Введённые данные остаются в анкете; обновите список подач или обратитесь к администратору.";
-  }
-
-  if (/conflict|409|already updated|изменилась|обновлена другим/.test(normalized)) {
-    return "Подача была изменена в другом окне. Введённые данные остаются в анкете; обновите подачу и повторите сохранение.";
-  }
-
-  return "Сервис не подтвердил сохранение. Введённые данные остаются в анкете — повторите попытку или продолжите редактирование.";
-}
 
 const questionnaireSaveIntentPriority: Record<QuestionnaireSaveIntent, number> = {
   autosave: 0,
@@ -3212,6 +3188,23 @@ export function FigmaQuestionnaireScreen({
         });
     });
   }, [activeApplicantModel, activeBlockingIssues, activeSection, sections]);
+  const currentIssueCorrectionConfirmed = Boolean(
+    currentSectionIssue &&
+      currentSectionIssue.status === "open" &&
+      isAgentIssueCorrectionConfirmed(draftSubmission, currentSectionIssue),
+  );
+  const currentIssueCompletesCorrectionSet = Boolean(
+    currentSectionIssue &&
+      currentSectionIssue.status === "open" &&
+      draftSubmission.issues
+        .filter(
+          (issue) =>
+            issue.status === "open" && issue.id !== currentSectionIssue.id,
+        )
+        .every((issue) =>
+          isAgentIssueCorrectionConfirmed(draftSubmission, issue),
+        ),
+  );
 
   const clearAutosaveTimer = useCallback(() => {
     if (autosaveTimerRef.current === undefined) return;
@@ -4190,11 +4183,15 @@ export function FigmaQuestionnaireScreen({
     try {
       const pendingIssueResolution = issueResolutionPromiseRef.current;
       if (pendingIssueResolution && !(await pendingIssueResolution)) return;
+      const correctionSavedCurrentDraft = Boolean(pendingIssueResolution);
       const hasDraftWork =
         Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
         Boolean(inFlightSaveRef.current) ||
         Boolean(queuedSaveRef.current);
-      if (hasDraftWork || !saveAndExitDraftReadyRef.current) {
+      if (
+        !correctionSavedCurrentDraft &&
+        (hasDraftWork || !saveAndExitDraftReadyRef.current)
+      ) {
         await saveDraftFromButton();
       }
       if (onSaveAndExit) {
@@ -4232,17 +4229,22 @@ export function FigmaQuestionnaireScreen({
     setIssueResolutionError("");
     const resolution = (async () => {
       try {
-        await saveDraftFromButton();
-        await onMarkIssueFixed(issueId);
+        clearAutosaveTimer();
+        const nextSubmission = await onMarkIssueFixed(
+          issueId,
+          completionPayload("manual"),
+        );
+        replacePendingFieldUpdates({});
+        saveAndExitDraftReadyRef.current = true;
         setSaveStatus("saved");
-        setSaveMessage("Исправление отмечено и готово к отправке");
+        setSaveMessage(
+          nextSubmission?.status === "corrections_received"
+            ? "Все исправления сохранены и отправлены на проверку"
+            : "Исправление сохранено",
+        );
         return true;
       } catch (error) {
-        setIssueResolutionError(
-          error instanceof Error
-            ? error.message
-            : "Не удалось отметить замечание исправленным.",
-        );
+        setIssueResolutionError(questionnaireSaveFailureMessage(error));
         return false;
       } finally {
         issueResolutionPendingRef.current = false;
@@ -5481,7 +5483,8 @@ export function FigmaQuestionnaireScreen({
                       >
                         <div className="v19-questionnaire-review-strip" />
                         <div className="v19-questionnaire-review-icon">
-                          {currentSectionIssue.status === "fixed_by_agent" ? (
+                          {currentSectionIssue.status === "fixed_by_agent" ||
+                          currentIssueCorrectionConfirmed ? (
                             <CheckCircle2 className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
                           ) : (
                             <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
@@ -5495,6 +5498,12 @@ export function FigmaQuestionnaireScreen({
                                     ? ` по полю «${currentSectionIssue.target.field}»`
                                     : ""
                                 } отправлено, ожидает проверки администратора`
+                              : currentIssueCorrectionConfirmed
+                                ? `Исправление${
+                                    currentSectionIssue.target.field
+                                      ? ` по полю «${currentSectionIssue.target.field}»`
+                                      : ""
+                                  } сохранено`
                               : currentSectionIssue.target.field
                                 ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
                                 : currentSectionIssue.reason}
@@ -5502,15 +5511,22 @@ export function FigmaQuestionnaireScreen({
                           <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
                             {currentSectionIssue.status === "fixed_by_agent"
                               ? "Исправление сохранено и не блокирует повторную отправку. Администратор увидит его при проверке."
+                              : currentIssueCorrectionConfirmed
+                                ? "Исправление будет отправлено на проверку автоматически, когда будут сохранены остальные замечания."
                               : currentSectionIssue.comment}
                           </p>
                         </div>
                         {isEditable &&
                         currentSectionIssue.status === "open" &&
+                        !currentIssueCorrectionConfirmed &&
                         onMarkIssueFixed ? (
                           <div className="flex shrink-0 flex-col items-end gap-2">
                             <button
-                              {...agentInteractionProps("questionnaire.mark-fixed")}
+                              {...agentInteractionProps(
+                                currentIssueCompletesCorrectionSet
+                                  ? "questionnaire.save-and-submit-corrections"
+                                  : "questionnaire.mark-fixed",
+                              )}
                               aria-busy={
                                 pendingIssueResolutionId === currentSectionIssue.id
                               }
@@ -5521,7 +5537,7 @@ export function FigmaQuestionnaireScreen({
                             >
                               {pendingIssueResolutionId === currentSectionIssue.id
                                 ? "Сохраняем…"
-                                : "Пометить исправленным"}
+                                : "Сохранить исправление"}
                             </button>
                             {issueResolutionError ? (
                               <span

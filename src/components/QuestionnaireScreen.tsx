@@ -8,6 +8,7 @@ import {
   type QuestionnaireInitialFocus,
   type QuestionnaireDocumentsFilter,
 } from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import { QuestionnaireValidationError } from "../modules/submissions/questionnaireSaveError";
 import {
   createQuestionnaireSections,
   normalizeSubmissionQuestionnaire,
@@ -18,7 +19,7 @@ import { defaultLocalAgentOwnerId } from "../modules/submissions/ownership";
 import { confirmApplicantPassportReview } from "../modules/submissions/passportExtraction";
 import {
   applySubmissionActionResult,
-  markSubmissionIssueFixedResult,
+  confirmAgentCorrectionResult,
   withRecalculatedSubmissionProgress,
 } from "../modules/submissions/status";
 import type {
@@ -40,7 +41,6 @@ interface QuestionnaireScreenProps {
   submission?: Submission;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onSaveDraft?: (submissionId: string) => void | Promise<void>;
-  onMarkIssueFixed?: (issueId: string) => Promise<Submission>;
   onSubmissionUpdate?: (
     update: (submission: Submission) => Submission,
   ) => Promise<Submission>;
@@ -354,7 +354,6 @@ export function QuestionnaireScreen({
   submission,
   onUploadFile,
   onSaveDraft,
-  onMarkIssueFixed,
   onSubmissionUpdate,
   onSubmissionChange,
   onSubmitForReview,
@@ -427,7 +426,9 @@ export function QuestionnaireScreen({
                 actorId,
               )
             : { ok: true as const, data: preparedSubmission };
-        if (!savedResult.ok) throw new Error(savedResult.error.message);
+        if (!savedResult.ok) {
+          throw new QuestionnaireValidationError(savedResult.error.message);
+        }
         const completionAction =
           savedResult.data.status === "returned"
             ? "submit_corrections"
@@ -438,14 +439,20 @@ export function QuestionnaireScreen({
           "agent",
           actorId,
         );
-        if (!submittedResult.ok) throw new Error(submittedResult.error.message);
+        if (!submittedResult.ok) {
+          throw new QuestionnaireValidationError(
+            submittedResult.error.message,
+          );
+        }
         return submittedResult.data;
       });
       if (
         nextSubmission.status !== "corrections_received" &&
         nextSubmission.status !== "submitted_for_review"
       ) {
-        throw new Error("Не удалось подтвердить отправку анкеты в актуальном состоянии.");
+        throw new QuestionnaireValidationError(
+          "Не удалось подтвердить отправку анкеты в актуальном состоянии.",
+        );
       }
       const completedAction =
         nextSubmission.status === "corrections_received"
@@ -465,25 +472,28 @@ export function QuestionnaireScreen({
   );
 
   const handleMarkIssueFixed = useCallback(
-    async (issueId: string) => {
-      if (onMarkIssueFixed) {
-        const nextSubmission = await onMarkIssueFixed(issueId);
-        workingSubmissionRef.current = nextSubmission;
-        setWorkingSubmission(nextSubmission);
-        return;
-      }
-
-      await persistSubmissionUpdate((currentSubmission) => {
-        const result = markSubmissionIssueFixedResult(
+    async (issueId: string, payload: QuestionnaireCommitPayload) =>
+      persistSubmissionUpdate((currentSubmission) => {
+        const nowIso = new Date().toISOString();
+        const preparedSubmission = applyQuestionnairePayload(
           currentSubmission,
+          payload,
+          currentSubmission.agentId,
+          nowIso,
+        );
+        const result = confirmAgentCorrectionResult(
+          preparedSubmission,
           issueId,
           "agent",
+          currentSubmission.agentId,
+          nowIso,
         );
-        if (!result.ok) throw new Error(result.error.message);
+        if (!result.ok) {
+          throw new QuestionnaireValidationError(result.error.message);
+        }
         return result.data;
-      });
-    },
-    [onMarkIssueFixed, persistSubmissionUpdate],
+      }),
+    [persistSubmissionUpdate],
   );
 
   const handleConfirmPassportReview = useCallback(

@@ -502,6 +502,23 @@ describe("AdminReviewDrawer", () => {
     );
   });
 
+  test("gives a general questionnaire remark a stable canonical field target", () => {
+    const onAddIssue = vi.fn();
+    renderDrawer({ activeTab: "issues", onAddIssue });
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить замечание" }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить замечание" }));
+
+    expect(onAddIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: expect.any(String),
+        fieldId: expect.any(String),
+        sectionId: expect.any(String),
+        type: "field",
+      }),
+    );
+  });
+
   test("routes the selected passport into the protected review workspace", () => {
     const submission = adminReviewSubmission();
     const applicant = submission.applicants[0];

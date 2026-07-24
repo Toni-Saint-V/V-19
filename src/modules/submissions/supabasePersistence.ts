@@ -30,7 +30,10 @@ import {
   submissionPublicNumberMin,
 } from "./submissionIdentity";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
-import { normalizeSubmissionQuestionnaire } from "./questionnaire";
+import {
+  normalizeSubmissionQuestionnaire,
+  questionnaireFieldMatchesTarget,
+} from "./questionnaire";
 import {
   isCity,
   isQuestionnaireReviewSource,
@@ -46,7 +49,13 @@ import {
   isPersistablePrivateFileAsset,
   withRecomputedFileCompletion,
 } from "./fileAsset";
-import { isSubmissionIssueResolved, transitionMatrix } from "./status";
+import {
+  isAgentIssueCorrectionConfirmed,
+  isSubmissionIssueResolved,
+  transitionMatrix,
+} from "./status";
+import { currentIssueTargetRevision } from "./correctionRevision";
+import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
 import { normalizeSubmissionForCanonicalRuntime } from "./submissionActions";
 import type {
   Applicant,
@@ -89,7 +98,7 @@ const exportBatchSelect =
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,source,note,changed_by,changed_at" as const;
 const correctionSelect =
-  "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at" as const;
+  "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at,target_revision,agent_confirmed_at,agent_confirmed_revision,target_section_id,target_field_id,target_baseline,target_projection" as const;
 const agentProfileSelect = "id,display_name" as const;
 
 export interface CockpitLoadResult {
@@ -103,6 +112,83 @@ export interface AdminCockpitSaveResult {
   caseRevisionsBySubmissionId: Map<string, number>;
   operationId: string;
   ownerIdsBySubmissionId: Map<string, string>;
+}
+
+export interface AgentCockpitSaveResult {
+  caseRevisionsBySubmissionId: Map<string, number>;
+  ownerIdsBySubmissionId: Map<string, string>;
+}
+
+type CockpitCanonicalLoader = (
+  profile: AppProfile,
+) => Promise<CockpitLoadResult>;
+
+function canonicalTargetJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalTargetJson);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nested]) => [key, canonicalTargetJson(nested)]),
+  );
+}
+
+function correctionTargetProjection(submission: Submission, issue: Issue) {
+  const applicant = submission.applicants.find(
+    (candidate) => candidate.id === issue.target.applicantId,
+  );
+  if (issue.target.fileType) {
+    const file = submission.files.find(
+      (candidate) =>
+        candidate.applicantId === issue.target.applicantId &&
+        candidate.type === issue.target.fileType,
+    );
+    return JSON.stringify(
+      canonicalTargetJson({
+        generatedFileName: file?.generatedFileName,
+        id: file?.id,
+        mimeType: file?.mimeType,
+        originalFileName: file?.originalFileName,
+        reviewStatus: file?.reviewStatus,
+        sizeBytes: file?.sizeBytes,
+        status: file?.status,
+        storageBucket: file?.storageBucket,
+        storagePath: file?.storagePath,
+        uploadStatus: file?.uploadStatus,
+      }),
+    );
+  }
+  if (
+    issue.target.section === "Паспорт" &&
+    issue.target.field === "Распознанные данные паспорта"
+  ) {
+    return JSON.stringify(canonicalTargetJson(applicant?.passportExtraction));
+  }
+  if (issue.type === "section") {
+    const targetSections =
+      applicant?.sections
+        .filter(
+          (section) =>
+            section.title === issue.target.section ||
+            section.title === issue.target.field,
+        )
+        .map((section) => ({
+          ...section,
+          fields: [...section.fields].sort((left, right) =>
+            left.id.localeCompare(right.id),
+          ),
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id)) ?? [];
+    return JSON.stringify(canonicalTargetJson(targetSections));
+  }
+  const targetFields =
+    applicant?.sections
+      .flatMap((section) => section.fields)
+      .filter((field) =>
+        questionnaireFieldMatchesTarget(field, issue.target.field),
+      )
+      .sort((left, right) => left.id.localeCompare(right.id)) ?? [];
+  return JSON.stringify(canonicalTargetJson(targetFields));
 }
 
 export type PublicNumberAssignment = {
@@ -165,6 +251,8 @@ type CockpitApplicantRow = Pick<
 type CockpitCorrectionRow = Pick<
   CorrectionRow,
   | "applicant_id"
+  | "agent_confirmed_at"
+  | "agent_confirmed_revision"
   | "created_at"
   | "created_by"
   | "field_key"
@@ -176,6 +264,11 @@ type CockpitCorrectionRow = Pick<
   | "severity"
   | "status"
   | "submission_id"
+  | "target_baseline"
+  | "target_field_id"
+  | "target_projection"
+  | "target_revision"
+  | "target_section_id"
 >;
 type CockpitQuestionnaireAnswerRow = Pick<
   QuestionnaireAnswerRow,
@@ -998,6 +1091,8 @@ function toCorrectionInsert(
     applicant_id: issue.target.applicantId,
     scope: issue.type === "file" || issue.type === "media" ? "media" : "field",
     field_key: issue.target.field ?? null,
+    target_section_id: issue.target.sectionId ?? null,
+    target_field_id: issue.target.fieldId ?? null,
     media_type: mediaTypeForIssue(issue.target.fileType),
     reason: `${issue.reason}${issue.comment ? ` — ${issue.comment}` : ""}`,
     severity: issue.severity === "blocker" ? "blocking" : "note",
@@ -1006,8 +1101,14 @@ function toCorrectionInsert(
     created_at: timestampOrNow(issue.createdAt),
     fixed_at:
       issue.status === "fixed_by_agent" || issue.status === "closed_by_admin"
-        ? new Date().toISOString()
+        ? issue.fixedAtIso ?? issue.agentConfirmation?.confirmedAtIso ?? null
         : null,
+    agent_confirmed_at: issue.agentConfirmation?.confirmedAtIso ?? null,
+    agent_confirmed_revision:
+      issue.agentConfirmation?.targetRevision ?? null,
+    target_revision: currentIssueTargetRevision(issue),
+    target_baseline: null,
+    target_projection: null,
   };
 }
 
@@ -1215,6 +1316,9 @@ export function reviewHandoffPersistenceIssues(
     const unresolvedFixedTargets = fixedIssues.filter(
       (issue) => !isSubmissionIssueResolved(submission, issue),
     );
+    const unconfirmedFixedTargets = fixedIssues.filter(
+      (issue) => !isAgentIssueCorrectionConfirmed(submission, issue),
+    );
     if (openIssues.length > 0) {
       issues.push("corrections_received cannot persist open issues");
     }
@@ -1223,6 +1327,22 @@ export function reviewHandoffPersistenceIssues(
     }
     if (unresolvedFixedTargets.length > 0) {
       issues.push("corrections_received fixed issues must resolve their targets");
+    }
+    if (unconfirmedFixedTargets.length > 0) {
+      issues.push(
+        "corrections_received requires a current confirmation for every fixed issue",
+      );
+    }
+    if (!blsQuestionnaireReadiness(submission).ready) {
+      issues.push("corrections_received requires a complete BLS questionnaire");
+    }
+    const mediaReadiness = canonicalRequiredMediaReadiness(submission, {
+      requireStorageIdentity: true,
+    });
+    if (!mediaReadiness.ok) {
+      issues.push(
+        `corrections_received requires canonical media: ${mediaReadiness.reason}`,
+      );
     }
     if (!hasHandoffHistory(submission, "corrections_received", "agent", role)) {
       issues.push("corrections_received requires matching agent history");
@@ -1419,17 +1539,28 @@ function issueFromCorrectionRow(
 
   return {
     id: row.id,
+    agentConfirmation:
+      row.agent_confirmed_at && row.agent_confirmed_revision !== null
+        ? {
+            confirmedAtIso: row.agent_confirmed_at,
+            targetRevision: row.agent_confirmed_revision,
+          }
+        : undefined,
     comment: "",
     createdAt: row.created_at,
     createdBy: "admin",
+    fixedAtIso: row.fixed_at ?? undefined,
     reason: row.reason,
     severity: row.severity === "blocking" ? "blocker" : "warning",
     status: issueStatusFromCorrectionRow(row.status),
+    targetRevision: row.target_revision,
     target: {
       applicantId: applicant.id,
       applicantName: applicant.fullName,
       field: row.field_key ?? undefined,
+      fieldId: row.target_field_id ?? undefined,
       fileType,
+      sectionId: row.target_section_id ?? undefined,
     },
     type:
       row.scope === "media"
@@ -1459,9 +1590,23 @@ export function attachDurableCorrectionRows(
     consumedCorrectionIds.add(durable.id);
     return {
       ...issue,
+      agentConfirmation:
+        durable.agent_confirmed_at && durable.agent_confirmed_revision !== null
+          ? {
+              confirmedAtIso: durable.agent_confirmed_at,
+              targetRevision: durable.agent_confirmed_revision,
+            }
+          : undefined,
       createdAt: durable.created_at,
+      fixedAtIso: durable.fixed_at ?? undefined,
       severity: durable.severity === "blocking" ? "blocker" : "warning",
       status: issueStatusFromCorrectionRow(durable.status),
+      targetRevision: durable.target_revision,
+      target: {
+        ...issue.target,
+        fieldId: durable.target_field_id ?? issue.target.fieldId,
+        sectionId: durable.target_section_id ?? issue.target.sectionId,
+      },
     };
   });
   const durableOnlyIssues = correctionRows
@@ -2119,6 +2264,17 @@ export function isAdminSubmissionConcurrencyConflict(error: unknown): boolean {
   );
 }
 
+export function isSubmissionConcurrencyConflict(error: unknown): boolean {
+  return (
+    error instanceof PersistenceObservableError &&
+    error.diagnostics.supabaseCode === "40001" &&
+    (error.diagnostics.operation ===
+      "rpc.save_admin_submission_batch_if_current" ||
+      error.diagnostics.operation === "rpc.save_submission_draft" ||
+      error.diagnostics.operation === "rpc.submit_corrections_handoff")
+  );
+}
+
 export async function saveAdminCockpitSubmissionsIfCurrent(
   profile: AppProfile,
   submissions: Submission[],
@@ -2224,62 +2380,170 @@ export async function saveCockpitSubmissionsForProfile(
   profile: AppProfile,
   submissions: Submission[],
   ownerIdsBySubmissionId: ReadonlyMap<string, string>,
-): Promise<Map<string, string>> {
+  caseRevisionsBySubmissionId: ReadonlyMap<string, number> = new Map(),
+  loadCanonical: CockpitCanonicalLoader = loadCockpitSubmissionsForProfile,
+): Promise<AgentCockpitSaveResult> {
   if (profile.role === "admin") {
     throw new Error(
       "Administrators must use the revision-checked admin concurrency writer.",
     );
   }
   const client = getSupabaseClient();
-  if (!client) return new Map(ownerIdsBySubmissionId);
+  if (!client) {
+    return {
+      caseRevisionsBySubmissionId: new Map(caseRevisionsBySubmissionId),
+      ownerIdsBySubmissionId: new Map(ownerIdsBySubmissionId),
+    };
+  }
 
   const nextOwnerIds = new Map(ownerIdsBySubmissionId);
+  const nextCaseRevisions = new Map(caseRevisionsBySubmissionId);
 
   for (const submission of submissions) {
     assertReviewHandoffPersistenceConsistency(submission, profile.role);
 
     const ownerId = profile.id;
-    const payload = toCockpitDraftPersistencePayload(
+    const expectedRevision = caseRevisionsBySubmissionId.get(submission.id);
+    const payload: SubmissionDraftPersistencePayload = {
+      ...toCockpitDraftPersistencePayload(
       submission,
       profile.id,
       ownerId,
       profile.role,
-    );
+      ),
+      client_contract_version: 2,
+      ...(expectedRevision === undefined
+        ? {}
+        : { expected_case_revision: expectedRevision }),
+    };
     const correctionHandoff = requiresCorrectionHandoff(submission, profile.role);
     const operation = correctionHandoff
       ? "rpc.submit_corrections_handoff"
       : "rpc.save_submission_draft";
-    const invokeSave = async (): Promise<{ error: unknown | null }> => {
+    const invokeSave = async (): Promise<{
+      data: unknown;
+      error: unknown | null;
+    }> => {
       try {
-        const { error } = correctionHandoff
+        const { data, error } = correctionHandoff
           ? await client.rpc("submit_corrections_handoff", { payload })
           : await client.rpc("save_submission_draft", { payload });
-        return { error };
+        return { data, error };
       } catch (error) {
-        return { error };
+        return { data: null, error };
       }
     };
 
-    let result = await invokeSave();
+    const result = await invokeSave();
     if (result.error) {
-      let failure = mapSupabasePersistenceError(result.error, {
+      const failure = mapSupabasePersistenceError(result.error, {
         operation,
         fallbackKind: "save",
       });
-      if (!correctionHandoff && failure.diagnostics.retryable) {
-        result = await invokeSave();
-        if (result.error) {
-          failure = mapSupabasePersistenceError(result.error, {
-            operation,
-            fallbackKind: "save",
-          });
+      if (failure.diagnostics.retryable) {
+        try {
+          const canonical = await loadCanonical(profile);
+          const canonicalSubmission = canonical.submissions.find(
+            (item) => item.id === submission.id,
+          );
+          const canonicalRevision =
+            canonical.caseRevisionsBySubmissionId.get(submission.id);
+          const intendedFixedIssues = submission.issues.filter(
+            (issue) => issue.status === "fixed_by_agent",
+          );
+          const intendedConfirmedIssues = submission.issues.filter(
+            (issue) => issue.agentConfirmation,
+          );
+          const canonicalIssuesById = new Map(
+            canonicalSubmission?.issues.map((issue) => [issue.id, issue]) ?? [],
+          );
+          const revisionAdvanced =
+            canonicalRevision !== undefined &&
+            (expectedRevision === undefined ||
+              canonicalRevision > expectedRevision);
+          const intendedConfirmationsAreDurable =
+            intendedConfirmedIssues.length > 0 &&
+            intendedConfirmedIssues.every((issue) => {
+              const persistedIssue = canonicalIssuesById.get(issue.id);
+              return (
+                persistedIssue?.status === issue.status &&
+                currentIssueTargetRevision(persistedIssue) ===
+                  currentIssueTargetRevision(issue) &&
+                correctionTargetProjection(
+                  canonicalSubmission ?? submission,
+                  persistedIssue,
+                ) ===
+                  correctionTargetProjection(submission, issue) &&
+                isAgentIssueCorrectionConfirmed(
+                  canonicalSubmission ?? submission,
+                  persistedIssue,
+                )
+              );
+            });
+          const handoffIsDurable =
+            canonicalSubmission?.status === "corrections_received" &&
+            !canonicalSubmission.issues.some((issue) => issue.status === "open") &&
+            intendedFixedIssues.length > 0 &&
+            intendedFixedIssues.every((issue) => {
+              const persistedIssue = canonicalIssuesById.get(issue.id);
+              return (
+                persistedIssue?.status === "fixed_by_agent" &&
+                currentIssueTargetRevision(persistedIssue) ===
+                  currentIssueTargetRevision(issue) &&
+                correctionTargetProjection(
+                  canonicalSubmission,
+                  persistedIssue,
+                ) === correctionTargetProjection(submission, issue) &&
+                isAgentIssueCorrectionConfirmed(
+                  canonicalSubmission,
+                  persistedIssue,
+                )
+              );
+            }) &&
+            revisionAdvanced;
+          const confirmationSaveIsDurable =
+            !correctionHandoff &&
+            canonicalSubmission?.status === submission.status &&
+            intendedConfirmationsAreDurable &&
+            revisionAdvanced;
+
+          if (handoffIsDurable || confirmationSaveIsDurable) {
+            return {
+              caseRevisionsBySubmissionId:
+                canonical.caseRevisionsBySubmissionId,
+              ownerIdsBySubmissionId: canonical.ownerIdsBySubmissionId,
+            };
+          }
+        } catch {
+          // Preserve the original observable transport failure unless canonical
+          // readback proves that the handoff committed.
         }
       }
-      if (result.error) throw failure;
+      throw failure;
     }
 
+    if (!result.data || typeof result.data !== "object") {
+      throw new Error(
+        `Supabase не вернул новую revision для подачи ${submission.id}.`,
+      );
+    }
+    const revision = (result.data as { caseRevision?: unknown }).caseRevision;
+    if (
+      typeof revision !== "number" ||
+      !Number.isSafeInteger(revision) ||
+      revision < 0 ||
+      (expectedRevision !== undefined && revision <= expectedRevision)
+    ) {
+      throw new Error(
+        `Supabase вернул некорректную revision для подачи ${submission.id}.`,
+      );
+    }
+    nextCaseRevisions.set(submission.id, revision);
     nextOwnerIds.set(submission.id, ownerId);
   }
 
-  return nextOwnerIds;
+  return {
+    caseRevisionsBySubmissionId: nextCaseRevisions,
+    ownerIdsBySubmissionId: nextOwnerIds,
+  };
 }

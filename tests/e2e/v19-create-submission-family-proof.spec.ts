@@ -117,12 +117,29 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   });
 
   await primary.click();
-  await expect(page.getByRole("heading", { level: 1, name: /Анкета:/ })).toBeVisible();
-  await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
-  await page.getByLabel("Выбрать туриста").click();
   await expect(
-    page.getByRole("listbox", { name: "Выбрать туриста" }).getByRole("option"),
-  ).toHaveCount(2);
+    page.getByRole("group", { name: "Разделы анкеты" }).first(),
+  ).toBeVisible();
+  await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
+  await page
+    .getByRole("button", { name: /Запись/ })
+    .first()
+    .click();
+  await expect(page.getByRole("combobox", { name: "Город подачи" })).toContainText(
+    "Казань",
+  );
+  const applicantSelectorName = mobile
+    ? "Выбрать заявителя — нижняя панель"
+    : "Выбрать туриста";
+  await page.getByLabel(applicantSelectorName).click();
+  const applicantListbox = page.getByRole("listbox", {
+    name: applicantSelectorName,
+  });
+  await expect(applicantListbox.getByRole("option")).toHaveCount(2);
+  await applicantListbox.getByRole("option").nth(1).click();
+  await expect(page.getByRole("combobox", { name: "Город подачи" })).toContainText(
+    "Казань",
+  );
 }
 
 test.describe("V-19 canonical family intake", () => {

@@ -66,6 +66,31 @@ Backup owner:
 - `20260722001000_admin_submission_batch_concurrency.sql`
 - `20260722002000_access_request_review_claim.sql`
 - `20260722003000_atomic_return_package_artifact_upload.sql`
+- `20260724084304_allow_agent_ready_for_export_resubmission.sql`
+- `20260724132405_agent_correction_confirmation.sql`
+- `20260724221841_repair_out_of_order_submission_schema.sql`
+- `20260724234200_server_owned_correction_targets.sql`
+  - open field corrections have stable section/field ids: ____________________;
+  - server target projections/revisions verified: ____________________;
+  - DB-side BLS questionnaire negative smoke: ____________________;
+  - expand phase only: version-1 draft saves remain temporarily accepted but
+    cannot persist confirmation/revision fields;
+  - correction handoff requires `client_contract_version: 2` plus
+    `expected_case_revision`;
+  - mutation-maintenance gate owner/time: ____________________;
+  - in-flight mutation count after drain (`0` required): ____________________;
+  - maximum old-tab lifetime expired at: ____________________;
+  - deployed v2 asset id and handoff smoke submission id: ____________________;
+  - contract enforcement for all draft saves is a separate migration after old
+    tabs expire and telemetry shows no version-1 callers;
+  - rollback retains correction revision/confirmation audit columns and data,
+    preserves v2 CAS, and runs under the same drained maintenance gate.
+- `20260725003000_harden_correction_validation_topology.sql`
+  - empty required targets and `reviewState: needs_review` confirmation probes
+    are rejected with exact Russian validation errors;
+  - agent correction confirmation outside `returned` is rejected;
+  - closed legacy/section corrections do not block subsequent draft saves;
+  - internal draft RPC topology and anonymous grants are verified live.
 
 ## Required Evidence
 
@@ -73,7 +98,14 @@ Backup owner:
 - `npm run verify:local-readiness`
 - `npm run verify:auth-data-readiness`
 - `npm run verify:supabase-release`
+- `V19_SUPABASE_LIVE_REGISTRY_ARTIFACT=<outside-repo-json> npm run verify:full`
 - `npm run verify:production-packet`
+- live production schema preflight confirms `submissions.public_number`,
+  `submissions.case_revision`, and every remote migration version declared in
+  `requiredRemoteMigrationOrder` before the client deploy
+- fresh `npm run verify:supabase-live-registry -- --artifact <outside-repo-json>`
+  result (15-minute TTL, exact production project/order/schema/RPC/triggers):
+  ____________________
 - expected before production evidence refresh: fail-closed `NO_GO`
 - expected before activation: pass
 

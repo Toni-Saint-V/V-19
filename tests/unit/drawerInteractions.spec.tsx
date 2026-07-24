@@ -531,6 +531,35 @@ describe("Drawer interactions", () => {
     );
   });
 
+  test("masks a mixed Russian and technical upload failure", async () => {
+    const onUploadApplicantFile = vi
+      .fn()
+      .mockRejectedValue(
+        new Error("Ошибка SQL: rpc.save_submission_draft failed safely"),
+      );
+    renderDrawer({
+      activeTab: "issues",
+      onUploadApplicantFile,
+      submission: returnedSubmission(),
+    });
+
+    fireEvent.change(
+      screen.getByLabelText("Выбрать файл: Мария Иванова • Селфи 1", {
+        selector: "input",
+      }),
+      {
+        target: {
+          files: [new File(["a"], "a.png", { type: "image/png" })],
+        },
+      },
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Не удалось загрузить файл.");
+    expect(alert).not.toHaveTextContent("rpc.save_submission_draft");
+    expect(alert).not.toHaveTextContent("failed safely");
+  });
+
   test("counts only open issues as requiring correction", async () => {
     const [fixedIssue, openIssue] = returnedSubmission().issues;
     if (!fixedIssue || !openIssue) {
@@ -555,7 +584,7 @@ describe("Drawer interactions", () => {
       issuesTab.querySelector(".v19-submission-drawer-tab-count"),
     ).toHaveTextContent("1");
     expect(screen.getByText("Нужно исправить")).toBeInTheDocument();
-    expect(screen.getByText("Исправлено, ждёт проверки")).toBeInTheDocument();
+    expect(screen.getByText("Сохранено / ждёт проверки")).toBeInTheDocument();
   });
 
   test("keeps submission B pending when submission A settles after the drawer switches", async () => {
@@ -608,19 +637,20 @@ describe("Drawer interactions", () => {
     await waitFor(() => expect(submissionBAction).toBeEnabled());
   });
 
-  test("opens history for read-only status without sending a mutation", async () => {
+  test("shows the truthful waiting state for a read-only submission without sending a mutation", async () => {
     const onAction = vi.fn();
     renderDrawer({
       onAction,
       submission: { ...readySubmission(), status: "submitted_for_review" },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Открыть историю" }));
-    await waitFor(() =>
-      expect(screen.getByRole("tab", { name: "История" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      ),
+    expect(
+      screen.getByRole("button", {
+        name: "Дождитесь ручной проверки администратора",
+      }),
+    ).toBeDisabled();
+    expect(screen.getByTestId("drawer-next-step")).toHaveTextContent(
+      "Дождитесь ручной проверки администратора",
     );
     expect(onAction).not.toHaveBeenCalled();
   });

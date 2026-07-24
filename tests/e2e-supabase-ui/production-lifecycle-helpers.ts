@@ -917,7 +917,12 @@ export function productionDraftSnapshotMutationFromBaseline(
   ) {
     return null;
   }
-  const result = markSubmissionIssueFixedResult(submission, issue.id, "agent");
+  const result = markSubmissionIssueFixedResult(
+    submission,
+    issue.id,
+    "agent",
+    "2026-07-24T00:00:00.000Z",
+  );
   if (!result.ok) return null;
   const persistedResult =
     options?.projectPersistedSnapshot?.(result.data) ?? result.data;

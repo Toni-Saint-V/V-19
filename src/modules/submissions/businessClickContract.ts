@@ -14,7 +14,7 @@ export type BusinessClickExecutionPath =
   | "updateQuestionnaireField"
   | "uploadRequiredFile"
   | "addPreciseAdminIssue"
-  | "markSubmissionIssueFixedResult"
+  | "confirmAgentCorrectionResult"
   | "exportSummary"
   | "applyExportStateToSelection"
   | "completeExportPackage"
@@ -113,10 +113,10 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     transition: { from: ["submitted_for_review"], to: "returned" },
   },
   mark_issue_fixed: {
-    executionPath: "markSubmissionIssueFixedResult",
+    executionPath: "confirmAgentCorrectionResult",
     intent: "issue_lifecycle",
     ownerRole: "agent",
-    productionLogic: "src/modules/submissions/status.markSubmissionIssueFixedResult",
+    productionLogic: "src/modules/submissions/status.confirmAgentCorrectionResult",
     surfaces: [
       "agent-actions",
       "agent-submissions",
@@ -130,7 +130,12 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     ownerRole: "agent",
     productionLogic: "src/modules/submissions/status.applySubmissionActionResult",
     submissionAction: "submit_corrections",
-    surfaces: ["agent-actions", "agent-submissions", "submission-drawer"],
+    surfaces: [
+      "agent-actions",
+      "agent-submissions",
+      "questionnaire",
+      "submission-drawer",
+    ],
     transition: { from: ["returned"], to: "corrections_received" },
   },
   accept: {

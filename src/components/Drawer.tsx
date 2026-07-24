@@ -38,6 +38,7 @@ import {
   agentQuestionnaireStatusPresentation,
   canAgentEditSubmission,
   getPrimaryAction,
+  isAgentIssueCorrectionConfirmed,
   statusLabelFor,
 } from "../modules/submissions/status";
 import { requiredPassportReviewMediaSlots } from "../modules/submissions/passportReviewContract";
@@ -62,6 +63,8 @@ import {
   tripDatesForSubmission,
   updatedLabel,
 } from "./v19BusinessScreenAdapter";
+import { isSubmissionActionDomainError } from "../modules/submissions/submissionActionErrors";
+import { formatPersistenceFailureForUser } from "../services/persistenceObservability";
 
 interface ApplicantDetail {
   completedSections: number;
@@ -201,8 +204,11 @@ function buildSubmissionDetail(submission: Submission): SubmissionDetail {
     id: submissionPublicId(submission),
     issuesCount: submission.issues.filter((issue) => issue.status !== "closed_by_admin")
       .length,
-    openIssuesCount: submission.issues.filter((issue) => issue.status === "open")
-      .length,
+    openIssuesCount: submission.issues.filter(
+      (issue) =>
+        issue.status === "open" &&
+        !isAgentIssueCorrectionConfirmed(submission, issue),
+    ).length,
     status: submission.status,
     title: submission.title,
     tripDates: tripDatesForSubmission(submission),
@@ -789,8 +795,9 @@ function issueTargetLabel(issue: Issue) {
     .join(" • ");
 }
 
-function issueBadgeLabel(issue: Issue) {
+function issueBadgeLabel(issue: Issue, correctionConfirmed = false) {
   if (issue.status === "fixed_by_agent") return "Исправлено";
+  if (correctionConfirmed) return "Сохранено";
   if (issue.severity === "blocker") return "Блокирующее";
   return "Замечание";
 }
@@ -800,6 +807,11 @@ function issueActionLabel(issue: Issue) {
     return issue.target.fileType ? "Открыть файл" : "Открыть анкету";
   }
   return issue.target.fileType ? "Перезагрузить файл" : "Исправить в анкете";
+}
+
+function drawerRussianErrorMessage(error: unknown, fallback: string) {
+  if (isSubmissionActionDomainError(error)) return error.message;
+  return formatPersistenceFailureForUser(error, fallback);
 }
 
 const IssuesTab = ({
@@ -822,9 +834,16 @@ const IssuesTab = ({
     tone: "error" | "success";
   } | null>(null);
   const uploadingIssueIdsRef = useRef(new Set<string>());
-  const openIssues = submission.issues.filter((issue) => issue.status === "open");
+  const openIssues = submission.issues.filter(
+    (issue) =>
+      issue.status === "open" &&
+      !isAgentIssueCorrectionConfirmed(submission, issue),
+  );
   const fixedIssues = submission.issues.filter(
-    (issue) => issue.status === "fixed_by_agent",
+    (issue) =>
+      issue.status === "fixed_by_agent" ||
+      (issue.status === "open" &&
+        isAgentIssueCorrectionConfirmed(submission, issue)),
   );
 
   const uploadIssueFile = async (
@@ -840,23 +859,31 @@ const IssuesTab = ({
     setUploadFeedback(null);
     setUploadingIssueId(issue.id);
     try {
-      await onUploadApplicantFile(
+      const nextSubmission = await onUploadApplicantFile(
         submission.id,
         issue.target.applicantId,
         issue.target.fileType,
         file,
       );
+      const sentForReview =
+        typeof nextSubmission === "object" &&
+        nextSubmission !== null &&
+        "status" in nextSubmission &&
+        nextSubmission.status === "corrections_received";
       setUploadFeedback({
         issueId: issue.id,
-        message: "Файл загружен. Исправление ожидает проверки администратора.",
+        message: sentForReview
+          ? "Файл загружен. Все исправления автоматически отправлены на проверку."
+          : "Файл и исправление сохранены. Завершите остальные замечания — повторная отправка произойдёт автоматически.",
         tone: "success",
       });
     } catch (error) {
       setUploadFeedback({
         issueId: issue.id,
-        message: `${
-          error instanceof Error ? error.message : "Не удалось загрузить файл."
-        } Состояние файла не изменено. Повторите попытку.`,
+        message: `${drawerRussianErrorMessage(
+          error,
+          "Не удалось загрузить файл.",
+        )} Состояние файла не изменено. Повторите попытку.`,
         tone: "error",
       });
     } finally {
@@ -866,6 +893,9 @@ const IssuesTab = ({
   };
 
   const renderIssue = (issue: Issue) => {
+    const correctionConfirmed =
+      issue.status === "open" &&
+      isAgentIssueCorrectionConfirmed(submission, issue);
     const IssueIcon = issue.target.fileType ? ImageIcon : FileText;
     const issueElementId = targetElementId({
       issueId: issue.id,
@@ -877,6 +907,7 @@ const IssuesTab = ({
       canEdit &&
       Boolean(issue.target.fileType) &&
       issue.status === "open" &&
+      !correctionConfirmed &&
       Boolean(onUploadApplicantFile);
     const isUploadingThisIssue = uploadingIssueId === issue.id;
     const feedback = uploadFeedback?.issueId === issue.id ? uploadFeedback : null;
@@ -885,7 +916,9 @@ const IssuesTab = ({
       <article
         aria-labelledby={`${issueElementId}-title`}
         className={`v19-agent-drawer-issue ${
-          issue.status === "fixed_by_agent" ? "is-fixed" : "is-open"
+          issue.status === "fixed_by_agent" || correctionConfirmed
+            ? "is-fixed"
+            : "is-open"
         }`}
         id={issueElementId}
         key={issue.id}
@@ -897,10 +930,16 @@ const IssuesTab = ({
         <div className="v19-agent-drawer-issue-copy">
           <div className="v19-agent-drawer-issue-title-row">
             <h4 id={`${issueElementId}-title`}>{issue.reason}</h4>
-            <span>{issueBadgeLabel(issue)}</span>
+            <span>{issueBadgeLabel(issue, correctionConfirmed)}</span>
           </div>
           <div className="v19-agent-drawer-issue-target">{issueTargetLabel(issue)}</div>
           <p>{issue.comment || issue.reason}</p>
+          {correctionConfirmed ? (
+            <p role="status">
+              Исправление сохранено. Оно отправится на проверку автоматически после
+              сохранения остальных замечаний.
+            </p>
+          ) : null}
           {feedback ? (
             <p
               className={`v19-agent-drawer-inline-feedback is-${feedback.tone}`}
@@ -1006,7 +1045,7 @@ const IssuesTab = ({
       {fixedIssues.length > 0 ? (
         <section aria-labelledby="drawer-fixed-issues-title">
           <div className="v19-agent-drawer-issue-group-heading is-fixed">
-            <h4 id="drawer-fixed-issues-title">Исправлено, ждёт проверки</h4>
+            <h4 id="drawer-fixed-issues-title">Сохранено / ждёт проверки</h4>
             <span>{fixedIssues.length}</span>
           </div>
           <div className="v19-agent-drawer-issue-list">
@@ -1271,17 +1310,17 @@ export function Drawer({
       ),
       reason: primaryAction.reason,
     };
-  } else if (!canEditSubmission) {
-    primaryIntent = {
-      kind: "history",
-      label: "Открыть историю",
-    };
   } else if (nextStepBrief.primaryAction.kind === "wait") {
     primaryIntent = {
       kind: "wait",
       label: nextStepBrief.primaryAction.label,
       reason:
         nextStepBrief.primaryAction.reason ?? "Дождитесь завершения текущей операции.",
+    };
+  } else if (!canEditSubmission) {
+    primaryIntent = {
+      kind: "history",
+      label: "Открыть историю",
     };
   } else if (nextStepTarget?.tab === "files") {
     const uploadTargetLabel =
@@ -1343,7 +1382,10 @@ export function Drawer({
   const footerActionNotice =
     actionError || (primaryIntent.kind === "wait" ? primaryIntent.reason : "");
   const footerInstruction =
-    footerActionNotice || actionAnnouncement || footerInstructions[data.status];
+    actionError ||
+    actionAnnouncement ||
+    footerActionNotice ||
+    footerInstructions[data.status];
   let footerInstructionToneClassName = "text-white/40";
   if (footerActionNotice || actionAnnouncement) {
     footerInstructionToneClassName = "text-white/70";

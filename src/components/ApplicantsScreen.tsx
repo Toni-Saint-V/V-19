@@ -48,6 +48,7 @@ import {
   submissionPublicId,
   submissionPublicNumber,
 } from "../modules/submissions/submissionIdentity";
+import { isSubmissionActionDomainError } from "../modules/submissions/submissionActionErrors";
 import {
   agentQuestionnaireCompletionDecision,
   canAgentEditSubmission,
@@ -60,6 +61,7 @@ import type {
 } from "../modules/submissions/types";
 import type { WorkspaceTarget } from "../modules/submissions/workspaceModel";
 import { agentInteractionProps } from "../modules/submissions/agentInteractionContract";
+import { formatPersistenceFailureForUser } from "../services/persistenceObservability";
 import {
   V19ListHeader,
   V19MetricCard,
@@ -929,10 +931,14 @@ export function ApplicantsScreen({
       await onSubmitForReview(submission.id);
       setPendingReviewSubmission(null);
     } catch (error) {
-      const message =
-        error instanceof Error
+      const safeDomainFallback =
+        isSubmissionActionDomainError(error)
           ? error.message
-          : "Не удалось отправить подачу на проверку.";
+          : "Не удалось отправить подачу на проверку. Повторите действие.";
+      const message = formatPersistenceFailureForUser(
+        error,
+        safeDomainFallback,
+      );
       setSubmissionError({ id: submission.id, message });
       setSubmissionDialogError(message);
     } finally {

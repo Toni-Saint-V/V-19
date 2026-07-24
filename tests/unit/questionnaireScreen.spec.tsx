@@ -545,7 +545,13 @@ describe("QuestionnaireScreen", () => {
       "agent",
     );
     if (!fixedResult.ok) throw new Error(fixedResult.error.message);
-    expect(fixedResult.data.issues[0]?.status).toBe("fixed_by_agent");
+    expect(fixedResult.data.issues[0]).toMatchObject({
+      status: "open",
+      agentConfirmation: {
+        confirmedAtIso: expect.any(String),
+        targetRevision: expect.any(Number),
+      },
+    });
 
     result.rerender(
       <QuestionnaireScreen

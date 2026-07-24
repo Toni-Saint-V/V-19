@@ -151,8 +151,10 @@ const questionnaireUpdateCanonicalEffect = {
 } as const satisfies AgentInteractionCanonicalEffect;
 
 const markIssueFixedCanonicalEffect = {
-  before: { "corrections.status": "open" },
-  expectedAfter: { "corrections.status": "fixed" },
+  before: { "corrections.agent_confirmed_revision": null },
+  expectedAfter: {
+    "corrections.agent_confirmed_revision": "$target-revision",
+  },
   primaryTarget: "corrections",
 } as const satisfies AgentInteractionCanonicalEffect;
 
@@ -276,9 +278,13 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "status_history",
       "submission-media",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
+    allowedNetworkTargets: [
+      "rpc:save_submission_draft",
+      "rpc:submit_corrections_handoff",
+      "storage:submission-media",
+    ],
     requiredChangedTargets: ["media_assets", "submission-media"],
-    requiredNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
+    requiredNetworkTargets: ["storage:submission-media"],
   }),
 } as const satisfies Partial<Record<BusinessClickIntent, AgentInteractionWriteScope>>;
 
@@ -836,11 +842,24 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     surface: "questionnaire",
     role: "agent",
     expectedEffect:
-      "Mark one resolved admin issue fixed and read back the issue state.",
+      "Save one resolved correction while keeping it open until the complete correction set is ready.",
     proof: lifecycleProof,
     businessIntent: "mark_issue_fixed",
     statusFixtures: returnedStatusFixtures,
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.mark_issue_fixed,
+  },
+  "questionnaire.save-and-submit-corrections": {
+    canonicalEffect: submitCorrectionsCanonicalEffect,
+    id: "questionnaire.save-and-submit-corrections",
+    kind: "mutation",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Save the final correction and atomically resubmit the complete correction set.",
+    proof: lifecycleProof,
+    businessIntent: "submit_corrections",
+    statusFixtures: returnedStatusFixtures,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.submit_corrections,
   },
   "drawer.close": {
     id: "drawer.close",

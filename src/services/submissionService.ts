@@ -45,7 +45,7 @@ const applicantSelect =
 const mediaAssetSelect =
   "id,applicant_id,submission_id,type,original_file_name,generated_file_name,storage_bucket,storage_path,mime_type,size_bytes,upload_status,review_status,uploaded_at,reviewed_at,reviewed_by" as const;
 const correctionSelect =
-  "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at" as const;
+  "id,submission_id,applicant_id,scope,field_key,media_type,reason,severity,status,created_by,created_at,fixed_at,target_revision,agent_confirmed_at,agent_confirmed_revision,target_section_id,target_field_id,target_baseline,target_projection" as const;
 const appointmentSelect =
   "id,submission_id,status,city,date,time,operator_comment,updated_by,updated_at" as const;
 const exportBatchSelect =

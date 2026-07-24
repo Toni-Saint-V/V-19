@@ -9,6 +9,22 @@ import type {
 
 type SubmissionActionErrorAction = SubmissionAction | "mark_issue_fixed";
 
+export class SubmissionActionDomainError extends Error {
+  readonly code: DomainErrorCode;
+
+  constructor(error: DomainError) {
+    super(error.message);
+    this.name = "SubmissionActionDomainError";
+    this.code = error.code;
+  }
+}
+
+export function isSubmissionActionDomainError(
+  error: unknown,
+): error is SubmissionActionDomainError {
+  return error instanceof SubmissionActionDomainError;
+}
+
 export type SubmissionActionErrorState = {
   action: SubmissionActionErrorAction;
   code: DomainErrorCode;

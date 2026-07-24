@@ -13,6 +13,7 @@ import {
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
+import { SubmissionActionDomainError } from "../../src/modules/submissions/submissionActionErrors";
 import {
   applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
@@ -20,6 +21,7 @@ import {
 } from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
 import { isAdminReviewQueueSubmission } from "../../src/modules/submissions/uiTypes";
+import { mapSupabasePersistenceError } from "../../src/services/persistenceObservability";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 let submissionSequence = 0;
@@ -551,7 +553,12 @@ describe("ApplicantsScreen interactions", () => {
 
   it("keeps a failed review handoff visible and retryable in the dialog", async () => {
     const submission = readySubmission("single");
-    const onSubmitForReview = vi.fn().mockRejectedValue(new Error("Сервис недоступен"));
+    const onSubmitForReview = vi.fn().mockRejectedValue(
+      new SubmissionActionDomainError({
+        code: "VALIDATION_ERROR",
+        message: "Заполните обязательные поля анкеты.",
+      }),
+    );
 
     render(
       <ApplicantsScreen
@@ -566,13 +573,78 @@ describe("ApplicantsScreen interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Сервис недоступен");
+    expect(alert).toHaveTextContent("Заполните обязательные поля анкеты.");
     expect(
       screen.getByRole("dialog", {
         name: "Отправить на проверку администратору?",
       }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Отправить" })).toBeEnabled();
+  });
+
+  it("shows a safe Russian message instead of an internal RPC error", async () => {
+    const submission = readySubmission("single");
+    const persistenceError = mapSupabasePersistenceError(
+      {
+        code: "42703",
+        message: "column submissions.public_number does not exist",
+      },
+      {
+        operation: "rpc.save_submission_draft",
+        fallbackKind: "save",
+      },
+    );
+    const onSubmitForReview = vi.fn().mockRejectedValue(persistenceError);
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Не удалось сохранить изменения. Загружена последняя сохранённая версия; повторите действие.",
+    );
+    expect(alert).toHaveTextContent(
+      "Код ошибки: rpc.save_submission_draft:save:42703.",
+    );
+    expect(alert).not.toHaveTextContent("failed safely");
+    expect(alert).not.toHaveTextContent("public_number");
+  });
+
+  it("does not trust a Russian-looking infrastructure error as domain validation", async () => {
+    const submission = readySubmission("single");
+    const onSubmitForReview = vi.fn().mockRejectedValue(
+      new Error(
+        'Ошибка SQL: update public.submissions set status = "waiting_review"',
+      ),
+    );
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Не удалось отправить подачу на проверку. Повторите действие.",
+    );
+    expect(alert).not.toHaveTextContent("Ошибка SQL");
+    expect(alert).not.toHaveTextContent("public.submissions");
   });
 
   it("sends an export-ready package back to admin review from the card action", async () => {

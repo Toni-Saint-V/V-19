@@ -12,6 +12,7 @@ import type {
   SubmissionFile,
 } from "./types";
 import type { PassportExtractionResult } from "./passportExtractionContract";
+import { bumpOpenIssueTargetRevisions } from "./correctionRevision";
 export {
   hasPassportExtractionReviewPending,
   requiresPassportExtractionReviewBeforeAction,
@@ -140,7 +141,7 @@ function updateApplicantExtraction(
     state: PassportExtractionReviewState | undefined,
   ) => PassportExtractionReviewState,
 ): Submission {
-  return {
+  const updated: Submission = {
     ...submission,
     applicants: submission.applicants.map((applicant) =>
       applicant.id === applicantId
@@ -152,6 +153,13 @@ function updateApplicantExtraction(
     ),
     updatedAt: "сейчас",
   };
+  return bumpOpenIssueTargetRevisions(
+    updated,
+    (issue) =>
+      issue.target.applicantId === applicantId &&
+      issue.target.section === "Паспорт" &&
+      issue.target.field === "Распознанные данные паспорта",
+  );
 }
 
 export function passportExtractionEnabledFromEnv(env: {
@@ -337,8 +345,20 @@ export function markPassportExtractionReviewed(
   mode: "verified" | "dismissed",
 ): Submission {
   const timestamp = new Date().toISOString();
+  const changedApplicantIds = new Set(
+    submission.applicants
+      .filter((applicant) => {
+        const state = applicant.passportExtraction;
+        return Boolean(
+          state?.status === "ready" &&
+            !state.verifiedAtIso &&
+            !state.dismissedAtIso,
+        );
+      })
+      .map((applicant) => applicant.id),
+  );
 
-  return {
+  const updated: Submission = {
     ...submission,
     applicants: submission.applicants.map((applicant) => {
       const state = applicant.passportExtraction;
@@ -369,6 +389,13 @@ export function markPassportExtractionReviewed(
     ],
     updatedAt: "сейчас",
   };
+  return bumpOpenIssueTargetRevisions(
+    updated,
+    (issue) =>
+      changedApplicantIds.has(issue.target.applicantId) &&
+      issue.target.section === "Паспорт" &&
+      issue.target.field === "Распознанные данные паспорта",
+  );
 }
 
 export function confirmApplicantPassportReview(

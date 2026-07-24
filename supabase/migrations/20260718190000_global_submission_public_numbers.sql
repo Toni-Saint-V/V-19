@@ -1,3 +1,5 @@
+begin;
+
 create sequence if not exists public.submission_public_number_seq
   as bigint
   minvalue 1
@@ -10,6 +12,15 @@ alter table public.submissions
 
 alter sequence public.submission_public_number_seq
   owned by public.submissions.public_number;
+
+-- This migration can be promoted after the canonical agent mutation guard is
+-- already active. The backfill changes only the new immutable public number,
+-- but the row-wide guard cannot distinguish that maintenance write from an
+-- unauthenticated client update. Disable exactly that trigger transactionally;
+-- all lifecycle/status triggers remain enabled, and a failed migration rolls
+-- the trigger state back with the rest of the transaction.
+alter table public.submissions
+  disable trigger submissions_agent_mutation_guard;
 
 with candidates as (
   select
@@ -76,6 +87,9 @@ end;
 $$;
 
 alter table public.submissions
+  enable trigger submissions_agent_mutation_guard;
+
+alter table public.submissions
   alter column public_number set not null;
 
 alter table public.submissions
@@ -120,3 +134,5 @@ drop trigger if exists submissions_public_number_guard on public.submissions;
 create trigger submissions_public_number_guard
 before insert or update of public_number on public.submissions
 for each row execute function app_private.assign_submission_public_number();
+
+commit;

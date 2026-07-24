@@ -108,6 +108,7 @@ type RemarkContext = {
   checklistItemId?: string;
   checklistItemLabel?: string;
   field?: string;
+  fieldId?: string;
   fileType?: AdminReviewFileTarget;
   reason?: string;
   sectionId?: string;
@@ -606,6 +607,7 @@ export function AdminReviewDrawer({
     setRemarkContext({
       applicantId: selectedApplicant.id,
       field: row.label,
+      fieldId: row.field?.id,
       reason: `${row.label}: требуется уточнение`,
       sectionId: row.sectionId,
       sectionLabel: row.section,
@@ -632,11 +634,27 @@ export function AdminReviewDrawer({
 
   function openGeneralRemark() {
     if (!selectedApplicant) return;
+    const targetSection =
+      selectedApplicant.sections.find((section) =>
+        section.fields.some(
+          (field) => Boolean(field.error) || (field.required && !field.value.trim()),
+        ),
+      ) ?? selectedApplicant.sections[0];
+    const targetField =
+      targetSection?.fields.find((field) => Boolean(field.error)) ??
+      targetSection?.fields.find(
+        (field) => field.required && !field.value.trim(),
+      ) ??
+      targetSection?.fields[0];
+    if (!targetSection || !targetField) return;
     setRemarkContext({
       applicantId: selectedApplicant.id,
+      field: targetField.label,
+      fieldId: targetField.id,
       reason: "Требуется уточнение",
-      sectionLabel: "Анкета",
-      targetLabel: "Анкета",
+      sectionId: targetSection.id,
+      sectionLabel: targetSection.title,
+      targetLabel: targetField.label,
       targetType: "questionnaire",
     });
   }
@@ -2501,15 +2519,33 @@ function AdminRemarkForm({
 
   function submit() {
     if (!canSubmit) return;
+    const targetApplicant = submission.applicants.find(
+      (applicant) => applicant.id === applicantId,
+    );
+    const canonicalTarget = !selectedFileType
+      ? targetApplicant?.sections
+          .flatMap((section) =>
+            section.fields.map((candidate) => ({ candidate, section })),
+          )
+          .find(
+            ({ candidate, section }) =>
+              candidate.label === field.trim() &&
+              (!context.sectionLabel ||
+                section.id === context.sectionId ||
+                section.title === context.sectionLabel),
+          )
+      : undefined;
     onSubmit({
       applicantId,
       comment: internalComment.trim()
         ? `${comment.trim()}\n\nВнутренне: ${internalComment.trim()}`
         : comment.trim(),
       field: field.trim() || context.checklistItemLabel || undefined,
+      fieldId: canonicalTarget?.candidate.id,
       fileType: selectedFileType,
       reason: reason.trim(),
       section: selectedFileType ? "Файлы" : (context.sectionLabel ?? "Анкета"),
+      sectionId: canonicalTarget?.section.id,
       severity: severity === "high" ? "blocker" : "warning",
       type: selectedFileType ? "file" : targetType === "section" ? "section" : "field",
     });

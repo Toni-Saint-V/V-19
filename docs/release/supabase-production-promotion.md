@@ -80,6 +80,11 @@ Apply migrations only in the repository order declared by
 - `20260722001000_admin_submission_batch_concurrency.sql`
 - `20260722002000_access_request_review_claim.sql`
 - `20260722003000_atomic_return_package_artifact_upload.sql`
+- `20260724084304_allow_agent_ready_for_export_resubmission.sql`
+- `20260724132405_agent_correction_confirmation.sql`
+- `20260724221841_repair_out_of_order_submission_schema.sql`
+- `20260724234200_server_owned_correction_targets.sql`
+- `20260725003000_harden_correction_validation_topology.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 
@@ -89,6 +94,45 @@ Before any promotion, confirm the hosted API Settings expose only `public` and
 
 Run `npm run test:supabase-live` only against the allow-listed V-19 sandbox
 project. The smoke must stay sandbox-only and must not read app `.env` files.
+
+## Live Production Schema Preflight
+
+Immediately before a production client deploy, compare the live migration
+registry with `requiredRemoteMigrationOrder` and fail closed on any missing or
+out-of-order entry. Independently require both client-owned submission columns:
+
+```sql
+select column_name
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'submissions'
+  and column_name in ('public_number', 'case_revision');
+```
+
+Both rows are mandatory. A local migration-file check, successful bundle build,
+or successful `CREATE FUNCTION` is not evidence that the live composite row
+type contains the columns referenced by PL/pgSQL.
+
+The production activation gate must consume a fresh raw registry snapshot from
+the explicitly selected production project:
+
+```bash
+node scripts/verify-live-supabase-registry.mjs --print-query
+npm run verify:supabase-live-registry -- --artifact "$V19_TEST_ARTIFACTS_DIR/supabase-live-registry.json"
+V19_SUPABASE_LIVE_REGISTRY_ARTIFACT="$V19_TEST_ARTIFACTS_DIR/supabase-live-registry.json" npm run verify:full
+```
+
+Run the printed read-only query through the allow-listed Supabase connector or
+SQL editor for the checked-in production project. Store the resulting raw
+catalog facts outside the repository using format
+`v19.supabase-live-registry.v1`; add the connector-selected `projectRef`,
+collector timestamp, and hashes printed by
+`--print-query-metadata`. The gate rejects snapshots older than 15 minutes,
+wrong projects/query/contract hashes, missing or extra migration rows, unsafe
+public/private RPC grants and topology, absent columns, and disabled lifecycle
+triggers. `verify:full` is intentionally blocked unless the fresh artifact path
+is supplied through `V19_SUPABASE_LIVE_REGISTRY_ARTIFACT`. A checked-in
+packet or local constant comparison never substitutes for this live gate.
 
 ## Auth Security Advisor Gate
 
@@ -135,6 +179,71 @@ execution while denying anon/public execution, and verifies the helper remains
 SECURITY INVOKER with its fixed search path before the remediation transaction
 can commit. The global submission mutation trigger is not changed by either the
 forward migration or this remediation template.
+
+For `20260724084304_allow_agent_ready_for_export_resubmission.sql`, the exact
+forward-remediation template is
+`supabase/remediation/20260724084304_allow_agent_ready_for_export_resubmission.rollback.sql`.
+After any production apply, rollback must be a newly timestamped migration made
+from that template; never delete or edit applied migration history. The template
+restores both prior trigger-function bodies, removes the transaction-local
+accepted-resubmission exception, and leaves existing submission/media triggers
+and production data in place.
+
+For `20260724132405_agent_correction_confirmation.sql`, use
+`supabase/remediation/20260724132405_agent_correction_confirmation.rollback.sql`
+as the rollback template. The forward migration must be applied before clients
+send `client_contract_version: 2` with `expected_case_revision`; it adds
+monotonic correction target revisions, server timestamps, exact-set handoff
+validation, and stale-write rejection. This is the expand phase: unversioned
+legacy draft payloads remain temporarily accepted, but they cannot write
+confirmation/revision fields and correction handoff requires version 2.
+Therefore correction handoff promotion uses a mandatory mutation-maintenance
+gate: block agent writes in the production client/edge layer, wait until the
+in-flight mutation counter is zero and the maximum supported old-tab lifetime
+has expired, apply the migration, deploy the version-2 client, smoke-test one
+version-2 handoff, and only then reopen writes. Record the gate start/end,
+in-flight count, deployed asset id, and smoke submission id in the approval
+packet. A migration-first apply without this drain is `NO_GO`.
+
+After reopening writes, verify that server logs contain no
+`V19_LEGACY_DRAFT_CONTRACT` events for the observation window, then promote a
+separate contract migration that rejects version-1 draft saves. Do not combine
+that contract step with this migration-first release.
+
+The rollback template removes the new trigger/RPC enforcement behavior but
+intentionally retains `target_revision`, `agent_confirmed_at`, and
+`agent_confirmed_revision` plus their data and a `caseRevision`-compatible RPC
+response. Its version-2 save path still locks the submission and checks
+`expected_case_revision`; legacy writes are allowed only for the rolled-back
+client contract. Rollback uses the same mandatory mutation-maintenance gate:
+block writes, drain in-flight mutations, deploy the rollback client, promote
+the timestamped rollback migration, verify canonical readback, then reopen
+writes. Never drop these audit columns in an emergency rollback. Rollback must
+be promoted as a new timestamped migration and never by editing applied
+migration history.
+
+`20260724221841_repair_out_of_order_submission_schema.sql` is forward-only.
+Its remediation file deliberately keeps public numbers, case revisions, audit
+data, and the private dispatch boundary. Roll back the frontend to a compatible
+deployment if needed; never restore the recursive out-of-order function shape
+or drop durable identifiers.
+
+`20260724234200_server_owned_correction_targets.sql` is also forward-only. It
+replaces client-owned correction fingerprints with stable field identity,
+server-owned semantic target projections, and monotonic target revisions.
+Before promotion, every open field correction must resolve to exactly one
+persisted questionnaire answer. The migration blocks ambiguous targets. Its
+DB-side guard recomputes required/conditional BLS fields and formats from
+`questionnaire_answers`; it does not trust client `field.error` or
+`questionnaire_percent`. Keep the columns, projections, triggers, and Russian
+validation contract during frontend rollback.
+
+`20260725003000_harden_correction_validation_topology.sql` is forward-only. It
+extends the server projection with canonical `reviewState`, rejects empty
+required targets at confirmation time, requires the parent submission to be
+`returned` for agent correction writes, skips immutable closed legacy rows
+during target synchronization, and verifies the non-recursive private draft
+dispatcher chain. Never remove these guards during rollback.
 
 Production client activation requires:
 

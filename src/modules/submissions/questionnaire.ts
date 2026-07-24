@@ -8,6 +8,7 @@ import type {
   QuestionnaireStatus,
   Submission,
 } from "./types";
+import { bumpOpenIssueTargetRevisions } from "./correctionRevision";
 
 type FieldSeed = {
   id: string;
@@ -412,6 +413,18 @@ export function normalizeSubmissionQuestionnaire(submission: Submission): Submis
         sections: sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) => {
+            if (
+              field.id === "appointment-city" &&
+              !field.value.trim() &&
+              submission.city.trim()
+            ) {
+              return {
+                ...field,
+                error:
+                  field.error === "Обязательное поле" ? undefined : field.error,
+                value: submission.city,
+              };
+            }
             if (field.id === "visa-type") return { ...field, value: "Шенгенская" };
             if (field.id === "category") return { ...field, value: "Normal" };
             if (field.id === "nationality") {
@@ -451,6 +464,15 @@ export function updateQuestionnaireField(
   submission: Submission,
   update: QuestionnaireFieldUpdate,
 ): Submission {
+  const previousApplicant = submission.applicants.find(
+    (applicant) => applicant.id === update.applicantId,
+  );
+  const previousSection = previousApplicant?.sections.find((section) =>
+    sectionMatchesUpdate(section.id, update.sectionId),
+  );
+  const previousField = previousSection?.fields.find(
+    (field) => field.id === update.fieldId,
+  );
   const next = {
     ...submission,
     applicants: submission.applicants.map((applicant) => {
@@ -485,15 +507,7 @@ export function updateQuestionnaireField(
                       error:
                         update.error ??
                         validateQuestionnaireFieldValue(field, update.value) ??
-                        (update.value.trim() &&
-                        !hasOpenQuestionnaireFieldIssue(
-                          submission,
-                          update.applicantId,
-                          section.title,
-                          field,
-                        )
-                          ? undefined
-                          : field.error),
+                        (update.value === field.value ? field.error : undefined),
                     }
                   : field,
               ),
@@ -505,7 +519,39 @@ export function updateQuestionnaireField(
     updatedAt: "сейчас",
   };
 
-  return recalculateQuestionnaire(next);
+  const recalculated = recalculateQuestionnaire(next);
+  const nextField = recalculated.applicants
+    .find((applicant) => applicant.id === update.applicantId)
+    ?.sections.find((section) => sectionMatchesUpdate(section.id, update.sectionId))
+    ?.fields.find((field) => field.id === update.fieldId);
+  const targetChanged =
+    Boolean(previousField && nextField) &&
+    (previousField?.value !== nextField?.value ||
+      previousField?.reviewState !== nextField?.reviewState);
+
+  if (!targetChanged || !previousSection || !nextField) return recalculated;
+
+  return bumpOpenIssueTargetRevisions(recalculated, (issue) => {
+    if (issue.target.applicantId !== update.applicantId) return false;
+    if (issue.type === "section") {
+      if (issue.target.sectionId && issue.target.fieldId) {
+        return (
+          issue.target.sectionId === previousSection.id &&
+          issue.target.fieldId === nextField.id
+        );
+      }
+      return (
+        issue.target.section === previousSection.title ||
+        issue.target.field === previousSection.title
+      );
+    }
+    return questionnaireIssueMatchesField(
+      issue,
+      update.applicantId,
+      previousSection.title,
+      nextField,
+    );
+  });
 }
 
 function sectionMatchesUpdate(sectionId: string, updateSectionId: string) {

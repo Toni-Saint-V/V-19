@@ -11,6 +11,7 @@ import {
   applyExportStateToSelection,
   applyActionToSubmissionListResult,
 } from "./modules/submissions/submissionActions";
+import { SubmissionActionDomainError } from "./modules/submissions/submissionActionErrors";
 import {
   acceptAiSuggestionAsIssue,
   dismissAiSuggestion,
@@ -30,6 +31,7 @@ import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submission
 import {
   ensureSubmissionPublicNumber,
   isAdminSubmissionConcurrencyConflict,
+  isSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
   saveAdminCockpitSubmissionsIfCurrent,
   saveCockpitSubmissionsForProfile,
@@ -61,6 +63,7 @@ import {
   completeSupabaseInvitePasswordSetup,
   getPendingSupabaseInvitePasswordSetup,
 } from "./services/supabaseInviteFlow";
+import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
 import { completeSupabasePasswordRecovery } from "./services/supabasePasswordRecovery";
 import { fetchCurrentProfile } from "./services/profileService";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
@@ -537,10 +540,10 @@ export default function App({
     } catch (error) {
       if (!isCurrentResponse()) return;
       setWorkspaceDataState({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Не удалось загрузить данные Supabase.",
+        error: formatPersistenceFailureForUser(
+          error,
+          "Не удалось загрузить данные. Обновите страницу и повторите действие.",
+        ),
         sessionUserId: sessionToken.userId,
         status: "error",
       });
@@ -806,21 +809,28 @@ export default function App({
                 currentCaseRevisions,
               )
             : null;
-        const nextOwnerIds = adminSaveResult
-          ? adminSaveResult.ownerIdsBySubmissionId
+        const agentSaveResult = adminSaveResult
+          ? null
           : await saveCockpitSubmissionsForProfile(
               persistenceProfile,
               changedSubmissions,
               currentOwnerIds,
+              currentCaseRevisions,
             );
+        const nextOwnerIds =
+          adminSaveResult?.ownerIdsBySubmissionId ??
+          agentSaveResult?.ownerIdsBySubmissionId ??
+          currentOwnerIds;
         fence.assertCurrent();
 
         workspaceRefreshRequestRef.current += 1;
         submissionsRef.current = nextSubmissions;
         setSubmissions(nextSubmissions);
-        if (adminSaveResult) {
-          caseRevisionsBySubmissionIdRef.current =
-            adminSaveResult.caseRevisionsBySubmissionId;
+        const nextCaseRevisions =
+          adminSaveResult?.caseRevisionsBySubmissionId ??
+          agentSaveResult?.caseRevisionsBySubmissionId;
+        if (nextCaseRevisions) {
+          caseRevisionsBySubmissionIdRef.current = nextCaseRevisions;
         }
         ownerIdsBySubmissionIdRef.current = nextOwnerIds;
         setOwnerIdsBySubmissionId(nextOwnerIds);
@@ -830,14 +840,27 @@ export default function App({
           status: workspaceDataStatusForCount(nextSubmissions.length),
         });
         mutationSucceeded = true;
-        return adminSaveResult?.caseRevisionsBySubmissionId;
+        return nextCaseRevisions;
       } catch (error) {
         if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
-          const errorMessage = isAdminSubmissionConcurrencyConflict(error)
-            ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
-            : error instanceof Error
-              ? error.message
-              : "Не удалось сохранить данные Supabase.";
+          const concurrencyConflict = isSubmissionConcurrencyConflict(error);
+          let conflictRefreshSucceeded = false;
+          if (concurrencyConflict) {
+            try {
+              await runCanonicalSubmissionsRefresh(true);
+              conflictRefreshSucceeded = true;
+            } catch {
+              conflictRefreshSucceeded = false;
+            }
+          }
+          const errorMessage = concurrencyConflict
+            ? conflictRefreshSucceeded
+              ? "Подача изменилась в другом окне. Загружена актуальная версия; повторите действие."
+              : "Подача изменилась в другом окне. Обновите подачу и повторите действие."
+            : formatPersistenceFailureForUser(
+                error,
+                "Не удалось сохранить данные. Обновите страницу и повторите действие.",
+              );
           setWorkspaceDataState({
             error: errorMessage,
             sessionUserId: sessionToken.userId,
@@ -867,6 +890,7 @@ export default function App({
       createWorkspaceMutationFence,
       localDemoEnabled,
       refreshCanonicalSubmissions,
+      runCanonicalSubmissionsRefresh,
       supabaseEnabled,
       supabaseProfile,
     ],
@@ -1332,7 +1356,7 @@ export default function App({
             source,
             session.userId,
           );
-          if (!result.ok) throw new Error(result.error.message);
+          if (!result.ok) throw new SubmissionActionDomainError(result.error);
           await persistSubmissions(result.data, fence);
         });
       } catch (caught) {
@@ -1346,7 +1370,13 @@ export default function App({
           workspaceSessionUserIdRef.current === session.userId
         ) {
           setWorkspaceDataState({
-            error: error.message,
+            error:
+              error instanceof SubmissionActionDomainError
+                ? error.message
+                : formatPersistenceFailureForUser(
+                    error,
+                    "Не удалось изменить подачу. Обновите страницу и повторите действие.",
+                  ),
             sessionUserId: session.userId,
             status: "error",
           });
@@ -1402,7 +1432,7 @@ export default function App({
           setWorkspaceDataState({
             error: isAdminSubmissionConcurrencyConflict(error)
               ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
-              : error.message,
+              : formatPersistenceFailureForUser(error, error.message),
             sessionUserId: session.userId,
             status: "error",
           });

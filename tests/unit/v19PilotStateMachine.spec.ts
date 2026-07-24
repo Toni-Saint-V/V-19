@@ -18,6 +18,7 @@ import {
   applySubmissionActionResult,
   canPerformAction,
 } from "../../src/modules/submissions/status";
+import { updateQuestionnaireField } from "../../src/modules/submissions/submissionActions";
 import type {
   CommandResult,
   IssueInput,
@@ -27,6 +28,7 @@ import {
   adminAcceptRequiredMediaForTest,
   adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
 } from "./helpers/questionnaireTestFill";
 
 function byId(id: string): Submission {
@@ -53,13 +55,20 @@ function canonicalMediaSubmission(submission: Submission): Submission {
 }
 
 function readyInProgressSubmission(): Submission {
-  const ready = fillRequiredQuestionnaireForTest(
-    canonicalMediaSubmission(byId("ПД-1056")),
+  const source = {
+    ...canonicalMediaSubmission(byId("ПД-1056")),
+    id: "ПД-PILOT-READY",
+  };
+  const ready = adminAcceptRequiredMediaForTest(
+    withCanonicalPrivateMediaIdentityForTest(
+      fillRequiredQuestionnaireForTest(
+        source,
+      ),
+    ),
   );
 
   return {
     ...ready,
-    id: "ПД-PILOT-READY",
     files: ready.files.map((file) => ({
       ...file,
       status: "uploaded",
@@ -88,18 +97,17 @@ function changeRouteIssueTarget(
   submission: Submission,
   value = "Madrid, Barcelona, Madrid",
 ): Submission {
-  return {
-    ...submission,
-    applicants: submission.applicants.map((applicant) => ({
-      ...applicant,
-      sections: applicant.sections.map((section) => ({
-        ...section,
-        fields: section.fields.map((field) =>
-          field.id === "first-entry-country" ? { ...field, value } : field,
-        ),
-      })),
-    })),
-  };
+  const applicant = submission.applicants[0];
+  const section = applicant?.sections.find((candidate) =>
+    candidate.fields.some((field) => field.id === "first-entry-country"),
+  );
+  if (!applicant || !section) return submission;
+  return updateQuestionnaireField(submission, {
+    applicantId: applicant.id,
+    fieldId: "first-entry-country",
+    sectionId: section.id,
+    value,
+  });
 }
 
 describe("V-19 pilot click logic state machine", () => {
@@ -131,7 +139,7 @@ describe("V-19 pilot click logic state machine", () => {
       ok: false,
       error: {
         code: "INVALID_SUBMISSION_KIND",
-        message: "Submission type must be single or family.",
+        message: "Выберите индивидуальную или семейную подачу.",
       },
     });
   });
@@ -154,14 +162,14 @@ describe("V-19 pilot click logic state machine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Questionnaire and files must be complete.",
+        message: "Заполните обязательные поля анкеты и загрузите все нужные файлы.",
       },
     });
     expect(submitForReview(missingTripDates, "agent")).toEqual({
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Trip dates must be complete.",
+        message: "Укажите даты начала и окончания поездки.",
       },
     });
 
@@ -187,13 +195,14 @@ describe("V-19 pilot click logic state machine", () => {
       action: "submit_corrections",
       disabled: true,
       label: "Отправить исправления",
-      reason: "Сначала отметьте замечания исправленными",
+      reason: "Сохраните исправления по всем замечаниям",
     });
     expect(resubmitCorrections(returned, "agent")).toEqual({
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Open issues must be fixed before resubmission.",
+        message:
+          "Сохраните все открытые исправления — после этого подача отправится автоматически.",
       },
     });
 
@@ -201,13 +210,14 @@ describe("V-19 pilot click logic state machine", () => {
       markIssueFixed(changeRouteIssueTarget(returned), "agent", issueId),
     );
     expect(fixed.issues[0]?.status).toBe("fixed_by_agent");
-    const resubmitted = unwrap(resubmitCorrections(fixed, "agent"));
+    expect(fixed.status).toBe("corrections_received");
+    const resubmitted = fixed;
     expect(resubmitted.status).toBe("corrections_received");
     expect(acceptSubmission(resubmitted, "admin")).toEqual({
       ok: false,
       error: {
         code: "ACCEPTANCE_BLOCKED",
-        message: "Acceptance is blocked until all issues are closed by admin.",
+        message: "Сначала закройте все замечания, затем примите подачу.",
       },
     });
 
@@ -243,7 +253,7 @@ describe("V-19 pilot click logic state machine", () => {
       ok: false,
       error: {
         code: "PERMISSION_DENIED",
-        message: "Only admin can generate export.",
+        message: "Сформировать выгрузку может только администратор.",
       },
     });
 
@@ -258,8 +268,7 @@ describe("V-19 pilot click logic state machine", () => {
       ok: false,
       error: {
         code: "EXPORT_NOT_READY",
-        message:
-          "Submission must have a downloaded export package before marking exported.",
+        message: "Сначала сформируйте и скачайте пакет выгрузки.",
       },
     });
 

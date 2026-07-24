@@ -1095,9 +1095,9 @@ test.describe("Supabase sandbox auth smoke", () => {
         `Agent correction draft save must succeed: ${agentDraftSaveResponse.status()}: ${agentDraftSaveBody}`,
       ).toBe(true);
       await expect(
-        page.getByRole("button", { name: "Пометить исправленным" }),
+        page.getByRole("button", { name: "Сохранить исправление" }),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Пометить исправленным" }).click();
+      await page.getByRole("button", { name: "Сохранить исправление" }).click();
       await expect(
         page.getByText("Исправление по полю «Страна первого въезда»", {
           exact: false,

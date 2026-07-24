@@ -3,7 +3,15 @@ import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { AppProfile } from "../../src/types/session";
 import type { Json } from "../../src/lib/supabase/database.types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
+import {
+  createDraftSubmission,
+  uploadRequiredFiles,
+} from "../../src/modules/submissions/submissionActions";
+import {
+  fillRequiredQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
+} from "./helpers/questionnaireTestFill";
 
 const mockState = vi.hoisted(() => ({
   applicantRows: [] as unknown[],
@@ -116,7 +124,12 @@ vi.mock("../../src/lib/supabase/client", () => {
       },
       rpc: (name: string, args: Record<string, unknown>) => {
         mockState.rpcCalls.push({ args, name });
-        return Promise.resolve(mockState.rpcResults.shift() ?? { error: null });
+        return Promise.resolve(
+          mockState.rpcResults.shift() ?? {
+            data: { caseRevision: mockState.rpcCalls.length },
+            error: null,
+          },
+        );
       },
     }),
   };
@@ -135,6 +148,7 @@ import {
   cockpitSubmissionFingerprintMap,
   ensureSubmissionPublicNumber,
   isAdminSubmissionConcurrencyConflict,
+  isSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
   readCockpitSnapshot,
   reviewHandoffPersistenceIssues,
@@ -183,6 +197,68 @@ function rpcNames() {
 
 function draftPayload(submission: Submission) {
   return toCockpitDraftPersistencePayload(submission, agentProfile.id, agentProfile.id);
+}
+
+function correctionHandoffFixture(): Submission {
+  const ready = withCanonicalPrivateMediaIdentityForTest(
+    uploadRequiredFiles(
+      fillRequiredQuestionnaireForTest(
+        createDraftSubmission({
+          applicantNames: ["Иван Иванов"],
+          city: "Москва",
+          familyCount: 1,
+          idScheme: "supabase",
+          submissions: [],
+          type: "single",
+        }),
+      ),
+    ),
+  );
+  const applicant = ready.applicants[0];
+  if (!applicant) throw new Error("Missing correction fixture applicant");
+
+  return {
+    ...ready,
+    agentId: agentProfile.id,
+    status: "corrections_received",
+    updatedAt: "2026-07-16T12:30:00.000Z",
+    issues: [
+      {
+        id: "issue-correction-handoff",
+        type: "field",
+        targetRevision: 1,
+        agentConfirmation: {
+          confirmedAtIso: "2026-07-16T12:25:00.000Z",
+          targetRevision: 1,
+        },
+        target: {
+          applicantId: applicant.id,
+          applicantName: applicant.fullName,
+          field: "Маршрут поездки",
+          fieldId: "route",
+          section: "Анкета",
+          sectionId: "trip",
+        },
+        reason: "Уточните маршрут",
+        comment: "Добавьте города.",
+        severity: "blocker",
+        status: "fixed_by_agent",
+        createdBy: "admin",
+        createdAt: "2026-07-16T12:00:00.000Z",
+      },
+    ],
+    history: [
+      {
+        id: "history-correction-handoff",
+        text: "Агент отправил исправления",
+        at: "2026-07-16T12:25:00.000Z",
+        fromStatus: "returned",
+        source: "agent",
+        toStatus: "corrections_received",
+      },
+      ...ready.history,
+    ],
+  };
 }
 
 beforeEach(() => {
@@ -451,7 +527,39 @@ describe("V-19 Supabase cockpit persistence", () => {
     });
   });
 
-  it("retries a transient idempotent draft save once", async () => {
+  it("persists the canonical submission city in the appointment questionnaire answer", async () => {
+    const submission = {
+      ...normalizeSubmissionQuestionnaire(
+        createDraftSubmission({
+          city: "Казань",
+          familyCount: 1,
+          submissions: [],
+          type: "single",
+        }),
+      ),
+      agentId: agentProfile.id,
+    };
+
+    await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [submission],
+      new Map(),
+    );
+
+    const payload = mockState.rpcCalls[0]?.args
+      .payload as ReturnType<typeof toCockpitDraftPersistencePayload>;
+    expect(mockState.rpcCalls[0]?.name).toBe("save_submission_draft");
+    expect(
+      payload.questionnaire_answers?.find(
+        (answer) => answer.field_id === "appointment-city",
+      ),
+    ).toMatchObject({
+      value: "Казань",
+      updated_by: agentProfile.id,
+    });
+  });
+
+  it("does not blindly retry an agent snapshot after a lost response", async () => {
     const changedSubmission = {
       ...(initialSubmissions[0] as Submission),
       title: "Повторяемая отправка",
@@ -463,19 +571,354 @@ describe("V-19 Supabase cockpit persistence", () => {
           name: "FetchError",
         },
       },
-      { error: null },
     ];
 
-    await saveCockpitSubmissionsForProfile(
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [changedSubmission],
+        new Map(),
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        operation: "rpc.save_submission_draft",
+        retryable: true,
+      },
+    });
+
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+  });
+
+  it("reconciles a committed intermediate issue confirmation after a lost response", async () => {
+    const handoff = correctionHandoffFixture();
+    const confirmedIssue = handoff.issues[0] as Submission["issues"][number];
+    const intermediateConfirmation: Submission = {
+      ...handoff,
+      status: "returned",
+      issues: [
+        { ...confirmedIssue, status: "open" },
+        {
+          ...confirmedIssue,
+          id: "issue-still-open",
+          agentConfirmation: undefined,
+          status: "open",
+        },
+      ],
+    };
+    const ownerIds = new Map([[intermediateConfirmation.id, agentProfile.id]]);
+    const staleRevisions = new Map([[intermediateConfirmation.id, 7]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[intermediateConfirmation.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [intermediateConfirmation],
+    }));
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+    ];
+
+    const saved = await saveCockpitSubmissionsForProfile(
       agentProfile,
-      [changedSubmission],
-      new Map(),
+      [intermediateConfirmation],
+      ownerIds,
+      staleRevisions,
+      canonicalLoader,
     );
 
-    expect(rpcNames()).toEqual([
-      "save_submission_draft",
-      "save_submission_draft",
-    ]);
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(canonicalLoader).toHaveBeenCalledOnce();
+    expect(saved.caseRevisionsBySubmissionId.get(intermediateConfirmation.id)).toBe(
+      8,
+    );
+  });
+
+  it("does not mistake another tab's different corrected value for a committed save", async () => {
+    const handoff = correctionHandoffFixture();
+    const confirmedIssue = handoff.issues[0] as Submission["issues"][number];
+    const intended: Submission = {
+      ...handoff,
+      status: "returned",
+      issues: [{ ...confirmedIssue, status: "open" }],
+    };
+    const committedByOtherTab: Submission = {
+      ...intended,
+      applicants: intended.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "first-entry-country"
+              ? { ...field, value: "Барселона" }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const ownerIds = new Map([[intended.id, agentProfile.id]]);
+    const staleRevisions = new Map([[intended.id, 7]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[intended.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [committedByOtherTab],
+    }));
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+    ];
+
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [intended],
+        ownerIds,
+        staleRevisions,
+        canonicalLoader,
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        operation: "rpc.save_submission_draft",
+        retryable: true,
+      },
+    });
+
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(canonicalLoader).toHaveBeenCalledOnce();
+  });
+
+  it("does not mistake another tab's different review source for a committed save", async () => {
+    const handoff = correctionHandoffFixture();
+    const confirmedIssue = handoff.issues[0] as Submission["issues"][number];
+    const intended: Submission = {
+      ...handoff,
+      status: "returned",
+      issues: [{ ...confirmedIssue, status: "open" }],
+      applicants: handoff.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "first-entry-country"
+              ? { ...field, reviewSource: "manual" }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const committedByOtherTab: Submission = {
+      ...intended,
+      applicants: intended.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "first-entry-country"
+              ? { ...field, reviewSource: "passport_ocr" }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const ownerIds = new Map([[intended.id, agentProfile.id]]);
+    const staleRevisions = new Map([[intended.id, 7]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[intended.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [committedByOtherTab],
+    }));
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+    ];
+
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [intended],
+        ownerIds,
+        staleRevisions,
+        canonicalLoader,
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        operation: "rpc.save_submission_draft",
+        retryable: true,
+      },
+    });
+
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(canonicalLoader).toHaveBeenCalledOnce();
+  });
+
+  it("does not mistake another tab's different review provenance for a committed save", async () => {
+    const handoff = correctionHandoffFixture();
+    const confirmedIssue = handoff.issues[0] as Submission["issues"][number];
+    const intended: Submission = {
+      ...handoff,
+      status: "returned",
+      issues: [{ ...confirmedIssue, status: "open" }],
+      applicants: handoff.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "first-entry-country"
+              ? {
+                  ...field,
+                  reviewConfirmedBy: "agent-tab-a",
+                  reviewOriginSource: "manual",
+                  reviewSource: "manual",
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const committedByOtherTab: Submission = {
+      ...intended,
+      applicants: intended.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "first-entry-country"
+              ? {
+                  ...field,
+                  reviewConfirmedBy: "agent-tab-b",
+                  reviewOriginSource: "passport_ocr",
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const ownerIds = new Map([[intended.id, agentProfile.id]]);
+    const staleRevisions = new Map([[intended.id, 7]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[intended.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [committedByOtherTab],
+    }));
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+    ];
+
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [intended],
+        ownerIds,
+        staleRevisions,
+        canonicalLoader,
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        operation: "rpc.save_submission_draft",
+        retryable: true,
+      },
+    });
+
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(canonicalLoader).toHaveBeenCalledOnce();
+  });
+
+  it("does not mistake another tab's incomplete section for a committed save", async () => {
+    const handoff = correctionHandoffFixture();
+    const confirmedIssue = handoff.issues[0] as Submission["issues"][number];
+    const targetSection = handoff.applicants[0]?.sections.find((section) =>
+      section.fields.some((field) => field.id === "first-entry-country"),
+    );
+    if (!targetSection) throw new Error("Missing target section");
+    const intended: Submission = {
+      ...handoff,
+      status: "returned",
+      issues: [
+        {
+          ...confirmedIssue,
+          type: "section",
+          status: "open",
+          target: {
+            ...confirmedIssue.target,
+            field: targetSection.title,
+            section: targetSection.title,
+          },
+        },
+      ],
+    };
+    const committedByOtherTab: Submission = {
+      ...intended,
+      applicants: intended.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) =>
+          section.id === targetSection.id
+            ? {
+                ...section,
+                missing: "Заполните обязательные поля",
+                status: "partial",
+              }
+            : section,
+        ),
+      })),
+    };
+    const ownerIds = new Map([[intended.id, agentProfile.id]]);
+    const staleRevisions = new Map([[intended.id, 7]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[intended.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [committedByOtherTab],
+    }));
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+    ];
+
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [intended],
+        ownerIds,
+        staleRevisions,
+        canonicalLoader,
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        operation: "rpc.save_submission_draft",
+        retryable: true,
+      },
+    });
+
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(canonicalLoader).toHaveBeenCalledOnce();
   });
 
   it("writes separate trip date range columns while keeping legacy travel_date", () => {
@@ -580,39 +1023,9 @@ describe("V-19 Supabase cockpit persistence", () => {
   });
 
   it("uses one atomic RPC when submitting fixed corrections for review", async () => {
-    const returnedSubmission = initialSubmissions.find(
-      (submission) => submission.status === "returned",
-    ) as Submission;
     const correctedSubmission: Submission = {
-      ...returnedSubmission,
+      ...correctionHandoffFixture(),
       updatedAt: "сейчас",
-      status: "corrections_received",
-      issues: returnedSubmission.issues.map((issue) =>
-        issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
-      ),
-      files: returnedSubmission.files.map((file) =>
-        file.linkedIssueId
-          ? {
-              ...file,
-              reviewStatus: "accepted",
-              status: "accepted",
-              storageBucket: "visa-documents",
-              storagePath: `submissions/${returnedSubmission.id}/${file.id}`,
-              uploadedAtIso: "2026-06-27T10:00:00.000Z",
-            }
-          : file,
-      ),
-      history: [
-        {
-          id: "и-corrections-handoff",
-          text: "Агент отправил исправления",
-          at: "сейчас",
-          fromStatus: "returned",
-          source: "agent",
-          toStatus: "corrections_received",
-        },
-        ...returnedSubmission.history,
-      ],
     };
 
     await saveCockpitSubmissionsForProfile(
@@ -622,51 +1035,102 @@ describe("V-19 Supabase cockpit persistence", () => {
     );
 
     expect(rpcNames()).toEqual(["submit_corrections_handoff"]);
+    const handoffPayload = mockState.rpcCalls.find(
+      (call) => call.name === "submit_corrections_handoff",
+    )?.args.payload as {
+      corrections: Array<{
+        agent_confirmed_at: string | null;
+        agent_confirmed_revision: number | null;
+      }>;
+      submission: { status: string };
+    };
+    expect(handoffPayload.submission.status).toBe("waiting_review");
     expect(
-      (
-        mockState.rpcCalls.find((call) => call.name === "submit_corrections_handoff")
-          ?.args.payload as {
-          submission: { status: string };
-        }
-    ).submission.status,
-    ).toBe("waiting_review");
+      (mockState.rpcCalls[0]?.args.payload as {
+        client_contract_version?: number;
+      }).client_contract_version,
+    ).toBe(2);
+    expect(handoffPayload.corrections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          agent_confirmed_at: "2026-07-16T12:25:00.000Z",
+          agent_confirmed_revision: expect.any(Number),
+          target_field_id: "route",
+          target_section_id: "trip",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps a historical closed issue stable during the next correction handoff", async () => {
+    const current = correctionHandoffFixture();
+    const historicalFixedAt = "2026-07-15T09:00:00.000Z";
+    const withHistoricalClosedIssue: Submission = {
+      ...current,
+      issues: [
+        {
+          ...(current.issues[0] as Submission["issues"][number]),
+          id: "historical-closed-issue",
+          fixedAtIso: historicalFixedAt,
+          status: "closed_by_admin",
+        },
+        ...(current.issues ?? []),
+      ],
+    };
+
+    mockState.rpcResults = [{ data: { caseRevision: 8 }, error: null }];
+    await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [withHistoricalClosedIssue],
+      new Map([[withHistoricalClosedIssue.id, agentProfile.id]]),
+      new Map([[withHistoricalClosedIssue.id, 7]]),
+    );
+
+    expect(rpcNames()).toEqual(["submit_corrections_handoff"]);
+    const repeatedPayload = mockState.rpcCalls[0]?.args
+      .payload as ReturnType<typeof draftPayload>;
+    const historicalCorrection = repeatedPayload.corrections.find(
+      (correction) => correction.fixed_at === historicalFixedAt,
+    );
+    expect(historicalCorrection?.fixed_at).toBe(historicalFixedAt);
+    expect(historicalCorrection?.created_by).toBe(agentProfile.id);
+  });
+
+  it("reconciles a committed correction handoff after the RPC response is lost", async () => {
+    const correctedSubmission = correctionHandoffFixture();
+    const ownerIds = new Map([[correctedSubmission.id, agentProfile.id]]);
+    const staleRevisions = new Map([[correctedSubmission.id, 7]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[correctedSubmission.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [correctedSubmission],
+    }));
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+    ];
+
+    const saved = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [correctedSubmission],
+      ownerIds,
+      staleRevisions,
+      canonicalLoader,
+    );
+
+    expect(rpcNames()).toEqual(["submit_corrections_handoff"]);
+    expect(canonicalLoader).toHaveBeenCalledOnce();
+    expect(saved.caseRevisionsBySubmissionId.get(correctedSubmission.id)).toBe(8);
   });
 
   it("uses the draft RPC when an admin reviews an existing correction handoff", async () => {
-    const returnedSubmission = initialSubmissions.find(
-      (submission) => submission.status === "returned",
-    ) as Submission;
-    const handedOffSubmission: Submission = {
-      ...returnedSubmission,
-      updatedAt: "2026-07-16T12:30:00.000Z",
-      status: "corrections_received",
-      issues: returnedSubmission.issues.map((issue) =>
-        issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
-      ),
-      files: returnedSubmission.files.map((file) =>
-        file.linkedIssueId
-          ? {
-              ...file,
-              reviewStatus: "accepted",
-              status: "accepted",
-              storageBucket: "visa-documents",
-              storagePath: `submissions/${returnedSubmission.id}/${file.id}`,
-              uploadedAtIso: "2026-06-27T10:00:00.000Z",
-            }
-          : file,
-      ),
-      history: [
-        {
-          id: "и-existing-corrections-handoff",
-          text: "Агент отправил исправления",
-          at: "2026-07-16T12:25:00.000Z",
-          fromStatus: "returned",
-          source: "agent",
-          toStatus: "corrections_received",
-        },
-        ...returnedSubmission.history,
-      ],
-    };
+    const handedOffSubmission = correctionHandoffFixture();
     const operationId = "00000000-0000-4000-8000-000000000881";
     vi.spyOn(crypto, "randomUUID").mockReturnValue(operationId);
     mockState.rpcResults = [
@@ -2377,6 +2841,79 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(isAdminSubmissionConcurrencyConflict(conflict)).toBe(true);
     expect(mockState.rpcCalls).toHaveLength(1);
+  });
+
+  it("rejects stale confirmations from a second agent tab with the same revision", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const tabSubmission = (confirmedAtIso: string): Submission => ({
+      ...submission,
+      issues: submission.issues.map((issue, index) =>
+        index === 0
+          ? {
+              ...issue,
+              agentConfirmation: {
+                confirmedAtIso,
+                targetRevision: issue.targetRevision ?? 0,
+              },
+            }
+          : issue,
+      ),
+    });
+    const ownerIds = new Map([[submission.id, agentProfile.id]]);
+    const staleRevision = new Map([[submission.id, 7]]);
+    mockState.rpcResults = [
+      {
+        data: { caseRevision: 8 },
+        error: null,
+      },
+      {
+        data: null,
+        error: {
+          code: "40001",
+          message: "V19_AGENT_SUBMISSION_CONFLICT",
+        },
+      },
+    ];
+
+    const firstTab = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [tabSubmission("2026-07-24T12:00:00.000Z")],
+      ownerIds,
+      staleRevision,
+    );
+    const secondTabConflict = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [tabSubmission("2026-07-24T12:00:01.000Z")],
+      ownerIds,
+      staleRevision,
+    ).catch((error: unknown) => error);
+
+    expect(firstTab.caseRevisionsBySubmissionId.get(submission.id)).toBe(8);
+    expect(isSubmissionConcurrencyConflict(secondTabConflict)).toBe(true);
+    expect(mockState.rpcCalls).toHaveLength(2);
+    expect(
+      (mockState.rpcCalls[0]?.args.payload as {
+        expected_case_revision?: number;
+      }).expected_case_revision,
+    ).toBe(7);
+    expect(
+      (mockState.rpcCalls[1]?.args.payload as {
+        expected_case_revision?: number;
+      }).expected_case_revision,
+    ).toBe(7);
+    expect(
+      (
+        mockState.rpcCalls[0]?.args.payload as {
+          corrections: Array<{ agent_confirmed_at: string | null }>;
+        }
+      ).corrections[0]?.agent_confirmed_at,
+    ).not.toBe(
+      (
+        mockState.rpcCalls[1]?.args.payload as {
+          corrections: Array<{ agent_confirmed_at: string | null }>;
+        }
+      ).corrections[0]?.agent_confirmed_at,
+    );
   });
 
   it("retries a lost admin CAS response once with the same durable operation id", async () => {

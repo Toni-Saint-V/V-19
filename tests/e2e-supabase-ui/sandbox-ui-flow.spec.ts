@@ -1466,7 +1466,7 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
       `Исправьте данные ${runId} и отправьте повторно.`,
     );
     await expect(
-      blocker.getByRole("button", { name: "Пометить исправленным" }),
+      blocker.getByRole("button", { name: "Сохранить исправление" }),
     ).toBeVisible();
     await assertNoOverflow(page);
     await captureUiEvidence({

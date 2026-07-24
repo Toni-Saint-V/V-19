@@ -338,17 +338,25 @@ export type QuestionnaireSection = {
 export type Issue = {
   id: string;
   type: "field" | "section" | "file" | "media";
+  agentConfirmation?: {
+    confirmedAtIso: string;
+    targetRevision: number;
+  };
+  targetRevision?: number;
   target: {
     applicantId: string;
     applicantName: string;
     section?: string;
+    sectionId?: string;
     field?: string;
+    fieldId?: string;
     fileType?: SubmissionFileType;
   };
   reason: string;
   comment: string;
   severity: IssueSeverity;
   status: IssueStatus;
+  fixedAtIso?: string;
   createdBy: "admin" | "system";
   createdAt: string;
   snapshot?: string;
@@ -360,7 +368,9 @@ export type IssueInput = {
   type: Issue["type"];
   applicantId: string;
   section?: string;
+  sectionId?: string;
   field?: string;
+  fieldId?: string;
   fileType?: SubmissionFileType;
   reason: string;
   comment: string;
@@ -374,7 +384,9 @@ export type AiSuggestion = {
     applicantId: string;
     applicantName: string;
     section?: string;
+    sectionId?: string;
     field?: string;
+    fieldId?: string;
     fileType?: SubmissionFileType;
   };
   title: string;

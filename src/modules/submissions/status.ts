@@ -15,7 +15,9 @@ import {
   clearOpenQuestionnaireIssueErrors,
   clearQuestionnaireIssueError,
   questionnaireFieldMatchesTarget,
+  validateQuestionnaireFieldValue,
 } from "./questionnaire";
+import { currentIssueTargetRevision } from "./correctionRevision";
 import { applicantFileStatusForFiles } from "./fileAsset";
 import {
   passportGateIssues,
@@ -40,6 +42,7 @@ import {
 } from "./passportReviewContract";
 import {
   blsApplicantQuestionnaireStatus,
+  blsQuestionnaireFieldValidationMessage,
   blsQuestionnaireReadiness,
   isBlsQuestionnaireFileReady,
 } from "./questionnaireBlsRules";
@@ -844,11 +847,30 @@ function validateSubmissionActionPolicy(
     action === "submit_corrections" &&
     fixedIssueCount(submission) === 0
   ) {
-    return { ok: false, reason: "Сначала отметьте замечания исправленными" };
+    return { ok: false, reason: "Сохраните исправления по всем замечаниям" };
   }
 
   if (action === "submit_corrections" && openIssueCount(submission) > 0) {
-    return { ok: false, reason: "Сначала отметьте замечания исправленными" };
+    return { ok: false, reason: "Сохраните исправления по всем замечаниям" };
+  }
+
+  if (action === "submit_corrections" && hasMissingRequiredWork(submission)) {
+    return {
+      ok: false,
+      reason: "Заполните анкету и загрузите все обязательные файлы",
+    };
+  }
+
+  if (
+    action === "submit_corrections" &&
+    !canonicalRequiredMediaReadiness(submission, {
+      requireStorageIdentity: true,
+    }).ok
+  ) {
+    return {
+      ok: false,
+      reason: "Медиапакет не готов. Дождитесь загрузки всех обязательных файлов",
+    };
   }
 
   if (action === "return_with_issues" && !canAdminReturnSubmission(submission)) {
@@ -991,7 +1013,7 @@ export function transitionSubmissionStatus(
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Submission status is not canonical.",
+        message: "Статус подачи не распознан. Обновите данные и повторите.",
       },
     };
   }
@@ -1000,14 +1022,17 @@ export function transitionSubmissionStatus(
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Target status is not canonical.",
+        message: "Новый статус подачи не распознан. Обновите данные и повторите.",
       },
     };
   }
   if (submission.status === "exported") {
     return {
       ok: false,
-      error: { code: "EXPORTED_TERMINAL", message: "Exported is terminal for V-19." },
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Подача уже выгружена, поэтому изменить её статус нельзя.",
+      },
     };
   }
   const statusTransitionAllowed = isStatusTransitionAllowed(
@@ -1140,13 +1165,30 @@ export function markSubmissionIssueFixedResult(
   submission: Submission,
   issueId: string,
   role: Role,
+  nowIso = new Date().toISOString(),
+): CommandResult<Submission> {
+  return confirmAgentCorrectionResult(
+    submission,
+    issueId,
+    role,
+    undefined,
+    nowIso,
+  );
+}
+
+export function confirmAgentCorrectionResult(
+  submission: Submission,
+  issueId: string,
+  role: Role,
+  actorId?: string,
+  nowIso = new Date().toISOString(),
 ): CommandResult<Submission> {
   if (role !== "agent") {
     return {
       ok: false,
       error: {
         code: "PERMISSION_DENIED",
-        message: "Only agent can mark issue fixed.",
+        message: "Сохранить исправление может только назначенный агент.",
       },
     };
   }
@@ -1155,7 +1197,7 @@ export function markSubmissionIssueFixedResult(
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Submission status is not canonical.",
+        message: "Статус подачи не распознан. Обновите данные и повторите.",
       },
     };
   }
@@ -1164,7 +1206,7 @@ export function markSubmissionIssueFixedResult(
       ok: false,
       error: {
         code: "EXPORTED_TERMINAL",
-        message: "Exported is terminal for V-19.",
+        message: "Подача уже выгружена, поэтому исправления недоступны.",
       },
     };
   }
@@ -1173,7 +1215,8 @@ export function markSubmissionIssueFixedResult(
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Issues can be marked fixed only after admin return.",
+        message:
+          "Подача уже перешла в другой статус. Обновите данные и повторите.",
       },
     };
   }
@@ -1182,7 +1225,10 @@ export function markSubmissionIssueFixedResult(
   if (!issue) {
     return {
       ok: false,
-      error: { code: "ISSUE_NOT_FOUND", message: "Issue not found." },
+      error: {
+        code: "ISSUE_NOT_FOUND",
+        message: "Замечание не найдено. Обновите данные и повторите.",
+      },
     };
   }
   if (issue.status !== "open") {
@@ -1190,7 +1236,7 @@ export function markSubmissionIssueFixedResult(
       ok: false,
       error: {
         code: "ISSUE_NOT_FIXABLE",
-        message: "Only open issues can be marked fixed.",
+        message: "Это замечание уже отправлено на проверку или закрыто.",
       },
     };
   }
@@ -1199,32 +1245,125 @@ export function markSubmissionIssueFixedResult(
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target must be corrected before it can be marked fixed.",
+        message: correctionValidationMessage(submission, issue),
       },
     };
   }
 
+  if (isAgentIssueCorrectionConfirmed(submission, issue)) {
+    return { ok: true, data: submission };
+  }
+
   const clearedSubmission = clearQuestionnaireIssueError(submission, issueId);
-  const withFixedIssue: Submission = {
+  const withConfirmation: Submission = {
     ...clearedSubmission,
     issues: clearedSubmission.issues.map((item) =>
-      item.id === issueId && isIssueTransitionAllowed(item.status, "fixed_by_agent")
-        ? { ...item, status: "fixed_by_agent" }
+      item.id === issueId
+        ? {
+            ...item,
+            agentConfirmation: {
+              confirmedAtIso: nowIso,
+              targetRevision: currentIssueTargetRevision(item),
+            },
+          }
         : item,
     ),
-    updatedAt: "сейчас",
+    updatedAt: nowIso,
     history: [
       {
-        id: `и-${submission.id}-${issueId}-исправлено`,
-        text: "Агент отметил замечание исправленным",
-        at: "сейчас",
+        id: `и-${submission.id}-${issueId}-сохранено-${submission.history.length + 1}`,
+        actorId,
+        text: "Агент сохранил исправление",
+        at: nowIso,
+        createdAt: nowIso,
+        detail: issue.reason,
         source: "agent",
       },
       ...submission.history,
     ],
   };
 
-  return { ok: true, data: withFixedIssue };
+  const openIssues = withConfirmation.issues.filter(
+    (item) => item.status === "open",
+  );
+  const allCorrectionsConfirmed =
+    openIssues.length > 0 &&
+    openIssues.every(
+      (item) =>
+        isSubmissionIssueResolved(withConfirmation, item) &&
+        isAgentIssueCorrectionConfirmed(withConfirmation, item),
+    );
+
+  if (!allCorrectionsConfirmed) {
+    return { ok: true, data: withConfirmation };
+  }
+
+  if (
+    hasMissingRequiredWork(withConfirmation) ||
+    !canonicalRequiredMediaReadiness(withConfirmation, {
+      requireStorageIdentity: true,
+    }).ok
+  ) {
+    return { ok: true, data: withConfirmation };
+  }
+
+  const preparedForHandoff = clearOpenQuestionnaireIssueErrors({
+    ...withConfirmation,
+    issues: withConfirmation.issues.map((item) =>
+      item.status === "open" &&
+      isIssueTransitionAllowed(item.status, "fixed_by_agent")
+        ? {
+            ...item,
+            fixedAtIso: nowIso,
+            status: "fixed_by_agent" as const,
+          }
+        : item,
+    ),
+  });
+
+  return transitionSubmissionStatus(preparedForHandoff, {
+    actorId,
+    actorRole: role,
+    nextStatus: "corrections_received",
+    note: "Все исправления сохранены и автоматически отправлены на проверку",
+    nowIso,
+    source: "agent",
+  });
+}
+
+export function isAgentIssueCorrectionConfirmed(
+  submission: Submission,
+  issue: Issue,
+) {
+  return Boolean(
+    issue.agentConfirmation &&
+      issue.agentConfirmation.targetRevision === currentIssueTargetRevision(issue),
+  );
+}
+
+function correctionValidationMessage(submission: Submission, issue: Issue) {
+  if (issue.target.fileType) {
+    return `Загрузите новый файл для замечания «${issue.reason}», затем повторите.`;
+  }
+  if (issue.type === "section") {
+    return `Заполните раздел «${issue.target.section ?? issue.target.field ?? issue.reason}» без ошибок, затем сохраните исправление.`;
+  }
+  const applicant = submission.applicants.find(
+    (candidate) => candidate.id === issue.target.applicantId,
+  );
+  const field = applicant?.sections
+    .flatMap((section) => section.fields)
+    .find((candidate) =>
+      questionnaireFieldMatchesTarget(candidate, issue.target.field),
+    );
+  const fieldValidationError =
+    field?.error ??
+    (field ? validateQuestionnaireFieldValue(field) : undefined) ??
+    (field && applicant
+      ? blsQuestionnaireFieldValidationMessage(applicant, field)
+      : undefined);
+  if (fieldValidationError) return fieldValidationError;
+  return `Исправьте поле «${issue.target.field ?? issue.reason}» и заполните его новым значением.`;
 }
 
 export function getCardActionLabel(submission: Submission, role: Role) {
@@ -1553,6 +1692,13 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
 
   const value = field.value.trim();
   if (!value) return false;
+  if (
+    field.error ||
+    validateQuestionnaireFieldValue(field) ||
+    blsQuestionnaireFieldValidationMessage(applicant, field)
+  ) {
+    return false;
+  }
   return issue.snapshot ? value !== issue.snapshot : true;
 }
 

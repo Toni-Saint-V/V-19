@@ -35,7 +35,7 @@ function safeErrorMessage(error: unknown, fallback: string): string {
 
   if (error instanceof Error && error.message.trim()) {
     if (/password|credential|invalid login/i.test(error.message)) {
-      return "Unable to sign in. Check email, password, and Supabase profile.";
+      return "Не удалось войти. Проверьте email и пароль.";
     }
   }
 
@@ -66,7 +66,11 @@ export function useWorkspacePersistence({ setToast }: UseWorkspacePersistenceOpt
 
   const isSupabaseSession = session?.mode === "supabase";
   const saveStatusLabel =
-    saveState === "saving" ? "Saving" : saveState === "error" ? "Save failed" : "Saved";
+    saveState === "saving"
+      ? "Сохранение"
+      : saveState === "error"
+        ? "Не сохранено"
+        : "Сохранено";
   const saveStatusDescription =
     saveState === "error" && saveError ? saveError : saveStatusLabel;
 
@@ -173,7 +177,7 @@ export function useWorkspacePersistence({ setToast }: UseWorkspacePersistenceOpt
       setSaveState("error");
       const message = safeFailureToast(
         error,
-        "Remote save failed. Last saved Supabase data was reloaded.",
+        "Не удалось сохранить изменения. Загружена последняя сохранённая версия.",
       );
       setSaveError(message);
       try {
@@ -184,7 +188,7 @@ export function useWorkspacePersistence({ setToast }: UseWorkspacePersistenceOpt
           "Supabase reload after save failure failed",
           reloadError,
         );
-        setToast("Remote save failed. Refresh before continuing.");
+        setToast("Не удалось сохранить изменения. Обновите страницу.");
       }
     }
   }
@@ -236,7 +240,7 @@ export function useWorkspacePersistence({ setToast }: UseWorkspacePersistenceOpt
         logPersistenceDiagnostics("Supabase session bootstrap failed", error);
         if (!cancelled) {
           setAuthError(
-            safeErrorMessage(error, "Unable to load the current Supabase session."),
+            safeErrorMessage(error, "Не удалось загрузить текущую сессию."),
           );
         }
       } finally {
@@ -313,7 +317,7 @@ export function useWorkspacePersistence({ setToast }: UseWorkspacePersistenceOpt
             setSaveState("error");
             const message = safeFailureToast(
               error,
-              "Remote save failed. Last saved Supabase data was reloaded.",
+              "Не удалось сохранить изменения. Загружена последняя сохранённая версия.",
             );
             setSaveError(message);
             try {
@@ -324,7 +328,7 @@ export function useWorkspacePersistence({ setToast }: UseWorkspacePersistenceOpt
                 "Supabase reload after save failure failed",
                 reloadError,
               );
-              setToast("Remote save failed. Refresh before continuing.");
+              setToast("Не удалось сохранить изменения. Обновите страницу.");
             }
           }
         } finally {
@@ -375,14 +379,14 @@ export function useWorkspacePersistence({ setToast }: UseWorkspacePersistenceOpt
       setSession(nextSession);
       setSubmissions(loaded);
       persistedStatusHistoryIdsRef.current = collectPersistedStatusHistoryIds(loaded);
-      setToast(`Signed in as ${nextSession.profile.displayName}.`);
+      setToast(`Выполнен вход: ${nextSession.profile.displayName}.`);
       return true;
     } catch (error) {
       logPersistenceDiagnostics("Supabase sign-in failed", error);
       setAuthError(
         safeErrorMessage(
           error,
-          "Unable to sign in. Check email, password, and Supabase profile.",
+          "Не удалось войти. Проверьте email и пароль.",
         ),
       );
       return false;

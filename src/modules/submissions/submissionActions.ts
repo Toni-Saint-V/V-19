@@ -14,6 +14,7 @@ import {
   updateQuestionnaireField as updateQuestionnaireFieldInSubmission,
   type QuestionnaireFieldUpdate,
 } from "./questionnaire";
+import { bumpOpenIssueTargetRevisions } from "./correctionRevision";
 import {
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
@@ -479,7 +480,7 @@ export function cockpitUploadExtensionForMimeType(
     !isCanonicalFrontendMediaType(fileType) &&
     !isRejectedLegacyMediaType(fileType)
   ) {
-    throw new Error("Unsupported media type for Package 1 upload slot.");
+    throw new Error("Этот тип файла нельзя загрузить в пакет подачи.");
   }
   if (fileType === "passport_scan" && mimeType === "application/pdf") return "pdf";
   if (fileType === "video" && mimeType === "video/mp4") return "mp4";
@@ -487,7 +488,7 @@ export function cockpitUploadExtensionForMimeType(
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/heic") return "heic";
   if (mimeType === "image/heif") return "heif";
-  throw new Error("Unsupported media MIME type for this upload slot.");
+  throw new Error("Формат выбранного файла не поддерживается для этого слота.");
 }
 
 export function generatedCockpitMediaFileName({
@@ -855,7 +856,7 @@ export function normalizeSubmissionForCanonicalRuntime(
   }
   const status = normalizedStatus.ok ? normalizedStatus.data : options.statusFallback;
   if (!isCanonicalSubmissionStatus(status)) {
-    throw new Error("Unknown submission status.");
+    throw new Error("Статус подачи не распознан. Обновите данные и повторите.");
   }
 
   const issues = canonicalRuntimeIssues(submission.issues);
@@ -943,9 +944,7 @@ export function uploadRequiredFile(
   const applicant = submission.applicants.find(
     (item) => item.id === targetFile.applicantId,
   );
-  const issues = markReplacementIssuesPendingAdminReview(submission.issues, targetFile);
-
-  return withRecalculatedSubmissionProgress({
+  const updated = withRecalculatedSubmissionProgress({
     ...submission,
     applicants: submission.applicants.map((item) => ({
       ...item,
@@ -957,7 +956,7 @@ export function uploadRequiredFile(
           : item.passportExtraction,
     })),
     files,
-    issues,
+    issues: submission.issues,
     updatedAt: "сейчас",
     history: [
       {
@@ -972,6 +971,12 @@ export function uploadRequiredFile(
       ...submission.history,
     ],
   });
+  return bumpOpenIssueTargetRevisions(
+    updated,
+    (issue) =>
+      issue.target.applicantId === targetFile.applicantId &&
+      issue.target.fileType === targetFile.type,
+  );
 }
 
 export function ensureApplicantMediaSlot(
@@ -1000,22 +1005,6 @@ export function ensureApplicantMediaSlot(
     file,
     submission: { ...submission, files: [...submission.files, file] },
   };
-}
-
-function markReplacementIssuesPendingAdminReview(
-  issues: Issue[],
-  targetFile: SubmissionFile,
-) {
-  return issues.map((issue) => {
-    if (
-      issue.status === "open" &&
-      issue.target.applicantId === targetFile.applicantId &&
-      issue.target.fileType === targetFile.type
-    ) {
-      return { ...issue, status: "fixed_by_agent" as const };
-    }
-    return issue;
-  });
 }
 
 function fileStorageIdentityLabel(file: SubmissionFile) {
@@ -1067,13 +1056,16 @@ export function addPreciseAdminIssue(
   if (!reason || !comment) return submission;
 
   const hasExplicitIssueTarget = Boolean(input.fileType || input.field);
-  const issueInput = hasExplicitIssueTarget
-    ? input
-    : { ...input, field: "Маршрут поездки" };
+  if (!hasExplicitIssueTarget) return submission;
+  const issueInput = input;
   const applicant = submission.applicants.find(
     (item) => item.id === issueInput.applicantId,
   );
   if (!applicant) return submission;
+  const targetIdentity = issueQuestionnaireTargetIdentity(
+    applicant,
+    issueInput,
+  );
 
   const passportReviewMediaType =
     issueInput.fileType === "passport_scan" ||
@@ -1098,7 +1090,9 @@ export function addPreciseAdminIssue(
       applicantId: applicant.id,
       applicantName: applicant.fullName,
       section: issueInput.section,
+      sectionId: targetIdentity?.sectionId,
       field: issueInput.field,
+      fieldId: targetIdentity?.fieldId,
       fileType: issueInput.fileType,
     },
     reason,
@@ -1133,6 +1127,50 @@ export function addPreciseAdminIssue(
       ...submission.history,
     ],
   };
+}
+
+function issueQuestionnaireTargetIdentity(
+  applicant: Submission["applicants"][number],
+  input: IssueInput,
+) {
+  if (input.fileType) return undefined;
+  if (input.sectionId && input.fieldId) {
+    return { sectionId: input.sectionId, fieldId: input.fieldId };
+  }
+  if (input.type === "section") {
+    const targetSection = applicant.sections.find(
+      (section) =>
+        section.id === input.sectionId ||
+        section.title === input.field ||
+        section.title === input.section,
+    );
+    const targetField =
+      targetSection?.fields.find((field) => Boolean(field.error)) ??
+      targetSection?.fields.find(
+        (field) => field.required && !field.value.trim(),
+      ) ??
+      targetSection?.fields[0];
+    if (targetSection && targetField) {
+      return { sectionId: targetSection.id, fieldId: targetField.id };
+    }
+  }
+
+  for (const section of applicant.sections) {
+    if (
+      input.section &&
+      section.id !== input.section &&
+      section.title !== input.section
+    ) {
+      continue;
+    }
+    const field = section.fields.find(
+      (candidate) =>
+        candidate.id === input.fieldId ||
+        questionnaireFieldMatchesTarget(candidate, input.field),
+    );
+    if (field) return { sectionId: section.id, fieldId: field.id };
+  }
+  return undefined;
 }
 
 export function applyActionToSubmissionList(

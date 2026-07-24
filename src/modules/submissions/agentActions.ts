@@ -2,10 +2,9 @@ import {
   blockerCount,
   canAgentEditSubmission,
   fixedIssueCount,
-  canPerformAction,
+  isAgentIssueCorrectionConfirmed,
   openIssueCount,
   statusLabelFor,
-  unresolvedOpenIssueCount,
 } from "./status";
 import { formatAgentActionRowText } from "./listFormatters";
 import { applicantCountLabel, submissionSearchText } from "./selectors";
@@ -751,35 +750,19 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
     });
   }
 
-  const readyToSubmitCorrections =
-    canPerformAction(submission, "submit_corrections", "agent").ok &&
-    unresolvedOpenIssueCount(submission) === 0;
-  if (readyToSubmitCorrections && !replacementFile) {
-    const rowText = formatAgentActionRowText({
-      kind: "submit_corrections",
-      submission,
-    });
-    return [
-      {
-        badges: [{ label: "Готово", tone: "teal" }],
-        completed: false,
-        context: rowText.subtitle,
-        cta: "Отправить",
-        due: "week",
-        dueLabel: "Готово к отправке",
-        id: `submit-corrections-${submission.id}`,
-        searchText: "",
-        severity: "ready",
-        submission,
-        tab: "issues",
-        title: rowText.title,
-      },
-    ];
-  }
-
-  const questionnaireApplicant = submission.applicants.find((applicant) =>
-    ["empty", "partial", "needs_fix"].includes(applicant.questionnaireStatus),
+  const firstUnconfirmedQuestionnaireIssue = submission.issues.find(
+    (issue) =>
+      issue.status === "open" &&
+      !issue.target.fileType &&
+      !isAgentIssueCorrectionConfirmed(submission, issue),
   );
+  const questionnaireApplicant =
+    submission.applicants.find(
+      (applicant) => applicant.id === firstUnconfirmedQuestionnaireIssue?.target.applicantId,
+    ) ??
+    submission.applicants.find((applicant) =>
+      ["empty", "partial", "needs_fix"].includes(applicant.questionnaireStatus),
+    );
   if (questionnaireApplicant) {
     const missingSection = questionnaireApplicant.sections.find(
       (section) => section.missing,

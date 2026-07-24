@@ -14,6 +14,10 @@ import {
   questionnaireUiLegacyBindingDispositions,
   questionnaireUiNonRenderedFieldDispositions,
 } from "../../src/modules/submissions/components/FigmaQuestionnaireScreen";
+import {
+  QuestionnaireValidationError,
+  questionnaireSaveFailureMessage,
+} from "../../src/modules/submissions/questionnaireSaveError";
 import { auditAgentInteractionControls } from "../../src/modules/submissions/agentInteractionContract";
 import { questionnaireBlueprintContract } from "../../src/modules/submissions/questionnaire";
 import {
@@ -25,6 +29,28 @@ import type { Submission } from "../../src/modules/submissions/types";
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+});
+
+test("preserves an exact safe Russian questionnaire validation error", () => {
+  expect(
+    questionnaireSaveFailureMessage(
+      new QuestionnaireValidationError("Проверьте формат email"),
+    ),
+  ).toBe("Проверьте формат email");
+  expect(
+    questionnaireSaveFailureMessage(
+      new Error("Ошибка token secret: Проверьте формат email"),
+    ),
+  ).toBe(
+    "Сессия завершилась. Введённые данные остаются в анкете; повторите сохранение после восстановления доступа.",
+  );
+  expect(
+    questionnaireSaveFailureMessage(
+      new Error("Ошибка SQL: обновлена таблица questionnaire_answers"),
+    ),
+  ).toBe(
+    "Сервис не подтвердил сохранение. Введённые данные остаются в анкете — повторите попытку или продолжите редактирование.",
+  );
 });
 
 function deferred() {
@@ -2401,7 +2427,7 @@ describe("FigmaQuestionnaireScreen", () => {
       await vi.advanceTimersByTimeAsync(900);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Пометить исправленным" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить исправление" }));
     fireEvent.click(screen.getByRole("button", { name: "Назад" }));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
 
@@ -2412,10 +2438,10 @@ describe("FigmaQuestionnaireScreen", () => {
       await Promise.resolve();
     });
 
-    expect(onSaveDraft).toHaveBeenCalledTimes(2);
-    expect(onSaveDraft.mock.calls[1]?.[0]).toEqual(
+    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onMarkIssueFixed.mock.calls[0]?.[1]).toEqual(
       expect.objectContaining({
-        fieldUpdates: [],
+        fieldUpdates: expect.any(Array),
         saveIntent: "manual",
       }),
     );
@@ -2455,12 +2481,12 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Почтовый индекс"), {
       target: { value: "101000" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Пометить исправленным" }));
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить исправление" }));
+    expect(onSaveDraft).toHaveBeenCalledTimes(0);
 
     window.dispatchEvent(new Event("pagehide"));
     await act(async () => Promise.resolve());
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSaveDraft).toHaveBeenCalledTimes(0);
 
     await act(async () => {
       issueSave.resolve();
@@ -2500,7 +2526,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Отель / приглашение");
-    fireEvent.click(screen.getByRole("button", { name: "Пометить исправленным" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить исправление" }));
     await waitFor(() => expect(onMarkIssueFixed).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "Назад" }));
     expect(onBack).not.toHaveBeenCalled();
@@ -2544,12 +2570,14 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Отель / приглашение");
-    fireEvent.click(screen.getByRole("button", { name: "Пометить исправленным" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить исправление" }));
     await waitFor(() => expect(onMarkIssueFixed).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
 
     await act(async () => {
-      markFixed.reject(new Error("Не удалось отметить замечание"));
+      markFixed.reject(
+        new QuestionnaireValidationError("Не удалось отметить замечание"),
+      );
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -2591,9 +2619,9 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Отель / приглашение");
-    fireEvent.click(screen.getByRole("button", { name: "Пометить исправленным" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить исправление" }));
     await waitFor(() => expect(onMarkIssueFixed).toHaveBeenCalledTimes(1));
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSaveDraft).toHaveBeenCalledTimes(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
     expect(onSaveAndExit).not.toHaveBeenCalled();
@@ -2604,7 +2632,7 @@ describe("FigmaQuestionnaireScreen", () => {
       await Promise.resolve();
     });
 
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    expect(onSaveDraft).toHaveBeenCalledTimes(0);
     expect(onSaveAndExit).toHaveBeenCalledTimes(1);
   });
 

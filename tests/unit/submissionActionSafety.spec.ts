@@ -4,6 +4,7 @@ import {
   applySubmissionActionResult,
   calculateSubmissionProgress,
   canPerformAction,
+  confirmAgentCorrectionResult,
   getPrimaryAction,
   transitionSubmissionById,
 } from "../../src/modules/submissions/status";
@@ -439,13 +440,14 @@ describe("submission action safety", () => {
     });
   });
 
-  test("replacement upload fixes the matching file issue and does not move status", () => {
+  test("replacement upload stays open until explicit confirmation, then auto-submits the last correction", () => {
     const returned: Submission = {
       ...reviewReadySubmission(),
       status: "returned",
       issues: [],
     };
-    const targetFile = returned.files[0];
+    const targetFile =
+      returned.files.find((file) => file.type === "selfie") ?? returned.files[0];
     if (!targetFile) throw new Error("Missing file fixture");
     const needsReplacement: Submission = {
       ...returned,
@@ -493,13 +495,33 @@ describe("submission action safety", () => {
     });
 
     expect(uploaded.status).toBe("returned");
-    expect(uploaded.issues[0]?.status).toBe("fixed_by_agent");
+    expect(uploaded.issues[0]?.status).toBe("open");
     expect(uploaded.files.find((file) => file.id === targetFile.id)).toMatchObject({
       status: "uploaded",
       storagePath: "new/path.jpg",
       uploadStatus: "uploaded",
     });
     expect(uploaded.history[0]?.detail).toContain("old/path.jpg");
+
+    const confirmed = confirmAgentCorrectionResult(
+      uploaded,
+      "issue-file-replacement",
+      "agent",
+      uploaded.agentId,
+      "2026-07-07T10:01:00.000Z",
+    );
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok) return;
+    expect(confirmed.data.status).toBe("returned");
+    expect(confirmed.data.issues[0]).toMatchObject({
+      status: "open",
+      agentConfirmation: {
+        confirmedAtIso: "2026-07-07T10:01:00.000Z",
+      },
+    });
+    expect(confirmed.data.history[0]?.text).toBe(
+      "Агент сохранил исправление",
+    );
   });
 
   test("exported blocks upload and status changes", () => {
@@ -523,7 +545,7 @@ describe("submission action safety", () => {
       ok: false,
       error: {
         code: "EXPORTED_TERMINAL",
-        message: "Exported is terminal for V-19.",
+        message: "Подача уже выгружена, поэтому изменить её статус нельзя.",
       },
     });
   });

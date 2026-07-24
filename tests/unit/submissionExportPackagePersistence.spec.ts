@@ -202,7 +202,7 @@ describe("V-19 submission export package persistence", () => {
         safeCode: "rpc.complete_export_package:rls:42501",
       },
       userMessage:
-        "Access was denied by Supabase policy. Ask an operator to confirm access.",
+        "Недостаточно прав для этого действия. Обратитесь к администратору.",
     });
   });
 

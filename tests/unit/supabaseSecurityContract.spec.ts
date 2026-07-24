@@ -1111,6 +1111,446 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("persists agent correction confirmations through an invoker-safe agent RPC", () => {
+    const confirmationMigration = readProjectFile(
+      "supabase/migrations/20260724132405_agent_correction_confirmation.sql",
+    );
+
+    expect(confirmationMigration).toContain(
+      "add column if not exists agent_confirmed_at timestamptz",
+    );
+    expect(confirmationMigration).toContain(
+      "add column if not exists agent_confirmed_revision bigint",
+    );
+    expect(confirmationMigration).toContain(
+      "corrections_agent_confirmation_pair_check",
+    );
+    expect(confirmationMigration).toContain(
+      "create or replace function public.save_submission_draft(payload jsonb)",
+    );
+    expect(confirmationMigration).toContain("security invoker");
+    expect(confirmationMigration).toContain(
+      "app_private.dispatch_submission_draft_with_revision_context(",
+    );
+    expect(confirmationMigration).toContain(
+      "and corrections.submission_id = target_submission_id",
+    );
+    expect(confirmationMigration).toContain(
+      "revoke all on function public.save_submission_draft(jsonb)",
+    );
+    expect(confirmationMigration).toContain(
+      "grant execute on function public.save_submission_draft(jsonb)",
+    );
+    expect(confirmationMigration).toContain("for update");
+    expect(confirmationMigration).toContain("expected_case_revision");
+    expect(confirmationMigration).toContain("client_contract_version");
+    expect(confirmationMigration).toContain(
+      "matching_open_payload_count <> open_correction_count",
+    );
+    expect(confirmationMigration).toContain(
+      "requested.item ->> 'status' = 'fixed'",
+    );
+    expect(confirmationMigration).toContain(
+      "requested.item ->> 'agent_confirmed_revision' is not null",
+    );
+    expect(confirmationMigration).toContain(
+      "V19_AGENT_SUBMISSION_CONFLICT",
+    );
+    expect(confirmationMigration).toContain(
+      "clock_timestamp()",
+    );
+
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const promotionRunbook = readProjectFile(
+      "docs/release/supabase-production-promotion.md",
+    );
+    const approvalRunbook = readProjectFile(
+      "docs/release/supabase-production-approval-checklist.md",
+    );
+    const rollback = readProjectFile(
+      "supabase/remediation/20260724132405_agent_correction_confirmation.rollback.sql",
+    );
+    expect(migrationContract).toContain(
+      "20260724132405_agent_correction_confirmation.sql",
+    );
+    expect(migrationContract).toContain(
+      "20260724132405_agent_correction_confirmation",
+    );
+    expect(promotionRunbook).toContain(
+      "20260724132405_agent_correction_confirmation.rollback.sql",
+    );
+    expect(approvalRunbook).toContain(
+      "20260724132405_agent_correction_confirmation.sql",
+    );
+    expect(rollback).toContain(
+      "drop function if exists app_private.enforce_agent_correction_target_revision()",
+    );
+    expect(rollback).not.toContain("drop column if exists target_revision");
+    expect(rollback).not.toContain("drop column if exists agent_confirmed_at");
+    expect(rollback).not.toContain(
+      "drop column if exists agent_confirmed_revision",
+    );
+    expect(rollback).toContain(
+      "Retained by rollback to preserve lifecycle audit data",
+    );
+    expect(rollback).toContain("V19_AGENT_SUBMISSION_CONFLICT");
+    expect(rollback).toContain("for update");
+    expect(rollback).toContain("to_jsonb('returned'::text)");
+    expect(rollback).toContain("'{corrections}'");
+  });
+
+  test("rejects a partial correction handoff payload under the submission lock", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260724132405_agent_correction_confirmation.sql",
+    );
+
+    expectSqlStatement(migration, "where submission.id = target_submission_id for update");
+    expectSqlStatement(
+      migration,
+      "where correction.submission_id = target_submission_id order by correction.id for update",
+    );
+    expectSqlStatement(
+      migration,
+      "if matching_open_payload_count <> open_correction_count then",
+    );
+    expectSqlStatement(
+      migration,
+      "requested.item ->> 'status' = 'fixed'",
+    );
+    expectSqlStatement(
+      migration,
+      "requested.item ->> 'agent_confirmed_at' is not null",
+    );
+    expectSqlStatement(
+      migration,
+      "requested.item ->> 'agent_confirmed_revision' is not null",
+    );
+    expectSqlStatement(
+      migration,
+      "(requested.item ->> 'target_revision')::bigint = (requested.item ->> 'agent_confirmed_revision')::bigint",
+    );
+    expectSqlStatement(
+      migration,
+      "final_payload := jsonb_set( payload - 'expected_case_revision' - 'client_contract_version', '{corrections}', '[]'::jsonb, true )",
+    );
+    expectSqlStatement(
+      migration,
+      "preparation_payload := jsonb_set( jsonb_set( payload - 'expected_case_revision' - 'client_contract_version', '{submission,status}', to_jsonb('returned'::text), false ), '{corrections}', '[]'::jsonb, true )",
+    );
+    expectSqlStatement(
+      migration,
+      "perform app_private.dispatch_submission_draft_with_revision_context( preparation_payload )",
+    );
+    expectSqlStatement(
+      migration,
+      "update public.corrections set status = 'fixed'",
+    );
+    expectSqlStatement(
+      migration,
+      "persisted_result := app_private.dispatch_submission_draft_with_revision_context( final_payload )",
+    );
+  });
+
+  test("rejects correction lifecycle regression and unknown handoff rows", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260724132405_agent_correction_confirmation.sql",
+    );
+
+    expectSqlStatement(
+      migration,
+      "if old.status <> 'open' and new.status is distinct from old.status then",
+    );
+    expectSqlStatement(
+      migration,
+      "if old.status = 'open' and new.status not in ('open', 'fixed') then",
+    );
+    expectSqlStatement(
+      migration,
+      "if old.status = 'open' and new.status = 'fixed' then new.fixed_at := clock_timestamp()",
+    );
+    expectSqlStatement(
+      migration,
+      "where correction.status <> 'open' and ( requested.item ->> 'status' is distinct from correction.status::text",
+    );
+    expect(migration).toContain("Payload содержит неизвестное замечание");
+    expect(migration).toContain("Нельзя изменять ранее обработанные замечания");
+    expect(migration).toContain(
+      "Нельзя изменять подтверждение ранее обработанного замечания",
+    );
+    expect(migration).toContain(
+      "Исправленные замечания отправляются только через handoff",
+    );
+    expect(migration).not.toContain(
+      "(requested.item ->> 'created_by')::uuid",
+    );
+  });
+
+  test("keeps a versioned expand-contract window without allowing legacy confirmations", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260724132405_agent_correction_confirmation.sql",
+    );
+
+    expectSqlStatement(
+      migration,
+      "client_contract_version integer := coalesce( (payload ->> 'client_contract_version')::integer, 1 )",
+    );
+    expectSqlStatement(
+      migration,
+      "if client_contract_version >= 2 and not payload ? 'expected_case_revision' then",
+    );
+    expect(migration).toContain(
+      "Подтверждения исправлений требуют revision-checked контракта",
+    );
+    expect(migration).toContain("V19_LEGACY_DRAFT_CONTRACT");
+    const promotionRunbook = readProjectFile(
+      "docs/release/supabase-production-promotion.md",
+    );
+    expect(promotionRunbook).toContain("mandatory mutation-maintenance");
+    expect(promotionRunbook).toContain(
+      "A migration-first apply without this drain is `NO_GO`",
+    );
+    expectSqlStatement(
+      migration,
+      "payload - 'expected_case_revision' - 'client_contract_version'",
+    );
+  });
+
+  test("owns correction target identity, revision, validation, and timestamps on the server", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260724234200_server_owned_correction_targets.sql",
+    );
+    const rollback = readProjectFile(
+      "supabase/remediation/20260724234200_server_owned_correction_targets.rollback.sql",
+    );
+    const verification = readProjectFile(
+      "supabase/remediation/20260724234200_server_owned_correction_targets.verify.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const liveRegistryVerifier = readProjectFile(
+      "scripts/verify-live-supabase-registry.mjs",
+    );
+
+    for (const column of [
+      "target_section_id",
+      "target_field_id",
+      "target_baseline",
+      "target_projection",
+    ]) {
+      expect(migration).toContain(`add column if not exists ${column}`);
+      expect(verification).toContain(`correction.${column} is null`);
+    }
+    expect(migration).toContain(
+      "create trigger questionnaire_answers_refresh_correction_targets",
+    );
+    expect(migration).toContain(
+      "target_revision = correction.target_revision + 1",
+    );
+    expect(migration).toContain(
+      "new.target_revision is distinct from old.target_revision",
+    );
+    expect(migration).toContain(
+      "revision цели назначается сервером",
+    );
+    expect(migration).toContain(
+      "old.target_projection = old.target_baseline",
+    );
+    expect(migration).toContain(
+      "app_private.questionnaire_field_validation_error(",
+    );
+    expect(migration).toContain("new.agent_confirmed_at := clock_timestamp()");
+    expect(migration).toContain(
+      "app_private.submission_questionnaire_validation_error(new.id)",
+    );
+    expect(migration).toContain(
+      "create trigger submissions_returned_questionnaire_readiness_guard",
+    );
+    expect(migration).toContain(
+      "Сохраните и подтвердите исправление по каждому замечанию",
+    );
+    expect(migration).toContain(
+      "Одно из исправлений не подтверждено в актуальной версии",
+    );
+    expect(rollback).toContain("FORWARD_ONLY");
+    expect(migrationContract).toContain(
+      "20260724234200_server_owned_correction_targets.sql",
+    );
+    expect(migrationContract).toContain(
+      "20260724200418_20260724234200_server_owned_correction_targets",
+    );
+    expect(liveRegistryVerifier).toContain(
+      "submissions_returned_questionnaire_readiness_guard",
+    );
+    expect(liveRegistryVerifier).toContain(
+      "questionnaire_answers_refresh_correction_targets",
+    );
+  });
+
+  test("hardens correction validation, parent status, legacy rows, and live topology", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260725003000_harden_correction_validation_topology.sql",
+    );
+    const rollback = readProjectFile(
+      "supabase/remediation/20260725003000_harden_correction_validation_topology.rollback.sql",
+    );
+    const liveRegistryVerifier = readProjectFile(
+      "scripts/verify-live-supabase-registry.mjs",
+    );
+    const packageJson = JSON.parse(readProjectFile("package.json"));
+
+    expect(migration).toContain(
+      "app_private.questionnaire_field_is_required(",
+    );
+    expect(migration).toContain("return 'Обязательное поле'");
+    expect(migration).toContain(
+      "answer_json ->> 'reviewState' = 'needs_review'",
+    );
+    expect(migration).toContain(
+      "return 'Подтвердите значение поля перед сохранением'",
+    );
+    expect(migration).toContain(
+      "create trigger corrections_agent_parent_status_guard",
+    );
+    expect(migration).toContain("if parent_status <> 'returned' then");
+    expect(migration).toContain(
+      "Исправления можно подтверждать только после возврата подачи",
+    );
+    expect(migration).toContain("if correction_status = 'open' then");
+    expect(migration).toContain(
+      "sync_correction_targets_from_payload_all_rows_v1",
+    );
+    expect(migration).toContain(
+      "revoke all on function app_private.save_submission_draft_without_questionnaire_rows(jsonb)",
+    );
+    expect(rollback).toContain("FORWARD_ONLY");
+    expect(liveRegistryVerifier).toContain("pg_get_functiondef(proc.oid)");
+    expect(liveRegistryVerifier).toContain(
+      "app_private.save_submission_draft_for_internal_dispatch(jsonb)",
+    );
+    expect(liveRegistryVerifier).toContain(
+      "live draft RPC topology is missing or recursive",
+    );
+    expect(packageJson.scripts["verify:full"]).toContain(
+      "npm run verify:supabase-live-registry",
+    );
+  });
+
+  test("records and repairs the complete late production migration chain", () => {
+    const publicNumberMigration = readProjectFile(
+      "supabase/migrations/20260718190000_global_submission_public_numbers.sql",
+    );
+    const repairMigration = readProjectFile(
+      "supabase/migrations/20260724221841_repair_out_of_order_submission_schema.sql",
+    );
+    const rollback = readProjectFile(
+      "supabase/remediation/20260724221841_repair_out_of_order_submission_schema.rollback.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const releaseVerifier = readProjectFile(
+      "scripts/verify-supabase-release.mjs",
+    );
+    const readinessVerifier = readProjectFile(
+      "scripts/verify-production-readiness.mjs",
+    );
+    const promotionRunbook = readProjectFile(
+      "docs/release/supabase-production-promotion.md",
+    );
+    const expectedRemoteOrder = [
+      "20260724094952_20260724084304_allow_agent_ready_for_export_resubmission",
+      "20260724172604_20260724132405_agent_correction_confirmation",
+      "20260724191643_20260718190000_global_submission_public_numbers",
+      "20260724191652_20260719160000_assign_public_number_after_questionnaire",
+      "20260724191701_20260720000000_export_package_media_only_file_count",
+      "20260724191712_20260722000000_harden_workflow_rpc_anon_execute",
+      "20260724191726_20260722001000_admin_submission_batch_concurrency",
+      "20260724191737_20260722002000_access_request_review_claim",
+      "20260724191750_20260722003000_atomic_return_package_artifact_upload",
+      "20260724191927_20260724221841_repair_out_of_order_submission_schema",
+      "20260724200418_20260724234200_server_owned_correction_targets",
+      "20260724204041_20260725003000_harden_correction_validation_topology",
+    ];
+
+    expectSqlStatement(
+      publicNumberMigration,
+      "alter table public.submissions disable trigger submissions_agent_mutation_guard",
+    );
+    expectSqlStatement(
+      publicNumberMigration,
+      "alter table public.submissions enable trigger submissions_agent_mutation_guard",
+    );
+    expect(repairMigration).toContain(
+      "app_private.save_submission_draft_for_internal_dispatch",
+    );
+    expect(repairMigration).toContain(
+      "app_private.save_submission_draft_without_questionnaire_rows",
+    );
+    expect(repairMigration).toContain("expected_case_revision");
+    expect(repairMigration).toContain(
+      "Internal draft persistence dispatch is recursively wrapped",
+    );
+    expect(rollback).toContain("Forward-only production repair");
+    expect(rollback).not.toContain("drop column");
+    expect(promotionRunbook).toContain("Live Production Schema Preflight");
+    expect(promotionRunbook).toContain(
+      "column_name in ('public_number', 'case_revision')",
+    );
+
+    let previousIndex = -1;
+    for (const remoteMigration of expectedRemoteOrder) {
+      const contractIndex = migrationContract.indexOf(remoteMigration);
+      expect(contractIndex).toBeGreaterThan(previousIndex);
+      expect(releaseVerifier).toContain(remoteMigration);
+      previousIndex = contractIndex;
+    }
+    for (const releaseScopedPath of [
+      "supabase/migrations/20260718190000_global_submission_public_numbers.sql",
+      "supabase/migrations/20260719160000_assign_public_number_after_questionnaire.sql",
+      "supabase/migrations/20260720000000_export_package_media_only_file_count.sql",
+      "supabase/migrations/20260722000000_harden_workflow_rpc_anon_execute.sql",
+      "supabase/migrations/20260722001000_admin_submission_batch_concurrency.sql",
+      "supabase/migrations/20260722002000_access_request_review_claim.sql",
+      "supabase/migrations/20260722003000_atomic_return_package_artifact_upload.sql",
+      "supabase/migrations/20260724084304_allow_agent_ready_for_export_resubmission.sql",
+      "supabase/migrations/20260724132405_agent_correction_confirmation.sql",
+      "supabase/migrations/20260724221841_repair_out_of_order_submission_schema.sql",
+      "supabase/migrations/20260724234200_server_owned_correction_targets.sql",
+      "supabase/migrations/20260725003000_harden_correction_validation_topology.sql",
+      "supabase/remediation/20260724221841_repair_out_of_order_submission_schema.rollback.sql",
+      "supabase/remediation/20260724221841_repair_out_of_order_submission_schema.verify.sql",
+      "supabase/remediation/20260724234200_server_owned_correction_targets.rollback.sql",
+      "supabase/remediation/20260724234200_server_owned_correction_targets.verify.sql",
+      "supabase/remediation/20260725003000_harden_correction_validation_topology.rollback.sql",
+      "supabase/remediation/20260725003000_harden_correction_validation_topology.verify.sql",
+    ]) {
+      expect(readinessVerifier).toContain(releaseScopedPath);
+    }
+  });
+
+  test("keeps the revision RPC compatible with canonical VF text submission ids", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260724132405_agent_correction_confirmation.sql",
+    );
+    const rollback = readProjectFile(
+      "supabase/remediation/20260724132405_agent_correction_confirmation.rollback.sql",
+    );
+
+    expect(migration).toContain("target_submission_id text;");
+    expect(migration).toContain("id text,");
+    expect(migration).not.toContain("target_submission_id uuid");
+    expect(migration).not.toContain(
+      "(payload -> 'submission' ->> 'id')::uuid",
+    );
+    expect(rollback).toContain(
+      "target_submission_id text := payload -> 'submission' ->> 'id'",
+    );
+    expect(rollback).not.toContain("target_submission_id uuid");
+  });
+
   test("keeps cockpit saves from overwriting normalized applicant profile fields", () => {
     const profilePreservationMigration = readProjectFile(
       "supabase/migrations/20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
@@ -1556,6 +1996,97 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("allows only an atomic accepted-package resubmission to clear review readiness", () => {
+    const migrationFileName =
+      "20260724084304_allow_agent_ready_for_export_resubmission.sql";
+    const migration = readProjectFile(`supabase/migrations/${migrationFileName}`);
+    const rollbackTemplate = readProjectFile(
+      "supabase/remediation/20260724084304_allow_agent_ready_for_export_resubmission.rollback.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const promotionRunbook = readProjectFile(
+      "docs/release/supabase-production-promotion.md",
+    );
+
+    expectSqlStatement(
+      migration,
+      "create or replace function app_private.enforce_submission_agent_mutation()",
+    );
+    expectSqlStatement(
+      migration,
+      "old.status = 'ready_for_excel' and new.status = 'waiting_review'",
+    );
+    expectSqlStatement(migration, "old.accepted_at is null");
+    expectSqlStatement(migration, "new.type is distinct from old.type");
+    expectSqlStatement(migration, "new.country is distinct from old.country");
+    expectSqlStatement(
+      migration,
+      "new.trip_date_from is distinct from old.trip_date_from",
+    );
+    expectSqlStatement(
+      migration,
+      "new.readiness_percent is distinct from old.readiness_percent",
+    );
+    expectSqlStatement(migration, "new.accepted_at is not null");
+    expectSqlStatement(migration, "new.exported_at is not null");
+    expectSqlStatement(
+      migration,
+      "perform set_config( 'app.visaflow_accepted_resubmission_submission_id', new.id, true )",
+    );
+    expectSqlStatement(
+      migration,
+      "create or replace function app_private.enforce_media_asset_review_boundary()",
+    );
+    expectSqlStatement(
+      migration,
+      "old.review_status = 'accepted'::public.media_review_status",
+    );
+    expectSqlStatement(
+      migration,
+      "accepted_resubmission_submission_id = new.submission_id and not content_changed",
+    );
+    expectSqlStatement(
+      migration,
+      "submission.agent_id = auth.uid() and submission.status = 'waiting_review'",
+    );
+    expectSqlStatement(
+      migration,
+      "new.review_status := 'not_reviewed'::public.media_review_status",
+    );
+    expectSqlStatement(migration, "new.reviewed_at := null");
+    expectSqlStatement(migration, "new.reviewed_by := null");
+    expect(migration).toContain("set search_path = pg_catalog, public, app_private");
+    expectSqlStatement(
+      migration,
+      "revoke all on function app_private.enforce_submission_agent_mutation() from public, anon, authenticated",
+    );
+    expectSqlStatement(
+      migration,
+      "revoke all on function app_private.enforce_media_asset_review_boundary() from public, anon, authenticated",
+    );
+
+    expect(migrationContract).toContain(migrationFileName);
+    expect(migrationContract).toContain(
+      "20260724084304_allow_agent_ready_for_export_resubmission",
+    );
+    expect(migrationContract).not.toContain(
+      "20260724084304_allow_agent_ready_for_export_resubmission.rollback.sql",
+    );
+    expect(promotionRunbook).toContain(
+      "supabase/remediation/20260724084304_allow_agent_ready_for_export_resubmission.rollback.sql",
+    );
+
+    expect(rollbackTemplate).toContain(
+      "Agents cannot update review, export, or appointment state",
+    );
+    expect(rollbackTemplate).toContain("Agents cannot change media review state");
+    expect(rollbackTemplate).not.toContain(
+      "app.visaflow_accepted_resubmission_submission_id",
+    );
+  });
+
   test("cascades a normalized media identity into its server-owned document projection", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260715000000_document_assets_source_media_id_update_cascade.sql",
@@ -1632,9 +2163,7 @@ describe("Supabase security contract", () => {
       "create unique index submissions_public_number_uidx on public.submissions (public_number)",
     );
     expect(migration).toContain("Submission public number is immutable");
-    expect(migration).toContain(
-      "nextval('public.submission_public_number_seq')",
-    );
+    expect(migration).toContain("nextval('public.submission_public_number_seq')");
     expectSqlStatement(
       migration,
       "revoke all on function app_private.assign_submission_public_number() from public",

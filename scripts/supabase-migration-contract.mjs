@@ -55,6 +55,11 @@ export const requiredMigrationOrder = [
   "20260722001000_admin_submission_batch_concurrency.sql",
   "20260722002000_access_request_review_claim.sql",
   "20260722003000_atomic_return_package_artifact_upload.sql",
+  "20260724084304_allow_agent_ready_for_export_resubmission.sql",
+  "20260724132405_agent_correction_confirmation.sql",
+  "20260724221841_repair_out_of_order_submission_schema.sql",
+  "20260724234200_server_owned_correction_targets.sql",
+  "20260725003000_harden_correction_validation_topology.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -122,6 +127,18 @@ export const requiredRemoteMigrationOrder = [
   "20260714191730_20260714200000_harden_null_safe_admin_rpc_guards",
   "20260715000000_document_assets_source_media_id_update_cascade",
   "20260717050000_admin_passport_review_media_policy",
+  "20260724094952_20260724084304_allow_agent_ready_for_export_resubmission",
+  "20260724172604_20260724132405_agent_correction_confirmation",
+  "20260724191643_20260718190000_global_submission_public_numbers",
+  "20260724191652_20260719160000_assign_public_number_after_questionnaire",
+  "20260724191701_20260720000000_export_package_media_only_file_count",
+  "20260724191712_20260722000000_harden_workflow_rpc_anon_execute",
+  "20260724191726_20260722001000_admin_submission_batch_concurrency",
+  "20260724191737_20260722002000_access_request_review_claim",
+  "20260724191750_20260722003000_atomic_return_package_artifact_upload",
+  "20260724191927_20260724221841_repair_out_of_order_submission_schema",
+  "20260724200418_20260724234200_server_owned_correction_targets",
+  "20260724204041_20260725003000_harden_correction_validation_topology",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

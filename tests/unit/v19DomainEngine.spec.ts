@@ -131,25 +131,28 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "PERMISSION_DENIED",
-        message: "Admin cannot edit agent-owned submission data.",
+        message: "Администратор не может изменять данные, которые заполняет агент.",
       },
     });
     expect(submitForReview(ready, "admin")).toEqual({
       ok: false,
-      error: { code: "PERMISSION_DENIED", message: "Only agent can submit." },
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Отправить подачу может только агент.",
+      },
     });
     expect(returnWithIssues(ready, "agent", [firstIssueInput(ready)])).toEqual({
       ok: false,
       error: {
         code: "PERMISSION_DENIED",
-        message: "Only admin can return with issues.",
+        message: "Вернуть подачу с замечаниями может только администратор.",
       },
     });
     expect(acceptSubmission(ready, "agent")).toEqual({
       ok: false,
       error: {
         code: "PERMISSION_DENIED",
-        message: "Only admin can accept submissions.",
+        message: "Принять подачу может только администратор.",
       },
     });
   });
@@ -179,7 +182,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Questionnaire and files must be complete.",
+        message: "Заполните обязательные поля анкеты и загрузите все нужные файлы.",
       },
     });
   });
@@ -208,7 +211,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Questionnaire and files must be complete.",
+        message: "Заполните обязательные поля анкеты и подготовьте все файлы.",
       },
     });
     expect(incompleteQuestionnaire.status).toBe("submitted_for_review");
@@ -229,7 +232,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target must be corrected before it can be marked fixed.",
+        message: "Исправьте поле «Маршрут поездки» и заполните его новым значением.",
       },
     });
 
@@ -244,16 +247,17 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Issues can be marked fixed only after admin return.",
+        message:
+          "Подача уже перешла в другой статус. Обновите данные и повторите.",
       },
     });
 
     const fixed = unwrap(markIssueFixed(corrected, "agent", issueId));
-    expect(closeIssue(fixed, "admin", issueId)).toEqual({
+    expect(closeIssue({ ...fixed, status: "returned" }, "admin", issueId)).toEqual({
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Issues can be closed only during corrections review.",
+        message: "Закрыть замечание можно только во время проверки исправлений.",
       },
     });
   });
@@ -275,7 +279,8 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Open issues must be fixed before resubmission.",
+        message:
+          "Сохраните все открытые исправления — после этого подача отправится автоматически.",
       },
     });
 
@@ -283,14 +288,14 @@ describe("V-19 domain engine", () => {
       markIssueFixed(changeRouteIssueTarget(returned), "agent", issueId),
     );
     expect(fixed.issues[0]?.status).toBe("fixed_by_agent");
-
-    const resubmitted = unwrap(resubmitCorrections(fixed, "agent"));
+    expect(fixed.status).toBe("corrections_received");
+    const resubmitted = fixed;
     expect(resubmitted.status).toBe("corrections_received");
     expect(acceptSubmission(resubmitted, "admin")).toEqual({
       ok: false,
       error: {
         code: "ACCEPTANCE_BLOCKED",
-        message: "Acceptance is blocked until all issues are closed by admin.",
+        message: "Сначала закройте все замечания, затем примите подачу.",
       },
     });
 
@@ -313,7 +318,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target, reason, and comment must be valid.",
+        message: "Укажите корректное поле или файл, причину и понятный комментарий.",
       },
     });
     expect(
@@ -324,7 +329,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target, reason, and comment must be valid.",
+        message: "Укажите корректное поле или файл, причину и понятный комментарий.",
       },
     });
     expect(
@@ -341,7 +346,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target, reason, and comment must be valid.",
+        message: "Укажите корректное поле или файл, причину и понятный комментарий.",
       },
     });
     expect(
@@ -352,7 +357,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target, reason, and comment must be valid.",
+        message: "Укажите корректное поле или файл, причину и понятный комментарий.",
       },
     });
   });
@@ -370,7 +375,7 @@ describe("V-19 domain engine", () => {
 
     expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
       ok: false,
-      reason: "Сначала отметьте замечания исправленными",
+      reason: "Сохраните исправления по всем замечаниям",
     });
 
     const fixed = unwrap(
@@ -419,7 +424,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "ACCEPTANCE_BLOCKED",
-        message: "Acceptance is blocked until all issues are closed by admin.",
+        message: "Сначала закройте все замечания, затем примите подачу.",
       },
     });
     expect(canPerformAction(submitted, "accept", "admin")).toEqual({
@@ -534,11 +539,17 @@ describe("V-19 domain engine", () => {
 
     expect(updateSubmission(exported, "agent", { city: "Казань" })).toEqual({
       ok: false,
-      error: { code: "EXPORTED_TERMINAL", message: "Exported is terminal for V-19." },
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Подача уже выгружена, дальнейшие изменения недоступны.",
+      },
     });
     expect(markIssueFixed(exported, "agent", "missing")).toEqual({
       ok: false,
-      error: { code: "EXPORTED_TERMINAL", message: "Exported is terminal for V-19." },
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Подача уже выгружена, поэтому исправления недоступны.",
+      },
     });
   });
 
@@ -552,14 +563,14 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "EXPORT_NOT_READY",
-        message: "Export guard blocked this selection.",
+        message: "Выбранные подачи ещё не готовы к выгрузке.",
       },
     });
     expect(generateExport([ready], "agent")).toEqual({
       ok: false,
       error: {
         code: "PERMISSION_DENIED",
-        message: "Only admin can generate export.",
+        message: "Сформировать выгрузку может только администратор.",
       },
     });
     expect(generateExport([ready], "admin").ok).toBe(true);
@@ -567,8 +578,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "EXPORT_NOT_READY",
-        message:
-          "Submission must have a downloaded export package before marking exported.",
+        message: "Сначала сформируйте и скачайте пакет выгрузки.",
       },
     });
 
@@ -733,7 +743,7 @@ describe("V-19 domain engine", () => {
       ok: false,
       error: {
         code: "EXPORTED_TERMINAL",
-        message: "Exported is terminal for V-19.",
+        message: "Подача уже выгружена, поэтому изменить её статус нельзя.",
       },
     });
   });

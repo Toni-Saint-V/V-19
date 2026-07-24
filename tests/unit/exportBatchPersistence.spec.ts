@@ -151,7 +151,7 @@ describe("Supabase export batch persistence", () => {
         retryable: false,
       },
       userMessage:
-        "Access was denied by Supabase policy. Ask an operator to confirm access.",
+        "Недостаточно прав для этого действия. Обратитесь к администратору.",
     });
   });
 

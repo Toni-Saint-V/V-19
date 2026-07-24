@@ -570,6 +570,25 @@ function blsFormDataForApplicant(applicant: Applicant): BlsFormData {
   return formData;
 }
 
+export function blsQuestionnaireFieldValidationMessage(
+  applicant: Applicant,
+  field: QuestionnaireField,
+) {
+  const context = {
+    applicantRole: applicant.role,
+    field,
+    formData: blsFormDataForApplicant(applicant),
+  } satisfies BlsFieldValidationContext;
+
+  if (isBlsQuestionnaireFieldReady(context)) return undefined;
+  return (
+    validateBlsQuestionnaireField(context) ??
+    (field.reviewState === "needs_review"
+      ? "Подтвердите значение поля перед сохранением"
+      : "Обязательное поле")
+  );
+}
+
 export function blsApplicableQuestionnaireFields(applicant: Applicant) {
   const formData = blsFormDataForApplicant(applicant);
   return applicant.sections

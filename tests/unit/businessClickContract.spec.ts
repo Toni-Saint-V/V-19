@@ -40,6 +40,7 @@ import {
   adminAcceptRequiredMediaForTest,
   adminApprovePassportFieldsForTest,
   fillRequiredQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
 } from "./helpers/questionnaireTestFill";
 
 const allContracts = V19_BUSINESS_CLICK_CONTRACT_LIST;
@@ -234,7 +235,7 @@ describe("V-19 business click contract", () => {
     if (!fileToReplace) throw new Error("Missing issue target file.");
 
     const fixedFile = uploadRequiredFile(returned.data, fileToReplace.id);
-    expect(fixedFile.issues[0]?.status).toBe("fixed_by_agent");
+    expect(fixedFile.issues[0]?.status).toBe("open");
 
     const readyForExport = readyForExportFixture();
     const generated = applyExportStateToSelection(
@@ -401,7 +402,9 @@ function submittedWithOpenIssueFixture(): Submission {
 }
 
 function returnedWithFixedIssueFixture(): Submission {
-  const submitted = submittedFixture();
+  const submitted = adminAcceptRequiredMediaForTest(
+    withCanonicalPrivateMediaIdentityForTest(submittedFixture()),
+  );
   const issue = routeIssueInput(submitted);
   return {
     ...submitted,

@@ -143,7 +143,7 @@ describe("Supabase persistence failure paths", () => {
         safeCode: "storage.upload_media:upload:S3Error",
         retryable: true,
       },
-      userMessage: "Media upload failed. No uploaded file was marked complete.",
+      userMessage: "Не удалось загрузить файл. Он не был отмечен как загруженный.",
     });
   });
 
@@ -178,7 +178,7 @@ describe("Supabase persistence failure paths", () => {
         safeCode: "storage.delete_media:storage:S3Error",
         retryable: true,
       },
-      userMessage: "Supabase storage could not complete the file action.",
+      userMessage: "Не удалось выполнить действие с файлом. Повторите попытку.",
     });
   });
 
@@ -213,7 +213,7 @@ describe("Supabase persistence failure paths", () => {
         safeCode: "storage.download_media:storage:S3Error",
         retryable: true,
       },
-      userMessage: "Supabase storage could not complete the file action.",
+      userMessage: "Не удалось выполнить действие с файлом. Повторите попытку.",
     });
   });
 
@@ -241,7 +241,7 @@ describe("Supabase persistence failure paths", () => {
         retryable: false,
       },
       userMessage:
-        "Access was denied by Supabase policy. Ask an operator to confirm access.",
+        "Недостаточно прав для этого действия. Обратитесь к администратору.",
     });
     expect(rpc).toHaveBeenCalledWith("save_submission_draft", {
       payload: expect.any(Object),
@@ -271,7 +271,7 @@ describe("Supabase persistence failure paths", () => {
         safeCode: "auth.sign_in_password:auth:HTTP_400",
         retryable: false,
       },
-      userMessage: "Unable to sign in. Check email, password, and Supabase profile.",
+      userMessage: "Не удалось войти. Проверьте email и пароль.",
     });
   });
 
@@ -295,7 +295,7 @@ describe("Supabase persistence failure paths", () => {
         kind: "auth",
         retryable: true,
       },
-      userMessage: expect.stringMatching(/Supabase|sign/i),
+      userMessage: "Не удалось войти. Проверьте email и пароль.",
     });
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(signOut).toHaveBeenCalledWith({ scope: "local" });

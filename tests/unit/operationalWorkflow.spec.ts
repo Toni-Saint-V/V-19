@@ -100,7 +100,7 @@ describe("operational workflow logic spine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Questionnaire and files must be complete.",
+        message: "Заполните обязательные поля анкеты и загрузите все нужные файлы.",
       },
     });
   });

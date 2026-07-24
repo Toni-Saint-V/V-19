@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
   requiredMigrationOrder,
   requiredMigrationsInActualOrder,
+  requiredRemoteMigrationOrder,
   undeclaredMigrationFiles,
 } from "./supabase-migration-contract.mjs";
 
@@ -234,6 +235,32 @@ function verifyMigrationOrder() {
     );
   } else {
     pass("No undeclared Supabase migrations exist outside promotion order");
+  }
+
+  const expectedLateRemoteOrder = [
+    "20260724094952_20260724084304_allow_agent_ready_for_export_resubmission",
+    "20260724172604_20260724132405_agent_correction_confirmation",
+    "20260724191643_20260718190000_global_submission_public_numbers",
+    "20260724191652_20260719160000_assign_public_number_after_questionnaire",
+    "20260724191701_20260720000000_export_package_media_only_file_count",
+    "20260724191712_20260722000000_harden_workflow_rpc_anon_execute",
+    "20260724191726_20260722001000_admin_submission_batch_concurrency",
+    "20260724191737_20260722002000_access_request_review_claim",
+    "20260724191750_20260722003000_atomic_return_package_artifact_upload",
+    "20260724191927_20260724221841_repair_out_of_order_submission_schema",
+    "20260724200418_20260724234200_server_owned_correction_targets",
+    "20260724204041_20260725003000_harden_correction_validation_topology",
+  ];
+  const lateRemoteOrder = requiredRemoteMigrationOrder.filter((migration) =>
+    expectedLateRemoteOrder.includes(migration),
+  );
+  if (lateRemoteOrder.join("\n") === expectedLateRemoteOrder.join("\n")) {
+    pass("Remote migration contract includes the complete late production chain");
+  } else {
+    fail(
+      "Remote migration contract includes the complete late production chain",
+      `Expected ${expectedLateRemoteOrder.join(" -> ")}`,
+    );
   }
 }
 
@@ -904,6 +931,7 @@ function verifyDocsAndScripts() {
     "npm run verify:local-readiness",
     "npm run verify:auth-data-readiness",
     "npm run verify:supabase-release",
+    "npm run verify:supabase-live-registry",
     "npm run verify:production-packet",
   ];
   const readme = readProjectFile(supabaseReadmePath, "Supabase README exists");
@@ -1001,6 +1029,20 @@ function verifyDocsAndScripts() {
     );
   }
 
+  if (
+    hasScriptCommand(
+      verifyFullCommands,
+      "npm run verify:supabase-live-registry",
+    )
+  ) {
+    pass("verify:full includes live Supabase registry gate");
+  } else {
+    fail(
+      "verify:full includes live Supabase registry gate",
+      "npm run verify:full must include npm run verify:supabase-live-registry",
+    );
+  }
+
   if (hasScriptCommand(verifyFullCommands, "npm run verify:auth-data-readiness")) {
     pass("verify:full includes Auth/Data readiness gate");
   } else {
@@ -1041,21 +1083,28 @@ function verifyDocsAndScripts() {
     verifyFullCommands,
     "npm run verify:production-packet",
   );
+  const liveRegistryIndex = commandIndex(
+    verifyFullCommands,
+    "npm run verify:supabase-live-registry",
+  );
   if (
     localReadinessIndex > -1 &&
     authDataReadinessIndex > -1 &&
     supabaseReleaseIndex > -1 &&
+    liveRegistryIndex > -1 &&
     productionPacketIndex > -1 &&
     authDataReadinessIndex > localReadinessIndex &&
     supabaseReleaseIndex > authDataReadinessIndex &&
     productionPacketIndex > localReadinessIndex &&
-    productionPacketIndex > supabaseReleaseIndex
+    productionPacketIndex > supabaseReleaseIndex &&
+    liveRegistryIndex > supabaseReleaseIndex &&
+    productionPacketIndex > liveRegistryIndex
   ) {
     pass("verify:full runs production packet after local release proof");
   } else {
     fail(
       "verify:full runs production packet after local release proof",
-      "npm run verify:production-packet must run after npm run verify:local-readiness, npm run verify:auth-data-readiness, and npm run verify:supabase-release so fail-closed production blockers do not hide local proof",
+      "npm run verify:production-packet must run after local/auth/release/live-registry proof so fail-closed production blockers do not hide local proof",
     );
   }
 

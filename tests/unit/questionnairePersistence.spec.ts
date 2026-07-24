@@ -65,7 +65,7 @@ describe("questionnaire persistence", () => {
     expect(completed.history[0]?.text).toBe("Анкета сохранена");
   });
 
-  test("keeps legacy issue labels attached to renamed questionnaire fields", () => {
+  test("maps legacy issue labels to renamed fields and clears guidance after edit", () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -99,6 +99,10 @@ describe("questionnaire persistence", () => {
       edited.applicants[0]?.sections
         .flatMap((section) => section.fields)
         .find((field) => field.id === "passport-expiry-date")?.error,
-    ).toBe("Требует проверки");
+    ).toBeUndefined();
+    expect(edited.issues[0]).toMatchObject({
+      status: "open",
+      targetRevision: 1,
+    });
   });
 });

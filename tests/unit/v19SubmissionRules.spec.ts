@@ -78,6 +78,7 @@ import {
   canPerformAction,
   defaultDrawerTab,
   hasMissingRequiredWork,
+  isAgentIssueCorrectionConfirmed,
   markSubmissionIssueFixedResult,
   transitionMatrix,
 } from "../../src/modules/submissions/status";
@@ -94,6 +95,7 @@ import {
   adminApprovePassportFieldsForTest,
   adminApproveQuestionnaireForTest,
   fillRequiredQuestionnaireForTest,
+  withCanonicalPrivateMediaIdentityForTest,
 } from "./helpers/questionnaireTestFill";
 
 const canonicalMediaTypes = ["passport_scan", "selfie", "selfie_2"] as const;
@@ -1268,7 +1270,7 @@ describe("V-19 submission actions", () => {
 
     expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
       ok: false,
-      reason: "Сначала отметьте замечания исправленными",
+      reason: "Сохраните исправления по всем замечаниям",
     });
 
     const withSelfieReplacement = applyUploadedFileMetadata(returned, selfieFile.id, {
@@ -1293,7 +1295,7 @@ describe("V-19 submission actions", () => {
       canPerformAction(withSelfieReplacement, "submit_corrections", "agent"),
     ).toEqual({
       ok: false,
-      reason: "Сначала отметьте замечания исправленными",
+      reason: "Сохраните исправления по всем замечаниям",
     });
 
     const withAllReplacements = applyUploadedFileMetadata(
@@ -1311,7 +1313,10 @@ describe("V-19 submission actions", () => {
     );
     expect(
       canPerformAction(withAllReplacements, "submit_corrections", "agent"),
-    ).toEqual({ ok: true });
+    ).toEqual({
+      ok: false,
+      reason: "Сохраните исправления по всем замечаниям",
+    });
 
     const withExtractedPassport = finishPassportExtraction(
       withAllReplacements,
@@ -1343,39 +1348,25 @@ describe("V-19 submission actions", () => {
       "verified",
     );
 
-    expect(
-      canPerformAction(withVerifiedPassport, "submit_corrections", "agent"),
-    ).toEqual({
-      ok: true,
-    });
+    let submittedCorrections = withVerifiedPassport;
+    for (const issue of withVerifiedPassport.issues) {
+      const confirmation = markSubmissionIssueFixedResult(
+        submittedCorrections,
+        issue.id,
+        "agent",
+      );
+      if (!confirmation.ok) throw new Error(confirmation.error.message);
+      submittedCorrections = confirmation.data;
+    }
 
-    const withFixedIssues = withVerifiedPassport;
-    const queue = agentActionQueue([withFixedIssues]);
-
-    expect(
-      canPerformAction(withFixedIssues, "submit_corrections", "agent"),
-    ).toEqual({
-      ok: true,
-    });
-    expect(queue.open).toHaveLength(1);
-    expect(queue.open[0]).toMatchObject({
-      context: "Отправить исправления",
-      cta: "Отправить",
-      tab: "issues",
-      title: "Ивановы",
-    });
-
-    const submittedCorrections = applySubmissionAction(
-      withFixedIssues,
-      "submit_corrections",
-      "agent",
-    );
-
-    expect(submittedCorrections.status).toBe("corrections_received");
+    expect(submittedCorrections.status).toBe("returned");
     expect(submittedCorrections.issues.map((issue) => issue.status)).toEqual([
-      "fixed_by_agent",
-      "fixed_by_agent",
+      "open",
+      "open",
     ]);
+    const queue = agentActionQueue([submittedCorrections]);
+    expect(queue.open).toHaveLength(1);
+    expect(queue.completed).toHaveLength(0);
   });
 
   it("keeps the local agent queue scoped to the current owner", () => {
@@ -2265,12 +2256,12 @@ describe("V-19 submission actions", () => {
       edited.applicants[0]?.sections
         .find((section) => section.title === "Поездка")
         ?.fields.find((field) => field.label === "Страна первого въезда")?.error,
-    ).toBe("Нужно уточнить маршрут поездки");
+    ).toBeUndefined();
 
     const returned = applySubmissionAction(edited, "return_with_issues", "admin");
     expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
       ok: false,
-      reason: "Сначала отметьте замечания исправленными",
+      reason: "Сохраните исправления по всем замечаниям",
     });
 
     const fixed = markSubmissionIssueFixedResult(
@@ -2285,7 +2276,13 @@ describe("V-19 submission actions", () => {
       "agent",
     );
 
-    expect(corrected.issues[0]?.status).toBe("fixed_by_agent");
+    expect(corrected.issues[0]).toMatchObject({
+      status: "open",
+      agentConfirmation: {
+        targetRevision: expect.any(Number),
+      },
+    });
+    expect(corrected.status).toBe("returned");
     expect(
       corrected.applicants[0]?.sections
         .find((section) => section.title === "Поездка")
@@ -2334,6 +2331,15 @@ describe("V-19 submission actions", () => {
     const fixed = markSubmissionIssueFixedResult(returned, routeIssue.id, "agent");
     if (!fixed.ok) throw new Error(fixed.error.code);
 
+    expect(fixed.data.status).toBe("returned");
+    expect(
+      fixed.data.issues.find((issue) => issue.id === routeIssue.id),
+    ).toMatchObject({
+      status: "open",
+      agentConfirmation: {
+        targetRevision: expect.any(Number),
+      },
+    });
     expect(
       fixed.data.issues.find(
         (issue) => issue.target.field === "Основная страна назначения",
@@ -2347,7 +2353,7 @@ describe("V-19 submission actions", () => {
     ).toBe("Нужно подтвердить основную страну назначения");
   });
 
-  it("captures the fallback target snapshot for a general admin issue", () => {
+  it("rejects a general admin issue without a precise canonical target", () => {
     const submission = byId("ПД-1053");
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Missing applicant");
@@ -2360,23 +2366,8 @@ describe("V-19 submission actions", () => {
       severity: "blocker",
       type: "field",
     });
-    const issue = withIssue.issues[0];
-    if (!issue) throw new Error("Missing issue");
-    const routeValue = submission.applicants[0]?.sections
-      .flatMap((section) => section.fields)
-      .find((field) => field.id === "first-entry-country")?.value;
-
-    expect(issue.target.field).toBe("Маршрут поездки");
-    expect(issue.snapshot).toBe(routeValue);
-
-    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
-    expect(markSubmissionIssueFixedResult(returned, issue.id, "agent")).toEqual({
-      ok: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Issue target must be corrected before it can be marked fixed.",
-      },
-    });
+    expect(withIssue).toBe(submission);
+    expect(withIssue.issues).toEqual(submission.issues);
   });
 
   it("blocks marking a returned issue fixed until its target changes", () => {
@@ -2394,9 +2385,418 @@ describe("V-19 submission actions", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target must be corrected before it can be marked fixed.",
+        message: "Нужно уточнить маршрут поездки",
       },
     });
+  });
+
+  it("blocks confirmation for invalid email and an explicit field error", () => {
+    const source = fillRequiredQuestionnaireForTest(
+      createDraftSubmission({
+        city: "Москва",
+        familyCount: 1,
+        submissions: [],
+        type: "single",
+      }),
+    );
+    const applicant = source.applicants[0];
+    const emailSection = applicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "email"),
+    );
+    const emailField = emailSection?.fields.find((field) => field.id === "email");
+    if (!applicant || !emailSection || !emailField) {
+      throw new Error("Missing email fixture");
+    }
+    const reviewed = addPreciseAdminIssue(
+      { ...source, status: "submitted_for_review" },
+      {
+        applicantId: applicant.id,
+        comment: "Укажите корректный email.",
+        field: emailField.label,
+        reason: "Email указан неверно",
+        section: emailSection.title,
+        severity: "blocker",
+        type: "field",
+      },
+    );
+    const returned = applySubmissionAction(
+      reviewed,
+      "return_with_issues",
+      "admin",
+    );
+    const invalidEmail = updateQuestionnaireField(returned, {
+      applicantId: applicant.id,
+      fieldId: emailField.id,
+      sectionId: emailSection.id,
+      value: "not-an-email",
+    });
+    const issueId = invalidEmail.issues[0]?.id;
+    if (!issueId) throw new Error("Missing email issue");
+
+    expect(markSubmissionIssueFixedResult(invalidEmail, issueId, "agent")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Проверьте формат email",
+      },
+    });
+
+    const explicitFieldError: Submission = {
+      ...invalidEmail,
+      applicants: invalidEmail.applicants.map((candidate) =>
+        candidate.id !== applicant.id
+          ? candidate
+          : {
+              ...candidate,
+              sections: candidate.sections.map((section) => ({
+                ...section,
+                fields: section.fields.map((field) =>
+                  field.id === emailField.id
+                    ? {
+                        ...field,
+                        error: "Исправьте email по данным заявителя",
+                        value: "new@example.com",
+                      }
+                    : field,
+                ),
+              })),
+            },
+      ),
+    };
+    expect(
+      markSubmissionIssueFixedResult(explicitFieldError, issueId, "agent"),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Исправьте email по данным заявителя",
+      },
+    });
+
+    const postalSection = applicant.sections.find((section) =>
+      section.fields.some((field) => field.id === "postal-code"),
+    );
+    const postalField = postalSection?.fields.find(
+      (field) => field.id === "postal-code",
+    );
+    if (!postalSection || !postalField) throw new Error("Missing postal field");
+    const postalIssue = addPreciseAdminIssue(
+      { ...source, status: "submitted_for_review" },
+      {
+        applicantId: applicant.id,
+        comment: "Укажите индекс в формате BLS.",
+        field: postalField.label,
+        reason: "Индекс указан неверно",
+        section: postalSection.title,
+        severity: "blocker",
+        type: "field",
+      },
+    );
+    const postalReturned = applySubmissionAction(
+      postalIssue,
+      "return_with_issues",
+      "admin",
+    );
+    const invalidPostal = updateQuestionnaireField(postalReturned, {
+      applicantId: applicant.id,
+      fieldId: postalField.id,
+      sectionId: postalSection.id,
+      value: "!",
+    });
+    expect(
+      markSubmissionIssueFixedResult(
+        invalidPostal,
+        invalidPostal.issues[0]?.id ?? "",
+        "agent",
+      ),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Введите индекс: 3–16 букв или цифр, можно пробел и дефис",
+      },
+    });
+  });
+
+  it("keeps corrected issues returned until questionnaire and media are complete", () => {
+    const incomplete = byId("ПД-1053");
+    const withIssue = addPreciseAdminIssue(
+      { ...incomplete, status: "submitted_for_review" },
+      routeIssueInput(incomplete),
+    );
+    const returned = applySubmissionAction(
+      withIssue,
+      "return_with_issues",
+      "admin",
+    );
+    const applicant = returned.applicants[0];
+    const routeSection = applicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "first-entry-country"),
+    );
+    if (!applicant || !routeSection || !returned.issues[0]) {
+      throw new Error("Missing returned fixture");
+    }
+    const edited = updateQuestionnaireField(returned, {
+      applicantId: applicant.id,
+      fieldId: "first-entry-country",
+      sectionId: routeSection.id,
+      value: "Spain via Madrid",
+    });
+    const confirmed = markSubmissionIssueFixedResult(
+      edited,
+      returned.issues[0].id,
+      "agent",
+    );
+    expect(confirmed).toMatchObject({
+      ok: true,
+      data: {
+        status: "returned",
+        issues: [expect.objectContaining({ status: "open" })],
+      },
+    });
+
+    const ready = withCanonicalPrivateMediaIdentityForTest(
+      uploadRequiredFiles(fillRequiredQuestionnaireForTest(incomplete)),
+    );
+    const readyWithIssue = addPreciseAdminIssue(
+      { ...ready, status: "submitted_for_review" },
+      routeIssueInput(ready),
+    );
+    const readyReturned = applySubmissionAction(
+      readyWithIssue,
+      "return_with_issues",
+      "admin",
+    );
+    const readyApplicant = readyReturned.applicants[0];
+    const readyRouteSection = readyApplicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "first-entry-country"),
+    );
+    const missingFile = readyReturned.files[0];
+    if (!readyApplicant || !readyRouteSection || !missingFile) {
+      throw new Error("Missing ready fixture");
+    }
+    const correctedWithMissingMedia = updateQuestionnaireField(
+      {
+        ...readyReturned,
+        files: readyReturned.files.map((file) =>
+          file.id === missingFile.id
+            ? { ...file, status: "missing" as const }
+            : file,
+        ),
+      },
+      {
+        applicantId: readyApplicant.id,
+        fieldId: "first-entry-country",
+        sectionId: readyRouteSection.id,
+        value: "Spain via Madrid",
+      },
+    );
+    const mediaBlocked = markSubmissionIssueFixedResult(
+      correctedWithMissingMedia,
+      readyReturned.issues[0]?.id ?? "",
+      "agent",
+    );
+    expect(mediaBlocked).toMatchObject({
+      ok: true,
+      data: { status: "returned" },
+    });
+  });
+
+  it("invalidates confirmation after target change and revert", () => {
+    const source = byId("ПД-1053");
+    const withIssue = addPreciseAdminIssue(
+      { ...source, status: "submitted_for_review" },
+      routeIssueInput(source),
+    );
+    const returned = applySubmissionAction(
+      withIssue,
+      "return_with_issues",
+      "admin",
+    );
+    const applicant = returned.applicants[0];
+    const routeSection = applicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "first-entry-country"),
+    );
+    const issue = returned.issues[0];
+    if (!applicant || !routeSection || !issue) throw new Error("Missing issue");
+
+    const firstEdit = updateQuestionnaireField(returned, {
+      applicantId: applicant.id,
+      fieldId: "first-entry-country",
+      sectionId: routeSection.id,
+      value: "Spain via Madrid",
+    });
+    const firstConfirmation = markSubmissionIssueFixedResult(
+      firstEdit,
+      issue.id,
+      "agent",
+      "2026-07-24T12:00:00.000Z",
+    );
+    if (!firstConfirmation.ok) throw new Error(firstConfirmation.error.message);
+    const confirmedIssue = firstConfirmation.data.issues[0];
+    if (!confirmedIssue) throw new Error("Missing confirmed issue");
+
+    const changed = updateQuestionnaireField(firstConfirmation.data, {
+      applicantId: applicant.id,
+      fieldId: "first-entry-country",
+      sectionId: routeSection.id,
+      value: "France",
+    });
+    const reverted = updateQuestionnaireField(changed, {
+      applicantId: applicant.id,
+      fieldId: "first-entry-country",
+      sectionId: routeSection.id,
+      value: "Spain via Madrid",
+    });
+    const revertedIssue = reverted.issues[0];
+    if (!revertedIssue) throw new Error("Missing reverted issue");
+
+    expect(revertedIssue.targetRevision).toBe(
+      (confirmedIssue.targetRevision ?? 0) + 2,
+    );
+    expect(revertedIssue.agentConfirmation).toBeUndefined();
+    expect(isAgentIssueCorrectionConfirmed(reverted, revertedIssue)).toBe(false);
+  });
+
+  it("aligns client correction revision with the server semantic projection", () => {
+    const source = byId("ПД-1053");
+    const withIssue = addPreciseAdminIssue(
+      { ...source, status: "submitted_for_review" },
+      routeIssueInput(source),
+    );
+    const returned = applySubmissionAction(
+      withIssue,
+      "return_with_issues",
+      "admin",
+    );
+    const applicant = returned.applicants[0];
+    const routeSection = applicant?.sections.find((section) =>
+      section.fields.some((field) => field.id === "first-entry-country"),
+    );
+    const issue = returned.issues[0];
+    if (!applicant || !routeSection || !issue) throw new Error("Missing issue");
+
+    const value = routeSection.fields.find(
+      (field) => field.id === "first-entry-country",
+    )?.value;
+    if (value === undefined) throw new Error("Missing route value");
+
+    const metadataOnly = updateQuestionnaireField(returned, {
+      applicantId: applicant.id,
+      error: "Локальная подсказка",
+      fieldId: "first-entry-country",
+      reviewSource: "manual",
+      sectionId: routeSection.id,
+      value,
+    });
+    expect(metadataOnly.issues[0]?.targetRevision).toBe(issue.targetRevision);
+
+    const canonicalReviewChange = updateQuestionnaireField(metadataOnly, {
+      applicantId: applicant.id,
+      fieldId: "first-entry-country",
+      reviewState: "needs_review",
+      sectionId: routeSection.id,
+      value,
+    });
+    expect(canonicalReviewChange.issues[0]?.targetRevision).toBe(
+      (issue.targetRevision ?? 0) + 1,
+    );
+  });
+
+  it("keeps semantic passport JSON key order independent of confirmation", () => {
+    const source = byId("ПД-1053");
+    const applicant = source.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const issue = {
+      id: "passport-json-order",
+      type: "field" as const,
+      targetRevision: 4,
+      agentConfirmation: {
+        confirmedAtIso: "2026-07-24T12:00:00.000Z",
+        targetRevision: 4,
+      },
+      target: {
+        applicantId: applicant.id,
+        applicantName: applicant.fullName,
+        section: "Паспорт",
+        field: "Распознанные данные паспорта",
+      },
+      reason: "Проверьте паспорт",
+      comment: "",
+      severity: "blocker" as const,
+      status: "open" as const,
+      createdBy: "admin" as const,
+      createdAt: "2026-07-24T11:00:00.000Z",
+    };
+    const first: Submission = {
+      ...source,
+      issues: [issue],
+      applicants: source.applicants.map((candidate) =>
+        candidate.id === applicant.id
+          ? {
+              ...candidate,
+              passportExtraction: {
+                status: "unavailable",
+                summary: "same",
+                extractedFields: [],
+                appliedFieldKeys: [],
+              },
+            }
+          : candidate,
+      ),
+    };
+    const reordered = structuredClone(first);
+    const reorderedApplicant = reordered.applicants.find(
+      (candidate) => candidate.id === applicant.id,
+    );
+    if (!reorderedApplicant) throw new Error("Missing reordered applicant");
+    reorderedApplicant.passportExtraction = {
+      appliedFieldKeys: [],
+      extractedFields: [],
+      summary: "same",
+      status: "unavailable",
+    };
+
+    expect(isAgentIssueCorrectionConfirmed(first, issue)).toBe(true);
+    expect(isAgentIssueCorrectionConfirmed(reordered, reordered.issues[0]!)).toBe(
+      true,
+    );
+  });
+
+  it("keeps the compatibility confirmation timestamp ISO-compatible", () => {
+    const source = byId("ПД-1053");
+    const withIssue = addPreciseAdminIssue(
+      { ...source, status: "submitted_for_review" },
+      routeIssueInput(source),
+    );
+    const returned = applySubmissionAction(
+      withIssue,
+      "return_with_issues",
+      "admin",
+    );
+    const applicant = returned.applicants[0];
+    const section = applicant?.sections.find((candidate) =>
+      candidate.fields.some((field) => field.id === "first-entry-country"),
+    );
+    if (!applicant || !section) throw new Error("Missing route field");
+    const edited = updateQuestionnaireField(returned, {
+      applicantId: applicant.id,
+      fieldId: "first-entry-country",
+      sectionId: section.id,
+      value: "Spain via Madrid",
+    });
+    const confirmed = markSubmissionIssueFixedResult(
+      edited,
+      edited.issues[0]?.id ?? "",
+      "agent",
+    );
+    if (!confirmed.ok) throw new Error(confirmed.error.message);
+    const confirmedAtIso =
+      confirmed.data.issues[0]?.agentConfirmation?.confirmedAtIso;
+    expect(confirmedAtIso).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
+    expect(confirmedAtIso).not.toBe("сейчас");
   });
 
   it("updates export state and marks downloaded submissions exported", () => {
@@ -2587,7 +2987,17 @@ describe("V-19 ББ helper suggestions", () => {
     expect(fixed).toMatchObject({
       ok: true,
       data: {
-        issues: [expect.objectContaining({ status: "fixed_by_agent" })],
+        issues: [
+          expect.objectContaining({
+            status: "open",
+            agentConfirmation: {
+              confirmedAtIso: expect.stringMatching(
+                /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+              ),
+              targetRevision: expect.any(Number),
+            },
+          }),
+        ],
       },
     });
   });
@@ -2863,14 +3273,14 @@ describe("V-19 persistence boundary", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Issue target must be corrected before it can be marked fixed.",
+        message: "Загрузите новый файл для замечания «Селфи 1», затем повторите.",
       },
     });
 
     const uploaded = uploadRequiredFile(normalized, targetFile.id);
 
     expect(uploaded.issues.find((item) => item.id === issue.id)?.status).toBe(
-      "fixed_by_agent",
+      "open",
     );
   });
 

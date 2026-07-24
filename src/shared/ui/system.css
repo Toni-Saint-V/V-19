@@ -30458,8 +30458,12 @@ section[data-testid="agent-actions-screen"]
 }
 
 .access-brand-panel {
+  gap: var(--v19b-size-28) !important;
+  padding: var(--v19b-size-32) !important;
   border-color: var(--v19b-color-app) !important;
   background: var(--v19b-color-app) !important;
+  box-shadow: inset 0 0 0 var(--v19b-size-1)
+    var(--v19b-color-border-faint) !important;
 }
 
 .access-card {
@@ -30474,8 +30478,93 @@ section[data-testid="agent-actions-screen"]
 
 .access-brand-logo {
   display: block !important;
-  margin-bottom: var(--vf-ref-size-20px) !important;
-  margin-left: var(--vf-ref-size-150px) !important;
+  width: var(--v19b-size-80) !important;
+  height: var(--v19b-size-80) !important;
+  margin: 0 !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-panel) !important;
+  object-fit: cover !important;
+}
+
+.access-brand-lockup {
+  display: flex !important;
+  width: 100% !important;
+  align-items: center !important;
+  gap: var(--v19b-size-16) !important;
+}
+
+.access-brand-identity {
+  display: grid;
+  min-width: 0;
+  gap: var(--v19b-size-4);
+}
+
+.access-brand-product {
+  display: flex;
+  align-items: center;
+  gap: var(--v19b-size-8);
+  color: var(--vf-text-primary);
+  font-size: var(--v19b-size-22);
+  font-weight: var(--vf-ref-font-weight-690);
+  line-height: var(--vf-ref-line-height-1neg-08);
+}
+
+.access-brand-product span {
+  display: inline-flex;
+  min-height: var(--v19b-size-24);
+  align-items: center;
+  padding-inline: var(--v19b-size-8);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-pill);
+  color: var(--v19b-color-primary-text);
+  background: var(--v19b-color-primary-soft-10);
+  font-size: var(--v19b-size-10);
+  font-weight: var(--v19b-weight-control);
+  letter-spacing: 0.04em;
+}
+
+.access-brand-caption {
+  color: var(--vf-text-secondary);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--vf-ref-line-height-1neg-35);
+}
+
+.access-brand-message {
+  margin-top: 0 !important;
+}
+
+.access-brand-title {
+  max-width: var(--v19b-size-400);
+  color: var(--vf-text-primary);
+}
+
+.access-brand-text {
+  color: var(--vf-text-secondary);
+}
+
+.access-brand-trust {
+  display: inline-flex;
+  width: fit-content;
+  min-height: var(--v19b-size-40);
+  align-items: center;
+  gap: var(--v19b-size-8);
+  margin-top: var(--v19b-size-20);
+  padding-inline: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  color: var(--vf-text-secondary);
+  background: var(--v19b-color-control);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--vf-ref-line-height-1neg-35);
+}
+
+.access-brand-trust svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  flex: none;
+  color: var(--v19b-color-primary-text);
 }
 
 .access-card h1,
@@ -30816,28 +30905,77 @@ section[data-testid="agent-actions-screen"]
   }
 
   .access-brand-panel {
-    min-height: var(--v19b-size-96) !important;
+    min-height: calc(var(--v19b-size-96) + var(--v19b-size-16)) !important;
     align-content: center !important;
+    gap: var(--v19b-size-8) !important;
     justify-items: center !important;
+    padding: var(--v19b-size-12) var(--v19b-size-16) !important;
     text-align: center !important;
   }
 
   .access-brand-lockup {
     display: flex !important;
+    width: auto !important;
+    align-items: center !important;
+    gap: var(--v19b-size-10) !important;
     justify-content: center !important;
     justify-self: center !important;
-    width: 100% !important;
   }
 
   .access-brand-logo {
     display: block !important;
-    width: var(--v19b-size-96) !important;
+    width: var(--v19b-size-52) !important;
     max-width: var(--v19b-size-full) !important;
-    height: auto !important;
+    height: var(--v19b-size-52) !important;
     margin-bottom: 0 !important;
     margin-inline: auto !important;
     object-fit: contain !important;
     object-position: center center !important;
+  }
+
+  .access-brand-identity {
+    gap: var(--v19b-size-2);
+    text-align: left;
+  }
+
+  .access-brand-product {
+    gap: var(--v19b-size-6);
+    font-size: var(--v19b-size-16);
+  }
+
+  .access-brand-product span {
+    min-height: var(--v19b-size-20);
+    padding-inline: var(--v19b-size-6);
+    font-size: var(--v19b-size-9);
+  }
+
+  .access-brand-caption {
+    font-size: var(--v19b-size-11);
+  }
+
+  .access-brand-message {
+    margin-top: 0 !important;
+  }
+
+  .access-brand-title,
+  .access-brand-text {
+    display: none;
+  }
+
+  .access-brand-trust {
+    min-height: 0;
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+    color: var(--vf-text-muted);
+    background: transparent;
+    font-size: var(--v19b-size-10);
+    line-height: var(--vf-ref-line-height-1neg-3);
+  }
+
+  .access-brand-trust svg {
+    width: var(--v19b-size-12);
+    height: var(--v19b-size-12);
   }
 
   .access-card {
@@ -30859,15 +30997,15 @@ section[data-testid="agent-actions-screen"]
 
   .access-card .access-password-control input {
     padding-right: calc(
-      var(--v19b-size-40) + var(--v19b-size-12)
+      var(--v19b-size-44) + var(--v19b-size-12)
     ) !important;
   }
 
   .access-card .access-password-control .access-password-toggle {
-    width: var(--v19b-size-40) !important;
-    min-width: var(--v19b-size-40) !important;
-    height: var(--v19b-size-40) !important;
-    min-height: var(--v19b-size-40) !important;
+    width: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
   }
 
   .access-card
