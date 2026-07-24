@@ -6,7 +6,7 @@ import type { SubmissionFile } from "../modules/submissions/types";
 export type ReviewMediaPreviewState = {
   reason?: "expired_or_error" | "missing" | "rejected";
   retryable?: boolean;
-  status: "loading" | "ready" | "unavailable";
+  status: "idle" | "loading" | "ready" | "unavailable";
   url?: string;
 };
 
@@ -93,7 +93,10 @@ export function ReviewMediaPreview({
   const externalViewer = needsExternalViewer(file);
   const embeddedMedia = Boolean(previewUrl && !externalViewer && !pdfFile);
   const mediaReady = Boolean(previewUrl && loadedMediaUrl === previewUrl);
-  const mediaPending = preview.status === "loading" || (embeddedMedia && !mediaReady);
+  const mediaPending =
+    preview.status === "idle" ||
+    preview.status === "loading" ||
+    (embeddedMedia && !mediaReady);
   const unavailable = unavailableCopy(file, preview);
 
   useEffect(() => {
@@ -134,7 +137,7 @@ export function ReviewMediaPreview({
       </span>
 
       <div aria-busy={mediaPending} className="v19-review-preview-canvas">
-        {preview.status === "loading" ? (
+        {preview.status === "idle" || preview.status === "loading" ? (
           <LoadingPreviewState />
         ) : previewUrl ? (
           pdfFile ? (

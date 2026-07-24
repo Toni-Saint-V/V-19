@@ -108,7 +108,7 @@ function decisionReadySubmission(): Submission {
 }
 
 describe("ReviewWorkspace perceived feedback", () => {
-  test("reveals the passport without waiting for slower selfie URLs", async () => {
+  test("loads originals on demand and blocks confirmation until every required file is opened", async () => {
     const submission = reviewSubmission();
     const passport = deferred<string>();
     const selfie = deferred<string>();
@@ -126,6 +126,7 @@ describe("ReviewWorkspace perceived feedback", () => {
       <ReviewWorkspace
         applicantId={submission.applicants[0]?.id}
         onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
         onBack={() => undefined}
         submission={submission}
         submissionId={submission.id}
@@ -133,7 +134,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     );
 
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
     expect(screen.getAllByText("Загружаем оригинал")[0]).toBeVisible();
 
@@ -158,12 +159,44 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(passportImage).toHaveClass("is-loading");
     expect(fileStatus).toHaveAttribute(
       "aria-label",
-      "Оригиналы: загружается 2; доступно 1 из 3",
+      "Оригиналы: не просмотрено 2; доступно 1 из 3",
     );
 
     fireEvent.load(passportImage);
 
     await waitFor(() => expect(passportImage).toHaveClass("is-ready"));
+    const confirmButton = screen.getByRole("button", {
+      name: "Подтвердить паспортную секцию",
+    });
+    expect(confirmButton).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Откройте и проверьте каждый обязательный оригинал перед подтверждением.",
+      ),
+    ).toBeVisible();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
+    await waitFor(() =>
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
+    );
+    await act(async () => {
+      selfie.resolve("https://media.test/selfie.jpg");
+      await selfie.promise;
+    });
+    expect(
+      await screen.findByRole("img", { name: "Первое селфи заявителя" }),
+    ).toHaveAttribute("src", "https://media.test/selfie.jpg");
+    expect(confirmButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
+    await waitFor(() =>
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+    );
+    await act(async () => {
+      secondSelfie.resolve("https://media.test/selfie-2.jpg");
+      await secondSelfie.promise;
+    });
+    await waitFor(() => expect(confirmButton).toBeEnabled());
   });
 
   test("shows a warning only after protected media becomes unavailable", async () => {
@@ -185,7 +218,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     );
 
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
     const fileStatus = document.querySelector(
       ".v19-review-status-strip > span:nth-child(3)",
@@ -202,27 +235,18 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(fileStatus).not.toHaveClass("is-loading");
     expect(fileStatus).toHaveAttribute(
       "aria-label",
-      "Оригиналы: недоступно 1; загружается 2; доступно 0 из 3",
+      "Оригиналы: недоступно 1; не просмотрено 2; доступно 0 из 3",
     );
     expect(
       screen.getByText(
         "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи.",
       ),
     ).toBeVisible();
-
-    await act(async () => {
-      for (const request of mediaRequests.slice(1)) {
-        request.reject(new Error("offline"));
-      }
-      await Promise.allSettled(
-        mediaRequests.slice(1).map((request) => request.promise),
-      );
-    });
   });
 
   test("retries a transient signed URL failure without reopening the workspace", async () => {
     const submission = reviewSubmission();
-    const requests = Array.from({ length: 6 }, () => deferred<string>());
+    const requests = Array.from({ length: 2 }, () => deferred<string>());
     let requestIndex = 0;
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
       () => requests[requestIndex++]?.promise ?? Promise.resolve(""),
@@ -238,7 +262,7 @@ describe("ReviewWorkspace perceived feedback", () => {
       />,
     );
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
 
     await act(async () => {
@@ -247,12 +271,12 @@ describe("ReviewWorkspace perceived feedback", () => {
     });
     fireEvent.click(await screen.findByRole("button", { name: "Повторить загрузку" }));
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(6),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
     );
 
     await act(async () => {
-      requests[3]?.resolve("https://media.test/retried-passport.jpg");
-      await requests[3]?.promise;
+      requests[1]?.resolve("https://media.test/retried-passport.jpg");
+      await requests[1]?.promise;
     });
 
     expect(
@@ -297,9 +321,7 @@ describe("ReviewWorkspace perceived feedback", () => {
       ),
     ).toBeVisible();
     expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
-    await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
-    );
+    expect(mediaStorage.createMediaSignedUrl).not.toHaveBeenCalled();
     expect(
       screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
     ).toBeDisabled();
@@ -335,15 +357,13 @@ describe("ReviewWorkspace perceived feedback", () => {
 
     expect(screen.getByText("Оригинал нельзя принять")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
-    await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
-    );
+    expect(mediaStorage.createMediaSignedUrl).not.toHaveBeenCalled();
   });
 
   test("ignores signed URLs from the previously selected applicant", async () => {
     const firstSubmission = reviewSubmission("з-1053-1");
     const nextSubmission = reviewSubmission("з-2053-1");
-    const requests = Array.from({ length: 6 }, () => deferred<string>());
+    const requests = Array.from({ length: 2 }, () => deferred<string>());
     let requestIndex = 0;
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
       () => requests[requestIndex++]?.promise ?? Promise.resolve(""),
@@ -359,18 +379,8 @@ describe("ReviewWorkspace perceived feedback", () => {
       />,
     );
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
-
-    await act(async () => {
-      requests[0]?.resolve("https://media.test/ready-first-passport.jpg");
-      await requests[0]?.promise;
-    });
-    const firstImage = await screen.findByRole("img", {
-      name: "Оригинал загранпаспорта",
-    });
-    fireEvent.load(firstImage);
-    await waitFor(() => expect(firstImage).toHaveClass("is-ready"));
 
     rerender(
       <ReviewWorkspace
@@ -382,18 +392,18 @@ describe("ReviewWorkspace perceived feedback", () => {
       />,
     );
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(6),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
     );
 
     await act(async () => {
-      requests[1]?.resolve("https://media.test/stale-selfie.jpg");
-      await requests[1]?.promise;
+      requests[0]?.resolve("https://media.test/stale-passport.jpg");
+      await requests[0]?.promise;
     });
     expect(screen.queryByRole("img", { name: "Оригинал загранпаспорта" })).toBeNull();
 
     await act(async () => {
-      requests[3]?.resolve("https://media.test/current-passport.jpg");
-      await requests[3]?.promise;
+      requests[1]?.resolve("https://media.test/current-passport.jpg");
+      await requests[1]?.promise;
     });
     expect(
       await screen.findByRole("img", { name: "Оригинал загранпаспорта" }),
@@ -414,7 +424,7 @@ describe("ReviewWorkspace perceived feedback", () => {
           : file,
       ),
     };
-    const requests = Array.from({ length: 6 }, () => deferred<string>());
+    const requests = Array.from({ length: 2 }, () => deferred<string>());
     let requestIndex = 0;
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
       () => requests[requestIndex++]?.promise ?? Promise.resolve(""),
@@ -428,7 +438,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     };
     const { rerender } = render(<ReviewWorkspace {...props} submission={submission} />);
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
 
     await act(async () => {
@@ -442,12 +452,12 @@ describe("ReviewWorkspace perceived feedback", () => {
     rerender(<ReviewWorkspace {...props} submission={replacementSubmission} />);
     expect(screen.queryByRole("img", { name: "Оригинал загранпаспорта" })).toBeNull();
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(6),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(2),
     );
 
     await act(async () => {
-      requests[3]?.resolve("https://media.test/replacement-passport.jpg");
-      await requests[3]?.promise;
+      requests[1]?.resolve("https://media.test/replacement-passport.jpg");
+      await requests[1]?.promise;
     });
     expect(
       await screen.findByRole("img", { name: "Оригинал загранпаспорта" }),
@@ -456,7 +466,7 @@ describe("ReviewWorkspace perceived feedback", () => {
 
   test("drops a ready preview when the same file loses its protected storage identity", async () => {
     const submission = reviewSubmission();
-    const requests = Array.from({ length: 5 }, () => deferred<string>());
+    const requests = [deferred<string>()];
     let requestIndex = 0;
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
       () => requests[requestIndex++]?.promise ?? Promise.resolve(""),
@@ -469,7 +479,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     };
     const { rerender } = render(<ReviewWorkspace {...props} submission={submission} />);
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
 
     await act(async () => {
@@ -497,9 +507,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(screen.queryByRole("img", { name: "Оригинал загранпаспорта" })).toBeNull();
     expect(screen.getByText("Оригинал нельзя принять")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
-    await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(5),
-    );
+    expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1);
   });
 
   test("does not refetch unchanged media for a new submission object", async () => {
@@ -515,7 +523,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     };
     const { rerender } = render(<ReviewWorkspace {...props} submission={submission} />);
     await waitFor(() =>
-      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3),
+      expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
 
     rerender(
@@ -526,7 +534,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     );
     await act(async () => Promise.resolve());
 
-    expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(3);
+    expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1);
   });
 
   test("reserves the measured decision footer height for mobile scrolling", async () => {
@@ -598,6 +606,8 @@ describe("ReviewWorkspace perceived feedback", () => {
     const confirmButton = screen.getByRole("button", {
       name: "Подтвердить паспортную секцию",
     });
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() => expect(confirmButton).toBeEnabled());
 
     fireEvent.click(confirmButton);
@@ -640,6 +650,8 @@ describe("ReviewWorkspace perceived feedback", () => {
     const confirmButton = screen.getByRole("button", {
       name: "Подтвердить паспортную секцию",
     });
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
 
@@ -650,6 +662,8 @@ describe("ReviewWorkspace perceived feedback", () => {
         submission={nextSubmission}
       />,
     );
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),

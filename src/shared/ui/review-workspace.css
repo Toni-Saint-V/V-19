@@ -1194,7 +1194,8 @@
   );
 }
 
-.v19-review-status-strip > span.is-loading {
+.v19-review-status-strip > span.is-loading,
+.v19-review-status-strip > span.is-pending {
   border: var(--v19b-size-1) solid var(--v19b-status-info-border);
   background: color-mix(in srgb, var(--v19b-status-info-bg) 58%, transparent);
 }

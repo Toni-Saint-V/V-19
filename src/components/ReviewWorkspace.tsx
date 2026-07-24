@@ -88,6 +88,11 @@ type OwnedPreviewState = {
   previews: PreviewStateMap;
 };
 
+type OwnedVisitedMediaState = {
+  ownerKey: string;
+  types: Set<ReviewMediaType>;
+};
+
 const mediaTargetsByType: Record<ReviewMediaType, ReviewMediaTarget> = {
   passport_scan: {
     alt: "Оригинал загранпаспорта",
@@ -114,6 +119,8 @@ const unavailablePreview: ReviewMediaPreviewState = {
   retryable: true,
   status: "unavailable",
 };
+
+const initialVisitedMediaTypes = new Set<ReviewMediaType>(["passport_scan"]);
 
 function unavailablePreviewForFile(
   file: SubmissionFile | undefined,
@@ -266,7 +273,6 @@ export function ReviewWorkspace({
       }),
     [mediaTargets, selectedApplicantId, submission, submissionId],
   );
-  const [mediaRetryAttempt, setMediaRetryAttempt] = useState(0);
   const mediaGenerationKey = protectedMedia
     .map(({ file, target }) =>
       [
@@ -283,15 +289,24 @@ export function ReviewWorkspace({
       ].join(":"),
     )
     .join("|");
-  const mediaOwnerKey = `${submissionId}:${selectedApplicantId ?? "unselected"}:${mediaGenerationKey}:attempt-${mediaRetryAttempt}`;
+  const mediaOwnerKey = `${submissionId}:${selectedApplicantId ?? "unselected"}:${mediaGenerationKey}`;
+  const [activeMediaType, setActiveMediaType] =
+    useState<ReviewMediaType>("passport_scan");
+  const [ownedVisitedMedia, setOwnedVisitedMedia] = useState<OwnedVisitedMediaState>({
+    ownerKey: mediaOwnerKey,
+    types: initialVisitedMediaTypes,
+  });
+  const visitedMediaTypes =
+    ownedVisitedMedia.ownerKey === mediaOwnerKey
+      ? ownedVisitedMedia.types
+      : initialVisitedMediaTypes;
+  const [mediaRequestRevision, setMediaRequestRevision] = useState(0);
   const initialMediaPreviews = useMemo(
     () =>
       Object.fromEntries(
         protectedMedia.map(({ file, protectedFile, target }) => [
           target.type,
-          protectedFile
-            ? { status: "loading" }
-            : unavailablePreviewForFile(file),
+          protectedFile ? { status: "idle" } : unavailablePreviewForFile(file),
         ]),
       ) as PreviewStateMap,
     [protectedMedia],
@@ -301,11 +316,6 @@ export function ReviewWorkspace({
     // The owner key fingerprints every value consumed by this async generation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mediaOwnerKey],
-  );
-  const [activeMediaType, setActiveMediaType] =
-    useState<ReviewMediaType>("passport_scan");
-  const [visitedMediaTypes, setVisitedMediaTypes] = useState<Set<ReviewMediaType>>(
-    () => new Set<ReviewMediaType>(["passport_scan"]),
   );
   const [ownedMediaPreviews, setOwnedMediaPreviews] = useState<OwnedPreviewState>({
     ownerKey: mediaOwnerKey,
@@ -417,7 +427,10 @@ export function ReviewWorkspace({
   useEffect(() => {
     sectionApprovalRunRef.current += 1;
     setActiveMediaType("passport_scan");
-    setVisitedMediaTypes(new Set<ReviewMediaType>(["passport_scan"]));
+    setOwnedVisitedMedia({
+      ownerKey: mediaOwnerKey,
+      types: initialVisitedMediaTypes,
+    });
     setZoom(100);
     setRotation(0);
     setSectionApprovalPending(false);
@@ -425,7 +438,7 @@ export function ReviewWorkspace({
     setAcceptanceError("");
     setReviewActionError("");
     setReviewActionSaved("");
-  }, [selectedApplicantId, submissionId]);
+  }, [mediaOwnerKey, selectedApplicantId, submissionId]);
 
   useEffect(() => {
     const footer = decisionFooterRef.current;
@@ -502,14 +515,35 @@ export function ReviewWorkspace({
   }, [nestedDialogOpen]);
 
   useEffect(() => {
-    let cancelled = false;
-    setOwnedMediaPreviews({
-      ownerKey: mediaOwnerKey,
-      previews: mediaGeneration.initialMediaPreviews,
-    });
+    setOwnedMediaPreviews((current) =>
+      current.ownerKey === mediaOwnerKey
+        ? current
+        : {
+            ownerKey: mediaOwnerKey,
+            previews: mediaGeneration.initialMediaPreviews,
+          },
+    );
 
     mediaGeneration.protectedMedia.forEach(({ protectedFile, target }) => {
-      if (!protectedFile) return;
+      if (
+        !protectedFile ||
+        !visitedMediaTypes.has(target.type) ||
+        mediaPreviews[target.type]?.status !== "idle"
+      ) {
+        return;
+      }
+
+      setOwnedMediaPreviews((current) =>
+        current.ownerKey === mediaOwnerKey
+          ? {
+              ...current,
+              previews: {
+                ...current.previews,
+                [target.type]: { status: "loading" },
+              },
+            }
+          : current,
+      );
 
       void (async () => {
         let preview: ReviewMediaPreviewState = unavailablePreview;
@@ -525,7 +559,7 @@ export function ReviewWorkspace({
           preview = unavailablePreview;
         }
 
-        if (cancelled) return;
+        if (!mountedRef.current) return;
         setOwnedMediaPreviews((current) =>
           current.ownerKey === mediaOwnerKey
             ? {
@@ -539,11 +573,13 @@ export function ReviewWorkspace({
         );
       })();
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mediaGeneration, mediaOwnerKey]);
+  }, [
+    mediaGeneration,
+    mediaOwnerKey,
+    mediaPreviews,
+    mediaRequestRevision,
+    visitedMediaTypes,
+  ]);
 
   const passportIssueInScope = (issue: Submission["issues"][number]) =>
     Boolean(
@@ -605,6 +641,10 @@ export function ReviewWorkspace({
   const allProtectedMediaReady = confirmationMediaStates.every(
     (status) => status === "ready",
   );
+  const pendingMediaReviewCount = confirmationMediaTypes.filter(
+    (type) => !visitedMediaTypes.has(type),
+  ).length;
+  const allProtectedMediaReviewed = pendingMediaReviewCount === 0;
   const sectionAlreadyAccepted =
     sectionApprovedLocally ||
     (reviewFields.every((field) => field.alreadyApproved) &&
@@ -618,6 +658,7 @@ export function ReviewWorkspace({
     onApproveSection &&
     allFieldsFilled &&
     allProtectedMediaReady &&
+    allProtectedMediaReviewed &&
     !hasOpenPassportIssue &&
     !sectionAlreadyAccepted &&
     !sectionApprovalPending,
@@ -659,6 +700,9 @@ export function ReviewWorkspace({
         : "Для подтверждения нужен защищённый оригинал паспорта.";
   } else if (loadingMediaCount > 0) {
     completionReason = "Загружаем защищённые оригиналы для сверки…";
+  } else if (pendingMediaReviewCount > 0) {
+    completionReason =
+      "Откройте и проверьте каждый обязательный оригинал перед подтверждением.";
   } else if (hasOpenPassportIssue) {
     completionReason =
       "Есть открытое замечание. Сначала агент должен отправить исправление.";
@@ -763,25 +807,43 @@ export function ReviewWorkspace({
     );
   };
 
-  const handlePreviewRetry = () => {
-    setMediaRetryAttempt((attempt) => attempt + 1);
+  const handlePreviewRetry = (mediaType: ReviewMediaType) => {
+    setOwnedMediaPreviews((current) =>
+      current.ownerKey === mediaOwnerKey
+        ? {
+            ...current,
+            previews: {
+              ...current.previews,
+              [mediaType]: { status: "idle" },
+            },
+          }
+        : current,
+    );
+    setMediaRequestRevision((revision) => revision + 1);
   };
 
   const handleFullscreen = () => {
     void previewPaneRef.current?.requestFullscreen?.().catch(() => undefined);
   };
 
-  const handleMediaSelect = useCallback((mediaType: ReviewMediaType) => {
-    setActiveMediaType(mediaType);
-    setVisitedMediaTypes((current) => {
-      if (current.has(mediaType)) return current;
-      const next = new Set(current);
-      next.add(mediaType);
-      return next;
-    });
-    setZoom(100);
-    setRotation(0);
-  }, []);
+  const handleMediaSelect = useCallback(
+    (mediaType: ReviewMediaType) => {
+      setActiveMediaType(mediaType);
+      setOwnedVisitedMedia((current) => {
+        const currentTypes =
+          current.ownerKey === mediaOwnerKey ? current.types : initialVisitedMediaTypes;
+        if (currentTypes.has(mediaType) && current.ownerKey === mediaOwnerKey) {
+          return current;
+        }
+        const next = new Set(currentTypes);
+        next.add(mediaType);
+        return { ownerKey: mediaOwnerKey, types: next };
+      });
+      setZoom(100);
+      setRotation(0);
+    },
+    [mediaOwnerKey],
+  );
 
   const handleMediaTabKeyDown = (
     event: ReactKeyboardEvent<HTMLButtonElement>,
@@ -979,7 +1041,7 @@ export function ReviewWorkspace({
                   testId="protected-media-preview-passport_scan"
                   variant="reference"
                   onError={() => handlePreviewError("passport_scan")}
-                  onRetry={handlePreviewRetry}
+                  onRetry={() => handlePreviewRetry("passport_scan")}
                 />
                 <ReviewMediaPreview
                   alt={activeMediaTarget.alt}
@@ -990,7 +1052,7 @@ export function ReviewWorkspace({
                   transform={activeMediaTransform}
                   variant="active"
                   onError={() => handlePreviewError(activeMediaTarget.type)}
-                  onRetry={handlePreviewRetry}
+                  onRetry={() => handlePreviewRetry(activeMediaTarget.type)}
                 />
               </div>
             ) : (
@@ -1003,7 +1065,7 @@ export function ReviewWorkspace({
                 transform={activeMediaTransform}
                 variant="single"
                 onError={() => handlePreviewError(activeMediaTarget.type)}
-                onRetry={handlePreviewRetry}
+                onRetry={() => handlePreviewRetry(activeMediaTarget.type)}
               />
             )}
           </div>
@@ -1047,7 +1109,8 @@ export function ReviewWorkspace({
                     <span className="v19-review-media-tab-label">
                       {target.shortLabel}
                     </span>
-                    {visitedMediaTypes.has(target.type) ? (
+                    {visitedMediaTypes.has(target.type) &&
+                    mediaPreviews[target.type]?.status === "ready" ? (
                       <CheckCircle2
                         aria-hidden="true"
                         className="v19-review-media-tab-visited"
@@ -1107,6 +1170,7 @@ export function ReviewWorkspace({
               mediaReadyCount={readyMediaCount}
               mediaTotal={confirmationMediaTypes.length}
               mediaLoadingCount={loadingMediaCount}
+              mediaPendingReviewCount={pendingMediaReviewCount}
               mediaUnavailableCount={unavailableMediaCount}
               onNextStep={handleNextReviewStep}
               openIssueCount={openPassportIssueCount}

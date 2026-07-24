@@ -13,6 +13,7 @@ type ReviewReadinessPanelProps = {
   mediaReadyCount: number;
   mediaTotal: number;
   mediaLoadingCount: number;
+  mediaPendingReviewCount: number;
   mediaUnavailableCount: number;
   onNextStep: () => void;
   openIssueCount: number;
@@ -25,6 +26,7 @@ function readinessHeadline({
   filledFieldCount,
   mediaReadyCount,
   mediaTotal,
+  mediaPendingReviewCount,
   openIssueCount,
   readOnly,
   totalFieldCount,
@@ -33,12 +35,14 @@ function readinessHeadline({
   | "filledFieldCount"
   | "mediaReadyCount"
   | "mediaTotal"
+  | "mediaPendingReviewCount"
   | "openIssueCount"
   | "readOnly"
   | "totalFieldCount"
 >) {
   if (readOnly) return "Просмотр без изменений";
   if (openIssueCount > 0) return "Ждём исправление от агента";
+  if (mediaPendingReviewCount > 0) return "Проверьте все оригиналы";
   if (mediaReadyCount < mediaTotal) return "Нужны защищённые оригиналы";
   if (filledFieldCount < totalFieldCount) return "Есть неполные паспортные данные";
   return "Паспортная секция готова к подтверждению";
@@ -51,6 +55,7 @@ export function ReviewReadinessPanel({
   mediaReadyCount,
   mediaTotal,
   mediaLoadingCount,
+  mediaPendingReviewCount,
   mediaUnavailableCount,
   onNextStep,
   openIssueCount,
@@ -62,6 +67,7 @@ export function ReviewReadinessPanel({
     filledFieldCount,
     mediaReadyCount,
     mediaTotal,
+    mediaPendingReviewCount,
     openIssueCount,
     readOnly,
     totalFieldCount,
@@ -69,6 +75,7 @@ export function ReviewReadinessPanel({
   const mediaStatusLabel = [
     mediaUnavailableCount > 0 ? `недоступно ${mediaUnavailableCount}` : "",
     mediaLoadingCount > 0 ? `загружается ${mediaLoadingCount}` : "",
+    mediaPendingReviewCount > 0 ? `не просмотрено ${mediaPendingReviewCount}` : "",
     `доступно ${mediaReadyCount} из ${mediaTotal}`,
   ]
     .filter(Boolean)
@@ -115,7 +122,9 @@ export function ReviewReadinessPanel({
               ? "has-warning"
               : mediaLoadingCount > 0
                 ? "is-loading"
-                : undefined
+                : mediaPendingReviewCount > 0
+                  ? "is-pending"
+                  : undefined
           }
         >
           <ShieldCheck aria-hidden="true" />
