@@ -87,7 +87,7 @@ function readySubmission(): Submission {
 
 function persistedReviewedPassportSubmission(): Submission {
   const draft = createDraftSubmission({
-    applicantNames: ["Мария Иванова"],
+    applicantNames: ["MARIA IVANOVA"],
     city: "Москва",
     familyCount: 1,
     idScheme: "supabase",
@@ -116,14 +116,24 @@ function persistedReviewedPassportSubmission(): Submission {
     status: "extracted",
     summary: "Паспортные данные подготовлены.",
   };
-  const extracted = finishPassportExtraction(draft, passportFile, extraction);
+  const complete = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
+  const uploadedPassportFile = complete.files.find(
+    (file) => file.applicantId === applicantId && file.type === "passport_scan",
+  );
+  if (!uploadedPassportFile) {
+    throw new Error("Expected uploaded applicant passport slot.");
+  }
+  const extracted = finishPassportExtraction(
+    complete,
+    uploadedPassportFile,
+    extraction,
+  );
   const applied = applySafePassportExtractionFields(extracted, applicantId);
-  const complete = uploadRequiredFiles(fillRequiredQuestionnaireForTest(applied));
 
   return {
-    ...complete,
+    ...applied,
     status: "in_progress",
-    applicants: complete.applicants.map((applicant) => ({
+    applicants: applied.applicants.map((applicant) => ({
       ...applicant,
       passportExtraction: applicant.passportExtraction
         ? {
@@ -445,11 +455,57 @@ describe("Drawer interactions", () => {
     renderDrawer({ submission: persistedReviewedPassportSubmission() });
 
     expect(
+      screen.queryAllByText("Подтвердите ручную проверку паспортных данных"),
+    ).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Отправить на проверку" })).toBeEnabled();
+  });
+
+  test("offers review submission when verified extraction proof survives without answer metadata", async () => {
+    const reviewed = persistedReviewedPassportSubmission();
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const productionReload = {
+      ...reviewed,
+      applicants: reviewed.applicants.map((applicant) => ({
+        ...applicant,
+        passportExtraction: applicant.passportExtraction
+          ? {
+              ...applicant.passportExtraction,
+              extractedFields: applicant.passportExtraction.extractedFields.map(
+                (field) => ({ ...field, needsManualReview: false, verified: true }),
+              ),
+              verifiedAtIso: undefined,
+            }
+          : undefined,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.reviewOriginSource === "passport_ocr"
+              ? {
+                  ...field,
+                  reviewConfirmedAtIso: undefined,
+                  reviewConfirmedBy: undefined,
+                  reviewOriginSource: undefined,
+                  reviewSource: undefined,
+                  reviewState: undefined,
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    renderDrawer({ onAction, submission: productionReload });
+
+    expect(
       screen.queryByText("Подтвердите ручную проверку паспортных данных"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Отправить на проверку" }),
-    ).toBeEnabled();
+    const submitButton = screen.getByRole("button", {
+      name: "Отправить на проверку",
+    });
+    expect(submitButton).toBeEnabled();
+
+    fireEvent.click(submitButton);
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith("submit_for_review"));
   });
 
   test("keeps rejected primary-action feedback visible and associated with the CTA", async () => {

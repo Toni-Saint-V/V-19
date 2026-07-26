@@ -410,6 +410,28 @@ describe("ApplicantsScreen interactions", () => {
     expect(visibleSubmissionIds()).toEqual([matched.id]);
   });
 
+  it("finds a legacy submission by the same derived VF number shown on its card", () => {
+    const matched = createSubmission("single");
+    matched.id = "ПД-1052";
+    delete matched.publicNumber;
+    const other = createSubmission("single");
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        submissions={[other, matched]}
+        typeFilter="single"
+      />,
+    );
+
+    expect(screen.getByText("VF-1052")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+      target: { value: "VF-1052" },
+    });
+
+    expect(visibleSubmissionIds()).toEqual([matched.id]);
+  });
+
   it("uses one system confirmation request for the review handoff", async () => {
     const single = readySubmission("single");
     const family = readySubmission("family");
@@ -667,8 +689,16 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+    fireEvent.click(screen.getByRole("button", { name: /Вернуть на проверку:/ }));
+    const confirmation = screen.getByRole("dialog", {
+      name: "Вернуть подачу на проверку?",
+    });
+    expect(confirmation).toHaveTextContent(
+      "готовность к выгрузке будет сброшена канонической командой",
+    );
+    fireEvent.click(
+      within(confirmation).getByRole("button", { name: "Вернуть на проверку" }),
+    );
     await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(accepted.id));
     expect(onOpenDrawer).not.toHaveBeenCalled();
 
@@ -717,8 +747,12 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+    fireEvent.click(screen.getByRole("button", { name: /Вернуть на проверку:/ }));
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Вернуть подачу на проверку?" }),
+      ).getByRole("button", { name: "Вернуть на проверку" }),
+    );
     await waitFor(() =>
       expect(onSubmitForReview).toHaveBeenCalledWith(acceptedLegacy.id),
     );

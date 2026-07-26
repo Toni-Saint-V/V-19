@@ -23,10 +23,7 @@ export type PassportGateIssue = {
   message: string;
 };
 
-const passportQuestionnaireFieldIds: Record<
-  PassportExtractedFieldKey,
-  string
-> = {
+const passportQuestionnaireFieldIds: Record<PassportExtractedFieldKey, string> = {
   birthCountry: "birth-country",
   birthDate: "birth-date",
   birthPlace: "birth-place",
@@ -52,16 +49,18 @@ const passportGateActions = new Set<SubmissionAction>([
 ]);
 
 export function hasPassportExtractionReviewPending(submission: Submission) {
-  return submission.applicants.some((applicant) => {
-    const state = applicant.passportExtraction;
-    return (
-      state?.status === "ready" &&
-      state.extractedFields.length > 0 &&
-      !state.verifiedAtIso &&
-      !state.dismissedAtIso &&
-      !hasPersistedPassportExtractionReview(applicant)
-    );
-  });
+  return submission.applicants.some(hasApplicantPassportExtractionReviewPending);
+}
+
+export function hasApplicantPassportExtractionReviewPending(applicant: Applicant) {
+  const state = applicant.passportExtraction;
+  return (
+    state?.status === "ready" &&
+    state.extractedFields.length > 0 &&
+    !state.verifiedAtIso &&
+    !state.dismissedAtIso &&
+    !hasPersistedPassportExtractionReview(applicant)
+  );
 }
 
 export function requiresPassportExtractionReviewBeforeAction(
@@ -130,24 +129,12 @@ function applicantPassportGateIssues(
 
   if (!state) {
     return hasRealPassportUpload(file)
-      ? [
-          issue(
-            applicant,
-            "passport_not_confirmed",
-            "Скан паспорта не проверен.",
-          ),
-        ]
+      ? [issue(applicant, "passport_not_confirmed", "Скан паспорта не проверен.")]
       : [];
   }
 
   if (state.status === "extracting") {
-    return [
-      issue(
-        applicant,
-        "passport_not_confirmed",
-        "Дождитесь проверки скана.",
-      ),
-    ];
+    return [issue(applicant, "passport_not_confirmed", "Дождитесь проверки скана.")];
   }
 
   const canUseQuestionnaireFallback =
@@ -157,11 +144,7 @@ function applicantPassportGateIssues(
 
   if (state.status === "ready" && !state.extractedFields.length) {
     return [
-      issue(
-        applicant,
-        "passport_not_confirmed",
-        "Паспортные данные не прочитаны.",
-      ),
+      issue(applicant, "passport_not_confirmed", "Паспортные данные не прочитаны."),
     ];
   }
 
@@ -262,14 +245,6 @@ function hasPersistedPassportExtractionReview(applicant: Applicant) {
   }
 
   const appliedFieldKeys = new Set(state.appliedFieldKeys);
-  if (
-    state.extractedFields.some(
-      (extractedField) => !appliedFieldKeys.has(extractedField.key),
-    )
-  ) {
-    return false;
-  }
-
   const questionnaireFields = new Map(
     applicant.sections
       .flatMap((section) => section.fields)
@@ -281,12 +256,20 @@ function hasPersistedPassportExtractionReview(applicant: Applicant) {
       passportQuestionnaireFieldIds[extractedField.key],
     );
     const reviewOrigin = field?.reviewOriginSource ?? field?.reviewSource;
-    return (
+    const hasQuestionnaireProof =
+      appliedFieldKeys.has(extractedField.key) &&
       reviewOrigin === "passport_ocr" &&
       field?.reviewState === "confirmed" &&
       Boolean(field.reviewConfirmedAtIso) &&
-      Boolean(field.reviewConfirmedBy)
-    );
+      Boolean(field.reviewConfirmedBy);
+    const hasExtractionProof =
+      extractedField.verified === true &&
+      Boolean(field?.value.trim()) &&
+      !field?.error &&
+      field?.reviewState !== "needs_review" &&
+      normalizeText(field?.value ?? "") === normalizeText(extractedField.value);
+
+    return hasQuestionnaireProof || hasExtractionProof;
   });
 }
 
@@ -310,12 +293,12 @@ function passportFileForApplicant(submission: Submission, applicantId: string) {
 function hasRealPassportUpload(file: SubmissionFile | undefined) {
   return Boolean(
     file &&
-      isCompletedFileAsset(file) &&
-      (file.mimeType ||
-        file.originalFileName ||
-        file.generatedFileName ||
-        file.storagePath ||
-        file.storageBucket),
+    isCompletedFileAsset(file) &&
+    (file.mimeType ||
+      file.originalFileName ||
+      file.generatedFileName ||
+      file.storagePath ||
+      file.storageBucket),
   );
 }
 

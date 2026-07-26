@@ -46,6 +46,10 @@ import {
   submissionPublicNumber,
   submissionPublicNumberMax,
 } from "./modules/submissions/submissionIdentity";
+import {
+  agentSubmissionPersistenceCheckpoints,
+  isFinalSubmissionPersistenceCheckpoint,
+} from "./modules/submissions/submissionPersistencePlan";
 import { getSupabaseClient } from "./lib/supabase/client";
 import type {
   AccessRequest,
@@ -730,6 +734,7 @@ export default function App({
       nextSubmissions: Submission[],
       providedFence?: WorkspaceMutationFence,
       expectedCaseRevisions?: ReadonlyMap<string, number>,
+      refreshAfterCommit = true,
     ) => {
       const currentSubmissions = submissionsRef.current;
       const currentOwnerIds = ownerIdsBySubmissionIdRef.current;
@@ -876,6 +881,7 @@ export default function App({
           );
           if (
             mutationSucceeded &&
+            refreshAfterCommit &&
             workspaceMutationStateRef.current.count === 0 &&
             fence.isCurrent()
           ) {
@@ -968,10 +974,28 @@ export default function App({
         }
         const nextSubmission = update(current);
         if (nextSubmission === current) return current;
-        const nextSubmissions = submissionsRef.current.map((submission) =>
-          submission.id === submissionId ? nextSubmission : submission,
+        const persistencePlan = agentSubmissionPersistenceCheckpoints(
+          current,
+          nextSubmission,
+          ownerAgentId,
         );
-        await persistSubmissions(nextSubmissions, fence);
+        if (!persistencePlan.ok) {
+          throw new SubmissionActionDomainError(persistencePlan.error);
+        }
+        for (const [index, checkpoint] of persistencePlan.data.entries()) {
+          const checkpointSubmissions = submissionsRef.current.map((submission) =>
+            submission.id === submissionId ? checkpoint : submission,
+          );
+          await persistSubmissions(
+            checkpointSubmissions,
+            fence,
+            undefined,
+            isFinalSubmissionPersistenceCheckpoint(
+              index,
+              persistencePlan.data.length,
+            ),
+          );
+        }
         return (
           submissionsRef.current.find(
             (submission) => submission.id === submissionId,

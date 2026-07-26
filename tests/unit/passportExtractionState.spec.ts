@@ -268,11 +268,7 @@ describe("passport extraction state", () => {
       summary: "Страна рождения подготовлена.",
     };
 
-    const readyDefault = finishPassportExtraction(
-      draft,
-      file,
-      extractedBirthCountry,
-    );
+    const readyDefault = finishPassportExtraction(draft, file, extractedBirthCountry);
     const autofilledDefault = applySafePassportExtractionFields(
       readyDefault,
       applicantId,
@@ -295,10 +291,7 @@ describe("passport extraction state", () => {
       file,
       extractedBirthCountry,
     );
-    const preservedManual = applySafePassportExtractionFields(
-      readyManual,
-      applicantId,
-    );
+    const preservedManual = applySafePassportExtractionFields(readyManual, applicantId);
     expect(questionnaireValue(preservedManual, "birth-country")).toBe("Spain");
     expect(passportExtractionRows(preservedManual.applicants[0]!)).toEqual(
       expect.arrayContaining([
@@ -600,6 +593,65 @@ describe("passport extraction state", () => {
 
     expect(hasPassportExtractionReviewPending(incompleteProof)).toBe(true);
     expect(passportGateIssues(incompleteProof).map((issue) => issue.code)).toContain(
+      "passport_extraction_not_reviewed",
+    );
+  });
+
+  test("reconciles persisted verified extraction fields when normalized answers lose the review envelope", () => {
+    const draft = draftSubmission();
+    const ready = finishPassportExtraction(
+      draft,
+      passportFile(draft),
+      extractedPassportNumber,
+    );
+    const applicantId = ready.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+    const applied = applyPassportExtractionField(ready, applicantId, "passportNumber");
+    const persisted = {
+      ...applied,
+      applicants: applied.applicants.map((applicant) => ({
+        ...applicant,
+        passportExtraction: applicant.passportExtraction
+          ? {
+              ...applicant.passportExtraction,
+              extractedFields: applicant.passportExtraction.extractedFields.map(
+                (field) => ({ ...field, needsManualReview: false, verified: true }),
+              ),
+              verifiedAtIso: undefined,
+            }
+          : undefined,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "passport-no"
+              ? {
+                  ...field,
+                  reviewConfirmedAtIso: undefined,
+                  reviewConfirmedBy: undefined,
+                  reviewOriginSource: undefined,
+                  reviewSource: undefined,
+                  reviewState: undefined,
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    expect(hasPassportExtractionReviewPending(persisted)).toBe(false);
+    expect(passportGateIssues(persisted).map((issue) => issue.code)).not.toContain(
+      "passport_extraction_not_reviewed",
+    );
+
+    const staleProof = updateQuestionnaireField(persisted, {
+      applicantId,
+      fieldId: "passport-no",
+      sectionId: sectionIdForField(persisted, "passport-no"),
+      value: "765432199",
+    });
+
+    expect(hasPassportExtractionReviewPending(staleProof)).toBe(true);
+    expect(passportGateIssues(staleProof).map((issue) => issue.code)).toContain(
       "passport_extraction_not_reviewed",
     );
   });

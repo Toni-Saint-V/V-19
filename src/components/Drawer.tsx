@@ -693,6 +693,11 @@ const QuestionnaireTab = ({
     (section) => section.status !== "done",
   ).length;
   const remainingBlockLabel = remainingBlocksLabel(remainingBlockCount);
+  const acceptedPackageNeedsRevalidation =
+    submission.status === "ready_for_export" && remainingBlockCount > 0;
+  const questionnaireDescription = acceptedPackageNeedsRevalidation
+    ? "Пакет был принят ранее. Чтобы продолжить заполнение, верните подачу на проверку."
+    : questionnairePresentation.drawerDescription;
 
   function openSection(target: QuestionnaireFocusTarget | undefined) {
     onOpenQuestionnaire(target);
@@ -704,7 +709,7 @@ const QuestionnaireTab = ({
         <div>
           <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
           <p className="text-[12px] text-white/50 mt-1">
-            {questionnairePresentation.drawerDescription}
+            {questionnaireDescription}
           </p>
           <p className="text-[11px] text-white/40 mt-1">{remainingBlockLabel}</p>
         </div>
