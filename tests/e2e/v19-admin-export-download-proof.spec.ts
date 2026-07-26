@@ -1,4 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Download,
+  type Page,
+} from "@playwright/test";
+import { Buffer } from "node:buffer";
+import JSZip from "jszip";
 import {
   clearExportSelection,
   clickWorkspaceButton,
@@ -6,6 +13,78 @@ import {
   expectNoHorizontalOverflow,
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
+
+async function expectDownloadedFamilyArchive(download: Download) {
+  const stream = await download.createReadStream();
+  if (!stream) throw new Error("Downloaded ZIP stream is unavailable");
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  const zip = await JSZip.loadAsync(Buffer.concat(chunks));
+  const fileNames = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
+  const rootFolder = fileNames
+    .find((name) => name.endsWith("/manifest.json"))
+    ?.replace(/\/manifest\.json$/, "");
+  expect(rootFolder).toMatch(/^VisaFlow_Export_\d{4}-\d{2}-\d{2}$/);
+  if (!rootFolder) throw new Error("ZIP manifest root is unavailable");
+
+  const mediaNames = fileNames
+    .filter((name) => /_(passport_scan|selfie_[12])\.(jpg|jpeg|png|pdf)$/i.test(name))
+    .sort();
+  expect(mediaNames).toEqual(
+    [
+      `${rootFolder}/Москва/Семья Волковых/660011021_passport_scan.jpg`,
+      `${rootFolder}/Москва/Семья Волковых/660011021_selfie_1.jpg`,
+      `${rootFolder}/Москва/Семья Волковых/660011021_selfie_2.jpg`,
+      `${rootFolder}/Москва/Семья Волковых/660011022_passport_scan.jpg`,
+      `${rootFolder}/Москва/Семья Волковых/660011023_passport_scan.jpg`,
+    ].sort(),
+  );
+  expect(
+    mediaNames.some((name) => /(660011022|660011023)_selfie_[12]\./.test(name)),
+  ).toBe(false);
+
+  const manifest = JSON.parse(
+    await zip.file(`${rootFolder}/manifest.json`)!.async("string"),
+  ) as {
+    applicantCount: number;
+    fileCount: number;
+    submissions: Array<{
+      id: string;
+      applicants: Array<{ id: string; documentTypes: string[] }>;
+    }>;
+    workbookFileName: string;
+  };
+  expect(manifest.applicantCount).toBe(3);
+  expect(manifest.fileCount).toBe(5);
+  expect(manifest.submissions).toEqual([
+    expect.objectContaining({
+      id: "SUB-1102",
+      applicants: [
+        expect.objectContaining({
+          id: "з-1102-1",
+          documentTypes: ["passport_scan", "selfie_1", "selfie_2"],
+        }),
+        expect.objectContaining({
+          id: "з-1102-2",
+          documentTypes: ["passport_scan"],
+        }),
+        expect.objectContaining({
+          id: "з-1102-3",
+          documentTypes: ["passport_scan"],
+        }),
+      ],
+    }),
+  ]);
+
+  const workbookBytes = await zip
+    .file(`${rootFolder}/${manifest.workbookFileName}`)!
+    .async("uint8array");
+  expect(new TextDecoder().decode(workbookBytes.slice(0, 2))).toBe("PK");
+}
 
 function blockingBrowserProblems(problems: string[]) {
   return problems.filter(
@@ -90,6 +169,7 @@ test.describe("V-19 admin export download proof", () => {
       /^visaflow-export-.+_documents\.zip$/,
     );
     await expect(download.failure()).resolves.toBeNull();
+    await expectDownloadedFamilyArchive(download);
 
     await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
     await expectBodyMatches(page, [/пакет зафиксирован|Выгрузка завершена/i]);
