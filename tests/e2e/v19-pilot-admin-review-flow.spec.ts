@@ -114,9 +114,19 @@ async function verifyRemarkSubmitActionability(
   if (viewport.width >= 768) {
     await clickWorkspaceButton(page, /Проверка|Работа|Очередь/);
   }
-  await expectBodyMatches(page, [/Нина Волкова|ПД-1053|Проверка|Очередь/i]);
+  const returnTarget =
+    viewport.width >= 768
+      ? {
+          cardName: /Ручная проверка заявки Елена Смирнова/,
+          open: /Елена Смирнова|ПД-1055/,
+        }
+      : {
+          cardName: /Ручная проверка заявки Нина Волкова/,
+          open: /Нина Волкова|ПД-1053/,
+        };
+  await expectBodyMatches(page, [returnTarget.open, /Проверка|Очередь/i]);
 
-  await openAdminSubmission(page, /Нина Волкова|ПД-1053|Смирнов|Петров|Волков/i);
+  await openAdminSubmission(page, returnTarget.open);
   const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
   const addRemarkButton = reviewWorkspace.getByRole("button", {
     name: "Добавить замечание: Номер паспорта",
@@ -154,14 +164,37 @@ async function verifyRemarkSubmitActionability(
     reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
   ).toContainText(/Открыто\s+1/);
 
-  const returnButton = reviewWorkspace.getByRole("button", {
+  const returnForCorrection = reviewWorkspace.getByRole("button", {
     name: "Отправить на исправление",
   });
-  await expect(returnButton).toBeEnabled();
-  await returnButton.click();
+  await expect(returnForCorrection).toBeEnabled();
+  await returnForCorrection.click();
   await expect(
     reviewWorkspace.getByText("Возврат на исправление сохранён."),
   ).toBeVisible();
+  await expect(reviewWorkspace.getByText("Просмотр без изменений")).toBeVisible();
+  const returnReadbackRoot = testRunArtifactPath("admin-return-readback");
+  mkdirSync(returnReadbackRoot, { recursive: true });
+  await page.screenshot({
+    fullPage: true,
+    path: `${returnReadbackRoot}/${evidenceLabel}-workspace.png`,
+  });
+
+  await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Очередь на проверку" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Очередь на проверку" }),
+  ).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: `${returnReadbackRoot}/${evidenceLabel}.png`,
+  });
+  await expect(page.getByRole("button", { name: returnTarget.cardName })).toHaveCount(
+    0,
+  );
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
@@ -531,6 +564,17 @@ test.describe("V-19 pilot admin review click flow", () => {
     await expect(
       reviewWorkspace.getByText("Подача принята и сохранена."),
     ).toBeVisible();
+    await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
+    ).toBeVisible();
+    await clickWorkspaceButton(page, /Выгрузка/);
+    await expect(page.getByTestId("admin-export-row-ПД-1055")).toBeVisible();
 
     expect(
       blockingBrowserProblems(browserProblems),
