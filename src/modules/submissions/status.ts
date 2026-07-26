@@ -551,17 +551,7 @@ export function withRecalculatedSubmissionProgress(
 }
 
 export function canAgentSubmitForReview(submission: Submission) {
-  const questionnaire = blsQuestionnaireReadiness(submission);
-
-  return (
-    submission.status === "in_progress" &&
-    questionnaire.ready &&
-    hasRequiredDocuments(submission) &&
-    !hasBlockingIssues(submission) &&
-    hasUsableTripDateRange(submission) &&
-    !requiresPassportGateBeforeAction(submission, "submit_for_review") &&
-    !requiresPassportExtractionReviewBeforeAction(submission, "submit_for_review")
-  );
+  return canPerformAction(submission, "submit_for_review", "agent").ok;
 }
 
 export function agentQuestionnaireCompletionDecision(
