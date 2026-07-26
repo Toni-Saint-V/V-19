@@ -1268,6 +1268,107 @@
   font-size: var(--v19b-size-10);
 }
 
+.v19-review-corrected-issues {
+  display: grid;
+  gap: var(--v19b-size-12);
+  padding: var(--v19b-size-16);
+  border: var(--v19b-size-1) solid
+    color-mix(in srgb, var(--v19b-dot-warning) 54%, transparent);
+  border-left-width: var(--v19b-size-4);
+  border-radius: var(--v19b-radius-panel);
+  background: color-mix(
+    in srgb,
+    var(--v19b-dot-warning) 9%,
+    var(--v19b-color-panel)
+  );
+}
+
+.v19-review-corrected-issues > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--v19b-size-12);
+}
+
+.v19-review-corrected-issues > header > div {
+  display: grid;
+  gap: var(--v19b-size-4);
+}
+
+.v19-review-corrected-issues > header span {
+  color: var(--v19b-dot-warning);
+  font-size: var(--v19b-size-10);
+  font-weight: var(--v19b-weight-title);
+  letter-spacing: var(--v19b-letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.v19-review-corrected-issues h2,
+.v19-review-corrected-issues p {
+  margin: var(--v19b-size-0);
+}
+
+.v19-review-corrected-issues h2 {
+  color: var(--v19b-color-text);
+  font-size: var(--v19b-size-16);
+}
+
+.v19-review-corrected-issues > header > strong {
+  display: grid;
+  min-width: var(--v19b-size-32);
+  min-height: var(--v19b-size-32);
+  place-content: center;
+  border-radius: var(--v19b-radius-pill);
+  color: var(--v19b-dot-warning);
+  background: color-mix(in srgb, var(--v19b-dot-warning) 15%, transparent);
+}
+
+.v19-review-corrected-issues > p {
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-12);
+  line-height: var(--v19b-line-height-copy);
+}
+
+.v19-review-corrected-issue-list {
+  display: grid;
+  gap: var(--v19b-size-8);
+}
+
+.v19-review-corrected-issue-list article {
+  display: grid;
+  gap: var(--v19b-size-8);
+  padding: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid
+    color-mix(in srgb, var(--v19b-dot-warning) 30%, var(--v19b-color-border));
+  border-radius: var(--v19b-radius-control);
+  background: color-mix(
+    in srgb,
+    var(--v19b-dot-warning) 4%,
+    var(--v19b-color-control)
+  );
+}
+
+.v19-review-corrected-issue-list article > div {
+  display: grid;
+  gap: var(--v19b-size-4);
+}
+
+.v19-review-corrected-issue-list article strong {
+  color: var(--v19b-color-text);
+  font-size: var(--v19b-size-12);
+}
+
+.v19-review-corrected-issue-list article span {
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-10);
+}
+
+.v19-review-corrected-issue-list article p {
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-11);
+  line-height: var(--v19b-line-height-copy);
+}
+
 .v19-review-questionnaire-entry > svg {
   flex: none;
   color: var(--v19b-color-primary-text);
