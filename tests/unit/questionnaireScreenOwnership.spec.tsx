@@ -14,37 +14,34 @@ const completionState = vi.hoisted(() => ({
   onRejected: vi.fn(),
 }));
 
-vi.mock(
-  "../../src/modules/submissions/components/FigmaQuestionnaireScreen",
-  () => ({
-    FigmaQuestionnaireScreen: ({
-      onComplete,
-    }: {
-      onComplete: (payload: {
-        fieldUpdates: [];
-        reviewConfirmations: [];
-        saveIntent: "completion";
-        travelEnd: string;
-        travelStart: string;
-      }) => Promise<void>;
-    }) => (
-      <button
-        type="button"
-        onClick={() => {
-          void onComplete({
-            fieldUpdates: [],
-            reviewConfirmations: [],
-            saveIntent: "completion",
-            travelEnd: "2026-08-20",
-            travelStart: "2026-08-11",
-          }).catch((error: unknown) => completionState.onRejected(error));
-        }}
-      >
-        Complete questionnaire
-      </button>
-    ),
-  }),
-);
+vi.mock("../../src/modules/submissions/components/FigmaQuestionnaireScreen", () => ({
+  FigmaQuestionnaireScreen: ({
+    onComplete,
+  }: {
+    onComplete: (payload: {
+      fieldUpdates: [];
+      reviewConfirmations: [];
+      saveIntent: "completion";
+      travelEnd: string;
+      travelStart: string;
+    }) => Promise<void>;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        void onComplete({
+          fieldUpdates: [],
+          reviewConfirmations: [],
+          saveIntent: "completion",
+          travelEnd: "2026-08-20",
+          travelStart: "2026-08-11",
+        }).catch((error: unknown) => completionState.onRejected(error));
+      }}
+    >
+      Complete questionnaire
+    </button>
+  ),
+}));
 
 import { QuestionnaireScreen } from "../../src/components/QuestionnaireScreen";
 
