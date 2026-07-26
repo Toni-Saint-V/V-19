@@ -23,6 +23,17 @@ import {
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
+vi.mock("../../src/lib/supabase/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/lib/supabase/config")>();
+  return {
+    ...actual,
+    supabaseRuntimeConfig: {
+      ...actual.supabaseRuntimeConfig,
+      target: "supabase",
+    },
+  };
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
