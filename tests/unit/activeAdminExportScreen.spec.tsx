@@ -75,6 +75,19 @@ function changeQuestionnaireField(
 }
 
 describe("active admin export screen", () => {
+  test("shows the canonical submission city used by export package rules", () => {
+    const submission = initialSubmissions.find((item) => item.id === "SUB-1103");
+    if (!submission) {
+      throw new Error("Missing cross-city export fixture SUB-1103");
+    }
+
+    render(<AdminExportScreen submissions={[submission]} />);
+
+    const row = screen.getByTestId(`admin-export-row-${submission.id}`);
+    expect(within(row).getByText("Санкт-Петербург")).toBeInTheDocument();
+    expect(within(row).queryByText("Москва")).not.toBeInTheDocument();
+  });
+
   test("renders the selected package Excel Preview with all 56 contract columns and values", async () => {
     const submission = readySubmission();
     const preview = exportSummary([submission]).preview;
