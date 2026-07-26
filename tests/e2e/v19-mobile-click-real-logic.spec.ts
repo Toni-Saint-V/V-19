@@ -231,13 +231,22 @@ test.describe("V-19 mobile click real logic", () => {
     await expectNoFixedLayerOverControls(page, "390 agent actions");
 
     const lastEventAction = page
-      .getByRole("button", { name: /^Открыть (действие|подачу):/ })
+      .getByRole("button", { name: /^Выбрать действие:/ })
       .last();
     await expectCenterHitTarget(lastEventAction, "390 actions last row action");
     await lastEventAction.click();
-    const questionnaireWorkspace = page.getByRole("heading", {
+    const mobileActionDetail = page.getByTestId("agent-action-mobile-detail");
+    await expect(mobileActionDetail).toBeVisible();
+    const primaryAction = mobileActionDetail.locator(
+      '[data-v19-interaction-id="actions.open-primary"]',
+    );
+    await expectCenterHitTarget(primaryAction, "390 actions inline primary action");
+    await expect(primaryAction).toBeEnabled();
+    await primaryAction.click();
+    const questionnaireWorkspace = page.locator(".v19-questionnaire-screen-shell");
+    const submissionsWorkspace = page.getByRole("heading", {
       level: 1,
-      name: /^Анкета:/,
+      name: "Мои подачи",
     });
     await expect
       .poll(async () => {
@@ -245,9 +254,12 @@ test.describe("V-19 mobile click real logic", () => {
         if (await questionnaireWorkspace.isVisible().catch(() => false)) {
           return "questionnaire";
         }
+        if (await submissionsWorkspace.isVisible().catch(() => false)) {
+          return "submissions";
+        }
         return "none";
       })
-      .toMatch(/drawer|questionnaire/);
+      .toMatch(/drawer|questionnaire|submissions/);
 
     if (await drawer(page).isVisible().catch(() => false)) {
       await expectCenterHitTarget(
@@ -256,7 +268,7 @@ test.describe("V-19 mobile click real logic", () => {
       );
       await drawerCloseButton(page).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
-    } else {
+    } else if (await questionnaireWorkspace.isVisible().catch(() => false)) {
       const backToActions = page.getByRole("button", { name: "Назад" });
       await expectCenterHitTarget(backToActions, "390 questionnaire back to actions");
       await backToActions.click();
