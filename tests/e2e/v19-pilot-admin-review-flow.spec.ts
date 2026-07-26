@@ -1,4 +1,7 @@
+import { mkdirSync } from "node:fs";
+
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
+import { testRunArtifactPath } from "../support/artifacts";
 import {
   clearExportSelection,
   clickWorkspaceButton,
@@ -179,6 +182,8 @@ async function verifyEveryAdminDrawerSubview(
   await openAdminSubmission(page, /Нина Волкова|ПД-1053/);
 
   const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+  await expect(reviewWorkspace).toBeVisible();
+  await expectWithinViewport(page, reviewWorkspace);
   const mediaTablist = reviewWorkspace.getByRole("tablist", {
     name: "Выбор файла для проверки",
   });
@@ -200,16 +205,19 @@ async function verifyEveryAdminDrawerSubview(
   await expect(passportTab).toHaveAttribute("aria-selected", "true");
   await expect(passportTab).toBeFocused();
 
+  const screenshotRoot = testRunArtifactPath("admin-review-workspace");
+  mkdirSync(screenshotRoot, { recursive: true });
   for (const [id, label] of mediaTabs) {
     const tab = mediaTablist.getByRole("tab", { name: label, exact: true });
+    await expectWithinViewport(page, tab);
     await tab.click();
     await expect(tab).toHaveAttribute("aria-selected", "true");
     await expect(reviewWorkspace.getByRole("tabpanel")).toBeVisible();
     await expect
       .poll(() =>
-        reviewWorkspace.locator(
-          ".v19-review-preview-state.is-unavailable:visible",
-        ).count(),
+        reviewWorkspace
+          .locator(".v19-review-preview-state.is-unavailable:visible")
+          .count(),
       )
       .toBeGreaterThan(0);
 
@@ -223,14 +231,18 @@ async function verifyEveryAdminDrawerSubview(
       }),
     ).toBe(true);
 
-    const screenshotPath = testInfo.outputPath(
-      `admin-review-workspace-${viewport.width}-${id}.png`,
+    const screenshotPath = testRunArtifactPath(
+      "admin-review-workspace",
+      `admin-review-workspace-${viewport.width}x${viewport.height}-${id}.png`,
     );
     await page.screenshot({ path: screenshotPath });
-    await testInfo.attach(`admin-review-workspace-${viewport.width}-${id}`, {
-      contentType: "image/png",
-      path: screenshotPath,
-    });
+    await testInfo.attach(
+      `admin-review-workspace-${viewport.width}x${viewport.height}-${id}`,
+      {
+        contentType: "image/png",
+        path: screenshotPath,
+      },
+    );
   }
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
@@ -337,9 +349,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       await compactDensity.click();
       await expect(compactDensity).toHaveAttribute("aria-checked", "true");
       await expect
-        .poll(() =>
-          page.evaluate(() => document.documentElement.dataset.v19Density),
-        )
+        .poll(() => page.evaluate(() => document.documentElement.dataset.v19Density))
         .toBe("compact");
 
       await page.reload();
@@ -422,9 +432,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       }),
     ).toBe(true);
 
-    await reviewWorkspace
-      .getByRole("button", { name: "Вернуться к очереди" })
-      .click();
+    await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
     await expect(reviewWorkspace).toBeHidden();
     await expect(
       page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
@@ -446,6 +454,10 @@ test.describe("V-19 pilot admin review click flow", () => {
     await verifyEveryAdminDrawerSubview(page, testInfo, {
       height: 844,
       width: 390,
+    });
+    await verifyEveryAdminDrawerSubview(page, testInfo, {
+      height: 800,
+      width: 360,
     });
   });
 

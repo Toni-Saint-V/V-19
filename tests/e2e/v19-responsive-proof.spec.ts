@@ -1,12 +1,17 @@
-import { expect, test, type Page } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openFreshWorkspace } from "./v19-pilot-helpers";
-import { testArtifactPath } from "../support/artifacts";
+import { testRunArtifactPath } from "../support/artifacts";
 
 type ViewportProof = {
   height: number;
   label: string;
+  maxCreateInnerOverflowPx?: number;
   width: number;
 };
+
+const responsiveEvidenceRoot = testRunArtifactPath("responsive-proof");
 
 const responsiveViewports: ViewportProof[] = [
   { height: 900, label: "1440", width: 1440 },
@@ -14,6 +19,12 @@ const responsiveViewports: ViewportProof[] = [
   { height: 1024, label: "768", width: 768 },
   { height: 844, label: "390", width: 390 },
   { height: 812, label: "375", width: 375 },
+  {
+    height: 800,
+    label: "360",
+    maxCreateInnerOverflowPx: 10,
+    width: 360,
+  },
 ];
 
 function collectBrowserProblems(page: Page) {
@@ -48,7 +59,11 @@ async function expectNoHorizontalDocumentOverflow(page: Page, context: string) {
   expect(metrics.scrollWidth, context).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
-async function expectCreateContentFitsWithoutScroll(page: Page, context: string) {
+async function expectCreateContentFitsWithinOverflowBudget(
+  page: Page,
+  context: string,
+  maxOverflowPx = 1,
+) {
   const body = page.locator('[data-agent-screen="create"] .v19-preupload-card-body');
   await expect(body, `${context}: create content body`).toBeVisible();
   const metrics = await body.evaluate((element) => {
@@ -78,10 +93,11 @@ async function expectCreateContentFitsWithoutScroll(page: Page, context: string)
       cardTop: rect?.top ?? 0,
     };
   });
+  const overflowPx = Math.max(0, metrics.bodyScrollHeight - metrics.bodyClientHeight);
   expect(
-    metrics.bodyScrollHeight,
-    `${context}: create content should fit without inner scroll ${JSON.stringify(metrics)}`,
-  ).toBeLessThanOrEqual(metrics.bodyClientHeight + 1);
+    overflowPx,
+    `${context}: create content inner overflow ${JSON.stringify(metrics)}`,
+  ).toBeLessThanOrEqual(maxOverflowPx);
 }
 
 async function expectAgentNoDocumentScroll(page: Page, context: string) {
@@ -127,13 +143,11 @@ async function expectDrawerFitsViewport(
   page: Page,
   context: string,
   closeButtonName = "Закрыть подачу",
-) {
+): Promise<{ closeButton: Locator; dialog: Locator }> {
   const dialog = page.getByRole("dialog").first();
   await expect(dialog).toBeVisible();
   const closeButton = dialog.getByRole("button", { name: closeButtonName }).first();
-  if (await closeButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    await expect(closeButton).toBeVisible();
-  }
+  await expect(closeButton).toBeVisible();
 
   const viewport = page.viewportSize();
 
@@ -154,12 +168,34 @@ async function expectDrawerFitsViewport(
       { message: `${context}: drawer settles within the viewport` },
     )
     .toBe(true);
+  await expect
+    .poll(
+      async () => {
+        const box = await closeButton.boundingBox();
+        if (!box) return false;
+
+        return (
+          box.x >= -1 &&
+          box.y >= -1 &&
+          box.x + box.width <= viewport!.width + 1 &&
+          box.y + box.height <= viewport!.height + 1
+        );
+      },
+      { message: `${context}: close control stays within the viewport` },
+    )
+    .toBe(true);
+
+  return { closeButton, dialog };
 }
 
 async function screenshot(page: Page, viewport: ViewportProof, name: string) {
+  mkdirSync(responsiveEvidenceRoot, { recursive: true });
   await page.screenshot({
     fullPage: true,
-    path: testArtifactPath(`2026-06-21-v19-responsive-${viewport.label}-${name}.png`),
+    path: testRunArtifactPath(
+      "responsive-proof",
+      `v19-responsive-${viewport.width}x${viewport.height}-${name}.png`,
+    ),
   });
 }
 
@@ -271,7 +307,11 @@ test.describe("V-19 responsive proof", () => {
         page,
         `${viewport.label}: create workspace`,
       );
-      await expectCreateContentFitsWithoutScroll(page, viewport.label);
+      await expectCreateContentFitsWithinOverflowBudget(
+        page,
+        viewport.label,
+        viewport.maxCreateInnerOverflowPx,
+      );
       await screenshot(page, viewport, "create-submission-workspace");
 
       await createWorkspace.getByLabel("Город подачи").click();
@@ -300,11 +340,26 @@ test.describe("V-19 responsive proof", () => {
         .first();
       await expect(submissionRow).toBeVisible();
       await submissionRow.press("Enter");
-      await expectDrawerFitsViewport(page, `${viewport.label}: submission drawer`);
+      const { closeButton, dialog } = await expectDrawerFitsViewport(
+        page,
+        `${viewport.label}: submission drawer`,
+      );
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: drawer`);
+      const questionnaireTab = dialog.getByRole("tab", {
+        exact: true,
+        name: "Анкета",
+      });
+      await questionnaireTab.click();
+      await expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
+      const overviewTab = dialog.getByRole("tab", {
+        exact: true,
+        name: "Обзор",
+      });
+      await overviewTab.click();
+      await expect(overviewTab).toHaveAttribute("aria-selected", "true");
       await screenshot(page, viewport, "submission-drawer");
-      await page.keyboard.press("Escape");
-      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await closeButton.click();
+      await expect(dialog).toHaveCount(0);
 
       await clickOperationalNav(page, /^Настройки/);
       await expect(
