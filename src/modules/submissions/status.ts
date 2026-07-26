@@ -1,5 +1,6 @@
 import type {
   ActionDecision,
+  AgentOwnerId,
   CommandResult,
   DomainErrorCode,
   DrawerTab,
@@ -43,6 +44,7 @@ import {
   blsQuestionnaireReadiness,
   isBlsQuestionnaireFileReady,
 } from "./questionnaireBlsRules";
+import { submissionBelongsToAgent } from "./ownership";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -550,8 +552,14 @@ export function withRecalculatedSubmissionProgress(
   };
 }
 
-export function canAgentSubmitForReview(submission: Submission) {
-  return canPerformAction(submission, "submit_for_review", "agent").ok;
+export function canAgentSubmitForReview(
+  submission: Submission,
+  actorId: AgentOwnerId,
+) {
+  return (
+    submissionBelongsToAgent(submission, actorId) &&
+    canPerformAction(submission, "submit_for_review", "agent").ok
+  );
 }
 
 export function agentQuestionnaireCompletionDecision(
@@ -783,9 +791,6 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: packageLevelExportActionReason };
   }
 
-  const isAcceptedPackageResubmission =
-    action === "submit_for_review" && submission.status === "ready_for_export";
-
   if (action === "save_progress" && !hasRequiredBasics(submission)) {
     return { ok: false, reason: "Нужен город и хотя бы один заявитель" };
   }
@@ -796,14 +801,12 @@ function validateSubmissionActionPolicy(
 
   if (
     action === "submit_for_review" &&
-    !isAcceptedPackageResubmission &&
     hasMissingRequiredWork(submission)
   ) {
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
   if (
-    !isAcceptedPackageResubmission &&
     requiresPassportGateBeforeAction(submission, action)
   ) {
     return {
@@ -813,7 +816,6 @@ function validateSubmissionActionPolicy(
   }
 
   if (
-    !isAcceptedPackageResubmission &&
     requiresPassportExtractionReviewBeforeAction(submission, action)
   ) {
     return {
@@ -824,7 +826,6 @@ function validateSubmissionActionPolicy(
 
   if (
     action === "submit_for_review" &&
-    !isAcceptedPackageResubmission &&
     !hasUsableTripDateRange(submission)
   ) {
     return { ok: false, reason: missingTripDateRangeReason };
@@ -973,6 +974,27 @@ export function transitionSubmissionById(
 }
 
 export function transitionSubmissionStatus(
+  submission: Submission,
+  input: Omit<SubmissionStatusTransitionInput, "submissionId">,
+): CommandResult<Submission> {
+  if (
+    input.nextStatus === "submitted_for_review" &&
+    (submission.status === "in_progress" ||
+      submission.status === "ready_for_export")
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Submit for review requires the canonical action executor.",
+      },
+    };
+  }
+
+  return transitionPreparedSubmissionStatus(submission, input);
+}
+
+function transitionPreparedSubmissionStatus(
   submission: Submission,
   input: Omit<SubmissionStatusTransitionInput, "submissionId">,
 ): CommandResult<Submission> {
@@ -1337,7 +1359,7 @@ export function applySubmissionAction(
   submission: Submission,
   action: SubmissionAction,
   role: Role,
-  actorId?: string,
+  actorId?: AgentOwnerId,
 ): Submission {
   const result = applySubmissionActionResult(submission, action, role, actorId);
   return result.ok ? result.data : submission;
@@ -1347,8 +1369,22 @@ export function applySubmissionActionResult(
   submission: Submission,
   action: SubmissionAction,
   role: Role,
-  actorId?: string,
+  actorId?: AgentOwnerId,
 ): CommandResult<Submission> {
+  if (
+    action === "submit_for_review" &&
+    role === "agent" &&
+    (!actorId || !submissionBelongsToAgent(submission, actorId))
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Agent can submit only an owned submission.",
+      },
+    };
+  }
+
   const guard = canPerformAction(submission, action, role);
   if (!guard.ok) {
     return submissionActionFailure(action, guard.reason);
@@ -1412,12 +1448,18 @@ export function applySubmissionActionResult(
       exportState: "not_ready",
       files: submission.files.map((file) =>
         file.status === "uploaded" || file.status === "accepted"
-          ? { ...file, status: "pending_review" }
+          ? {
+              ...file,
+              reviewedAtIso: undefined,
+              reviewedBy: undefined,
+              reviewStatus: "not_reviewed",
+              status: "pending_review",
+            }
           : file,
       ),
     };
 
-    return transitionSubmissionStatus(prepared, {
+    return transitionPreparedSubmissionStatus(prepared, {
       actorId,
       actorRole: role,
       nextStatus: "submitted_for_review",
@@ -1453,8 +1495,18 @@ export function applySubmissionActionResult(
 
 export function applyAgentSubmitForReviewResult(
   submission: Submission,
-  actorId?: string,
+  actorId: AgentOwnerId,
 ): CommandResult<Submission> {
+  if (!submissionBelongsToAgent(submission, actorId)) {
+    return {
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Agent can submit only an owned submission.",
+      },
+    };
+  }
+
   const preparedResult =
     submission.status === "draft"
       ? applySubmissionActionResult(
