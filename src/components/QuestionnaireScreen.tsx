@@ -515,11 +515,6 @@ export function QuestionnaireScreen({
       };
       workingSubmissionRef.current = savedSubmission;
       setWorkingSubmission(savedSubmission);
-      if (assignment.assignedNow) {
-        window.alert(
-          `Анкета сохранена. Номер подачи: VF-${assignment.publicNumber}`,
-        );
-      }
     }
 
     if (onSavedAndExit) {
