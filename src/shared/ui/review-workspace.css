@@ -1326,7 +1326,7 @@
 .v19-review-corrected-issues > p {
   color: var(--v19b-color-text-muted);
   font-size: var(--v19b-size-12);
-  line-height: var(--v19b-line-height-body);
+  line-height: var(--v19b-line-height-copy);
 }
 
 .v19-review-corrected-issue-list {
@@ -1364,9 +1364,9 @@
 }
 
 .v19-review-corrected-issue-list article p {
-  color: var(--v19b-color-text-secondary);
+  color: var(--v19b-color-text-muted);
   font-size: var(--v19b-size-11);
-  line-height: var(--v19b-line-height-body);
+  line-height: var(--v19b-line-height-copy);
 }
 
 .v19-review-questionnaire-entry > svg {
