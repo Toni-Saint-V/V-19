@@ -15,12 +15,18 @@
    THE SYSTEM SHALL установить `exportState: not_ready`.
 3. WHEN переход завершается успешно
    THE SYSTEM SHALL вернуть файлы со статусом `uploaded` или `accepted` в
-   `pending_review`.
+   `pending_review`, установить `reviewStatus: not_reviewed` и очистить
+   `reviewedAtIso`/`reviewedBy`.
 4. WHEN переход завершается успешно
-   THE SYSTEM SHALL добавить каноническую history-запись отправки агентом.
-5. WHILE пакет является уже принятым legacy-пакетом
-   THE SYSTEM SHALL сохранить действующую совместимость и не открывать повторно
-   intake-, passport- и trip-date gates, применяемые к `in_progress`.
+   THE SYSTEM SHALL добавить каноническую history-запись с authenticated
+   `actorId`.
+5. WHEN persisted `media_assets` повторно загружаются для
+   `submitted_for_review`
+   THE SYSTEM SHALL восстановить `review_status: not_reviewed` как
+   `pending_review`, а не как `accepted` или обычный `uploaded`.
+6. WHILE пакет имеет статус `ready_for_export`
+   THE SYSTEM SHALL применить те же canonical T2 package-, passport-,
+   issue- и trip-date gates, что и для `in_progress`.
 
 ## US-2: Сохранить единый policy и fail-closed ошибки
 
@@ -30,8 +36,8 @@
 
 ### Acceptance Criteria (EARS)
 
-1. WHEN `canAgentSubmitForReview` оценивает пакет
-   THE SYSTEM SHALL вернуть результат канонического
+1. WHEN `canAgentSubmitForReview` оценивает пакет для authenticated agent
+   THE SYSTEM SHALL потребовать ownership и положительный результат
    `canPerformAction(submission, "submit_for_review", "agent")`.
 2. WHEN `in_progress` пакет отправляется на проверку
    THE SYSTEM SHALL сохранить существующие completeness, required-media и
@@ -40,6 +46,20 @@
    THE SYSTEM SHALL вернуть существующий typed domain error.
 4. WHEN команда завершается ошибкой
    THE SYSTEM SHALL NOT мутировать исходный submission snapshot.
+5. WHEN `in_progress` или `ready_for_export` пакет проходит guard
+   THE SYSTEM SHALL выполнить подготовку и transition через один
+   `applySubmissionActionResult` executor.
+6. WHEN authenticated agent не владеет submission
+   THE SYSTEM SHALL вернуть `PERMISSION_DENIED` до content-derived validation.
+7. WHEN любой caller вызывает canonical `submit_for_review` executor без
+   authenticated `actorId` либо с foreign actor
+   THE SYSTEM SHALL вернуть `PERMISSION_DENIED` без мутации.
+8. WHEN Questionnaire completion инициирует lifecycle command
+   THE SYSTEM SHALL использовать session-owned `agentId`, а не owner id из
+   изменяемого submission snapshot.
+9. WHEN caller пытается выполнить T2 через direct status transition API
+   THE SYSTEM SHALL вернуть `INVALID_TRANSITION`; подготовка T2 разрешена
+   только owner-aware canonical action executor.
 
 ## US-3: Ограничить transition canonical-полями
 
@@ -50,16 +70,20 @@
 ### Acceptance Criteria (EARS)
 
 1. WHEN `ready_for_export` пакет возвращается на review
-   THE SYSTEM SHALL сохранить applicants, questionnaire, issues и
+   THE SYSTEM SHALL сохранить applicant identity, questionnaire, issues и
    `exportPackage` без изменений.
-2. THE SYSTEM SHALL NOT вводить новые status values, API, RPC, SQL, migrations,
-   checksum или ZIP contracts.
-3. THE SYSTEM SHALL NOT утверждать production persistence без отдельного
+2. WHEN transition пересчитывает derived state
+   THE SYSTEM MAY обновить только `completeness` и
+   `applicants[*].fileStatus` в соответствии с текущим snapshot.
+3. THE SYSTEM SHALL NOT вводить новые status values, network API, RPC, SQL,
+   migrations, checksum или ZIP contracts.
+4. THE SYSTEM SHALL NOT утверждать production persistence без отдельного
    авторизованного RLS/RPC пути и транзакционного доказательства.
 
 ## Out of scope
 
-- UI, CSS, browser handlers и responsive behavior.
-- Изменение существующего accepted-legacy action-policy.
-- Supabase schema, RLS, RPC, persistence и production deployment.
+- Visual UI, CSS, responsive behavior и E2E.
+- Изменения questionnaire UX кроме bounded session-actor wiring к canonical
+  command.
+- Supabase schema, RLS, RPC и production deployment.
 - Расширение `DomainError` или export package interfaces.

@@ -150,14 +150,14 @@ describe("V-19 pilot click logic state machine", () => {
     };
     const ready = readyInProgressSubmission();
 
-    expect(submitForReview(incomplete, "agent")).toEqual({
+    expect(submitForReview(incomplete, "agent", incomplete.agentId)).toEqual({
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
         message: "Questionnaire and files must be complete.",
       },
     });
-    expect(submitForReview(missingTripDates, "agent")).toEqual({
+    expect(submitForReview(missingTripDates, "agent", missingTripDates.agentId)).toEqual({
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
@@ -165,7 +165,7 @@ describe("V-19 pilot click logic state machine", () => {
       },
     });
 
-    const submitted = unwrap(submitForReview(ready, "agent"));
+    const submitted = unwrap(submitForReview(ready, "agent", ready.agentId));
     expect(submitted.status).toBe("submitted_for_review");
     expect(submitted.files.every((file) => file.status === "pending_review")).toBe(true);
   });

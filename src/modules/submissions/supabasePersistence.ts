@@ -482,6 +482,7 @@ function attachQuestionnaireAnswerRows(
 
 function fileStatusFromMediaAssetRow(
   row: CockpitMediaAssetRow,
+  submissionStatus: Submission["status"],
 ): SubmissionFile["status"] {
   if (row.review_status === "accepted") return "accepted";
   if (
@@ -489,6 +490,13 @@ function fileStatusFromMediaAssetRow(
     row.review_status === "poor_quality"
   ) {
     return "needs_replacement";
+  }
+  if (
+    submissionStatus === "submitted_for_review" &&
+    row.review_status === "not_reviewed" &&
+    row.upload_status === "uploaded"
+  ) {
+    return "pending_review";
   }
   return row.upload_status === "uploaded" ? "uploaded" : "missing";
 }
@@ -504,6 +512,7 @@ function submissionFileTypeFromMediaAssetRow(
 
 function submissionFileFromMediaAssetRow(
   row: CockpitMediaAssetRow,
+  submissionStatus: Submission["status"],
 ): SubmissionFile | null {
   const type = submissionFileTypeFromMediaAssetRow(row);
   if (!type) return null;
@@ -512,7 +521,7 @@ function submissionFileFromMediaAssetRow(
     id: row.id,
     applicantId: row.applicant_id,
     type,
-    status: fileStatusFromMediaAssetRow(row),
+    status: fileStatusFromMediaAssetRow(row, submissionStatus),
     generatedFileName: row.generated_file_name ?? undefined,
     mimeType: row.mime_type ?? undefined,
     originalFileName: row.original_file_name ?? undefined,
@@ -538,7 +547,7 @@ export function attachDurableMediaAssetRows(
   if (!mediaRows.length) return withRecomputedFileCompletion(submission);
 
   const durableFiles = mediaRows
-    .map(submissionFileFromMediaAssetRow)
+    .map((row) => submissionFileFromMediaAssetRow(row, submission.status))
     .filter((file): file is SubmissionFile => Boolean(file));
   if (!durableFiles.length) return withRecomputedFileCompletion(submission);
 
@@ -703,6 +712,12 @@ function attachExportPackageRow(
 ): Submission {
   const durableExportState = exportStateFromDurableRowStatus(rowStatus);
   if (durableExportState === "not_ready") {
+    if (rowStatus === "submitted_for_review" && submission.exportPackage) {
+      return {
+        ...submission,
+        exportState: "not_ready",
+      };
+    }
     return clearSnapshotExportPackage(submission, rowStatus);
   }
 
