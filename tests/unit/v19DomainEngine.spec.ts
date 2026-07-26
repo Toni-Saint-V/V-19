@@ -697,13 +697,15 @@ describe("V-19 domain engine", () => {
       reason: "Действие недоступно в текущем статусе",
     });
     expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
-      ok: false,
-      reason: "Есть исправленные замечания вне паспортной проверки",
+      ok: true,
     });
-    expect(
-      applySubmissionAction(corrected, "close_issues_accept", "admin").issues[0]
-        ?.status,
-    ).toBe("fixed_by_agent");
+    const accepted = applySubmissionAction(
+      corrected,
+      "close_issues_accept",
+      "admin",
+    );
+    expect(accepted.status).toBe("ready_for_export");
+    expect(accepted.issues[0]?.status).toBe("closed_by_admin");
   });
 
   it("blocks acceptance for any open issue, not only blockers", () => {

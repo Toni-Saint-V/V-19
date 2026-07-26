@@ -42,7 +42,7 @@ async function isFullyWithinViewport(locator: Locator) {
 }
 
 test.describe("V-19 P0 admin document review", () => {
-  test("mobile review opens the protected-media workspace and blocks section confirmation without originals", async ({
+  test("mobile review rejects an unusable original and blocks section confirmation on incomplete fields", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -92,13 +92,8 @@ test.describe("V-19 P0 admin document review", () => {
 
     await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
     await expect(
-      reviewWorkspace.getByText(
-        /Защищённый оригинал недоступен|Файл не загружен/,
-      ),
+      reviewWorkspace.getByRole("alert").getByText("Оригинал нельзя принять"),
     ).toBeVisible();
-    await expect(
-      reviewWorkspace.getByRole("img", { name: "Оригинал загранпаспорта" }),
-    ).toHaveCount(0);
     await expect(
       reviewWorkspace.getByRole("button", {
         name: "Подтвердить паспортную секцию",
@@ -111,7 +106,7 @@ test.describe("V-19 P0 admin document review", () => {
     await page.screenshot({
       animations: "disabled",
       fullPage: false,
-      path: testInfo.outputPath("mobile-390-passport-fail-closed.png"),
+      path: testInfo.outputPath("mobile-390-passport-incomplete-fields.png"),
     });
 
     await page.keyboard.press("Escape");
