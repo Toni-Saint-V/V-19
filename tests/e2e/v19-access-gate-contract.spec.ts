@@ -21,13 +21,29 @@ test.describe("V-19 access gate contract", () => {
         page.getByRole("heading", { name: "Заявка на доступ" }),
       ).toBeVisible();
 
-      const metrics = await page.locator(".access-shell").evaluate((shell) => {
-        const card = shell.querySelector<HTMLElement>(".access-card");
-        const logo = shell.querySelector<HTMLElement>(".access-brand-logo");
-        const submit = shell.querySelector<HTMLElement>(".access-submit");
-        const firstInput = shell.querySelector<HTMLElement>(".access-field input");
+      const shell = page.locator(".access-shell");
+      await expect(shell).toHaveAttribute("data-access-mode", "register");
+      await expect(shell.locator(".access-brand-product")).toContainText(
+        "VisaFlow V-19",
+      );
+      await expect(shell.locator(".access-brand-trust")).toHaveText(
+        "Доступ к кабинету подтверждает администратор",
+      );
+
+      if (viewport.width <= 760) {
+        await expect(shell.locator(".access-brand-title")).toBeHidden();
+      } else {
+        await expect(shell.locator(".access-brand-title")).toBeVisible();
+      }
+
+      const metrics = await shell.evaluate((shellElement) => {
+        const card = shellElement.querySelector<HTMLElement>(".access-card");
+        const logo = shellElement.querySelector<HTMLElement>(".access-brand-logo");
+        const submit = shellElement.querySelector<HTMLElement>(".access-submit");
+        const firstInput =
+          shellElement.querySelector<HTMLElement>(".access-field input");
         const controls = Array.from(
-          shell.querySelectorAll<HTMLElement>(
+          shellElement.querySelectorAll<HTMLElement>(
             ".access-card input, .access-card button",
           ),
         );
@@ -41,7 +57,7 @@ test.describe("V-19 access gate contract", () => {
             firstInput?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
           logoHeight: logo?.getBoundingClientRect().height ?? Number.POSITIVE_INFINITY,
           overflowX: document.documentElement.scrollWidth - window.innerWidth,
-          shellScrollable: shell.scrollHeight > shell.clientHeight,
+          shellScrollable: shellElement.scrollHeight > shellElement.clientHeight,
           submitBottom:
             submit?.getBoundingClientRect().bottom ?? Number.POSITIVE_INFINITY,
         };
@@ -51,10 +67,11 @@ test.describe("V-19 access gate contract", () => {
         metrics.overflowX,
         `${viewport.width}px has no page overflow`,
       ).toBeLessThanOrEqual(0);
+      const minimumControlHeight = viewport.width <= 760 ? 44 : 40;
       expect(
         Math.min(...metrics.controlHeights),
-        `${viewport.width}px controls keep a 40px minimum target`,
-      ).toBeGreaterThanOrEqual(40);
+        `${viewport.width}px controls keep a ${minimumControlHeight}px minimum target`,
+      ).toBeGreaterThanOrEqual(minimumControlHeight);
 
       if (viewport.width <= 430) {
         expect(
@@ -101,6 +118,10 @@ test.describe("V-19 access gate contract", () => {
     await page.getByRole("button", { name: "Уже есть доступ? Войти" }).click();
 
     await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
+    await expect(page.locator(".access-shell")).toHaveAttribute(
+      "data-access-mode",
+      "login",
+    );
     const loginButton = page.getByRole("button", { name: "Войти в кабинет" });
     await loginButton.click();
     await expect(page.getByRole("alert")).toHaveText("Введите корректный email");
@@ -122,6 +143,10 @@ test.describe("V-19 access gate contract", () => {
     await expect(
       page.getByRole("heading", { name: "Восстановление доступа" }),
     ).toBeVisible();
+    await expect(page.locator(".access-shell")).toHaveAttribute(
+      "data-access-mode",
+      "reset",
+    );
     await page.getByRole("button", { name: "Вернуться ко входу" }).click();
     await expect(page.getByRole("heading", { name: "Вход" })).toBeVisible();
 
