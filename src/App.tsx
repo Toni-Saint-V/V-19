@@ -941,7 +941,19 @@ export default function App({
         throw new Error("Только активный агент может изменить свои подачи.");
       }
       await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+        const ownerAgentId = session.ownerAgentId ?? session.userId;
         const currentSubmissions = submissionsRef.current;
+        for (const submission of nextVisibleSubmissions) {
+          if (submission.agentId !== ownerAgentId) {
+            throw new Error("Нельзя сохранить подачу от имени другого агента.");
+          }
+          const existing = currentSubmissions.find(
+            (candidate) => candidate.id === submission.id,
+          );
+          if (existing && existing.agentId !== ownerAgentId) {
+            throw new Error("Номер подачи уже принадлежит другому агенту.");
+          }
+        }
         const nextById = new Map(
           nextVisibleSubmissions.map((submission) => [submission.id, submission]),
         );
@@ -2027,6 +2039,7 @@ export default function App({
           onAssignPublicNumber: assignVisibleAgentSubmissionPublicNumber,
           onSubmissionUpdate: updateVisibleAgentSubmission,
           onSubmissionsChange: persistVisibleAgentSubmissions,
+          reservedSubmissionIds: submissions.map((submission) => submission.id),
           submissions: visibleSubmissions,
           usesSupabase: supabaseEnabled,
           onSignOut: handleSignOut,
