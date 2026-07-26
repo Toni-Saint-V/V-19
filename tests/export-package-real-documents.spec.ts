@@ -14,6 +14,7 @@ import {
 import { buildLocalDemoExportMediaZipOptions } from "../src/modules/submissions/exportMediaZipLocalDemo";
 import { parseExportWorkbookBlob } from "../src/lib/export/exportWorkbookCore";
 import { createVisaApplicationFormPdfBlob } from "../src/modules/submissions/visaApplicationFormPdf";
+import { buildMediaStoragePath } from "../src/modules/submissions/mediaStoragePolicy";
 import { normalizeSubmissionQuestionnaire } from "../src/modules/submissions/questionnaire";
 import { fillRequiredQuestionnaireForTest } from "./unit/helpers/questionnaireTestFill";
 import type {
@@ -219,9 +220,9 @@ function makeSubmission(input: {
     issues: [],
     files: input.applicants.flatMap((applicant) =>
       [
-        makeFile(applicant, "passport_scan"),
-        makeFile(applicant, "selfie"),
-        makeFile(applicant, "selfie_2"),
+        makeFile(input.id, applicant, "passport_scan"),
+        makeFile(input.id, applicant, "selfie"),
+        makeFile(input.id, applicant, "selfie_2"),
       ],
     ),
     completeness: { questionnaire: 100, files: 100, total: 100 },
@@ -343,23 +344,35 @@ function verifiedPassportField(
   };
 }
 
-function makeFile(applicant: Applicant, type: SubmissionFile["type"]): SubmissionFile {
+function makeFile(
+  submissionId: string,
+  applicant: Applicant,
+  type: SubmissionFile["type"],
+): SubmissionFile {
   const passport = applicant.sections
     .flatMap((section) => section.fields)
     .find((field) => field.id === "passport-no")?.value;
-  const documentName = type === "selfie" ? "selfie_1" : type;
+  const generatedFileName = `${passport}_${type}.jpg`;
+  const storage = buildMediaStoragePath(
+    submissionId,
+    applicant.id,
+    type,
+    generatedFileName,
+  );
   return {
     id: `${applicant.id}-${type}`,
     applicantId: applicant.id,
     type,
     status: "accepted",
-    generatedFileName: `${passport}_${documentName}.jpg`,
+    generatedFileName,
     mimeType: "image/jpeg",
-    originalFileName: `${passport}_${documentName}.jpg`,
+    originalFileName: generatedFileName,
     reviewedAtIso: "2026-05-12T00:00:00.000Z",
     reviewStatus: "accepted",
     sizeBytes: 2048,
-    storageAdapter: "local-dev",
+    storageAdapter: "supabase-private",
+    storageBucket: storage.bucket,
+    storagePath: storage.path,
     uploadStatus: "uploaded",
     uploadedAtIso: "2026-05-12T00:00:00.000Z",
   };
