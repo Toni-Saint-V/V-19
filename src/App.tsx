@@ -31,6 +31,7 @@ import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submission
 import {
   ensureSubmissionPublicNumber,
   isAdminSubmissionConcurrencyConflict,
+  isCanonicalSubmissionReadbackMismatch,
   isSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
   saveAdminCockpitSubmissionsIfCurrent,
@@ -821,6 +822,8 @@ export default function App({
               changedSubmissions,
               currentOwnerIds,
               currentCaseRevisions,
+              loadCockpitSubmissionsForProfile,
+              { verifyCanonicalReadback: true },
             );
         const nextOwnerIds =
           adminSaveResult?.ownerIdsBySubmissionId ??
@@ -849,8 +852,10 @@ export default function App({
       } catch (error) {
         if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
           const concurrencyConflict = isSubmissionConcurrencyConflict(error);
+          const canonicalReadbackMismatch =
+            isCanonicalSubmissionReadbackMismatch(error);
           let conflictRefreshSucceeded = false;
-          if (concurrencyConflict) {
+          if (concurrencyConflict || canonicalReadbackMismatch) {
             try {
               await runCanonicalSubmissionsRefresh(true);
               conflictRefreshSucceeded = true;
@@ -862,6 +867,10 @@ export default function App({
             ? conflictRefreshSucceeded
               ? "Подача изменилась в другом окне. Загружена актуальная версия; повторите действие."
               : "Подача изменилась в другом окне. Обновите подачу и повторите действие."
+            : canonicalReadbackMismatch
+              ? conflictRefreshSucceeded
+                ? "Сохранение не подтверждено. Загружена каноническая версия; повторите действие."
+                : "Сохранение не подтверждено. Обновите подачу и повторите действие."
             : formatPersistenceFailureForUser(
                 error,
                 "Не удалось сохранить данные. Обновите страницу и повторите действие.",

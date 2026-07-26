@@ -47,6 +47,56 @@ describe("agent submission persistence plan", () => {
     ).toEqual([false, true]);
   });
 
+  test("keeps the latest draft data in the durable intermediate checkpoint", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["ANTON VOLKOV"],
+      city: "Санкт-Петербург",
+      familyCount: 1,
+      idScheme: "supabase",
+      submissions: [],
+      type: "single",
+    });
+    const latestTitle = "Последняя версия перед отправкой";
+    const latestApplicantName = "ANTON UPDATED";
+    const latestFileName = "latest-passport.jpg";
+    const submitted = {
+      ...draft,
+      title: latestTitle,
+      status: "submitted_for_review" as const,
+      applicants: draft.applicants.map((applicant) => ({
+        ...applicant,
+        fullName: latestApplicantName,
+      })),
+      files: draft.files.map((file, index) =>
+        index === 0
+          ? {
+              ...file,
+              generatedFileName: latestFileName,
+              status: "pending_review" as const,
+            }
+          : file,
+      ),
+    };
+
+    const result = agentSubmissionPersistenceCheckpoints(
+      draft,
+      submitted,
+      draft.agentId,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data[0]).toMatchObject({
+      status: "in_progress",
+      title: latestTitle,
+      applicants: [expect.objectContaining({ fullName: latestApplicantName })],
+    });
+    expect(result.data[0]?.files[0]).toMatchObject({
+      generatedFileName: latestFileName,
+      status: "uploaded",
+    });
+  });
+
   test("keeps an existing in-progress submission as a single persistence write", () => {
     const draft = createDraftSubmission({
       applicantNames: ["ANTON VOLKOV"],

@@ -522,6 +522,75 @@ describe("V-19 Supabase cockpit persistence", () => {
     });
   });
 
+  it("confirms a successful draft save through canonical readback", async () => {
+    const changedSubmission = {
+      ...(initialSubmissions[0] as Submission),
+      agentId: agentProfile.id,
+      title: "Canonical draft",
+    };
+    const ownerIds = new Map([[changedSubmission.id, agentProfile.id]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[changedSubmission.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [
+        {
+          ...changedSubmission,
+          agentDisplayName: agentProfile.displayName,
+          createdAt: "2026-07-26T10:00:00.000Z",
+          publicNumber: 1059,
+          updatedAt: "2026-07-26T10:00:01.000Z",
+        },
+      ],
+    }));
+    mockState.rpcResults = [{ data: { caseRevision: 8 }, error: null }];
+
+    const saved = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [changedSubmission],
+      ownerIds,
+      new Map([[changedSubmission.id, 7]]),
+      canonicalLoader,
+      { verifyCanonicalReadback: true },
+    );
+
+    expect(canonicalLoader).toHaveBeenCalledOnce();
+    expect(saved.caseRevisionsBySubmissionId.get(changedSubmission.id)).toBe(8);
+  });
+
+  it("fails closed when canonical readback differs from the saved draft", async () => {
+    const changedSubmission = {
+      ...(initialSubmissions[0] as Submission),
+      agentId: agentProfile.id,
+      title: "Intended draft",
+    };
+    const ownerIds = new Map([[changedSubmission.id, agentProfile.id]]);
+    const canonicalLoader = vi.fn(async () => ({
+      caseRevisionsBySubmissionId: new Map([[changedSubmission.id, 8]]),
+      ownerIdsBySubmissionId: ownerIds,
+      quarantinedSubmissionIds: new Set<string>(),
+      submissions: [{ ...changedSubmission, title: "Stale canonical draft" }],
+    }));
+    mockState.rpcResults = [{ data: { caseRevision: 8 }, error: null }];
+
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [changedSubmission],
+        ownerIds,
+        new Map([[changedSubmission.id, 7]]),
+        canonicalLoader,
+        { verifyCanonicalReadback: true },
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        safeCode:
+          "rpc.save_submission_draft:save:CANONICAL_READBACK_MISMATCH",
+      },
+    });
+    expect(canonicalLoader).toHaveBeenCalledOnce();
+  });
+
   it("persists the canonical submission city in the appointment questionnaire answer", async () => {
     const submission = {
       ...normalizeSubmissionQuestionnaire(
