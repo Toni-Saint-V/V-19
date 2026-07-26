@@ -92,7 +92,11 @@ export function AdminUsersAccessScreen({
   }
 
   return (
-    <section className="v19-access-screen" aria-labelledby="v19-access-title">
+    <section
+      className="v19-access-screen"
+      aria-labelledby="v19-access-title"
+      data-testid="admin-users-access-requests"
+    >
       <header className="v19-access-hero">
         <div>
           <span className="v19-access-eyebrow">

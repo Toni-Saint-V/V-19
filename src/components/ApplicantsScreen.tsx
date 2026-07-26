@@ -538,6 +538,7 @@ function FamilySubmissionCard({
       aria-label={`Подача ${title}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      data-testid="agent-submission-card"
       tabIndex={0}
       onClick={(event) => {
         if (
@@ -644,6 +645,7 @@ function IndividualSubmissionCard({
       aria-label={`Подача ${name}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      data-testid="agent-submission-card"
       tabIndex={0}
       onClick={(event) => {
         if (
