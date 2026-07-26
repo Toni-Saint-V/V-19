@@ -445,7 +445,7 @@ describe("submission next-step engine", () => {
     });
   });
 
-  test("blocks corrected acceptance for a fixed issue outside passport scope", () => {
+  test("offers explicit corrected acceptance for a fixed questionnaire issue", () => {
     const ready = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(readyForReviewSubmission()),
     );
@@ -476,13 +476,13 @@ describe("submission next-step engine", () => {
       surface: "review",
     });
 
-    expect(brief.status).toBe("blocked");
+    expect(brief.status).toBe("ready_for_action");
     expect(brief.owner).toBe("admin");
     expect(brief.blockers).not.toContain("1 исправлений ждут закрытия администратором");
     expect(brief.primaryAction).toMatchObject({
-      disabled: true,
-      kind: "none",
-      reason: "Есть исправленные замечания вне паспортной проверки",
+      disabled: false,
+      kind: "submission_action",
+      label: "Закрыть исправления и принять",
       submissionAction: "close_issues_accept",
     });
   });

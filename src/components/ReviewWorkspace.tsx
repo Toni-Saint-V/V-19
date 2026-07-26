@@ -26,6 +26,7 @@ import {
   createMediaSignedUrl,
   mediaStorageBucket,
 } from "../modules/submissions/mediaStorage";
+import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
 import { getAdminReviewActions } from "../modules/submissions/status";
 import {
@@ -548,10 +549,18 @@ export function ReviewWorkspace({
       void (async () => {
         let preview: ReviewMediaPreviewState = unavailablePreview;
         try {
-          const url = await createMediaSignedUrl({
-            bucket: mediaStorageBucket,
-            path: protectedFile.storagePath,
-          });
+          const url =
+            __V19_LOCAL_DEMO_BUILD__ &&
+            supabaseRuntimeConfig.target === "local-demo"
+              ? (
+                  await import(
+                    "../modules/submissions/exportMediaZipLocalDemo"
+                  )
+                ).localDemoReviewMediaUrl(target.type)
+              : await createMediaSignedUrl({
+                  bucket: mediaStorageBucket,
+                  path: protectedFile.storagePath,
+                });
           preview = url
             ? { status: "ready", url }
             : unavailablePreview;
@@ -605,6 +614,8 @@ export function ReviewWorkspace({
     submission?.issues.filter(
       (issue) => issue.status === "closed_by_admin" && passportIssueInScope(issue),
     ).length ?? 0;
+  const correctedIssuesAwaitingClosure =
+    submission?.issues.filter((issue) => issue.status === "fixed_by_agent") ?? [];
   const hasOpenPassportIssue = openPassportIssueCount > 0;
   const hasUnambiguousPrimaryApplicant = Boolean(
     submission && hasUnambiguousPrimaryApplicantForPassportReview(submission),
@@ -1178,6 +1189,47 @@ export function ReviewWorkspace({
               readOnly={!isEditableReviewStatus}
               totalFieldCount={ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
             />
+
+            {correctedIssuesAwaitingClosure.length > 0 ? (
+              <section
+                aria-label="Исправления к закрытию"
+                className="v19-review-corrected-issues"
+              >
+                <header>
+                  <div>
+                    <span>Решение администратора</span>
+                    <h2>Исправления к закрытию</h2>
+                  </div>
+                  <strong>{correctedIssuesAwaitingClosure.length}</strong>
+                </header>
+                <p>
+                  Сверьте исправленные значения. Команда «Закрыть исправления и
+                  принять» закроет перечисленные замечания и передаст пакет на
+                  выгрузку.
+                </p>
+                <div className="v19-review-corrected-issue-list">
+                  {correctedIssuesAwaitingClosure.map((issue) => {
+                    const target = [
+                      issue.target.applicantName,
+                      issue.target.section,
+                      issue.target.field,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+
+                    return (
+                      <article key={issue.id}>
+                        <div>
+                          <strong>{issue.reason}</strong>
+                          {target ? <span>{target}</span> : null}
+                        </div>
+                        <p>{issue.comment}</p>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             <header className="v19-review-section-heading">
               <div>

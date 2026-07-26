@@ -35,8 +35,6 @@ import {
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
   hasAdminPassportReviewValue,
-  isAdminPassportReviewIssueInScope,
-  passportReviewMediaTypesVisibleForApplicant,
   requiredPassportReviewMediaSlots,
 } from "./passportReviewContract";
 import {
@@ -407,22 +405,6 @@ export function unresolvedOpenIssueCount(submission: Submission) {
 
 export function fixedIssueCount(submission: Submission) {
   return submission.issues.filter((issue) => isFixedIssueStatus(issue.status)).length;
-}
-
-function isIssueInAdminPassportReviewScope(
-  submission: Submission,
-  issue: Issue,
-): boolean {
-  return submission.applicants.some((applicant) =>
-    isAdminPassportReviewIssueInScope(issue, {
-      applicantId: applicant.id,
-      fields: applicant.sections.flatMap((section) => section.fields),
-      mediaTypes: passportReviewMediaTypesVisibleForApplicant(
-        submission,
-        applicant.id,
-      ),
-    }),
-  );
 }
 
 export function isFixedIssueStatus(status: Issue["status"]) {
@@ -856,20 +838,6 @@ function validateSubmissionActionPolicy(
 
   if (action === "close_issues_accept" && openIssueCount(submission) > 0) {
     return { ok: false, reason: "Есть незакрытые замечания" };
-  }
-
-  if (
-    action === "close_issues_accept" &&
-    submission.issues.some(
-      (issue) =>
-        issue.status === "fixed_by_agent" &&
-        !isIssueInAdminPassportReviewScope(submission, issue),
-    )
-  ) {
-    return {
-      ok: false,
-      reason: "Есть исправленные замечания вне паспортной проверки",
-    };
   }
 
   if (
@@ -1342,7 +1310,10 @@ export function getAdminReviewActions(
   return {
     acceptForExport: {
       action: acceptAction,
-      label: "Принять на выгрузку",
+      label:
+        acceptAction === "close_issues_accept"
+          ? "Закрыть исправления и принять"
+          : "Принять на выгрузку",
       disabled: !acceptGuard.ok,
       reason: acceptGuard.reason,
     },
@@ -1409,8 +1380,7 @@ export function applySubmissionActionResult(
       ...submission,
       exportState: "ready",
       issues: submission.issues.map((issue) =>
-        isIssueTransitionAllowed(issue.status, "closed_by_admin") &&
-        isIssueInAdminPassportReviewScope(submission, issue)
+        isIssueTransitionAllowed(issue.status, "closed_by_admin")
           ? { ...issue, status: "closed_by_admin" }
           : issue,
       ),
