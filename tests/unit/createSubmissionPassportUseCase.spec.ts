@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 import { createDraftSubmission } from "../../src/modules/submissions/submissionActions";
 import { persistCreatedSubmissionWithPassports } from "../../src/modules/submissions/createSubmissionPassportUseCase";
+import {
+  loadSubmissions,
+  saveSubmissions,
+} from "../../src/modules/submissions/persistence";
 import type {
   PassportUploadDraft,
   Submission,
@@ -85,6 +89,62 @@ describe("persistCreatedSubmissionWithPassports", () => {
       uploadStatus: "uploaded",
     });
     expect(result.applicants[0]?.passportExtraction?.status).toBe("ready");
+  });
+
+  test("reloads a locally persisted family with passport metadata", async () => {
+    const previousStorage = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "localStorage",
+    );
+    const values = new Map<string, string>();
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (key: string) => values.get(key) ?? null,
+        removeItem: (key: string) => values.delete(key),
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    });
+
+    try {
+      const family = createDraftSubmission({
+        agentId: "agent-family",
+        applicantNames: ["V19 QA Main", "V19 QA Spouse"],
+        city: "Санкт-Петербург",
+        familyCount: 2,
+        submissions: [],
+        type: "family",
+      });
+      let persistedFamily = family;
+
+      await persistCreatedSubmissionWithPassports({
+        onPendingSubmission: () => undefined,
+        passportUploads: [passportUpload(0), passportUpload(1)],
+        persistSubmission: async (submission) => {
+          persistedFamily = submission;
+          expect(saveSubmissions([submission])).toEqual({ ok: true });
+        },
+        storageAdapter: "local-dev",
+        submission: family,
+      });
+
+      const reloadedFamily = loadSubmissions().find(
+        (submission) => submission.id === family.id,
+      );
+      expect(reloadedFamily).toMatchObject({
+        agentId: "agent-family",
+        type: "family",
+      });
+      expect(reloadedFamily?.applicants).toHaveLength(
+        persistedFamily.applicants.length,
+      );
+    } finally {
+      if (previousStorage) {
+        Object.defineProperty(globalThis, "localStorage", previousStorage);
+      } else {
+        Reflect.deleteProperty(globalThis, "localStorage");
+      }
+    }
   });
 
   test("persists parent rows before Storage and records every passport immediately", async () => {

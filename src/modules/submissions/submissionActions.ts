@@ -77,6 +77,7 @@ export type CreateDraftInput = {
   familyCount: number;
   idScheme?: "local" | "supabase";
   preliminaryIntake?: PreliminaryIntakeDraft;
+  reservedSubmissionIds?: readonly Submission["id"][];
   submissions: Submission[];
   type: Submission["type"];
 };
@@ -516,11 +517,12 @@ export function createDraftSubmission({
   familyCount,
   idScheme = "local",
   preliminaryIntake,
+  reservedSubmissionIds = [],
   submissions,
   type,
 }: CreateDraftInput): Submission {
   const nowIso = new Date().toISOString();
-  const nextIndex = nextSubmissionIndex(submissions);
+  const nextIndex = nextSubmissionIndex(submissions, reservedSubmissionIds);
   const draftIdToken = draftIdTokenForScheme(nextIndex, idScheme);
   const applicantTotal = type === "family" ? familyCount : 1;
   const submissionId = submissionIdForScheme(draftIdToken, idScheme);
@@ -1309,9 +1311,12 @@ export function markSelectedExported(submissions: Submission[], selectedIds: str
   );
 }
 
-function nextSubmissionIndex(submissions: Submission[]) {
-  const indexes = submissions
-    .map((submission) => submissionIndexFromId(submission.id))
+function nextSubmissionIndex(
+  submissions: Submission[],
+  reservedSubmissionIds: readonly Submission["id"][] = [],
+) {
+  const indexes = [...submissions.map((submission) => submission.id), ...reservedSubmissionIds]
+    .map(submissionIndexFromId)
     .filter(Number.isFinite);
   return Math.max(1058, ...indexes) + 1;
 }
