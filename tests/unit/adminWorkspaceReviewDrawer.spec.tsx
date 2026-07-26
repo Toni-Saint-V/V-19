@@ -160,7 +160,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       },
       {
         submission: reviewedCorrections,
-        button: "Принять на выгрузку",
+        button: "Закрыть исправления и принять",
         action: "close_issues_accept",
       },
       {
@@ -357,7 +357,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       />,
     );
 
-    const accept = screen.getByRole("button", { name: "Принять на выгрузку" });
+    const accept = screen.getByRole("button", {
+      name: "Закрыть исправления и принять",
+    });
     expect(accept).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "Отправить на исправление" }),
@@ -1262,6 +1264,57 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       screen.queryByRole("img", { name: /Готовность \d+%/ }),
     ).not.toBeInTheDocument();
+  });
+
+  test("surfaces corrected questionnaire issues before the admin closes them", () => {
+    const source = singleSubmission();
+    const applicant = source.applicants[0];
+    if (!applicant) throw new Error("Expected review applicant.");
+    const submission: Submission = {
+      ...source,
+      issues: [
+        {
+          comment: "Адрес заменён на актуальный.",
+          createdAt: "2026-07-26T12:00:00.000Z",
+          createdBy: "admin",
+          id: "corrected-hotel-address",
+          reason: "Проверьте новый адрес отеля",
+          severity: "blocker",
+          status: "fixed_by_agent",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Адрес отеля",
+            section: "Поездка",
+          },
+          type: "field",
+        },
+      ],
+      status: "corrections_received",
+    };
+
+    render(
+      <ReviewWorkspace
+        applicantId={applicant.id}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        onReviewAction={vi.fn().mockResolvedValue(true)}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const correctedIssues = screen.getByRole("region", {
+      name: "Исправления к закрытию",
+    });
+    expect(correctedIssues).toHaveTextContent("Проверьте новый адрес отеля");
+    expect(correctedIssues).toHaveTextContent("Адрес заменён на актуальный.");
+    expect(correctedIssues).toHaveTextContent(
+      `${applicant.fullName} · Поездка · Адрес отеля`,
+    );
+    expect(
+      screen.getByRole("button", { name: "Закрыть исправления и принять" }),
+    ).toBeInTheDocument();
   });
 
   test.each([

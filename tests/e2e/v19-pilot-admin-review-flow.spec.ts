@@ -380,7 +380,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     ).toEqual([]);
   });
 
-  test("admin passport reconciliation stays blocked without protected evidence", async ({
+  test("admin passport reconciliation rejects an unusable original and stays blocked on incomplete fields", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
@@ -461,6 +461,65 @@ test.describe("V-19 pilot admin review click flow", () => {
       await verifyRemarkSubmitActionability(page, testInfo, label, viewport);
     });
   }
+
+  test("admin closes corrected issues and accepts the package for export", async ({
+    page,
+  }) => {
+    const browserProblems = collectBrowserProblems(page);
+
+    await openFreshWorkspace(page, {
+      heading: "Очередь на проверку",
+      workspaceEmail: "admin@visaflow.local",
+    });
+    await openAdminSubmission(page, /Смирновы|ПД-1055/);
+
+    const reviewWorkspace = page.getByRole("dialog", {
+      name: "Сверка паспорта",
+    });
+    const correctedIssues = reviewWorkspace.getByRole("region", {
+      name: "Исправления к закрытию",
+    });
+    await expect(correctedIssues).toBeVisible();
+    await expect(correctedIssues).toContainText("Адрес отеля был неполным");
+    const acceptButton = reviewWorkspace.getByRole("button", {
+      name: "Закрыть исправления и принять",
+    });
+
+    const applicantSelect = reviewWorkspace.getByRole("combobox", {
+      name: "Заявитель для проверки",
+    });
+    for (const mediaTab of await reviewWorkspace
+      .getByRole("tablist", { name: "Выбор файла для проверки" })
+      .getByRole("tab")
+      .all()) {
+      await mediaTab.click();
+    }
+    await expect(
+      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
+    ).toContainText(/Оригиналы\s+3\/3/);
+    await reviewWorkspace
+      .getByRole("button", { name: "Подтвердить паспортную секцию" })
+      .click();
+
+    await applicantSelect.selectOption({ label: "Алексей Смирнов" });
+    await expect(
+      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
+    ).toContainText(/Оригиналы\s+1\/1/);
+    await reviewWorkspace
+      .getByRole("button", { name: "Подтвердить паспортную секцию" })
+      .click();
+
+    await expect(acceptButton).toBeEnabled();
+    await acceptButton.click();
+    await expect(
+      reviewWorkspace.getByText("Подача принята и сохранена."),
+    ).toBeVisible();
+
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
+  });
 
   test("admin export surface selects a ready package and prepares Excel", async ({
     page,
