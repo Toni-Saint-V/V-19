@@ -1,5 +1,6 @@
 import { submissionBelongsToAgent } from "./ownership";
 import { BLS_CITY_OPTIONS } from "./questionnaire";
+import { submissionPublicId } from "./submissionIdentity";
 import type { AgentOwnerId, Submission, SubmissionStatus } from "./types";
 import { blockerCount, fixedIssueCount, openIssueCount } from "./status";
 
@@ -154,6 +155,7 @@ export function submissionSearchText(submission: Submission): string {
 
   return [
     submission.id,
+    submissionPublicId(submission),
     submission.publicNumber ? `VF-${submission.publicNumber}` : "",
     submission.title,
     submission.listTitle ?? "",
