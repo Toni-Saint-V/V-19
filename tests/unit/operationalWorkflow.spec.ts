@@ -105,6 +105,54 @@ describe("operational workflow logic spine", () => {
     });
   });
 
+  test("delegates accepted package resubmission without reopening intake gates", () => {
+    const inProgress = completeInProgressSubmission();
+    const acceptedBase: Submission = {
+      ...inProgress,
+      exportState: "ready",
+      files: inProgress.files.map((file) => ({
+        ...file,
+        status: "accepted",
+      })),
+      status: "ready_for_export",
+    };
+    const exportPackage = buildExportPackageIdentity([acceptedBase]);
+    if (!exportPackage) throw new Error("Missing export package identity.");
+    const accepted: Submission = {
+      ...acceptedBase,
+      applicants: acceptedBase.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((questionnaireField, index) =>
+            index === 0 ? { ...questionnaireField, value: "" } : questionnaireField,
+          ),
+        })),
+      })),
+      exportPackage,
+    };
+    const before = structuredClone(accepted);
+
+    const resubmitted = unwrap(submitOperationalForReview(accepted, "agent"));
+
+    expect(accepted).toEqual(before);
+    expect(resubmitted).toMatchObject({
+      exportPackage,
+      exportState: "not_ready",
+      status: "submitted_for_review",
+    });
+    expect(resubmitted.files.every((file) => file.status === "pending_review")).toBe(
+      true,
+    );
+    expect(resubmitted.applicants).toEqual(before.applicants);
+    expect(resubmitted.issues).toEqual(before.issues);
+    expect(resubmitted.history[0]).toMatchObject({
+      fromStatus: "ready_for_export",
+      source: "agent",
+      toStatus: "submitted_for_review",
+    });
+  });
+
   test("marks passport autofill fields as needs_review and blocks submit until confirmed", () => {
     const inProgress = completeInProgressSubmission();
     const applied = unwrap(

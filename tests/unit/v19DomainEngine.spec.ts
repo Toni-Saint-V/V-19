@@ -106,6 +106,23 @@ function completeInProgressSubmission(): Submission {
   );
 }
 
+function readyForExportSubmission(): Submission {
+  const completed = completeInProgressSubmission();
+  const accepted: Submission = {
+    ...completed,
+    exportState: "ready",
+    files: completed.files.map((file) => ({
+      ...file,
+      status: "accepted",
+    })),
+    status: "ready_for_export",
+  };
+  const exportPackage = buildExportPackageIdentity([accepted]);
+  if (!exportPackage) throw new Error("Missing export package identity");
+
+  return { ...accepted, exportPackage };
+}
+
 describe("V-19 domain engine", () => {
   it("creates only single/family Spain submissions with derived completeness", () => {
     const draft = unwrap(
@@ -167,6 +184,112 @@ describe("V-19 domain engine", () => {
 
     expect(submitted.status).toBe("submitted_for_review");
     expect(submitted.completeness.total).toBe(100);
+  });
+
+  it("resubmits an accepted legacy package through the canonical action policy", () => {
+    const accepted = readyForExportSubmission();
+    const legacyAccepted: Submission = {
+      ...accepted,
+      applicants: accepted.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field, index) =>
+            index === 0 ? { ...field, value: "" } : field,
+          ),
+        })),
+      })),
+    };
+    const before = structuredClone(legacyAccepted);
+
+    expect(canAgentSubmitForReview(legacyAccepted)).toBe(true);
+
+    const resubmitted = unwrap(submitForReview(legacyAccepted, "agent"));
+
+    expect(legacyAccepted).toEqual(before);
+    expect(resubmitted).toMatchObject({
+      exportState: "not_ready",
+      status: "submitted_for_review",
+    });
+    expect(resubmitted.files.every((file) => file.status === "pending_review")).toBe(
+      true,
+    );
+    expect(resubmitted.applicants).toEqual(before.applicants);
+    expect(resubmitted.issues).toEqual(before.issues);
+    expect(resubmitted.exportPackage).toEqual(before.exportPackage);
+    expect(resubmitted.history).toHaveLength(before.history.length + 1);
+    expect(resubmitted.history[0]).toMatchObject({
+      fromStatus: "ready_for_export",
+      source: "agent",
+      toStatus: "submitted_for_review",
+    });
+  });
+
+  it("fails accepted resubmission without mutating blocked, unauthorized, or terminal input", () => {
+    const accepted = readyForExportSubmission();
+    const acceptedBefore = structuredClone(accepted);
+    const applicant = accepted.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const blocked: Submission = {
+      ...accepted,
+      issues: [
+        {
+          comment: "Нужно повторно проверить маршрут.",
+          createdAt: "сейчас",
+          createdBy: "admin",
+          id: "accepted-open-issue",
+          reason: "Маршрут требует проверки",
+          severity: "warning",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Маршрут поездки",
+            section: "Анкета",
+          },
+          type: "field",
+        },
+      ],
+    };
+    const blockedBefore = structuredClone(blocked);
+    const unsupported: Submission = { ...accepted, status: "draft" };
+    const unsupportedBefore = structuredClone(unsupported);
+    const terminal: Submission = { ...accepted, status: "exported" };
+    const terminalBefore = structuredClone(terminal);
+
+    expect(canAgentSubmitForReview(blocked)).toBe(false);
+    expect(submitForReview(blocked, "agent")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Есть незакрытые замечания",
+      },
+    });
+    expect(blocked).toEqual(blockedBefore);
+    expect(submitForReview(accepted, "admin")).toEqual({
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Only agent can submit.",
+      },
+    });
+    expect(submitForReview(unsupported, "agent")).toEqual({
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Only in-progress submissions can be submitted.",
+      },
+    });
+    expect(unsupported).toEqual(unsupportedBefore);
+    expect(submitForReview(terminal, "agent")).toEqual({
+      ok: false,
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Exported is terminal for V-19.",
+      },
+    });
+    expect(terminal).toEqual(terminalBefore);
+    expect(accepted).toEqual(acceptedBefore);
   });
 
   it("blocks submission when derived questionnaire or file completeness is incomplete", () => {

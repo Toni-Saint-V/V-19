@@ -7,6 +7,7 @@ import {
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
 import {
   adminQuestionnaireReviewReadiness,
+  applySubmissionActionResult,
   canPerformAction,
   blockerCount,
   calculateSubmissionProgress,
@@ -106,6 +107,9 @@ export function submitForReview(
   if (terminal) return terminal;
   if (role !== "agent") {
     return failure("PERMISSION_DENIED", "Отправить подачу может только агент.");
+  }
+  if (submission.status === "ready_for_export") {
+    return applySubmissionActionResult(submission, "submit_for_review", role);
   }
   if (submission.status !== "in_progress") {
     return failure(
