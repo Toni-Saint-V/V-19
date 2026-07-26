@@ -1,10 +1,18 @@
 import { describe, expect, test } from "vitest";
 import { buildIdentityConsistencyReport } from "../../src/modules/submissions/identityConsistency";
 import {
+  applySafePassportExtractionFields,
+  finishPassportExtraction,
+} from "../../src/modules/submissions/passportExtraction";
+import {
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
-import type { Submission, VisaApplicationPdfReviewState } from "../../src/modules/submissions/types";
+import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
+import type {
+  Submission,
+  VisaApplicationPdfReviewState,
+} from "../../src/modules/submissions/types";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function baseSubmission(): Submission {
@@ -49,6 +57,65 @@ function withVisaPdfReview(
 }
 
 describe("identity consistency report", () => {
+  test("does not reopen a persisted confirmed passport review", () => {
+    const submission = baseSubmission();
+    const applicant = submission.applicants[0];
+    const passportFile = submission.files.find(
+      (file) => file.applicantId === applicant?.id && file.type === "passport_scan",
+    );
+    if (!applicant || !passportFile) throw new Error("expected passport fixture");
+    const extraction: PassportExtractionResult = {
+      fields: [
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: true,
+          value: "765432100",
+        },
+      ],
+      guardrails: [],
+      source: "local-ocr",
+      status: "extracted",
+      summary: "Паспортные данные подготовлены.",
+    };
+    const applied = applySafePassportExtractionFields(
+      finishPassportExtraction(submission, passportFile, extraction),
+      applicant.id,
+    );
+    const persisted: Submission = {
+      ...applied,
+      applicants: applied.applicants.map((candidate) => ({
+        ...candidate,
+        passportExtraction: candidate.passportExtraction
+          ? {
+              ...candidate.passportExtraction,
+              verifiedAtIso: undefined,
+            }
+          : undefined,
+        sections: candidate.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.reviewOriginSource === "passport_ocr"
+              ? {
+                  ...field,
+                  reviewConfirmedAtIso: "2026-07-24T08:00:00.000Z",
+                  reviewConfirmedBy: "agent-reviewer",
+                  reviewSource: "manual" as const,
+                  reviewState: "confirmed" as const,
+                }
+              : field,
+          ),
+        })),
+      })),
+    };
+
+    const report = buildIdentityConsistencyReport(persisted);
+
+    expect(
+      report.findings.some((finding) => finding.code === "passport_ocr_unverified"),
+    ).toBe(false);
+  });
+
   test("blocks when questionnaire and PDF/passport disagree on passport number", () => {
     const submission = withVisaPdfReview(baseSubmission(), {
       passportNumber: "990000001",

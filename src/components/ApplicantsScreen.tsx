@@ -461,7 +461,14 @@ function SubmissionPrimaryAction({
   const actionVisible = visible || canSubmit;
   let actionLabel = "Открыть";
   if (canSubmit) {
-    actionLabel = submitting ? "Отправляем…" : "Отправить на проверку";
+    actionLabel =
+      submission.status === "ready_for_export"
+        ? submitting
+          ? "Возвращаем…"
+          : "Вернуть на проверку"
+        : submitting
+          ? "Отправляем…"
+          : "Отправить на проверку";
   }
   return (
     <button
@@ -956,6 +963,8 @@ export function ApplicantsScreen({
     onPrimaryAction: handlePrimaryAction,
     onUploadApplicantFile,
   };
+  const returningAcceptedPackage =
+    pendingReviewSubmission?.status === "ready_for_export";
   const renderSubmissionCard = (submission: Submission) =>
     submission.type === "family" ? (
       <FamilySubmissionCard
@@ -1137,12 +1146,20 @@ export function ApplicantsScreen({
         {pendingReviewSubmission ? (
           <ConfirmationDialog
             busy={submittingId === pendingReviewSubmission.id}
-            cancelLabel="Отмена"
+            cancelLabel={
+              returningAcceptedPackage ? "Оставить готовой к выгрузке" : "Отмена"
+            }
             cancelInteractionId="submissions.cancel-submit"
             confirmDanger={false}
-            confirmLabel="Отправить"
+            confirmLabel={
+              returningAcceptedPackage ? "Вернуть на проверку" : "Отправить"
+            }
             confirmInteractionId="submissions.submit-review"
-            description="После отправки подача перейдёт в очередь проверки администратора."
+            description={
+              returningAcceptedPackage
+                ? "Подача снова перейдёт в очередь администратора, а готовность к выгрузке будет сброшена канонической командой."
+                : "После отправки подача перейдёт в очередь проверки администратора."
+            }
             error={
               submissionDialogError ? (
                 <span className="v19-applicant-submit-error">
@@ -1150,8 +1167,14 @@ export function ApplicantsScreen({
                 </span>
               ) : undefined
             }
-            kicker="Подтверждение отправки"
-            title="Отправить на проверку администратору?"
+            kicker={
+              returningAcceptedPackage ? "Повторная проверка" : "Подтверждение отправки"
+            }
+            title={
+              returningAcceptedPackage
+                ? "Вернуть подачу на проверку?"
+                : "Отправить на проверку администратору?"
+            }
             onCancel={() => {
               if (submittingId !== pendingReviewSubmission.id) {
                 setPendingReviewSubmission(null);

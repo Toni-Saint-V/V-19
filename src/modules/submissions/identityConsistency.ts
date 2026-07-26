@@ -1,4 +1,5 @@
 import { passportExtractionRows } from "./passportExtraction";
+import { hasApplicantPassportExtractionReviewPending } from "./passportExtractionGuards";
 import { visaApplicationPdfReviewsForSubmission } from "./visaApplicationPdfReconciliation";
 import type { WorkspaceTarget } from "./workspaceModel";
 import type {
@@ -10,10 +11,7 @@ import type {
 } from "./types";
 import type { VisaPdfFieldKey, VisaPdfFinding } from "./visaApplicationPdfReviewTypes";
 
-export type IdentityConsistencySource =
-  | "questionnaire"
-  | "passport_ocr"
-  | "visa_pdf";
+export type IdentityConsistencySource = "questionnaire" | "passport_ocr" | "visa_pdf";
 
 export type IdentityConsistencySeverity = "critical" | "warning" | "info";
 
@@ -202,7 +200,11 @@ const fieldSpecsByKey = new Map(
 );
 const fieldSpecsByPdfKey = new Map(
   identityFieldSpecs.flatMap((spec) =>
-    spec.pdfKey ? ([[spec.pdfKey, spec] as const] satisfies Array<readonly [VisaPdfFieldKey, IdentityFieldSpec]>) : [],
+    spec.pdfKey
+      ? ([[spec.pdfKey, spec] as const] satisfies Array<
+          readonly [VisaPdfFieldKey, IdentityFieldSpec]
+        >)
+      : [],
   ),
 );
 
@@ -233,7 +235,8 @@ export function buildIdentityConsistencyReport(
     findings: sortedFindings,
     nextActions: buildNextActions(sortedFindings),
     operatorSummary: operatorSummaryFor(totals),
-    status: totals.blocked > 0 ? "blocked" : totals.findings > 0 ? "needs_review" : "clear",
+    status:
+      totals.blocked > 0 ? "blocked" : totals.findings > 0 ? "needs_review" : "clear",
     totals,
   };
 }
@@ -253,10 +256,14 @@ export function firstActionableIdentityFinding(
   );
 }
 
-export function identityConsistencyFieldLabel(field: IdentityFieldKey | VisaPdfFieldKey) {
-  return fieldSpecsByKey.get(field as IdentityFieldKey)?.label ??
+export function identityConsistencyFieldLabel(
+  field: IdentityFieldKey | VisaPdfFieldKey,
+) {
+  return (
+    fieldSpecsByKey.get(field as IdentityFieldKey)?.label ??
     fieldSpecsByPdfKey.get(field as VisaPdfFieldKey)?.label ??
-    "Поле PDF анкеты";
+    "Поле PDF анкеты"
+  );
 }
 
 function applicantIdentityFindings(
@@ -310,7 +317,12 @@ function fieldConsistencyFindings(
 
   if (!sourceValue("questionnaire", questionnaireValue, spec)?.normalized) {
     const sourceWithValue = [
-      sourceValue("passport_ocr", passportField?.value, spec, passportField?.confidence),
+      sourceValue(
+        "passport_ocr",
+        passportField?.value,
+        spec,
+        passportField?.confidence,
+      ),
       sourceValue("visa_pdf", pdfValue, spec),
     ].find((source) => source?.normalized);
 
@@ -341,16 +353,20 @@ function sourceMismatchSeverity(
   spec: IdentityFieldSpec,
   sources: SourceValue[],
 ): IdentityConsistencySeverity {
-  return sources.some((source) => source.source === "visa_pdf") ? spec.severity : "warning";
+  return sources.some((source) => source.source === "visa_pdf")
+    ? spec.severity
+    : "warning";
 }
 
-function passportManualReviewFinding(applicant: Applicant): IdentityConsistencyFinding[] {
+function passportManualReviewFinding(
+  applicant: Applicant,
+): IdentityConsistencyFinding[] {
   const extraction = applicant.passportExtraction;
   if (
     !extraction ||
     extraction.status !== "ready" ||
-    extraction.verifiedAtIso ||
-    !extraction.extractedFields.length
+    !extraction.extractedFields.length ||
+    !hasApplicantPassportExtractionReviewPending(applicant)
   ) {
     return [];
   }
@@ -368,7 +384,11 @@ function passportManualReviewFinding(applicant: Applicant): IdentityConsistencyF
   const spec = fieldSpecsByKey.get(firstRow.key as IdentityFieldKey);
   const target = spec
     ? targetForSpec(applicant.id, spec)
-    : ({ applicantId: applicant.id, section: "Паспорт", tab: "questionnaire" } satisfies WorkspaceTarget);
+    : ({
+        applicantId: applicant.id,
+        section: "Паспорт",
+        tab: "questionnaire",
+      } satisfies WorkspaceTarget);
 
   return [
     {
@@ -386,7 +406,11 @@ function passportManualReviewFinding(applicant: Applicant): IdentityConsistencyF
         value: `${row.fieldLabel}: ${row.extractedValue}`,
       })),
       field: spec?.key ?? "passportNumber",
-      id: identityFindingId(applicant.id, "passport_ocr_unverified", spec?.key ?? firstRow.key),
+      id: identityFindingId(
+        applicant.id,
+        "passport_ocr_unverified",
+        spec?.key ?? firstRow.key,
+      ),
       label: "Ручная сверка паспорта",
       message: `${applicant.fullName}: распознанные паспортные поля ещё не подтверждены вручную.`,
       severity: "warning",
@@ -420,7 +444,11 @@ function pdfReviewFindings(
       severity: finding.severity === "critical" ? "critical" : "warning",
       target: spec
         ? targetForSpec(applicant.id, spec)
-        : ({ applicantId: applicant.id, section: "Анкета", tab: "questionnaire" } satisfies WorkspaceTarget),
+        : ({
+            applicantId: applicant.id,
+            section: "Анкета",
+            tab: "questionnaire",
+          } satisfies WorkspaceTarget),
     };
   });
 }
