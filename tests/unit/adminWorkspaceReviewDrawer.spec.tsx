@@ -442,6 +442,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       screen.getByRole("tab", { name: /Первичная проверка/ }),
     ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Исправления/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Начать проверку/ }),
+    ).not.toBeInTheDocument();
   });
 
   test("distinguishes a genuinely empty queue from a filtered-empty result", () => {
