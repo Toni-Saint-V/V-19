@@ -146,6 +146,32 @@ describe("V-19 domain engine", () => {
     expect(draft.completeness).toEqual(getCompleteness(draft));
   });
 
+  it("reserves local draft ids already owned by another agent", () => {
+    const firstAgentDraft = unwrap(
+      createDraft({
+        agentId: "agent-first",
+        city: "Москва",
+        familyCount: 1,
+        submissions: [],
+        type: "single",
+      }),
+    );
+    const secondAgentDraft = unwrap(
+      createDraft({
+        agentId: "agent-second",
+        city: "Санкт-Петербург",
+        familyCount: 2,
+        reservedSubmissionIds: [firstAgentDraft.id],
+        submissions: [],
+        type: "family",
+      }),
+    );
+
+    expect(firstAgentDraft.id).toBe("ПД-1059");
+    expect(secondAgentDraft.id).toBe("ПД-1060");
+    expect(secondAgentDraft.agentId).toBe("agent-second");
+  });
+
   it("keeps agent and admin command ownership separated", () => {
     const ready = completeInProgressSubmission();
 
