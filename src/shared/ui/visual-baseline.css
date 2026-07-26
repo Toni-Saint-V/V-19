@@ -5089,6 +5089,21 @@
 
 /* Admin export: fail-closed queue with a compact mobile control sheet. */
 .v19-admin-export-screen-v2 {
+  --v19b-admin-red-border: color-mix(
+    in srgb,
+    var(--v19b-admin-red) 58%,
+    transparent
+  );
+  --v19b-admin-red-soft: color-mix(
+    in srgb,
+    var(--v19b-admin-red) 16%,
+    transparent
+  );
+  --v19b-admin-error-surface: color-mix(
+    in srgb,
+    var(--v19b-admin-red) 15%,
+    var(--v19b-color-control)
+  );
   display: grid;
   grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) minmax(
       var(--v19b-size-336),
@@ -5098,6 +5113,14 @@
   gap: var(--v19b-size-20);
   min-width: var(--v19b-size-0);
   min-height: var(--v19b-size-0);
+}
+
+.v19-admin-export-status-pill-v2.tone-danger {
+  border-color: var(--v19b-admin-red-border);
+  color: var(--v19b-admin-red);
+  background: var(--v19b-admin-error-surface);
+  box-shadow: inset 0 0 0 var(--v19b-size-1)
+    color-mix(in srgb, var(--v19b-admin-red) 10%, transparent);
 }
 
 .v19-admin-export-main-v2 {
@@ -42401,4 +42424,55 @@ section[data-testid="agent-actions-screen"]
     padding-left: var(--v19b-size-10);
     border-left: var(--v19b-size-1) solid var(--v19b-color-border);
   }
+}
+
+/* Export blockers must read as stop states, not as passive metadata. */
+.v19-admin-export-screen-v2
+  .v19-metric-strip
+  :is(.v19-summary-tile, .v19-metric-card).tone-danger {
+  border-color: var(--v19b-admin-red-border);
+  background: linear-gradient(
+    145deg,
+    var(--v19b-admin-error-surface),
+    color-mix(in srgb, var(--v19b-admin-red) 7%, var(--v19b-color-control))
+  );
+  box-shadow:
+    inset 0 var(--v19b-size-1) 0
+      color-mix(in srgb, var(--v19b-admin-red) 18%, transparent),
+    var(--v19b-shadow-row-inner);
+}
+
+.v19-admin-export-screen-v2
+  .v19-metric-strip
+  :is(.v19-summary-tile, .v19-metric-card).tone-danger
+  :is(
+    .v19-summary-tile-label,
+    .v19-summary-tile-icon,
+    .v19-metric-card-label,
+    .v19-metric-card-icon,
+    strong
+  ) {
+  color: var(--v19b-admin-red);
+}
+
+.v19-admin-export-screen-v2
+  .v19-metric-strip
+  :is(.v19-summary-tile, .v19-metric-card).tone-danger
+  :is(.v19-summary-tile-icon, .v19-metric-card-icon) {
+  background: var(--v19b-admin-red-soft);
+  box-shadow: var(--v19b-dot-halo-shadow-danger);
+}
+
+.v19-admin-export-screen-v2 .v19-admin-export-row-v2.is-blocked {
+  border-color: var(--v19b-admin-red-border);
+  box-shadow: inset var(--v19b-size-3) 0 0 var(--v19b-admin-red);
+}
+
+.v19-admin-export-screen-v2
+  .v19-admin-export-active-blockers-v2
+  > div {
+  border-color: var(--v19b-admin-red-border);
+  border-inline-start-width: var(--v19b-size-3);
+  background: var(--v19b-admin-error-surface);
+  font-weight: var(--v19b-weight-control);
 }
