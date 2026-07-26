@@ -1,5 +1,5 @@
 // src/components/AdminScreens.tsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   ArrowUpDown,
@@ -7,7 +7,6 @@ import {
   Bot,
   CheckCircle2,
   Clock,
-  Flame,
   ListChecks,
   MessageSquareWarning,
   Plane,
@@ -323,94 +322,6 @@ function ReviewQueueCard({
   );
 }
 
-function ReviewQueueCommandPanel({
-  attentionCount,
-  criticalCount,
-  onOpenTop,
-  onShowCritical,
-  top,
-  totalCount,
-}: {
-  attentionCount: number;
-  criticalCount: number;
-  onOpenTop: () => void;
-  onShowCritical: () => void;
-  top?: ReviewCard;
-  totalCount: number;
-}) {
-  return (
-    <section
-      aria-labelledby="review-queue-command-title"
-      className={`v19-review-command-panel is-${top?.priorityBand ?? "empty"}`}
-    >
-      <div className="v19-review-command-copy">
-        <div className="v19-review-command-kicker">
-          <span>
-            <ListChecks aria-hidden="true" />
-            Операционный план
-          </span>
-          <em>без автоприменения</em>
-        </div>
-        <h2 id="review-queue-command-title">
-          {top
-            ? `Следующий пакет: ${top.publicId} · ${top.title}`
-            : "По текущему фильтру пакетов нет"}
-        </h2>
-        <p>
-          {top?.priorityReason ??
-            "Сбросьте фильтры или дождитесь новой подачи на проверку."}
-        </p>
-        <div className="v19-review-command-guardrail">
-          <ShieldCheck aria-hidden="true" />
-          Порядок учитывает статус, замечания и дату поездки. Решение всегда
-          подтверждает администратор.
-        </div>
-      </div>
-
-      <div className="v19-review-command-metrics" aria-label="Состояние плана">
-        <span className={criticalCount ? "is-critical" : "is-clear"}>
-          <strong>{criticalCount}</strong>
-          <small>критично</small>
-        </span>
-        <span className={attentionCount ? "is-attention" : "is-clear"}>
-          <strong>{attentionCount}</strong>
-          <small>внимание</small>
-        </span>
-        <span>
-          <strong>{totalCount}</strong>
-          <small>в очереди</small>
-        </span>
-      </div>
-
-      <div className="v19-review-command-actions">
-        <button
-          aria-keyshortcuts="Alt+Enter"
-          className="v19-review-command-primary"
-          disabled={!top}
-          type="button"
-          onClick={onOpenTop}
-        >
-          <span>
-            <ArrowUpRight aria-hidden="true" />
-            Начать проверку
-          </span>
-          <kbd>Alt ↵</kbd>
-        </button>
-        <button
-          className="v19-review-command-secondary"
-          disabled={criticalCount === 0}
-          type="button"
-          onClick={onShowCritical}
-        >
-          <Flame aria-hidden="true" />
-          Критичные
-          <strong>{criticalCount}</strong>
-        </button>
-      </div>
-    </section>
-  );
-}
-
 type ReviewAiWatchItem =
   | {
       agent?: string;
@@ -533,31 +444,6 @@ export function ReviewScreen({
           : filteredReviews.filter((item) => item.lane === activeLane),
     [activeLane, filteredReviews],
   );
-  const nextVisibleReview = visibleReviews[0];
-  const openNextVisibleReview = useCallback(() => {
-    if (nextVisibleReview) onOpenDrawer(nextVisibleReview.id);
-  }, [nextVisibleReview, onOpenDrawer]);
-
-  useEffect(() => {
-    const openPriorityFromKeyboard = (event: KeyboardEvent) => {
-      if (!event.altKey || event.key !== "Enter" || event.defaultPrevented) return;
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        target.closest('input, textarea, select, [contenteditable="true"]')
-      ) {
-        return;
-      }
-      if (!nextVisibleReview) return;
-
-      event.preventDefault();
-      openNextVisibleReview();
-    };
-
-    document.addEventListener("keydown", openPriorityFromKeyboard);
-    return () => document.removeEventListener("keydown", openPriorityFromKeyboard);
-  }, [nextVisibleReview, openNextVisibleReview]);
-
   const packagesWithBlockers = filteredReviews.filter(
     (item) => item.blockers > 0,
   ).length;
@@ -616,15 +502,6 @@ export function ReviewScreen({
       className="v19-admin-screen v19-admin-review-screen"
     >
       <section className="v19-admin-review-main min-w-0 space-y-5">
-        <ReviewQueueCommandPanel
-          attentionCount={priorityCounts.attention}
-          criticalCount={priorityCounts.critical}
-          onOpenTop={openNextVisibleReview}
-          onShowCritical={() => setActiveLane("urgent")}
-          top={nextVisibleReview}
-          totalCount={filteredReviews.length}
-        />
-
         <V19MetricStrip>
           <V19MetricCard
             active={activeLane === "review"}
