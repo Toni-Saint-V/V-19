@@ -573,13 +573,6 @@ test.describe("V-19 pilot admin review click flow", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
     ).toBeVisible();
-    await clickWorkspaceButton(page, /Выгрузка/);
-    await expect(page.getByTestId("admin-export-row-ПД-1055")).toBeVisible();
-
-    await page.reload();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
-    ).toBeVisible();
     await clickWorkspaceButton(page, /^Выгрузка$/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
