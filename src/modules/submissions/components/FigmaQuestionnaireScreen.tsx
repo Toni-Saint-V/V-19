@@ -1092,10 +1092,10 @@ function FormField({
             <AnimatePresence>
               {isOpen ? (
                 <motion.div
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  animate={{ opacity: 1, y: 0 }}
                   className="v19-questionnaire-dropdown"
-                  exit={{ opacity: 0, scale: 0.98, y: -4 }}
-                  initial={{ opacity: 0, scale: 0.98, y: -4 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  initial={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.15 }}
                 >
                   {usesOptionSearch ? (
@@ -1251,11 +1251,11 @@ function FormField({
             />
             {inputSuggestionListOpen ? (
               <motion.div
-                animate={{ opacity: 1, scale: 1, y: 0 }}
+                animate={{ opacity: 1, y: 0 }}
                 className="v19-questionnaire-dropdown"
-                exit={{ opacity: 0, scale: 0.98, y: -4 }}
+                exit={{ opacity: 0, y: -4 }}
                 id={suggestionsId}
-                initial={{ opacity: 0, scale: 0.98, y: -4 }}
+                initial={{ opacity: 0, y: -4 }}
                 role="listbox"
                 transition={{ duration: 0.15 }}
               >

@@ -61,20 +61,23 @@ async function openQuestionnaire(
   ).toBeVisible();
 
   const openQuestionnaireAction = page
-    .locator("button:visible")
-    .filter({ hasText: /^Открыть анкету$/ })
+    .getByRole("button")
+    .filter({ hasText: "Артём Соколов" })
+    .filter({ hasText: "Открыть анкету" })
     .first();
-  if (await openQuestionnaireAction.isVisible({ timeout: 750 }).catch(() => false)) {
-    await openQuestionnaireAction.click();
-  } else {
-    const mobileQuestionnaireAction = page
-      .locator(
-        'button:visible[aria-label^="Открыть действие:"][aria-label*="Артём Соколов"]',
-      )
-      .first();
-    await expect(mobileQuestionnaireAction).toBeVisible();
-    await mobileQuestionnaireAction.click();
-  }
+  await expect(openQuestionnaireAction).toBeVisible();
+  await openQuestionnaireAction.click();
+  const expandedAction = page
+    .getByRole("region", {
+      name: /Выбрать действие:.*Артём Соколов.*Открыть анкету/,
+    })
+    .first();
+  const openQuestionnaireButton = expandedAction.getByRole("button", {
+    exact: true,
+    name: "Открыть анкету",
+  });
+  await expect(openQuestionnaireButton).toBeVisible();
+  await openQuestionnaireButton.click();
 
   const questionnaireScreen = page.locator(".vf-figma-questionnaire-screen");
   if (!(await questionnaireScreen.isVisible({ timeout: 1_000 }).catch(() => false))) {
@@ -150,24 +153,30 @@ async function expectFullscreenQuestionnaireShell(
 }
 
 async function expectMobileControlsAtLeast44(page: Page) {
+  const cssPixelTolerance = 0.01;
   const undersizedControls = await page
     .locator(
       ".vf-figma-questionnaire-screen button:visible:not(:disabled), .vf-figma-questionnaire-screen select:visible:not(:disabled), .vf-figma-questionnaire-screen input:visible:not(:disabled)",
     )
-    .evaluateAll((controls) =>
-      controls
-        .map((control) => {
-          const box = control.getBoundingClientRect();
-          return {
-            height: box.height,
-            label:
-              control.getAttribute("aria-label") ??
-              control.textContent?.replace(/\s+/g, " ").trim() ??
-              control.tagName,
-            width: box.width,
-          };
-        })
-        .filter(({ height, width }) => height < 44 || width < 44),
+    .evaluateAll(
+      (controls, tolerance) =>
+        controls
+          .map((control) => {
+            const box = control.getBoundingClientRect();
+            return {
+              height: box.height,
+              label:
+                control.getAttribute("aria-label") ??
+                control.textContent?.replace(/\s+/g, " ").trim() ??
+                control.tagName,
+              width: box.width,
+            };
+          })
+          .filter(
+            ({ height, width }) =>
+              height < 44 - tolerance || width < 44 - tolerance,
+          ),
+      cssPixelTolerance,
     );
   expect(undersizedControls).toEqual([]);
 }
@@ -356,6 +365,11 @@ test.describe("V-19 questionnaire live sanity", () => {
     await page.setViewportSize({ height: 844, width: 390 });
     await openQuestionnaire(page, { withSpouse: true });
     await expectMobileQuestionnaireLayout(page, { height: 844, width: 390 });
+    await mobileQuestionnaireSection(page, "Личные данные").click();
+    await expect(mobileQuestionnaireSection(page, "Личные данные")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     await expect(page.locator(".v19-questionnaire-screen-header")).toBeHidden();
     await expect(page.locator(".v19-questionnaire-header-actions")).toBeHidden();
@@ -414,7 +428,10 @@ test.describe("V-19 questionnaire live sanity", () => {
     const blocker = page.getByRole("button", {
       name: /^Перейти к следующему обязательному действию:/,
     });
-    await expect(blocker).toHaveCount(0);
+    await expect(blocker).toBeVisible();
+    await expect(blocker).toHaveAccessibleName(
+      /Город проживания.*Заполните обязательное поле/,
+    );
     await expect(
       page.locator(".v19-questionnaire-section-tab.status-issue").first(),
     ).toBeVisible();

@@ -123,6 +123,22 @@ type CockpitCanonicalLoader = (
   profile: AppProfile,
 ) => Promise<CockpitLoadResult>;
 
+interface AgentCockpitSaveOptions {
+  verifyCanonicalReadback?: boolean;
+}
+
+const canonicalReadbackMismatchSafeCodeSuffix =
+  ":save:CANONICAL_READBACK_MISMATCH";
+
+export function isCanonicalSubmissionReadbackMismatch(error: unknown) {
+  return (
+    error instanceof PersistenceObservableError &&
+    error.diagnostics.safeCode.endsWith(
+      canonicalReadbackMismatchSafeCodeSuffix,
+    )
+  );
+}
+
 function canonicalTargetJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalTargetJson);
   if (!value || typeof value !== "object") return value;
@@ -130,6 +146,59 @@ function canonicalTargetJson(value: unknown): unknown {
     Object.entries(value as Record<string, unknown>)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, nested]) => [key, canonicalTargetJson(nested)]),
+  );
+}
+
+const canonicalReadbackTimestampKeys = new Set([
+  "adminReviewApprovedAtIso",
+  "at",
+  "checkedAtIso",
+  "confirmedAtIso",
+  "createdAt",
+  "deletedAtIso",
+  "dismissedAtIso",
+  "fixedAtIso",
+  "lastAttemptAtIso",
+  "manualReviewConfirmedAtIso",
+  "reviewConfirmedAtIso",
+  "reviewedAtIso",
+  "updatedAt",
+  "uploadedAt",
+  "uploadedAtIso",
+  "verifiedAtIso",
+]);
+
+function canonicalReadbackProjection(
+  value: unknown,
+  parentKey = "",
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalReadbackProjection(item, parentKey));
+  }
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => {
+        if (key === "agentDisplayName" || key === "publicNumber") return false;
+        if (canonicalReadbackTimestampKeys.has(key)) return false;
+        return !(parentKey === "history" && key === "id");
+      })
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nested]) => [
+        key,
+        canonicalReadbackProjection(nested, key),
+      ]),
+  );
+}
+
+function canonicalReadbackMatches(
+  intended: Submission,
+  canonical: Submission,
+): boolean {
+  return (
+    JSON.stringify(canonicalReadbackProjection(intended)) ===
+    JSON.stringify(canonicalReadbackProjection(canonical))
   );
 }
 
@@ -2382,6 +2451,7 @@ export async function saveCockpitSubmissionsForProfile(
   ownerIdsBySubmissionId: ReadonlyMap<string, string>,
   caseRevisionsBySubmissionId: ReadonlyMap<string, number> = new Map(),
   loadCanonical: CockpitCanonicalLoader = loadCockpitSubmissionsForProfile,
+  options: AgentCockpitSaveOptions = {},
 ): Promise<AgentCockpitSaveResult> {
   if (profile.role === "admin") {
     throw new Error(
@@ -2540,6 +2610,65 @@ export async function saveCockpitSubmissionsForProfile(
     }
     nextCaseRevisions.set(submission.id, revision);
     nextOwnerIds.set(submission.id, ownerId);
+  }
+
+  if (options.verifyCanonicalReadback && submissions.length > 0) {
+    let canonical: CockpitLoadResult;
+    try {
+      canonical = await loadCanonical(profile);
+    } catch (cause) {
+      throw new PersistenceObservableError(
+        "Canonical readback was unavailable after saving submissions.",
+        {
+          operation: "rpc.save_submission_draft",
+          kind: "save",
+          safeCode:
+            "rpc.save_submission_draft:save:CANONICAL_READBACK_MISMATCH",
+          retryable: true,
+        },
+        { cause },
+      );
+    }
+
+    for (const submission of submissions) {
+      const ownerId =
+        nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id;
+      const intendedSubmission = assignSubmissionOwner(
+        ensureSubmissionOwner(submission, ownerId),
+        ownerId,
+      );
+      const canonicalSubmission = canonical.submissions.find(
+        (item) => item.id === submission.id,
+      );
+      const expectedRevision = nextCaseRevisions.get(submission.id);
+      const canonicalRevision =
+        canonical.caseRevisionsBySubmissionId.get(submission.id);
+      const operation = requiresCorrectionHandoff(submission, profile.role)
+        ? "rpc.submit_corrections_handoff"
+        : "rpc.save_submission_draft";
+
+      if (
+        !canonicalSubmission ||
+        canonicalRevision !== expectedRevision ||
+        !canonicalReadbackMatches(intendedSubmission, canonicalSubmission)
+      ) {
+        throw new PersistenceObservableError(
+          `Canonical readback mismatch for submission ${submission.id}.`,
+          {
+            operation,
+            kind: "save",
+            safeCode: `${operation}${canonicalReadbackMismatchSafeCodeSuffix}`,
+            retryable: true,
+          },
+        );
+      }
+    }
+
+    return {
+      caseRevisionsBySubmissionId:
+        canonical.caseRevisionsBySubmissionId,
+      ownerIdsBySubmissionId: canonical.ownerIdsBySubmissionId,
+    };
   }
 
   return {
