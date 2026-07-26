@@ -6,6 +6,7 @@ import {
 } from "./v19-pilot-helpers";
 
 const userPassword = "secure-local-password";
+const adminWorkspaceHeading = "Очередь на проверку";
 
 async function ensureLoginMode(page: Page) {
   const loginHeading = page.getByRole("heading", { level: 1, name: "Вход" });
@@ -176,29 +177,34 @@ test.describe("V-19 registration admin approval", () => {
 
     await logout(page);
     await login(page, "2@2.ru", "22");
-    await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
-    await clickWorkspaceButton(page, /^Настройки$/);
-    await page
-      .getByRole("button", { name: /Входящие заявки на регистрацию/ })
-      .click();
-    const queue = page.getByTestId("admin-access-queue");
+    await expect(
+      page.getByRole("heading", { level: 1, name: adminWorkspaceHeading }),
+    ).toBeVisible();
+    await clickWorkspaceButton(page, /^Пользователи$/);
+    const queue = page.getByRole("region", { name: "Пользователи и заявки" });
     await expect(queue).toBeVisible();
     await expect(queue.getByText(userEmail)).toBeVisible();
     await expect(queue.getByText("Анна Петрова")).toBeVisible();
-    await expectNoHorizontalOverflow(page, "admin settings access queue");
-    const settingsQueueScreenshot = testInfo.outputPath("admin-settings-access-queue.png");
+    await expectNoHorizontalOverflow(page, "admin users access queue");
+    const settingsQueueScreenshot = testInfo.outputPath("admin-users-access-queue.png");
     await page.screenshot({ path: settingsQueueScreenshot });
-    await testInfo.attach("admin-settings-access-queue", {
+    await testInfo.attach("admin-users-access-queue", {
       contentType: "image/png",
       path: settingsQueueScreenshot,
     });
-    await queue.getByRole("button", { name: "Одобрить" }).click();
+    await queue
+      .locator("article")
+      .filter({ hasText: userEmail })
+      .getByRole("button", { name: "Одобрить" })
+      .click();
     await expect(queue.getByText(userEmail)).toHaveCount(0);
 
     await logout(page);
     await login(page, userEmail, userPassword);
     await expect(page.getByRole("heading", { level: 1, name: "Мои действия" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { level: 1, name: adminWorkspaceHeading }),
+    ).toHaveCount(0);
     await expect(page.getByText("Семья Ивановых")).toHaveCount(0);
 
     await logout(page);
@@ -209,25 +215,25 @@ test.describe("V-19 registration admin approval", () => {
 
     await logout(page);
     await login(page, "2@2.ru", "22");
-    await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
-    await clickWorkspaceButton(page, /^Настройки$/);
-    await page
-      .getByRole("button", { name: /Входящие заявки на регистрацию/ })
-      .click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: adminWorkspaceHeading }),
+    ).toBeVisible();
+    await clickWorkspaceButton(page, /^Пользователи$/);
     await expect(queue.getByText(secondAgentEmail)).toBeVisible();
     await queue
+      .locator("article")
       .filter({ hasText: secondAgentEmail })
       .getByRole("button", { name: "Одобрить" })
       .click();
     await expect(queue.getByText(secondAgentEmail)).toHaveCount(0);
 
-    await clickWorkspaceButton(page, /^Пользователи$/);
-    const usersPanel = page.getByTestId("admin-users-access-requests");
-    await expect(usersPanel).toBeVisible();
-    await usersPanel.getByRole("button", { name: /^История [1-9]/ }).click();
+    const usersPanel = queue;
+    await usersPanel.getByRole("tab", { name: /^Одобрено/ }).click();
     await expect(usersPanel.getByText(userEmail)).toBeVisible();
     await expect(usersPanel.getByText(secondAgentEmail)).toBeVisible();
-    await expect(usersPanel.getByText("Доступ выдан")).toHaveCount(2);
+    await expect(
+      usersPanel.locator("article").getByText("Одобрено", { exact: true }),
+    ).toHaveCount(2);
     await expectNoHorizontalOverflow(page, "admin users access history");
     const usersHistoryScreenshot = testInfo.outputPath("admin-users-access-history.png");
     await page.screenshot({ path: usersHistoryScreenshot });
@@ -276,7 +282,9 @@ test.describe("V-19 registration admin approval", () => {
       role: "agent",
       status: "pending",
     });
-    await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { level: 1, name: adminWorkspaceHeading }),
+    ).toHaveCount(0);
 
     expect(browserProblems).toEqual([]);
   });
