@@ -9,6 +9,45 @@ afterEach(() => {
 });
 
 describe("AccessGate invite password setup", () => {
+  test("shares factual trust context across register, login, and reset modes", () => {
+    const view = render(
+      <AccessGate
+        error=""
+        inviteSetupEmail=""
+        recoverySetupEmail=""
+        pendingSession={null}
+        onCompleteInvite={vi.fn(async () => undefined)}
+        onCompleteRecovery={vi.fn(async () => undefined)}
+        onLogin={vi.fn(async () => undefined)}
+        onRegister={vi.fn(async () => undefined)}
+        onResetPassword={vi.fn(async () => "")}
+        onSignOut={vi.fn(async () => undefined)}
+      />,
+    );
+
+    const shell = view.container.querySelector(".access-shell");
+    expect(shell).toHaveAttribute("data-access-mode", "register");
+    expect(view.container.querySelector(".access-brand-product")).toHaveTextContent(
+      "VisaFlow V-19",
+    );
+    expect(view.container.querySelector(".access-brand-title")).toHaveTextContent(
+      "Рабочий кабинет визовых подач",
+    );
+    expect(view.container.querySelector(".access-brand-trust")).toHaveTextContent(
+      "Доступ к кабинету подтверждает администратор",
+    );
+    expect(view.container.querySelector(".access-brand-logo")).toHaveAttribute(
+      "alt",
+      "",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Уже есть доступ? Войти" }));
+    expect(shell).toHaveAttribute("data-access-mode", "login");
+
+    fireEvent.click(screen.getByRole("button", { name: "Не помню пароль" }));
+    expect(shell).toHaveAttribute("data-access-mode", "reset");
+  });
+
   test("deduplicates rapid login submissions", async () => {
     let resolveLogin!: () => void;
     const login = new Promise<void>((resolve) => {
@@ -54,7 +93,9 @@ describe("AccessGate invite password setup", () => {
   test("keeps a pending session visible when sign-out fails and allows retry", async () => {
     const onSignOut = vi
       .fn()
-      .mockRejectedValueOnce(new Error("Не удалось завершить сессию. Повторите попытку."))
+      .mockRejectedValueOnce(
+        new Error("Не удалось завершить сессию. Повторите попытку."),
+      )
       .mockResolvedValueOnce(undefined);
 
     render(
@@ -81,6 +122,10 @@ describe("AccessGate invite password setup", () => {
       />,
     );
 
+    expect(document.querySelector(".access-shell")).toHaveAttribute(
+      "data-access-mode",
+      "pending",
+    );
     const signOut = screen.getByRole("button", { name: "Выйти" });
     fireEvent.click(signOut);
     fireEvent.click(signOut);
@@ -89,7 +134,9 @@ describe("AccessGate invite password setup", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Не удалось завершить сессию. Повторите попытку.",
     );
-    expect(screen.getByRole("heading", { name: "Ожидает подтверждения" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Ожидает подтверждения" }),
+    ).toBeVisible();
     await waitFor(() => expect(signOut).toBeEnabled());
 
     fireEvent.click(signOut);
@@ -157,6 +204,10 @@ describe("AccessGate invite password setup", () => {
     expect(
       screen.getByRole("heading", { name: "Создайте пароль" }),
     ).toBeInTheDocument();
+    expect(document.querySelector(".access-shell")).toHaveAttribute(
+      "data-access-mode",
+      "invite",
+    );
 
     fireEvent.change(screen.getByLabelText("Новый пароль"), {
       target: { value: "Unique-E2E-password-2026" },
@@ -178,6 +229,37 @@ describe("AccessGate invite password setup", () => {
       expect(onCompleteInvite).toHaveBeenCalledWith("Unique-E2E-password-2026");
     });
     expect(await screen.findByRole("heading", { name: "Вход" })).toBeInTheDocument();
+    expect(document.querySelector(".access-shell")).toHaveAttribute(
+      "data-access-mode",
+      "login",
+    );
     expect(screen.getByRole("status")).toHaveTextContent("Пароль сохранён");
+  });
+
+  test("marks the recovery password setup state without changing its fields", () => {
+    render(
+      <AccessGate
+        error=""
+        inviteSetupEmail=""
+        recoverySetupEmail="recovery.user@example.test"
+        pendingSession={null}
+        onCompleteInvite={vi.fn(async () => undefined)}
+        onCompleteRecovery={vi.fn(async () => undefined)}
+        onLogin={vi.fn(async () => undefined)}
+        onRegister={vi.fn(async () => undefined)}
+        onResetPassword={vi.fn(async () => "")}
+        onSignOut={vi.fn(async () => undefined)}
+      />,
+    );
+
+    expect(document.querySelector(".access-shell")).toHaveAttribute(
+      "data-access-mode",
+      "recovery",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Установите новый пароль" }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Новый пароль")).toBeVisible();
+    expect(screen.getByLabelText("Повторите пароль")).toBeVisible();
   });
 });
