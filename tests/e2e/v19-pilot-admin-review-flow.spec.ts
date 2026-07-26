@@ -532,6 +532,19 @@ test.describe("V-19 pilot admin review click flow", () => {
       reviewWorkspace.getByText("Подача принята и сохранена."),
     ).toBeVisible();
 
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
+    ).toBeVisible();
+    await clickWorkspaceButton(page, /^Выгрузка$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
+    ).toBeVisible();
+    const acceptedExportRow = page.getByTestId("admin-export-row-ПД-1055");
+    await expect(acceptedExportRow).toContainText("Елена Смирнова");
+    await expect(acceptedExportRow).toContainText("Москва");
+    await expect(acceptedExportRow.getByRole("checkbox")).toBeEnabled();
+
     expect(
       blockingBrowserProblems(browserProblems),
       browserProblems.join("\n"),
