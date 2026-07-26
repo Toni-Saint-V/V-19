@@ -367,7 +367,7 @@ function expectDropdownOption(name: string) {
 }
 
 describe("FigmaQuestionnaireScreen", () => {
-  test("renders passport values from the active submission instead of static defaults", () => {
+  test("renders passport values from the active submission instead of static defaults", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -405,9 +405,12 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByLabelText("Дата выдачи")).toHaveValue("26.02.2016");
     expect(screen.getByLabelText("Действителен до")).toHaveValue("26.02.2026");
     expect(screen.getByLabelText("Место выдачи")).toHaveValue("FMS 78039");
+    await waitFor(() =>
+      expect(screen.getByLabelText("Действителен до")).toHaveFocus(),
+    );
     expect(
       result.container.querySelector("[data-field-focused='true']"),
-    ).toHaveTextContent("Действителен до");
+    ).not.toBeInTheDocument();
     expect(auditAgentInteractionControls(result.container)).toEqual([]);
   });
 
@@ -611,11 +614,10 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     const birthPlace = screen.getByLabelText("Место рождения");
-    expect(birthPlace.closest("[data-field-label]")).toHaveAttribute(
-      "data-field-focused",
-      "true",
-    );
     await waitFor(() => expect(birthPlace).toHaveFocus());
+    expect(birthPlace.closest("[data-field-label]")).not.toHaveAttribute(
+      "data-field-focused",
+    );
     expect(
       screen.getByText(
         "Контекст анкеты: заявитель Volkov Anton; раздел Личные данные.",

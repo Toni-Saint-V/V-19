@@ -212,7 +212,7 @@ describe("QuestionnaireScreen", () => {
     expect(saveAndExit).not.toHaveTextContent(/^Сохранить$/);
   });
 
-  test("assigns and announces a public number only after a complete questionnaire save", async () => {
+  test("assigns a public number and exits without a blocking browser alert", async () => {
     const submission = readySubmission("draft");
     const onAssignPublicNumber = vi.fn().mockResolvedValue({
       assignedNow: true,
@@ -240,10 +240,7 @@ describe("QuestionnaireScreen", () => {
     expect(onSubmissionChange).toHaveBeenCalledTimes(1);
     expect(onAssignPublicNumber).toHaveBeenCalledOnce();
     expect(onAssignPublicNumber).toHaveBeenCalledWith(submission.id);
-    expect(alert).toHaveBeenCalledOnce();
-    expect(alert).toHaveBeenCalledWith(
-      "Анкета сохранена. Номер подачи: VF-1059",
-    );
+    expect(alert).not.toHaveBeenCalled();
     expect(onSavedAndExit).toHaveBeenCalledWith(
       expect.objectContaining({ publicNumber: 1059 }),
     );

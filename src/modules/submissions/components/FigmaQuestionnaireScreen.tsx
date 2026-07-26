@@ -2744,6 +2744,9 @@ export function FigmaQuestionnaireScreen({
   const onSaveDraftRef = useRef(onSaveDraft);
   const canSaveDraft = Boolean(onSaveDraft);
   const initialFocusAppliedRef = useRef(false);
+  const [highlightedInitialFieldId, setHighlightedInitialFieldId] = useState<
+    string | undefined
+  >(initialFieldTarget?.fieldId);
   const saveRequestRunnerRef = useRef<(request: QuestionnaireSaveRequest) => void>(
     () => undefined,
   );
@@ -2835,9 +2838,25 @@ export function FigmaQuestionnaireScreen({
   );
 
   useEffect(() => {
+    initialFocusAppliedRef.current = false;
+    setHighlightedInitialFieldId(initialFieldTarget?.fieldId);
+  }, [
+    initialFieldTarget?.fieldId,
+    initialFocus?.applicantId,
+    initialFocus?.field,
+    initialFocus?.fileId,
+    initialFocus?.section,
+    submission.id,
+  ]);
+
+  useEffect(() => {
     if (initialFocusAppliedRef.current) return;
     let attempt = 0;
     let timer: number | undefined;
+    const finishInitialFocus = () => {
+      initialFocusAppliedRef.current = true;
+      setHighlightedInitialFieldId(undefined);
+    };
     const applyInitialFocus = () => {
       const activeElement = document.activeElement;
       if (
@@ -2845,7 +2864,7 @@ export function FigmaQuestionnaireScreen({
         activeElement !== document.body &&
         screenRef.current?.contains(activeElement)
       ) {
-        initialFocusAppliedRef.current = true;
+        finishInitialFocus();
         return;
       }
       const fieldLabel = initialFieldTarget
@@ -2858,7 +2877,7 @@ export function FigmaQuestionnaireScreen({
       if (focusedFile) {
         focusedFile.focus({ preventScroll: true });
         focusedFile.scrollIntoView?.({ behavior: "smooth", block: "center" });
-        initialFocusAppliedRef.current = true;
+        finishInitialFocus();
         return;
       }
       if (fieldLabel) {
@@ -2875,7 +2894,7 @@ export function FigmaQuestionnaireScreen({
         if (target) {
           target.focus({ preventScroll: true });
           element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-          initialFocusAppliedRef.current = true;
+          finishInitialFocus();
           return;
         }
       }
@@ -2889,7 +2908,7 @@ export function FigmaQuestionnaireScreen({
       screenRef.current
         ?.querySelector<HTMLButtonElement>('button[aria-label="Назад"]')
         ?.focus({ preventScroll: true });
-      initialFocusAppliedRef.current = true;
+      finishInitialFocus();
     };
 
     timer = window.setTimeout(applyInitialFocus, 0);
@@ -5045,7 +5064,7 @@ export function FigmaQuestionnaireScreen({
       ),
     errorMessage: fieldErrorMessage,
     focused: (fieldId) =>
-      initialFieldTarget?.fieldId === fieldId &&
+      highlightedInitialFieldId === fieldId &&
       (initialFocus?.applicantId ?? activeApplicant) === activeApplicant,
     revealRequiredErrors,
     required: fieldIsRequired,
