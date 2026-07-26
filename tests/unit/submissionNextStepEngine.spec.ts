@@ -95,6 +95,16 @@ function visibleCopy(brief: ReturnType<typeof buildSubmissionNextStepBrief>) {
   ].join(" ");
 }
 
+function submittedForReviewSubmission(): Submission {
+  const ready = readyForReviewSubmission();
+  return applySubmissionAction(
+    ready,
+    "submit_for_review",
+    "agent",
+    ready.agentId,
+  );
+}
+
 describe("submission next-step engine", () => {
   test("prioritizes safe passport field application before submit handoff", () => {
     const draft = draftSubmission();
@@ -277,11 +287,7 @@ describe("submission next-step engine", () => {
   test("returns admin accept and export actions from lifecycle state", () => {
     const submitted = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(
-        applySubmissionAction(
-          readyForReviewSubmission(),
-          "submit_for_review",
-          "agent",
-        ),
+        submittedForReviewSubmission(),
       ),
     );
     const adminReview = buildSubmissionNextStepBrief({
@@ -310,11 +316,7 @@ describe("submission next-step engine", () => {
   });
 
   test("treats agent submitted review as waiting for admin, not an action", () => {
-    const submitted = applySubmissionAction(
-      readyForReviewSubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedForReviewSubmission();
 
     const brief = buildSubmissionNextStepBrief({
       role: "agent",
@@ -344,6 +346,7 @@ describe("submission next-step engine", () => {
       withExistingPassport,
       "submit_for_review",
       "agent",
+      withExistingPassport.agentId,
     );
     const withPassport = finishPassportExtraction(
       submitted,
@@ -368,7 +371,12 @@ describe("submission next-step engine", () => {
 
   test("keeps agent waiting after review handoff even when queue blockers exist", () => {
     const ready = readyForReviewSubmission();
-    const submitted = applySubmissionAction(ready, "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      ready,
+      "submit_for_review",
+      "agent",
+      ready.agentId,
+    );
     const issue: Issue = {
       id: "issue-email-after-handoff",
       type: "field",

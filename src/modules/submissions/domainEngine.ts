@@ -5,6 +5,7 @@ import {
   type ExportSummary,
 } from "./exportRules";
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
+import { submissionBelongsToAgent } from "./ownership";
 import {
   adminQuestionnaireReviewReadiness,
   applySubmissionActionResult,
@@ -25,7 +26,6 @@ import {
   isExportedTerminal,
   isIssueTransitionAllowed,
 } from "./domainContract";
-import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
 import {
   resolveQuestionnaireIssueInputIdentity,
   resolveQuestionnaireTargetField,
@@ -33,6 +33,7 @@ import {
 import { requiredPassportReviewMediaTypesForApplicant } from "./passportReviewContract";
 import type {
   ActionDecision,
+  AgentOwnerId,
   CommandResult,
   DomainErrorCode,
   ExportPackageIdentity,
@@ -102,51 +103,56 @@ export function updateSubmission(
 export function submitForReview(
   submission: Submission,
   role: Role,
+  actorId: AgentOwnerId,
 ): CommandResult<Submission> {
-  const terminal = ensureNotTerminal(submission);
-  if (terminal) return terminal;
   if (role !== "agent") {
     return failure("PERMISSION_DENIED", "Отправить подачу может только агент.");
   }
-  if (submission.status === "ready_for_export") {
-    return applySubmissionActionResult(submission, "submit_for_review", role);
-  }
-  if (submission.status !== "in_progress") {
+  if (!submissionBelongsToAgent(submission, actorId)) {
     return failure(
-      "INVALID_TRANSITION",
-      "Отправить на проверку можно только подачу в работе.",
+      "PERMISSION_DENIED",
+      "Агент может отправить только собственную подачу.",
     );
   }
+  const terminal = ensureNotTerminal(submission);
+  if (terminal) return terminal;
 
-  const completeness = getCompleteness(submission);
+  const result = applySubmissionActionResult(
+    submission,
+    "submit_for_review",
+    role,
+    actorId,
+  );
+  if (result.ok) return result;
+
   if (
-    !blsQuestionnaireReadiness(submission).ready ||
-    completeness.total < 100 ||
-    !canonicalRequiredMediaReadiness(submission).ok
+    submission.status === "in_progress" &&
+    result.error.code === "VALIDATION_ERROR" &&
+    result.error.message === "Есть незаполненные поля или недостающие файлы"
   ) {
     return failure(
       "VALIDATION_ERROR",
       "Заполните обязательные поля анкеты и загрузите все нужные файлы.",
     );
   }
-  if (!hasUsableTripDateRange(submission)) {
+  if (
+    submission.status === "in_progress" &&
+    result.error.code === "VALIDATION_ERROR" &&
+    result.error.message === "Укажите даты поездки перед отправкой"
+  ) {
     return failure("VALIDATION_ERROR", "Укажите даты начала и окончания поездки.");
   }
-  return transitionSubmissionStatus(
-    withDerivedState({
-      ...submission,
-      files: submission.files.map((file) =>
-        file.status === "uploaded" ? { ...file, status: "pending_review" } : file,
-      ),
-    }),
-    {
-      actorRole: role,
-      nextStatus: "submitted_for_review",
-      note: "Агент отправил подачу на проверку",
-      nowIso: "сейчас",
-      source: "agent",
-    },
-  );
+  if (
+    result.error.code === "INVALID_TRANSITION" &&
+    result.error.message === "Действие недоступно в текущем статусе"
+  ) {
+    return failure(
+      "INVALID_TRANSITION",
+      "Отправить на проверку можно только подачу в работе или готовую к выгрузке.",
+    );
+  }
+
+  return result;
 }
 
 export function returnWithIssues(

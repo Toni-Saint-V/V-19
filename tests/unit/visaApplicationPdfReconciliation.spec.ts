@@ -749,7 +749,12 @@ function submittedFixture(
     tripDateTo: "2026-01-18",
   };
   const inProgress = applySubmissionAction(withFiles, "save_progress", "agent");
-  return applySubmissionAction(inProgress, "submit_for_review", "agent");
+  return applySubmissionAction(
+    inProgress,
+    "submit_for_review",
+    "agent",
+    inProgress.agentId,
+  );
 }
 
 function exportedFixture(submission = submittedFixture()): Submission {

@@ -43,13 +43,19 @@ function reviewReadySubmission(): Submission {
   });
 }
 
+function submittedReviewReadySubmission(): Submission {
+  const ready = reviewReadySubmission();
+  return applySubmissionAction(
+    ready,
+    "submit_for_review",
+    "agent",
+    ready.agentId,
+  );
+}
+
 describe("submission action safety", () => {
   test("does not allow history view action to export a submission under review", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
 
     expect(canPerformAction(submitted, "open_history", "admin")).toEqual({
       ok: false,
@@ -82,10 +88,12 @@ describe("submission action safety", () => {
   });
 
   test("returns a typed failure instead of silently swallowing blocked lifecycle actions", () => {
+    const ready = reviewReadySubmission();
     const submitted = applySubmissionAction(
-      reviewReadySubmission(),
+      ready,
       "submit_for_review",
       "agent",
+      ready.agentId,
     );
 
     expect(applySubmissionActionResult(submitted, "accept", "agent")).toEqual({
@@ -96,7 +104,12 @@ describe("submission action safety", () => {
       },
     });
     expect(
-      applySubmissionActionResult(submitted, "submit_for_review", "agent"),
+      applySubmissionActionResult(
+        submitted,
+        "submit_for_review",
+        "agent",
+        submitted.agentId,
+      ),
     ).toEqual({
       ok: false,
       error: {
@@ -128,6 +141,7 @@ describe("submission action safety", () => {
       staleSubmission.id,
       "submit_for_review",
       "agent",
+      currentSubmission.agentId,
     );
 
     expect(result.ok).toBe(true);
@@ -152,11 +166,7 @@ describe("submission action safety", () => {
   });
 
   test("list action result returns typed failure without mutating blocked candidates", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const submissions = [submitted];
 
     const result = applyActionToSubmissionListResult(
@@ -177,11 +187,7 @@ describe("submission action safety", () => {
   });
 
   test("scoped action errors clear after the submission state changes", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const error = createSubmissionActionErrorState({
       action: "accept",
       error: {
@@ -204,11 +210,7 @@ describe("submission action safety", () => {
   });
 
   test("scoped action errors clear when the role can now perform the action", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const error = createSubmissionActionErrorState({
       action: "accept",
       error: {
@@ -222,11 +224,7 @@ describe("submission action safety", () => {
   });
 
   test("scoped action errors use stable codes instead of localized copy for applicability", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const error = createSubmissionActionErrorState({
       action: "accept",
       error: {
@@ -242,11 +240,7 @@ describe("submission action safety", () => {
   });
 
   test("keeps agent status view reachable without exposing a lifecycle transition", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
 
     expect(getPrimaryAction(submitted, "agent", "agent")).toEqual({
       action: "open_history",
@@ -262,11 +256,7 @@ describe("submission action safety", () => {
   });
 
   test("keeps workbook generation as a package-level action, not a submission mutation", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const accepted = applySubmissionAction(
       adminAcceptRequiredMediaForTest(submitted),
       "accept",
@@ -334,7 +324,7 @@ describe("submission action safety", () => {
     });
   });
 
-  test("canonical transition helper rejects direct review handoff without required work", () => {
+  test("canonical transition helper rejects direct review handoff", () => {
     const incomplete = {
       ...reviewReadySubmission(),
       files: [],
@@ -351,18 +341,49 @@ describe("submission action safety", () => {
     ).toEqual({
       ok: false,
       error: {
-        code: "VALIDATION_ERROR",
-        message: "Есть незаполненные поля или недостающие файлы",
+        code: "INVALID_TRANSITION",
+        message: "Submit for review requires the canonical action executor.",
       },
     });
   });
 
-  test("canonical transition helper requires prepared export approval snapshot", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
+  test("direct accepted resubmission cannot bypass ownership or preparation", () => {
+    const submitted = submittedReviewReadySubmission();
+    const accepted = applySubmissionAction(
+      adminAcceptRequiredMediaForTest(submitted),
+      "accept",
+      "admin",
+      "admin-reviewer",
     );
+    const before = structuredClone(accepted);
+
+    for (const actorId of [undefined, "foreign-agent", accepted.agentId]) {
+      expect(
+        transitionSubmissionById([accepted], {
+          actorId,
+          actorRole: "agent",
+          nextStatus: "submitted_for_review",
+          source: "agent",
+          submissionId: accepted.id,
+        }),
+      ).toEqual({
+        ok: false,
+        error: {
+          code: "INVALID_TRANSITION",
+          message: "Submit for review requires the canonical action executor.",
+        },
+      });
+      expect(accepted).toEqual(before);
+      expect(accepted).toMatchObject({
+        exportState: "ready",
+        status: "ready_for_export",
+      });
+      expect(accepted.files.every((file) => file.status === "accepted")).toBe(true);
+    }
+  });
+
+  test("canonical transition helper requires prepared export approval snapshot", () => {
+    const submitted = submittedReviewReadySubmission();
 
     expect(
       transitionSubmissionById([submitted], {
@@ -400,11 +421,7 @@ describe("submission action safety", () => {
   });
 
   test("blocks approval when any open issue remains, not only blocker severity", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const withWarningIssue: Submission = {
       ...submitted,
       issues: [

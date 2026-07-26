@@ -130,13 +130,19 @@ function visibleCopy(brief: ReturnType<typeof buildCaseCopilotBrief>) {
   ].join(" ");
 }
 
+function submittedReviewReadySubmission(): Submission {
+  const ready = reviewReadySubmission();
+  return applySubmissionAction(
+    ready,
+    "submit_for_review",
+    "agent",
+    ready.agentId,
+  );
+}
+
 describe("local Case Copilot", () => {
   test("maps every submission lifecycle status to a safe copilot state and owner", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const cases = [
       {
         expectedOwner: "agent",
@@ -451,11 +457,7 @@ describe("local Case Copilot", () => {
   });
 
   test("keeps stale passport signals read-only after agent handoff", () => {
-    const submitted = applySubmissionAction(
-      reviewReadySubmission(),
-      "submit_for_review",
-      "agent",
-    );
+    const submitted = submittedReviewReadySubmission();
     const stalePassport = finishPassportExtraction(
       submitted,
       passportFile(submitted),

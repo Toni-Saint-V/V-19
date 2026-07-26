@@ -714,7 +714,7 @@ describe("ApplicantsScreen interactions", () => {
     ).toBe(true);
   });
 
-  it("resubmits an accepted legacy package without reopening completed intake gates", async () => {
+  it("keeps export-ready resubmission fail-closed when canonical intake data drifts", () => {
     const ready = readySubmission("single");
     const acceptedLegacy: Submission = {
       ...ready,
@@ -734,9 +734,9 @@ describe("ApplicantsScreen interactions", () => {
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
-    expect(canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok).toBe(
-      true,
-    );
+    expect(
+      canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok,
+    ).toBe(false);
 
     render(
       <ApplicantsScreen
@@ -747,24 +747,26 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Вернуть на проверку:/ }));
-    fireEvent.click(
-      within(
-        screen.getByRole("dialog", { name: "Вернуть подачу на проверку?" }),
-      ).getByRole("button", { name: "Вернуть на проверку" }),
-    );
-    await waitFor(() =>
-      expect(onSubmitForReview).toHaveBeenCalledWith(acceptedLegacy.id),
-    );
+    expect(
+      screen.queryByRole("button", { name: /Отправить на проверку:/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Отправить на проверку администратору?",
+      }),
+    ).not.toBeInTheDocument();
+    expect(onSubmitForReview).not.toHaveBeenCalled();
     expect(onOpenDrawer).not.toHaveBeenCalled();
 
-    const transition = applyAgentSubmitForReviewResult(
-      acceptedLegacy,
-      acceptedLegacy.agentId,
-    );
-    expect(transition.ok).toBe(true);
-    if (!transition.ok) return;
-    expect(transition.data.status).toBe("submitted_for_review");
+    expect(
+      applyAgentSubmitForReviewResult(
+        acceptedLegacy,
+        acceptedLegacy.agentId,
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "VALIDATION_ERROR" },
+    });
   });
 
   it("opens an export-ready package from its visible status action", () => {

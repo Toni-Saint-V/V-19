@@ -18,7 +18,7 @@ import {
   applicantHasPassportNumber,
   buildApplicantDocumentFileName,
 } from "./filenamePolicy";
-import { agentOwnerDisplayName } from "./ownership";
+import { agentOwnerDisplayName, submissionBelongsToAgent } from "./ownership";
 import {
   passportGateReason,
   requiresPassportExtractionReviewBeforeAction,
@@ -28,6 +28,7 @@ import { normalizeSubmissionQuestionnaire } from "./questionnaire";
 import type { ExportContractRow } from "./exportContract";
 import type { CreateDraftInput } from "./submissionActions";
 import type {
+  AgentOwnerId,
   City,
   CommandResult,
   DomainErrorCode,
@@ -497,8 +498,13 @@ export function createOperationalDraft(
 export function submitOperationalForReview(
   submission: Submission,
   role: Role,
+  actorId: AgentOwnerId,
 ): OperationalWorkflowResult<Submission> {
-  if (role === "agent" && submission.status === "in_progress") {
+  if (
+    role === "agent" &&
+    submissionBelongsToAgent(submission, actorId) &&
+    submission.status === "in_progress"
+  ) {
     const pendingReviews = questionnaireReviewBlockers(submission);
     if (pendingReviews.length > 0) {
       return failure("VALIDATION_ERROR", pendingReviews[0] ?? "Review is required.");
@@ -516,7 +522,7 @@ export function submitOperationalForReview(
     }
   }
 
-  return submitForReview(submission, role);
+  return submitForReview(submission, role, actorId);
 }
 
 export function applyPassportAutofillResult(

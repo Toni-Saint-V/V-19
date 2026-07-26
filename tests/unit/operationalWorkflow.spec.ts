@@ -96,7 +96,7 @@ describe("operational workflow logic spine", () => {
 
     const savedDraft = applySubmissionAction(draft, "save_progress", "agent");
 
-    expect(submitOperationalForReview(savedDraft, "agent")).toEqual({
+    expect(submitOperationalForReview(savedDraft, "agent", savedDraft.agentId)).toEqual({
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
@@ -105,35 +105,24 @@ describe("operational workflow logic spine", () => {
     });
   });
 
-  test("delegates accepted package resubmission without reopening intake gates", () => {
+  test("delegates complete accepted package resubmission to the canonical command", () => {
     const inProgress = completeInProgressSubmission();
     const acceptedBase: Submission = {
-      ...inProgress,
+      ...adminAcceptRequiredMediaForTest(
+        withCanonicalPrivateMediaIdentityForTest(inProgress),
+      ),
       exportState: "ready",
-      files: inProgress.files.map((file) => ({
-        ...file,
-        status: "accepted",
-      })),
       status: "ready_for_export",
     };
     const exportPackage = buildExportPackageIdentity([acceptedBase]);
     if (!exportPackage) throw new Error("Missing export package identity.");
     const accepted: Submission = {
       ...acceptedBase,
-      applicants: acceptedBase.applicants.map((applicant) => ({
-        ...applicant,
-        sections: applicant.sections.map((section) => ({
-          ...section,
-          fields: section.fields.map((questionnaireField, index) =>
-            index === 0 ? { ...questionnaireField, value: "" } : questionnaireField,
-          ),
-        })),
-      })),
       exportPackage,
     };
     const before = structuredClone(accepted);
 
-    const resubmitted = unwrap(submitOperationalForReview(accepted, "agent"));
+    const resubmitted = unwrap(submitOperationalForReview(accepted, "agent", accepted.agentId));
 
     expect(accepted).toEqual(before);
     expect(resubmitted).toMatchObject({
@@ -144,12 +133,23 @@ describe("operational workflow logic spine", () => {
     expect(resubmitted.files.every((file) => file.status === "pending_review")).toBe(
       true,
     );
+    expect(
+      resubmitted.files.every((file) => file.reviewStatus === "not_reviewed"),
+    ).toBe(true);
     expect(resubmitted.applicants).toEqual(before.applicants);
     expect(resubmitted.issues).toEqual(before.issues);
     expect(resubmitted.history[0]).toMatchObject({
+      actorId: accepted.agentId,
       fromStatus: "ready_for_export",
       source: "agent",
       toStatus: "submitted_for_review",
+    });
+    expect(submitOperationalForReview(accepted, "agent", "foreign-agent")).toEqual({
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Agent can submit only an owned submission.",
+      },
     });
   });
 
@@ -182,7 +182,7 @@ describe("operational workflow logic spine", () => {
       source: "system",
       text: "AI/OCR заполнил паспортные поля для ручной проверки",
     });
-    expect(submitOperationalForReview(applied, "agent")).toEqual({
+    expect(submitOperationalForReview(applied, "agent", applied.agentId)).toEqual({
       ok: false,
       error: expect.objectContaining({
         code: "VALIDATION_ERROR",
@@ -198,7 +198,7 @@ describe("operational workflow logic spine", () => {
         source: "passport_ocr",
       }),
     );
-    const submitted = unwrap(submitOperationalForReview(confirmed, "agent"));
+    const submitted = unwrap(submitOperationalForReview(confirmed, "agent", confirmed.agentId));
 
     expect(confirmed.applicants[0]?.passportExtraction?.verifiedAtIso).toBe(
       "2026-06-27T08:10:00.000Z",
@@ -241,7 +241,7 @@ describe("operational workflow logic spine", () => {
       }),
     );
 
-    expect(submitOperationalForReview(confirmed, "agent")).toEqual({
+    expect(submitOperationalForReview(confirmed, "agent", confirmed.agentId)).toEqual({
       ok: false,
       error: expect.objectContaining({
         code: "VALIDATION_ERROR",
@@ -303,7 +303,7 @@ describe("operational workflow logic spine", () => {
       summary: "Passport number detected.",
     });
 
-    expect(submitOperationalForReview(extracted, "agent")).toEqual({
+    expect(submitOperationalForReview(extracted, "agent", extracted.agentId)).toEqual({
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
@@ -343,7 +343,7 @@ describe("operational workflow logic spine", () => {
         status: "failed",
       }),
     );
-    const submitted = unwrap(submitOperationalForReview(failed, "agent"));
+    const submitted = unwrap(submitOperationalForReview(failed, "agent", failed.agentId));
 
     expect(failed.applicants[0]?.passportExtraction).toMatchObject({
       appliedFieldKeys: [],

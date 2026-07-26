@@ -1576,7 +1576,12 @@ describe("V-19 submission actions", () => {
     expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
       ok: true,
     });
-    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      inProgress,
+      "submit_for_review",
+      "agent",
+      inProgress.agentId,
+    );
     expect(submitted.status).toBe("submitted_for_review");
     expect(submitted.files.every((file) => file.status === "pending_review")).toBe(
       true,
@@ -2223,7 +2228,12 @@ describe("V-19 submission actions", () => {
     });
     const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const inProgress = applySubmissionAction(filled, "save_progress", "agent");
-    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      inProgress,
+      "submit_for_review",
+      "agent",
+      inProgress.agentId,
+    );
     const applicant = submitted.applicants[0];
     if (!applicant) throw new Error("Missing applicant");
 

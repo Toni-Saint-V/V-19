@@ -359,6 +359,7 @@ export function QuestionnaireScreen({
   onSubmitForReview,
 }: QuestionnaireScreenProps) {
   const bridge = useVisaflowBusinessBridge();
+  const commandActorId = agentId ?? defaultLocalAgentOwnerId;
   const sourceSubmission = useMemo(
     () =>
       normalizeSubmissionQuestionnaire(
@@ -393,7 +394,7 @@ export function QuestionnaireScreen({
         const preparedSubmission = applyQuestionnairePayload(
           currentSubmission,
           payload,
-          currentSubmission.agentId,
+          commandActorId,
           new Date().toISOString(),
         );
 
@@ -403,18 +404,17 @@ export function QuestionnaireScreen({
       });
       await onSaveDraft?.(nextSubmission.id);
     },
-    [onSaveDraft, persistSubmissionUpdate],
+    [commandActorId, onSaveDraft, persistSubmissionUpdate],
   );
 
   const handleComplete = useCallback(
     async (payload: QuestionnaireCommitPayload) => {
       const nextSubmission = await persistSubmissionUpdate((currentSubmission) => {
         const nowIso = new Date().toISOString();
-        const actorId = currentSubmission.agentId;
         const preparedSubmission = applyQuestionnairePayload(
           currentSubmission,
           payload,
-          actorId,
+          commandActorId,
           nowIso,
         );
         const savedResult =
@@ -423,7 +423,7 @@ export function QuestionnaireScreen({
                 preparedSubmission,
                 "save_progress",
                 "agent",
-                actorId,
+                commandActorId,
               )
             : { ok: true as const, data: preparedSubmission };
         if (!savedResult.ok) {
@@ -437,7 +437,7 @@ export function QuestionnaireScreen({
           savedResult.data,
           completionAction,
           "agent",
-          actorId,
+          commandActorId,
         );
         if (!submittedResult.ok) {
           throw new QuestionnaireValidationError(
@@ -468,7 +468,7 @@ export function QuestionnaireScreen({
         },
       });
     },
-    [bridge, onSubmitForReview, persistSubmissionUpdate],
+    [bridge, commandActorId, onSubmitForReview, persistSubmissionUpdate],
   );
 
   const handleMarkIssueFixed = useCallback(
