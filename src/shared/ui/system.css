@@ -30954,6 +30954,8 @@ section[data-testid="agent-actions-screen"]
   }
 
   .access-brand-message {
+    display: grid;
+    justify-items: center;
     margin-top: 0 !important;
   }
 
@@ -30967,7 +30969,7 @@ section[data-testid="agent-actions-screen"]
     margin-top: 0;
     padding: 0;
     border: 0;
-    color: var(--vf-text-muted);
+    color: var(--vf-text-secondary);
     background: transparent;
     font-size: var(--v19b-size-10);
     line-height: var(--vf-ref-line-height-1neg-3);

@@ -26,9 +26,11 @@ test.describe("V-19 access gate contract", () => {
       await expect(shell.locator(".access-brand-product")).toContainText(
         "VisaFlow V-19",
       );
-      await expect(shell.locator(".access-brand-trust")).toHaveText(
+      const trustCue = shell.locator(".access-brand-trust");
+      await expect(trustCue).toHaveText(
         "Доступ к кабинету подтверждает администратор",
       );
+      await expect(trustCue).toBeVisible();
 
       if (viewport.width <= 760) {
         await expect(shell.locator(".access-brand-title")).toBeHidden();
