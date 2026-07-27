@@ -4,6 +4,7 @@ import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
 import { RemarkForm } from "./RemarkForm";
 import { ReviewWorkspace } from "./ReviewWorkspace";
+import { AdminReviewDrawer } from "../modules/submissions/components/AdminReviewDrawer";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { AdminUsersAccessScreen } from "./AdminUsersAccessScreen";
 import { AdminSystemSettingsScreen } from "./AdminSystemSettingsScreen";
@@ -19,6 +20,7 @@ import {
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import type { AccessRequest } from "../shared/authContract";
 import type {
+  DrawerTab,
   IssueInput,
   Submission,
   SubmissionAction,
@@ -33,7 +35,7 @@ import {
 } from "../integration/visaflowBusinessBridge";
 
 type AdminNavSection = BridgeAdminNavSection | "users";
-type AdminViewState = "main" | "review_workspace";
+type AdminViewState = "main" | "review_drawer" | "review_workspace";
 
 interface AdminWorkspaceProps {
   accessRequests?: AccessRequest[];
@@ -63,6 +65,8 @@ export function AdminWorkspace({
   const [activeNav, setActiveNav] = useState<AdminNavSection>("review");
   const [currentView, setCurrentView] = useState<AdminViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [adminDrawerTab, setAdminDrawerTab] =
+    useState<DrawerTab>("questionnaire");
   const [reviewApplicantId, setReviewApplicantId] = useState<string>();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
@@ -79,6 +83,8 @@ export function AdminWorkspace({
   const adminIssuePendingRef = useRef(false);
   const adminPassportApprovalPendingRef = useRef(false);
   const adminReviewActionPendingRef = useRef(false);
+  const adminAiReviewPendingRef = useRef(false);
+  const adminAiSuggestionPendingRef = useRef(false);
   const signOutPendingRef = useRef(false);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
 
@@ -100,9 +106,8 @@ export function AdminWorkspace({
       .toUpperCase() || "АД";
 
   useEffect(() => {
-    if (currentView !== "review_workspace" || !selectedRow || selectedSubmission) {
-      return;
-    }
+    if (currentView === "main") return;
+    if (selectedRow && selectedSubmission) return;
 
     setCurrentView("main");
     setSelectedRow(null);
@@ -197,33 +202,51 @@ export function AdminWorkspace({
   };
 
   const handleOpenReviewDrawer = (submissionId: string) => {
-    const submission = submissions?.find((item) => item.id === submissionId);
     reviewReturnFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     bridge.onAdminReviewOpen?.(submissionId);
-    bridge.onVerifyDocument?.(submissionId);
     emitVisaflowUiEvent(bridge, {
       type: "admin.review.open",
-      submissionId,
-    });
-    emitVisaflowUiEvent(bridge, {
-      type: "admin.document.verify",
       submissionId,
     });
     setAdminAsyncError("");
     setCommandPaletteOpen(false);
     setSelectedRow(submissionId);
+    setAdminDrawerTab("questionnaire");
+    setReviewApplicantId(undefined);
+    setRemarkFormOpen(false);
+    setCurrentView("review_drawer");
+  };
+
+  const handleVerifyDocument = (applicantId?: string) => {
+    if (!selectedRow || !selectedSubmission) return;
+    bridge.onVerifyDocument?.(selectedRow);
+    emitVisaflowUiEvent(bridge, {
+      type: "admin.document.verify",
+      submissionId: selectedRow,
+    });
     setReviewApplicantId(
-      submission ? primaryApplicantIdForPassportReview(submission) : undefined,
+      applicantId ?? primaryApplicantIdForPassportReview(selectedSubmission),
     );
+    setRemarkFormOpen(false);
     setCurrentView("review_workspace");
   };
 
   const handleBackToQueue = () => {
+    setRemarkFormOpen(false);
     setCurrentView("main");
     window.requestAnimationFrame(() => {
       reviewReturnFocusRef.current?.focus({ preventScroll: true });
     });
+  };
+
+  const handleBackToDrawer = () => {
+    if (!selectedSubmission) {
+      handleBackToQueue();
+      return;
+    }
+    setRemarkFormOpen(false);
+    setCurrentView("review_drawer");
   };
 
   const handleOpenRemark = (
@@ -269,6 +292,65 @@ export function AdminWorkspace({
       throw error;
     } finally {
       adminIssuePendingRef.current = false;
+    }
+  };
+
+  const handleAdminAiReview = async () => {
+    if (!selectedRow || adminAiReviewPendingRef.current) return;
+    if (!bridge.onAdminAiReviewRun) {
+      setAdminAsyncError("AI-сверка недоступна: сохранение не подключено.");
+      return;
+    }
+
+    setAdminAsyncError("");
+    adminAiReviewPendingRef.current = true;
+    try {
+      await bridge.onAdminAiReviewRun(selectedRow);
+      emitVisaflowUiEvent(bridge, {
+        type: "admin.ai.run",
+        submissionId: selectedRow,
+      });
+    } catch (error) {
+      setAdminAsyncError(
+        persistenceFailureMessage(error, "Не удалось выполнить AI-сверку."),
+      );
+    } finally {
+      adminAiReviewPendingRef.current = false;
+    }
+  };
+
+  const handleAdminAiSuggestion = async (
+    action: "accept" | "dismiss",
+    suggestionId: string,
+  ) => {
+    if (!selectedRow || adminAiSuggestionPendingRef.current) return;
+    const handler =
+      action === "accept"
+        ? bridge.onAdminAiSuggestionAccept
+        : bridge.onAdminAiSuggestionDismiss;
+    if (!handler) {
+      setAdminAsyncError("Действие AI-помощника недоступно: сохранение не подключено.");
+      return;
+    }
+
+    const payload = { submissionId: selectedRow, suggestionId };
+    setAdminAsyncError("");
+    adminAiSuggestionPendingRef.current = true;
+    try {
+      await handler(payload);
+      emitVisaflowUiEvent(bridge, {
+        type: action === "accept" ? "admin.ai.accept" : "admin.ai.dismiss",
+        payload,
+      });
+    } catch (error) {
+      setAdminAsyncError(
+        persistenceFailureMessage(
+          error,
+          "Не удалось применить действие AI-помощника.",
+        ),
+      );
+    } finally {
+      adminAiSuggestionPendingRef.current = false;
     }
   };
 
@@ -399,6 +481,18 @@ export function AdminWorkspace({
     }
   };
 
+  const handleDrawerReviewAction = (action: SubmissionAction) => {
+    if (action === "generate_export") {
+      navigateTo("export");
+      return;
+    }
+    void handleReviewAction(action).catch(() => undefined);
+  };
+
+  const handleDrawerAddIssue = (input: IssueInput) => {
+    void handleAddIssue(input).catch(() => undefined);
+  };
+
   const pageTitle =
     activeNav === "review"
       ? "Очередь на проверку"
@@ -476,9 +570,29 @@ export function AdminWorkspace({
           onApplicantChange={setReviewApplicantId}
           onApproveSection={handlePassportSectionApprove}
           onReviewAction={handleReviewAction}
-          onBack={handleBackToQueue}
+          onBack={handleBackToDrawer}
           submission={selectedSubmission}
           submissionId={selectedRow}
+        />
+      ) : null}
+
+      {currentView === "review_drawer" && selectedSubmission ? (
+        <AdminReviewDrawer
+          actionError=""
+          activeTab={adminDrawerTab}
+          onAcceptAiSuggestion={(suggestionId) =>
+            void handleAdminAiSuggestion("accept", suggestionId)
+          }
+          onAction={handleDrawerReviewAction}
+          onAddIssue={handleDrawerAddIssue}
+          onClose={handleBackToQueue}
+          onDismissAiSuggestion={(suggestionId) =>
+            void handleAdminAiSuggestion("dismiss", suggestionId)
+          }
+          onRunAiReview={() => void handleAdminAiReview()}
+          onTab={setAdminDrawerTab}
+          onVerifyDocument={handleVerifyDocument}
+          submission={selectedSubmission}
         />
       ) : null}
 
@@ -496,7 +610,7 @@ export function AdminWorkspace({
       <div className="contents">
         <AppShell
           collectionSurface={activeNav === "review" || activeNav === "export"}
-          drawerOpen={currentView === "review_workspace"}
+          drawerOpen={currentView !== "main"}
           header={
             <PageHeader
               actions={
@@ -536,14 +650,14 @@ export function AdminWorkspace({
               title={pageTitle}
             />
           }
-          inactive={currentView === "review_workspace"}
+          inactive={currentView !== "main"}
           label="Рабочая область администратора"
           mobileNavOpen={mobileNavOpen}
           role="admin"
           sideMenu={{
             ariaLabel: "Меню администратора",
             displayMode: "regular",
-            inactive: currentView === "review_workspace",
+            inactive: currentView !== "main",
             items: sideMenuItems,
             mobileCloseLabel: "Закрыть меню администратора",
             mobileOpen: mobileNavOpen,
@@ -558,7 +672,7 @@ export function AdminWorkspace({
           }}
           sideMenuMode="regular"
           surface={surface}
-          workspaceInactive={currentView === "review_workspace"}
+          workspaceInactive={currentView !== "main"}
         >
           <div className="v19-admin-workspace-scroll flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
             <div className="max-w-[1460px] mx-auto h-full">
