@@ -567,7 +567,7 @@ export function AccessGate({
           подтверждения администратором.
         </p>
         <p className="access-success" role="status">
-          Статус: pending · роль agent
+          Статус заявки: На рассмотрении
         </p>
         {localError || error ? (
           <p className="access-error" role="alert">
