@@ -10,10 +10,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   BookUser,
-  Plus,
   UploadCloud,
-  UserRound,
-  UsersRound,
   Wand2,
   X,
 } from "lucide-react";
@@ -551,7 +548,7 @@ export function PreUploadScreen({
     fileInputRef.current?.click();
   };
 
-  const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDropActive(false);
     handleFiles(Array.from(event.dataTransfer.files ?? []), null);
@@ -697,12 +694,166 @@ export function PreUploadScreen({
     packageType,
     activeItem,
   );
+  const applicantPanel = (
+    <section
+      aria-label="Заявители в подаче"
+      className="v19-preupload-applicants-panel"
+    >
+      <div className="v19-preupload-applicants-heading">
+        <div>
+          <p>{packageType === "family" ? "Семья" : "Заявитель"}</p>
+          <h3>
+            {packageType === "family" ? "Заявители в семье" : "Один заявитель"}
+          </h3>
+        </div>
+        {packageType === "family" ? (
+          <button
+            {...agentInteractionProps("new-submission.configure")}
+            aria-label={
+              applicantCount >= submissionIntakeFamilyMax
+                ? `Максимум ${submissionIntakeFamilyMax} заявителей`
+                : "Добавить заявителя в семью"
+            }
+            className="v19-preupload-add-applicant"
+            disabled={
+              actionPending ||
+              busyItems.length > 0 ||
+              applicantCount >= submissionIntakeFamilyMax
+            }
+            onClick={() =>
+              setFamilyApplicantCount((current) =>
+                Math.min(submissionIntakeFamilyMax, current + 1),
+              )
+            }
+            type="button"
+          >
+            + заявитель
+          </button>
+        ) : null}
+      </div>
+
+      <div className="v19-preupload-applicant-controls">
+        <div
+          className="v19-preupload-applicant-grid"
+          data-package-type={packageType}
+          data-testid={`preupload-${packageType}-grid`}
+          role="list"
+        >
+          {Array.from({ length: applicantCount }, (_, applicantIndex) => {
+            const item = assignedItems.get(applicantIndex);
+            const applicantLabel = applicantDisplayLabel(
+              applicantIndex,
+              packageType,
+              item,
+            );
+            const cellLabel = applicantCellLabel(
+              applicantIndex,
+              packageType,
+              item,
+            );
+            const applicantDetails = applicantCompactDetails(item);
+            const removable = packageType === "family" && applicantIndex >= 2;
+            const active = activeApplicantIndex === applicantIndex;
+            return (
+              <article
+                aria-current={active ? "true" : undefined}
+                className={[
+                  item ? "has-file" : "",
+                  item?.status === "ready" ? "is-recognized" : "",
+                  active ? "is-active" : "",
+                  packageType === "single" ? "is-single" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                key={applicantIndex}
+                role="listitem"
+              >
+                <button
+                  {...agentInteractionProps("new-submission.choose-files")}
+                  aria-label={`${item ? "Заменить" : "Загрузить"} паспорт: ${applicantLabel}`}
+                  className="v19-preupload-applicant-label"
+                  disabled={actionPending || busyItems.length > 0}
+                  onClick={() => {
+                    setActiveApplicantIndex(applicantIndex);
+                    openFilePicker(applicantIndex);
+                  }}
+                  onFocus={primeOcr}
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="v19-preupload-applicant-order"
+                  >
+                    {applicantIndex + 1}
+                  </span>
+                  <span className="v19-preupload-applicant-copy">
+                    <span className="v19-preupload-applicant-name">
+                      {cellLabel}
+                    </span>
+                    {applicantDetails ? (
+                      <span className="v19-preupload-applicant-details">
+                        {applicantDetails}
+                      </span>
+                    ) : null}
+                    <span className="v19-preupload-applicant-state">
+                      {statusLabel(item)}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  {...agentInteractionProps(
+                    item || removable
+                      ? "new-submission.manage-file"
+                      : "new-submission.choose-files",
+                  )}
+                  aria-label={
+                    item
+                      ? `Удалить паспорт: ${applicantLabel}`
+                      : removable
+                        ? `Удалить заявителя ${applicantIndex + 1}`
+                        : `Открыть загрузку паспорта: ${applicantLabel}`
+                  }
+                  className="v19-preupload-applicant-icon"
+                  disabled={actionPending || busyItems.length > 0}
+                  onClick={() => {
+                    setActiveApplicantIndex(applicantIndex);
+                    if (item) clearApplicantPassport(applicantIndex);
+                    else if (removable) requestRemoveApplicant(applicantIndex);
+                    else openFilePicker(applicantIndex);
+                  }}
+                  type="button"
+                >
+                  {removable && !item ? (
+                    <X aria-hidden="true" />
+                  ) : (
+                    <>
+                      <BookUser
+                        aria-hidden="true"
+                        className="v19-preupload-passport-icon"
+                      />
+                      {item ? (
+                        <X
+                          aria-hidden="true"
+                          className="v19-preupload-remove-icon"
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <motion.section
       animate={{ opacity: 1, y: 0 }}
       aria-labelledby="new-submission-workspace-title"
       className="v19-preupload-screen text-[var(--v19-depth-text)]"
+      data-create-submission-surface="preupload-blue"
       data-testid="preupload-workspace"
       exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
       initial={false}
@@ -710,27 +861,12 @@ export function PreUploadScreen({
         reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
       }
     >
-      <div className="v19-preupload-main">
-        <div className="v19-preupload-layout">
+      <div className="v19-preupload-main v19-preupload-production-body">
+        <div className="v19-preupload-layout v19-preupload-production-grid">
           <section className="v19-preupload-primary">
-            <motion.div className="v19-preupload-card">
-              <motion.div
-                animate={
-                  reduceMotion
-                    ? undefined
-                    : { opacity: [0.55, 0.8, 0.55], scale: [1, 1.12, 1] }
-                }
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[var(--v19-depth-accent-soft)] blur-3xl"
-                transition={
-                  reduceMotion
-                    ? { duration: 0 }
-                    : { duration: 4, ease: "easeInOut", repeat: Infinity }
-                }
-              />
-
+            <motion.div className="v19-preupload-card v19-preupload-production-primary">
               <div className="v19-preupload-card-body">
-                <div className="v19-preupload-card-intro relative z-10">
+                <div className="v19-preupload-card-intro sr-only">
                   <h2
                     id="new-submission-workspace-title"
                     ref={headingRef}
@@ -741,28 +877,24 @@ export function PreUploadScreen({
                   <p>Выберите тип и город. Паспорт можно добавить сейчас или позже.</p>
                 </div>
 
-                <div className="v19-preupload-operational-card relative z-10">
-                  <div className="v19-preupload-section-heading">
+                <div className="v19-preupload-operational-card v19-preupload-setup-panel">
+                  <div className="v19-preupload-setup-heading">
                     <div>
-                      <h3>Заявители</h3>
-                      <p>Настройте состав подачи и добавьте паспорта.</p>
+                      <p>Заявитель / Семья</p>
+                      <h3>Структура подачи</h3>
                     </div>
+                    <span>{applicantCount} чел.</span>
                   </div>
                   <div className="v19-preupload-setup-row">
                     <div
                       aria-label="Тип подачи"
-                      className="v19-preupload-package-toggle flex rounded-full border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-page)] p-1 shadow-[var(--v19-depth-inner-highlight)]"
+                      className="v19-preupload-package-toggle"
                       role="radiogroup"
                     >
                       {[
-                        { icon: UsersRound, label: "Семья", type: "family" as const },
-                        {
-                          icon: UserRound,
-                          label: "Заявитель",
-                          type: "single" as const,
-                        },
+                        { label: "Семья", type: "family" as const },
+                        { label: "Один", type: "single" as const },
                       ].map((option) => {
-                        const Icon = option.icon;
                         const active = packageType === option.type;
                         return (
                           <button
@@ -775,7 +907,6 @@ export function PreUploadScreen({
                             role="radio"
                             type="button"
                           >
-                            <Icon aria-hidden="true" className="h-3.5 w-3.5" />
                             {option.label}
                           </button>
                         );
@@ -800,160 +931,9 @@ export function PreUploadScreen({
                       />
                     </div>
                   </div>
-
-                  <div className="v19-preupload-applicant-controls">
-                    <div
-                      className="v19-preupload-applicant-grid"
-                      data-package-type={packageType}
-                      data-testid={`preupload-${packageType}-grid`}
-                      role="list"
-                    >
-                      {Array.from({ length: applicantCount }, (_, applicantIndex) => {
-                        const item = assignedItems.get(applicantIndex);
-                        const applicantLabel = applicantDisplayLabel(
-                          applicantIndex,
-                          packageType,
-                          item,
-                        );
-                        const cellLabel = applicantCellLabel(
-                          applicantIndex,
-                          packageType,
-                          item,
-                        );
-                        const applicantDetails = applicantCompactDetails(item);
-                        const removable =
-                          packageType === "family" && applicantIndex >= 2;
-                        const active = activeApplicantIndex === applicantIndex;
-                        return (
-                          <article
-                            aria-current={active ? "true" : undefined}
-                            className={[
-                              item ? "has-file" : "",
-                              item?.status === "ready" ? "is-recognized" : "",
-                              active ? "is-active" : "",
-                              packageType === "single" ? "is-single" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                            key={applicantIndex}
-                            role="listitem"
-                          >
-                            <button
-                              {...agentInteractionProps("new-submission.choose-files")}
-                              aria-label={`${item ? "Заменить" : "Загрузить"} паспорт: ${applicantLabel}`}
-                              className="v19-preupload-applicant-label"
-                              disabled={actionPending || busyItems.length > 0}
-                              onClick={() => {
-                                setActiveApplicantIndex(applicantIndex);
-                                openFilePicker(applicantIndex);
-                              }}
-                              onFocus={primeOcr}
-                              type="button"
-                            >
-                              <span
-                                aria-hidden="true"
-                                className="v19-preupload-applicant-order"
-                              >
-                                {applicantIndex + 1}
-                              </span>
-                              <span className="v19-preupload-applicant-copy">
-                                <span className="v19-preupload-applicant-name">
-                                  {cellLabel}
-                                </span>
-                                {applicantDetails ? (
-                                  <span className="v19-preupload-applicant-details">
-                                    {applicantDetails}
-                                  </span>
-                                ) : null}
-                                <span className="v19-preupload-applicant-state">
-                                  {statusLabel(item)}
-                                </span>
-                              </span>
-                            </button>
-                            <button
-                              {...agentInteractionProps(
-                                item || removable
-                                  ? "new-submission.manage-file"
-                                  : "new-submission.choose-files",
-                              )}
-                              aria-label={
-                                item
-                                  ? `Удалить паспорт: ${applicantLabel}`
-                                  : removable
-                                    ? `Удалить заявителя ${applicantIndex + 1}`
-                                    : `Открыть загрузку паспорта: ${applicantLabel}`
-                              }
-                              className="v19-preupload-applicant-icon"
-                              disabled={actionPending || busyItems.length > 0}
-                              onClick={() => {
-                                setActiveApplicantIndex(applicantIndex);
-                                if (item) clearApplicantPassport(applicantIndex);
-                                else if (removable)
-                                  requestRemoveApplicant(applicantIndex);
-                                else openFilePicker(applicantIndex);
-                              }}
-                              type="button"
-                            >
-                              {removable && !item ? (
-                                <X aria-hidden="true" />
-                              ) : (
-                                <>
-                                  <BookUser
-                                    aria-hidden="true"
-                                    className="v19-preupload-passport-icon"
-                                  />
-                                  {item ? (
-                                    <X
-                                      aria-hidden="true"
-                                      className="v19-preupload-remove-icon"
-                                    />
-                                  ) : null}
-                                </>
-                              )}
-                            </button>
-                          </article>
-                        );
-                      })}
-                      {packageType === "family" ? (
-                        <article
-                          className="v19-preupload-add-applicant"
-                          role="listitem"
-                        >
-                          <button
-                            {...agentInteractionProps("new-submission.configure")}
-                            aria-label={
-                              applicantCount >= submissionIntakeFamilyMax
-                                ? `Максимум ${submissionIntakeFamilyMax} заявителей`
-                                : "Добавить следующего заявителя"
-                            }
-                            disabled={
-                              actionPending ||
-                              busyItems.length > 0 ||
-                              applicantCount >= submissionIntakeFamilyMax
-                            }
-                            onClick={() =>
-                              setFamilyApplicantCount((current) =>
-                                Math.min(submissionIntakeFamilyMax, current + 1),
-                              )
-                            }
-                            type="button"
-                          >
-                            <Plus aria-hidden="true" />
-                            <span className="sr-only">Добавить заявителя</span>
-                          </button>
-                        </article>
-                      ) : null}
-                    </div>
-                  </div>
                 </div>
 
                 <div className="v19-preupload-upload-panel">
-                  <div className="v19-preupload-section-heading">
-                    <div>
-                      <h3>Паспорт</h3>
-                      <p>Добавьте файл для выбранного заявителя.</p>
-                    </div>
-                  </div>
                   <div className="v19-preupload-upload-group">
                     {busyItems.length ? (
                       <div
@@ -1002,12 +982,8 @@ export function PreUploadScreen({
                       </div>
                     ) : null}
 
-                    <button
-                      {...agentInteractionProps("new-submission.choose-files")}
-                      aria-label="Выбрать файлы"
-                      className={`v19-preupload-dropzone relative flex min-h-[180px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-3xl border border-dashed p-6 text-center transition-colors ${dropActive ? "is-drag-active" : ""}`}
-                      disabled={actionPending || busyItems.length > 0}
-                      onClick={() => openFilePicker(null)}
+                    <div
+                      className={`v19-preupload-dropzone create-submission-passport-upload-zone ${dropActive ? "is-drag-active" : ""}`}
                       onDragEnter={primeOcr}
                       onDragLeave={() => setDropActive(false)}
                       onDragOver={(event) => {
@@ -1016,60 +992,33 @@ export function PreUploadScreen({
                         primeOcr();
                       }}
                       onDrop={handleDrop}
-                      onFocus={primeOcr}
                       onPointerEnter={primeOcr}
-                      type="button"
                     >
-                      {!reduceMotion ? (
-                        <motion.div
-                          aria-hidden="true"
-                          animate={{ opacity: [0.1, 0.9, 0.1], y: [0, 250, 0] }}
-                          className="v19-preupload-scan-line"
-                          transition={{
-                            duration: 2.8,
-                            ease: "easeInOut",
-                            repeat: Infinity,
-                          }}
-                        />
-                      ) : null}
-                      <motion.div
-                        animate={
-                          reduceMotion
-                            ? undefined
-                            : {
-                                rotate: dropActive ? 2 : 0,
-                                scale: busyItems.length ? [1, 1.06, 1] : 1,
-                              }
-                        }
-                        className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--v19-depth-accent-border)] bg-[var(--v19-depth-accent-soft)]"
-                        transition={
-                          reduceMotion
-                            ? { duration: 0 }
-                            : { duration: 1.2, repeat: busyItems.length ? Infinity : 0 }
-                        }
-                      >
-                        {busyItems.length ? (
-                          <Wand2
-                            aria-hidden="true"
-                            className="h-6 w-6 text-[var(--v19-depth-accent-text)]"
-                          />
-                        ) : (
-                          <UploadCloud
-                            aria-hidden="true"
-                            className="h-6 w-6 text-[var(--v19-depth-accent-text)]"
-                          />
-                        )}
-                      </motion.div>
-                      <h3 className="text-[18px] font-semibold text-white">
-                        {activeItem
-                          ? `Заменить паспорт: ${activeApplicantLabel}`
-                          : `Паспорт: ${activeApplicantLabel}`}
+                      <span aria-hidden="true" className="v19-preupload-dropzone-inset" />
+                      <div className="v19-preupload-upload-icon">
+                        <UploadCloud aria-hidden="true" />
+                      </div>
+                      <h3>
+                        Перетащите паспорта сюда
                       </h3>
                       <p className="v19-preupload-dropzone-copy">
-                        {passportScanUploadFormatLabel}, до 50 МБ. Распознаём данные на
-                        этом устройстве. Файл загрузится только после сохранения.
+                        {passportScanUploadFormatLabel}.
+                        <br />
+                        Сначала реальный OCR. В защищённое хранилище файлы попадут
+                        только после сохранения подачи.
                       </p>
-                    </button>
+                      <button
+                        {...agentInteractionProps("new-submission.choose-files")}
+                        aria-label={`Выбрать файлы для ${activeApplicantLabel}`}
+                        className="v19-create-upload-button"
+                        disabled={actionPending || busyItems.length > 0}
+                        onClick={() => openFilePicker(null)}
+                        onFocus={primeOcr}
+                        type="button"
+                      >
+                        Выбрать файлы
+                      </button>
+                    </div>
                     <input
                       {...agentInteractionProps("new-submission.choose-files")}
                       accept={passportScanUploadAccept}
@@ -1099,68 +1048,88 @@ export function PreUploadScreen({
                 </div>
               </div>
 
-              <div className="v19-preupload-footer">
-                {actionError ? (
-                  <p className="v19-preupload-action-error" role="alert">
-                    {actionError}
-                  </p>
-                ) : null}
-                {submissionDisabledReason && !actionPending ? (
-                  <p
-                    className="v19-preupload-disabled-reason"
-                    id="preupload-disabled-reason"
-                  >
-                    {submissionDisabledReason}
-                  </p>
-                ) : null}
-                <button
-                  {...agentInteractionProps("new-submission.save-draft")}
-                  aria-describedby={
-                    submitDisabled ? "preupload-disabled-reason" : undefined
-                  }
-                  className="v19-preupload-secondary-action"
-                  disabled={submitDisabled}
-                  onClick={() => void submit("list")}
-                  type="button"
-                >
-                  {actionPending
-                    ? persistenceLabel(persistenceProgress)
-                    : "Сохранить черновик"}
-                </button>
-                <button
-                  {...agentInteractionProps("new-submission.continue")}
-                  aria-describedby={
-                    submitDisabled ? "preupload-disabled-reason" : undefined
-                  }
-                  className="v19-preupload-primary-action"
-                  disabled={submitDisabled}
-                  onClick={() => void submit("questionnaire")}
-                  type="button"
-                >
-                  {actionPending
-                    ? persistenceLabel(persistenceProgress)
-                    : items.length
-                      ? "Создать и открыть анкету"
-                      : "Продолжить без паспорта"}
-                </button>
-              </div>
             </motion.div>
           </section>
 
-          <aside className="v19-preupload-rail">
+          <aside className="v19-preupload-rail v19-preupload-production-rail">
             <div className="v19-preupload-rail-card">
-              <div className="v19-preupload-prefill-heading">
-                <div className="flex items-center justify-between gap-3">
-                  <h3>Данные из паспорта</h3>
-                  <span>
-                    {activeApplicantIndex + 1}/{applicantCount}
-                  </span>
+              {applicantPanel}
+              <section
+                aria-label="Очередь обработки"
+                className="v19-preupload-prefill-panel"
+              >
+                <div className="v19-preupload-queue-heading">
+                  <h3>Очередь обработки</h3>
+                  <span>{items.length} ITEMS</span>
                 </div>
-                <p>{activeApplicantLabel}. Проверьте распознанные данные в анкете.</p>
-              </div>
-              <PrefillPreviewList fields={previewFields} reduceMotion={reduceMotion} />
+                <div className="v19-preupload-prefill-heading">
+                  <div className="flex items-center justify-between gap-3">
+                    <h4>Распознано OCR</h4>
+                    <span>{previewFields.length} ПОЛЕЙ</span>
+                  </div>
+                  <p>{activeApplicantLabel}</p>
+                </div>
+                <PrefillPreviewList
+                  fields={previewFields}
+                  reduceMotion={reduceMotion}
+                />
+              </section>
             </div>
           </aside>
+
+          <footer className="v19-preupload-footer v19-create-drawer-footer">
+            <div className="v19-preupload-footer-actions">
+              <button
+                {...agentInteractionProps("new-submission.save-draft")}
+                aria-describedby={
+                  submitDisabled ? "preupload-disabled-reason" : undefined
+                }
+                className="v19-preupload-secondary-action"
+                disabled={submitDisabled}
+                onClick={() => void submit("list")}
+                type="button"
+              >
+                {actionPending
+                  ? persistenceLabel(persistenceProgress)
+                  : "Сохранить черновик"}
+              </button>
+              <button
+                {...agentInteractionProps("new-submission.continue")}
+                aria-describedby={
+                  submitDisabled ? "preupload-disabled-reason" : undefined
+                }
+                className="v19-preupload-primary-action"
+                disabled={submitDisabled}
+                onClick={() => void submit("questionnaire")}
+                type="button"
+              >
+                {actionPending
+                  ? persistenceLabel(persistenceProgress)
+                  : items.length
+                    ? "Создать и открыть анкету"
+                    : "Продолжить без паспорта"}
+              </button>
+            </div>
+            <div
+              aria-live="polite"
+              className="v19-preupload-footer-summary"
+              role="status"
+            >
+              {actionError ? (
+                <p className="v19-preupload-action-error" role="alert">
+                  {actionError}
+                </p>
+              ) : null}
+              {submissionDisabledReason && !actionPending ? (
+                <p
+                  className="v19-preupload-disabled-reason"
+                  id="preupload-disabled-reason"
+                >
+                  {submissionDisabledReason}
+                </p>
+              ) : null}
+            </div>
+          </footer>
 
           <AnimatePresence>
             {mobilePrefillOpen ? (
