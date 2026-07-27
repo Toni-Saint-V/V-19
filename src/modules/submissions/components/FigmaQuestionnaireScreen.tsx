@@ -834,8 +834,7 @@ function FormField({
         gap;
       const availableAbove = triggerRect.top - viewportMargin - gap;
       setOptionsOpenAbove(
-        availableBelow < Math.min(estimatedHeight, 180) &&
-          availableAbove > availableBelow,
+        availableBelow < estimatedHeight && availableAbove > availableBelow,
       );
     }
     setIsOpen(true);
