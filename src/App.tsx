@@ -823,7 +823,6 @@ export default function App({
               currentOwnerIds,
               currentCaseRevisions,
               loadCockpitSubmissionsForProfile,
-              { verifyCanonicalReadback: true },
             );
         const nextOwnerIds =
           adminSaveResult?.ownerIdsBySubmissionId ??
