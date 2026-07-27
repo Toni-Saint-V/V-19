@@ -58,6 +58,7 @@ import { useReviewWorkspaceShortcuts } from "./review/useReviewWorkspaceShortcut
 
 interface ReviewWorkspaceProps {
   applicantId?: string;
+  initialMediaType?: PassportReviewMediaType;
   nestedDialogOpen?: boolean;
   onAddRemark: (
     field?: string,
@@ -120,8 +121,6 @@ const unavailablePreview: ReviewMediaPreviewState = {
   retryable: true,
   status: "unavailable",
 };
-
-const initialVisitedMediaTypes = new Set<ReviewMediaType>(["passport_scan"]);
 
 function unavailablePreviewForFile(
   file: SubmissionFile | undefined,
@@ -199,6 +198,7 @@ function reviewActionLabel(
 
 export function ReviewWorkspace({
   applicantId,
+  initialMediaType = "passport_scan",
   nestedDialogOpen = false,
   onAddRemark,
   onApplicantChange,
@@ -291,16 +291,21 @@ export function ReviewWorkspace({
     )
     .join("|");
   const mediaOwnerKey = `${submissionId}:${selectedApplicantId ?? "unselected"}:${mediaGenerationKey}`;
+  const initialActiveMediaType = mediaTargets.some(
+    (target) => target.type === initialMediaType,
+  )
+    ? initialMediaType
+    : (mediaTargets[0]?.type ?? "passport_scan");
   const [activeMediaType, setActiveMediaType] =
-    useState<ReviewMediaType>("passport_scan");
+    useState<ReviewMediaType>(initialActiveMediaType);
   const [ownedVisitedMedia, setOwnedVisitedMedia] = useState<OwnedVisitedMediaState>({
     ownerKey: mediaOwnerKey,
-    types: initialVisitedMediaTypes,
+    types: new Set([initialActiveMediaType]),
   });
   const visitedMediaTypes =
     ownedVisitedMedia.ownerKey === mediaOwnerKey
       ? ownedVisitedMedia.types
-      : initialVisitedMediaTypes;
+      : new Set<ReviewMediaType>([initialActiveMediaType]);
   const [mediaRequestRevision, setMediaRequestRevision] = useState(0);
   const initialMediaPreviews = useMemo(
     () =>
@@ -427,10 +432,10 @@ export function ReviewWorkspace({
 
   useEffect(() => {
     sectionApprovalRunRef.current += 1;
-    setActiveMediaType("passport_scan");
+    setActiveMediaType(initialActiveMediaType);
     setOwnedVisitedMedia({
       ownerKey: mediaOwnerKey,
-      types: initialVisitedMediaTypes,
+      types: new Set([initialActiveMediaType]),
     });
     setZoom(100);
     setRotation(0);
@@ -439,7 +444,7 @@ export function ReviewWorkspace({
     setAcceptanceError("");
     setReviewActionError("");
     setReviewActionSaved("");
-  }, [mediaOwnerKey, selectedApplicantId, submissionId]);
+  }, [initialActiveMediaType, mediaOwnerKey, selectedApplicantId, submissionId]);
 
   useEffect(() => {
     const footer = decisionFooterRef.current;
@@ -842,7 +847,9 @@ export function ReviewWorkspace({
       setActiveMediaType(mediaType);
       setOwnedVisitedMedia((current) => {
         const currentTypes =
-          current.ownerKey === mediaOwnerKey ? current.types : initialVisitedMediaTypes;
+          current.ownerKey === mediaOwnerKey
+            ? current.types
+            : new Set<ReviewMediaType>([initialActiveMediaType]);
         if (currentTypes.has(mediaType) && current.ownerKey === mediaOwnerKey) {
           return current;
         }
@@ -853,7 +860,7 @@ export function ReviewWorkspace({
       setZoom(100);
       setRotation(0);
     },
-    [mediaOwnerKey],
+    [initialActiveMediaType, mediaOwnerKey],
   );
 
   const handleMediaTabKeyDown = (

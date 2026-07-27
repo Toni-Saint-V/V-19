@@ -26,7 +26,10 @@ import type {
   SubmissionAction,
   SubmissionFileType,
 } from "../modules/submissions/types";
-import { primaryApplicantIdForPassportReview } from "../modules/submissions/passportReviewContract";
+import {
+  primaryApplicantIdForPassportReview,
+  type PassportReviewMediaType,
+} from "../modules/submissions/passportReviewContract";
 import { isAdminReviewQueueSubmission } from "../modules/submissions/uiTypes";
 import {
   emitVisaflowUiEvent,
@@ -68,6 +71,8 @@ export function AdminWorkspace({
   const [adminDrawerTab, setAdminDrawerTab] =
     useState<DrawerTab>("questionnaire");
   const [reviewApplicantId, setReviewApplicantId] = useState<string>();
+  const [reviewMediaType, setReviewMediaType] =
+    useState<PassportReviewMediaType>("passport_scan");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
   const [adminAsyncError, setAdminAsyncError] = useState("");
@@ -219,11 +224,15 @@ export function AdminWorkspace({
     setSelectedRow(submissionId);
     setAdminDrawerTab("questionnaire");
     setReviewApplicantId(undefined);
+    setReviewMediaType("passport_scan");
     setRemarkFormOpen(false);
     setCurrentView("review_drawer");
   };
 
-  const handleVerifyDocument = (applicantId?: string) => {
+  const handleVerifyDocument = (
+    applicantId?: string,
+    mediaType: PassportReviewMediaType = "passport_scan",
+  ) => {
     if (!selectedRow || !selectedSubmission) return;
     bridge.onVerifyDocument?.(selectedRow);
     emitVisaflowUiEvent(bridge, {
@@ -233,6 +242,7 @@ export function AdminWorkspace({
     setReviewApplicantId(
       applicantId ?? primaryApplicantIdForPassportReview(selectedSubmission),
     );
+    setReviewMediaType(mediaType);
     setRemarkFormOpen(false);
     setCurrentView("review_workspace");
   };
@@ -570,6 +580,7 @@ export function AdminWorkspace({
       {currentView === "review_workspace" && selectedRow && selectedSubmission ? (
         <ReviewWorkspace
           applicantId={reviewApplicantId}
+          initialMediaType={reviewMediaType}
           nestedDialogOpen={remarkFormOpen}
           onAddRemark={handleOpenRemark}
           onApplicantChange={setReviewApplicantId}

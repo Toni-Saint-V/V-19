@@ -919,8 +919,8 @@
   }
 
   .v19-review-media-pane {
-    height: var(--v19b-size-304);
-    min-height: var(--v19b-size-304);
+    height: var(--v19b-size-360);
+    min-height: var(--v19b-size-360);
   }
 
   .v19-review-media-toolbar {

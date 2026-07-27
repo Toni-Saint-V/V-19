@@ -37998,6 +37998,10 @@ select,
   grid-template-columns: repeat(2, minmax(var(--v19b-size-0), 1fr)) !important;
 }
 
+.admin-review-drawer .admin-review-overview-next {
+  grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
+}
+
 .admin-review-files-tab .v19-drawer-file-item {
   grid-template-columns:
     var(--v19b-size-36)

@@ -228,7 +228,10 @@ export function AdminReviewDrawer({
   onDismissAiSuggestion: (suggestionId: string) => void;
   onRunAiReview: () => void;
   onTab: (tab: DrawerTab) => void;
-  onVerifyDocument: (applicantId: string) => void;
+  onVerifyDocument: (
+    applicantId: string,
+    mediaType?: AdminReviewFileTarget,
+  ) => void;
   submission: Submission;
 }) {
   const [selectedApplicantId, setSelectedApplicantId] = useState(
@@ -467,7 +470,10 @@ export function AdminReviewDrawer({
   ) {
     setSelectedApplicantId(applicantId);
     if (tab === "passport" || tab === "selfie") {
-      onVerifyDocument(applicantId);
+      onVerifyDocument(
+        applicantId,
+        tab === "selfie" ? "selfie" : "passport_scan",
+      );
       return;
     }
     selectReviewTab(tab);
@@ -557,7 +563,7 @@ export function AdminReviewDrawer({
 
     if (target.tab === "files" && isAdminReviewFileTarget(target.fileType)) {
       setReviewTarget(target.fileType);
-      onVerifyDocument(target.applicantId);
+      onVerifyDocument(target.applicantId, target.fileType);
       return;
     }
 
@@ -847,7 +853,7 @@ export function AdminReviewDrawer({
                   }}
                   onOpenReview={(file) => {
                     setSelectedApplicantId(file.applicantId);
-                    onVerifyDocument(file.applicantId);
+                    onVerifyDocument(file.applicantId, file.type);
                   }}
                 />
               ) : activeReviewTab === "passport" ? (
@@ -878,7 +884,9 @@ export function AdminReviewDrawer({
                   }
                   onFieldRemark={openQuestionnaireRemark}
                   onOpenWorkspace={() => {
-                    if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
+                    if (selectedApplicant) {
+                      onVerifyDocument(selectedApplicant.id, "passport_scan");
+                    }
                   }}
                   onNext={() => selectReviewTab("questionnaire")}
                   onRemark={() => openFileRemark("passport_scan", "Скан паспорта требует замены")}
@@ -902,7 +910,12 @@ export function AdminReviewDrawer({
                   }
                   onFileRemark={openFileRemark}
                   onOpenWorkspace={() => {
-                    if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
+                    if (selectedApplicant) {
+                      onVerifyDocument(
+                        selectedApplicant.id,
+                        reviewTarget === "passport_scan" ? "selfie" : reviewTarget,
+                      );
+                    }
                   }}
                   onReviewTarget={setReviewTarget}
                 />
@@ -913,7 +926,9 @@ export function AdminReviewDrawer({
                   submission={submission}
                   onFieldRemark={openQuestionnaireRemark}
                   onVerifyPassport={() => {
-                    if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
+                    if (selectedApplicant) {
+                      onVerifyDocument(selectedApplicant.id, "passport_scan");
+                    }
                   }}
                 />
               ) : activeReviewTab === "issues" ? (
@@ -999,7 +1014,9 @@ export function AdminReviewDrawer({
             selectReviewTab("questionnaire");
           }}
           onOpenWorkspace={() => {
-            if (selectedApplicant) onVerifyDocument(selectedApplicant.id);
+            if (selectedApplicant) {
+              onVerifyDocument(selectedApplicant.id, "passport_scan");
+            }
           }}
           onRemark={() => openFileRemark("passport_scan", "Скан паспорта требует замены")}
         />
