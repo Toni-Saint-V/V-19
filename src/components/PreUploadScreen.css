@@ -1234,6 +1234,11 @@
 }
 
 [data-create-submission-surface="preupload-blue"]
+  .v19-preupload-footer-summary:empty {
+  visibility: hidden;
+}
+
+[data-create-submission-surface="preupload-blue"]
   :is(.v19-preupload-primary-action, .v19-preupload-secondary-action) {
   min-height: var(--v19b-size-44);
 }
