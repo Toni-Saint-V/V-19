@@ -1,11 +1,11 @@
 import {
   existsSync,
   lstatSync,
-  readdirSync,
   readFileSync,
+  readdirSync,
   realpathSync,
-  statSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
@@ -29,184 +29,450 @@ const guardedCompilerPackageRoots = [
   "undici-types",
 ];
 
-const forbiddenDirectories = [
-  ".playwright-cli",
-  ".playwright-mcp",
-  "docs/qa",
-  "output",
-  "playwright",
-  "playwright-report",
-  "playwright-report-e2e-fastlane",
-  "test-results",
+const requiredFiles = [
+  "AGENTS.md",
+  "docs/agent-workflow/README.md",
+  "docs/staging/specs/2026-07-27-codex-workflow-hardening-v1.md",
+  ".agents/skills/browser-runtime-proof/SKILL.md",
+  ".agents/skills/independent-diff-review/SKILL.md",
 ];
 
-for (const directory of forbiddenDirectories) {
-  if (exists(directory)) failures.push(`generated directory is present: ${directory}`);
+for (const path of requiredFiles) {
+  if (!existsSync(join(root, path))) fail(`required file is missing: ${path}`);
 }
 
-for (const entry of readdirSync(root, { withFileTypes: true })) {
-  if (entry.isDirectory()) {
-    if (/^(playwright-report|test-results)-/.test(entry.name)) {
-      failures.push(`generated directory is present: ${entry.name}`);
-    }
-    continue;
-  }
-
-  if (/\.(gif|jpe?g|png|webp|zip)$/i.test(entry.name)) {
-    failures.push(`generated root artifact is present: ${entry.name}`);
-  }
-
-  if (/^playwright\..+\.config\.ts$/.test(entry.name)) {
-    failures.push(
-      `specialized Playwright config must live in config/playwright: ${entry.name}`,
-    );
-  }
+if (exists("AGENTS.md")) {
+  checkIncludes("AGENTS.md", [
+    "TONY_REPOSITORY_RULES_V1",
+    "## Source of truth",
+    "## Pre-work report",
+    "## Scope and no-go",
+    "## Runtime and package manager",
+    "## Ownership",
+    "## Cross-repository lock",
+    "## Completion gate",
+    "PASS",
+    "BLOCKED",
+    "FAIL",
+  ]);
 }
 
-const playwrightConfigRoot = validateRepositoryDirectoryPath(
-  join("config", "playwright"),
-  failures,
-);
-const playwrightConfigs = [
-  "playwright.config.ts",
-  ...(playwrightConfigRoot
-    ? readdirSync(join(root, playwrightConfigRoot))
-        .filter((name) => name.endsWith(".config.ts"))
-        .map((name) => join(playwrightConfigRoot, name))
-    : []),
-];
-
-for (const config of playwrightConfigs) {
-  const source = read(config);
-  for (const forbidden of ["docs/qa", "playwright-report", "test-results"]) {
-    if (source.includes(forbidden)) {
-      failures.push(`${config} contains forbidden artifact policy: ${forbidden}`);
-    }
-  }
-  if (!source.includes("outputDir: testArtifactPath(")) {
-    failures.push(`${config} must route outputDir through testArtifactPath`);
-  }
-
-  const retainsFailureArtifacts =
-    source.includes('screenshot: "only-on-failure"') ||
-    source.includes('trace: "retain-on-failure"') ||
-    source.includes('video: "retain-on-failure"');
-
-  if (retainsFailureArtifacts) {
-    if (!source.includes('preserveOutput: "failures-only"')) {
-      failures.push(
-        `${config} must preserve output only for failures when failure artifacts are enabled`,
-      );
-    }
-
-    const definesExternalArtifactRoot =
-      source.includes("V19_TEST_ARTIFACTS_DIR") &&
-      source.includes("tmpdir()") &&
-      source.includes("const testArtifactPath");
-    const importsExternalArtifactHelper =
-      source.includes('from "../../tests/support/artifacts"') ||
-      source.includes('from "./tests/support/artifacts"');
-
-    if (!definesExternalArtifactRoot && !importsExternalArtifactHelper) {
-      failures.push(
-        `${config} may retain failure artifacts only through the external testArtifactPath contract`,
-      );
-    }
-  }
+if (exists("docs/agent-workflow/README.md")) {
+  checkIncludes("docs/agent-workflow/README.md", [
+    "## TASK CONTRACT",
+    "## BROWSER RECEIPT",
+    "## VERIFICATION LEDGER",
+    "## REVIEW FINDING",
+    "APPLY_MANUALLY",
+    "REQUIRES_MANUAL_REVIEW",
+    "TONY_CODEX_BIN=/opt/homebrew/bin/codex",
+    "MCP 2026-07-28 default-off canary",
+    "ru-text",
+    "codebase-recon",
+    "spec-driven",
+    "tool-advisor",
+    "Duplicate resolution",
+    "unshadowed named `defineConfig`",
+    "unaliased named value imports",
+    "sanctioned composition positions",
+    "direct/indirect/computed `eval`/`require`/`Function`/`import()` code",
+    "`createRequire`/`getBuiltinModule`",
+    "rejected by reference",
+    "TypeScript type-aware callable check",
+    "recursively parses every relative value, type-only, or side-effect",
+    "`.env*` imports are rejected without reading",
+    "guarded CompilerHost",
+    "host-read audit probe",
+    "Every I/O-capable CompilerHost surface",
+    "drives an actual guarded TypeScript program",
+    "closed method inventory",
+    "unaliased `expect` value",
+    "unknown package or path alias",
+    "`process.env`, `process.cwd`, and `process.pid`",
+    "symlinked config paths",
+    "PASS",
+    "BLOCKED",
+    "FAIL",
+    "Task ID:",
+    "Objective:",
+    "Definition of done:",
+    "Repository:",
+    "Exact base:",
+    "Worktree:",
+    "Branch:",
+    "Primary writer:",
+    "Read-only reviewers:",
+    "Authoritative sources:",
+    "Allowed behavior:",
+    "Forbidden behavior:",
+    "Allowed files:",
+    "Forbidden files:",
+    "Dependency policy:",
+    "Package manager and runtime:",
+    "External evidence directory:",
+    "Browser target and roles:",
+    "Verification commands:",
+    "Manual approvals:",
+    "Known baseline failures:",
+    "Rollback:",
+    "Unresolved assumptions:",
+    "Repository/base/diff:",
+    "Timestamp and timezone:",
+    "Localhost URL:",
+    "Approved network origins:",
+    "Server command:",
+    "Playwright version:",
+    "Browser binary path:",
+    "Artifact root:",
+    "Official fixture:",
+    "Start state:",
+    "Expected backend/domain effect:",
+    "Canonical readback:",
+    "Reload readback:",
+    "Role-isolation check:",
+    "Failed requests:",
+    "Network requests:",
+    "Network responses:",
+    "Blocked origin attempts:",
+    "WebSocket requests:",
+    "Relevant responses:",
+    "Persistence:",
+    "Horizontal overflow:",
+    "Final Playwright command:",
+    "HTML report:",
+    "Trace/video/screenshot policy:",
+    "Evidence gaps:",
+    "Residual risk:",
+    "Severity: BLOCKER | HIGH | MEDIUM | LOW",
+    "Reviewer: VERIFIER | RED-TEAM",
+    "File and line:",
+    "Requirement:",
+    "Problem:",
+    "Impact:",
+    "Reproduction/evidence:",
+    "Minimal fix:",
+    "Disposition: OPEN | FIXED | ACCEPTED",
+  ]);
 }
 
-const artifactHelper = read("tests/support/artifacts.ts");
-for (const marker of [
-  "V19_TEST_ARTIFACTS_DIR",
-  "tmpdir()",
-  "export function testArtifactPath",
-]) {
-  if (!artifactHelper.includes(marker)) {
-    failures.push(
-      `tests/support/artifacts.ts is missing external routing marker: ${marker}`,
-    );
-  }
+if (exists("docs/staging/specs/2026-07-27-codex-workflow-hardening-v1.md")) {
+  checkIncludes("docs/staging/specs/2026-07-27-codex-workflow-hardening-v1.md", [
+    "af640895ea1bddfa463f22369573af666c430de8",
+    "## Requirements",
+    "## Acceptance criteria",
+    "## Rollback",
+    "browser-runtime-proof",
+    "independent-diff-review",
+    "scope-lock",
+    "verification-before-completion",
+    "shadowed `defineConfig`",
+    "aliased Playwright imports",
+    "imported-config mutation",
+    "device-policy mutation",
+    "parenthesized, aliased, computed-property",
+    "`createRequire` device mutation",
+    "computed process module",
+    "`.join()` and",
+    "side-effect helper mutation",
+    "lexical module escape",
+    "dynamic code",
+    "canonical path escape",
+  ]);
 }
 
-const sensitivePlaywrightConfigs = playwrightConfigs.filter((path) =>
-  /supabase|production/.test(path),
-);
-const graphAnalysis = analyzeSensitiveExecutableModuleGraph(sensitivePlaywrightConfigs);
-failures.push(...graphAnalysis.errors);
-for (const requiredModule of [
-  join("src", "modules", "submissions", "submissionActions.ts"),
-  join("tests", "e2e-supabase-ui", "production-cohort-helpers.ts"),
-  join("tests", "support", "artifacts.ts"),
-]) {
-  if (!graphAnalysis.modulePaths.has(requiredModule)) {
-    failures.push(`sensitive executable module graph is incomplete: ${requiredModule}`);
-  }
-}
-
-for (const path of sensitivePlaywrightConfigs) {
-  const analysis = analyzeSensitivePlaywrightConfig(path);
-  failures.push(...analysis.errors);
-
-  for (const [setting, expected] of [
-    ["preserveOutput", "never"],
-    ["screenshot", "off"],
-    ["trace", "off"],
-    ["video", "off"],
-  ]) {
-    const values = analysis.values.get(setting) ?? [];
-    if (values.length === 0 || values.some((value) => value !== expected)) {
-      failures.push(`${path} must keep effective ${setting} exactly "${expected}"`);
-    }
-  }
-}
-
+verifyRepositorySkills();
+verifyPromptSurface();
+verifyPackageContract();
+verifyPlaywrightContract();
+verifyPlaywrightNegativeProbes();
 verifySensitivePolicyNegativeProbes();
 
-for (const directory of [".agents", "config", "scripts", "tests"]) {
-  for (const file of listTextFiles(join(root, directory))) {
-    if (file.endsWith("verify-repository-hygiene.mjs")) continue;
-    const source = readFileSync(file, "utf8");
-    if (source.includes("docs/qa")) {
-      failures.push(`${relative(root, file)} still writes or points to docs/qa`);
-    }
-  }
-}
-
 if (failures.length > 0) {
-  console.error("Repository hygiene verification failed:");
+  console.error("Agent workflow verification failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log("Repository hygiene verification passed");
+console.log("Agent workflow verification passed");
 
-function exists(path) {
-  try {
-    statSync(join(root, path));
-    return true;
-  } catch {
-    return false;
+function verifyRepositorySkills() {
+  const skillsRoot = join(root, ".agents", "skills");
+  if (!existsSync(skillsRoot)) {
+    fail("repository skills directory is missing: .agents/skills");
+    return;
+  }
+
+  const skillFiles = readdirSync(skillsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(skillsRoot, entry.name, "SKILL.md"))
+    .filter((path) => existsSync(path))
+    .sort();
+
+  const seenNames = new Map();
+  const seenDescriptions = new Map();
+
+  for (const path of skillFiles) {
+    const displayPath = relative(root, path);
+    const source = readFileSync(path, "utf8");
+    const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!frontmatter) {
+      fail(`${displayPath} has no YAML frontmatter`);
+      continue;
+    }
+
+    const name = frontmatter[1].match(/^name:\s*(.+)$/m)?.[1]?.trim();
+    const description = frontmatter[1].match(/^description:\s*(.+)$/m)?.[1]?.trim();
+
+    if (!name) fail(`${displayPath} has no frontmatter name`);
+    if (!description) fail(`${displayPath} has no frontmatter description`);
+
+    if (name) {
+      if (seenNames.has(name)) {
+        fail(
+          `duplicate repository skill name "${name}": ${seenNames.get(name)} and ${displayPath}`,
+        );
+      } else {
+        seenNames.set(name, displayPath);
+      }
+    }
+
+    if (description) {
+      if (seenDescriptions.has(description)) {
+        fail(
+          `duplicate repository skill description: ${seenDescriptions.get(description)} and ${displayPath}`,
+        );
+      } else {
+        seenDescriptions.set(description, displayPath);
+      }
+    }
+
+    for (const heading of [
+      "## When to use",
+      "## Do not use",
+      "## Inputs",
+      "## Outputs",
+    ]) {
+      if (!source.includes(heading)) {
+        fail(`${displayPath} is missing required section: ${heading}`);
+      }
+    }
+  }
+
+  for (const requiredName of ["browser-runtime-proof", "independent-diff-review"]) {
+    if (!seenNames.has(requiredName)) {
+      fail(`required repository skill is missing: ${requiredName}`);
+    }
+  }
+
+  for (const duplicateName of ["scope-lock", "verification-before-completion"]) {
+    if (seenNames.has(duplicateName)) {
+      fail(`duplicate-resolution violation: repository skill ${duplicateName}`);
+    }
   }
 }
 
-function read(path) {
-  return readFileSync(join(root, path), "utf8");
+function verifyPromptSurface() {
+  const promptsRoot = join(root, ".agents", "prompts");
+  if (!existsSync(promptsRoot)) return;
+
+  for (const prompt of listFiles(promptsRoot)) {
+    fail(`new repository prompt is forbidden: ${relative(root, prompt)}`);
+  }
 }
 
-function listTextFiles(directory) {
-  if (!exists(relative(root, directory))) return [];
+function listFiles(directory) {
   const files = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
-      files.push(...listTextFiles(path));
-      continue;
-    }
-    if ([".css", ".json", ".md", ".mjs", ".ts", ".tsx"].includes(extname(entry.name))) {
+      files.push(...listFiles(path));
+    } else if (entry.isFile()) {
       files.push(path);
     }
   }
-  return files;
+  return files.sort();
+}
+
+function verifyPackageContract() {
+  const packageJson = readJson("package.json");
+  const packageLock = readJson("package-lock.json");
+  if (!packageJson || !packageLock) return;
+
+  if (packageJson.devDependencies?.["@playwright/test"] !== "1.62.0") {
+    fail('package.json must pin @playwright/test exactly to "1.62.0"');
+  }
+
+  if (
+    packageJson.scripts?.["verify:agent-workflow"] !==
+    "node scripts/verify-agent-workflow.mjs"
+  ) {
+    fail("package.json must expose verify:agent-workflow");
+  }
+
+  const verifySteps = packageJson.scripts?.verify
+    ?.split("&&")
+    .map((step) => step.trim());
+  if (!verifySteps?.includes("npm run verify:agent-workflow")) {
+    fail("package.json verify must include verify:agent-workflow");
+  } else if (verifySteps[0] !== "npm run verify:agent-workflow") {
+    fail("package.json verify must run verify:agent-workflow first");
+  }
+
+  if (packageLock.packages?.[""]?.devDependencies?.["@playwright/test"] !== "1.62.0") {
+    fail("package-lock root must pin @playwright/test exactly to 1.62.0");
+  }
+
+  if (packageLock.packages?.["node_modules/@playwright/test"]?.version !== "1.62.0") {
+    fail("package-lock must resolve @playwright/test to 1.62.0");
+  }
+
+  if (packageLock.packages?.["node_modules/playwright"]?.version !== "1.62.0") {
+    fail("package-lock must resolve playwright to 1.62.0");
+  }
+
+  if (packageLock.packages?.["node_modules/playwright-core"]?.version !== "1.62.0") {
+    fail("package-lock must resolve playwright-core to 1.62.0");
+  }
+}
+
+function verifyPlaywrightContract() {
+  if (!exists("playwright.config.ts")) return;
+
+  checkIncludes("playwright.config.ts", [
+    "V19_TEST_ARTIFACTS_DIR",
+    'resolve(tmpdir(), "visaflow-v19")',
+    'outputDir: testArtifactPath("playwright", "local-e2e")',
+    'preserveOutput: "failures-only"',
+    "retries: process.env.CI ? 2 : 0",
+    'retryStrategy: "isolated"',
+    'screenshot: "only-on-failure"',
+    'trace: "retain-on-failure"',
+    'video: "retain-on-failure"',
+    'const denyExternalProxy = "http://127.0.0.1:1"',
+    "bypass: `${e2eHost}:${e2ePort}`",
+    "server: denyExternalProxy",
+    'serviceWorkers: "block"',
+    '["list"]',
+    '"html"',
+    'outputFolder: testArtifactPath("playwright", "html-report")',
+    'open: "never"',
+    'process.env.PW_BASE_HOST ?? "127.0.0.1"',
+    'process.env.PW_SERVER_HOST ?? "127.0.0.1"',
+    "V19_TEST_ARTIFACTS_DIR must resolve outside the repository",
+    "PW_BASE_HOST",
+    "PW_SERVER_HOST",
+    "PW_BASE_PORT",
+    "canonicalizeBoundaryPath",
+    "requireLocalhost",
+    "requirePort",
+  ]);
+
+  if (exists("tests/e2e/v19-responsive-proof.spec.ts")) {
+    checkIncludes("tests/e2e/v19-responsive-proof.spec.ts", [
+      '{ height: 900, label: "1440", width: 1440 }',
+      '{ height: 1024, label: "768", width: 768 }',
+      '{ height: 844, label: "390", width: 390 }',
+    ]);
+  } else {
+    fail("targeted responsive proof is missing");
+  }
+
+  const configRoot = validateRepositoryDirectoryPath(
+    join("config", "playwright"),
+    failures,
+  );
+  if (!configRoot) {
+    return;
+  }
+
+  const sensitiveConfigs = readdirSync(join(root, configRoot))
+    .filter((name) => name.endsWith(".config.ts") && /supabase|production/.test(name))
+    .sort();
+
+  const graphAnalysis = analyzeSensitiveExecutableModuleGraph(
+    sensitiveConfigs.map((name) => join("config", "playwright", name)),
+  );
+  for (const error of graphAnalysis.errors) fail(error);
+  for (const requiredModule of [
+    join("src", "modules", "submissions", "submissionActions.ts"),
+    join("tests", "e2e-supabase-ui", "production-cohort-helpers.ts"),
+    join("tests", "support", "artifacts.ts"),
+  ]) {
+    if (!graphAnalysis.modulePaths.has(requiredModule)) {
+      fail(`sensitive executable module graph is incomplete: ${requiredModule}`);
+    }
+  }
+
+  for (const name of sensitiveConfigs) {
+    const path = join("config", "playwright", name);
+    const analysis = analyzeSensitivePlaywrightConfig(path);
+    for (const error of analysis.errors) fail(error);
+
+    for (const [setting, expected] of [
+      ["preserveOutput", "never"],
+      ["screenshot", "off"],
+      ["trace", "off"],
+      ["video", "off"],
+    ]) {
+      const values = analysis.values.get(setting) ?? [];
+      if (values.length === 0 || values.some((value) => value !== expected)) {
+        fail(`${path} must keep effective ${setting} exactly "${expected}"`);
+      }
+    }
+  }
+}
+
+function verifyPlaywrightNegativeProbes() {
+  const cli = join(root, "node_modules", "@playwright", "test", "cli.js");
+  if (!existsSync(cli)) {
+    fail("Playwright CLI is missing; run npm ci before verify:agent-workflow");
+    return;
+  }
+
+  const probes = [
+    {
+      environment: { PW_BASE_HOST: "example.com" },
+      expectedError: "PW_BASE_HOST must be exactly 127.0.0.1 or localhost",
+      name: "remote base host",
+    },
+    {
+      environment: { PW_SERVER_HOST: "127.0.0.1;touch-forbidden" },
+      expectedError: "PW_SERVER_HOST must be exactly 127.0.0.1 or localhost",
+      name: "server-host command injection",
+    },
+    {
+      environment: { PW_BASE_PORT: "4207;touch-forbidden" },
+      expectedError: "PW_BASE_PORT must be a decimal port",
+      name: "port command injection",
+    },
+    {
+      environment: { V19_TEST_ARTIFACTS_DIR: root },
+      expectedError: "V19_TEST_ARTIFACTS_DIR must resolve outside the repository",
+      name: "repository-local artifact root",
+    },
+  ];
+
+  for (const probe of probes) {
+    const result = spawnSync(
+      process.execPath,
+      [cli, "test", "--list", "--config", join(root, "playwright.config.ts")],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, ...probe.environment },
+        timeout: 30_000,
+      },
+    );
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+
+    if (result.error) {
+      fail(`Playwright negative probe failed to execute (${probe.name})`);
+    } else if (result.status === 0) {
+      fail(`Playwright negative probe was accepted (${probe.name})`);
+    } else if (!output.includes(probe.expectedError)) {
+      fail(`Playwright negative probe failed for the wrong reason (${probe.name})`);
+    }
+  }
 }
 
 function verifySensitivePolicyNegativeProbes() {
@@ -231,9 +497,7 @@ function verifySensitivePolicyNegativeProbes() {
       error.includes("computed property"),
     )
   ) {
-    failures.push(
-      "repository hygiene AST probe accepted a comment/computed-key bypass",
-    );
+    fail("sensitive policy AST probe accepted a comment/computed-key bypass");
   }
 
   const helperProbe = analyzeSensitivePlaywrightConfig(
@@ -255,7 +519,7 @@ function verifySensitivePolicyNegativeProbes() {
   if (
     !helperProbe.errors.some((error) => error.includes("use must be an object literal"))
   ) {
-    failures.push("repository hygiene AST probe accepted helper-generated use policy");
+    fail("sensitive policy AST probe accepted helper-generated use policy");
   }
 
   const shadowedDefineConfigProbe = analyzeSensitivePlaywrightConfig(
@@ -286,9 +550,7 @@ function verifySensitivePolicyNegativeProbes() {
       ),
     )
   ) {
-    failures.push(
-      "repository hygiene AST probe accepted a shadowed defineConfig binding",
-    );
+    fail("sensitive policy AST probe accepted a shadowed defineConfig binding");
   }
 
   const aliasedImportProbe = analyzeSensitivePlaywrightConfig(
@@ -311,7 +573,7 @@ function verifySensitivePolicyNegativeProbes() {
       error.includes("unsupported or aliased Playwright policy import"),
     )
   ) {
-    failures.push("repository hygiene AST probe accepted an aliased Playwright import");
+    fail("sensitive policy AST probe accepted an aliased Playwright import");
   }
 
   const importedConfigMutationProbe = analyzeSensitivePlaywrightConfig(
@@ -334,7 +596,7 @@ function verifySensitivePolicyNegativeProbes() {
       ),
     )
   ) {
-    failures.push("repository hygiene AST probe accepted imported config mutation");
+    fail("sensitive policy AST probe accepted imported config mutation");
   }
 
   const deviceMutationProbe = analyzeSensitivePlaywrightConfig(
@@ -364,7 +626,7 @@ function verifySensitivePolicyNegativeProbes() {
       ),
     )
   ) {
-    failures.push("repository hygiene AST probe accepted Playwright device mutation");
+    fail("sensitive policy AST probe accepted Playwright device mutation");
   }
 
   const dynamicCodeProbe = analyzeSensitivePlaywrightConfig(
@@ -388,7 +650,7 @@ function verifySensitivePolicyNegativeProbes() {
       error.includes("dynamic policy code is forbidden: eval"),
     )
   ) {
-    failures.push("repository hygiene AST probe accepted dynamic code");
+    fail("sensitive policy AST probe accepted dynamic code");
   }
 
   const indirectEvalProbe = analyzeSensitivePlaywrightConfig(
@@ -414,7 +676,7 @@ function verifySensitivePolicyNegativeProbes() {
       error.includes("dynamic policy code is forbidden: eval"),
     )
   ) {
-    failures.push("repository hygiene AST probe accepted indirect or aliased eval");
+    fail("sensitive policy AST probe accepted indirect or aliased eval");
   }
 
   const computedFunctionProbe = analyzeSensitivePlaywrightConfig(
@@ -441,9 +703,7 @@ function verifySensitivePolicyNegativeProbes() {
       ),
     )
   ) {
-    failures.push(
-      "repository hygiene AST probe accepted computed eval/Function access",
-    );
+    fail("sensitive policy AST probe accepted computed eval/Function access");
   }
 
   const createRequireProbe = analyzeSensitivePlaywrightConfig(
@@ -478,9 +738,7 @@ function verifySensitivePolicyNegativeProbes() {
       error.includes("dynamic policy code is forbidden: createRequire"),
     )
   ) {
-    failures.push(
-      "repository hygiene AST probe accepted createRequire device mutation",
-    );
+    fail("sensitive policy AST probe accepted createRequire device mutation");
   }
 
   const processLoaderProbe = analyzeSensitivePlaywrightConfig(
@@ -506,9 +764,7 @@ function verifySensitivePolicyNegativeProbes() {
       ),
     )
   ) {
-    failures.push(
-      "repository hygiene AST probe accepted computed process module loader",
-    );
+    fail("sensitive policy AST probe accepted computed process module loader");
   }
 
   const runtimeBuiltCallableProbe = analyzeSensitivePlaywrightConfig(
@@ -541,9 +797,7 @@ function verifySensitivePolicyNegativeProbes() {
       ),
     ).length < 2
   ) {
-    failures.push(
-      "repository hygiene AST probe accepted runtime-built callable properties",
-    );
+    fail("sensitive policy AST probe accepted runtime-built callable properties");
   }
 
   const virtualGraphSources = new Map([
@@ -598,9 +852,7 @@ function verifySensitivePolicyNegativeProbes() {
           ),
       )
     ) {
-      failures.push(
-        `repository hygiene graph probe accepted helper mutation: ${helperPath}`,
-      );
+      fail(`sensitive policy graph probe accepted helper mutation: ${helperPath}`);
     }
   }
 
@@ -629,7 +881,7 @@ function verifySensitivePolicyNegativeProbes() {
       error.includes("relative module import escapes the repository"),
     )
   ) {
-    failures.push("repository hygiene graph probe accepted a lexical module escape");
+    fail("sensitive policy graph probe accepted a lexical module escape");
   }
 
   const syntheticRoot = resolve(sep, "locked-repository");
@@ -643,10 +895,10 @@ function verifySensitivePolicyNegativeProbes() {
       escapedCanonicalCandidate,
     )
   ) {
-    failures.push("repository hygiene path probe accepted a canonical symlink escape");
+    fail("sensitive policy path probe accepted a canonical symlink escape");
   }
 
-  verifyGuardedCompilerHostReadProbe((message) => failures.push(message));
+  verifyGuardedCompilerHostReadProbe(fail);
 }
 
 function analyzeSensitiveExecutableModuleGraph(entryPaths, virtualSources = new Map()) {
@@ -2346,4 +2598,32 @@ function readStaticStringExpression(expression) {
   }
 
   return null;
+}
+
+function checkIncludes(path, markers) {
+  const source = read(path);
+  for (const marker of markers) {
+    if (!source.includes(marker)) fail(`${path} is missing marker: ${marker}`);
+  }
+}
+
+function readJson(path) {
+  try {
+    return JSON.parse(read(path));
+  } catch (error) {
+    fail(`${path} is not valid JSON: ${error.message}`);
+    return null;
+  }
+}
+
+function read(path) {
+  return readFileSync(join(root, path), "utf8");
+}
+
+function exists(path) {
+  return existsSync(join(root, path));
+}
+
+function fail(message) {
+  failures.push(message);
 }
