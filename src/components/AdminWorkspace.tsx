@@ -188,7 +188,12 @@ export function AdminWorkspace({
 
   const openCommandPalette = () => {
     commandPaletteFocusOriginRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      mobileNavOpen && mobileNavTriggerRef.current?.isConnected
+        ? mobileNavTriggerRef.current
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    setMobileNavOpen(false);
     setCommandPaletteOpen(true);
   };
 

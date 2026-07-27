@@ -288,7 +288,7 @@
   }
 
   .v19-command-palette::before {
-    content: "Command Palette";
+    content: "Командная палитра";
     position: absolute;
     top: 26px;
     left: 20px;
@@ -297,6 +297,28 @@
     font-weight: 650;
     letter-spacing: 0.02em;
     text-transform: uppercase;
+  }
+
+  .v19-command-palette-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 1;
+    display: inline-flex !important;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    border-radius: 10px;
+    background: #1b1b1f;
+    color: #d4d4d8;
+  }
+
+  .v19-command-palette-close:focus-visible {
+    outline: 2px solid #8b86ff;
+    outline-offset: 2px;
   }
 
   .v19-command-palette-search {
@@ -309,9 +331,7 @@
   }
 
   .v19-command-palette-search kbd {
-    position: absolute;
-    top: 25px;
-    right: 20px;
+    display: none;
   }
 
   .v19-command-palette-list {

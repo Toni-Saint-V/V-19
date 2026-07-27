@@ -471,6 +471,10 @@
   font-family: var(--v19-font-family);
 }
 
+.v19-command-palette-close {
+  display: none;
+}
+
 .v19-command-palette-search {
   display: grid;
   grid-template-columns: var(--v19b-size-24) minmax(var(--v19b-size-0), 1fr);

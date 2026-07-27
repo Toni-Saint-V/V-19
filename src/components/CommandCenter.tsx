@@ -206,6 +206,7 @@ export function CommandCenter({
   const questionnaireOriginSurfaceRef = useRef<"drawer" | "workspace">("workspace");
   const questionnaireSubmissionSnapshotRef = useRef<Submission | undefined>(undefined);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
+  const mobileNavTriggerRef = useRef<HTMLElement | null>(null);
   const createExitFocusOriginRef = useRef<HTMLElement | null>(null);
   const createExitDialogRef = useRef<HTMLElement | null>(null);
   const [canonicalOverrides, setCanonicalOverrides] = useState<
@@ -441,7 +442,11 @@ export function CommandCenter({
   const openCommandPalette = () => {
     if (createNavigationState.busy || pendingCreateExit) return;
     commandPaletteFocusOriginRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      mobileNavOpen && mobileNavTriggerRef.current?.isConnected
+        ? mobileNavTriggerRef.current
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
     setMobileNavOpen(false);
     setCommandPaletteOpen(true);
   };
@@ -1147,7 +1152,10 @@ export function CommandCenter({
                   {...agentInteractionProps("shell.toggle-mobile-menu")}
                   controls={v19SideMenuId}
                   disabled={createNavigationState.busy}
-                  onClick={() => setMobileNavOpen((open) => !open)}
+                  onClick={(event) => {
+                    mobileNavTriggerRef.current = event.currentTarget;
+                    setMobileNavOpen((open) => !open);
+                  }}
                   open={mobileNavOpen}
                 />
               }

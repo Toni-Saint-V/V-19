@@ -13,6 +13,7 @@ import {
   Sparkles,
   UserRound,
   UsersRound,
+  X,
 } from "lucide-react";
 import { submissionPublicId } from "../submissionIdentity";
 import {
@@ -94,6 +95,14 @@ export function CommandPalette({
       open={open}
       overlayClassName="v19-command-palette-overlay"
     >
+      <button
+        aria-label="Закрыть командную палитру"
+        className="v19-command-palette-close"
+        type="button"
+        onClick={() => onOpenChange(false)}
+      >
+        <X aria-hidden="true" focusable="false" size={20} strokeWidth={1.8} />
+      </button>
       <div className="v19-command-palette-search">
         <Search aria-hidden="true" focusable="false" size={17} strokeWidth={1.8} />
         <Command.Input
