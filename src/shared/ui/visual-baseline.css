@@ -16190,7 +16190,7 @@ body,
   min-height: var(--v19b-viewport-height) !important;
   height: var(--v19b-viewport-height) !important;
   display: grid !important;
-  grid-template-rows: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+  grid-template-rows: auto auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
   gap: var(--v19b-size-16) !important;
   padding: var(--v19b-size-16) var(--v19b-size-8) !important;
   border: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
