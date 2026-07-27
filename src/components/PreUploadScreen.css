@@ -1326,11 +1326,14 @@
   }
 
   [data-create-submission-surface="preupload-blue"] .v19-preupload-footer {
+    bottom: auto;
     gap: var(--v19b-size-8);
     grid-template-columns: minmax(0, 1fr);
     order: 3;
     padding: var(--v19b-size-8) 0
       max(var(--v19b-size-8), env(safe-area-inset-bottom));
+    position: static;
+    z-index: auto;
   }
 
   [data-create-submission-surface="preupload-blue"]

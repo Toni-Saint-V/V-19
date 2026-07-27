@@ -663,6 +663,7 @@ function FormField({
 }: FormFieldProps) {
   const fieldContract = useContext(QuestionnaireFieldUiContext);
   const [isOpen, setIsOpen] = useState(false);
+  const [optionsOpenAbove, setOptionsOpenAbove] = useState(false);
   const [quickOptionsExpanded, setQuickOptionsExpanded] = useState(() => !value);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const [optionQuery, setOptionQuery] = useState("");
@@ -804,12 +805,39 @@ function FormField({
       : undefined;
   function closeOptions({ returnFocus = false } = {}) {
     setIsOpen(false);
+    setOptionsOpenAbove(false);
     setActiveOptionIndex(-1);
     setOptionQuery("");
     if (returnFocus) optionTriggerRef.current?.focus();
   }
 
   function openOptions(edge: "first" | "last" = "first") {
+    const triggerRect = optionTriggerRef.current?.getBoundingClientRect();
+    if (triggerRect) {
+      const viewportMargin = 12;
+      const gap = 6;
+      const estimatedHeight = Math.min(
+        filteredOptions.length * 40 + (usesOptionSearch ? 60 : 12),
+        220,
+      );
+      const mobileFooter = document.querySelector<HTMLElement>(
+        '[data-testid="questionnaire-mobile-footer"]',
+      );
+      const visibleFooterTop =
+        mobileFooter && window.getComputedStyle(mobileFooter).display !== "none"
+          ? mobileFooter.getBoundingClientRect().top
+          : window.innerHeight;
+      const availableBelow =
+        Math.min(window.innerHeight, visibleFooterTop) -
+        triggerRect.bottom -
+        viewportMargin -
+        gap;
+      const availableAbove = triggerRect.top - viewportMargin - gap;
+      setOptionsOpenAbove(
+        availableBelow < Math.min(estimatedHeight, 180) &&
+          availableAbove > availableBelow,
+      );
+    }
     setIsOpen(true);
     setActiveOptionIndex(edge === "last" ? Math.max(filteredOptions.length - 1, 0) : 0);
   }
@@ -1096,7 +1124,9 @@ function FormField({
               {isOpen ? (
                 <motion.div
                   animate={{ opacity: 1, y: 0 }}
-                  className="v19-questionnaire-dropdown"
+                  className={`v19-questionnaire-dropdown ${
+                    optionsOpenAbove ? "is-upward" : ""
+                  }`}
                   exit={{ opacity: 0, y: -4 }}
                   initial={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.15 }}

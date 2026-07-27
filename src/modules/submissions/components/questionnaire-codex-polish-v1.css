@@ -629,6 +629,12 @@
   padding: var(--v19b-size-0) var(--v19b-size-24) var(--v19b-size-16);
 }
 
+.vf-figma-questionnaire-screen.codex-polish-v1
+  .v19-questionnaire-dropdown.is-upward {
+  top: auto;
+  bottom: calc(100% + var(--v19b-size-6));
+}
+
 .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-mobile-footer {
   display: none;
 }
