@@ -31,6 +31,18 @@ export type WorkspaceExperienceSettingsScreenProps = {
   usesSupabase?: boolean;
 };
 
+function activeParameterLabel(count: number) {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return `${count} активных параметров`;
+  }
+  if (lastDigit === 1) return `${count} активный параметр`;
+  if (lastDigit >= 2 && lastDigit <= 4) return `${count} активных параметра`;
+  return `${count} активных параметров`;
+}
+
 export function WorkspaceExperienceSettingsScreen({
   currentIdentity,
   instrumentAgentInteractions = false,
@@ -106,7 +118,7 @@ export function WorkspaceExperienceSettingsScreen({
         </div>
         <div
           className="v19-settings-score"
-          aria-label={`${activeCount} активных параметра`}
+          aria-label={activeParameterLabel(activeCount)}
         >
           <span>{activeCount}</span>
           <small>активно</small>

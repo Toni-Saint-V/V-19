@@ -467,7 +467,7 @@ export function V19SideMenu({
               role === "agent" ? "shell.navigate-settings" : undefined
             }
             className="ops-session v19-ds-side-menu-profile v19-agent-sidebar-profile"
-            aria-label="Открыть профиль"
+            aria-label="Открыть настройки"
             variant="ghost"
             onClick={() => {
               settingsItem?.onClick();
