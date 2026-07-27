@@ -30892,6 +30892,12 @@ section[data-testid="agent-actions-screen"]
     min-height: calc(var(--vf-ref-size-420px) + var(--vf-ref-size-4px)) !important;
   }
 
+  .access-shell[data-access-mode="pending"]
+    .access-layout:not(:has(#workspace-register-title))
+    .access-card {
+    min-height: auto !important;
+  }
+
   .access-layout:not(:has(#workspace-register-title)) .access-field {
     position: relative;
     padding-bottom: var(--vf-ref-size-18px);
