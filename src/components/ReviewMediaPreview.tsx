@@ -13,12 +13,14 @@ export type ReviewMediaPreviewState = {
 type ReviewMediaPreviewProps = {
   alt: string;
   file?: SubmissionFile;
+  generationKey?: string;
   label: string;
   preview: ReviewMediaPreviewState;
   testId: string;
   transform?: string;
   variant: "active" | "reference" | "single";
   onError: () => void;
+  onReady?: () => void;
   onRetry?: () => void;
 };
 
@@ -29,16 +31,6 @@ function fileName(file?: SubmissionFile) {
 function isPdfFile(file?: SubmissionFile) {
   const name = fileName(file).toLocaleLowerCase();
   return file?.mimeType === "application/pdf" || name.endsWith(".pdf");
-}
-
-function needsExternalViewer(file?: SubmissionFile) {
-  const name = fileName(file).toLocaleLowerCase();
-  return (
-    file?.mimeType === "image/heic" ||
-    file?.mimeType === "image/heif" ||
-    name.endsWith(".heic") ||
-    name.endsWith(".heif")
-  );
 }
 
 function unavailableCopy(
@@ -78,21 +70,37 @@ function LoadingPreviewState() {
 export function ReviewMediaPreview({
   alt,
   file,
+  generationKey,
   label,
   preview,
   testId,
   transform,
   variant,
   onError,
+  onReady,
   onRetry,
 }: ReviewMediaPreviewProps) {
   const previewUrl = preview.status === "ready" ? preview.url : undefined;
-  const [loadedMediaUrl, setLoadedMediaUrl] = useState<string | null>(null);
+  const renderGenerationKey =
+    generationKey ??
+    [file?.id ?? "missing", file?.storagePath ?? "no-path", previewUrl ?? "no-url"].join(
+      ":",
+    );
+  const latestGenerationRef = useRef(renderGenerationKey);
+  const onErrorRef = useRef(onError);
+  const onReadyRef = useRef(onReady);
+  latestGenerationRef.current = renderGenerationKey;
+  onErrorRef.current = onError;
+  onReadyRef.current = onReady;
+  const [loadedMediaGeneration, setLoadedMediaGeneration] = useState<string | null>(
+    null,
+  );
   const pdfObjectRef = useRef<HTMLObjectElement | null>(null);
   const pdfFile = isPdfFile(file);
-  const externalViewer = needsExternalViewer(file);
-  const embeddedMedia = Boolean(previewUrl && !externalViewer && !pdfFile);
-  const mediaReady = Boolean(previewUrl && loadedMediaUrl === previewUrl);
+  const embeddedMedia = Boolean(previewUrl);
+  const mediaReady = Boolean(
+    previewUrl && loadedMediaGeneration === renderGenerationKey,
+  );
   const mediaPending =
     preview.status === "idle" ||
     preview.status === "loading" ||
@@ -102,25 +110,74 @@ export function ReviewMediaPreview({
   useEffect(() => {
     const object = pdfObjectRef.current;
     if (!object || !pdfFile) return;
-    object.addEventListener("error", onError);
-    return () => object.removeEventListener("error", onError);
-  }, [onError, pdfFile, previewUrl]);
+    const handleObjectError = () => {
+      if (
+        !object.isConnected ||
+        latestGenerationRef.current !== renderGenerationKey
+      ) {
+        return;
+      }
+      setLoadedMediaGeneration(null);
+      onErrorRef.current();
+    };
+    object.addEventListener("error", handleObjectError);
+    return () => object.removeEventListener("error", handleObjectError);
+  }, [pdfFile, renderGenerationKey]);
 
   const handleImageLoad = async (event: SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget;
     const loadedUrl = previewUrl;
+    const loadedGeneration = renderGenerationKey;
     if (!loadedUrl) return;
 
     if (typeof image.decode === "function") {
       try {
         await image.decode();
       } catch {
-        // A completed load can still be rendered when optional decoding rejects.
+        if (
+          image.isConnected &&
+          latestGenerationRef.current === loadedGeneration
+        ) {
+          setLoadedMediaGeneration(null);
+          onErrorRef.current();
+        }
+        return;
       }
     }
 
-    if (image.getAttribute("src") !== loadedUrl) return;
-    setLoadedMediaUrl(loadedUrl);
+    if (
+      !image.isConnected ||
+      latestGenerationRef.current !== loadedGeneration ||
+      image.getAttribute("src") !== loadedUrl
+    ) {
+      return;
+    }
+    setLoadedMediaGeneration(loadedGeneration);
+    onReadyRef.current?.();
+  };
+
+  const handlePdfLoad = () => {
+    const object = pdfObjectRef.current;
+    if (
+      !previewUrl ||
+      !object?.isConnected ||
+      latestGenerationRef.current !== renderGenerationKey
+    ) {
+      return;
+    }
+    setLoadedMediaGeneration(renderGenerationKey);
+    onReadyRef.current?.();
+  };
+
+  const handleMediaError = (event: SyntheticEvent<HTMLImageElement>) => {
+    if (
+      !event.currentTarget.isConnected ||
+      latestGenerationRef.current !== renderGenerationKey
+    ) {
+      return;
+    }
+    setLoadedMediaGeneration(null);
+    onErrorRef.current();
   };
 
   return (
@@ -141,25 +198,22 @@ export function ReviewMediaPreview({
           <LoadingPreviewState />
         ) : previewUrl ? (
           pdfFile ? (
-            <object
-              aria-label={alt}
-              className="is-ready"
-              data={previewUrl}
-              ref={pdfObjectRef}
-              type="application/pdf"
-            >
-              <a href={previewUrl} rel="noreferrer" target="_blank">
-                Открыть оригинал
-              </a>
-            </object>
-          ) : externalViewer ? (
-            <div className="v19-review-preview-state">
-              <ShieldCheck aria-hidden="true" />
-              <strong>Оригинал готов</strong>
-              <a href={previewUrl} rel="noreferrer" target="_blank">
-                Открыть
-              </a>
-            </div>
+            <>
+              <object
+                aria-label={alt}
+                className={mediaReady ? "is-ready" : "is-loading"}
+                data={previewUrl}
+                key={renderGenerationKey}
+                onLoad={handlePdfLoad}
+                ref={pdfObjectRef}
+                type="application/pdf"
+              >
+                <a href={previewUrl} rel="noreferrer" target="_blank">
+                  Открыть оригинал
+                </a>
+              </object>
+              {mediaReady ? null : <LoadingPreviewState />}
+            </>
           ) : (
             <>
               <img
@@ -168,8 +222,8 @@ export function ReviewMediaPreview({
                 data-testid={testId}
                 decoding="async"
                 draggable={false}
-                key={previewUrl}
-                onError={onError}
+                key={renderGenerationKey}
+                onError={handleMediaError}
                 onLoad={(event) => void handleImageLoad(event)}
                 src={previewUrl}
                 style={transform ? { transform } : undefined}

@@ -1006,9 +1006,7 @@
   .v19-review-details-scroll {
     padding: var(--v19b-size-10) var(--v19b-size-16)
       calc(var(--v19b-size-144) + env(safe-area-inset-bottom));
-    scroll-padding-bottom: calc(
-      var(--v19b-size-144) + env(safe-area-inset-bottom)
-    );
+    scroll-padding-bottom: calc(var(--v19b-size-144) + env(safe-area-inset-bottom));
   }
 
   .v19-review-status-strip {
@@ -1173,7 +1171,7 @@
 }
 
 .v19-review-preview-state button {
-  min-height: var(--v19b-size-40);
+  min-height: var(--v19b-size-44);
   padding: var(--v19b-size-0) var(--v19b-size-12);
   border: var(--v19b-size-1) solid var(--v19b-color-border-selected);
   border-radius: var(--v19b-radius-control);
@@ -1276,11 +1274,7 @@
     color-mix(in srgb, var(--v19b-dot-warning) 54%, transparent);
   border-left-width: var(--v19b-size-4);
   border-radius: var(--v19b-radius-panel);
-  background: color-mix(
-    in srgb,
-    var(--v19b-dot-warning) 9%,
-    var(--v19b-color-panel)
-  );
+  background: color-mix(in srgb, var(--v19b-dot-warning) 9%, var(--v19b-color-panel));
 }
 
 .v19-review-corrected-issues > header {
@@ -1341,11 +1335,7 @@
   border: var(--v19b-size-1) solid
     color-mix(in srgb, var(--v19b-dot-warning) 30%, var(--v19b-color-border));
   border-radius: var(--v19b-radius-control);
-  background: color-mix(
-    in srgb,
-    var(--v19b-dot-warning) 4%,
-    var(--v19b-color-control)
-  );
+  background: color-mix(in srgb, var(--v19b-dot-warning) 4%, var(--v19b-color-control));
 }
 
 .v19-review-corrected-issue-list article > div {
@@ -1512,7 +1502,6 @@
     animation-iteration-count: var(--v19b-z-base) !important;
   }
 }
-
 
 /* Readiness cockpit */
 .v19-review-readiness {
@@ -1805,5 +1794,579 @@
 
   .v19-review-questionnaire-entry button {
     width: var(--v19b-size-full);
+  }
+}
+
+/* Focused admin review: only the protected passport and selfie originals,
+   their explicit confirmation, and the final decision remain visible. */
+.v19-review-workspace.is-media-focus {
+  overflow: hidden;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-header-applicant {
+  display: block;
+  width: min(var(--v19b-size-240), 52vw);
+  max-width: var(--v19b-size-full);
+  min-height: var(--v19b-size-44);
+  overflow: hidden;
+  margin-bottom: var(--v19b-size-2);
+  padding: var(--v19b-size-0) var(--v19b-size-24) var(--v19b-size-0) var(--v19b-size-0);
+  border: var(--v19b-size-0);
+  color: var(--v19b-color-text-faint);
+  background: transparent;
+  font: inherit;
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-row);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-main {
+  display: grid;
+  min-height: var(--v19b-size-0);
+  flex: 1;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  grid-template-rows: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  overflow: hidden;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-media-pane {
+  height: auto;
+  min-height: var(--v19b-size-0);
+  border-right: var(--v19b-size-0);
+  border-bottom: var(--v19b-size-0);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-media-stage {
+  min-height: var(--v19b-size-0);
+  padding: var(--v19b-size-8);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-media-switcher {
+  padding: var(--v19b-size-8) var(--v19b-size-12);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-media-actions {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  gap: var(--v19b-size-8);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-media-tabs {
+  max-width: var(--v19b-size-full);
+}
+
+.v19-review-file-actions {
+  display: flex;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  gap: var(--v19b-size-6);
+}
+
+.v19-review-file-approve {
+  display: inline-flex;
+  min-width: var(--v19b-size-40);
+  min-height: var(--v19b-size-40);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19b-size-8);
+  padding: var(--v19b-size-0) var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-deep-border);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-primary-deep);
+  font: inherit;
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  white-space: nowrap;
+  transition:
+    color var(--v19b-motion-fast),
+    border-color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    opacity var(--v19b-motion-fast),
+    transform var(--v19b-motion-fast);
+}
+
+.v19-review-file-approve:hover {
+  border-color: var(--v19b-color-primary-bright);
+  background: var(--v19b-color-primary);
+}
+
+.v19-review-file-approve:active {
+  transform: var(--v19b-transform-press);
+}
+
+.v19-review-file-approve:disabled {
+  cursor: not-allowed;
+  border-color: var(--v19b-color-border-strong);
+  color: var(--v19b-color-text-35);
+  background: var(--v19b-color-control);
+  opacity: var(--v19b-opacity-disabled);
+}
+
+.v19-review-file-approve.is-approved:disabled {
+  border-color: var(--v19b-color-primary-deep-border);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-primary-deep);
+  opacity: var(--v19b-opacity-full);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-details-pane {
+  display: grid;
+  min-height: var(--v19b-size-0);
+  grid-template-columns:
+    minmax(var(--v19b-size-220), var(--v19b-grid-fr))
+    minmax(var(--v19b-size-320), var(--v19b-size-420));
+  overflow: hidden;
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-details-scroll {
+  min-height: var(--v19b-size-0);
+  overflow: hidden;
+  padding: var(--v19b-size-8);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-confirmation {
+  min-height: var(--v19b-size-56);
+  margin: var(--v19b-size-0);
+  padding: var(--v19b-size-8) var(--v19b-size-12);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-decision {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  gap: var(--v19b-size-6);
+  padding: var(--v19b-size-8) var(--v19b-size-12);
+  border-top: var(--v19b-size-0);
+  box-shadow: none;
+}
+
+@media (max-width: 767px) {
+  .v19-review-workspace.is-media-focus .v19-review-header {
+    position: static;
+    padding: var(--v19b-size-8) var(--v19b-size-12);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-header-applicant {
+    width: min(var(--v19b-size-220), 48vw);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-stage {
+    padding: var(--v19b-size-4) var(--v19b-size-8);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-compare {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    grid-template-rows: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    gap: var(--v19b-size-4);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-switcher {
+    padding: var(--v19b-size-6) var(--v19b-size-8);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-actions {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    gap: var(--v19b-size-6);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-tabs {
+    width: var(--v19b-size-full);
+    overflow: hidden;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-tabs button {
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-36);
+    flex: 1;
+    padding: var(--v19b-size-0) var(--v19b-size-6);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-file-actions {
+    width: var(--v19b-size-full);
+  }
+
+  .v19-review-workspace.is-media-focus
+    .v19-review-file-actions
+    :is(.v19-review-file-remark, .v19-review-file-approve) {
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-40);
+    flex: 1;
+    padding: var(--v19b-size-0) var(--v19b-size-8);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-details-pane {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    grid-template-rows: auto auto;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-details-scroll {
+    overflow: hidden;
+    padding: var(--v19b-size-6) var(--v19b-size-8);
+    scroll-padding-bottom: var(--v19b-size-0);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-confirmation {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+    min-height: var(--v19b-size-48);
+    gap: var(--v19b-size-8);
+    padding: var(--v19b-size-4) var(--v19b-size-8);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-confirmation button {
+    width: auto;
+    min-height: var(--v19b-size-40);
+    padding: var(--v19b-size-0) var(--v19b-size-10);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-decision {
+    padding: var(--v19b-size-6) var(--v19b-size-8)
+      max(var(--v19b-size-6), env(safe-area-inset-bottom));
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-decision-actions button {
+    min-height: var(--v19b-size-44);
+  }
+}
+
+@media (max-width: 359px) {
+  .v19-review-workspace.is-media-focus .v19-review-decision-actions {
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-decision-actions button {
+    width: auto;
+  }
+}
+
+/* Focused passport comparison: the protected original stays in place while
+   the administrator swipes through the eight values being verified. */
+.v19-review-workspace.is-media-focus .v19-review-header {
+  grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+}
+
+.v19-review-workspace.is-media-focus .v19-review-back {
+  min-width: var(--v19b-size-44);
+  min-height: var(--v19b-size-44);
+  gap: var(--v19b-size-6);
+  padding: var(--v19b-size-0) var(--v19b-size-12);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-media-pane {
+  display: grid;
+  grid-template-rows: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto auto;
+  overflow: hidden;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-strip {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  gap: var(--v19b-size-6);
+  padding: var(--v19b-size-6) var(--v19b-size-12) var(--v19b-size-8);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+  background: var(--v19b-color-page);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-strip > header {
+  display: flex;
+  min-height: var(--v19b-size-20);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v19b-size-8);
+  color: var(--v19b-color-text-faint);
+  font-size: var(--v19b-size-10);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-strip > header strong {
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-title);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-carousel {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  grid-auto-columns: clamp(var(--v19b-size-240), 31vw, var(--v19b-size-320));
+  grid-auto-flow: column;
+  gap: var(--v19b-size-8);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--v19b-size-2) var(--v19b-size-2) var(--v19b-size-6);
+  scroll-behavior: smooth;
+  scroll-padding-inline: var(--v19b-size-2);
+  scroll-snap-type: x mandatory;
+  scrollbar-color: var(--v19b-color-border-selected) transparent;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-carousel:focus-visible {
+  border-radius: var(--v19b-radius-control);
+  outline: none;
+  box-shadow: var(--v19b-focus-ring);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-card {
+  min-height: var(--v19b-size-80);
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto auto;
+  gap: var(--v19b-size-6);
+  padding: var(--v19b-size-8);
+  scroll-margin: var(--v19b-size-0);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  transform: none;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-card:hover {
+  transform: none;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-card.is-approved {
+  border-color: var(--v19b-color-primary-deep-border);
+  background: var(--v19b-color-primary-soft-20);
+}
+
+.v19-review-workspace.is-media-focus
+  :is(.v19-review-field-approve, .v19-review-field-remark) {
+  display: inline-flex;
+  min-width: var(--v19b-size-44);
+  min-height: var(--v19b-size-44);
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19b-size-6);
+  border-radius: var(--v19b-radius-control);
+  font: inherit;
+  font-size: var(--v19b-size-10);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-review-workspace.is-media-focus button.v19-review-field-remark {
+  min-height: var(--v19b-size-44) !important;
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-approve {
+  padding: var(--v19b-size-0) var(--v19b-size-10);
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-deep-border);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-primary-deep);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-status.is-approved {
+  min-height: var(--v19b-size-44);
+  border-color: var(--v19b-color-primary-deep-border);
+  color: var(--v19b-color-primary-text);
+  background: var(--v19b-color-primary-soft-20);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-copy {
+  gap: var(--v19b-size-3);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-label {
+  font-size: var(--v19b-size-9);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-field-copy strong {
+  font-size: var(--v19b-size-14);
+}
+
+.v19-review-workspace.is-media-focus
+  :is(
+    .v19-review-media-tabs button,
+    .v19-review-file-remark,
+    .v19-review-file-approve,
+    .v19-review-confirmation button,
+    .v19-review-decision-actions button
+  ) {
+  min-height: var(--v19b-size-44);
+}
+
+.v19-review-workspace.is-media-focus .v19-review-confirmation p {
+  overflow: hidden;
+  max-width: 62ch;
+  margin-top: var(--v19b-size-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .v19-review-workspace.is-media-focus .v19-review-field-strip {
+    padding: var(--v19b-size-4) var(--v19b-size-8) var(--v19b-size-6);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-field-carousel {
+    grid-auto-columns: min(78vw, var(--v19b-size-288));
+    gap: var(--v19b-size-6);
+    padding-bottom: var(--v19b-size-4);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-field-card {
+    min-height: var(--v19b-size-72);
+    padding: var(--v19b-size-6);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-field-status {
+    position: absolute;
+    width: var(--v19b-size-1);
+    height: var(--v19b-size-1);
+    min-height: var(--v19b-size-1);
+    overflow: hidden;
+    clip-path: inset(var(--v19b-size-half));
+    white-space: nowrap;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-tabs {
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-tabs button {
+    min-width: var(--v19b-size-92);
+    min-height: var(--v19b-size-44);
+    flex: 1 0 auto;
+  }
+
+  .v19-review-workspace.is-media-focus
+    .v19-review-file-actions
+    :is(.v19-review-file-remark, .v19-review-file-approve),
+  .v19-review-workspace.is-media-focus .v19-review-confirmation button {
+    min-height: var(--v19b-size-44);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-confirmation {
+    min-height: var(--v19b-size-56);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-confirmation p {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 359px) {
+  .v19-review-workspace.is-media-focus .v19-review-back span {
+    position: absolute;
+    width: var(--v19b-size-1);
+    height: var(--v19b-size-1);
+    overflow: hidden;
+    clip-path: inset(var(--v19b-size-half));
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-back {
+    padding: var(--v19b-size-0);
+  }
+}
+
+@media (min-width: 560px) and (max-height: 560px) {
+  .v19-review-workspace.is-media-focus .v19-review-header {
+    min-height: var(--v19b-size-56);
+    padding: var(--v19b-size-6) var(--v19b-size-12);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-main {
+    grid-template-rows:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19b-size-64);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-heading {
+    display: grid;
+    grid-template-columns:
+      minmax(var(--v19b-size-160), var(--v19b-size-240))
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    align-items: center;
+    gap: var(--v19b-size-12);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-header-applicant {
+    width: var(--v19b-size-full);
+    margin-bottom: var(--v19b-size-0);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-pane {
+    grid-template-columns:
+      minmax(var(--v19b-size-240), var(--v19b-grid-fr))
+      minmax(var(--v19b-size-320), var(--v19b-grid-fr));
+    grid-template-rows: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-stage {
+    grid-row: 1 / span 2;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-field-strip {
+    min-height: var(--v19b-size-0);
+    grid-column: 2;
+    grid-row: 1;
+    gap: var(--v19b-size-2);
+    padding: var(--v19b-size-2) var(--v19b-size-8) var(--v19b-size-4);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-field-strip > header {
+    min-height: var(--v19b-size-16);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-field-carousel {
+    padding-top: var(--v19b-size-0);
+    padding-bottom: var(--v19b-size-2);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-field-card {
+    min-height: var(--v19b-size-64);
+    padding: var(--v19b-size-4);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-switcher {
+    grid-column: 2;
+    grid-row: 2;
+    padding: var(--v19b-size-4) var(--v19b-size-8);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-media-actions {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    gap: var(--v19b-size-4);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-details-pane {
+    height: var(--v19b-size-64);
+    grid-template-columns:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19b-size-320);
+    grid-template-rows: auto;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-details-scroll {
+    padding: var(--v19b-size-4) var(--v19b-size-8);
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-confirmation {
+    min-height: var(--v19b-size-56);
+    padding: var(--v19b-size-4) var(--v19b-size-8);
+  }
+
+  .v19-review-workspace.is-media-focus
+    .v19-review-confirmation
+    #passport-review-completion-reason {
+    position: absolute;
+    width: var(--v19b-size-1);
+    height: var(--v19b-size-1);
+    overflow: hidden;
+    clip-path: inset(var(--v19b-size-half));
+    white-space: nowrap;
+  }
+
+  .v19-review-workspace.is-media-focus .v19-review-decision {
+    min-height: var(--v19b-size-64);
+    padding: var(--v19b-size-6) var(--v19b-size-8);
   }
 }

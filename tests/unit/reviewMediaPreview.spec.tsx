@@ -94,12 +94,14 @@ describe("ReviewMediaPreview", () => {
     const decode = new Promise<void>((resolve) => {
       finishDecode = resolve;
     });
+    const onReady = vi.fn();
     const props = {
       alt: "Оригинал загранпаспорта",
       label: "Паспорт",
       testId: "protected-media-preview-passport_scan",
       variant: "single" as const,
       onError: vi.fn(),
+      onReady,
     };
     const { rerender } = render(
       <ReviewMediaPreview
@@ -130,6 +132,75 @@ describe("ReviewMediaPreview", () => {
     });
     expect(currentImage).toHaveAttribute("src", "blob:new-passport");
     expect(currentImage).toHaveClass("is-loading");
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  test("ignores a stale decode when the file generation changes at the same URL", async () => {
+    let finishDecode!: () => void;
+    const decode = new Promise<void>((resolve) => {
+      finishDecode = resolve;
+    });
+    const onReady = vi.fn();
+    const props = {
+      alt: "Оригинал загранпаспорта",
+      label: "Паспорт",
+      preview: { status: "ready" as const, url: "blob:shared-passport" },
+      testId: "protected-media-preview-passport_scan",
+      variant: "single" as const,
+      onError: vi.fn(),
+      onReady,
+    };
+    const { rerender } = render(
+      <ReviewMediaPreview {...props} generationKey="applicant-a:request-0" />,
+    );
+    const oldImage = screen.getByRole("img", { name: "Оригинал загранпаспорта" });
+    Object.defineProperty(oldImage, "decode", {
+      configurable: true,
+      value: () => decode,
+    });
+    fireEvent.load(oldImage);
+
+    rerender(
+      <ReviewMediaPreview {...props} generationKey="applicant-b:request-0" />,
+    );
+    await act(async () => {
+      finishDecode();
+      await decode;
+    });
+
+    const currentImage = screen.getByRole("img", {
+      name: "Оригинал загранпаспорта",
+    });
+    expect(currentImage).not.toBe(oldImage);
+    expect(currentImage).toHaveClass("is-loading");
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  test("fails closed when browser image decoding rejects", async () => {
+    const onError = vi.fn();
+    const onReady = vi.fn();
+    render(
+      <ReviewMediaPreview
+        alt="Оригинал загранпаспорта"
+        label="Паспорт"
+        preview={{ status: "ready", url: "blob:decode-failure" }}
+        testId="protected-media-preview-passport_scan"
+        variant="single"
+        onError={onError}
+        onReady={onReady}
+      />,
+    );
+    const image = screen.getByRole("img", { name: "Оригинал загранпаспорта" });
+    Object.defineProperty(image, "decode", {
+      configurable: true,
+      value: () => Promise.reject(new Error("decode failed")),
+    });
+
+    fireEvent.load(image);
+
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect(onReady).not.toHaveBeenCalled();
+    expect(image).toHaveClass("is-loading");
   });
 
   test("replaces the image element when the preview URL changes", () => {
@@ -161,6 +232,41 @@ describe("ReviewMediaPreview", () => {
     expect(currentImage).not.toBe(oldImage);
     expect(currentImage).toHaveAttribute("src", "blob:new-passport");
     expect(currentImage).toHaveClass("is-loading");
+  });
+
+  test("requires an actual HEIC image load before reporting the original ready", async () => {
+    const onReady = vi.fn();
+    render(
+      <ReviewMediaPreview
+        alt="Оригинал паспорта HEIC"
+        file={
+          {
+            applicantId: "applicant-1",
+            generatedFileName: "passport.heic",
+            id: "passport-heic",
+            mimeType: "image/heic",
+            status: "pending_review",
+            type: "passport_scan",
+          } satisfies SubmissionFile
+        }
+        label="Паспорт"
+        preview={{ status: "ready", url: "blob:passport-heic" }}
+        testId="protected-media-preview-passport_scan"
+        variant="single"
+        onError={vi.fn()}
+        onReady={onReady}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "Оригинал паспорта HEIC" });
+    expect(image).toHaveAttribute("src", "blob:passport-heic");
+    expect(image).toHaveClass("is-loading");
+    expect(onReady).not.toHaveBeenCalled();
+
+    fireEvent.load(image);
+
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+    expect(image).toHaveClass("is-ready");
   });
 
   test("announces unavailable protected media", () => {
@@ -273,6 +379,9 @@ describe("ReviewMediaPreview", () => {
     const closeRule = ruleBodies(".v19-remark-form-close")[0];
     expect(closeRule).toContain("min-width: var(--v19b-size-44)");
     expect(closeRule).toContain("min-height: var(--v19b-size-44)");
+    expect(ruleBodies(".v19-review-preview-state button")).toContainEqual(
+      expect.stringContaining("min-height: var(--v19b-size-44)"),
+    );
   });
 
   test("preserves warning and completed feedback without relying on icons", () => {

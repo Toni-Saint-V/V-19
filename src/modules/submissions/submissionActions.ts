@@ -28,6 +28,7 @@ import {
 import { defaultLocalAgentOwnerId } from "./ownership";
 import {
   CANONICAL_FRONTEND_MEDIA_TYPES,
+  hasCanonicalAcceptedMediaReview,
   isCanonicalFrontendMediaType,
   isCanonicalSubmissionStatus,
   isRejectedLegacyMediaType,
@@ -318,12 +319,7 @@ export function approvePassportReviewSectionForAdmin(
       field && (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
   );
   const hasFileChanges = requiredFiles.some(
-    (file) =>
-      file &&
-      (file.status !== "accepted" ||
-        file.reviewStatus !== "accepted" ||
-        !file.reviewedAtIso ||
-        !file.reviewedBy),
+    (file) => file && !hasCanonicalAcceptedMediaReview(file),
   );
   const hasIssueChanges = fixedPassportIssues.length > 0;
   if (!hasFieldChanges && !hasFileChanges && !hasIssueChanges) {
@@ -360,12 +356,7 @@ export function approvePassportReviewSectionForAdmin(
       if (file.applicantId !== applicant.id || !requiredMediaTypeSet.has(file.type)) {
         return file;
       }
-      if (
-        file.status === "accepted" &&
-        file.reviewStatus === "accepted" &&
-        file.reviewedAtIso &&
-        file.reviewedBy
-      ) {
+      if (hasCanonicalAcceptedMediaReview(file)) {
         return file;
       }
       return {
@@ -376,11 +367,7 @@ export function approvePassportReviewSectionForAdmin(
         reviewStatus: "accepted" as const,
       };
     }),
-    issues: submission.issues.map((issue) =>
-      issue.status === "fixed_by_agent" && passportIssueInScope(issue)
-        ? { ...issue, status: "closed_by_admin" as const }
-        : issue,
-    ),
+    issues: submission.issues,
     history: [
       {
         id: `и-${submission.id}-${applicant.id}-passport-section-approved-${submission.history.length + 1}`,
@@ -389,7 +376,7 @@ export function approvePassportReviewSectionForAdmin(
         createdAt: approvedAtIso,
         source: "admin" as const,
         text: hasIssueChanges
-          ? "Администратор перепроверил паспортную секцию и закрыл исправленные замечания"
+          ? "Администратор перепроверил исправления паспортной секции"
           : "Администратор подтвердил паспортную секцию",
       },
       ...submission.history,

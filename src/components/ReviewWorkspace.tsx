@@ -10,23 +10,13 @@ import {
 } from "react";
 import { motion } from "motion/react";
 import "../shared/ui/review-workspace.css";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Download,
-  FileText,
-  Maximize2,
-  MessageSquarePlus,
-  RotateCw,
-  UserRound,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, MessageSquarePlus } from "lucide-react";
 import {
   createMediaSignedUrl,
   mediaStorageBucket,
 } from "../modules/submissions/mediaStorage";
 import { supabaseRuntimeConfig } from "../lib/supabase/config";
+import { hasCanonicalAcceptedMediaReview } from "../modules/submissions/domainContract";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
 import { getAdminReviewActions } from "../modules/submissions/status";
 import {
@@ -37,6 +27,7 @@ import {
   isAdminPassportReviewIssueInScope,
   passportReviewMediaTypesVisibleForApplicant,
   requiredPassportReviewMediaTypesForApplicant,
+  type AdminPassportReviewFieldId,
   type PassportReviewMediaType,
 } from "../modules/submissions/passportReviewContract";
 import type {
@@ -52,7 +43,6 @@ import {
   ReviewPassportFieldRow,
   type PassportReviewField,
 } from "./ReviewPassportFieldRow";
-import { ReviewReadinessPanel } from "./review/ReviewReadinessPanel";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { useReviewWorkspaceShortcuts } from "./review/useReviewWorkspaceShortcuts";
 
@@ -95,6 +85,21 @@ type OwnedVisitedMediaState = {
   types: Set<ReviewMediaType>;
 };
 
+type OwnedApprovedMediaState = {
+  ownerKey: string;
+  types: Set<ReviewMediaType>;
+};
+
+type OwnedRenderedMediaState = {
+  ownerKey: string;
+  urls: Partial<Record<ReviewMediaType, string>>;
+};
+
+type OwnedApprovedFieldState = {
+  ids: Set<AdminPassportReviewFieldId>;
+  ownerKey: string;
+};
+
 const mediaTargetsByType: Record<ReviewMediaType, ReviewMediaTarget> = {
   passport_scan: {
     alt: "Оригинал загранпаспорта",
@@ -121,6 +126,7 @@ const unavailablePreview: ReviewMediaPreviewState = {
   retryable: true,
   status: "unavailable",
 };
+const noRenderedMediaUrls: Partial<Record<ReviewMediaType, string>> = Object.freeze({});
 
 function unavailablePreviewForFile(
   file: SubmissionFile | undefined,
@@ -171,29 +177,79 @@ function reviewFieldsForApplicant(applicant?: Applicant): PassportReviewField[] 
   });
 }
 
-function reviewFileName(target: ReviewMediaTarget, file?: SubmissionFile) {
-  const missingFileLabel =
-    target.type === "passport_scan" ? "Паспорт не загружен" : `${target.label} не загружен`;
+function passportIssueInApplicantScope(
+  submission: Submission,
+  applicant: Applicant,
+  issue: Submission["issues"][number],
+) {
+  const fields = reviewFieldsForApplicant(applicant);
+  return isAdminPassportReviewIssueInScope(issue, {
+    applicantId: applicant.id,
+    fields: fields.map((field) => ({
+      id: field.id,
+      label: field.sourceLabel,
+    })),
+    mediaTypes: passportReviewMediaTypesVisibleForApplicant(submission, applicant.id),
+  });
+}
 
-  return (
-    file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel
-  );
+function passportCorrectionWasReviewed(
+  submission: Submission,
+  applicant: Applicant,
+  issue: Submission["issues"][number],
+) {
+  const correctedAt = Date.parse(issue.fixedAtIso ?? issue.createdAt);
+  if (!Number.isFinite(correctedAt)) return false;
+
+  return submission.history.some((entry) => {
+    if (
+      entry.source !== "admin" ||
+      !entry.actorId?.trim() ||
+      !entry.id.includes(`-${applicant.id}-passport-section-approved-`)
+    ) {
+      return false;
+    }
+    const reviewedAt = Date.parse(entry.createdAt ?? entry.at);
+    return Number.isFinite(reviewedAt) && reviewedAt >= correctedAt;
+  });
 }
 
 function sectionActionLabel(accepted: boolean, pending: boolean) {
-  if (accepted) return "Секция подтверждена";
+  if (accepted) return "Сохранено";
   if (pending) return "Сохраняем…";
-  return "Подтвердить паспортную секцию";
+  return "Сохранить";
 }
 
-function reviewActionLabel(
-  decision: ActionDecision | undefined,
-  pendingAction: SubmissionAction | null,
-  fallback: string,
-  pendingLabel: string,
-) {
-  if (decision && pendingAction === decision.action) return pendingLabel;
-  return decision?.label ?? fallback;
+function applicantPassportReviewCompleted(
+  submission: Submission,
+  applicant: Applicant,
+): boolean {
+  const fields = reviewFieldsForApplicant(applicant);
+  const mediaTypes = requiredPassportReviewMediaTypesForApplicant(
+    submission,
+    applicant.id,
+  );
+  const mediaFiles = mediaTypes.map((type) =>
+    submission.files.find(
+      (file) => file.applicantId === applicant.id && file.type === type,
+    ),
+  );
+  const issueInScope = (issue: Submission["issues"][number]) =>
+    passportIssueInApplicantScope(submission, applicant, issue);
+
+  return (
+    fields.every((field) => field.alreadyApproved && !field.hasError) &&
+    mediaFiles.every((file) =>
+      Boolean(file && hasCanonicalAcceptedMediaReview(file)),
+    ) &&
+    !submission.issues.some(
+      (issue) =>
+        issueInScope(issue) &&
+        (issue.status === "open" ||
+          (issue.status === "fixed_by_agent" &&
+            !passportCorrectionWasReviewed(submission, applicant, issue))),
+    )
+  );
 }
 
 export function ReviewWorkspace({
@@ -209,8 +265,6 @@ export function ReviewWorkspace({
   submissionId,
 }: ReviewWorkspaceProps) {
   const workspaceRef = useRef<HTMLDivElement | null>(null);
-  const decisionFooterRef = useRef<HTMLElement | null>(null);
-  const previewPaneRef = useRef<HTMLDivElement | null>(null);
   const mediaTabRefs = useRef<
     Partial<Record<ReviewMediaType, HTMLButtonElement | null>>
   >({});
@@ -241,10 +295,7 @@ export function ReviewWorkspace({
   const requiredMediaTypes = useMemo(
     () =>
       submission && selectedApplicantId
-        ? requiredPassportReviewMediaTypesForApplicant(
-            submission,
-            selectedApplicantId,
-          )
+        ? requiredPassportReviewMediaTypesForApplicant(submission, selectedApplicantId)
         : (["passport_scan"] as const),
     [selectedApplicantId, submission],
   );
@@ -287,6 +338,8 @@ export function ReviewWorkspace({
         file?.uploadedAtIso ?? file?.uploadedAt ?? "no-upload-time",
         file?.status ?? "no-status",
         file?.reviewStatus ?? "no-review-status",
+        file?.reviewedAtIso ?? "no-reviewed-at",
+        file?.reviewedBy ?? "no-reviewer",
       ].join(":"),
     )
     .join("|");
@@ -302,11 +355,105 @@ export function ReviewWorkspace({
     ownerKey: mediaOwnerKey,
     types: new Set([initialActiveMediaType]),
   });
-  const visitedMediaTypes =
-    ownedVisitedMedia.ownerKey === mediaOwnerKey
-      ? ownedVisitedMedia.types
-      : new Set<ReviewMediaType>([initialActiveMediaType]);
-  const [mediaRequestRevision, setMediaRequestRevision] = useState(0);
+  const visitedMediaTypes = useMemo(
+    () =>
+      ownedVisitedMedia.ownerKey === mediaOwnerKey
+        ? ownedVisitedMedia.types
+        : new Set<ReviewMediaType>([initialActiveMediaType]),
+    [initialActiveMediaType, mediaOwnerKey, ownedVisitedMedia],
+  );
+  const persistedApprovedMediaKey = protectedMedia
+    .filter(
+      ({ protectedFile }) =>
+        protectedFile && hasCanonicalAcceptedMediaReview(protectedFile),
+    )
+    .map(({ target }) => target.type)
+    .join("|");
+  const initialApprovedMediaTypes = useMemo(
+    () =>
+      new Set<ReviewMediaType>(
+        persistedApprovedMediaKey
+          ? (persistedApprovedMediaKey.split("|") as ReviewMediaType[])
+          : [],
+      ),
+    [persistedApprovedMediaKey],
+  );
+  const [ownedApprovedMedia, setOwnedApprovedMedia] = useState<OwnedApprovedMediaState>(
+    {
+      ownerKey: mediaOwnerKey,
+      types: initialApprovedMediaTypes,
+    },
+  );
+  const approvedMediaTypes =
+    ownedApprovedMedia.ownerKey === mediaOwnerKey
+      ? ownedApprovedMedia.types
+      : initialApprovedMediaTypes;
+  const [ownedRenderedMedia, setOwnedRenderedMedia] = useState<OwnedRenderedMediaState>(
+    {
+      ownerKey: mediaOwnerKey,
+      urls: {},
+    },
+  );
+  const renderedMediaUrls =
+    ownedRenderedMedia.ownerKey === mediaOwnerKey
+      ? ownedRenderedMedia.urls
+      : noRenderedMediaUrls;
+  const fieldGenerationKey = reviewFields
+    .map((field) =>
+      [
+        field.id,
+        field.sectionId,
+        field.value,
+        field.hasError ? "error" : "valid",
+        field.alreadyApproved ? "approved" : "pending",
+      ].join(":"),
+    )
+    .join("|");
+  const fieldOwnerKey = `${submissionId}:${selectedApplicantId ?? "unselected"}:${fieldGenerationKey}`;
+  const persistedApprovedFieldKey = reviewFields
+    .filter((field) => field.alreadyApproved && !field.hasError)
+    .map((field) => field.id)
+    .join("|");
+  const initialApprovedFieldIds = useMemo(
+    () =>
+      new Set<AdminPassportReviewFieldId>(
+        persistedApprovedFieldKey
+          ? (persistedApprovedFieldKey.split("|") as AdminPassportReviewFieldId[])
+          : [],
+      ),
+    [persistedApprovedFieldKey],
+  );
+  const [ownedApprovedFields, setOwnedApprovedFields] =
+    useState<OwnedApprovedFieldState>({
+      ids: initialApprovedFieldIds,
+      ownerKey: fieldOwnerKey,
+    });
+  const approvedFieldIds =
+    ownedApprovedFields.ownerKey === fieldOwnerKey
+      ? ownedApprovedFields.ids
+      : initialApprovedFieldIds;
+  const [mediaRequestRevisions, setMediaRequestRevisions] = useState<
+    Record<ReviewMediaType, number>
+  >({
+    passport_scan: 0,
+    selfie: 0,
+    selfie_2: 0,
+  });
+  const mediaRequestKeys = useMemo<Record<ReviewMediaType, string>>(
+    () => ({
+      passport_scan: `${mediaOwnerKey}:passport_scan:request-${mediaRequestRevisions.passport_scan}`,
+      selfie: `${mediaOwnerKey}:selfie:request-${mediaRequestRevisions.selfie}`,
+      selfie_2: `${mediaOwnerKey}:selfie_2:request-${mediaRequestRevisions.selfie_2}`,
+    }),
+    [
+      mediaOwnerKey,
+      mediaRequestRevisions.passport_scan,
+      mediaRequestRevisions.selfie,
+      mediaRequestRevisions.selfie_2,
+    ],
+  );
+  const latestMediaRequestKeysRef = useRef(mediaRequestKeys);
+  latestMediaRequestKeysRef.current = mediaRequestKeys;
   const initialMediaPreviews = useMemo(
     () =>
       Object.fromEntries(
@@ -319,9 +466,7 @@ export function ReviewWorkspace({
   );
   const mediaGeneration = useMemo(
     () => ({ initialMediaPreviews, protectedMedia }),
-    // The owner key fingerprints every value consumed by this async generation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mediaOwnerKey],
+    [initialMediaPreviews, protectedMedia],
   );
   const [ownedMediaPreviews, setOwnedMediaPreviews] = useState<OwnedPreviewState>({
     ownerKey: mediaOwnerKey,
@@ -331,8 +476,6 @@ export function ReviewWorkspace({
     ownedMediaPreviews.ownerKey === mediaOwnerKey
       ? ownedMediaPreviews.previews
       : initialMediaPreviews;
-  const [zoom, setZoom] = useState(100);
-  const [rotation, setRotation] = useState(0);
   const [sectionApprovalPending, setSectionApprovalPending] = useState(false);
   const [sectionApprovedLocally, setSectionApprovedLocally] = useState(false);
   const [acceptanceError, setAcceptanceError] = useState("");
@@ -351,60 +494,20 @@ export function ReviewWorkspace({
       file.applicantId === selectedApplicantId && file.type === activeMediaTarget.type,
   );
   const activePreview = mediaPreviews[activeMediaTarget.type] ?? unavailablePreview;
-  const activePreviewUrl =
-    activePreview.status === "ready" ? activePreview.url : undefined;
-  const activeMediaIsPdf = Boolean(
-    activeMediaFile?.mimeType === "application/pdf" ||
-      activeMediaFile?.originalFileName?.toLocaleLowerCase().endsWith(".pdf") ||
-      activeMediaFile?.generatedFileName?.toLocaleLowerCase().endsWith(".pdf"),
+  const activeMediaRendered = Boolean(
+    activePreview.status === "ready" &&
+    activePreview.url &&
+    renderedMediaUrls[activeMediaTarget.type] === activePreview.url,
   );
-  const activeMediaSupportsTransform = Boolean(activePreviewUrl && !activeMediaIsPdf);
   const passportMediaTarget = mediaTargetsByType.passport_scan;
   const passportMediaFile = submission?.files.find(
     (file) => file.applicantId === selectedApplicantId && file.type === "passport_scan",
   );
   const passportPreview = mediaPreviews.passport_scan ?? unavailablePreview;
   const isIdentityComparison = activeMediaTarget.type !== "passport_scan";
-  const activeMediaTransform = `scale(${zoom / 100}) rotate(${rotation}deg)`;
   const adminReviewActions = submission
     ? getAdminReviewActions(submission, "admin")
     : null;
-  const applicantReviewStates = useMemo(() => {
-    if (!submission) return [];
-
-    return submission.applicants.map((applicant) => {
-      const fields = reviewFieldsForApplicant(applicant);
-      const mediaTypes = requiredPassportReviewMediaTypesForApplicant(
-        submission,
-        applicant.id,
-      );
-      const completed =
-        fields.length === ADMIN_PASSPORT_REVIEW_FIELD_IDS.length &&
-        fields.every(
-          (field) =>
-            field.alreadyApproved &&
-            hasAdminPassportReviewValue(field.value) &&
-            !field.hasError,
-        ) &&
-        mediaTypes.every((type) =>
-          submission.files.some(
-            (file) =>
-              file.applicantId === applicant.id &&
-              file.type === type &&
-              file.status === "accepted",
-          ),
-        );
-
-      return {
-        completed,
-        id: applicant.id,
-        name: applicant.fullName,
-      };
-    });
-  }, [submission]);
-  const approvedApplicantCount = applicantReviewStates.filter(
-    (state) => state.completed,
-  ).length;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -437,43 +540,39 @@ export function ReviewWorkspace({
       ownerKey: mediaOwnerKey,
       types: new Set([initialActiveMediaType]),
     });
-    setZoom(100);
-    setRotation(0);
+    setOwnedApprovedMedia({
+      ownerKey: mediaOwnerKey,
+      types: initialApprovedMediaTypes,
+    });
+    setOwnedRenderedMedia({
+      ownerKey: mediaOwnerKey,
+      urls: {},
+    });
     setSectionApprovalPending(false);
     setSectionApprovedLocally(false);
     setAcceptanceError("");
     setReviewActionError("");
     setReviewActionSaved("");
-  }, [initialActiveMediaType, mediaOwnerKey, selectedApplicantId, submissionId]);
+  }, [
+    initialActiveMediaType,
+    initialApprovedMediaTypes,
+    mediaOwnerKey,
+    selectedApplicantId,
+    submissionId,
+  ]);
 
   useEffect(() => {
-    const footer = decisionFooterRef.current;
-    const workspace = workspaceRef.current;
-    if (!footer || !workspace) return;
-
-    const updateDecisionHeight = () => {
-      const height = Math.ceil(footer.getBoundingClientRect().height);
-      if (height > 0) {
-        workspace.style.setProperty("--v19-review-decision-height", `${height}px`);
-      }
-    };
-
-    updateDecisionHeight();
-    if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", updateDecisionHeight);
-      return () => {
-        window.removeEventListener("resize", updateDecisionHeight);
-        workspace.style.removeProperty("--v19-review-decision-height");
-      };
-    }
-
-    const observer = new ResizeObserver(updateDecisionHeight);
-    observer.observe(footer);
-    return () => {
-      observer.disconnect();
-      workspace.style.removeProperty("--v19-review-decision-height");
-    };
-  }, []);
+    sectionApprovalRunRef.current += 1;
+    setOwnedApprovedFields({
+      ids: initialApprovedFieldIds,
+      ownerKey: fieldOwnerKey,
+    });
+    setSectionApprovalPending(false);
+    setSectionApprovedLocally(false);
+    setAcceptanceError("");
+    setReviewActionError("");
+    setReviewActionSaved("");
+  }, [fieldOwnerKey, initialApprovedFieldIds]);
 
   useEffect(() => {
     const wasNestedDialogOpen = wasNestedDialogOpenRef.current;
@@ -531,6 +630,7 @@ export function ReviewWorkspace({
     );
 
     mediaGeneration.protectedMedia.forEach(({ protectedFile, target }) => {
+      const requestKey = mediaRequestKeys[target.type];
       if (
         !protectedFile ||
         !visitedMediaTypes.has(target.type) ||
@@ -555,25 +655,25 @@ export function ReviewWorkspace({
         let preview: ReviewMediaPreviewState = unavailablePreview;
         try {
           const url =
-            __V19_LOCAL_DEMO_BUILD__ &&
-            supabaseRuntimeConfig.target === "local-demo"
+            __V19_LOCAL_DEMO_BUILD__ && supabaseRuntimeConfig.target === "local-demo"
               ? (
-                  await import(
-                    "../modules/submissions/exportMediaZipLocalDemo"
-                  )
+                  await import("../modules/submissions/exportMediaZipLocalDemo")
                 ).localDemoReviewMediaUrl(target.type)
               : await createMediaSignedUrl({
                   bucket: mediaStorageBucket,
                   path: protectedFile.storagePath,
                 });
-          preview = url
-            ? { status: "ready", url }
-            : unavailablePreview;
+          preview = url ? { status: "ready", url } : unavailablePreview;
         } catch {
           preview = unavailablePreview;
         }
 
-        if (!mountedRef.current) return;
+        if (
+          !mountedRef.current ||
+          latestMediaRequestKeysRef.current[target.type] !== requestKey
+        ) {
+          return;
+        }
         setOwnedMediaPreviews((current) =>
           current.ownerKey === mediaOwnerKey
             ? {
@@ -591,43 +691,49 @@ export function ReviewWorkspace({
     mediaGeneration,
     mediaOwnerKey,
     mediaPreviews,
-    mediaRequestRevision,
+    mediaRequestKeys,
     visitedMediaTypes,
   ]);
 
   const passportIssueInScope = (issue: Submission["issues"][number]) =>
     Boolean(
-      selectedApplicantId &&
-      isAdminPassportReviewIssueInScope(issue, {
-        applicantId: selectedApplicantId,
-        fields: reviewFields.map((field) => ({
-          id: field.id,
-          label: field.sourceLabel,
-        })),
-        mediaTypes: mediaTargets.map((target) => target.type),
-      }),
+      submission &&
+      selectedApplicant &&
+      passportIssueInApplicantScope(submission, selectedApplicant, issue),
     );
   const openPassportIssueCount =
     submission?.issues.filter(
       (issue) => issue.status === "open" && passportIssueInScope(issue),
     ).length ?? 0;
-  const fixedPassportIssueCount =
-    submission?.issues.filter(
-      (issue) => issue.status === "fixed_by_agent" && passportIssueInScope(issue),
-    ).length ?? 0;
-  const closedPassportIssueCount =
-    submission?.issues.filter(
-      (issue) => issue.status === "closed_by_admin" && passportIssueInScope(issue),
-    ).length ?? 0;
-  const correctedIssuesAwaitingClosure =
-    submission?.issues.filter((issue) => issue.status === "fixed_by_agent") ?? [];
   const hasOpenPassportIssue = openPassportIssueCount > 0;
   const hasUnambiguousPrimaryApplicant = Boolean(
     submission && hasUnambiguousPrimaryApplicantForPassportReview(submission),
   );
-  const hasFixedPassportIssue = Boolean(
-    submission?.issues.some(
+  const fixedPassportIssues =
+    submission?.issues.filter(
       (issue) => issue.status === "fixed_by_agent" && passportIssueInScope(issue),
+    ) ?? [];
+  const fixedIssues =
+    submission?.issues.filter((issue) => issue.status === "fixed_by_agent") ?? [];
+  const fixedPassportIssuesAcrossSubmission =
+    submission?.applicants.flatMap((applicant) =>
+      fixedIssues
+        .filter((issue) => passportIssueInApplicantScope(submission, applicant, issue))
+        .map((issue) => ({ applicant, issue })),
+    ) ?? [];
+  const hasFixedIssueOutsidePassport =
+    fixedPassportIssuesAcrossSubmission.length !== fixedIssues.length;
+  const selectedPassportCorrectionsReviewed = Boolean(
+    submission &&
+    selectedApplicant &&
+    fixedPassportIssues.every((issue) =>
+      passportCorrectionWasReviewed(submission, selectedApplicant, issue),
+    ),
+  );
+  const allFixedPassportCorrectionsReviewed = Boolean(
+    submission &&
+    fixedPassportIssuesAcrossSubmission.every(({ applicant, issue }) =>
+      passportCorrectionWasReviewed(submission, applicant, issue),
     ),
   );
   const allFieldsFilled =
@@ -638,6 +744,10 @@ export function ReviewWorkspace({
         hasAdminPassportReviewValue(field.value) &&
         !field.hasError,
     );
+  const pendingFieldApprovalCount = reviewFields.filter(
+    (field) => !approvedFieldIds.has(field.id),
+  ).length;
+  const allFieldsApproved = allFieldsFilled && pendingFieldApprovalCount === 0;
   const confirmationMediaTypes = mediaTargets.map((target) => target.type);
   const requiredMediaFiles = requiredMediaTypes.map((type) =>
     submission?.files.find(
@@ -657,15 +767,26 @@ export function ReviewWorkspace({
   const allProtectedMediaReady = confirmationMediaStates.every(
     (status) => status === "ready",
   );
-  const pendingMediaReviewCount = confirmationMediaTypes.filter(
-    (type) => !visitedMediaTypes.has(type),
+  const allProtectedMediaRendered = confirmationMediaTypes.every((type) => {
+    const preview = mediaPreviews[type];
+    return Boolean(
+      preview?.status === "ready" &&
+      preview.url &&
+      renderedMediaUrls[type] === preview.url,
+    );
+  });
+  const pendingMediaApprovalCount = confirmationMediaTypes.filter(
+    (type) => !approvedMediaTypes.has(type),
   ).length;
-  const allProtectedMediaReviewed = pendingMediaReviewCount === 0;
+  const allProtectedMediaApproved = pendingMediaApprovalCount === 0;
+  const persistedSectionEvidenceAccepted =
+    reviewFields.every((field) => field.alreadyApproved && !field.hasError) &&
+    requiredMediaFiles.every((file) =>
+      Boolean(file && hasCanonicalAcceptedMediaReview(file)),
+    );
   const sectionAlreadyAccepted =
     sectionApprovedLocally ||
-    (reviewFields.every((field) => field.alreadyApproved) &&
-      requiredMediaFiles.every((file) => file?.status === "accepted") &&
-      !hasFixedPassportIssue);
+    (persistedSectionEvidenceAccepted && selectedPassportCorrectionsReviewed);
   const canConfirmSection = Boolean(
     selectedApplicantId &&
     submission &&
@@ -673,31 +794,26 @@ export function ReviewWorkspace({
     hasUnambiguousPrimaryApplicant &&
     onApproveSection &&
     allFieldsFilled &&
+    allFieldsApproved &&
     allProtectedMediaReady &&
-    allProtectedMediaReviewed &&
+    allProtectedMediaRendered &&
+    allProtectedMediaApproved &&
     !hasOpenPassportIssue &&
     !sectionAlreadyAccepted &&
     !sectionApprovalPending,
   );
-  const filledFieldCount = reviewFields.filter(
-    (field) => hasAdminPassportReviewValue(field.value) && !field.hasError,
-  ).length;
   const loadingMediaCount = confirmationMediaStates.filter(
     (status) => status === "loading",
   ).length;
   const unavailableMediaCount = confirmationMediaStates.filter(
     (status) => status === "unavailable",
   ).length;
-  const readyMediaCount = confirmationMediaStates.filter(
-    (status) => status === "ready",
-  ).length;
   const requiredMediaLabel = requiredMediaTypes.includes("selfie")
     ? "паспорт и оба селфи"
     : confirmationMediaTypes.length > requiredMediaTypes.length
       ? "паспорт и файлы исправлений"
       : "паспорт";
-  let completionReason =
-    `Сверьте все ${ADMIN_PASSPORT_REVIEW_FIELD_IDS.length} паспортных полей и ${requiredMediaLabel} перед подтверждением секции.`;
+  let completionReason = `Подтвердите ${requiredMediaLabel}, затем сохраните проверку.`;
   if (!selectedApplicantId) {
     completionReason = "Не выбран заявитель. Подтверждение недоступно.";
   } else if (!hasUnambiguousPrimaryApplicant) {
@@ -706,8 +822,7 @@ export function ReviewWorkspace({
   } else if (!isEditableReviewStatus) {
     completionReason = `Статус «${submission?.status ?? "неизвестно"}» доступен только для чтения.`;
   } else if (!allFieldsFilled) {
-    completionReason =
-      "Заполнены не все паспортные поля или в данных есть ошибка.";
+    completionReason = "Заполнены не все паспортные поля или в данных есть ошибка.";
   } else if (unavailableMediaCount > 0) {
     completionReason = requiredMediaTypes.includes("selfie")
       ? "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи."
@@ -716,38 +831,63 @@ export function ReviewWorkspace({
         : "Для подтверждения нужен защищённый оригинал паспорта.";
   } else if (loadingMediaCount > 0) {
     completionReason = "Загружаем защищённые оригиналы для сверки…";
-  } else if (pendingMediaReviewCount > 0) {
-    completionReason =
-      "Откройте и проверьте каждый обязательный оригинал перед подтверждением.";
+  } else if (!allProtectedMediaRendered) {
+    completionReason = "Дождитесь отображения каждого оригинала.";
+  } else if (pendingMediaApprovalCount > 0) {
+    completionReason = "Подтвердите каждый оригинал перед сохранением проверки.";
   } else if (hasOpenPassportIssue) {
     completionReason =
       "Есть открытое замечание. Сначала агент должен отправить исправление.";
+  } else if (pendingFieldApprovalCount > 0) {
+    completionReason = "Сверьте с паспортом и подтвердите каждое поле.";
   } else if (!onApproveSection) {
     completionReason = "Сохранение подтверждения не подключено.";
   } else if (sectionAlreadyAccepted) {
-    completionReason = "Паспортная секция уже подтверждена.";
+    completionReason = "Проверка паспорта и селфи уже сохранена.";
   } else if (sectionApprovalPending) {
-    completionReason = "Сохраняем подтверждение паспортной секции…";
+    completionReason = "Сохраняем проверку паспорта и селфи…";
   }
 
   const returnDecision = adminReviewActions?.returnForCorrection;
-  const acceptDecision = adminReviewActions?.acceptForExport;
-  let reviewDecisionReason = "Проверка готова к решению.";
-  if (!isEditableReviewStatus) {
-    reviewDecisionReason = `Статус «${submission?.status ?? "неизвестно"}» доступен только для чтения.`;
-  } else if (!onReviewAction) {
-    reviewDecisionReason = "Сохранение решения не подключено.";
-  } else {
-    const availableDecision =
-      acceptDecision && !acceptDecision.disabled
-        ? acceptDecision
-        : returnDecision && !returnDecision.disabled
-          ? returnDecision
+  const rawAcceptDecision = adminReviewActions?.acceptForExport;
+  const scopedCloseBlockedReason =
+    rawAcceptDecision?.action !== "close_issues_accept"
+      ? undefined
+      : hasFixedIssueOutsidePassport
+        ? "Есть исправления вне паспортной проверки. Их нельзя закрыть с этого экрана."
+        : !allFixedPassportCorrectionsReviewed || !sectionAlreadyAccepted
+          ? "Сначала сохраните проверку паспорта для каждого заявителя, затем примите подачу."
           : undefined;
-    reviewDecisionReason = availableDecision
-      ? (availableDecision.reason ?? reviewDecisionReason)
-      : (acceptDecision?.reason ?? returnDecision?.reason ?? reviewDecisionReason);
-  }
+  const acceptDecision =
+    scopedCloseBlockedReason && rawAcceptDecision
+      ? {
+          ...rawAcceptDecision,
+          disabled: true,
+          reason: scopedCloseBlockedReason,
+        }
+      : rawAcceptDecision;
+  const returnDecisionReason = !isEditableReviewStatus
+    ? `Статус «${submission?.status ?? "неизвестно"}» доступен только для чтения.`
+    : !onReviewAction
+      ? "Сохранение решения не подключено."
+      : (returnDecision?.reason ?? "Возврат доступен.");
+  const acceptDecisionReason = !isEditableReviewStatus
+    ? `Статус «${submission?.status ?? "неизвестно"}» доступен только для чтения.`
+    : !onReviewAction
+      ? "Сохранение решения не подключено."
+      : (acceptDecision?.reason ?? "Проверка готова к решению.");
+  const returnDecisionDisabled = Boolean(
+    !returnDecision ||
+    returnDecision.disabled ||
+    !onReviewAction ||
+    reviewActionPending,
+  );
+  const acceptDecisionDisabled = Boolean(
+    !acceptDecision ||
+    acceptDecision.disabled ||
+    !onReviewAction ||
+    reviewActionPending,
+  );
 
   const handleConfirmSection = async () => {
     if (!canConfirmSection || !selectedApplicantId || !onApproveSection) return;
@@ -789,8 +929,8 @@ export function ReviewWorkspace({
       if (mountedRef.current) {
         setReviewActionSaved(
           decision.action === "accept" || decision.action === "close_issues_accept"
-            ? "Подача принята и сохранена."
-            : "Возврат на исправление сохранён.",
+            ? "Подача принята"
+            : "Подача возвращена",
         );
       }
     } catch (error) {
@@ -809,7 +949,51 @@ export function ReviewWorkspace({
     }
   };
 
-  const handlePreviewError = (mediaType: ReviewMediaType) => {
+  const clearTransientMediaReview = (mediaType: ReviewMediaType) => {
+    setOwnedRenderedMedia((current) => {
+      if (current.ownerKey !== mediaOwnerKey || !current.urls[mediaType]) {
+        return current;
+      }
+      const nextUrls = { ...current.urls };
+      delete nextUrls[mediaType];
+      return { ownerKey: mediaOwnerKey, urls: nextUrls };
+    });
+    setOwnedApprovedMedia((current) => {
+      const currentTypes =
+        current.ownerKey === mediaOwnerKey ? current.types : initialApprovedMediaTypes;
+      if (initialApprovedMediaTypes.has(mediaType) || !currentTypes.has(mediaType)) {
+        return current;
+      }
+      const nextTypes = new Set(currentTypes);
+      nextTypes.delete(mediaType);
+      return { ownerKey: mediaOwnerKey, types: nextTypes };
+    });
+  };
+
+  const handleMediaReady = (
+    mediaType: ReviewMediaType,
+    renderedUrl: string | undefined,
+    requestKey: string,
+  ) => {
+    if (latestMediaRequestKeysRef.current[mediaType] !== requestKey) return;
+    const preview = mediaPreviews[mediaType];
+    if (!renderedUrl || preview?.status !== "ready" || preview.url !== renderedUrl) {
+      return;
+    }
+    setOwnedRenderedMedia((current) => {
+      if (current.ownerKey !== mediaOwnerKey) return current;
+      const currentUrls = current.urls;
+      if (currentUrls[mediaType] === renderedUrl) return current;
+      return {
+        ownerKey: mediaOwnerKey,
+        urls: { ...currentUrls, [mediaType]: renderedUrl },
+      };
+    });
+  };
+
+  const handlePreviewError = (mediaType: ReviewMediaType, requestKey: string) => {
+    if (latestMediaRequestKeysRef.current[mediaType] !== requestKey) return;
+    clearTransientMediaReview(mediaType);
     setOwnedMediaPreviews((current) =>
       current.ownerKey === mediaOwnerKey
         ? {
@@ -823,7 +1007,9 @@ export function ReviewWorkspace({
     );
   };
 
-  const handlePreviewRetry = (mediaType: ReviewMediaType) => {
+  const handlePreviewRetry = (mediaType: ReviewMediaType, requestKey: string) => {
+    if (latestMediaRequestKeysRef.current[mediaType] !== requestKey) return;
+    clearTransientMediaReview(mediaType);
     setOwnedMediaPreviews((current) =>
       current.ownerKey === mediaOwnerKey
         ? {
@@ -835,11 +1021,10 @@ export function ReviewWorkspace({
           }
         : current,
     );
-    setMediaRequestRevision((revision) => revision + 1);
-  };
-
-  const handleFullscreen = () => {
-    void previewPaneRef.current?.requestFullscreen?.().catch(() => undefined);
+    setMediaRequestRevisions((revisions) => ({
+      ...revisions,
+      [mediaType]: revisions[mediaType] + 1,
+    }));
   };
 
   const handleMediaSelect = useCallback(
@@ -857,11 +1042,75 @@ export function ReviewWorkspace({
         next.add(mediaType);
         return { ownerKey: mediaOwnerKey, types: next };
       });
-      setZoom(100);
-      setRotation(0);
     },
     [initialActiveMediaType, mediaOwnerKey],
   );
+
+  const handleMediaApprove = useCallback(
+    (mediaType: ReviewMediaType) => {
+      const mediaEntry = protectedMedia.find(
+        (entry) => entry.target.type === mediaType,
+      );
+      if (
+        !isEditableReviewStatus ||
+        mediaPreviews[mediaType]?.status !== "ready" ||
+        !mediaPreviews[mediaType]?.url ||
+        renderedMediaUrls[mediaType] !== mediaPreviews[mediaType]?.url ||
+        !mediaEntry?.protectedFile
+      ) {
+        return;
+      }
+
+      setOwnedApprovedMedia((current) => {
+        const currentTypes =
+          current.ownerKey === mediaOwnerKey
+            ? current.types
+            : initialApprovedMediaTypes;
+        if (current.ownerKey === mediaOwnerKey && currentTypes.has(mediaType)) {
+          return current;
+        }
+        const next = new Set(currentTypes);
+        next.add(mediaType);
+        return { ownerKey: mediaOwnerKey, types: next };
+      });
+    },
+    [
+      initialApprovedMediaTypes,
+      isEditableReviewStatus,
+      mediaOwnerKey,
+      mediaPreviews,
+      protectedMedia,
+      renderedMediaUrls,
+    ],
+  );
+
+  const handleFieldApprove = (field: PassportReviewField) => {
+    if (
+      !isEditableReviewStatus ||
+      !field.sectionId ||
+      !hasAdminPassportReviewValue(field.value) ||
+      field.hasError
+    ) {
+      return;
+    }
+    setOwnedApprovedFields((current) => {
+      const currentIds =
+        current.ownerKey === fieldOwnerKey ? current.ids : initialApprovedFieldIds;
+      if (currentIds.has(field.id)) return current;
+      const nextIds = new Set(currentIds);
+      nextIds.add(field.id);
+      return { ids: nextIds, ownerKey: fieldOwnerKey };
+    });
+  };
+
+  const handleFieldRemark = (
+    field?: string,
+    applicant?: string,
+    fileType?: SubmissionFileType,
+    fieldApplicantId?: string,
+  ) => {
+    onAddRemark(field, applicant, fileType, fieldApplicantId);
+  };
 
   const handleMediaTabKeyDown = (
     event: ReactKeyboardEvent<HTMLButtonElement>,
@@ -889,48 +1138,6 @@ export function ReviewWorkspace({
     mediaTabRefs.current[nextTarget.type]?.focus({ preventScroll: true });
   };
 
-  const handleNextReviewStep = useCallback(() => {
-    const nextMediaType = confirmationMediaTypes.find(
-      (type) =>
-        mediaPreviews[type]?.status !== "ready" || !visitedMediaTypes.has(type),
-    );
-    if (nextMediaType) {
-      handleMediaSelect(nextMediaType);
-      mediaTabRefs.current[nextMediaType]?.focus({ preventScroll: true });
-      return;
-    }
-
-    const nextField = reviewFields.find(
-      (field) =>
-        !field.sectionId ||
-        !hasAdminPassportReviewValue(field.value) ||
-        field.hasError,
-    );
-    if (nextField) {
-      const fieldElement = workspaceRef.current?.querySelector<HTMLElement>(
-        `[data-passport-field-id="${nextField.id}"]`,
-      );
-      fieldElement?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-      fieldElement
-        ?.querySelector<HTMLButtonElement>("button")
-        ?.focus({ preventScroll: true });
-      return;
-    }
-
-    workspaceRef.current
-      ?.querySelector<HTMLButtonElement>("#passport-review-confirm-button")
-      ?.focus({ preventScroll: true });
-  }, [
-    handleMediaSelect,
-    mediaPreviews,
-    confirmationMediaTypes,
-    reviewFields,
-    visitedMediaTypes,
-  ]);
-
   const shortcutMediaTypes = useMemo(
     () => mediaTargets.map((target) => target.type),
     [mediaTargets],
@@ -949,7 +1156,7 @@ export function ReviewWorkspace({
       aria-hidden={nestedDialogOpen ? "true" : undefined}
       aria-label="Сверка паспорта"
       aria-modal="true"
-      className="v19-review-workspace"
+      className="v19-review-workspace is-media-focus"
       exit={{ opacity: 0, scale: 0.985 }}
       inert={nestedDialogOpen ? true : undefined}
       initial={false}
@@ -965,84 +1172,41 @@ export function ReviewWorkspace({
           type="button"
         >
           <ArrowLeft aria-hidden="true" />
+          <span>Назад</span>
         </button>
         <div className="v19-review-heading">
-          <span>{selectedApplicant?.fullName ?? "Проверка документов"}</span>
+          {submission && submission.applicants.length > 1 ? (
+            <select
+              aria-label="Заявитель для проверки"
+              className="v19-review-header-applicant"
+              onChange={(event) => onApplicantChange?.(event.target.value)}
+              value={selectedApplicantId}
+            >
+              {submission.applicants.map((applicant) => (
+                <option key={applicant.id} value={applicant.id}>
+                  {applicant.fullName} —{" "}
+                  {applicantPassportReviewCompleted(submission, applicant)
+                    ? "проверено"
+                    : "проверить"}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{selectedApplicant?.fullName ?? "Проверка документов"}</span>
+          )}
           <div>
             <h1 aria-label={`Сверка паспорта · ${submissionId}`}>Сверка паспорта</h1>
             <code title={submissionId}>{submissionId}</code>
           </div>
         </div>
-        <a
-          aria-disabled={!activePreviewUrl}
-          className={`v19-review-download${activePreviewUrl ? "" : " is-disabled"}`}
-          download={
-            activeMediaFile
-              ? reviewFileName(activeMediaTarget, activeMediaFile)
-              : undefined
-          }
-          href={activePreviewUrl}
-          tabIndex={activePreviewUrl ? undefined : -1}
-        >
-          <Download aria-hidden="true" />
-          <span>Скачать</span>
-        </a>
       </header>
 
       <main className="v19-review-main">
         <section aria-label="Оригиналы документов" className="v19-review-media-pane">
-          <div className="v19-review-media-toolbar">
-            <div className="v19-review-filebar">
-              {activeMediaTarget.type === "passport_scan" ? (
-                <FileText aria-hidden="true" />
-              ) : (
-                <UserRound aria-hidden="true" />
-              )}
-              <span>{reviewFileName(activeMediaTarget, activeMediaFile)}</span>
-              <div className="v19-review-media-controls">
-                <button
-                  aria-label="Уменьшить изображение"
-                  disabled={!activeMediaSupportsTransform || zoom <= 60}
-                  onClick={() => setZoom((value) => Math.max(60, value - 10))}
-                  type="button"
-                >
-                  <ZoomOut aria-hidden="true" />
-                </button>
-                <output aria-label="Масштаб изображения">{zoom}%</output>
-                <button
-                  aria-label="Увеличить изображение"
-                  disabled={!activeMediaSupportsTransform || zoom >= 180}
-                  onClick={() => setZoom((value) => Math.min(180, value + 10))}
-                  type="button"
-                >
-                  <ZoomIn aria-hidden="true" />
-                </button>
-                <button
-                  aria-label="Повернуть изображение"
-                  disabled={!activeMediaSupportsTransform}
-                  onClick={() => setRotation((value) => (value + 90) % 360)}
-                  type="button"
-                >
-                  <RotateCw aria-hidden="true" />
-                </button>
-                <button
-                  aria-label="Открыть на весь экран"
-                  className="v19-review-fullscreen"
-                  disabled={!activePreviewUrl}
-                  onClick={handleFullscreen}
-                  type="button"
-                >
-                  <Maximize2 aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          </div>
-
           <div
             aria-labelledby={activeMediaTabId}
             className={`v19-review-media-stage${isIdentityComparison ? " is-comparison" : ""}`}
             id={mediaPanelId}
-            ref={previewPaneRef}
             role="tabpanel"
           >
             {isIdentityComparison ? (
@@ -1054,39 +1218,111 @@ export function ReviewWorkspace({
                 <ReviewMediaPreview
                   alt={passportMediaTarget.alt}
                   file={passportMediaFile}
+                  generationKey={mediaRequestKeys.passport_scan}
                   label="Паспорт"
                   preview={passportPreview}
                   testId="protected-media-preview-passport_scan"
                   variant="reference"
-                  onError={() => handlePreviewError("passport_scan")}
-                  onRetry={() => handlePreviewRetry("passport_scan")}
+                  onError={() =>
+                    handlePreviewError("passport_scan", mediaRequestKeys.passport_scan)
+                  }
+                  onReady={() =>
+                    handleMediaReady(
+                      "passport_scan",
+                      passportPreview.url,
+                      mediaRequestKeys.passport_scan,
+                    )
+                  }
+                  onRetry={() =>
+                    handlePreviewRetry("passport_scan", mediaRequestKeys.passport_scan)
+                  }
                 />
                 <ReviewMediaPreview
                   alt={activeMediaTarget.alt}
                   file={activeMediaFile}
+                  generationKey={mediaRequestKeys[activeMediaTarget.type]}
                   label={activeMediaTarget.shortLabel}
                   preview={activePreview}
                   testId={`protected-media-preview-${activeMediaTarget.type}`}
-                  transform={activeMediaTransform}
                   variant="active"
-                  onError={() => handlePreviewError(activeMediaTarget.type)}
-                  onRetry={() => handlePreviewRetry(activeMediaTarget.type)}
+                  onError={() =>
+                    handlePreviewError(
+                      activeMediaTarget.type,
+                      mediaRequestKeys[activeMediaTarget.type],
+                    )
+                  }
+                  onReady={() =>
+                    handleMediaReady(
+                      activeMediaTarget.type,
+                      activePreview.url,
+                      mediaRequestKeys[activeMediaTarget.type],
+                    )
+                  }
+                  onRetry={() =>
+                    handlePreviewRetry(
+                      activeMediaTarget.type,
+                      mediaRequestKeys[activeMediaTarget.type],
+                    )
+                  }
                 />
               </div>
             ) : (
               <ReviewMediaPreview
                 alt={activeMediaTarget.alt}
                 file={activeMediaFile}
+                generationKey={mediaRequestKeys[activeMediaTarget.type]}
                 label={activeMediaTarget.shortLabel}
                 preview={activePreview}
                 testId={`protected-media-preview-${activeMediaTarget.type}`}
-                transform={activeMediaTransform}
                 variant="single"
-                onError={() => handlePreviewError(activeMediaTarget.type)}
-                onRetry={() => handlePreviewRetry(activeMediaTarget.type)}
+                onError={() =>
+                  handlePreviewError(
+                    activeMediaTarget.type,
+                    mediaRequestKeys[activeMediaTarget.type],
+                  )
+                }
+                onReady={() =>
+                  handleMediaReady(
+                    activeMediaTarget.type,
+                    activePreview.url,
+                    mediaRequestKeys[activeMediaTarget.type],
+                  )
+                }
+                onRetry={() =>
+                  handlePreviewRetry(
+                    activeMediaTarget.type,
+                    mediaRequestKeys[activeMediaTarget.type],
+                  )
+                }
               />
             )}
           </div>
+
+          <section aria-label="Поля паспорта" className="v19-review-field-strip">
+            <header>
+              <strong>Поля паспорта</strong>
+              <span>
+                {approvedFieldIds.size}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
+              </span>
+            </header>
+            <div
+              aria-label="Лента полей для сверки с паспортом"
+              className="v19-review-field-carousel"
+              tabIndex={0}
+            >
+              {reviewFields.map((field) => (
+                <ReviewPassportFieldRow
+                  applicant={selectedApplicant}
+                  approved={approvedFieldIds.has(field.id)}
+                  field={field}
+                  key={field.id}
+                  onAddRemark={handleFieldRemark}
+                  onApprove={() => handleFieldApprove(field)}
+                  readOnly={!isEditableReviewStatus}
+                />
+              ))}
+            </div>
+          </section>
 
           <div className="v19-review-media-switcher">
             <div className="v19-review-media-actions">
@@ -1127,8 +1363,7 @@ export function ReviewWorkspace({
                     <span className="v19-review-media-tab-label">
                       {target.shortLabel}
                     </span>
-                    {visitedMediaTypes.has(target.type) &&
-                    mediaPreviews[target.type]?.status === "ready" ? (
+                    {approvedMediaTypes.has(target.type) ? (
                       <CheckCircle2
                         aria-hidden="true"
                         className="v19-review-media-tab-visited"
@@ -1139,140 +1374,74 @@ export function ReviewWorkspace({
                 ))}
               </div>
               {isEditableReviewStatus ? (
-                <button
-                  aria-label={`Добавить замечание: ${activeMediaTarget.label}`}
-                  className="v19-review-file-remark"
-                  onClick={() =>
-                    onAddRemark(
-                      `${activeMediaTarget.label}: требуется проверка`,
-                      selectedApplicant?.fullName,
-                      activeMediaTarget.type,
-                      selectedApplicantId,
-                    )
-                  }
-                  type="button"
+                <div
+                  aria-label={`Решение по документу: ${activeMediaTarget.shortLabel}`}
+                  className="v19-review-file-actions"
+                  role="group"
                 >
-                  <MessageSquarePlus aria-hidden="true" />
-                  <span>Замечание</span>
-                </button>
+                  <button
+                    aria-label={`Добавить замечание: ${activeMediaTarget.label}`}
+                    className="v19-review-file-remark"
+                    onClick={() => {
+                      onAddRemark(
+                        `${activeMediaTarget.label}: требуется проверка`,
+                        selectedApplicant?.fullName,
+                        activeMediaTarget.type,
+                        selectedApplicantId,
+                      );
+                    }}
+                    type="button"
+                  >
+                    <MessageSquarePlus aria-hidden="true" />
+                    <span>Замечание</span>
+                  </button>
+                  <button
+                    aria-label={
+                      approvedMediaTypes.has(activeMediaTarget.type)
+                        ? `Оригинал проверен: ${activeMediaTarget.shortLabel}`
+                        : `Подтвердить оригинал: ${activeMediaTarget.shortLabel}`
+                    }
+                    className={`v19-review-file-approve${approvedMediaTypes.has(activeMediaTarget.type) ? " is-approved" : ""}`}
+                    disabled={
+                      approvedMediaTypes.has(activeMediaTarget.type) ||
+                      activePreview.status !== "ready" ||
+                      !activeMediaRendered ||
+                      !protectedMedia.find(
+                        (entry) => entry.target.type === activeMediaTarget.type,
+                      )?.protectedFile
+                    }
+                    onClick={() => handleMediaApprove(activeMediaTarget.type)}
+                    type="button"
+                  >
+                    <CheckCircle2 aria-hidden="true" />
+                    <span>
+                      {approvedMediaTypes.has(activeMediaTarget.type)
+                        ? "Проверено"
+                        : "Подтвердить"}
+                    </span>
+                  </button>
+                </div>
               ) : null}
             </div>
           </div>
         </section>
 
         <section className="v19-review-details-pane">
-          {submission && submission.applicants.length > 1 ? (
-            <header className="v19-review-details-header is-applicant-only">
-              <label className="v19-review-applicant-select">
-                <span>Заявитель</span>
-                <select
-                  aria-label="Заявитель для проверки"
-                  onChange={(event) => onApplicantChange?.(event.target.value)}
-                  value={selectedApplicantId}
-                >
-                  {submission.applicants.map((applicant) => (
-                    <option key={applicant.id} value={applicant.id}>
-                      {applicant.fullName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </header>
-          ) : null}
-
           <div className="v19-review-details-scroll">
-            <ReviewReadinessPanel
-              closedIssueCount={closedPassportIssueCount}
-              filledFieldCount={filledFieldCount}
-              fixedIssueCount={fixedPassportIssueCount}
-              mediaReadyCount={readyMediaCount}
-              mediaTotal={confirmationMediaTypes.length}
-              mediaLoadingCount={loadingMediaCount}
-              mediaPendingReviewCount={pendingMediaReviewCount}
-              mediaUnavailableCount={unavailableMediaCount}
-              onNextStep={handleNextReviewStep}
-              openIssueCount={openPassportIssueCount}
-              packageGuardReason={acceptDecision?.reason ?? reviewDecisionReason}
-              readOnly={!isEditableReviewStatus}
-              totalFieldCount={ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-            />
-
-            {correctedIssuesAwaitingClosure.length > 0 ? (
-              <section
-                aria-label="Исправления к закрытию"
-                className="v19-review-corrected-issues"
-              >
-                <header>
-                  <div>
-                    <span>Решение администратора</span>
-                    <h2>Исправления к закрытию</h2>
-                  </div>
-                  <strong>{correctedIssuesAwaitingClosure.length}</strong>
-                </header>
-                <p>
-                  Сверьте исправленные значения. Команда «Закрыть исправления и
-                  принять» закроет перечисленные замечания и передаст пакет на
-                  выгрузку.
-                </p>
-                <div className="v19-review-corrected-issue-list">
-                  {correctedIssuesAwaitingClosure.map((issue) => {
-                    const target = [
-                      issue.target.applicantName,
-                      issue.target.section,
-                      issue.target.field,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ");
-
-                    return (
-                      <article key={issue.id}>
-                        <div>
-                          <strong>{issue.reason}</strong>
-                          {target ? <span>{target}</span> : null}
-                        </div>
-                        <p>{issue.comment}</p>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            ) : null}
-
-            <header className="v19-review-section-heading">
-              <div>
-                <span>Источник решения</span>
-                <h2>Все поля паспорта</h2>
-              </div>
-              <strong>
-                {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-              </strong>
-            </header>
-
-            <div className="v19-review-field-grid">
-              {reviewFields.map((field) => (
-                <ReviewPassportFieldRow
-                  applicant={selectedApplicant}
-                  field={field}
-                  key={field.id}
-                  readOnly={!isEditableReviewStatus}
-                  onAddRemark={onAddRemark}
-                />
-              ))}
-            </div>
-
             <section
               aria-busy={sectionApprovalPending}
               aria-live="polite"
               className={`v19-review-confirmation${sectionApprovalPending ? " is-pending" : ""}${sectionAlreadyAccepted ? " is-complete" : ""}${acceptanceError ? " is-error" : ""}${canConfirmSection ? " is-ready" : ""}`}
             >
               <div>
-                <strong>Паспортная секция</strong>
+                <strong>Паспорт и селфи</strong>
                 <p id="passport-review-completion-reason">{completionReason}</p>
               </div>
               {isEditableReviewStatus ? (
                 <button
                   aria-busy={sectionApprovalPending}
                   aria-describedby="passport-review-completion-reason"
+                  aria-description={completionReason}
                   disabled={!canConfirmSection}
                   id="passport-review-confirm-button"
                   onClick={() => void handleConfirmSection()}
@@ -1296,89 +1465,36 @@ export function ReviewWorkspace({
             aria-busy={Boolean(reviewActionPending)}
             aria-live="polite"
             className={`v19-review-decision${reviewActionPending ? " is-pending" : ""}${reviewActionError ? " is-error" : ""}`}
-            ref={decisionFooterRef}
           >
-            <div className="v19-review-decision-context">
-              <div className="v19-review-decision-title">
-                <strong>Решение</strong>
-                <span>
-                  {approvedApplicantCount}/{applicantReviewStates.length} секций
-                </span>
-              </div>
-              {applicantReviewStates.length > 1 ? (
-                <div
-                  aria-label="Готовность паспортных секций заявителей"
-                  className="v19-review-applicant-progress"
-                  role="group"
-                >
-                  {applicantReviewStates.map((state) => (
-                    <button
-                      aria-label={`Открыть проверку: ${state.name}`}
-                      className={
-                        state.id === selectedApplicantId ? "is-active" : undefined
-                      }
-                      key={state.id}
-                      onClick={() => onApplicantChange?.(state.id)}
-                      type="button"
-                    >
-                      {state.completed ? (
-                        <CheckCircle2 aria-hidden="true" />
-                      ) : (
-                        <UserRound aria-hidden="true" />
-                      )}
-                      <span>{state.name}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <p id="admin-review-decision-reason">{reviewDecisionReason}</p>
-            </div>
-
             {isEditableReviewStatus ? (
-            <div className="v19-review-decision-actions">
-              <button
-                aria-busy={Boolean(reviewActionPending)}
-                aria-describedby="admin-review-decision-reason"
-                className="v19-review-return"
-                disabled={Boolean(
-                  !returnDecision ||
-                  returnDecision.disabled ||
-                  !onReviewAction ||
-                  reviewActionPending,
-                )}
-                onClick={() => void handleReviewDecision(returnDecision)}
-                type="button"
-              >
-                <MessageSquarePlus aria-hidden="true" />
-                {reviewActionLabel(
-                  returnDecision,
-                  reviewActionPending,
-                  "На исправление",
-                  "Возвращаем…",
-                )}
-              </button>
-              <button
-                aria-busy={Boolean(reviewActionPending)}
-                aria-describedby="admin-review-decision-reason"
-                className="v19-review-accept"
-                disabled={Boolean(
-                  !acceptDecision ||
-                  acceptDecision.disabled ||
-                  !onReviewAction ||
-                  reviewActionPending,
-                )}
-                onClick={() => void handleReviewDecision(acceptDecision)}
-                type="button"
-              >
-                <CheckCircle2 aria-hidden="true" />
-                {reviewActionLabel(
-                  acceptDecision,
-                  reviewActionPending,
-                  "Принять",
-                  "Принимаем…",
-                )}
-              </button>
-            </div>
+              <div className="v19-review-decision-actions">
+                <button
+                  aria-busy={Boolean(reviewActionPending)}
+                  aria-description={returnDecisionReason}
+                  className="v19-review-return"
+                  disabled={returnDecisionDisabled}
+                  onClick={() => void handleReviewDecision(returnDecision)}
+                  type="button"
+                >
+                  <MessageSquarePlus aria-hidden="true" />
+                  {returnDecision && reviewActionPending === returnDecision.action
+                    ? "Возвращаем…"
+                    : "Вернуть"}
+                </button>
+                <button
+                  aria-busy={Boolean(reviewActionPending)}
+                  aria-description={acceptDecisionReason}
+                  className="v19-review-accept"
+                  disabled={acceptDecisionDisabled}
+                  onClick={() => void handleReviewDecision(acceptDecision)}
+                  type="button"
+                >
+                  <CheckCircle2 aria-hidden="true" />
+                  {acceptDecision && reviewActionPending === acceptDecision.action
+                    ? "Принимаем…"
+                    : "Принять"}
+                </button>
+              </div>
             ) : (
               <span className="v19-review-read-only-badge">Мутации недоступны</span>
             )}

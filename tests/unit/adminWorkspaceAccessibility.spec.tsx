@@ -74,9 +74,7 @@ function submissionFixture(
     exportState: status === "ready_for_export" ? "ready" : "not_ready",
   };
   return status === "ready_for_export"
-    ? adminAcceptRequiredMediaForTest(
-        withCanonicalPrivateMediaIdentityForTest(fixture),
-      )
+    ? adminAcceptRequiredMediaForTest(withCanonicalPrivateMediaIdentityForTest(fixture))
     : fixture;
 }
 
@@ -254,7 +252,10 @@ describe("AdminWorkspace production navigation", () => {
     expect(screen.getByRole("tab", { name: "Паспорт" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Селфи 1" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Селфи 2" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Принять" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Вернуть" })).toBeVisible();
+    expect(screen.queryByText("Готовность паспортной проверки")).toBeNull();
+    expect(screen.queryByText("Все поля паспорта")).toBeNull();
     expect(onAdminReviewOpen).toHaveBeenCalledWith(submission.id);
     expect(onVerifyDocument).toHaveBeenCalledWith(submission.id);
   });
@@ -331,6 +332,84 @@ describe("AdminWorkspace production navigation", () => {
         screen.queryByRole("dialog", { name: "Сверка паспорта" }),
       ).not.toBeInTheDocument();
       expect(card).toHaveFocus();
+    });
+  });
+
+  test("focuses the next queue card when the original card leaves Review", async () => {
+    const opened = acceptableReviewSubmission();
+    const fallback = submissionFixture(
+      "submitted_for_review",
+      "fallback-review-card",
+      "Следующая проверка",
+    );
+    const onSignOut = vi.fn();
+    const view = render(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={onSignOut}
+        submissions={[opened, fallback]}
+        usesSupabase
+      />,
+    );
+    const opener = view.container.querySelector<HTMLButtonElement>(
+      '[data-submission-id="review-async-failure"]',
+    );
+    if (!opener) throw new Error("Review card was not rendered.");
+    opener.focus();
+    fireEvent.click(opener);
+    await screen.findByRole("dialog", { name: "Сверка паспорта" });
+
+    view.rerender(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={onSignOut}
+        submissions={[{ ...opened, status: "ready_for_export" }, fallback]}
+        usesSupabase
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Вернуться к очереди" }));
+
+    await waitFor(() => {
+      const fallbackCard = view.container.querySelector<HTMLButtonElement>(
+        '[data-submission-id="fallback-review-card"]',
+      );
+      expect(fallbackCard).toHaveFocus();
+    });
+  });
+
+  test("focuses the queue root when the reviewed card was the last one", async () => {
+    const opened = acceptableReviewSubmission();
+    const onSignOut = vi.fn();
+    const view = render(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={onSignOut}
+        submissions={[opened]}
+        usesSupabase
+      />,
+    );
+    const opener = view.container.querySelector<HTMLButtonElement>(
+      '[data-submission-id="review-async-failure"]',
+    );
+    if (!opener) throw new Error("Review card was not rendered.");
+    opener.focus();
+    fireEvent.click(opener);
+    await screen.findByRole("dialog", { name: "Сверка паспорта" });
+
+    view.rerender(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={onSignOut}
+        submissions={[{ ...opened, status: "ready_for_export" }]}
+        usesSupabase
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Вернуться к очереди" }));
+
+    await waitFor(() => {
+      expect(
+        view.container.querySelector<HTMLElement>("[data-admin-review-queue]"),
+      ).toHaveFocus();
     });
   });
 

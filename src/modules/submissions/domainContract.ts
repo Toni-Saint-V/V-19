@@ -279,6 +279,20 @@ export type MediaReadinessSubmission = {
   files: MediaReadinessFile[];
 };
 
+export function hasCanonicalAcceptedMediaReview(
+  file: Pick<
+    MediaReadinessFile,
+    "reviewedAtIso" | "reviewedBy" | "reviewStatus" | "status"
+  >,
+): boolean {
+  return (
+    file.status === "accepted" &&
+    file.reviewStatus === "accepted" &&
+    hasValidPersistedTimestamp(file.reviewedAtIso) &&
+    Boolean(file.reviewedBy?.trim())
+  );
+}
+
 export function canonicalRequiredMediaTypesForApplicant(
   submission: Pick<MediaReadinessSubmission, "applicants">,
   applicantId: string,
@@ -331,12 +345,7 @@ export function canonicalRequiredMediaReadiness(
     if (options.requireAccepted && file.status !== "accepted") {
       return { ok: false, reason: `Required ${slot.type} is not accepted.` };
     }
-    if (
-      options.requireReviewMetadata &&
-      (file.reviewStatus !== "accepted" ||
-        !hasValidPersistedTimestamp(file.reviewedAtIso) ||
-        !file.reviewedBy?.trim())
-    ) {
+    if (options.requireReviewMetadata && !hasCanonicalAcceptedMediaReview(file)) {
       return {
         ok: false,
         reason: `Required ${slot.type} has no accepted admin review.`,

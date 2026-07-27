@@ -11,9 +11,16 @@ import {
 } from "../../src/modules/submissions/passportReviewContract";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
 import { canonicalRequiredMediaReadiness } from "../../src/modules/submissions/domainContract";
-import { canReplaceDocument } from "../../src/modules/submissions/status";
+import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import {
+  applySubmissionActionResult,
+  canReplaceDocument,
+} from "../../src/modules/submissions/status";
 import type { Submission, SubmissionFile } from "../../src/modules/submissions/types";
-import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
+import {
+  adminApproveQuestionnaireForTest,
+  fillRequiredQuestionnaireForTest,
+} from "./helpers/questionnaireTestFill";
 
 function reviewableSubmission(
   type: Submission["type"] = "single",
@@ -206,6 +213,47 @@ describe("admin passport review section approval", () => {
     expect(repeated).toEqual({ ok: true, data: approved });
   });
 
+  test("repairs accepted media with incomplete persisted review metadata", () => {
+    const submission = reviewableSubmission();
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+    const initiallyApproved = unwrap(
+      approvePassportReviewSectionForAdmin(
+        submission,
+        { applicantId: applicant.id },
+        "admin-reviewer",
+        "2026-07-17T03:00:00.000Z",
+      ),
+    );
+    const partial: Submission = {
+      ...initiallyApproved,
+      files: initiallyApproved.files.map((file) =>
+        file.applicantId === applicant.id && file.type === "passport_scan"
+          ? { ...file, reviewedAtIso: undefined, reviewedBy: undefined }
+          : file,
+      ),
+    };
+
+    const repaired = unwrap(
+      approvePassportReviewSectionForAdmin(
+        partial,
+        { applicantId: applicant.id },
+        "admin-repairer",
+        "2026-07-17T03:10:00.000Z",
+      ),
+    );
+    expect(
+      repaired.files.find(
+        (file) => file.applicantId === applicant.id && file.type === "passport_scan",
+      ),
+    ).toMatchObject({
+      reviewedAtIso: "2026-07-17T03:10:00.000Z",
+      reviewedBy: "admin-repairer",
+      reviewStatus: "accepted",
+      status: "accepted",
+    });
+  });
+
   test.each([
     "draft",
     "in_progress",
@@ -344,13 +392,15 @@ describe("admin passport review section approval", () => {
       true,
     );
 
-    const fixedByAgent: Submission = {
+    const fixedByAgent: Submission = adminApproveQuestionnaireForTest({
       ...withIssue,
       issues: withIssue.issues.map((issue) => ({
         ...issue,
+        fixedAtIso: "2026-07-27T10:00:00.000Z",
         status: "fixed_by_agent" as const,
       })),
-    };
+      status: "corrections_received",
+    });
     const rechecked = unwrap(
       approvePassportReviewSectionForAdmin(
         fixedByAgent,
@@ -361,11 +411,64 @@ describe("admin passport review section approval", () => {
     expect(rechecked.issues).toEqual([
       expect.objectContaining({
         id: "passport-field-issue",
-        status: "closed_by_admin",
+        status: "fixed_by_agent",
       }),
     ]);
     expect(rechecked.files.every((file) => file.status === "accepted")).toBe(true);
-    expect(rechecked.history[0]?.text).toContain("закрыл исправленные замечания");
+    expect(rechecked.history[0]?.text).toContain(
+      "перепроверил исправления паспортной секции",
+    );
+
+  });
+
+  test("keeps correction closure atomic with canonical close-and-accept", () => {
+    const source = initialSubmissions.find((submission) => submission.id === "ПД-1056");
+    const applicant = source?.applicants[0];
+    if (!source || !applicant) throw new Error("Expected accepted passport fixture.");
+    const corrected: Submission = {
+      ...source,
+      exportState: "not_ready",
+      issues: [
+        {
+          comment: "Номер паспорта исправлен агентом.",
+          createdAt: "2026-07-26T12:00:00.000Z",
+          createdBy: "admin",
+          fixedAtIso: "2026-07-26T13:00:00.000Z",
+          id: "passport-number-correction",
+          reason: "Сверьте исправленный номер паспорта",
+          severity: "blocker",
+          status: "fixed_by_agent",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Номер паспорта",
+            section: "Паспорт",
+          },
+          type: "field",
+        },
+      ],
+      status: "corrections_received",
+    };
+
+    const reviewed = unwrap(
+      approvePassportReviewSectionForAdmin(
+        corrected,
+        { applicantId: applicant.id },
+        "admin-reviewer",
+        "2026-07-27T12:00:00.000Z",
+      ),
+    );
+    expect(reviewed.issues[0]?.status).toBe("fixed_by_agent");
+
+    const accepted = applySubmissionActionResult(
+      reviewed,
+      "close_issues_accept",
+      "admin",
+      "admin-reviewer",
+    );
+    if (!accepted.ok) throw new Error(accepted.error.message);
+    expect(accepted.data.status).toBe("ready_for_export");
+    expect(accepted.data.issues[0]?.status).toBe("closed_by_admin");
   });
 
   test("rechecks a protected legacy secondary selfie without making it required media", () => {
@@ -429,7 +532,7 @@ describe("admin passport review section approval", () => {
       ),
     );
 
-    expect(rechecked.issues[0]?.status).toBe("closed_by_admin");
+    expect(rechecked.issues[0]?.status).toBe("fixed_by_agent");
     expect(
       rechecked.files.find(
         (file) => file.applicantId === secondary.id && file.type === "passport_scan",

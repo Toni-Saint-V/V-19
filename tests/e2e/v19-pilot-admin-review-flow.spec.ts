@@ -147,9 +147,7 @@ async function verifyRemarkSubmitActionability(
 
   await expect(remarkDialog).toHaveCount(0);
   await expect(reviewWorkspace).toBeVisible();
-  await expect(
-    reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-  ).toContainText(/Открыто\s+1/);
+  await expect(reviewWorkspace.getByRole("button", { name: "Вернуть" })).toBeEnabled();
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
@@ -184,6 +182,55 @@ async function verifyEveryAdminDrawerSubview(
   });
   await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
   await expect(mediaTablist.getByRole("tab")).toHaveCount(3);
+  const passportPreview = reviewWorkspace.locator("figure").first();
+  const fieldCarousel = reviewWorkspace.getByLabel(
+    "Лента полей для сверки с паспортом",
+  );
+  const mediaPane = reviewWorkspace.locator(".v19-review-media-pane");
+  const mediaSwitcher = reviewWorkspace.locator(".v19-review-media-switcher");
+  const passportBeforeSwipe = await passportPreview.boundingBox();
+  const mediaPaneBounds = await mediaPane.boundingBox();
+  const fieldCarouselBounds = await fieldCarousel.boundingBox();
+  const mediaSwitcherBounds = await mediaSwitcher.boundingBox();
+  expect(passportBeforeSwipe?.height ?? 0).toBeGreaterThanOrEqual(96);
+  expect(fieldCarouselBounds?.height ?? 0).toBeGreaterThanOrEqual(56);
+  expect(mediaPaneBounds).not.toBeNull();
+  expect(fieldCarouselBounds).not.toBeNull();
+  expect(mediaSwitcherBounds).not.toBeNull();
+  if (mediaPaneBounds && fieldCarouselBounds && mediaSwitcherBounds) {
+    expect(fieldCarouselBounds.y).toBeGreaterThanOrEqual(mediaPaneBounds.y);
+    expect(fieldCarouselBounds.y + fieldCarouselBounds.height).toBeLessThanOrEqual(
+      mediaSwitcherBounds.y + 0.5,
+    );
+    expect(mediaSwitcherBounds.y + mediaSwitcherBounds.height).toBeLessThanOrEqual(
+      mediaPaneBounds.y + mediaPaneBounds.height + 0.5,
+    );
+  }
+  await fieldCarousel.evaluate((element) => {
+    element.scrollTo({ left: element.scrollWidth, behavior: "instant" });
+  });
+  await expect
+    .poll(() => fieldCarousel.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
+  const passportAfterSwipe = await passportPreview.boundingBox();
+  expect(passportAfterSwipe).toEqual(passportBeforeSwipe);
+  expect(
+    await reviewWorkspace.evaluate((workspace) =>
+      Array.from(workspace.querySelectorAll<HTMLElement>("button, select"))
+        .map((element) => element.getBoundingClientRect())
+        .filter(
+          (bounds) =>
+            bounds.width > 0 &&
+            bounds.height > 0 &&
+            bounds.bottom > 0 &&
+            bounds.top < window.innerHeight &&
+            (bounds.width < 44 || bounds.height < 44),
+        ).length,
+    ),
+  ).toBe(0);
+  await fieldCarousel.evaluate((element) => {
+    element.scrollTo({ left: 0, behavior: "instant" });
+  });
 
   const passportTab = mediaTablist.getByRole("tab", { name: "Паспорт" });
   const firstSelfieTab = mediaTablist.getByRole("tab", { name: "Селфи 1" });
@@ -397,7 +444,9 @@ test.describe("V-19 pilot admin review click flow", () => {
     await reviewAction.click();
     const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
     await expect(reviewWorkspace).toBeVisible();
-    await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
+    await expect(
+      reviewWorkspace.getByRole("region", { name: "Поля паспорта" }),
+    ).toBeVisible();
     await expect(
       reviewWorkspace
         .getByText(
@@ -407,7 +456,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     ).toBeVisible();
     await expect(
       reviewWorkspace.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: "Сохранить",
       }),
     ).toBeDisabled();
     await expect(
@@ -438,17 +487,19 @@ test.describe("V-19 pilot admin review click flow", () => {
     ).toEqual([]);
   });
 
-  test("admin review workspace opens every protected-media view without overflow on desktop and mobile", async ({
+  test("admin review workspace keeps the passport fixed across responsive viewports", async ({
     page,
   }, testInfo) => {
-    await verifyEveryAdminDrawerSubview(page, testInfo, {
-      height: 900,
-      width: 1440,
-    });
-    await verifyEveryAdminDrawerSubview(page, testInfo, {
-      height: 844,
-      width: 390,
-    });
+    for (const viewport of [
+      { height: 900, width: 1440 },
+      { height: 1024, width: 768 },
+      { height: 844, width: 390 },
+      { height: 720, width: 320 },
+      { height: 390, width: 844 },
+      { height: 320, width: 568 },
+    ]) {
+      await verifyEveryAdminDrawerSubview(page, testInfo, viewport);
+    }
   });
 
   for (const [label, viewport] of [
@@ -462,7 +513,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     });
   }
 
-  test("admin closes corrected issues and accepts the package for export", async ({
+  test("admin keeps non-passport corrections out of passport-only acceptance", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
@@ -476,44 +527,19 @@ test.describe("V-19 pilot admin review click flow", () => {
     const reviewWorkspace = page.getByRole("dialog", {
       name: "Сверка паспорта",
     });
-    const correctedIssues = reviewWorkspace.getByRole("region", {
-      name: "Исправления к закрытию",
-    });
-    await expect(correctedIssues).toBeVisible();
-    await expect(correctedIssues).toContainText("Адрес отеля был неполным");
+    await expect(
+      reviewWorkspace.getByRole("region", {
+        name: "Исправления к закрытию",
+      }),
+    ).toHaveCount(0);
     const acceptButton = reviewWorkspace.getByRole("button", {
-      name: "Закрыть исправления и принять",
+      name: "Принять",
     });
-
-    const applicantSelect = reviewWorkspace.getByRole("combobox", {
-      name: "Заявитель для проверки",
-    });
-    for (const mediaTab of await reviewWorkspace
-      .getByRole("tablist", { name: "Выбор файла для проверки" })
-      .getByRole("tab")
-      .all()) {
-      await mediaTab.click();
-    }
-    await expect(
-      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-    ).toContainText(/Оригиналы\s+3\/3/);
-    await reviewWorkspace
-      .getByRole("button", { name: "Подтвердить паспортную секцию" })
-      .click();
-
-    await applicantSelect.selectOption({ label: "Алексей Смирнов" });
-    await expect(
-      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-    ).toContainText(/Оригиналы\s+1\/1/);
-    await reviewWorkspace
-      .getByRole("button", { name: "Подтвердить паспортную секцию" })
-      .click();
-
-    await expect(acceptButton).toBeEnabled();
-    await acceptButton.click();
-    await expect(
-      reviewWorkspace.getByText("Подача принята и сохранена."),
-    ).toBeVisible();
+    await expect(acceptButton).toBeDisabled();
+    await expect(acceptButton).toHaveAttribute(
+      "aria-description",
+      "Есть исправления вне паспортной проверки. Их нельзя закрыть с этого экрана.",
+    );
 
     expect(
       blockingBrowserProblems(browserProblems),

@@ -90,13 +90,15 @@ test.describe("V-19 P0 admin document review", () => {
       path: testInfo.outputPath("mobile-390-files-entry.png"),
     });
 
-    await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
+    await expect(
+      reviewWorkspace.getByRole("region", { name: "Поля паспорта" }),
+    ).toBeVisible();
     await expect(
       reviewWorkspace.getByRole("alert").getByText("Оригинал нельзя принять"),
     ).toBeVisible();
     await expect(
       reviewWorkspace.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: "Сохранить",
       }),
     ).toBeDisabled();
     await expect(
@@ -116,7 +118,7 @@ test.describe("V-19 P0 admin document review", () => {
     expect(browserProblems).toEqual([]);
   });
 
-  test("desktop passport workspace shows exactly eight fields, three protected originals, and one section action", async ({
+  test("desktop passport workspace shows exactly eight fields, three protected originals, and one save action", async ({
     page,
   }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
@@ -150,7 +152,7 @@ test.describe("V-19 P0 admin document review", () => {
     await expect(reviewWorkspace.locator("[data-review-media]")).toHaveCount(3);
     await expect(
       reviewWorkspace.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: "Сохранить",
       }),
     ).toHaveCount(1);
     await reviewWorkspace

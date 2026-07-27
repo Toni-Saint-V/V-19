@@ -216,12 +216,10 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       await screen.findByRole("dialog", { name: "Сверка паспорта" }),
     ).toBeVisible();
     const acceptButton = screen.getByRole("button", {
-      name: "Принять на выгрузку",
+      name: "Принять",
     });
     expect(acceptButton).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "Отправить на исправление" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Вернуть" })).toBeDisabled();
 
     fireEvent.click(acceptButton);
 
@@ -235,11 +233,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(
       await screen.findByRole("dialog", { name: "Сверка паспорта" }),
     ).toBeVisible();
-    expect(await screen.findByText("Подача принята и сохранена.")).toBeVisible();
-    expect(screen.getAllByText("Просмотр без изменений")[0]).toBeVisible();
-    expect(
-      screen.queryByRole("button", { name: "Принять на выгрузку" }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByText("Подача принята")).toBeVisible();
+    expect(screen.getAllByText("Только просмотр")[0]).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Принять" })).not.toBeInTheDocument();
   });
 
   test("opens a field remark at its exact questionnaire field", async () => {
@@ -436,13 +432,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       ),
     ).toHaveTextContent("VF-1053");
     expect(
-      container.querySelectorAll(
-        '.v19-review-queue-list [data-submission-card]',
-      ),
+      container.querySelectorAll(".v19-review-queue-list [data-submission-card]"),
     ).toHaveLength(2);
-    expect(
-      screen.getByRole("tab", { name: /Первичная проверка/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Первичная проверка/ })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Исправления/ })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Начать проверку/ }),
@@ -451,11 +443,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
 
   test("distinguishes a genuinely empty queue from a filtered-empty result", () => {
     const { rerender } = render(
-      <ReviewScreen
-        onOpenDrawer={vi.fn()}
-        onOpenExport={vi.fn()}
-        submissions={[]}
-      />,
+      <ReviewScreen onOpenDrawer={vi.fn()} onOpenExport={vi.fn()} submissions={[]} />,
     );
 
     expect(screen.getByText("Очередь пуста")).toBeInTheDocument();
@@ -1199,12 +1187,30 @@ describe("ReviewWorkspace passport section contract", () => {
     };
   }
 
-  function visitPrimaryIdentityMedia() {
-    fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
+  async function approvePrimaryIdentityMedia() {
+    const mediaByLabel = {
+      Паспорт: "passport_scan",
+      "Селфи 1": "selfie",
+      "Селфи 2": "selfie_2",
+    } as const;
+    for (const label of ["Паспорт", "Селфи 1", "Селфи 2"] as const) {
+      fireEvent.click(screen.getByRole("tab", { name: label }));
+      const preview = await screen.findByTestId(
+        `protected-media-preview-${mediaByLabel[label]}`,
+      );
+      fireEvent.load(preview);
+      const approveButton = screen.getByRole("button", {
+        name: `Подтвердить оригинал: ${label}`,
+      });
+      await waitFor(() => expect(approveButton).toBeEnabled());
+      fireEvent.click(approveButton);
+    }
+    screen
+      .getAllByRole("button", { name: /Подтвердить поле:/ })
+      .forEach((button) => fireEvent.click(button));
   }
 
-  test("shows exactly eight canonical passport fields, per-item remarks, and one confirmation", () => {
+  test("keeps passport fields in a swipe strip without legacy review blocks", () => {
     const submission = singleSubmission();
     const { container } = render(
       <ReviewWorkspace
@@ -1216,33 +1222,22 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    expect(
-      Array.from(container.querySelectorAll("[data-passport-field-id]")).map((field) =>
-        field.getAttribute("data-passport-field-id"),
-      ),
-    ).toEqual([
-      "first-name",
-      "surname",
-      "passport-no",
-      "birth-date",
-      "passport-issue-place",
-      "passport-expiry-date",
-      "birth-place",
-      "birth-country",
-    ]);
-    expect(container.querySelectorAll(".v19-admin-passport-field-remark")).toHaveLength(
-      Object.keys(passportValues).length,
-    );
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(3);
+    expect(container.querySelectorAll("[data-passport-field-id]")).toHaveLength(8);
+    expect(screen.getByRole("region", { name: "Поля паспорта" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^Подтвердить:/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toHaveLength(1);
+      screen.getByLabelText("Лента полей для сверки с паспортом"),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".v19-review-readiness")).toBeNull();
+    expect(container.querySelector(".v19-review-corrected-issues")).toBeNull();
+    expect(container.querySelector(".v19-review-decision-context")).toBeNull();
+    expect(screen.queryByText("Все поля паспорта")).toBeNull();
+    expect(screen.getByRole("button", { name: "Сохранить" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Вернуть" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Принять" })).toBeInTheDocument();
   });
 
-  test("shows questionnaire readiness only as a read-only package guard summary", () => {
+  test("does not expose questionnaire, readiness, or AI controls", () => {
     const submission = singleSubmission();
 
     const { container } = render(
@@ -1258,18 +1253,16 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       screen.queryByRole("region", { name: "Необязательный просмотр анкеты" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Посмотреть" })).not.toBeInTheDocument();
-    expect(screen.getByText("Пакетный guard")).toBeInTheDocument();
     expect(
-      container.querySelector(".v19-review-questionnaire-entry small"),
-    ).toHaveTextContent(/.+/);
-    expect(screen.queryByText(/AI-подсказ/i)).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("img", { name: /Готовность \d+%/ }),
+      screen.queryByRole("button", { name: "Посмотреть" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("Пакетный guard")).not.toBeInTheDocument();
+    expect(container.querySelector(".v19-review-questionnaire-entry")).toBeNull();
+    expect(screen.queryByText(/AI-подсказ/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Готовность паспортной проверки")).toBeNull();
   });
 
-  test("surfaces corrected questionnaire issues before the admin closes them", () => {
+  test("keeps corrected questionnaire issues out of the media-only workspace", () => {
     const source = singleSubmission();
     const applicant = source.applicants[0];
     if (!applicant) throw new Error("Expected review applicant.");
@@ -1296,27 +1289,162 @@ describe("ReviewWorkspace passport section contract", () => {
       status: "corrections_received",
     };
 
+    const onReviewAction = vi.fn().mockResolvedValue(true);
     render(
       <ReviewWorkspace
         applicantId={applicant.id}
         onAddRemark={() => undefined}
         onBack={() => undefined}
-        onReviewAction={vi.fn().mockResolvedValue(true)}
+        onReviewAction={onReviewAction}
         submission={submission}
         submissionId={submission.id}
       />,
     );
 
-    const correctedIssues = screen.getByRole("region", {
-      name: "Исправления к закрытию",
-    });
-    expect(correctedIssues).toHaveTextContent("Проверьте новый адрес отеля");
-    expect(correctedIssues).toHaveTextContent("Адрес заменён на актуальный.");
-    expect(correctedIssues).toHaveTextContent(
-      `${applicant.fullName} · Поездка · Адрес отеля`,
-    );
     expect(
-      screen.getByRole("button", { name: "Закрыть исправления и принять" }),
+      screen.queryByRole("region", { name: "Исправления к закрытию" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Проверьте новый адрес отеля")).toBeNull();
+    const acceptButton = screen.getByRole("button", { name: "Принять" });
+    expect(acceptButton).toBeDisabled();
+    expect(acceptButton).toHaveAttribute(
+      "aria-description",
+      "Есть исправления вне паспортной проверки. Их нельзя закрыть с этого экрана.",
+    );
+    fireEvent.click(acceptButton);
+    expect(onReviewAction).not.toHaveBeenCalled();
+  });
+
+  test("dispatches canonical close-and-accept only after passport correction readback", () => {
+    const source = reviewReadySubmission();
+    const applicant = source.applicants[0];
+    if (!applicant) throw new Error("Expected review applicant.");
+    const submission: Submission = {
+      ...source,
+      exportState: "not_ready",
+      issues: [
+        {
+          comment: "Номер паспорта исправлен.",
+          createdAt: "2026-07-26T12:00:00.000Z",
+          createdBy: "admin",
+          fixedAtIso: "2026-07-26T13:00:00.000Z",
+          id: "corrected-passport-number",
+          reason: "Сверьте исправленный номер паспорта",
+          severity: "blocker",
+          status: "fixed_by_agent",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Номер паспорта",
+            section: "Данные",
+          },
+          type: "field",
+        },
+      ],
+      status: "corrections_received",
+    };
+    const onReviewAction = vi.fn().mockResolvedValue(true);
+
+    const view = render(
+      <ReviewWorkspace
+        applicantId={applicant.id}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        onReviewAction={onReviewAction}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const acceptButton = screen.getByRole("button", { name: "Принять" });
+    expect(acceptButton).toBeDisabled();
+    expect(acceptButton).toHaveAttribute(
+      "aria-description",
+      "Сначала сохраните проверку паспорта для каждого заявителя, затем примите подачу.",
+    );
+    fireEvent.click(acceptButton);
+    expect(onReviewAction).not.toHaveBeenCalled();
+
+    const readback: Submission = {
+      ...submission,
+      history: [
+        {
+          actorId: "admin-reviewer",
+          at: "2026-07-27T12:00:00.000Z",
+          createdAt: "2026-07-27T12:00:00.000Z",
+          id: `и-${submission.id}-${applicant.id}-passport-section-approved-${submission.history.length + 1}`,
+          source: "admin",
+          text: "Администратор перепроверил исправления паспортной секции",
+        },
+        ...submission.history,
+      ],
+    };
+    view.rerender(
+      <ReviewWorkspace
+        applicantId={applicant.id}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        onReviewAction={onReviewAction}
+        submission={readback}
+        submissionId={readback.id}
+      />,
+    );
+
+    const enabledAcceptButton = screen.getByRole("button", { name: "Принять" });
+    expect(enabledAcceptButton).toBeEnabled();
+    fireEvent.click(enabledAcceptButton);
+    expect(onReviewAction).toHaveBeenCalledWith("close_issues_accept");
+  });
+
+  test("marks a family applicant for review when a passport remark is open", () => {
+    const source = initialSubmissions.find((item) => item.id === "ПД-1054");
+    const primary = source?.applicants[0];
+    const secondary = source?.applicants[1];
+    if (!source || !primary || !secondary) {
+      throw new Error("Expected completed family review fixture.");
+    }
+    let submission: Submission = {
+      ...source,
+      issues: [],
+      status: "submitted_for_review",
+    };
+    submission = adminApprovePassportFieldsForTest(submission);
+    submission = adminAcceptRequiredMediaForTest(submission);
+    submission = {
+      ...submission,
+      issues: [
+        {
+          createdAt: "2026-07-26T12:00:00.000Z",
+          createdBy: "admin",
+          id: "open-secondary-passport-issue",
+          reason: "Повторно сверить номер паспорта",
+          severity: "blocker",
+          status: "open",
+          target: {
+            applicantId: secondary.id,
+            applicantName: secondary.fullName,
+            field: "Номер паспорта",
+            section: "Данные",
+          },
+          type: "field",
+        },
+      ],
+    };
+
+    render(
+      <ReviewWorkspace
+        applicantId={primary.id}
+        onAddRemark={() => undefined}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(
+      screen.getByRole("option", {
+        name: `${secondary.fullName} — проверить`,
+      }),
     ).toBeInTheDocument();
   });
 
@@ -1345,23 +1473,17 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    expect(screen.getByText("Просмотр без изменений")).toBeVisible();
-    expect(screen.getAllByText(/доступен только для чтения/).length).toBeGreaterThan(0);
-    expect(
-      screen.queryByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Принять на выгрузку" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Отправить на исправление" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getAllByText("Только просмотр")[0]).toBeVisible();
+    expect(screen.getByText("Мутации недоступны")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Сохранить" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Принять" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Вернуть" })).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Добавить замечание:/ }),
     ).not.toBeInTheDocument();
   });
 
-  test("keeps media tabs keyboard-operable and disables unavailable preview tools", () => {
+  test("keeps media tabs keyboard-operable without legacy preview tools", () => {
     const submission = singleSubmission();
 
     render(
@@ -1378,9 +1500,22 @@ describe("ReviewWorkspace passport section contract", () => {
     const firstSelfieTab = screen.getByRole("tab", { name: "Селфи 1" });
     const secondSelfieTab = screen.getByRole("tab", { name: "Селфи 2" });
 
-    expect(screen.getByRole("button", { name: "Увеличить изображение" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Повернуть изображение" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Открыть на весь экран" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Увеличить изображение" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Повернуть изображение" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Открыть на весь экран" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Скачать")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Вернуться к очереди" }),
+    ).toHaveTextContent("Назад");
+    expect(
+      screen.getByRole("button", { name: "Подтвердить оригинал: Паспорт" }),
+    ).toBeDisabled();
 
     passportTab.focus();
     fireEvent.keyDown(passportTab, { key: "ArrowRight" });
@@ -1470,10 +1605,12 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeDisabled();
-    expect(
-      screen.getAllByText("Подтвердите паспортные поля перед принятием"),
-    ).toHaveLength(2);
+    const blockedAcceptButton = screen.getByRole("button", { name: "Принять" });
+    expect(blockedAcceptButton).toBeDisabled();
+    expect(blockedAcceptButton).toHaveAttribute(
+      "aria-description",
+      "Подтвердите паспортные поля перед принятием",
+    );
 
     const approvedSubmission = adminApprovePassportFieldsForTest(submission);
     view.rerender(
@@ -1488,10 +1625,13 @@ describe("ReviewWorkspace passport section contract", () => {
     );
 
     const acceptButton = screen.getByRole("button", {
-      name: "Принять на выгрузку",
+      name: "Принять",
     });
     expect(acceptButton).toBeEnabled();
-    expect(screen.getAllByText("Проверка готова к решению.")).toHaveLength(2);
+    expect(acceptButton).toHaveAttribute(
+      "aria-description",
+      "Проверка готова к решению.",
+    );
     expect(
       screen.queryByText("Нужно добавить точное замечание"),
     ).not.toBeInTheDocument();
@@ -1527,17 +1667,14 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toBeDisabled();
-    expect(
-      screen.getByText(
-        /Заполнены не все паспортные поля или в данных есть ошибка/,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Сохранить" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Сохранить" })).toHaveAttribute(
+      "aria-description",
+      "Заполнены не все паспортные поля или в данных есть ошибка.",
+    );
   });
 
-  test("keeps a field remark attached to its exact applicant and label", () => {
+  test("keeps a passport-file remark attached to its exact applicant", () => {
     const submission = singleSubmission();
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Expected applicant.");
@@ -1553,12 +1690,14 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Добавить замечание: Номер паспорта" }),
+      screen.getByRole("button", {
+        name: "Добавить замечание: Скан загранпаспорта",
+      }),
     );
     expect(onAddRemark).toHaveBeenCalledWith(
-      "Номер паспорта",
+      "Скан загранпаспорта: требуется проверка",
       applicant.fullName,
-      undefined,
+      "passport_scan",
       applicant.id,
     );
   });
@@ -1586,6 +1725,8 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
+    fireEvent.load(screen.getByTestId("protected-media-preview-passport_scan"));
+    await approvePrimaryIdentityMedia();
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
@@ -1595,22 +1736,18 @@ describe("ReviewWorkspace passport section contract", () => {
         name: "Сравнение паспорта и селфи 1",
       }),
     ).toBeVisible();
-    expect(
-      screen.getByTestId("protected-media-preview-passport_scan"),
-    ).toBeVisible();
-    fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
-    await waitFor(() =>
-      expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible(),
-    );
+    expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible();
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Сохранить",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
 
     await waitFor(() => expect(onApproveSection).toHaveBeenCalledTimes(1));
     expect(onApproveSection).toHaveBeenCalledWith({ applicantId: applicant.id });
-    await waitFor(() => expect(screen.getByText("Секция подтверждена")).toBeVisible());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Сохранено" })).toBeVisible(),
+    );
   });
 
   test("blocks confirmation when a family has more than one primary applicant", async () => {
@@ -1648,10 +1785,13 @@ describe("ReviewWorkspace passport section contract", () => {
     );
 
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Сохранить",
     });
     await waitFor(() => expect(confirmButton).toBeDisabled());
-    expect(screen.getByText(/ровно один основной заявитель/)).toBeInTheDocument();
+    expect(confirmButton).toHaveAttribute(
+      "aria-description",
+      expect.stringContaining("ровно один основной заявитель"),
+    );
     expect(
       screen.queryByTestId("protected-media-preview-selfie"),
     ).not.toBeInTheDocument();
@@ -1716,11 +1856,9 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    visitPrimaryIdentityMedia();
+    await approvePrimaryIdentityMedia();
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-      ).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Сохранить" })).toBeEnabled(),
     );
     expect(
       screen.queryByText(/Есть открытое замечание паспортной секции/),
@@ -1761,9 +1899,9 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toBeVisible();
 
     const confirmButton = await screen.findByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Сохранить",
     });
-    visitPrimaryIdentityMedia();
+    await approvePrimaryIdentityMedia();
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
 
@@ -1787,39 +1925,37 @@ describe("ReviewWorkspace passport section contract", () => {
       expected:
         "Сессия или права доступа изменились. Войдите снова; подача не была изменена.",
     },
-  ])("preserves exact bridge failure feedback in the active workspace: $expected", async ({
-    error,
-    expected,
-  }) => {
-    const submission = reviewReadySubmission();
-    const onSubmissionAction = vi.fn().mockRejectedValue(error);
-    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
-      "https://example.test/protected-review.jpg",
-    );
-    const { container } = render(
-      <VisaflowBusinessBridgeProvider bridge={{ onSubmissionAction }}>
-        <AdminWorkspace
-          currentEmail="qa-admin@example.test"
-          onSignOut={() => undefined}
-          submissions={[submission]}
-          usesSupabase
-        />
-      </VisaflowBusinessBridgeProvider>,
-    );
+  ])(
+    "preserves exact bridge failure feedback in the active workspace: $expected",
+    async ({ error, expected }) => {
+      const submission = reviewReadySubmission();
+      const onSubmissionAction = vi.fn().mockRejectedValue(error);
+      vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+        "https://example.test/protected-review.jpg",
+      );
+      const { container } = render(
+        <VisaflowBusinessBridgeProvider bridge={{ onSubmissionAction }}>
+          <AdminWorkspace
+            currentEmail="qa-admin@example.test"
+            onSignOut={() => undefined}
+            submissions={[submission]}
+            usesSupabase
+          />
+        </VisaflowBusinessBridgeProvider>,
+      );
 
-    const opener = container.querySelector<HTMLButtonElement>(
-      `[data-submission-id="${submission.id}"]`,
-    );
-    if (!opener) throw new Error("Review queue opener was not rendered.");
-    fireEvent.click(opener);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Принять на выгрузку" }),
-    );
+      const opener = container.querySelector<HTMLButtonElement>(
+        `[data-submission-id="${submission.id}"]`,
+      );
+      if (!opener) throw new Error("Review queue opener was not rendered.");
+      fireEvent.click(opener);
+      fireEvent.click(await screen.findByRole("button", { name: "Принять" }));
 
-    expect(await screen.findByText(expected)).toBeVisible();
-    expect(screen.getByRole("dialog", { name: "Сверка паспорта" })).toBeVisible();
-    expect(onSubmissionAction).toHaveBeenCalledTimes(1);
-  });
+      expect(await screen.findByText(expected)).toBeVisible();
+      expect(screen.getByRole("dialog", { name: "Сверка паспорта" })).toBeVisible();
+      expect(onSubmissionAction).toHaveBeenCalledTimes(1);
+    },
+  );
 
   test("preserves revision-conflict feedback from the passport-section bridge", async () => {
     const submission = singleSubmission();
@@ -1845,9 +1981,9 @@ describe("ReviewWorkspace passport section contract", () => {
     );
     if (!opener) throw new Error("Review queue opener was not rendered.");
     fireEvent.click(opener);
-    visitPrimaryIdentityMedia();
+    await approvePrimaryIdentityMedia();
     const confirmButton = await screen.findByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Сохранить",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
@@ -1906,9 +2042,7 @@ describe("ReviewWorkspace passport section contract", () => {
 
   test("keeps revision-conflict feedback inside the open remark form", async () => {
     const submission = singleSubmission();
-    const onAdminIssueAdd = vi
-      .fn()
-      .mockRejectedValue(new Error("revision conflict"));
+    const onAdminIssueAdd = vi.fn().mockRejectedValue(new Error("revision conflict"));
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
       "https://example.test/protected-passport-section.jpg",
     );
@@ -1981,12 +2115,26 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
     );
+    fireEvent.load(screen.getByTestId("protected-media-preview-passport_scan"));
+    expect(
+      screen.getByRole("option", {
+        name: `${secondary.fullName} — проверить`,
+      }),
+    ).toBeInTheDocument();
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(1);
     expect(
       screen.queryByTestId("protected-media-preview-selfie"),
     ).not.toBeInTheDocument();
+    const approvePassportButton = screen.getByRole("button", {
+      name: "Подтвердить оригинал: Паспорт",
+    });
+    await waitFor(() => expect(approvePassportButton).toBeEnabled());
+    fireEvent.click(approvePassportButton);
+    screen
+      .getAllByRole("button", { name: /Подтвердить поле:/ })
+      .forEach((button) => fireEvent.click(button));
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Сохранить",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
@@ -2055,10 +2203,14 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
+    const approvePassportButton = screen.getByRole("button", {
+      name: "Подтвердить оригинал: Паспорт",
+    });
+    fireEvent.load(await screen.findByTestId("protected-media-preview-passport_scan"));
+    await waitFor(() => expect(approvePassportButton).toBeEnabled());
+    fireEvent.click(approvePassportButton);
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
-    expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Сохранить" })).toBeDisabled();
     await act(async () => {
       correctedSelfie.resolve("https://example.test/legacy-secondary-selfie.jpg");
       await correctedSelfie.promise;
@@ -2066,14 +2218,21 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie")).toBeVisible(),
     );
+    fireEvent.load(screen.getByTestId("protected-media-preview-selfie"));
     expect(container.querySelectorAll("[data-review-media]")).toHaveLength(2);
     expect(
       screen.queryByTestId("protected-media-preview-selfie_2"),
     ).not.toBeInTheDocument();
+    const approveSelfieButton = screen.getByRole("button", {
+      name: "Подтвердить оригинал: Селфи 1",
+    });
+    await waitFor(() => expect(approveSelfieButton).toBeEnabled());
+    fireEvent.click(approveSelfieButton);
+    screen
+      .getAllByRole("button", { name: /Подтвердить поле:/ })
+      .forEach((button) => fireEvent.click(button));
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-      ).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Сохранить" })).toBeEnabled(),
     );
   });
 });

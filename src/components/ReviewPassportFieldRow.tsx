@@ -17,7 +17,9 @@ export type PassportReviewField = {
 
 type ReviewPassportFieldRowProps = {
   applicant?: Applicant;
+  approved?: boolean;
   field: PassportReviewField;
+  onApprove?: () => void;
   readOnly?: boolean;
   onAddRemark: (
     field?: string,
@@ -29,14 +31,17 @@ type ReviewPassportFieldRowProps = {
 
 export function ReviewPassportFieldRow({
   applicant,
+  approved = false,
   field,
+  onApprove,
   readOnly = false,
   onAddRemark,
 }: ReviewPassportFieldRowProps) {
   const valid = hasAdminPassportReviewValue(field.value) && !field.hasError;
-  const state = field.alreadyApproved ? "approved" : valid ? "review" : "warning";
-  const statusLabel = field.alreadyApproved
-    ? "Подтверждено"
+  const isApproved = valid && (field.alreadyApproved || approved);
+  const state = isApproved ? "approved" : valid ? "review" : "warning";
+  const statusLabel = isApproved
+    ? "Проверено"
     : valid
       ? "Проверить"
       : "Нужно замечание";
@@ -54,23 +59,38 @@ export function ReviewPassportFieldRow({
         </strong>
       </div>
 
-      {state === "warning" ? null : (
+      {isApproved || readOnly ? (
         <span className={`v19-review-field-status is-${state}`}>
-          {field.alreadyApproved ? (
+          {isApproved ? (
             <CheckCircle2 aria-hidden="true" />
           ) : (
             <AlertCircle aria-hidden="true" />
           )}
           {statusLabel}
         </span>
-      )}
+      ) : valid ? (
+        <button
+          aria-label={`Подтвердить поле: ${field.label}`}
+          className="v19-review-field-approve"
+          onClick={onApprove}
+          type="button"
+        >
+          <CheckCircle2 aria-hidden="true" />
+          <span>Верно</span>
+        </button>
+      ) : null}
 
       {readOnly ? null : (
         <button
           aria-label={`Добавить замечание: ${field.label}`}
           className="v19-admin-passport-field-remark v19-review-field-remark"
           onClick={() =>
-            onAddRemark(field.sourceLabel, applicant?.fullName, undefined, applicant?.id)
+            onAddRemark(
+              field.sourceLabel,
+              applicant?.fullName,
+              undefined,
+              applicant?.id,
+            )
           }
           type="button"
         >

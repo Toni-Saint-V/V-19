@@ -500,6 +500,8 @@ export function ReviewScreen({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="v19-admin-screen v19-admin-review-screen"
+      data-admin-review-queue=""
+      tabIndex={-1}
     >
       <section className="v19-admin-review-main min-w-0 space-y-5">
         <V19MetricStrip>
