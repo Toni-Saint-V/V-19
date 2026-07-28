@@ -1,7 +1,78 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
-import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
+import {
+  normalizeTestEvidenceRunId,
+  testArtifactPath,
+} from "../support/artifacts";
+import {
+  clickFirstVisible,
+  collectBrowserProblems,
+  openFreshWorkspace,
+  openMobileMenu,
+} from "./v19-pilot-helpers";
+
+async function openQuestionnaireFromAction(page: Page) {
+  const questionnaireAction = page
+    .getByRole("button", {
+      name: /^Выбрать действие:.*Артём Соколов.*Следующее действие: Открыть анкету/,
+    })
+    .first();
+  await expect(questionnaireAction).toBeVisible();
+  await questionnaireAction.click();
+
+  const openQuestionnaire = page
+    .locator('[data-v19-interaction-id="actions.open-primary"]:visible')
+    .first();
+  await expect(openQuestionnaire).toBeVisible();
+  await openQuestionnaire.click();
+}
+
+async function signOutAndLoginWithoutClearingWorkspaceState(
+  page: Page,
+  {
+    expectedHeading,
+    password,
+    workspaceEmail,
+  }: {
+    expectedHeading: RegExp | string;
+    password: string;
+    workspaceEmail: string;
+  },
+) {
+  await openMobileMenu(page);
+  const workspaceMenu = page
+    .getByRole("dialog", { name: /^Меню (агента|администратора)$/ })
+    .or(
+      page.getByRole("complementary", {
+        name: /^Меню (агента|администратора)$/,
+      }),
+    );
+  await clickFirstVisible(
+    workspaceMenu.getByRole("button", { name: "Выйти" }),
+  );
+  await expect(
+    page.getByRole("main", { name: "Вход в рабочий кабинет" }),
+  ).toBeVisible();
+
+  const emailField = page.locator("#workspace-email");
+  const switchToLogin = page.getByRole("button", {
+    name: "Уже есть доступ? Войти",
+  });
+  if (await switchToLogin.isVisible()) {
+    await switchToLogin.click();
+  }
+
+  await expect(emailField).toBeVisible();
+  await emailField.fill(workspaceEmail);
+  await page.locator("#workspace-password").fill(password);
+  await page.getByRole("button", { name: "Войти в кабинет" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: expectedHeading }),
+  ).toBeVisible();
+}
 
 async function openQuestionnaire(
   page: Page,
@@ -60,21 +131,7 @@ async function openQuestionnaire(
     page.getByRole("heading", { level: 1, name: "Мои действия" }),
   ).toBeVisible();
 
-  const openQuestionnaireAction = page
-    .locator("button:visible")
-    .filter({ hasText: /^Открыть анкету$/ })
-    .first();
-  if (await openQuestionnaireAction.isVisible({ timeout: 750 }).catch(() => false)) {
-    await openQuestionnaireAction.click();
-  } else {
-    const mobileQuestionnaireAction = page
-      .locator(
-        'button:visible[aria-label^="Открыть действие:"][aria-label*="Артём Соколов"]',
-      )
-      .first();
-    await expect(mobileQuestionnaireAction).toBeVisible();
-    await mobileQuestionnaireAction.click();
-  }
+  await openQuestionnaireFromAction(page);
 
   const questionnaireScreen = page.locator(".vf-figma-questionnaire-screen");
   if (!(await questionnaireScreen.isVisible({ timeout: 1_000 }).catch(() => false))) {
@@ -363,9 +420,9 @@ test.describe("V-19 questionnaire live sanity", () => {
     await expect(mobileFooter).toBeVisible();
     await expect(
       mobileFooter.getByRole("button", {
-        name: "Предыдущий раздел недоступен",
+        name: "Предыдущий раздел: Паспорт",
       }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     await expect(
       mobileFooter.getByRole("button", {
         name: "Сохранить и выйти — нижняя панель",
@@ -397,9 +454,7 @@ test.describe("V-19 questionnaire live sanity", () => {
 
       return {
         activeSection: style(".v19-questionnaire-section-tab.is-active"),
-        issueSection: style(
-          ".v19-questionnaire-section-tab.status-issue.is-active",
-        ),
+        issueSection: style(".v19-questionnaire-section-tab.status-issue"),
         pendingSection: style(
           ".v19-questionnaire-section-tab.status-pending:not(.is-active)",
         ),
@@ -420,17 +475,21 @@ test.describe("V-19 questionnaire live sanity", () => {
     ).toBeVisible();
     await expect(
       page.locator(".v19-questionnaire-field-control.is-review"),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(page.getByTestId("questionnaire-current-issue")).toHaveCount(0);
     await expect(page.locator(".v19-questionnaire-work-panel")).toBeVisible();
+    await expect(mobileQuestionnaireSection(page, "Адрес и контакты")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(
       mobileFooter.getByRole("button", {
-        name: "Следующий раздел: Паспорт",
+        name: "Следующий раздел: Работа / учеба",
       }),
     ).toBeEnabled();
 
     await mobileFooter
-      .getByRole("button", { name: "Следующий раздел: Паспорт" })
+      .getByRole("button", { name: "Предыдущий раздел: Паспорт" })
       .click();
     await expect(mobileQuestionnaireSection(page, "Паспорт")).toHaveAttribute(
       "aria-pressed",
@@ -443,6 +502,9 @@ test.describe("V-19 questionnaire live sanity", () => {
       "aria-pressed",
       "true",
     );
+    await expect(
+      page.locator(".v19-questionnaire-field-control.is-review"),
+    ).toBeVisible();
 
     const applicantNextButtons = page.locator(
       '[aria-label^="Следующее незаполненное:"]',
@@ -760,4 +822,301 @@ test.describe("V-19 questionnaire live sanity", () => {
       expect(browserProblems).toEqual([]);
     });
   }
+
+  test("bounded runtime proof keeps persistence, role isolation, and network local", async ({
+    baseURL,
+    browser,
+  }) => {
+    expect(baseURL).toBeTruthy();
+    if (!baseURL) throw new Error("Playwright baseURL is required");
+
+    const approvedUrl = new URL(baseURL);
+    expect(["127.0.0.1", "localhost"]).toContain(approvedUrl.hostname);
+    const approvedHttpOrigin = approvedUrl.origin;
+    const approvedWebSocketOrigin = `${approvedUrl.protocol === "https:" ? "wss:" : "ws:"}//${approvedUrl.host}`;
+    const proofRunId = normalizeTestEvidenceRunId(
+      process.env.V19_PROOF_RUN_ID?.trim() ||
+        `run-${Date.now()}-${process.pid}`,
+    );
+    const proofDirectory = testArtifactPath(
+      "questionnaire-runtime-proof",
+      proofRunId,
+    );
+    mkdirSync(proofDirectory, { recursive: true });
+    const viewportReceipts = [];
+
+    for (const viewport of [
+      { height: 844, width: 390 },
+      { height: 1024, width: 768 },
+      { height: 900, width: 1440 },
+    ]) {
+      const networkEvidence = {
+        blockedOrigins: [] as string[],
+        failedRequests: [] as string[],
+        requests: [] as Array<{
+          method: string;
+          origin: string;
+          path: string;
+          resourceType: string;
+        }>,
+        responses: [] as Array<{
+          origin: string;
+          path: string;
+          status: number;
+        }>,
+        webSocketErrors: [] as string[],
+        webSocketOrigins: [] as string[],
+      };
+      const context = await browser.newContext({
+        baseURL,
+        serviceWorkers: "block",
+        viewport,
+      });
+
+      await context.route("**/*", async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        if (
+          !["http:", "https:"].includes(url.protocol) ||
+          url.origin !== approvedHttpOrigin
+        ) {
+          networkEvidence.blockedOrigins.push(`${url.protocol}//${url.host}`);
+          await route.abort("blockedbyclient");
+          return;
+        }
+        networkEvidence.requests.push({
+          method: request.method(),
+          origin: url.origin,
+          path: url.pathname,
+          resourceType: request.resourceType(),
+        });
+        await route.continue();
+      });
+
+      const page = await context.newPage();
+      const browserProblems = collectBrowserProblems(page);
+      page.on("requestfailed", (request) => {
+        const failure = request.failure();
+        networkEvidence.failedRequests.push(
+          `${request.method()} ${request.url()} ${failure?.errorText ?? "unknown"}`,
+        );
+      });
+      page.on("response", (response) => {
+        const url = new URL(response.url());
+        networkEvidence.responses.push({
+          origin: url.origin,
+          path: url.pathname,
+          status: response.status(),
+        });
+      });
+      page.on("websocket", (socket) => {
+        const origin = new URL(socket.url()).origin;
+        networkEvidence.webSocketOrigins.push(origin);
+        socket.on("socketerror", (error) => {
+          networkEvidence.webSocketErrors.push(String(error));
+        });
+      });
+
+      await openQuestionnaire(page, { withSpouse: true });
+      await expectFullscreenQuestionnaireShell(page, viewport);
+      const country = page.getByRole("combobox", {
+        name: "Страна проживания",
+      });
+      await country.click();
+      const russianFederation = page.getByRole("option", {
+        exact: true,
+        name: "Russian Federation",
+      });
+      await expect(russianFederation).toBeVisible();
+      const countryOptionBox = await russianFederation.boundingBox();
+      expect(countryOptionBox).not.toBeNull();
+      expect(countryOptionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await russianFederation.click();
+
+      const city = page.getByRole("combobox", { name: "Город проживания" });
+      await city.fill("Каз");
+      const kazan = page.getByRole("option", { exact: true, name: "Казань" });
+      await expect(kazan).toBeVisible();
+      const cityOptionBox = await kazan.boundingBox();
+      expect(cityOptionBox).not.toBeNull();
+      expect(cityOptionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await kazan.click();
+      await expect(city).toHaveValue("Казань");
+      if (viewport.width > 767) {
+        await expect(
+          page.locator("[role='status']:visible").filter({ hasText: "Сохранено" }),
+        ).toBeVisible();
+      }
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const submissions = JSON.parse(
+              localStorage.getItem("visaflow.v19.submissions.v1") ?? "[]",
+            ) as Array<{
+              applicants?: Array<{
+                fullName?: string;
+                sections?: Array<{
+                  fields?: Array<{ id?: string; value?: string }>;
+                }>;
+              }>;
+            }>;
+            const applicant = submissions
+              .flatMap((submission) => submission.applicants ?? [])
+              .find((candidate) => candidate.fullName === "Артём Соколов");
+            return applicant?.sections
+              ?.flatMap((section) => section.fields ?? [])
+              .find((field) => field.id === "home-city")?.value;
+          }),
+        )
+        .toBe("Казань");
+      await expectNoDocumentOverflow(page);
+
+      const screenshotPath = join(
+        proofDirectory,
+        `questionnaire-${viewport.width}x${viewport.height}.png`,
+      );
+      await page.screenshot({ fullPage: true, path: screenshotPath });
+
+      const saveAndExit =
+        viewport.width <= 767
+          ? page
+              .getByTestId("questionnaire-mobile-footer")
+              .getByRole("button", {
+                name: "Сохранить и выйти — нижняя панель",
+              })
+          : page.getByRole("button", {
+              exact: true,
+              name: "Сохранить и выйти",
+            });
+      await saveAndExit.click();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Мои подачи" }),
+      ).toBeVisible();
+
+      await page.reload();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Мои действия" }),
+      ).toBeVisible();
+      await openQuestionnaireFromAction(page);
+      await expect(
+        page.getByRole("combobox", { name: "Город проживания" }),
+      ).toHaveValue("Казань");
+      await expectNoDocumentOverflow(page);
+
+      const saveReadback =
+        viewport.width <= 767
+          ? page
+              .getByTestId("questionnaire-mobile-footer")
+              .getByRole("button", {
+                name: "Сохранить и выйти — нижняя панель",
+              })
+          : page.getByRole("button", {
+              exact: true,
+              name: "Сохранить и выйти",
+            });
+      await saveReadback.click();
+      const persistedDraftBeforeRoleRoundTrip = await page.evaluate(() =>
+        localStorage.getItem("visaflow.v19.submissions.v1"),
+      );
+      expect(persistedDraftBeforeRoleRoundTrip).toBeTruthy();
+
+      await signOutAndLoginWithoutClearingWorkspaceState(page, {
+        expectedHeading: /^(Очередь на проверку|Проверка)$/,
+        password: "22",
+        workspaceEmail: "2@2.ru",
+      });
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            localStorage.getItem("visaflow.v19.submissions.v1"),
+          ),
+        )
+        .toBe(persistedDraftBeforeRoleRoundTrip);
+      await expect(
+        page.getByRole("main", { name: "Рабочая область администратора" }),
+      ).toBeVisible();
+      await expect(page.locator(".vf-figma-questionnaire-screen")).toHaveCount(0);
+
+      await signOutAndLoginWithoutClearingWorkspaceState(page, {
+        expectedHeading: "Мои действия",
+        password: "11",
+        workspaceEmail: "1@1.ru",
+      });
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            localStorage.getItem("visaflow.v19.submissions.v1"),
+          ),
+        )
+        .toBe(persistedDraftBeforeRoleRoundTrip);
+      await openQuestionnaireFromAction(page);
+      await expect(
+        page.getByRole("combobox", { name: "Город проживания" }),
+      ).toHaveValue("Казань");
+
+      const badResponses = networkEvidence.responses.filter(
+        (response) => response.status >= 400,
+      );
+      expect(browserProblems).toEqual([]);
+      expect(networkEvidence.blockedOrigins).toEqual([]);
+      expect(networkEvidence.failedRequests).toEqual([]);
+      expect(networkEvidence.webSocketErrors).toEqual([]);
+      expect(badResponses).toEqual([]);
+      expect(
+        networkEvidence.responses.every(
+          (response) => response.origin === approvedHttpOrigin,
+        ),
+      ).toBe(true);
+      expect(
+        networkEvidence.webSocketOrigins.every(
+          (origin) => origin === approvedWebSocketOrigin,
+        ),
+      ).toBe(true);
+      expect(networkEvidence.requests.length).toBeGreaterThan(0);
+
+      viewportReceipts.push({
+        action: "set home city to Казань",
+        canonicalReadbackAfterReload: "Казань",
+        consoleAndPageErrors: browserProblems,
+        dropdownOptionHeights: {
+          select: countryOptionBox?.height,
+          suggestion: cityOptionBox?.height,
+        },
+        horizontalOverflow: false,
+        network: networkEvidence,
+        roleIsolation:
+          "same persisted draft survived agent -> admin -> agent; admin questionnaire absent; agent readback stayed Казань",
+        screenshotPath,
+        viewport,
+      });
+      await context.close();
+    }
+
+    const receiptPath = join(proofDirectory, "browser-receipt.json");
+    writeFileSync(
+      receiptPath,
+      `${JSON.stringify(
+        {
+          approvedOrigins: [approvedHttpOrigin, approvedWebSocketOrigin],
+          baseSha: process.env.V19_PROOF_BASE_SHA ?? "not-provided",
+          command: process.env.V19_PROOF_COMMAND ?? "not-provided",
+          diffIdentity: process.env.V19_PROOF_DIFF_ID ?? "working-tree",
+          exitCode: 0,
+          fixture: "local-demo agent 1@1.ru with canonical seeded submissions",
+          gaps: [],
+          localhostUrl: baseURL,
+          playwrightVersion: process.env.V19_PLAYWRIGHT_VERSION ?? "not-provided",
+          receiptPath,
+          residualRisk: "local-demo evidence only; not production proof",
+          role: "agent, then admin isolation check",
+          runId: proofRunId,
+          task: "questionnaire e2e corner cases",
+          verdict: "PASS",
+          viewports: viewportReceipts,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  });
 });
