@@ -9,6 +9,7 @@ import type {
   PassportExtractedField,
   PassportExtractionStatus,
   PassportUploadDraft,
+  PreliminaryIntakeDraft,
   Submission,
   ApplicantRole,
 } from "./types";
@@ -37,6 +38,7 @@ export type SubmissionIntakeIntent = {
   destination: SubmissionIntakeDestination;
   familyCount: number;
   passportUploads: PassportUploadDraft[];
+  preliminaryIntake?: PreliminaryIntakeDraft;
   type: Submission["type"];
 };
 

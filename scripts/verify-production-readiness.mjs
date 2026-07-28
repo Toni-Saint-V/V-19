@@ -8,7 +8,11 @@ import {
   requiredRemoteMigrationOrder,
   undeclaredMigrationFiles,
 } from "./supabase-migration-contract.mjs";
-import { testArtifactPath } from "./lib/artifact-paths.mjs";
+import {
+  isPortableTrackedArtifactReference,
+  resolveTestArtifactReference,
+  testArtifactPath,
+} from "./lib/artifact-paths.mjs";
 
 const repoRoot = process.cwd();
 const readinessRelativePath = "docs/release/supabase-production-readiness.json";
@@ -17,6 +21,7 @@ const packagePath = resolve(repoRoot, "package.json");
 const migrationsDir = resolve(repoRoot, "supabase/migrations");
 const sandboxProjectId = "oevvaowoklqttqkraxho";
 const expectBlocked = process.argv.includes("--expect-blocked");
+const printContext = process.argv.includes("--print-context");
 const readinessContractVersion = "2026-06-16-production-readiness-v2";
 
 const integrityBlockers = [];
@@ -75,6 +80,8 @@ const scopedDiffPaths = [
   "config/playwright/playwright.supabase-production-export-a1-s1.config.ts",
   "config/playwright/playwright.supabase-production-export-a2-s1-abort.config.ts",
   "scripts/prepare-supabase-production-packet.mjs",
+  "scripts/lib/artifact-paths.d.mts",
+  "scripts/lib/artifact-paths.mjs",
   "scripts/verify-agent-interaction-evidence.mjs",
   "scripts/provision-supabase-pilot-cohort.mjs",
   "scripts/supabase-migration-contract.mjs",
@@ -106,6 +113,7 @@ const scopedDiffPaths = [
   "supabase/remediation/20260712201203_allow_admin_waiting_review_issue_checkpoint.rollback.sql",
   "supabase/remediation/20260712225209_save_returned_submission_update_first.rollback.sql",
   "docs/release/auth-data-production-readiness.md",
+  "docs/architecture/v19-flow-state-model.md",
   "docs/release/supabase-production-approval-checklist.md",
   "docs/release/supabase-production-promotion.md",
   "docs/release/supabase-workspace-pr-package.md",
@@ -115,6 +123,7 @@ const scopedDiffPaths = [
   "tests/e2e-supabase-ui/production-lifecycle-helpers.ts",
   "tests/e2e-supabase-ui/production-lifecycle-resumable.spec.ts",
   "tests/unit/appProductionWorkspaceRuntime.spec.tsx",
+  "tests/unit/artifactPaths.spec.ts",
   "tests/unit/productionCohortNetworkContract.spec.ts",
   "tests/unit/supabaseSecurityContract.spec.ts",
   "tests/unit/v19SubmissionRules.spec.ts",
@@ -136,6 +145,25 @@ function block(label, detail) {
 
 function activationBlock(label, detail) {
   activationBlockers.push({ label, detail });
+}
+
+function hostSpecificArtifactReferences(value, path = "$", references = []) {
+  if (!value || typeof value !== "object") return references;
+
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${path}.${key}`;
+    if (
+      typeof child === "string" &&
+      /(?:artifact|screenshot|report|trace|video)/i.test(key) &&
+      !isPortableTrackedArtifactReference(child)
+    ) {
+      references.push(childPath);
+      continue;
+    }
+    hostSpecificArtifactReferences(child, childPath, references);
+  }
+
+  return references;
 }
 
 function readText(path, label) {
@@ -371,7 +399,7 @@ function requireActivationExistingProjectFile(value, label) {
     return false;
   }
 
-  const path = resolve(repoRoot, value);
+  const path = resolveTestArtifactReference(value, repoRoot);
   if (existsSync(path)) {
     pass(label);
     return true;
@@ -382,7 +410,7 @@ function requireActivationExistingProjectFile(value, label) {
 }
 
 function projectFileExists(value) {
-  return present(value) && existsSync(resolve(repoRoot, value));
+  return present(value) && existsSync(resolveTestArtifactReference(value, repoRoot));
 }
 
 function requireNonNegativeInteger(value, label) {
@@ -396,7 +424,7 @@ function requireExistingProjectFile(value, label) {
     return false;
   }
 
-  const path = resolve(repoRoot, value);
+  const path = resolveTestArtifactReference(value, repoRoot);
   if (existsSync(path)) {
     pass(label);
     return true;
@@ -411,7 +439,7 @@ function verifyBrowserKeyAuditEvidence(sandbox) {
     ? sandbox.browserKeyAuditEvidenceArtifact
     : sandbox.browserKeyAuditScreenshot;
 
-  requireExistingProjectFile(
+  requireActivationExistingProjectFile(
     evidenceArtifact,
     "Sandbox browser key audit evidence artifact exists",
   );
@@ -606,7 +634,10 @@ function verifyPackageScript() {
 }
 
 function verifyAgentInteractionProductionEvidence() {
-  const verifierPath = resolve(repoRoot, "scripts/verify-agent-interaction-evidence.mjs");
+  const verifierPath = resolve(
+    repoRoot,
+    "scripts/verify-agent-interaction-evidence.mjs",
+  );
   let rawResult = "";
   try {
     rawResult = execFileSync(process.execPath, [verifierPath], {
@@ -629,7 +660,11 @@ function verifyAgentInteractionProductionEvidence() {
     return;
   }
 
-  if (result.status === "PASS" && Array.isArray(result.blockers) && !result.blockers.length) {
+  if (
+    result.status === "PASS" &&
+    Array.isArray(result.blockers) &&
+    !result.blockers.length
+  ) {
     pass("Exact deployed agent interaction evidence passes");
     return;
   }
@@ -654,7 +689,7 @@ function verifyProductionMigrationEvidence(packet) {
   if (!present(artifact)) return;
 
   const evidence = readText(
-    resolve(repoRoot, artifact),
+    resolveTestArtifactReference(artifact, repoRoot),
     "Production migration evidence artifact exists",
   );
   if (!evidence) return;
@@ -737,7 +772,7 @@ function verifySmokeDiscoveryEvidence(packet, smokeDiscovery) {
   if (!present(artifact)) return;
 
   const evidence = readText(
-    resolve(repoRoot, artifact),
+    resolveTestArtifactReference(artifact, repoRoot),
     "Production smoke account discovery evidence artifact exists",
   );
   if (!evidence) return;
@@ -828,7 +863,7 @@ function verifyPreActivationCheck(pre, key, command, label, verifierSha256) {
   if (!present(check.evidenceArtifact)) return;
 
   const evidence = readText(
-    resolve(repoRoot, check.evidenceArtifact),
+    resolveTestArtifactReference(check.evidenceArtifact, repoRoot),
     `${label} evidence artifact exists`,
   );
   if (!evidence) return;
@@ -863,6 +898,7 @@ function verifyPreActivationFreshness(
   verifierSha256,
   gitHead,
   controlledPilot = false,
+  verifyControlledPilotDeferral = false,
 ) {
   const scopedDiffSha256 = currentScopedDiffSha256();
   requireActivationEqual(
@@ -942,7 +978,7 @@ function verifyPreActivationFreshness(
       "test:e2e:supabase evidence",
       verifierSha256,
     );
-  } else if (controlledPilot) {
+  } else if (controlledPilot && verifyControlledPilotDeferral) {
     const check = pre.testE2eSupabase ?? {};
     const deferredFailure = check.deferredFailure ?? {};
     requireEqual(
@@ -1025,7 +1061,7 @@ function verifyPreActivationFreshness(
     }
     if (present(check.evidenceArtifact)) {
       const evidence = readText(
-        resolve(repoRoot, check.evidenceArtifact),
+        resolveTestArtifactReference(check.evidenceArtifact, repoRoot),
         "test:e2e:supabase deferred evidence artifact exists",
       );
       for (const marker of deferredE2eMarkers) {
@@ -1148,7 +1184,7 @@ function verifyAuthSecurityEvidence(packet, authSecurity) {
   if (!present(artifact)) return;
 
   const evidence = readText(
-    resolve(repoRoot, artifact),
+    resolveTestArtifactReference(artifact, repoRoot),
     "Supabase security advisor evidence artifact exists",
   );
   if (!evidence) return;
@@ -1268,7 +1304,7 @@ function verifyProductionWorkflowEvidence(packet, env, post) {
   if (!present(artifact)) return;
 
   const evidence = readText(
-    resolve(repoRoot, artifact),
+    resolveTestArtifactReference(artifact, repoRoot),
     "Production workflow smoke evidence artifact exists",
   );
   if (!evidence) return;
@@ -1350,6 +1386,11 @@ function controlledPilotEvidenceConfirmed(packet, key) {
   const artifact = structuredRisk.evidenceArtifact ?? pilot.evidenceArtifact;
   const riskMarkers = controlledPilotRiskEvidenceMarkers[key];
 
+  if (packet.goNoGo?.decision !== "GO") {
+    controlledPilotRiskEvidenceCache.set(key, false);
+    return false;
+  }
+
   if (!isControlledPilot(packet)) {
     block(
       label,
@@ -1396,7 +1437,7 @@ function controlledPilotEvidenceConfirmed(packet, key) {
     return false;
   }
 
-  const evidence = readText(resolve(repoRoot, artifact), label);
+  const evidence = readText(resolveTestArtifactReference(artifact, repoRoot), label);
   const requiredMarkers = [
     packet.productionTarget?.projectId ?? "",
     "Scope: `controlled-10-registered-agent-500-submission-pilot`",
@@ -1426,9 +1467,8 @@ function requireActivationIntegerEqual(value, expected, label) {
 }
 
 function requireEvidenceSnippet(artifact, snippet, label) {
-  requireExistingProjectFile(artifact, label);
-  if (!present(artifact)) return;
-  const evidence = readText(resolve(repoRoot, artifact), label);
+  if (!requireActivationExistingProjectFile(artifact, label)) return;
+  const evidence = readText(resolveTestArtifactReference(artifact, repoRoot), label);
   if (!evidence) return;
   requireSnippet(evidence, snippet, label);
 }
@@ -1567,7 +1607,7 @@ function verifyControlledPilotEnvelope(packet) {
   );
   if (projectFileExists(pilot.workloadEvidenceArtifact)) {
     const evidence = readText(
-      resolve(repoRoot, pilot.workloadEvidenceArtifact),
+      resolveTestArtifactReference(pilot.workloadEvidenceArtifact, repoRoot),
       "Controlled pilot volume evidence artifact exists",
     );
     requireEvidenceIntegerAtMost(
@@ -1624,6 +1664,15 @@ function verifyControlledPilotEnvelope(packet) {
 
 function verifyPacket(packet, rawContent) {
   verifyNoCommittedSecrets(rawContent);
+  const hostSpecificReferences = hostSpecificArtifactReferences(packet);
+  if (hostSpecificReferences.length === 0) {
+    pass("Production readiness packet artifact references are portable");
+  } else {
+    block(
+      "Production readiness packet artifact references are portable",
+      hostSpecificReferences.join(", "),
+    );
+  }
   const gitHead = currentGitHead();
   const verifierSha256 = sha256Text(
     readText(
@@ -1678,7 +1727,7 @@ function verifyPacket(packet, rawContent) {
   } else {
     block("Sandbox reference activation target is sandbox", "mismatch");
   }
-  requireExistingProjectFile(
+  requireActivationExistingProjectFile(
     sandbox.evidenceArtifact,
     "Sandbox evidence artifact exists",
   );
@@ -1849,7 +1898,13 @@ function verifyPacket(packet, rawContent) {
   );
 
   const pre = packet.preActivationVerification ?? {};
-  verifyPreActivationFreshness(pre, verifierSha256, gitHead, controlledPilot);
+  verifyPreActivationFreshness(
+    pre,
+    verifierSha256,
+    gitHead,
+    controlledPilot,
+    packet.goNoGo?.decision === "GO",
+  );
   requireActivationTrue(
     pre.verifyAuthDataReadinessPassed,
     "verify:auth-data-readiness passed",
@@ -2030,7 +2085,7 @@ function verifyPacket(packet, rawContent) {
     );
     if (present(packet.goNoGo?.blockerEvidenceArtifact)) {
       const evidence = readText(
-        resolve(repoRoot, packet.goNoGo.blockerEvidenceArtifact),
+        resolveTestArtifactReference(packet.goNoGo.blockerEvidenceArtifact, repoRoot),
         "Go / No-Go blocker evidence artifact exists",
       );
       if (evidence) {
@@ -2067,6 +2122,28 @@ if (rawReadiness) {
   } catch (error) {
     block("Production readiness packet is valid JSON", error.message);
   }
+}
+
+if (printContext) {
+  const verifierSha256 = sha256Text(
+    readText(
+      resolve(repoRoot, "scripts/verify-production-readiness.mjs"),
+      "Production readiness verifier exists",
+    ),
+  );
+  console.log(
+    JSON.stringify(
+      {
+        readinessContractVersion,
+        readinessVerifierSha256: verifierSha256,
+        gitHead: currentGitHead(),
+        scopedDiffSha256: currentScopedDiffSha256(),
+      },
+      null,
+      2,
+    ),
+  );
+  process.exit(integrityBlockers.length ? 1 : 0);
 }
 
 verifyPackageScript();

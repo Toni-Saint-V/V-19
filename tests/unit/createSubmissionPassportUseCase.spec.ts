@@ -2,6 +2,12 @@ import { describe, expect, test, vi } from "vitest";
 import { createDraftSubmission } from "../../src/modules/submissions/submissionActions";
 import { persistCreatedSubmissionWithPassports } from "../../src/modules/submissions/createSubmissionPassportUseCase";
 import {
+  buildLocalDemoExportMediaZipOptions,
+  localDemoReviewMediaUrl,
+} from "../../src/modules/submissions/exportMediaZipLocalDemo";
+import { saveLocalDemoMedia } from "../../src/modules/submissions/localDemoMediaStorage";
+import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
+import {
   loadSubmissions,
   saveSubmissions,
 } from "../../src/modules/submissions/persistence";
@@ -91,11 +97,198 @@ describe("persistCreatedSubmissionWithPassports", () => {
     expect(result.applicants[0]?.passportExtraction?.status).toBe("ready");
   });
 
-  test("reloads a locally persisted family with passport metadata", async () => {
-    const previousStorage = Object.getOwnPropertyDescriptor(
-      globalThis,
-      "localStorage",
+  test("stores exact local-demo bytes before publishing the simulated private identity", async () => {
+    const persisted: Submission[] = [];
+    const uploadMedia = vi.fn();
+    const initial = draft(1);
+
+    const result = await persistCreatedSubmissionWithPassports({
+      onPendingSubmission: () => undefined,
+      passportUploads: [passportUpload(0)],
+      persistSubmission: async (submission) => {
+        persisted.push(submission);
+      },
+      simulatePrivateStorage: true,
+      storageAdapter: "local-dev",
+      submission: initial,
+      uploadMedia,
+    });
+
+    expect(uploadMedia).not.toHaveBeenCalled();
+    expect(persisted).toHaveLength(2);
+    expect(result.files.find((file) => file.type === "passport_scan")).toMatchObject({
+      localDemoMediaStored: true,
+      originalFileName: "audit-1.png",
+      storageAdapter: "supabase-private",
+      storageBucket: "submission-media",
+      storagePath: expect.stringContaining(
+        `/${initial.applicants[0]?.id}/passport_scan/`,
+      ),
+      uploadStatus: "uploaded",
+    });
+
+    const exportSubmission: Submission = {
+      ...result,
+      files: result.files.map((file) =>
+        file.type === "passport_scan" ? { ...file, status: "accepted" } : file,
+      ),
+    };
+    const previousStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    const values = new Map<string, string>();
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (key: string) => values.get(key) ?? null,
+        removeItem: (key: string) => values.delete(key),
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    });
+    let reloadedSubmission: Submission | undefined;
+    try {
+      expect(saveSubmissions([exportSubmission])).toEqual({ ok: true });
+      reloadedSubmission = loadSubmissions().find(
+        (submission) => submission.id === exportSubmission.id,
+      );
+    } finally {
+      if (previousStorage) {
+        Object.defineProperty(globalThis, "localStorage", previousStorage);
+      } else {
+        Reflect.deleteProperty(globalThis, "localStorage");
+      }
+    }
+    expect(reloadedSubmission).toBeDefined();
+    const reloadedPassport = reloadedSubmission?.files.find(
+      (file) => file.type === "passport_scan",
     );
+    expect(reloadedPassport).toMatchObject({
+      localDemoMediaStored: true,
+      storageAdapter: "supabase-private",
+      storagePath: expect.stringContaining("/passport_scan/"),
+    });
+
+    const previousCreateObjectUrl = Object.getOwnPropertyDescriptor(
+      URL,
+      "createObjectURL",
+    );
+    const createObjectUrl = vi.fn((blob: Blob) => {
+      void blob;
+      return "blob:reloaded-passport";
+    });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrl,
+    });
+    try {
+      await expect(
+        localDemoReviewMediaUrl("passport_scan", reloadedPassport),
+      ).resolves.toBe("blob:reloaded-passport");
+      const previewBlob = createObjectUrl.mock.calls[0]?.[0] as Blob | undefined;
+      expect(previewBlob).toBeInstanceOf(Blob);
+      expect(Array.from(new Uint8Array(await previewBlob!.arrayBuffer()))).toEqual([
+        0x89, 0x50, 0x4e, 0x47,
+      ]);
+    } finally {
+      if (previousCreateObjectUrl) {
+        Object.defineProperty(URL, "createObjectURL", previousCreateObjectUrl);
+      } else {
+        Reflect.deleteProperty(URL, "createObjectURL");
+      }
+    }
+
+    const options = buildLocalDemoExportMediaZipOptions([reloadedSubmission!]);
+    const asset = options.documentAssets?.[0];
+    expect(asset).toBeDefined();
+    const exported = asset
+      ? await options.downloadDocument?.(asset, {
+          applicant: reloadedSubmission!.applicants[0]!,
+          applicantIndex: 0,
+          exportDate: "2026-07-28",
+          submission: reloadedSubmission!,
+          type: asset.type,
+        })
+      : null;
+    expect(exported).not.toBeNull();
+    expect(Array.from(new Uint8Array(await exported!.arrayBuffer()))).toEqual([
+      0x89, 0x50, 0x4e, 0x47,
+    ]);
+
+    const applicant = exportSubmission.applicants[0]!;
+    const selfieFile = new File(
+      [new Uint8Array([0xff, 0xd8, 0x01, 0xff, 0xd9])],
+      "selfie-source.jpg",
+      { type: "image/jpeg" },
+    );
+    const selfieTarget = buildMediaStoragePath(
+      exportSubmission.id,
+      applicant.id,
+      "selfie",
+      "123_selfie.jpg",
+    );
+    await saveLocalDemoMedia(selfieTarget, selfieFile);
+    const exportWithSelfie: Submission = {
+      ...exportSubmission,
+      files: [
+        ...exportSubmission.files,
+        {
+          applicantId: applicant.id,
+          generatedFileName: "123_selfie.jpg",
+          id: "selfie-source",
+          localDemoMediaStored: true,
+          mimeType: selfieFile.type,
+          originalFileName: selfieFile.name,
+          sizeBytes: selfieFile.size,
+          status: "accepted",
+          storageAdapter: "supabase-private",
+          storageBucket: selfieTarget.bucket,
+          storagePath: selfieTarget.path,
+          type: "selfie",
+          uploadStatus: "uploaded",
+        },
+      ],
+    };
+    const selfieOptions = buildLocalDemoExportMediaZipOptions([exportWithSelfie]);
+    const selfieAsset = selfieOptions.documentAssets?.find(
+      (candidate) => candidate.type === "selfie_1",
+    );
+    expect(selfieAsset?.storage.path).toContain("/selfie_1/");
+    const exportedSelfie = selfieAsset
+      ? await selfieOptions.downloadDocument?.(selfieAsset, {
+          applicant,
+          applicantIndex: 0,
+          exportDate: "2026-07-28",
+          submission: exportWithSelfie,
+          type: selfieAsset.type,
+        })
+      : null;
+    expect(Array.from(new Uint8Array(await exportedSelfie!.arrayBuffer()))).toEqual([
+      0xff, 0xd8, 0x01, 0xff, 0xd9,
+    ]);
+  });
+
+  test("rejects private-storage simulation with the production adapter", async () => {
+    const persistSubmission = vi.fn(async () => undefined);
+    const uploadMedia = vi.fn();
+
+    await expect(
+      persistCreatedSubmissionWithPassports({
+        onPendingSubmission: () => undefined,
+        passportUploads: [passportUpload(0)],
+        persistSubmission,
+        simulatePrivateStorage: true,
+        storageAdapter: "supabase-private",
+        submission: draft(1),
+        uploadMedia,
+      }),
+    ).rejects.toThrow(
+      "Private Storage simulation is available only with the local-dev adapter.",
+    );
+
+    expect(persistSubmission).not.toHaveBeenCalled();
+    expect(uploadMedia).not.toHaveBeenCalled();
+  });
+
+  test("reloads a locally persisted family with passport metadata", async () => {
+    const previousStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
     const values = new Map<string, string>();
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,

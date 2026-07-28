@@ -9,6 +9,9 @@ import {
 import type { WorkspaceDataStatus } from "../lib/supabase/workspaceRuntime";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
 import "../shared/ui/operational-screen-convergence.css";
+import "../shared/ui/operational-side-menu.css";
+import "../shared/ui/agent-actions-v2.css";
+import "../shared/ui/agent-drawer-v2.css";
 
 type Workspace = "agent" | "admin";
 

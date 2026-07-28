@@ -569,6 +569,11 @@
   font-size: var(--v19b-size-14) !important;
 }
 
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-dropdown-option {
+  block-size: calc(var(--v19b-size-44) + var(--v19b-size-1));
+  padding-block: calc(var(--v19b-size-10) + var(--v19b-size-1));
+}
+
 .vf-figma-questionnaire-screen.codex-polish-v1
   .v19-questionnaire-field-control.is-filled {
   border-color: var(--v19b-color-border-strong) !important;
@@ -1135,6 +1140,8 @@
 }
 
 .v19-select-menu-popover.is-questionnaire-tourist {
+  /* Portaled to body: stay above the legacy fullscreen questionnaire shell. */
+  z-index: 2147483100;
   gap: var(--v19b-size-4);
   padding: var(--v19b-size-8);
   border-color: var(--v19b-color-border-strong);
@@ -1730,11 +1737,6 @@
     .v19-questionnaire-mobile-footer-applicant
     .v19-select-menu-trigger:focus-visible {
     border-color: var(--v19b-color-border-selected);
-  }
-
-  /* The listbox portal is a body child; keep it above the legacy fullscreen shell. */
-  .v19-select-menu-popover.is-questionnaire-tourist[aria-label="Выбрать заявителя — нижняя панель"] {
-    z-index: 2147483100;
   }
 }
 

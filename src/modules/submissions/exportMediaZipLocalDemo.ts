@@ -7,30 +7,55 @@ import {
 import { mediaStorageBucket } from "./mediaStorage";
 import type { ExportMediaZipOptions } from "./exportMediaZip";
 import type { Submission, SubmissionFile } from "./types";
+import { loadLocalDemoMedia } from "./localDemoMediaStorage";
 
 export function buildLocalDemoExportMediaZipOptions(
   submissions: Submission[],
 ): Pick<ExportMediaZipOptions, "documentAssets" | "downloadDocument"> {
+  const sourceFiles = new Map(
+    submissions.flatMap((submission) =>
+      submission.files.map((file) => [file.id, file] as const),
+    ),
+  );
   return {
     documentAssets: localDemoDocumentAssetsFromSubmissionFiles(submissions),
-    downloadDocument: async (asset) => loadLocalDemoJpeg(asset.type),
+    downloadDocument: async (asset) => {
+      const sourceFile = asset.sourceMediaAssetId
+        ? sourceFiles.get(asset.sourceMediaAssetId)
+        : undefined;
+      if (!sourceFile?.localDemoMediaStored) return loadLocalDemoJpeg(asset.type);
+
+      if (!sourceFile.storagePath) return null;
+      const stored = await loadLocalDemoMedia(sourceFile.storagePath);
+      if (!stored || (sourceFile.sizeBytes && stored.size !== sourceFile.sizeBytes)) {
+        return null;
+      }
+      return stored;
+    },
   };
 }
 
 type LocalDemoJpegType = DocumentType;
 
 const localDemoJpegUrls: Partial<Record<LocalDemoJpegType, string>> = {
-  passport_scan: new URL(
-    "../../assets/export-demo/passport_scan.jpeg",
-    import.meta.url,
-  ).href,
+  passport_scan: new URL("../../assets/export-demo/passport_scan.jpeg", import.meta.url)
+    .href,
   selfie_1: new URL("../../assets/export-demo/selfie_1.jpg", import.meta.url).href,
   selfie_2: new URL("../../assets/export-demo/selfie_2.jpg", import.meta.url).href,
 };
 
-export function localDemoReviewMediaUrl(
+export async function localDemoReviewMediaUrl(
   type: "passport_scan" | "selfie" | "selfie_2",
-): string | null {
+  file?: SubmissionFile,
+): Promise<string | null> {
+  if (file?.localDemoMediaStored) {
+    if (!file.storagePath) return null;
+    const stored = await loadLocalDemoMedia(file.storagePath);
+    if (!stored || (file.sizeBytes && stored.size !== file.sizeBytes)) return null;
+    if (typeof URL.createObjectURL !== "function") return null;
+    return URL.createObjectURL(stored);
+  }
+
   const documentType = type === "selfie" ? "selfie_1" : type;
   return localDemoJpegUrls[documentType] ?? null;
 }
@@ -129,10 +154,7 @@ function localDemoDocumentAssetsFromSubmissionFiles(
   );
 }
 
-function localDemoDocumentFileName(
-  file: SubmissionFile,
-  type: DocumentType,
-): string {
+function localDemoDocumentFileName(file: SubmissionFile, type: DocumentType): string {
   const extension = localDemoExtension(file.mimeType);
   const raw =
     file.generatedFileName ??
