@@ -3,6 +3,7 @@ import {
   buildExportPackageIdentity,
   exportSummary,
 } from "../../src/modules/submissions/exportRules";
+import { localDemoReviewMediaUrl } from "../../src/modules/submissions/exportMediaZipLocalDemo";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { passportGateIssues } from "../../src/modules/submissions/passportExtractionGuards";
 import { hasMissingRequiredWork } from "../../src/modules/submissions/status";
@@ -10,12 +11,26 @@ import { createExportWorkbookArtifact } from "../../src/modules/submissions/expo
 import { parseExportWorkbookArtifact } from "../../src/modules/submissions/exportWorkbookVerification";
 import { createVisaApplicationFormPdfBlob } from "../../src/modules/submissions/visaApplicationFormPdf";
 import { loadSubmissions } from "../../src/modules/submissions/persistence";
+import type { Submission } from "../../src/modules/submissions/types";
 
 const storageKey = "visaflow.v19.submissions.v1";
 
 afterEach(() => {
   Reflect.deleteProperty(globalThis, "localStorage");
 });
+
+function installSubmissionSnapshot(submissions: Submission[]) {
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  });
+  globalThis.localStorage.setItem(storageKey, JSON.stringify(submissions));
+}
 
 describe("local demo export fixtures", () => {
   it("keeps every ready-for-export fixture genuinely exportable", () => {
@@ -164,5 +179,127 @@ describe("local demo export fixtures", () => {
     expect(new Set(rows.map((row) => row.dateOfBirth))).toEqual(
       new Set(["1991-03-14", "1988-11-22"]),
     );
+  });
+
+  it("rehydrates bundled originals for a persisted legacy official fixture", () => {
+    const source = initialSubmissions.find(
+      (submission) => submission.id === "SUB-1103",
+    );
+    if (!source) throw new Error("Expected official local demo fixture SUB-1103");
+    const legacy = structuredClone(source);
+    legacy.files = legacy.files.map((sourceFile) => {
+      const file = { ...sourceFile };
+      delete file.localDemoSeedMedia;
+      return file;
+    });
+    installSubmissionSnapshot([legacy]);
+
+    const loaded = loadSubmissions()[0];
+    const requiredMedia = loaded?.files.filter((file) =>
+      ["passport_scan", "selfie", "selfie_2"].includes(file.type),
+    );
+
+    expect(requiredMedia).toHaveLength(3);
+    expect(
+      requiredMedia?.map((file) => ({
+        localDemoMediaStored: file.localDemoMediaStored,
+        localDemoSeedMedia: file.localDemoSeedMedia,
+        type: file.type,
+      })),
+    ).toEqual([
+      {
+        localDemoMediaStored: undefined,
+        localDemoSeedMedia: true,
+        type: "passport_scan",
+      },
+      {
+        localDemoMediaStored: undefined,
+        localDemoSeedMedia: true,
+        type: "selfie",
+      },
+      {
+        localDemoMediaStored: undefined,
+        localDemoSeedMedia: true,
+        type: "selfie_2",
+      },
+    ]);
+  });
+
+  it("repairs a legacy stored marker without relying on the new seed flag", async () => {
+    const source = initialSubmissions.find(
+      (submission) => submission.id === "SUB-1103",
+    );
+    if (!source) throw new Error("Expected official local demo fixture SUB-1103");
+    const staleStoredMarker = structuredClone(source);
+    staleStoredMarker.files = staleStoredMarker.files.map((sourceFile) => {
+      const file = { ...sourceFile, localDemoMediaStored: true as const };
+      delete file.localDemoSeedMedia;
+      return file;
+    });
+    installSubmissionSnapshot([staleStoredMarker]);
+
+    const loaded = loadSubmissions()[0];
+    const requiredMedia = loaded?.files.filter((file) =>
+      ["passport_scan", "selfie", "selfie_2"].includes(file.type),
+    );
+
+    expect(requiredMedia).toHaveLength(3);
+    expect(
+      requiredMedia?.every(
+        (file) =>
+          file.localDemoMediaStored === undefined && file.localDemoSeedMedia === true,
+      ),
+    ).toBe(true);
+
+    const mediaByType = new Map(
+      requiredMedia?.map((file) => [file.type, file] as const),
+    );
+    const reviewMediaUrls = await Promise.all([
+      localDemoReviewMediaUrl("passport_scan", mediaByType.get("passport_scan")),
+      localDemoReviewMediaUrl("selfie", mediaByType.get("selfie")),
+      localDemoReviewMediaUrl("selfie_2", mediaByType.get("selfie_2")),
+    ]);
+
+    expect(
+      reviewMediaUrls.every((url) => typeof url === "string" && url.length > 0),
+    ).toBe(true);
+  });
+
+  it("preserves an IndexedDB-backed replacement instead of restoring seed identity", () => {
+    const source = initialSubmissions.find(
+      (submission) => submission.id === "SUB-1103",
+    );
+    if (!source) throw new Error("Expected official local demo fixture SUB-1103");
+    const stored = structuredClone(source);
+    const replacementIdentity = {
+      generatedFileName: "replacement11031_passport_scan.png",
+      localDemoMediaStored: true as const,
+      localDemoSeedMedia: true as const,
+      mimeType: "image/png",
+      originalFileName: "nikita-passport-replacement.png",
+      sizeBytes: 17,
+      storageAdapter: "supabase-private" as const,
+      storageBucket: "submission-media",
+      storagePath:
+        "submissions/SUB-1103/applicants/з-1103-1/passport_scan/replacement11031_passport_scan.png",
+    };
+    stored.files = stored.files.map((file) =>
+      file.type === "passport_scan" ? { ...file, ...replacementIdentity } : file,
+    );
+    installSubmissionSnapshot([stored]);
+
+    const loadedPassport = loadSubmissions()[0]?.files.find(
+      (file) => file.type === "passport_scan",
+    );
+
+    expect(loadedPassport).toMatchObject({
+      generatedFileName: replacementIdentity.generatedFileName,
+      localDemoMediaStored: true,
+      mimeType: replacementIdentity.mimeType,
+      originalFileName: replacementIdentity.originalFileName,
+      sizeBytes: replacementIdentity.sizeBytes,
+      storagePath: replacementIdentity.storagePath,
+    });
+    expect(loadedPassport?.localDemoSeedMedia).toBeUndefined();
   });
 });
