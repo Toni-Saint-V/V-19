@@ -1,9 +1,9 @@
-import {
-  isCompletedFileAsset,
-  isFileAssetUploadMissing,
-} from "./fileAsset";
+import { hasCanonicalPrivateStorageIdentityAtSubmissionTarget } from "./fileAsset";
+import { submissionBelongsToAgent } from "./ownership";
+import { canAgentEditSubmission } from "./status";
 import { updateQuestionnaireField } from "./submissionActions";
 import type {
+  AgentOwnerId,
   Applicant,
   PassportExtractedField,
   PassportExtractedFieldKey,
@@ -374,28 +374,18 @@ export function markPassportExtractionReviewed(
 export function confirmApplicantPassportReview(
   submission: Submission,
   applicantId: string,
+  actorId: AgentOwnerId,
 ): Submission {
   const applicant = submission.applicants.find((item) => item.id === applicantId);
   const file = submission.files.find(
     (item) => item.applicantId === applicantId && item.type === "passport_scan",
   );
   const state = applicant?.passportExtraction;
-  const hasDurableUploadedPassport = Boolean(
-    file &&
-      !isFileAssetUploadMissing(file) &&
-      file.generatedFileName &&
-      file.storageBucket &&
-      file.storagePath,
-  );
 
-  if (
-    !applicant ||
-    !file ||
-    (!isCompletedFileAsset(file) && !hasDurableUploadedPassport) ||
-    state?.status === "extracting"
-  ) {
+  if (!canConfirmApplicantPassportReview(submission, applicantId, actorId)) {
     return submission;
   }
+  if (!applicant || !file) return submission;
 
   const timestamp = new Date().toISOString();
   const hasExtractedFields =
@@ -431,10 +421,41 @@ export function confirmApplicantPassportReview(
         id: `и-${submission.id}-паспорт-проверен-${applicantId}-${timestamp}`,
         text: `Агент проверил паспорт заявителя ${applicant.fullName}`,
         at: "сейчас",
+        actorId,
         source: "agent",
       },
       ...submission.history,
     ],
     updatedAt: "сейчас",
   };
+}
+
+export function canConfirmApplicantPassportReview(
+  submission: Submission,
+  applicantId: string,
+  actorId: AgentOwnerId,
+): boolean {
+  const applicant = submission.applicants.find((item) => item.id === applicantId);
+  const file = submission.files.find(
+    (item) => item.applicantId === applicantId && item.type === "passport_scan",
+  );
+  const state = applicant?.passportExtraction;
+  const hasDurableUploadedPassport = Boolean(
+    file &&
+    hasCanonicalPrivateStorageIdentityAtSubmissionTarget(file, {
+      applicantId,
+      fileType: "passport_scan",
+      submissionId: submission.id,
+    }),
+  );
+
+  return Boolean(
+    applicant &&
+    file &&
+    canAgentEditSubmission(submission) &&
+    submissionBelongsToAgent(submission, actorId) &&
+    hasDurableUploadedPassport &&
+    state?.status !== "extracting" &&
+    !state?.verifiedAtIso,
+  );
 }

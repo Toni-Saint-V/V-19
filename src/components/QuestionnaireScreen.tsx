@@ -488,11 +488,24 @@ export function QuestionnaireScreen({
 
   const handleConfirmPassportReview = useCallback(
     async (applicantId: string) => {
-      await persistSubmissionUpdate((currentSubmission) =>
-        confirmApplicantPassportReview(currentSubmission, applicantId),
-      );
+      return persistSubmissionUpdate((currentSubmission) => {
+        const confirmedSubmission = confirmApplicantPassportReview(
+          currentSubmission,
+          applicantId,
+          commandActorId,
+        );
+        const confirmedApplicant = confirmedSubmission.applicants.find(
+          (applicant) => applicant.id === applicantId,
+        );
+        if (!confirmedApplicant?.passportExtraction?.verifiedAtIso) {
+          throw new Error(
+            "Паспорт ещё нельзя подтвердить: дождитесь загрузки и завершения обработки.",
+          );
+        }
+        return confirmedSubmission;
+      });
     },
-    [persistSubmissionUpdate],
+    [commandActorId, persistSubmissionUpdate],
   );
 
   const handleSaveAndExit = useCallback(async () => {
@@ -521,6 +534,7 @@ export function QuestionnaireScreen({
 
   return (
     <FigmaQuestionnaireScreen
+      commandActorId={commandActorId}
       initialFocus={initialFocus}
       submission={workingSubmission}
       onBack={onBack}

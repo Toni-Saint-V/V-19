@@ -6,28 +6,55 @@ import {
 } from "../documents/documentTypes";
 import { mediaStorageBucket } from "./mediaStorage";
 import type { ExportMediaZipOptions } from "./exportMediaZip";
+import { hasCanonicalPrivateStorageIdentityAtSubmissionTarget } from "./fileAsset";
 import type { Submission, SubmissionFile } from "./types";
 import { loadLocalDemoMedia } from "./localDemoMediaStorage";
 
+type LocalDemoMediaLoader = (path: string) => Promise<Blob | null>;
+
 export function buildLocalDemoExportMediaZipOptions(
   submissions: Submission[],
+  loadMedia: LocalDemoMediaLoader = loadLocalDemoMedia,
 ): Pick<ExportMediaZipOptions, "documentAssets" | "downloadDocument"> {
   const sourceFiles = new Map(
     submissions.flatMap((submission) =>
-      submission.files.map((file) => [file.id, file] as const),
+      submission.files.map(
+        (file) => [localDemoSourceFileKey(submission.id, file.id), file] as const,
+      ),
     ),
   );
   return {
     documentAssets: localDemoDocumentAssetsFromSubmissionFiles(submissions),
     downloadDocument: async (asset) => {
       const sourceFile = asset.sourceMediaAssetId
-        ? sourceFiles.get(asset.sourceMediaAssetId)
+        ? sourceFiles.get(
+            localDemoSourceFileKey(asset.submissionId, asset.sourceMediaAssetId),
+          )
         : undefined;
-      if (!sourceFile?.localDemoMediaStored) return loadLocalDemoJpeg(asset.type);
+      if (!sourceFile || !localDemoSourceFileMatchesAsset(sourceFile, asset)) {
+        return null;
+      }
+      if (!sourceFile.localDemoMediaStored) {
+        return isBundledLocalDemoSeed(sourceFile, asset.type)
+          ? loadLocalDemoJpeg(asset.type)
+          : null;
+      }
 
-      if (!sourceFile.storagePath) return null;
-      const stored = await loadLocalDemoMedia(sourceFile.storagePath);
-      if (!stored || (sourceFile.sizeBytes && stored.size !== sourceFile.sizeBytes)) {
+      if (
+        !sourceFile.storagePath ||
+        !hasCanonicalPrivateStorageIdentityAtSubmissionTarget(sourceFile, {
+          applicantId: asset.applicantId,
+          fileType: sourceFile.type,
+          submissionId: asset.submissionId,
+        })
+      ) {
+        return null;
+      }
+      const stored = await loadMedia(sourceFile.storagePath);
+      if (
+        !isExactStoredLocalDemoMedia(stored, sourceFile) ||
+        normalizeMimeType(asset.mime) !== normalizeMimeType(sourceFile.mimeType)
+      ) {
         return null;
       }
       return stored;
@@ -47,17 +74,33 @@ const localDemoJpegUrls: Partial<Record<LocalDemoJpegType, string>> = {
 export async function localDemoReviewMediaUrl(
   type: "passport_scan" | "selfie" | "selfie_2",
   file?: SubmissionFile,
+  submissionId?: string,
+  loadMedia: LocalDemoMediaLoader = loadLocalDemoMedia,
 ): Promise<string | null> {
   if (file?.localDemoMediaStored) {
-    if (!file.storagePath) return null;
-    const stored = await loadLocalDemoMedia(file.storagePath);
-    if (!stored || (file.sizeBytes && stored.size !== file.sizeBytes)) return null;
+    if (
+      !submissionId ||
+      !file.storagePath ||
+      !hasCanonicalPrivateStorageIdentityAtSubmissionTarget(file, {
+        applicantId: file.applicantId,
+        fileType: file.type,
+        submissionId,
+      })
+    ) {
+      return null;
+    }
+    const expectedDocumentType = type === "selfie" ? "selfie_1" : type;
+    if (tryNormalizeDocumentType(file.type) !== expectedDocumentType) return null;
+    const stored = await loadMedia(file.storagePath);
+    if (!isExactStoredLocalDemoMedia(stored, file)) return null;
     if (typeof URL.createObjectURL !== "function") return null;
     return URL.createObjectURL(stored);
   }
 
   const documentType = type === "selfie" ? "selfie_1" : type;
-  return localDemoJpegUrls[documentType] ?? null;
+  return file && isBundledLocalDemoSeed(file, documentType)
+    ? (localDemoJpegUrls[documentType] ?? null)
+    : null;
 }
 
 const localDemoJpegFallbackBase64 =
@@ -104,6 +147,56 @@ function hasJpegSignature(bytes: Uint8Array): boolean {
     bytes[1] === 0xd8 &&
     bytes[bytes.length - 2] === 0xff &&
     bytes[bytes.length - 1] === 0xd9
+  );
+}
+
+function localDemoSourceFileKey(submissionId: string, fileId: string): string {
+  return JSON.stringify([submissionId, fileId]);
+}
+
+function localDemoSourceFileMatchesAsset(
+  file: SubmissionFile,
+  asset: DocumentAsset,
+): boolean {
+  return (
+    file.applicantId === asset.applicantId &&
+    tryNormalizeDocumentType(file.type) === asset.type
+  );
+}
+
+function normalizeMimeType(value: string | null | undefined): string {
+  return value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+}
+
+function isBundledLocalDemoSeed(
+  file: SubmissionFile,
+  expectedType: DocumentType,
+): boolean {
+  const sourceNames = [file.generatedFileName, file.originalFileName].filter(
+    (value): value is string => Boolean(value?.trim()),
+  );
+  return Boolean(
+    file.localDemoSeedMedia === true &&
+    file.localDemoMediaStored !== true &&
+    tryNormalizeDocumentType(file.type) === expectedType &&
+    normalizeMimeType(file.mimeType) === "image/jpeg" &&
+    sourceNames.length > 0 &&
+    sourceNames.every((name) => /\.jpe?g$/i.test(name)),
+  );
+}
+
+function isExactStoredLocalDemoMedia(
+  stored: Blob | null,
+  file: SubmissionFile,
+): stored is Blob {
+  const expectedMimeType = normalizeMimeType(file.mimeType);
+  return Boolean(
+    stored &&
+    Number.isSafeInteger(file.sizeBytes) &&
+    (file.sizeBytes ?? 0) > 0 &&
+    stored.size === file.sizeBytes &&
+    expectedMimeType &&
+    normalizeMimeType(stored.type) === expectedMimeType,
   );
 }
 

@@ -19,20 +19,27 @@ describe("production evidence artifact references", () => {
     ).toBe(testArtifactPath("release", "production-evidence.md"));
   });
 
-  test("keeps ordinary project-relative and absolute references supported", () => {
+  test("keeps contained project-relative references supported", () => {
     const projectRoot = "/tmp/visaflow-project";
-    const absolute = "/tmp/visaflow-evidence/proof.md";
 
     expect(resolveTestArtifactReference("evidence/proof.md", projectRoot)).toBe(
       resolve(projectRoot, "evidence/proof.md"),
     );
-    expect(resolveTestArtifactReference(absolute, projectRoot)).toBe(absolute);
   });
 
-  test("rejects placeholder traversal outside the evidence root", () => {
-    expect(
-      resolveTestArtifactReference("$V19_TEST_ARTIFACTS_DIR/../../outside-proof.md"),
-    ).toBe("");
+  test.each([
+    "$V19_TEST_ARTIFACTS_DIR/../../outside-proof.md",
+    "../outside-proof.md",
+    "docs/../../outside-proof.md",
+    "..\\outside-proof.md",
+    "/tmp/visaflow-evidence/proof.md",
+    "C:\\evidence\\proof.md",
+    "\\\\server\\share\\proof.md",
+    "~/proof.md",
+    "file:///tmp/proof.md",
+  ])("rejects non-portable or escaping reference %s", (reference) => {
+    expect(resolveTestArtifactReference(reference, "/tmp/visaflow-project")).toBe("");
+    expect(isPortableTrackedArtifactReference(reference)).toBe(false);
   });
 
   test("rejects host-specific absolute paths in tracked evidence packets", () => {

@@ -22,7 +22,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
-import type { Submission } from "../types";
+import type { AgentOwnerId, Submission } from "../types";
 import {
   BLS_CITY_OPTIONS,
   POPULAR_RUSSIAN_CITY_OPTIONS,
@@ -55,6 +55,7 @@ import {
   passportReviewMediaTypeForIssue,
   primaryApplicantIdForPassportReview,
 } from "../passportReviewContract";
+import { canConfirmApplicantPassportReview } from "../passportExtraction";
 import { suggestedRussianAddress } from "../russianAddress";
 import {
   composeQuestionnaireHomeAddress,
@@ -202,11 +203,12 @@ const QuestionnaireFieldUiContext = createContext<QuestionnaireFieldUiContract |
 );
 
 type FigmaQuestionnaireScreenProps = {
+  commandActorId?: AgentOwnerId;
   initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
   onSaveAndExit?: () => void | Promise<void>;
   onComplete: (values: QuestionnaireCommitPayload) => void | Promise<void>;
-  onConfirmPassportReview?: (applicantId: string) => void | Promise<void>;
+  onConfirmPassportReview?: (applicantId: string) => Submission | Promise<Submission>;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
   onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
   onOpenDocuments?: (filter?: QuestionnaireDocumentsFilter) => void;
@@ -2651,6 +2653,7 @@ function departedSectionContext(key: string) {
 }
 
 export function FigmaQuestionnaireScreen({
+  commandActorId,
   initialFocus,
   onBack,
   onConfirmPassportReview,
@@ -2831,6 +2834,13 @@ export function FigmaQuestionnaireScreen({
       ) ?? draftSubmission.applicants[0],
     [activeApplicant, draftSubmission.applicants],
   );
+  const canConfirmActiveApplicantPassport = activeApplicantModel
+    ? canConfirmApplicantPassportReview(
+        draftSubmission,
+        activeApplicantModel.id,
+        commandActorId ?? "",
+      )
+    : false;
 
   useEffect(() => {
     if (initialFocusAppliedRef.current) return;
@@ -4375,7 +4385,17 @@ export function FigmaQuestionnaireScreen({
     setPassportReviewError("");
     try {
       await saveDraftFromButton();
-      await onConfirmPassportReview(activeApplicantModel.id);
+      const confirmedSubmission = await onConfirmPassportReview(
+        activeApplicantModel.id,
+      );
+      const confirmedApplicant = confirmedSubmission.applicants.find(
+        (applicant) => applicant.id === activeApplicantModel.id,
+      );
+      if (!confirmedApplicant?.passportExtraction?.verifiedAtIso) {
+        throw new Error(
+          "Паспорт ещё нельзя подтвердить: дождитесь загрузки и завершения обработки.",
+        );
+      }
       setSaveStatus("saved");
       setSaveMessage("Ручная проверка паспорта подтверждена");
     } catch (error) {
@@ -4526,8 +4546,7 @@ export function FigmaQuestionnaireScreen({
             value={formData.passportIssuePlace}
             onChange={(value) => updateField("passportIssuePlace", value)}
           />
-          {onConfirmPassportReview &&
-          !activeApplicantModel?.passportExtraction?.verifiedAtIso ? (
+          {onConfirmPassportReview && canConfirmActiveApplicantPassport ? (
             <div className="col-span-1 md:col-span-2 flex flex-col items-start gap-2">
               <button
                 {...agentInteractionProps("questionnaire.update-field")}

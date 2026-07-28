@@ -5,7 +5,11 @@ import {
   buildLocalDemoExportMediaZipOptions,
   localDemoReviewMediaUrl,
 } from "../../src/modules/submissions/exportMediaZipLocalDemo";
-import { saveLocalDemoMedia } from "../../src/modules/submissions/localDemoMediaStorage";
+import {
+  pruneUnreferencedLocalDemoMedia,
+  saveLocalDemoMedia,
+  type LocalDemoMediaMutationLock,
+} from "../../src/modules/submissions/localDemoMediaStorage";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
 import {
   loadSubmissions,
@@ -62,6 +66,23 @@ function uploadedPassportCount(submission: Submission): number {
   ).length;
 }
 
+function exclusiveMutationLock(): LocalDemoMediaMutationLock {
+  let tail: Promise<void> = Promise.resolve();
+  return async <T>(operation: () => Promise<T>) => {
+    let release!: () => void;
+    const previous = tail;
+    tail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
+  };
+}
+
 describe("persistCreatedSubmissionWithPassports", () => {
   test("uses the same canonical pipeline for local demo without claiming private storage", async () => {
     const progress: string[] = [];
@@ -101,6 +122,17 @@ describe("persistCreatedSubmissionWithPassports", () => {
     const persisted: Submission[] = [];
     const uploadMedia = vi.fn();
     const initial = draft(1);
+    const storedMedia = new Map<string, Blob>();
+    const storeLocalDemoMedia = vi.fn(async (target, file: File) => {
+      storedMedia.set(
+        target.path,
+        new Blob([await file.arrayBuffer()], {
+          type: file.type || "application/octet-stream",
+        }),
+      );
+      return { path: target.path };
+    });
+    const loadStoredMedia = async (path: string) => storedMedia.get(path) ?? null;
 
     const result = await persistCreatedSubmissionWithPassports({
       onPendingSubmission: () => undefined,
@@ -110,11 +142,13 @@ describe("persistCreatedSubmissionWithPassports", () => {
       },
       simulatePrivateStorage: true,
       storageAdapter: "local-dev",
+      storeLocalDemoMedia,
       submission: initial,
       uploadMedia,
     });
 
     expect(uploadMedia).not.toHaveBeenCalled();
+    expect(storeLocalDemoMedia).toHaveBeenCalledTimes(1);
     expect(persisted).toHaveLength(2);
     expect(result.files.find((file) => file.type === "passport_scan")).toMatchObject({
       localDemoMediaStored: true,
@@ -180,7 +214,12 @@ describe("persistCreatedSubmissionWithPassports", () => {
     });
     try {
       await expect(
-        localDemoReviewMediaUrl("passport_scan", reloadedPassport),
+        localDemoReviewMediaUrl(
+          "passport_scan",
+          reloadedPassport,
+          reloadedSubmission!.id,
+          loadStoredMedia,
+        ),
       ).resolves.toBe("blob:reloaded-passport");
       const previewBlob = createObjectUrl.mock.calls[0]?.[0] as Blob | undefined;
       expect(previewBlob).toBeInstanceOf(Blob);
@@ -195,7 +234,10 @@ describe("persistCreatedSubmissionWithPassports", () => {
       }
     }
 
-    const options = buildLocalDemoExportMediaZipOptions([reloadedSubmission!]);
+    const options = buildLocalDemoExportMediaZipOptions(
+      [reloadedSubmission!],
+      loadStoredMedia,
+    );
     const asset = options.documentAssets?.[0];
     expect(asset).toBeDefined();
     const exported = asset
@@ -224,7 +266,10 @@ describe("persistCreatedSubmissionWithPassports", () => {
       "selfie",
       "123_selfie.jpg",
     );
-    await saveLocalDemoMedia(selfieTarget, selfieFile);
+    storedMedia.set(
+      selfieTarget.path,
+      new Blob([await selfieFile.arrayBuffer()], { type: selfieFile.type }),
+    );
     const exportWithSelfie: Submission = {
       ...exportSubmission,
       files: [
@@ -246,7 +291,10 @@ describe("persistCreatedSubmissionWithPassports", () => {
         },
       ],
     };
-    const selfieOptions = buildLocalDemoExportMediaZipOptions([exportWithSelfie]);
+    const selfieOptions = buildLocalDemoExportMediaZipOptions(
+      [exportWithSelfie],
+      loadStoredMedia,
+    );
     const selfieAsset = selfieOptions.documentAssets?.find(
       (candidate) => candidate.type === "selfie_1",
     );
@@ -263,6 +311,183 @@ describe("persistCreatedSubmissionWithPassports", () => {
     expect(Array.from(new Uint8Array(await exportedSelfie!.arrayBuffer()))).toEqual([
       0xff, 0xd8, 0x01, 0xff, 0xd9,
     ]);
+
+    const wrongMimeOptions = buildLocalDemoExportMediaZipOptions(
+      [exportWithSelfie],
+      async (path) => {
+        const stored = storedMedia.get(path);
+        return stored
+          ? new Blob([await stored.arrayBuffer()], { type: "text/plain" })
+          : null;
+      },
+    );
+    const wrongMimeAsset = wrongMimeOptions.documentAssets?.find(
+      (candidate) => candidate.type === "selfie_1",
+    );
+    await expect(
+      wrongMimeAsset
+        ? wrongMimeOptions.downloadDocument?.(wrongMimeAsset, {
+            applicant,
+            applicantIndex: 0,
+            exportDate: "2026-07-28",
+            submission: exportWithSelfie,
+            type: wrongMimeAsset.type,
+          })
+        : null,
+    ).resolves.toBeNull();
+    await expect(
+      localDemoReviewMediaUrl(
+        "selfie",
+        exportWithSelfie.files.find((file) => file.id === "selfie-source"),
+        exportWithSelfie.id,
+        async (path) => {
+          const stored = storedMedia.get(path);
+          return stored
+            ? new Blob([await stored.arrayBuffer()], { type: "text/plain" })
+            : null;
+        },
+      ),
+    ).resolves.toBeNull();
+
+    const originalPassport = exportSubmission.files.find(
+      (file) => file.type === "passport_scan",
+    );
+    if (!originalPassport?.storagePath) throw new Error("expected stored passport");
+    const collisionSubmissionId = "collision-submission";
+    const collisionPath = originalPassport.storagePath.replace(
+      exportSubmission.id,
+      collisionSubmissionId,
+    );
+    storedMedia.set(
+      collisionPath,
+      new Blob([new Uint8Array([0x11, 0x22, 0x33, 0x44])], {
+        type: "image/png",
+      }),
+    );
+    const collisionSubmission: Submission = {
+      ...exportSubmission,
+      id: collisionSubmissionId,
+      files: exportSubmission.files.map((file) =>
+        file.id === originalPassport.id
+          ? { ...file, storagePath: collisionPath }
+          : file,
+      ),
+    };
+    const collisionOptions = buildLocalDemoExportMediaZipOptions(
+      [exportSubmission, collisionSubmission],
+      loadStoredMedia,
+    );
+    const passportAssets = collisionOptions.documentAssets?.filter(
+      (candidate) => candidate.type === "passport_scan",
+    );
+    expect(passportAssets).toHaveLength(2);
+    for (const asset of passportAssets ?? []) {
+      const sourceSubmission =
+        asset.submissionId === exportSubmission.id
+          ? exportSubmission
+          : collisionSubmission;
+      const downloaded = await collisionOptions.downloadDocument?.(asset, {
+        applicant: sourceSubmission.applicants[0]!,
+        applicantIndex: 0,
+        exportDate: "2026-07-28",
+        submission: sourceSubmission,
+        type: asset.type,
+      });
+      expect(Array.from(new Uint8Array(await downloaded!.arrayBuffer()))).toEqual(
+        asset.submissionId === exportSubmission.id
+          ? [0x89, 0x50, 0x4e, 0x47]
+          : [0x11, 0x22, 0x33, 0x44],
+      );
+    }
+  });
+
+  test("serializes initial local-demo storage and canonical publication with orphan cleanup", async () => {
+    const initial = draft(1);
+    const withLocalDemoMutationLock = exclusiveMutationLock();
+    const deleteStoredMedia = vi.fn(async () => undefined);
+    let canonicalSubmissions: Submission[] = [];
+    let storedPath = "";
+    let persistCallCount = 0;
+    let releaseCandidatePersistence!: () => void;
+    const candidatePersistenceBlocked = new Promise<void>((resolve) => {
+      releaseCandidatePersistence = resolve;
+    });
+    let markCandidatePersistenceStarted!: () => void;
+    const candidatePersistenceStarted = new Promise<void>((resolve) => {
+      markCandidatePersistenceStarted = resolve;
+    });
+
+    const creation = persistCreatedSubmissionWithPassports({
+      onPendingSubmission: () => undefined,
+      passportUploads: [passportUpload(0)],
+      persistSubmission: async (submission) => {
+        persistCallCount += 1;
+        if (persistCallCount === 2) {
+          markCandidatePersistenceStarted();
+          await candidatePersistenceBlocked;
+        }
+        canonicalSubmissions = [submission];
+      },
+      simulatePrivateStorage: true,
+      storageAdapter: "local-dev",
+      storeLocalDemoMedia: async (target) => {
+        storedPath = target.path;
+        return { path: target.path };
+      },
+      submission: initial,
+      withLocalDemoMutationLock,
+    });
+    await candidatePersistenceStarted;
+
+    const nowEpochMs = 1_800_000_000_000;
+    const cleanup = pruneUnreferencedLocalDemoMedia(() => canonicalSubmissions, {
+      deleteStoredMedia,
+      nowEpochMs,
+      orphanGracePeriodMs: 60_000,
+      storedAtEpochMsByPath: new Map([[storedPath, nowEpochMs - 10 * 60_000]]),
+      storedPaths: [storedPath],
+      withMutationLock: withLocalDemoMutationLock,
+    });
+    await Promise.resolve();
+    expect(deleteStoredMedia).not.toHaveBeenCalled();
+
+    releaseCandidatePersistence();
+    const createdSubmission = await creation;
+    await expect(cleanup).resolves.toEqual([]);
+    expect(deleteStoredMedia).not.toHaveBeenCalled();
+    expect(
+      createdSubmission.files.find((file) => file.type === "passport_scan"),
+    ).toMatchObject({
+      localDemoMediaStored: true,
+      storagePath: storedPath,
+    });
+  });
+
+  test("fails closed when durable IndexedDB storage is unavailable", async () => {
+    const previousIndexedDb = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+    Object.defineProperty(globalThis, "indexedDB", {
+      configurable: true,
+      value: undefined,
+    });
+    try {
+      await expect(
+        saveLocalDemoMedia(
+          buildMediaStoragePath(
+            "submission-no-indexed-db",
+            "applicant-no-indexed-db",
+            "passport_scan",
+            "abc_passport_scan.png",
+          ),
+          passportUpload(0).file!,
+        ),
+      ).rejects.toThrow("Локальное хранилище документов недоступно");
+    } finally {
+      if (previousIndexedDb) {
+        Object.defineProperty(globalThis, "indexedDB", previousIndexedDb);
+      } else {
+        Reflect.deleteProperty(globalThis, "indexedDB");
+      }
+    }
   });
 
   test("rejects private-storage simulation with the production adapter", async () => {

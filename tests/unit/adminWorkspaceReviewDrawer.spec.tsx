@@ -417,7 +417,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     );
   });
 
-  test("renders queue cards in the prioritized queue and exposes lane filters", () => {
+  test("renders prioritized queue cards without the legacy focus tabs", () => {
     const review = initialSubmissions.find((item) => item.id === "ПД-1053");
     const returned = initialSubmissions.find((item) => item.id === "ПД-1055");
     if (!review || !returned) throw new Error("Expected review queue fixtures.");
@@ -441,9 +441,8 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       ),
     ).toHaveLength(2);
     expect(
-      screen.getByRole("tab", { name: /Первичная проверка/ }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Исправления/ })).toBeInTheDocument();
+      screen.queryByRole("tablist", { name: "Фокус очереди" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Начать проверку/ }),
     ).not.toBeInTheDocument();
@@ -481,7 +480,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
 
     expect(screen.getByText("Ничего не найдено")).toBeInTheDocument();
     expect(
-      screen.getByText(/Измените фокус очереди или сбросьте фильтры/),
+      screen.getByText(/Сбросьте фильтры, чтобы вернуться/),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Показать всю очередь" }));
     expect(screen.getByText("Нина Волкова")).toBeInTheDocument();
@@ -1171,6 +1170,7 @@ describe("ReviewWorkspace passport section contract", () => {
       applicantId,
       generatedFileName,
       id: `${applicantId}-${type}`,
+      localDemoSeedMedia: true,
       mimeType: "image/jpeg",
       status: "pending_review",
       storageAdapter: "supabase-private",
@@ -1237,9 +1237,7 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       screen.queryByRole("button", { name: /^Подтвердить:/ }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Принять всё" })).toHaveLength(1);
   });
 
   test("shows questionnaire readiness only as a read-only package guard summary", () => {
@@ -1348,7 +1346,7 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(screen.getByText("Просмотр без изменений")).toBeVisible();
     expect(screen.getAllByText(/доступен только для чтения/).length).toBeGreaterThan(0);
     expect(
-      screen.queryByRole("button", { name: "Подтвердить паспортную секцию" }),
+      screen.queryByRole("button", { name: "Принять всё" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Принять на выгрузку" }),
@@ -1527,9 +1525,7 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Принять всё" })).toBeDisabled();
     expect(
       screen.getByText(
         /Заполнены не все паспортные поля или в данных есть ошибка/,
@@ -1595,15 +1591,13 @@ describe("ReviewWorkspace passport section contract", () => {
         name: "Сравнение паспорта и селфи 1",
       }),
     ).toBeVisible();
-    expect(
-      screen.getByTestId("protected-media-preview-passport_scan"),
-    ).toBeVisible();
+    expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible();
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible(),
     );
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
@@ -1648,7 +1642,7 @@ describe("ReviewWorkspace passport section contract", () => {
     );
 
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     await waitFor(() => expect(confirmButton).toBeDisabled());
     expect(screen.getByText(/ровно один основной заявитель/)).toBeInTheDocument();
@@ -1718,9 +1712,7 @@ describe("ReviewWorkspace passport section contract", () => {
 
     visitPrimaryIdentityMedia();
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-      ).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Принять всё" })).toBeEnabled(),
     );
     expect(
       screen.queryByText(/Есть открытое замечание паспортной секции/),
@@ -1761,7 +1753,7 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toBeVisible();
 
     const confirmButton = await screen.findByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     visitPrimaryIdentityMedia();
     await waitFor(() => expect(confirmButton).toBeEnabled());
@@ -1847,7 +1839,7 @@ describe("ReviewWorkspace passport section contract", () => {
     fireEvent.click(opener);
     visitPrimaryIdentityMedia();
     const confirmButton = await screen.findByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
@@ -1986,7 +1978,7 @@ describe("ReviewWorkspace passport section contract", () => {
       screen.queryByTestId("protected-media-preview-selfie"),
     ).not.toBeInTheDocument();
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
@@ -2056,9 +2048,7 @@ describe("ReviewWorkspace passport section contract", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
-    expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Принять всё" })).toBeDisabled();
     await act(async () => {
       correctedSelfie.resolve("https://example.test/legacy-secondary-selfie.jpg");
       await correctedSelfie.promise;
@@ -2071,9 +2061,7 @@ describe("ReviewWorkspace passport section contract", () => {
       screen.queryByTestId("protected-media-preview-selfie_2"),
     ).not.toBeInTheDocument();
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-      ).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Принять всё" })).toBeEnabled(),
     );
   });
 });
