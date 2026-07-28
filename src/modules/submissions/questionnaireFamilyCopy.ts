@@ -2,6 +2,40 @@
 import type { QuestionnaireFieldUpdate } from "./questionnaire";
 import type { Applicant, QuestionnaireField } from "./types";
 
+export const questionnaireFamilyCopyFieldIdsBySection = {
+  appointment: ["appointment-city", "desired-date-1", "desired-date-2"],
+  contacts: [
+    "home-address",
+    "home-country",
+    "home-city",
+    "home-street",
+    "home-house",
+    "home-building",
+    "home-unit",
+    "postal-code",
+  ],
+  hotel: [
+    "hotel-name",
+    "hotel-address",
+    "hotel-country",
+    "hotel-city",
+    "hotel-postal-code",
+  ],
+} as const;
+
+export type QuestionnaireFamilyCopySectionId =
+  keyof typeof questionnaireFamilyCopyFieldIdsBySection;
+
+export function isQuestionnaireFamilyCopyField(
+  sectionId: string,
+  fieldId: string,
+): sectionId is QuestionnaireFamilyCopySectionId {
+  const allowed = questionnaireFamilyCopyFieldIdsBySection[
+    sectionId as QuestionnaireFamilyCopySectionId
+  ] as readonly string[] | undefined;
+  return Boolean(allowed?.includes(fieldId));
+}
+
 type QuestionnaireFamilyCopyValidationField = Pick<
   QuestionnaireField,
   "id" | "label" | "required"
@@ -24,6 +58,17 @@ export type QuestionnaireFamilyCopyPlan = {
   updates: QuestionnaireFieldUpdate[];
 };
 
+type BuildAutomaticQuestionnaireFamilyCopyUpdatesInput = {
+  binding: QuestionnaireFamilyCopyBinding;
+  recipients: readonly Applicant[];
+  sourceApplicant: Applicant;
+  sourceUpdate: QuestionnaireFieldUpdate;
+  validate: (
+    field: QuestionnaireFamilyCopyValidationField,
+    value: string,
+  ) => string | undefined;
+};
+
 type BuildQuestionnaireFamilyCopyPlanInput = {
   bindings: readonly QuestionnaireFamilyCopyBinding[];
   recipients: readonly Applicant[];
@@ -35,15 +80,10 @@ type BuildQuestionnaireFamilyCopyPlanInput = {
 };
 
 function uniqueCandidateFieldIds(binding: QuestionnaireFamilyCopyBinding) {
-  return [
-    ...new Set([binding.canonicalFieldId, ...binding.candidateFieldIds]),
-  ];
+  return [...new Set([binding.canonicalFieldId, ...binding.candidateFieldIds])];
 }
 
-function applicantField(
-  applicant: Applicant,
-  candidateFieldIds: readonly string[],
-) {
+function applicantField(applicant: Applicant, candidateFieldIds: readonly string[]) {
   for (const fieldId of candidateFieldIds) {
     for (const section of applicant.sections) {
       const field = section.fields.find((candidate) => candidate.id === fieldId);
@@ -57,10 +97,7 @@ function applicantField(
 function isUserEnteredFamilyCopySource(field: QuestionnaireField) {
   if (field.reviewSource === "manual") return true;
 
-  return (
-    field.reviewSource === undefined &&
-    field.reviewOriginSource === "manual"
-  );
+  return field.reviewSource === undefined && field.reviewOriginSource === "manual";
 }
 
 function previewFieldKey(field: QuestionnaireFamilyCopyPreviewField) {
@@ -69,6 +106,38 @@ function previewFieldKey(field: QuestionnaireFamilyCopyPreviewField) {
 
 function updateKey(update: QuestionnaireFieldUpdate) {
   return `${update.applicantId}:${update.sectionId}:${update.fieldId}`;
+}
+
+export function buildAutomaticQuestionnaireFamilyCopyUpdates({
+  binding,
+  recipients,
+  sourceApplicant,
+  sourceUpdate,
+  validate,
+}: BuildAutomaticQuestionnaireFamilyCopyUpdatesInput): QuestionnaireFieldUpdate[] {
+  if (sourceUpdate.applicantId !== sourceApplicant.id) return [];
+
+  const candidateFieldIds = uniqueCandidateFieldIds(binding);
+  if (!candidateFieldIds.includes(sourceUpdate.fieldId)) return [];
+
+  return recipients.flatMap((recipient) => {
+    if (recipient.id === sourceApplicant.id) return [];
+    const targetField = applicantField(recipient, candidateFieldIds);
+    if (!targetField) return [];
+
+    return [
+      {
+        applicantId: recipient.id,
+        error: validate(targetField, sourceUpdate.value),
+        fieldId: targetField.id,
+        reviewOriginSource: "family_shared",
+        reviewSource: "family_shared",
+        reviewState: "confirmed",
+        sectionId: binding.sectionId,
+        value: sourceUpdate.value,
+      } satisfies QuestionnaireFieldUpdate,
+    ];
+  });
 }
 
 export function buildQuestionnaireFamilyCopyPlan({
@@ -84,10 +153,7 @@ export function buildQuestionnaireFamilyCopyPlan({
   for (const binding of bindings) {
     const candidateFieldIds = uniqueCandidateFieldIds(binding);
     const sourceField = applicantField(sourceApplicant, candidateFieldIds);
-    if (
-      !sourceField?.value.trim() ||
-      !isUserEnteredFamilyCopySource(sourceField)
-    ) {
+    if (!sourceField?.value.trim() || !isUserEnteredFamilyCopySource(sourceField)) {
       continue;
     }
 

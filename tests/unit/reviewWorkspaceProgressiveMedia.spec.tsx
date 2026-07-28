@@ -119,6 +119,110 @@ function decisionReadySubmission(): Submission {
 }
 
 describe("ReviewWorkspace perceived feedback", () => {
+  test("keeps the complete passport frame at the default zoom and restores it after zooming", async () => {
+    const submission = reviewSubmission();
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://media.test/passport.jpg",
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const passportImage = await screen.findByRole("img", {
+      name: "Оригинал загранпаспорта",
+    });
+    fireEvent.load(passportImage);
+    await waitFor(() => expect(passportImage).toHaveClass("is-ready"));
+
+    expect(passportImage).toHaveStyle({
+      transform: "scale(1) rotate(0deg)",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Уменьшить изображение" }));
+    expect(passportImage).toHaveStyle({
+      transform: "scale(0.9) rotate(0deg)",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Увеличить изображение" }));
+    expect(passportImage).toHaveStyle({
+      transform: "scale(1) rotate(0deg)",
+    });
+  });
+
+  test("moves the next-step control to the next unreviewed protected original", async () => {
+    const submission = reviewSubmission();
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://media.test/protected.jpg",
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const passportImage = await screen.findByRole("img", {
+      name: "Оригинал загранпаспорта",
+    });
+    fireEvent.load(passportImage);
+    await waitFor(() => expect(passportImage).toHaveClass("is-ready"));
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Перейти к следующему незавершённому шагу",
+      }),
+    );
+
+    const nextMedia = screen.getByRole("tab", { name: "Селфи 1" });
+    await waitFor(() => expect(nextMedia).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(document.activeElement).toBe(nextMedia));
+  });
+
+  test("does not trap the next-step control on an unavailable original", async () => {
+    const submission = reviewSubmission();
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockRejectedValue(
+      new Error("signed URL unavailable"),
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(await screen.findByText("Защищённый оригинал недоступен")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Перейти к следующему незавершённому шагу",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Селфи 1" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+  });
+
   test("loads originals on demand and blocks confirmation until every required file is opened", async () => {
     const submission = reviewSubmission();
     const passport = deferred<string>();
@@ -177,7 +281,7 @@ describe("ReviewWorkspace perceived feedback", () => {
 
     await waitFor(() => expect(passportImage).toHaveClass("is-ready"));
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     expect(confirmButton).toBeDisabled();
     expect(
@@ -333,9 +437,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     ).toBeVisible();
     expect(screen.queryByRole("button", { name: "Повторить загрузку" })).toBeNull();
     expect(mediaStorage.createMediaSignedUrl).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Принять всё" })).toBeDisabled();
   });
 
   test("does not retry media with a noncanonical private-storage identity", async () => {
@@ -376,6 +478,9 @@ describe("ReviewWorkspace perceived feedback", () => {
     const nextSubmission = reviewSubmission("з-2053-1");
     const requests = Array.from({ length: 2 }, () => deferred<string>());
     let requestIndex = 0;
+    const revokeObjectUrl = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => undefined);
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
       () => requests[requestIndex++]?.promise ?? Promise.resolve(""),
     );
@@ -407,10 +512,11 @@ describe("ReviewWorkspace perceived feedback", () => {
     );
 
     await act(async () => {
-      requests[0]?.resolve("https://media.test/stale-passport.jpg");
+      requests[0]?.resolve("blob:stale-passport");
       await requests[0]?.promise;
     });
     expect(screen.queryByRole("img", { name: "Оригинал загранпаспорта" })).toBeNull();
+    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:stale-passport");
 
     await act(async () => {
       requests[1]?.resolve("https://media.test/current-passport.jpg");
@@ -600,6 +706,7 @@ describe("ReviewWorkspace perceived feedback", () => {
   test("shows pending and completed section feedback as distinct states", async () => {
     const submission = reviewSubmission();
     const approval = deferred<boolean>();
+    const onApproveSection = vi.fn(() => approval.promise);
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
       "https://media.test/protected.jpg",
     );
@@ -608,20 +715,22 @@ describe("ReviewWorkspace perceived feedback", () => {
       <ReviewWorkspace
         applicantId={submission.applicants[0]?.id}
         onAddRemark={() => undefined}
-        onApproveSection={() => approval.promise}
+        onApproveSection={onApproveSection}
         onBack={() => undefined}
         submission={submission}
         submissionId={submission.id}
       />,
     );
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() => expect(confirmButton).toBeEnabled());
 
     fireEvent.click(confirmButton);
+    fireEvent.click(confirmButton);
+    expect(onApproveSection).toHaveBeenCalledTimes(1);
 
     const confirmation = container.querySelector(".v19-review-confirmation");
     expect(confirmation).toHaveClass("is-pending");
@@ -659,7 +768,7 @@ describe("ReviewWorkspace perceived feedback", () => {
       />,
     );
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: "Принять всё",
     });
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
@@ -676,9 +785,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-      ).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Принять всё" })).toBeEnabled(),
     );
 
     await act(async () => {
@@ -687,9 +794,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     });
 
     expect(screen.queryByText("Секция подтверждена")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Принять всё" })).toBeEnabled();
   });
 
   test("keeps final decision feedback explicit while persistence is pending", async () => {

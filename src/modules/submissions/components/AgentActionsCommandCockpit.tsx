@@ -195,9 +195,11 @@ export function AgentActionsCommandCockpit({
             columns={
               usesInlineContext
                 ? [
-                    { key: "identity", label: "Заявитель / ID" },
-                    { key: "next", label: "Следующий шаг" },
-                    { key: "status", label: "Статус" },
+                    { key: "id", label: "ID" },
+                    { key: "applicant", label: "Имя, фамилия" },
+                    { key: "dates", label: "Даты поездки" },
+                    { key: "city", label: "Город" },
+                    { key: "action", label: "Действие" },
                   ]
                 : [
                     { key: "submission", label: "Подача" },
@@ -441,17 +443,38 @@ function ActionTaskCard({
 
       {inlineContext ? (
         <>
-          <span className="v19-actions-cell-identity">
+          <span
+            className="v19-actions-cell-id"
+            title={submissionPublicId(task.submission)}
+          >
+            <strong>{submissionPublicId(task.submission)}</strong>
+          </span>
+          <span
+            className="v19-actions-cell-applicant"
+            title={task.applicantName || formatSubmissionListTitle(task.submission)}
+          >
             <strong>
               {task.applicantName || formatSubmissionListTitle(task.submission)}
             </strong>
-            <small>{submissionPublicId(task.submission)}</small>
           </span>
-          <span className="v19-actions-cell-next">
-            <strong>{task.nextAction.label}</strong>
+          <span className="v19-actions-cell-dates" title={dateLabel}>
+            {dateLabel}
           </span>
-          <span className="v19-actions-cell-status">
-            <StatusBadge status={task.status} label={task.statusLabel} />
+          <span
+            className="v19-actions-cell-city"
+            title={safeCity(task.submission.city)}
+          >
+            {safeCity(task.submission.city)}
+          </span>
+          <span className="v19-actions-cell-action">
+            <Badge
+              aria-label={`Действие: ${task.nextAction.label}`}
+              className="v19-actions-action-tag"
+              title={task.nextAction.label}
+              tone={statusTone(task.status)}
+            >
+              {compactActionTagLabel(task)}
+            </Badge>
           </span>
           <ChevronDown aria-hidden="true" className="v19-actions-table-chevron" />
         </>
@@ -914,24 +937,11 @@ function safeCity(city: string) {
   return city.trim() || "Город не указан";
 }
 
-function priorityDisplayLabel(task: AgentActionTask) {
-  if (task.priority.label.trim()) {
-    return task.priority.label;
-  }
+function compactActionTagLabel(task: AgentActionTask) {
+  const source =
+    task.nextAction.primaryLabel.trim() || task.nextAction.label.trim() || "Открыть";
 
-  if (task.priority.level === "urgent") {
-    return "Срочно";
-  }
-
-  if (task.priority.level === "high") {
-    return "Высокий";
-  }
-
-  if (task.priority.level === "medium") {
-    return "Средний";
-  }
-
-  return "Низкий";
+  return source.split(/\s+/).slice(0, 2).join(" ");
 }
 
 function stableDomId(value: string) {

@@ -50,6 +50,7 @@ interface AdminScreenProps {
 }
 
 type Lane = "urgent" | "review" | "returned";
+type ActiveReviewLane = "all" | "review" | "returned";
 type AdminReviewSort = "priority" | "tripDate" | "createdAt";
 type AdminReviewTypeFilter = "all" | "family" | "single";
 
@@ -382,7 +383,7 @@ export function ReviewScreen({
   onOpenExport,
   submissions,
 }: AdminScreenProps) {
-  const [activeLane, setActiveLane] = useState<Lane | "all">("all");
+  const [activeLane, setActiveLane] = useState<ActiveReviewLane>("all");
   const [cityFilter, setCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<AdminReviewSort>("priority");
@@ -439,9 +440,7 @@ export function ReviewScreen({
     () =>
       activeLane === "all"
         ? filteredReviews
-        : activeLane === "urgent"
-          ? filteredReviews.filter((item) => item.priorityBand === "critical")
-          : filteredReviews.filter((item) => item.lane === activeLane),
+        : filteredReviews.filter((item) => item.lane === activeLane),
     [activeLane, filteredReviews],
   );
   const packagesWithBlockers = filteredReviews.filter(
@@ -483,17 +482,6 @@ export function ReviewScreen({
     setSortBy("priority");
     setTypeFilter("all");
   }, []);
-
-  const focusTabs: Array<{
-    count: number;
-    id: Lane | "all";
-    label: string;
-  }> = [
-    { count: filteredReviews.length, id: "all", label: "Вся очередь" },
-    { count: laneCounts.urgent, id: "urgent", label: "Критично" },
-    { count: laneCounts.review, id: "review", label: "Первичная проверка" },
-    { count: laneCounts.returned, id: "returned", label: "Исправления" },
-  ];
 
   return (
     <motion.div
@@ -555,26 +543,6 @@ export function ReviewScreen({
             onAction={resetQueueView}
             title="Очередь проверки"
           />
-
-          <div
-            aria-label="Фокус очереди"
-            className="v19-review-focus-tabs"
-            role="tablist"
-          >
-            {focusTabs.map((tab) => (
-              <button
-                aria-selected={activeLane === tab.id}
-                className={activeLane === tab.id ? "is-active" : ""}
-                key={tab.id}
-                role="tab"
-                type="button"
-                onClick={() => setActiveLane(tab.id)}
-              >
-                <span>{tab.label}</span>
-                <strong>{tab.count}</strong>
-              </button>
-            ))}
-          </div>
 
           <AdminQueueToolbar
             actionDisabled={!hasActiveFilters}
@@ -638,7 +606,7 @@ export function ReviewScreen({
                 <p>
                   {reviewSource.length === 0
                     ? "Подачи появятся здесь после отправки агентом на первичную или повторную проверку."
-                    : "Измените фокус очереди или сбросьте фильтры, чтобы вернуться к полному списку."}
+                    : "Сбросьте фильтры, чтобы вернуться к полному списку."}
                 </p>
                 {reviewSource.length > 0 && hasActiveFilters ? (
                   <button type="button" onClick={resetQueueView}>

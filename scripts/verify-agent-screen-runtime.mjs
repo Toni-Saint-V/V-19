@@ -13,21 +13,35 @@ const runtimeStyleImportsByOwner = new Map([
       "src/shared/ui/premium-polish.css",
       "src/shared/ui/admin-review-operations.css",
       "src/shared/ui/figma-all-screens-v1.css",
-      "src/shared/ui/operational-side-menu.css",
     ],
   ],
   [
     "src/components/ReviewWorkspace.tsx",
-    ["src/shared/ui/review-workspace.css"],
+    [
+      "src/shared/ui/review-workspace.css",
+      "src/shared/ui/admin-review-composition.css",
+    ],
   ],
+  [
+    "src/components/WorkspaceSurface.tsx",
+    [
+      "src/shared/ui/operational-side-menu.css",
+      "src/shared/ui/agent-actions-v2.css",
+      "src/shared/ui/agent-drawer-v2.css",
+    ],
+  ],
+  ["src/components/PreUploadScreen.tsx", ["src/components/PreUploadScreen.css"]],
   [
     "src/modules/submissions/components/FigmaQuestionnaireScreen.tsx",
     ["src/modules/submissions/components/questionnaire-codex-polish-v1.css"],
   ],
+  ["src/pwa/bootstrap.tsx", ["src/pwa/pwa-shell.css"]],
+  [
+    "src/shared/ui/AccessibleSelectMenu.tsx",
+    ["src/shared/ui/accessible-select-menu.css"],
+  ],
 ]);
-const runtimeStyleFiles = [
-  ...new Set([...runtimeStyleImportsByOwner.values()].flat()),
-];
+const runtimeStyleFiles = [...new Set([...runtimeStyleImportsByOwner.values()].flat())];
 const ignoredDirs = new Set([".git", "node_modules", "dist"]);
 const failures = [];
 
@@ -83,7 +97,9 @@ function verifyMotionContract() {
     failures.push("Reduced motion must disable app animation and transition effects");
   }
 
-  const exportQueueBlocks = [...styles.matchAll(/\.magic-export-queue\s*\{([^{}]*)\}/g)];
+  const exportQueueBlocks = [
+    ...styles.matchAll(/\.magic-export-queue\s*\{([^{}]*)\}/g),
+  ];
   if (exportQueueBlocks.some((match) => /overflow:\s*hidden/.test(match[1]))) {
     failures.push(
       "Mobile export queue must not hide enabled row actions with overflow: hidden",
@@ -158,7 +174,9 @@ function verifyCssTokenContract() {
 
   for (const token of requiredRootTokens) {
     if (!rootTokenValues.has(token)) {
-      failures.push(`runtime style tokens missing required :root custom property ${token}`);
+      failures.push(
+        `runtime style tokens missing required :root custom property ${token}`,
+      );
     }
   }
 
@@ -200,7 +218,8 @@ function verifyCssTokenContract() {
   const combinedStyles = styleSources.map(({ source }) => source).join("\n");
   for (const match of combinedStyles.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)([^)]*)\)/g)) {
     const [, token, rest] = match;
-    if (!definedTokens.has(token) && !rest.includes(",")) undefinedReferences.add(token);
+    if (!definedTokens.has(token) && !rest.includes(","))
+      undefinedReferences.add(token);
   }
   for (const token of [...undefinedReferences].sort()) {
     failures.push(`runtime styles reference undefined custom property ${token}`);
@@ -252,7 +271,11 @@ function verifyRuntimeStyleTopology() {
     const actualImports = cssImports
       .filter((cssImport) => cssImport.owner === owner)
       .map(({ resolved }) => resolved);
-    assertSameOrderedList(actualImports, expectedImports, `${owner} runtime stylesheet import order`);
+    assertSameOrderedList(
+      actualImports,
+      expectedImports,
+      `${owner} runtime stylesheet import order`,
+    );
   }
   for (const cssImport of cssImports) {
     const expectedImports = runtimeStyleImportsByOwner.get(cssImport.owner) ?? [];
@@ -268,7 +291,9 @@ function verifyUnifiedSidebarContract() {
   const styles = readRequiredStyle("src/shared/ui/system.css");
   if (!styles) return;
   if (/\.surface-agent-inbox,\s*\.surface-agent-inbox/.test(styles)) {
-    failures.push("src/shared/ui/system.css duplicates .surface-agent-inbox in an :is() selector");
+    failures.push(
+      "src/shared/ui/system.css duplicates .surface-agent-inbox in an :is() selector",
+    );
   }
   if (/\.ops-shell\s+\.ops-sidebar/.test(styles)) {
     failures.push(
@@ -280,7 +305,9 @@ function verifyUnifiedSidebarContract() {
       styles,
     )
   ) {
-    failures.push("src/shared/ui/system.css has mobile sidebar selectors that bypass the unified side menu contract");
+    failures.push(
+      "src/shared/ui/system.css has mobile sidebar selectors that bypass the unified side menu contract",
+    );
   }
 }
 
@@ -307,20 +334,23 @@ function verifySubmissionVisualBypassContract() {
       if (!/\.(?:css|ts|tsx)$/i.test(file)) continue;
       const source = fs.readFileSync(file, "utf8");
       for (const [pattern, label] of forbiddenPatterns) {
-        if (pattern.test(source)) failures.push(`${relative(file)} contains forbidden ${label}`);
+        if (pattern.test(source))
+          failures.push(`${relative(file)} contains forbidden ${label}`);
       }
     }
   }
 }
 
 function verifyV19SemanticStyleContract() {
-  const styles = readRequiredStyle("src/shared/ui/system.css");
+  const styles = runtimeStyleFiles
+    .map((relativePath) => readRequiredStyle(relativePath))
+    .join("\n");
   if (!styles) return;
   const checkedSourceFiles = [
     "src/modules/submissions/components/FigmaSubmissionDrawer.tsx",
     "src/modules/submissions/components/FigmaQuestionnaireScreen.tsx",
-    "src/modules/submissions/components/CreateSubmissionDrawer.tsx",
     "src/modules/submissions/components/CollectionPrimitives.tsx",
+    "src/components/PreUploadScreen.tsx",
   ];
   const sourceByPath = new Map();
   for (const relativePath of checkedSourceFiles) {
@@ -338,17 +368,21 @@ function verifyV19SemanticStyleContract() {
     "v19-figma-drawer-shell",
     "v19-questionnaire-field-control",
     "v19-questionnaire-complete-button",
-    "v19-create-drawer-shell",
-    "v19-create-footer-action--primary",
+    "v19-preupload-screen",
+    "v19-preupload-primary-action",
     "v19-mobile-filter-sheet",
   ];
   const combinedSource = [...sourceByPath.values()].join("\n");
   for (const className of requiredSemanticClasses) {
     if (!combinedSource.includes(className)) {
-      failures.push(`V-19 semantic class ${className} is not used by a target UI surface`);
+      failures.push(
+        `V-19 semantic class ${className} is not used by a target UI surface`,
+      );
     }
     if (!styles.includes(`.${className}`)) {
-      failures.push(`V-19 semantic class ${className} is not defined in src/shared/ui/system.css`);
+      failures.push(
+        `V-19 semantic class ${className} is not defined in src/shared/ui/system.css`,
+      );
     }
   }
 
@@ -369,7 +403,7 @@ function verifyV19SemanticStyleContract() {
       ],
     ],
     [
-      "src/modules/submissions/components/CreateSubmissionDrawer.tsx",
+      "src/components/PreUploadScreen.tsx",
       [
         "bg-[#0e0e10] flex flex-col overflow-hidden",
         "bg-white text-black hover:bg-white/90",
@@ -380,7 +414,9 @@ function verifyV19SemanticStyleContract() {
     const source = sourceByPath.get(relativePath) ?? "";
     for (const snippet of forbiddenSnippets) {
       if (source.includes(snippet)) {
-        failures.push(`${relativePath} still contains inline visual contract: ${snippet}`);
+        failures.push(
+          `${relativePath} still contains inline visual contract: ${snippet}`,
+        );
       }
     }
   }
@@ -417,12 +453,16 @@ function assertSameSet(actual, expected, label) {
 
 function assertSameOrderedList(actual, expected, label) {
   if (actual.length !== expected.length) {
-    failures.push(`${label} expected ${expected.length} item(s), found ${actual.length}`);
+    failures.push(
+      `${label} expected ${expected.length} item(s), found ${actual.length}`,
+    );
     return;
   }
   for (const [index, expectedItem] of expected.entries()) {
     if (actual[index] !== expectedItem) {
-      failures.push(`${label} item ${index + 1} expected ${expectedItem}, found ${actual[index]}`);
+      failures.push(
+        `${label} item ${index + 1} expected ${expectedItem}, found ${actual[index]}`,
+      );
     }
   }
 }

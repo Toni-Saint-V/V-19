@@ -128,7 +128,7 @@
 .v19-agent-drawer-action-copy > span {
   color: var(--v19b-color-text-muted);
   font-size: var(--v19b-size-11);
-  font-weight: var(--v19b-weight-semibold);
+  font-weight: var(--v19b-weight-title);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -186,7 +186,7 @@
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19b-radius-control);
   font-size: var(--v19b-size-13);
-  font-weight: var(--v19b-weight-semibold);
+  font-weight: var(--v19b-weight-title);
   line-height: 1.2;
   text-align: center;
   transition:
@@ -336,7 +336,7 @@
 
 .v19-agent-drawer-document-action {
   color: var(--v19b-color-primary-text);
-  font-weight: var(--v19b-weight-semibold);
+  font-weight: var(--v19b-weight-title);
 }
 
 .v19-agent-drawer-applicant {
@@ -423,7 +423,7 @@
   background: var(--v19b-admin-drawer-orange-bg);
   color: var(--v19b-admin-drawer-orange-text);
   font-size: var(--v19b-size-11);
-  font-weight: var(--v19b-weight-semibold);
+  font-weight: var(--v19b-weight-title);
 }
 
 .v19-agent-drawer-issue-group-heading {
@@ -438,7 +438,7 @@
   margin: var(--v19b-size-0);
   color: var(--v19b-color-text-strong);
   font-size: var(--v19b-size-13);
-  font-weight: var(--v19b-weight-semibold);
+  font-weight: var(--v19b-weight-title);
 }
 
 .v19-agent-drawer-issue-group-heading.is-fixed > span {
@@ -519,7 +519,7 @@
   margin: var(--v19b-size-0);
   color: var(--v19b-color-text-strong);
   font-size: var(--v19b-size-14);
-  font-weight: var(--v19b-weight-semibold);
+  font-weight: var(--v19b-weight-title);
   line-height: 1.35;
 }
 

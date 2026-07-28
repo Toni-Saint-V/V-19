@@ -126,7 +126,7 @@ type CommandCenterProps = {
   reservedSubmissionIds?: readonly Submission["id"][];
   submissions?: Submission[];
   onSignOut?: () => void | Promise<void>;
-  onSwitchWorkspace?: () => void;
+  onSwitchWorkspace?: () => void | Promise<void>;
   onNavigateSettings?: () => void;
   usesSupabase?: boolean;
 };
@@ -171,6 +171,7 @@ export function CommandCenter({
   submissions: canonicalSubmissions,
   onSignOut,
   onNavigateSettings,
+  onSwitchWorkspace,
   usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
@@ -583,6 +584,14 @@ export function CommandCenter({
     setCurrentView("main");
   };
 
+  const handleQuestionnaireSavedAndExit = (submission: Submission) => {
+    if (questionnaireOriginSurfaceRef.current === "drawer") {
+      handleQuestionnaireBack();
+      return;
+    }
+    showSavedSubmissionInList(submission);
+  };
+
   const handleActionOpen = (action: AgentActionItem) => {
     const target = agentActionWorkspaceTarget(action);
     if (target) {
@@ -674,6 +683,7 @@ export function CommandCenter({
         city: intent.city,
         familyCount: intent.familyCount,
         idScheme: usesSupabase ? "supabase" : "local",
+        preliminaryIntake: intent.preliminaryIntake,
         reservedSubmissionIds,
         submissions: effectiveCanonicalSubmissions,
         type: intent.type,
@@ -699,6 +709,7 @@ export function CommandCenter({
           [submission.id]: submission,
         }));
       },
+      simulatePrivateStorage: __V19_LOCAL_DEMO_BUILD__ && !usesSupabase,
       storageAdapter: usesSupabase ? "supabase-private" : "local-dev",
       submission: pendingSubmission,
     });
@@ -785,6 +796,7 @@ export function CommandCenter({
           storageAdapter: "supabase-private";
           storageBucket: string;
           storagePath: string;
+          localDemoMediaStored?: true;
         });
     if (usesSupabase) {
       const target = buildMediaStoragePath(
@@ -804,6 +816,23 @@ export function CommandCenter({
         storageAdapter: "supabase-private",
         storageBucket: target.bucket,
         storagePath: uploaded.path,
+      };
+    } else if (__V19_LOCAL_DEMO_BUILD__) {
+      const target = buildMediaStoragePath(
+        submission.id,
+        applicantId,
+        mediaSlotTypeForSubmissionFileType(fileType),
+        generatedFileName,
+      );
+      const { saveLocalDemoMedia } =
+        await import("../modules/submissions/localDemoMediaStorage");
+      const stored = await saveLocalDemoMedia(target, file);
+      metadata = {
+        ...baseMetadata,
+        localDemoMediaStored: true,
+        storageAdapter: "supabase-private",
+        storageBucket: target.bucket,
+        storagePath: stored.path,
       };
     } else {
       metadata = { ...baseMetadata, storageAdapter: "local-dev" };
@@ -930,8 +959,28 @@ export function CommandCenter({
     return nextSubmission;
   };
 
-  const persistQuestionnaireSubmission = (nextSubmission: Submission) => {
-    return onSubmissionsChange?.([nextSubmission]);
+  const persistQuestionnaireSubmissionUpdate = async (
+    update: (submission: Submission) => Submission,
+  ) => {
+    if (!selectedRow) {
+      throw new Error("Не удалось определить подачу для сохранения анкеты.");
+    }
+    const currentSubmission = effectiveCanonicalSubmissions.find(
+      (submission) => submission.id === selectedRow,
+    );
+    if (!currentSubmission) {
+      throw new Error("Подача больше не доступна.");
+    }
+
+    const nextSubmission = onSubmissionUpdate
+      ? await onSubmissionUpdate(selectedRow, update)
+      : update(currentSubmission);
+    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
+    setCanonicalOverrides((current) => ({
+      ...current,
+      [nextSubmission.id]: nextSubmission,
+    }));
+    return nextSubmission;
   };
 
   const renderActionsList = () => (
@@ -1081,14 +1130,9 @@ export function CommandCenter({
             submission={selectedQuestionnaireSubmission}
             onAssignPublicNumber={onAssignPublicNumber}
             onBack={handleQuestionnaireBack}
-            onSavedAndExit={showSavedSubmissionInList}
+            onSavedAndExit={handleQuestionnaireSavedAndExit}
             onOpenDocuments={() => focusSubmissionInList(selectedRow)}
-            onSubmissionUpdate={
-              onSubmissionUpdate
-                ? (update) => onSubmissionUpdate(selectedRow, update)
-                : undefined
-            }
-            onSubmissionChange={persistQuestionnaireSubmission}
+            onSubmissionUpdate={persistQuestionnaireSubmissionUpdate}
             onMarkIssueFixed={markAgentIssueFixed}
             onUploadFile={
               selectedRow
@@ -1171,6 +1215,7 @@ export function CommandCenter({
             onCloseMobile: () => setMobileNavOpen(false),
             onCommandSearch: openCommandPalette,
             onResetWorkspace: () => onSignOut?.(),
+            onSwitchWorkspace,
             role: "agent",
             sessionDisplayName: agentName,
             sessionInitials: agentAvatar,

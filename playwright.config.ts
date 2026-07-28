@@ -35,6 +35,7 @@ const e2eServerHost = requireLocalhost(
 );
 const e2ePort = requirePort(process.env.PW_BASE_PORT ?? "4207");
 const e2eUrl = `http://${e2eHost}:${e2ePort}`;
+const browserChannel = process.env.PW_BROWSER_CHANNEL?.trim() || undefined;
 const denyExternalProxy = "http://127.0.0.1:1";
 
 export default defineConfig({
@@ -86,7 +87,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], channel: browserChannel },
     },
     {
       name: "mobile-chromium",

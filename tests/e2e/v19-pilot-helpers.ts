@@ -13,6 +13,21 @@ export function collectBrowserProblems(page: Page) {
     problems.push(`pageerror: ${error.message}`);
   });
 
+  page.on("requestfailed", (request) => {
+    const failure = request.failure();
+    problems.push(
+      `network: ${failure?.errorText ?? "request failed"} ${request.method()} ${request.url()}`,
+    );
+  });
+
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      problems.push(
+        `network: HTTP ${response.status()} ${response.request().method()} ${response.url()}`,
+      );
+    }
+  });
+
   return problems;
 }
 
@@ -39,10 +54,39 @@ export async function openFreshWorkspace(
   }, workspaceEmail);
   await page.reload();
 
+  const expectedHeading =
+    options.heading ??
+    (workspaceEmail === "2@2.ru" ? /^(Очередь на проверку|Проверка)$/ : "Мои действия");
+  const workspaceHeading = page.getByRole("heading", {
+    level: 1,
+    name: expectedHeading,
+  });
   const switchToLogin = page.getByRole("button", {
     name: "Уже есть доступ? Войти",
   });
-  await expect(switchToLogin).toBeVisible({ timeout: 5_000 });
+  const switchToRequestedWorkspace =
+    workspaceEmail === "2@2.ru"
+      ? page.getByRole("button", {
+          name: /^(В админскую зону|Сменить роль|Переключиться в кабинет администратора)$/,
+        })
+      : page.getByRole("button", {
+          name: /^(В кабинет агента|Сменить роль|Переключиться в кабинет агента)$/,
+        });
+  await expect(
+    workspaceHeading.or(switchToLogin).or(switchToRequestedWorkspace).first(),
+  ).toBeVisible({
+    timeout: 5_000,
+  });
+  if (await workspaceHeading.isVisible()) {
+    return;
+  }
+
+  if (await switchToRequestedWorkspace.first().isVisible()) {
+    await clickFirstVisible(switchToRequestedWorkspace);
+    await expect(workspaceHeading).toBeVisible();
+    return;
+  }
+
   await switchToLogin.click();
 
   const emailField = page.locator("#workspace-email");
@@ -51,12 +95,7 @@ export async function openFreshWorkspace(
   await page.locator("#workspace-password").fill(workspacePassword);
   await page.getByRole("button", { name: "Войти в кабинет" }).click();
 
-  const expectedHeading =
-    options.heading ??
-    (workspaceEmail === "2@2.ru" ? /^(Очередь на проверку|Проверка)$/ : "Мои действия");
-  await expect(
-    page.getByRole("heading", { level: 1, name: expectedHeading }),
-  ).toBeVisible();
+  await expect(workspaceHeading).toBeVisible();
 }
 
 function normalizeLocalDemoWorkspaceEmail(email?: string) {
@@ -87,14 +126,12 @@ export async function isVisible(locator: Locator) {
 }
 
 function mobileMenuTrigger(page: Page) {
-  return page
-    .getByRole("button", { exact: true, name: "Меню" })
-    .or(
-      page.getByRole("button", {
-        exact: true,
-        name: "Открыть меню администратора",
-      }),
-    );
+  return page.getByRole("button", { exact: true, name: "Меню" }).or(
+    page.getByRole("button", {
+      exact: true,
+      name: "Открыть меню администратора",
+    }),
+  );
 }
 
 export async function openMobileMenu(page: Page) {
@@ -162,11 +199,11 @@ async function waitForStableInViewport(locator: Locator) {
         const nextBox = await locator.boundingBox().catch(() => null);
         const isStable = Boolean(
           nextBox &&
-            previousBox &&
-            Math.abs(nextBox.x - previousBox.x) < 0.5 &&
-            Math.abs(nextBox.y - previousBox.y) < 0.5 &&
-            Math.abs(nextBox.width - previousBox.width) < 0.5 &&
-            Math.abs(nextBox.height - previousBox.height) < 0.5,
+          previousBox &&
+          Math.abs(nextBox.x - previousBox.x) < 0.5 &&
+          Math.abs(nextBox.y - previousBox.y) < 0.5 &&
+          Math.abs(nextBox.width - previousBox.width) < 0.5 &&
+          Math.abs(nextBox.height - previousBox.height) < 0.5,
         );
         previousBox = nextBox;
         return isStable;
@@ -217,6 +254,8 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
     await waitForStableInViewport(mobileButton);
     await mobileButton.click({ timeout: 10_000 });
     await mobileNavigation.waitFor({ state: "hidden", timeout: 2_000 });
+    await expect(page.locator(".ops-shell.is-mobile-nav-open")).toHaveCount(0);
+    await expect(page.locator(".ops-mobile-menu-backdrop")).toBeHidden();
     return;
   }
 
@@ -224,9 +263,12 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
 
   if (!(await hasAtLeastOneVisible(button))) {
     await openMobileMenu(page);
-    await button.first().waitFor({ state: "visible", timeout: 2_000 }).catch(() => {
-      // Keep the original visible-button assertion below as the failure owner.
-    });
+    await button
+      .first()
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .catch(() => {
+        // Keep the original visible-button assertion below as the failure owner.
+      });
   }
 
   await expectAtLeastOneVisible(
@@ -244,11 +286,13 @@ export function drawer(page: Page) {
 export function submissionCard(page: Page, name: string) {
   const fixtureIds: Record<string, string> = {
     "Нина Волкова": "ПД-1053",
-    "Петровы": "ПД-1054",
+    Петровы: "ПД-1054",
     "Семья Петровых": "ПД-1054",
   };
   const byText = page
-    .locator(".submission-card, .v17-admin-work-row, .v19-event-row, [data-submission-card]")
+    .locator(
+      ".submission-card, .v17-admin-work-row, .v19-event-row, [data-submission-card]",
+    )
     .filter({ hasText: name })
     .first();
   const fixtureId = fixtureIds[name];
@@ -480,7 +524,9 @@ export function e2ePassportFile(name: string) {
 }
 
 export async function uploadAllVisibleFiles(page: Page) {
-  await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
+  await expect(
+    drawer(page).getByRole("heading", { name: "Файлы подачи" }),
+  ).toBeVisible();
 
   for (let pass = 0; pass < 40; pass += 1) {
     const fileInputs = drawer(page).locator(".drawer-file-input");
@@ -509,14 +555,22 @@ export async function markVisibleIssuesFixed(page: Page) {
     name: "Отправить исправления",
   });
 
-  if (!((await submitCorrectionsButton.count()) > 0 && await submitCorrectionsButton.isEnabled())) {
-    await fixedButtons.first().waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
+  if (
+    !(
+      (await submitCorrectionsButton.count()) > 0 &&
+      (await submitCorrectionsButton.isEnabled())
+    )
+  ) {
+    await fixedButtons
+      .first()
+      .waitFor({ state: "visible", timeout: 2000 })
+      .catch(() => {});
   }
 
   for (let safety = 0; safety < 12; safety += 1) {
     if (
       (await submitCorrectionsButton.count()) > 0 &&
-      await submitCorrectionsButton.isEnabled()
+      (await submitCorrectionsButton.isEnabled())
     ) {
       return;
     }
@@ -524,7 +578,9 @@ export async function markVisibleIssuesFixed(page: Page) {
     if ((await fixedButtons.count()) === 0) return;
 
     await fixedButtons.first().click();
-    await expect(drawer(page).getByRole("heading", { name: "Замечания" })).toBeVisible();
+    await expect(
+      drawer(page).getByRole("heading", { name: "Замечания" }),
+    ).toBeVisible();
   }
 
   throw new Error("Too many visible issue fix buttons.");
