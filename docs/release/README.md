@@ -18,6 +18,14 @@ evidence records. When documents conflict, use this order:
 
 ## Current production boundary
 
+- Canonical Vercel project: `document-intake-system`.
+- Permanent production URL:
+  `https://document-intake-system.vercel.app`.
+- The Vercel project `v-19`, `v-19-iota.vercel.app`, preview URLs, and branch
+  aliases are not the canonical production target.
+- Deployment evidence must bind the exact Git SHA to
+  `document-intake-system`, `target=production`, the permanent alias, and a
+  fresh HTTP response.
 - `supabase-production-promotion.md` is the production promotion runbook.
 - `supabase-production-approval-checklist.md` records the approval checklist.
 - `supabase-production-readiness.json` is the current production readiness
