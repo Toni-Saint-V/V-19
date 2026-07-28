@@ -270,11 +270,7 @@ describe("passport extraction state", () => {
       summary: "Страна рождения подготовлена.",
     };
 
-    const readyDefault = finishPassportExtraction(
-      draft,
-      file,
-      extractedBirthCountry,
-    );
+    const readyDefault = finishPassportExtraction(draft, file, extractedBirthCountry);
     const autofilledDefault = applySafePassportExtractionFields(
       readyDefault,
       applicantId,
@@ -297,10 +293,7 @@ describe("passport extraction state", () => {
       file,
       extractedBirthCountry,
     );
-    const preservedManual = applySafePassportExtractionFields(
-      readyManual,
-      applicantId,
-    );
+    const preservedManual = applySafePassportExtractionFields(readyManual, applicantId);
     expect(questionnaireValue(preservedManual, "birth-country")).toBe("Spain");
     expect(passportExtractionRows(preservedManual.applicants[0]!)).toEqual(
       expect.arrayContaining([
@@ -664,9 +657,9 @@ describe("passport extraction state", () => {
     expect(
       canConfirmApplicantPassportReview(base, file.applicantId, base.agentId),
     ).toBe(false);
-    expect(
-      confirmApplicantPassportReview(base, file.applicantId, base.agentId),
-    ).toBe(base);
+    expect(confirmApplicantPassportReview(base, file.applicantId, base.agentId)).toBe(
+      base,
+    );
 
     const incompleteMetadata = uploadRequiredFile(base, file.id, {
       generatedFileName: "abc_passport_scan.png",
@@ -729,11 +722,7 @@ describe("passport extraction state", () => {
       ),
     ).toBe(false);
     expect(
-      confirmApplicantPassportReview(
-        extracting,
-        file.applicantId,
-        extracting.agentId,
-      ),
+      confirmApplicantPassportReview(extracting, file.applicantId, extracting.agentId),
     ).toBe(extracting);
   });
 
@@ -759,11 +748,7 @@ describe("passport extraction state", () => {
     });
 
     expect(
-      canConfirmApplicantPassportReview(
-        uploaded,
-        file.applicantId,
-        "foreign-agent",
-      ),
+      canConfirmApplicantPassportReview(uploaded, file.applicantId, "foreign-agent"),
     ).toBe(false);
     expect(
       confirmApplicantPassportReview(uploaded, file.applicantId, "foreign-agent"),

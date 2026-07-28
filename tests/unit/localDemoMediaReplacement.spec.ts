@@ -163,9 +163,7 @@ describe("local demo media replacement", () => {
       pruneUnreferencedLocalDemoMedia([submission], {
         deleteStoredMedia,
         nowEpochMs,
-        storedAtEpochMsByPath: new Map([
-          [previousPath, nowEpochMs - 10 * 60_000],
-        ]),
+        storedAtEpochMsByPath: new Map([[previousPath, nowEpochMs - 10 * 60_000]]),
         storedPaths: [currentPath, previousPath, "  "],
       }),
     ).resolves.toEqual([previousPath]);

@@ -30,10 +30,7 @@ export type PassportGateIssue = {
   message: string;
 };
 
-const passportQuestionnaireFieldIds: Record<
-  PassportExtractedFieldKey,
-  string
-> = {
+const passportQuestionnaireFieldIds: Record<PassportExtractedFieldKey, string> = {
   birthCountry: "birth-country",
   birthDate: "birth-date",
   birthPlace: "birth-place",
@@ -142,24 +139,12 @@ function applicantPassportGateIssues(
 
   if (!state && !hasManualAdminReview) {
     return hasRealPassportUpload(file)
-      ? [
-          issue(
-            applicant,
-            "passport_not_confirmed",
-            "Скан паспорта не проверен.",
-          ),
-        ]
+      ? [issue(applicant, "passport_not_confirmed", "Скан паспорта не проверен.")]
       : [];
   }
 
   if (state?.status === "extracting") {
-    return [
-      issue(
-        applicant,
-        "passport_not_confirmed",
-        "Дождитесь проверки скана.",
-      ),
-    ];
+    return [issue(applicant, "passport_not_confirmed", "Дождитесь проверки скана.")];
   }
 
   const canUseQuestionnaireFallback =
@@ -170,11 +155,7 @@ function applicantPassportGateIssues(
 
   if (state?.status === "ready" && !state.extractedFields.length) {
     return [
-      issue(
-        applicant,
-        "passport_not_confirmed",
-        "Паспортные данные не прочитаны.",
-      ),
+      issue(applicant, "passport_not_confirmed", "Паспортные данные не прочитаны."),
     ];
   }
 
@@ -298,10 +279,10 @@ function hasApprovedManualPassportReview(
     const field = fieldsById.get(fieldId);
     return Boolean(
       field &&
-        hasAdminPassportReviewValue(field.value) &&
-        !field.error &&
-        field.adminReviewApprovedAtIso &&
-        field.adminReviewApprovedBy,
+      hasAdminPassportReviewValue(field.value) &&
+      !field.error &&
+      field.adminReviewApprovedAtIso &&
+      field.adminReviewApprovedBy,
     );
   });
 }
@@ -361,12 +342,12 @@ function passportFileForApplicant(submission: Submission, applicantId: string) {
 function hasRealPassportUpload(file: SubmissionFile | undefined) {
   return Boolean(
     file &&
-      isCompletedFileAsset(file) &&
-      (file.mimeType ||
-        file.originalFileName ||
-        file.generatedFileName ||
-        file.storagePath ||
-        file.storageBucket),
+    isCompletedFileAsset(file) &&
+    (file.mimeType ||
+      file.originalFileName ||
+      file.generatedFileName ||
+      file.storagePath ||
+      file.storageBucket),
   );
 }
 

@@ -200,32 +200,35 @@ function applicant(
             summary: "Демо-скан проверен вручную; данные анкеты подтверждены.",
           }
         : undefined,
-    sections: createQuestionnaireSections(id, fullName, questionnaireStatus, missing).map(
-      (section) => ({
-        ...section,
-        fields: section.fields.map((field) => {
-          if (field.id === "passport-no") {
-            return { ...field, value: mockPassportNumber(id) };
-          }
-          if (
-            !readyForExportFixture ||
-            questionnaireStatus !== "complete" ||
-            field.value.trim() ||
-            (!field.required && !conditionallyRequiredBlsFieldIds.has(field.id))
-          ) {
-            return field;
-          }
-          return {
-            ...field,
-            value:
-              applicantValues?.[field.id] ??
-              completeDemoQuestionnaireValues[field.id] ??
-              field.options?.[0] ??
-              `DEMO ${field.id.toUpperCase()}`,
-          };
-        }),
+    sections: createQuestionnaireSections(
+      id,
+      fullName,
+      questionnaireStatus,
+      missing,
+    ).map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        if (field.id === "passport-no") {
+          return { ...field, value: mockPassportNumber(id) };
+        }
+        if (
+          !readyForExportFixture ||
+          questionnaireStatus !== "complete" ||
+          field.value.trim() ||
+          (!field.required && !conditionallyRequiredBlsFieldIds.has(field.id))
+        ) {
+          return field;
+        }
+        return {
+          ...field,
+          value:
+            applicantValues?.[field.id] ??
+            completeDemoQuestionnaireValues[field.id] ??
+            field.options?.[0] ??
+            `DEMO ${field.id.toUpperCase()}`,
+        };
       }),
-    ),
+    })),
   };
 }
 
@@ -252,7 +255,10 @@ function file(
   };
 }
 
-function localDemoStoredFile(submissionId: string, source: SubmissionFile): SubmissionFile {
+function localDemoStoredFile(
+  submissionId: string,
+  source: SubmissionFile,
+): SubmissionFile {
   const applicantKey = source.applicantId.replace(/\D/g, "");
   const generatedFileName = `demo${applicantKey}_${source.type}.jpg`;
   const target = buildMediaStoragePath(
@@ -513,8 +519,24 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1054-1", "Ирина Петрова", "main", "complete", "complete", undefined, true),
-      applicant("з-1054-2", "Павел Петров", "spouse", "complete", "complete", undefined, true),
+      applicant(
+        "з-1054-1",
+        "Ирина Петрова",
+        "main",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
+      applicant(
+        "з-1054-2",
+        "Павел Петров",
+        "spouse",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
     ],
     issues: [],
     files: localDemoStoredFiles("ПД-1054", [
@@ -625,7 +647,15 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "12.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1056-1", "Дмитрий Орлов", "main", "complete", "complete", undefined, true),
+      applicant(
+        "з-1056-1",
+        "Дмитрий Орлов",
+        "main",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
     ],
     issues: [],
     files: localDemoStoredFiles("ПД-1056", [
@@ -658,7 +688,15 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1101-1", "Ольга Фролова", "main", "complete", "complete", undefined, true),
+      applicant(
+        "з-1101-1",
+        "Ольга Фролова",
+        "main",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
     ],
     issues: [],
     files: localDemoStoredFiles("SUB-1101", [
@@ -671,7 +709,12 @@ export const initialSubmissions: Submission[] = [
     createdAt: "14.06",
     updatedAt: "15.06",
     history: [
-      { id: "и-1101-1", text: "Администратор принял подачу", at: "15.06", source: "admin" },
+      {
+        id: "и-1101-1",
+        text: "Администратор принял подачу",
+        at: "15.06",
+        source: "admin",
+      },
       { id: "и-1101-2", text: "Подача готова к Эксель", at: "15.06", source: "system" },
     ],
   },
@@ -687,9 +730,33 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1102-1", "Анна Волкова", "main", "complete", "complete", undefined, true),
-      applicant("з-1102-2", "Игорь Волков", "spouse", "complete", "complete", undefined, true),
-      applicant("з-1102-3", "Мила Волкова", "child", "complete", "complete", undefined, true),
+      applicant(
+        "з-1102-1",
+        "Анна Волкова",
+        "main",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
+      applicant(
+        "з-1102-2",
+        "Игорь Волков",
+        "spouse",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
+      applicant(
+        "з-1102-3",
+        "Мила Волкова",
+        "child",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
     ],
     issues: [],
     files: localDemoStoredFiles("SUB-1102", [
@@ -708,7 +775,12 @@ export const initialSubmissions: Submission[] = [
     createdAt: "14.06",
     updatedAt: "15.06",
     history: [
-      { id: "и-1102-1", text: "Администратор принял подачу", at: "15.06", source: "admin" },
+      {
+        id: "и-1102-1",
+        text: "Администратор принял подачу",
+        at: "15.06",
+        source: "admin",
+      },
       { id: "и-1102-2", text: "Подача готова к Эксель", at: "15.06", source: "system" },
     ],
   },
@@ -723,7 +795,15 @@ export const initialSubmissions: Submission[] = [
     tripDateTo: "16.09",
     status: "ready_for_export",
     applicants: [
-      applicant("з-1103-1", "Никита Морозов", "main", "complete", "complete", undefined, true),
+      applicant(
+        "з-1103-1",
+        "Никита Морозов",
+        "main",
+        "complete",
+        "complete",
+        undefined,
+        true,
+      ),
     ],
     issues: [],
     files: localDemoStoredFiles("SUB-1103", [
@@ -736,7 +816,12 @@ export const initialSubmissions: Submission[] = [
     createdAt: "13.06",
     updatedAt: "15.06",
     history: [
-      { id: "и-1103-1", text: "Администратор принял подачу", at: "15.06", source: "admin" },
+      {
+        id: "и-1103-1",
+        text: "Администратор принял подачу",
+        at: "15.06",
+        source: "admin",
+      },
       { id: "и-1103-2", text: "Подача готова к Эксель", at: "15.06", source: "system" },
     ],
   },

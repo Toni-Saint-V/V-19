@@ -436,9 +436,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       ),
     ).toHaveTextContent("VF-1053");
     expect(
-      container.querySelectorAll(
-        '.v19-review-queue-list [data-submission-card]',
-      ),
+      container.querySelectorAll(".v19-review-queue-list [data-submission-card]"),
     ).toHaveLength(2);
     expect(
       screen.queryByRole("tablist", { name: "Фокус очереди" }),
@@ -450,11 +448,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
 
   test("distinguishes a genuinely empty queue from a filtered-empty result", () => {
     const { rerender } = render(
-      <ReviewScreen
-        onOpenDrawer={vi.fn()}
-        onOpenExport={vi.fn()}
-        submissions={[]}
-      />,
+      <ReviewScreen onOpenDrawer={vi.fn()} onOpenExport={vi.fn()} submissions={[]} />,
     );
 
     expect(screen.getByText("Очередь пуста")).toBeInTheDocument();
@@ -479,9 +473,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     });
 
     expect(screen.getByText("Ничего не найдено")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Сбросьте фильтры, чтобы вернуться/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Сбросьте фильтры, чтобы вернуться/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Показать всю очередь" }));
     expect(screen.getByText("Нина Волкова")).toBeInTheDocument();
   });
@@ -1256,7 +1248,9 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       screen.queryByRole("region", { name: "Необязательный просмотр анкеты" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Посмотреть" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Посмотреть" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Пакетный guard")).toBeInTheDocument();
     expect(
       container.querySelector(".v19-review-questionnaire-entry small"),
@@ -1376,9 +1370,15 @@ describe("ReviewWorkspace passport section contract", () => {
     const firstSelfieTab = screen.getByRole("tab", { name: "Селфи 1" });
     const secondSelfieTab = screen.getByRole("tab", { name: "Селфи 2" });
 
-    expect(screen.getByRole("button", { name: "Увеличить изображение" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Повернуть изображение" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Открыть на весь экран" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Увеличить изображение" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Повернуть изображение" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Открыть на весь экран" }),
+    ).toBeDisabled();
 
     passportTab.focus();
     fireEvent.keyDown(passportTab, { key: "ArrowRight" });
@@ -1527,9 +1527,7 @@ describe("ReviewWorkspace passport section contract", () => {
 
     expect(screen.getByRole("button", { name: "Принять всё" })).toBeDisabled();
     expect(
-      screen.getByText(
-        /Заполнены не все паспортные поля или в данных есть ошибка/,
-      ),
+      screen.getByText(/Заполнены не все паспортные поля или в данных есть ошибка/),
     ).toBeInTheDocument();
   });
 
@@ -1779,39 +1777,39 @@ describe("ReviewWorkspace passport section contract", () => {
       expected:
         "Сессия или права доступа изменились. Войдите снова; подача не была изменена.",
     },
-  ])("preserves exact bridge failure feedback in the active workspace: $expected", async ({
-    error,
-    expected,
-  }) => {
-    const submission = reviewReadySubmission();
-    const onSubmissionAction = vi.fn().mockRejectedValue(error);
-    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
-      "https://example.test/protected-review.jpg",
-    );
-    const { container } = render(
-      <VisaflowBusinessBridgeProvider bridge={{ onSubmissionAction }}>
-        <AdminWorkspace
-          currentEmail="qa-admin@example.test"
-          onSignOut={() => undefined}
-          submissions={[submission]}
-          usesSupabase
-        />
-      </VisaflowBusinessBridgeProvider>,
-    );
+  ])(
+    "preserves exact bridge failure feedback in the active workspace: $expected",
+    async ({ error, expected }) => {
+      const submission = reviewReadySubmission();
+      const onSubmissionAction = vi.fn().mockRejectedValue(error);
+      vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+        "https://example.test/protected-review.jpg",
+      );
+      const { container } = render(
+        <VisaflowBusinessBridgeProvider bridge={{ onSubmissionAction }}>
+          <AdminWorkspace
+            currentEmail="qa-admin@example.test"
+            onSignOut={() => undefined}
+            submissions={[submission]}
+            usesSupabase
+          />
+        </VisaflowBusinessBridgeProvider>,
+      );
 
-    const opener = container.querySelector<HTMLButtonElement>(
-      `[data-submission-id="${submission.id}"]`,
-    );
-    if (!opener) throw new Error("Review queue opener was not rendered.");
-    fireEvent.click(opener);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Принять на выгрузку" }),
-    );
+      const opener = container.querySelector<HTMLButtonElement>(
+        `[data-submission-id="${submission.id}"]`,
+      );
+      if (!opener) throw new Error("Review queue opener was not rendered.");
+      fireEvent.click(opener);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Принять на выгрузку" }),
+      );
 
-    expect(await screen.findByText(expected)).toBeVisible();
-    expect(screen.getByRole("dialog", { name: "Сверка паспорта" })).toBeVisible();
-    expect(onSubmissionAction).toHaveBeenCalledTimes(1);
-  });
+      expect(await screen.findByText(expected)).toBeVisible();
+      expect(screen.getByRole("dialog", { name: "Сверка паспорта" })).toBeVisible();
+      expect(onSubmissionAction).toHaveBeenCalledTimes(1);
+    },
+  );
 
   test("preserves revision-conflict feedback from the passport-section bridge", async () => {
     const submission = singleSubmission();
@@ -1898,9 +1896,7 @@ describe("ReviewWorkspace passport section contract", () => {
 
   test("keeps revision-conflict feedback inside the open remark form", async () => {
     const submission = singleSubmission();
-    const onAdminIssueAdd = vi
-      .fn()
-      .mockRejectedValue(new Error("revision conflict"));
+    const onAdminIssueAdd = vi.fn().mockRejectedValue(new Error("revision conflict"));
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
       "https://example.test/protected-passport-section.jpg",
     );

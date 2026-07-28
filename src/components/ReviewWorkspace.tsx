@@ -545,11 +545,7 @@ export function ReviewWorkspace({
             __V19_LOCAL_DEMO_BUILD__ && supabaseRuntimeConfig.target === "local-demo"
               ? (
                   await import("../modules/submissions/exportMediaZipLocalDemo")
-                ).localDemoReviewMediaUrl(
-                  target.type,
-                  protectedFile,
-                  submissionId,
-                )
+                ).localDemoReviewMediaUrl(target.type, protectedFile, submissionId)
               : await createMediaSignedUrl({
                   bucket: mediaStorageBucket,
                   path: protectedFile.storagePath,
