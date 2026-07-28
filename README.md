@@ -105,6 +105,17 @@ filters, legal promise screens, or multi-country primary surfaces.
 
 ## Environment and production boundary
 
+The canonical Vercel production target is:
+
+- project: `document-intake-system`
+- permanent production URL:
+  `https://document-intake-system.vercel.app`
+
+The Vercel project `v-19`, its `v-19-iota.vercel.app` alias, preview URLs, and
+branch aliases are not the canonical V-19 production target. A production
+release must prove the exact Git SHA against the `document-intake-system`
+project, `target=production`, the permanent alias, and a fresh HTTP response.
+
 `.env.example` contains safe placeholders and fail-closed defaults only. Local
 or ignored env files must never be committed.
 
