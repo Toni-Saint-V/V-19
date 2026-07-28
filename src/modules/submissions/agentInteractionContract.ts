@@ -46,6 +46,7 @@ export const V19_AGENT_MUTATION_CHECK_TARGETS = [
   "access_requests",
   "profiles",
   "submissions",
+  "agent_submission_card_archives",
   "applicants",
   "questionnaire_answers",
   "media_assets",
@@ -61,6 +62,7 @@ export type AgentInteractionMutationTarget =
 
 export type AgentInteractionNetworkWriteTarget =
   | "edge:access-request"
+  | "rpc:archive_agent_submission_card"
   | "rpc:save_submission_draft"
   | "rpc:submit_corrections_handoff"
   | "storage:submission-media";
@@ -174,7 +176,23 @@ const submitCorrectionsCanonicalEffect = {
   primaryTarget: "submissions",
 } as const satisfies AgentInteractionCanonicalEffect;
 
+const archiveSubmissionCardCanonicalEffect = {
+  before: { "agent_submission_card_archives.archived_at": null },
+  expectedAfter: {
+    "agent_submission_card_archives.archived_at": "$server-timestamp",
+  },
+  primaryTarget: "agent_submission_card_archives",
+} as const satisfies AgentInteractionCanonicalEffect;
+
+const archiveSubmissionCardWriteScope = mutationWriteScope({
+  allowedChangedTargets: ["agent_submission_card_archives"],
+  allowedNetworkTargets: ["rpc:archive_agent_submission_card"],
+  requiredChangedTargets: ["agent_submission_card_archives"],
+  requiredNetworkTargets: ["rpc:archive_agent_submission_card"],
+});
+
 export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
+  archive_submission_card: archiveSubmissionCardWriteScope,
   create_submission: mutationWriteScope({
     allowedChangedTargets: [
       "submissions",
@@ -634,6 +652,38 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     role: "agent",
     expectedEffect: "Open the selected submission drawer without changing state.",
     proof: domProof,
+  },
+  "submissions.open-delete": {
+    id: "submissions.open-delete",
+    kind: "dialog",
+    surface: "agent-submissions",
+    role: "agent",
+    expectedEffect:
+      "Open the deletion confirmation for an eligible pre-review card without writing data.",
+    proof: domProof,
+    statusFixtures: initialReviewStatusFixtures,
+  },
+  "submissions.confirm-delete": {
+    businessIntent: "archive_submission_card",
+    canonicalEffect: archiveSubmissionCardCanonicalEffect,
+    id: "submissions.confirm-delete",
+    kind: "mutation",
+    surface: "agent-submissions",
+    role: "agent",
+    expectedEffect:
+      "Archive one owned pre-review card and remove it only after canonical readback.",
+    proof: mutationProof,
+    statusFixtures: initialReviewStatusFixtures,
+    writeScope: archiveSubmissionCardWriteScope,
+  },
+  "submissions.cancel-delete": {
+    id: "submissions.cancel-delete",
+    kind: "dialog",
+    surface: "agent-submissions",
+    role: "agent",
+    expectedEffect: "Close deletion confirmation without changing canonical state.",
+    proof: domProof,
+    statusFixtures: initialReviewStatusFixtures,
   },
   "submissions.open-questionnaire": {
     id: "submissions.open-questionnaire",

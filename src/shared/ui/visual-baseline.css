@@ -5089,16 +5089,8 @@
 
 /* Admin export: fail-closed queue with a compact mobile control sheet. */
 .v19-admin-export-screen-v2 {
-  --v19b-admin-red-border: color-mix(
-    in srgb,
-    var(--v19b-admin-red) 58%,
-    transparent
-  );
-  --v19b-admin-red-soft: color-mix(
-    in srgb,
-    var(--v19b-admin-red) 16%,
-    transparent
-  );
+  --v19b-admin-red-border: color-mix(in srgb, var(--v19b-admin-red) 58%, transparent);
+  --v19b-admin-red-soft: color-mix(in srgb, var(--v19b-admin-red) 16%, transparent);
   --v19b-admin-error-surface: color-mix(
     in srgb,
     var(--v19b-admin-red) 15%,
@@ -7857,6 +7849,53 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   line-height: var(--v19b-line-height-tight);
 }
 
+.v19-agent-submissions-board .v19-applicant-card-head-actions {
+  display: inline-flex;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--v19b-size-4);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-card-action {
+  display: inline-grid;
+  width: var(--v19b-size-44);
+  height: var(--v19b-size-44);
+  flex: 0 0 var(--v19b-size-44);
+  place-items: center;
+  padding: var(--v19b-size-0);
+  border: var(--v19b-size-1) solid transparent;
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    border-color var(--v19b-motion-fast),
+    background-color var(--v19b-motion-fast),
+    color var(--v19b-motion-fast);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-card-action .lucide {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-card-action:hover {
+  border-color: color-mix(in srgb, var(--vf-danger) 45%, transparent);
+  color: var(--vf-danger);
+  background: color-mix(in srgb, var(--vf-danger) 10%, transparent);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-card-action:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-1);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-card-action:disabled {
+  cursor: wait;
+  opacity: var(--v19b-opacity-disabled);
+}
+
 .v19-agent-submissions-board button.v19-applicant-card-status {
   display: inline-flex;
   min-height: var(--v19b-size-44);
@@ -8354,6 +8393,10 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   .v19-agent-submissions-board .v19-applicant-family-header {
     grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
     gap: var(--v19b-size-8);
+  }
+
+  .v19-agent-submissions-board .v19-applicant-card-head-actions {
+    align-items: flex-start;
   }
 
   .v19-agent-submissions-board
@@ -42468,9 +42511,7 @@ section[data-testid="agent-actions-screen"]
   box-shadow: inset var(--v19b-size-3) 0 0 var(--v19b-admin-red);
 }
 
-.v19-admin-export-screen-v2
-  .v19-admin-export-active-blockers-v2
-  > div {
+.v19-admin-export-screen-v2 .v19-admin-export-active-blockers-v2 > div {
   border-color: var(--v19b-admin-red-border);
   border-inline-start-width: var(--v19b-size-3);
   background: var(--v19b-admin-error-surface);

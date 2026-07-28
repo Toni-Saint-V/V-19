@@ -135,6 +135,8 @@ function productionFixture() {
   } as const;
   const writePathByTarget = {
     "edge:access-request": "/functions/v1/access-request",
+    "rpc:archive_agent_submission_card":
+      "/rest/v1/rpc/archive_agent_submission_card",
     "rpc:save_submission_draft": "/rest/v1/rpc/save_submission_draft",
     "rpc:submit_corrections_handoff":
       "/rest/v1/rpc/submit_corrections_handoff",

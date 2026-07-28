@@ -37,6 +37,12 @@ export type Database = {
         Update: Partial<SubmissionInsert>;
         Relationships: [];
       };
+      agent_submission_card_archives: {
+        Row: AgentSubmissionCardArchiveRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       applicants: {
         Row: ApplicantRow;
         Insert: ApplicantInsert;
@@ -132,6 +138,13 @@ export type Database = {
           assignedNow: boolean;
           publicNumber: number;
         };
+      };
+      archive_agent_submission_card: {
+        Args: {
+          expected_case_revision: number;
+          submission_id: string;
+        };
+        Returns: AgentSubmissionCardArchiveResult;
       };
       complete_export_package: {
         Args: {
@@ -374,6 +387,20 @@ export type SubmissionInsert = Omit<
   exported_at?: string | null;
   updated_at?: string;
 };
+
+export interface AgentSubmissionCardArchiveRow extends DbRecord {
+  submission_id: string;
+  agent_id: string;
+  case_revision: number;
+  archived_at: string;
+}
+
+export interface AgentSubmissionCardArchiveResult extends DbRecord {
+  submissionId: string;
+  caseRevision: number;
+  archivedAt: string;
+  idempotent: boolean;
+}
 
 export interface ApplicantRow extends DbRecord {
   id: string;

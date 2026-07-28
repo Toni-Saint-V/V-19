@@ -113,6 +113,17 @@ describe("V-19 business click contract", () => {
     ]);
   });
 
+  test("binds agent card archive to the canonical Supabase persistence owner", () => {
+    expect(businessClickContractFor("archive_submission_card")).toMatchObject({
+      executionPath: "archiveAgentSubmissionCard",
+      intent: "submission_lifecycle",
+      ownerRole: "agent",
+      productionLogic:
+        "src/modules/submissions/supabasePersistence.archiveAgentSubmissionCard",
+      surfaces: ["agent-submissions"],
+    });
+  });
+
   test("runs every submission lifecycle click through guard and mutation logic", () => {
     for (const contract of actionContracts) {
       const fixture = successFixtureFor(contract.submissionAction);

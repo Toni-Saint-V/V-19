@@ -6,6 +6,8 @@ import type { Json } from "../../src/lib/supabase/database.types";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const mockState = vi.hoisted(() => ({
+  archivedSubmissionError: null as unknown | null,
+  archivedSubmissionRows: [] as unknown[],
   applicantRows: [] as unknown[],
   correctionRows: [] as unknown[],
   exportBatchRows: [] as unknown[],
@@ -24,7 +26,7 @@ const mockState = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/lib/supabase/client", () => {
-  function queryResult(rows: unknown[]) {
+  function queryResult(rows: unknown[], error: unknown | null = null) {
     const fieldValue = (row: unknown, column: string) =>
       typeof row === "object" && row !== null
         ? (row as Record<string, unknown>)[column]
@@ -76,14 +78,14 @@ vi.mock("../../src/lib/supabase/client", () => {
         return result;
       },
       then(
-        resolve: (value: { data: unknown[]; error: null }) => unknown,
+        resolve: (value: { data: unknown[]; error: unknown | null }) => unknown,
         reject?: (reason: unknown) => unknown,
       ) {
         const rangedRows = range
           ? filteredRows.slice(range[0], range[1] + 1)
           : filteredRows;
         const data = rowLimit === null ? rangedRows : rangedRows.slice(0, rowLimit);
-        return Promise.resolve({ data, error: null }).then(resolve, reject);
+        return Promise.resolve({ data, error }).then(resolve, reject);
       },
     };
     return result;
@@ -94,10 +96,12 @@ vi.mock("../../src/lib/supabase/client", () => {
       from: (table: string) => {
         mockState.fromCalls.push(table);
         return {
-          select: () =>
-            queryResult(
+          select: () => {
+            const rows =
               table === "submissions"
                 ? mockState.submissionRows
+                : table === "agent_submission_card_archives"
+                  ? mockState.archivedSubmissionRows
                 : table === "applicants"
                   ? mockState.applicantRows
                   : table === "questionnaire_answers"
@@ -110,8 +114,14 @@ vi.mock("../../src/lib/supabase/client", () => {
                       ? mockState.statusHistoryRows
                       : table === "profiles"
                         ? mockState.profileRows
-                      : mockState.exportBatchRows,
-            ),
+                        : mockState.exportBatchRows;
+            return queryResult(
+              rows,
+              table === "agent_submission_card_archives"
+                ? mockState.archivedSubmissionError
+                : null,
+            );
+          },
         };
       },
       rpc: (name: string, args: Record<string, unknown>) => {
@@ -129,6 +139,7 @@ import {
 import { submitForReview } from "../../src/modules/submissions/domainEngine";
 import { normalizeSubmissionForCanonicalRuntime } from "../../src/modules/submissions/submissionActions";
 import {
+  archiveAgentSubmissionCard,
   changedCockpitSubmissions,
   cockpitSnapshotKey,
   cockpitSnapshotStatus,
@@ -187,6 +198,8 @@ function draftPayload(submission: Submission) {
 }
 
 beforeEach(() => {
+  mockState.archivedSubmissionError = null;
+  mockState.archivedSubmissionRows = [];
   mockState.applicantRows = [];
   mockState.correctionRows = [];
   mockState.exportBatchRows = [];
@@ -206,6 +219,137 @@ afterEach(() => {
 });
 
 describe("V-19 Supabase cockpit persistence", () => {
+  it("archives one card through the revision-aware Supabase RPC", async () => {
+    mockState.rpcResults = [
+      {
+        data: {
+          archivedAt: "2026-07-28T16:30:00.000Z",
+          caseRevision: 7,
+          idempotent: false,
+          submissionId: "submission-archive-1",
+        },
+        error: null,
+      },
+    ];
+
+    await expect(
+      archiveAgentSubmissionCard("submission-archive-1", 7),
+    ).resolves.toEqual({
+      archivedAt: "2026-07-28T16:30:00.000Z",
+      caseRevision: 7,
+      idempotent: false,
+      submissionId: "submission-archive-1",
+    });
+    expect(mockState.rpcCalls).toEqual([
+      {
+        args: {
+          expected_case_revision: 7,
+          submission_id: "submission-archive-1",
+        },
+        name: "archive_agent_submission_card",
+      },
+    ]);
+  });
+
+  it("filters archived cards from an agent readback without hiding them from admin audit", async () => {
+    const submission = {
+      ...(initialSubmissions[0] as Submission),
+      agentId: agentProfile.id,
+      id: "submission-archive-readback",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        case_revision: 4,
+        created_at: submission.createdAt,
+        updated_at: submission.updatedAt,
+      },
+    ];
+    mockState.archivedSubmissionRows = [
+      {
+        agent_id: agentProfile.id,
+        archived_at: "2026-07-28T16:30:00.000Z",
+        case_revision: 4,
+        submission_id: submission.id,
+      },
+    ];
+
+    const agentLoaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    expect(agentLoaded.submissions).toEqual([]);
+    expect(mockState.fromCalls).toContain("agent_submission_card_archives");
+
+    mockState.fromCalls = [];
+    const adminLoaded = await loadCockpitSubmissionsForProfile(adminProfile);
+    expect(adminLoaded.submissions).toHaveLength(1);
+    expect(mockState.fromCalls).not.toContain("agent_submission_card_archives");
+  });
+
+  it("fails closed when archive visibility is denied instead of re-exposing cards", async () => {
+    const submission = {
+      ...(initialSubmissions[0] as Submission),
+      agentId: agentProfile.id,
+      id: "submission-archive-permission-denied",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        case_revision: 4,
+        created_at: submission.createdAt,
+        updated_at: submission.updatedAt,
+      },
+    ];
+    mockState.archivedSubmissionError = {
+      code: "42501",
+      message:
+        "permission denied for table agent_submission_card_archives",
+    };
+
+    await expect(
+      loadCockpitSubmissionsForProfile(agentProfile),
+    ).rejects.toBeInstanceOf(PersistenceObservableError);
+  });
+
+  it.each(["42P01", "PGRST205"])(
+    "uses the staged compatibility fallback only for exact missing-schema code %s",
+    async (code) => {
+      const submission = {
+        ...(initialSubmissions[0] as Submission),
+        agentId: agentProfile.id,
+        id: `submission-archive-missing-${code}`,
+      };
+      const payload = toCockpitDraftPersistencePayload(
+        submission,
+        agentProfile.id,
+        agentProfile.id,
+      );
+      mockState.submissionRows = [
+        {
+          ...payload.submission,
+          case_revision: 4,
+          created_at: submission.createdAt,
+          updated_at: submission.updatedAt,
+        },
+      ];
+      mockState.archivedSubmissionError = {
+        code,
+        message: "agent_submission_card_archives is unavailable",
+      };
+
+      const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+      expect(loaded.submissions).toHaveLength(1);
+    },
+  );
+
   it("reloads an accepted resubmission with pending media and inactive package identity", async () => {
     const acceptedBase = normalizeSubmissionForCanonicalRuntime(
       fillRequiredQuestionnaireForTest({
@@ -1115,6 +1259,7 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(mockState.fromCalls).toEqual([
       "submissions",
+      "agent_submission_card_archives",
       "applicants",
       "questionnaire_answers",
       "media_assets",
@@ -2044,6 +2189,7 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(mockState.fromCalls).toEqual([
       "submissions",
+      "agent_submission_card_archives",
       "applicants",
       "questionnaire_answers",
       "media_assets",

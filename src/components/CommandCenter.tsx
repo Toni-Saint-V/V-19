@@ -118,6 +118,7 @@ const initialCreateNavigationState: CreateNavigationState = {
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
   onAssignPublicNumber?: (submissionId: string) => Promise<PublicNumberAssignment>;
+  onDeleteSubmission?: (submissionId: string) => Promise<void>;
   onSubmissionUpdate?: (
     submissionId: string,
     update: (submission: Submission) => Submission,
@@ -165,6 +166,7 @@ function normalizeAgentNav(
 export function CommandCenter({
   agentId,
   onAssignPublicNumber,
+  onDeleteSubmission,
   onSubmissionUpdate,
   onSubmissionsChange,
   reservedSubmissionIds,
@@ -1208,6 +1210,7 @@ export function CommandCenter({
                     <AgentReturnPackagesPanel enabled={usesSupabase} />
                     <ApplicantsScreen
                       focusRequest={submissionFocusRequest}
+                      onDeleteSubmission={onDeleteSubmission}
                       onOpenDrawer={handleRowClick}
                       onOpenQuestionnaire={handleOpenQuestionnaire}
                       onOpenWorkspaceTarget={handleOpenWorkspaceTarget}

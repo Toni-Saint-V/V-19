@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase/client";
 import type {
+  AgentSubmissionCardArchiveRow,
   ApplicantInsert,
   ApplicantRow,
   CorrectionInsert,
@@ -109,6 +110,70 @@ export type PublicNumberAssignment = {
   assignedNow: boolean;
   publicNumber: number;
 };
+
+export type AgentSubmissionCardArchiveResult = {
+  archivedAt: string;
+  caseRevision: number;
+  idempotent: boolean;
+  submissionId: string;
+};
+
+function agentSubmissionCardArchiveResultFromRpc(
+  value: unknown,
+): AgentSubmissionCardArchiveResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Supabase вернул некорректный результат удаления карточки.");
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.archivedAt !== "string" ||
+    !Number.isFinite(Date.parse(record.archivedAt)) ||
+    typeof record.caseRevision !== "number" ||
+    !Number.isSafeInteger(record.caseRevision) ||
+    record.caseRevision < 0 ||
+    typeof record.idempotent !== "boolean" ||
+    typeof record.submissionId !== "string" ||
+    record.submissionId.trim().length === 0
+  ) {
+    throw new Error("Supabase вернул некорректный результат удаления карточки.");
+  }
+
+  return {
+    archivedAt: record.archivedAt,
+    caseRevision: record.caseRevision,
+    idempotent: record.idempotent,
+    submissionId: record.submissionId,
+  };
+}
+
+export async function archiveAgentSubmissionCard(
+  submissionId: string,
+  expectedCaseRevision: number,
+): Promise<AgentSubmissionCardArchiveResult> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase недоступен для удаления карточки подачи.");
+  }
+  const { data, error } = await client.rpc("archive_agent_submission_card", {
+    expected_case_revision: expectedCaseRevision,
+    submission_id: submissionId,
+  });
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "rpc.archive_agent_submission_card",
+      fallbackKind: "rpc",
+    });
+  }
+  return agentSubmissionCardArchiveResultFromRpc(data);
+}
+
+export function isAgentSubmissionCardArchiveConflict(error: unknown): boolean {
+  return (
+    error instanceof PersistenceObservableError &&
+    error.diagnostics.operation === "rpc.archive_agent_submission_card" &&
+    error.diagnostics.supabaseCode === "40001"
+  );
+}
 
 function publicNumberAssignmentFromRpc(value: unknown): PublicNumberAssignment {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -1785,6 +1850,13 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
+  if (profile.role === "agent" && rows.length) {
+    const archivedSubmissionIds = await loadAgentArchivedSubmissionIds(
+      rows.map((row) => row.id),
+    );
+    rows = rows.filter((row) => !archivedSubmissionIds.has(row.id));
+  }
+
   if (!rows.length) {
     return {
       caseRevisionsBySubmissionId: new Map(),
@@ -2034,6 +2106,46 @@ export async function loadCockpitSubmissionsForProfile(
     quarantinedSubmissionIds,
     submissions,
   };
+}
+
+async function loadAgentArchivedSubmissionIds(
+  submissionIds: readonly string[],
+): Promise<Set<string>> {
+  const client = getSupabaseClient();
+  if (!client || submissionIds.length === 0) return new Set();
+
+  const archivedSubmissionIds = new Set<string>();
+  for (const submissionIdChunk of chunkedSubmissionIds(submissionIds)) {
+    const { data, error } = await client
+      .from("agent_submission_card_archives")
+      .select("submission_id")
+      .in("submission_id", submissionIdChunk);
+
+    if (error && isMissingAgentSubmissionCardArchivesTable(error)) {
+      return new Set();
+    }
+    if (error) {
+      throw mapSupabasePersistenceError(error, {
+        operation: "agent_submission_card_archives.list",
+        fallbackKind: "database",
+      });
+    }
+
+    for (const row of (data ?? []) as Pick<
+      AgentSubmissionCardArchiveRow,
+      "submission_id"
+    >[]) {
+      archivedSubmissionIds.add(row.submission_id);
+    }
+  }
+
+  return archivedSubmissionIds;
+}
+
+function isMissingAgentSubmissionCardArchivesTable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown };
+  return record.code === "42P01" || record.code === "PGRST205";
 }
 
 function isMissingCaseRevisionColumn(error: unknown): boolean {

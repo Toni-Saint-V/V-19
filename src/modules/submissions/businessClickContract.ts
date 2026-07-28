@@ -13,6 +13,7 @@ export type BusinessClickExecutionPath =
   | "createDraft"
   | "updateQuestionnaireField"
   | "uploadRequiredFile"
+  | "archiveAgentSubmissionCard"
   | "addPreciseAdminIssue"
   | "markSubmissionIssueFixedResult"
   | "exportSummary"
@@ -47,6 +48,14 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     ownerRole: "agent",
     productionLogic: "src/modules/submissions/domainEngine.createDraft",
     surfaces: ["agent-submissions", "new-submission", "submission-drawer"],
+  },
+  archive_submission_card: {
+    executionPath: "archiveAgentSubmissionCard",
+    intent: "submission_lifecycle",
+    ownerRole: "agent",
+    productionLogic:
+      "src/modules/submissions/supabasePersistence.archiveAgentSubmissionCard",
+    surfaces: ["agent-submissions"],
   },
   save_progress: {
     executionPath: "applySubmissionActionResult",
