@@ -8,6 +8,7 @@ import {
 } from "../integration/visaflowBusinessBridge";
 import type { WorkspaceDataStatus } from "../lib/supabase/workspaceRuntime";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
+import "../shared/ui/operational-screen-convergence.css";
 
 type Workspace = "agent" | "admin";
 

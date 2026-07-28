@@ -1,0 +1,700 @@
+/*
+ * Operational list-screen convergence.
+ * Presentation only: each screen keeps its own filters, state and actions.
+ */
+
+#root
+  :is(
+    .v19-admin-review-screen,
+    .v19-admin-export-screen-v2,
+    .v19-agent-shared-screen,
+    .v19-access-screen
+  )
+  .v19-metric-strip
+  .v19-metric-card:not(.tone-danger) {
+  border-color: var(--v19b-color-border-strong);
+  background: var(--v19b-color-panel);
+  box-shadow: var(--v19b-shadow-row-inner);
+}
+
+#root
+  :is(
+    .v19-admin-review-screen,
+    .v19-admin-export-screen-v2,
+    .v19-agent-shared-screen,
+    .v19-access-screen
+  )
+  .v19-metric-strip
+  button.v19-metric-card:is(.is-active, [aria-pressed="true"]) {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control);
+}
+
+#root
+  :is(
+    .v19-admin-review-board,
+    .v19-admin-export-workspace-v2,
+    .v19-agent-actions-board,
+    .v19-access-board
+  ) {
+  border-color: var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-panel);
+  background: var(--v19b-color-panel);
+  box-shadow: var(--v19b-shadow-panel);
+}
+
+#root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2, .v19-agent-actions-board)
+  .v19-admin-list-header {
+  min-height: var(--v19b-size-56);
+  padding: var(--v19b-size-10) var(--v19b-size-16) !important;
+  border-bottom-color: var(--v19b-color-border);
+}
+
+#root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2, .v19-agent-actions-board)
+  :is(
+    .v19-admin-toolbar-select-trigger,
+    .v19-admin-queue-toolbar-search input,
+    .v19-two-row-toolbar-search-row > button
+  ) {
+  height: var(--v19b-size-44) !important;
+  min-height: var(--v19b-size-44);
+}
+
+#root
+  :is(.v19-admin-export-screen-v2, .v19-legacy-actions-screen)
+  .v19-operational-table-header {
+  min-height: var(--v19b-size-44);
+  border-color: var(--v19b-color-border);
+  background: var(--v19b-color-black);
+}
+
+/* My Actions keeps five independent filters, presented as export-style cards. */
+#root .v19-legacy-actions-screen.surface-agent-actions .v19-agent-action-status-strip {
+  display: block;
+  min-width: var(--v19b-size-0);
+  overflow: visible;
+  border: var(--v19b-size-0);
+  border-radius: var(--v19b-size-0);
+  background: transparent;
+  box-shadow: none;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(var(--v19b-size-0), 1fr));
+  gap: var(--v19b-size-10);
+}
+
+#root .v19-legacy-actions-screen.surface-agent-actions .v19-agent-action-status-button {
+  position: relative;
+  display: block;
+  min-width: var(--v19b-size-0);
+  min-height: var(--v19b-size-88);
+  padding: var(--v19b-size-14);
+  overflow: hidden;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-panel);
+  color: var(--v19b-color-text-muted);
+  background: var(--v19b-color-panel);
+  box-shadow: var(--v19b-shadow-row-inner);
+  text-align: left;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-button::after {
+  display: none;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-button
+  > span {
+  position: absolute;
+  top: var(--v19b-size-12);
+  right: var(--v19b-size-52);
+  left: var(--v19b-size-14);
+  overflow: hidden;
+  color: var(--v19b-admin-unified-text);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-title);
+  letter-spacing: var(--v19b-letter-spacing-label);
+  line-height: var(--v19b-line-height-control);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-button
+  > strong {
+  position: absolute;
+  bottom: var(--v19b-size-12);
+  left: var(--v19b-size-14);
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-28);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--v19b-weight-title);
+  line-height: 1;
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-button
+  > svg {
+  position: absolute;
+  top: var(--v19b-size-10);
+  right: var(--v19b-size-10);
+  box-sizing: border-box;
+  width: var(--v19b-size-28);
+  height: var(--v19b-size-28);
+  padding: var(--v19b-size-6);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-admin-unified-text);
+  background: var(--v19b-color-primary-soft-10);
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-button:is(:hover, .is-active, [aria-pressed="true"]) {
+  border-color: var(--v19b-color-border-selected);
+  color: var(--v19b-color-text);
+  background: var(--v19b-color-control);
+  box-shadow: var(--v19b-shadow-panel);
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-button.tone-blockers
+  > svg {
+  color: var(--v19b-dot-danger);
+  background: var(--v19b-dot-halo-danger);
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  :is(
+    .v19-agent-action-status-button.tone-today,
+    .v19-agent-action-status-button.tone-week
+  )
+  > svg {
+  color: var(--v19b-dot-warning);
+  background: var(--v19b-dot-halo-warning);
+}
+
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-agent-action-status-button.tone-completed
+  > svg {
+  color: var(--v19b-dot-success);
+  background: var(--v19b-dot-halo-success);
+}
+
+/* Match the reference two-row filter/search composition on non-phone layouts. */
+@media (min-width: 768px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    display: grid !important;
+    grid-template-columns:
+      minmax(var(--v19b-size-0), 1fr)
+      var(--v19b-size-44) !important;
+    grid-template-rows:
+      var(--v19b-size-44)
+      var(--v19b-size-44) !important;
+    gap: var(--v19b-size-8);
+    padding: var(--v19b-size-16) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    > .v19-two-row-toolbar-filters {
+    display: flex !important;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    align-items: stretch;
+    gap: var(--v19b-size-8);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    > .v19-two-row-toolbar-search-row {
+    display: grid !important;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns:
+      minmax(var(--v19b-size-0), 1fr)
+      var(--v19b-size-44);
+    gap: var(--v19b-size-8);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-controls {
+    display: contents !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    .v19-admin-queue-toolbar-search {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    > .v19-two-row-toolbar-search-row
+    > button {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: stretch !important;
+    margin: var(--v19b-size-0) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-queue-list {
+    gap: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-0) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-queue-entry {
+    border-width: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-1) !important;
+    border-color: var(--v19b-color-border-faint) !important;
+    border-radius: var(--v19b-size-0) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-queue-entry:hover {
+    border-color: var(--v19b-color-border-faint) !important;
+    background: var(--v19b-color-control-hover) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-queue-entry.is-selected {
+    border-color: var(--v19b-color-border-faint) !important;
+    background: var(--v19b-color-primary-soft-10) !important;
+    box-shadow: inset var(--v19b-size-3) var(--v19b-size-0)
+      var(--v19b-color-primary-soft-30) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-table-row.is-inline-context {
+    min-height: var(--v19b-size-56) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-16) !important;
+  }
+
+  /* The cockpit supports compact and expanded table shapes; size each by its
+     rendered columns so the applicant track stays generous in either shape. */
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-table-head:has(> :nth-child(3):last-child),
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-table-row.is-inline-context:has(> .v19-actions-cell-identity) {
+    grid-template-columns:
+      minmax(var(--v19b-size-180), 1.58fr)
+      minmax(var(--v19b-size-144), 1.08fr)
+      minmax(var(--v19b-size-112), 0.71fr)
+      var(--v19b-size-20) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-table-head:has(> :nth-child(5):last-child),
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-table-row.is-inline-context:has(> .v19-actions-cell-applicant) {
+    grid-template-columns:
+      minmax(var(--v19b-size-76), 0.85fr)
+      minmax(var(--v19b-size-144), 1.28fr)
+      minmax(var(--v19b-size-96), 0.95fr)
+      minmax(var(--v19b-size-72), 0.78fr)
+      minmax(var(--v19b-size-96), 1.04fr)
+      var(--v19b-size-20) !important;
+  }
+
+  #root
+    :is(
+      .v19-admin-review-board,
+      .v19-admin-export-workspace-v2,
+      .v19-agent-actions-board
+    )
+    .v19-two-row-toolbar {
+    grid-template-rows:
+      var(--v19b-size-44)
+      var(--v19b-size-44);
+  }
+}
+
+/* Access keeps its four status filters, but uses the same metric-card grammar. */
+#root .v19-access-metrics {
+  gap: var(--v19b-size-10);
+}
+
+#root .v19-access-metric {
+  position: relative;
+  display: block;
+  min-width: var(--v19b-size-0);
+  min-height: var(--v19b-size-88);
+  padding: var(--v19b-size-14);
+  overflow: hidden;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-panel);
+  background: var(--v19b-color-panel);
+  box-shadow: var(--v19b-shadow-row-inner);
+}
+
+#root .v19-access-metric > span {
+  position: absolute;
+  top: var(--v19b-size-10);
+  right: var(--v19b-size-10);
+  display: grid;
+  width: var(--v19b-size-28);
+  height: var(--v19b-size-28);
+  padding: var(--v19b-size-0);
+  place-items: center;
+  border-radius: var(--v19b-radius-control);
+}
+
+#root .v19-access-metric > span svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+}
+
+#root .v19-access-metric > div {
+  display: block;
+}
+
+#root .v19-access-metric small {
+  position: absolute;
+  top: var(--v19b-size-12);
+  right: var(--v19b-size-52);
+  left: var(--v19b-size-14);
+  overflow: hidden;
+  color: var(--v19b-admin-unified-text);
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-title);
+  letter-spacing: var(--v19b-letter-spacing-label);
+  line-height: var(--v19b-line-height-control);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#root .v19-access-metric strong {
+  position: absolute;
+  bottom: var(--v19b-size-12);
+  left: var(--v19b-size-14);
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-28);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--v19b-weight-title);
+  line-height: 1;
+}
+
+#root .v19-access-board {
+  overflow: hidden;
+}
+
+#root .v19-access-toolbar {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), 1fr);
+  grid-template-rows:
+    var(--v19b-size-44)
+    var(--v19b-size-44);
+  align-items: stretch;
+  justify-content: stretch;
+  gap: var(--v19b-size-8);
+  min-height: var(--v19b-size-0);
+  padding: var(--v19b-size-16);
+  border-bottom-color: var(--v19b-color-border);
+  background: var(--v19b-color-panel);
+}
+
+#root .v19-access-tabs {
+  display: grid;
+  width: var(--v19b-size-full);
+  max-width: none;
+  grid-template-columns: repeat(4, minmax(var(--v19b-size-0), 1fr));
+  gap: var(--v19b-size-6);
+  padding: var(--v19b-size-0);
+  border: var(--v19b-size-0);
+  background: transparent;
+}
+
+#root .v19-access-tabs button,
+#root .v19-access-search {
+  min-height: var(--v19b-size-44);
+}
+
+#root .v19-access-search {
+  width: var(--v19b-size-full);
+  max-width: none;
+  height: var(--v19b-size-44);
+  justify-self: stretch;
+}
+
+#root .v19-access-search input {
+  height: var(--v19b-size-full) !important;
+  min-height: var(--v19b-size-40);
+}
+
+#root .v19-access-search button {
+  width: var(--v19b-size-40);
+  min-width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+  min-height: var(--v19b-size-40);
+}
+
+@media (max-width: 1024px) {
+  #root .ops-shell.has-unified-side-menu.is-v19-collection-surface {
+    grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
+  }
+
+  #root .ops-shell.has-unified-side-menu.is-v19-collection-surface > .workspace {
+    grid-column: 1 !important;
+    width: var(--v19b-size-full) !important;
+    max-width: none !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  #root
+    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-toolbar-controls {
+    display: contents !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  #root .v19-agent-submissions-board .v19-two-row-toolbar-filters {
+    grid-template-columns: repeat(4, var(--v19b-size-44)) !important;
+  }
+
+  #root
+    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-city-filter
+    .v19-admin-toolbar-select-menu {
+    top: calc(100% + var(--v19b-size-6)) !important;
+    right: var(--v19b-size-0) !important;
+    bottom: auto !important;
+    left: auto !important;
+  }
+
+  #root
+    .v19-agent-submissions-board
+    .v19-admin-city-filter
+    .v19-admin-toolbar-select-menu {
+    top: calc(100% + var(--v19b-size-6)) !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: var(--v19b-size-0) !important;
+  }
+}
+
+@media (max-width: 1199px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(var(--v19b-size-0), 1fr));
+    gap: var(--v19b-size-8);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-buttons {
+    display: contents;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-button.is-mobile-secondary {
+    display: none;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-button {
+    min-height: var(--v19b-size-80);
+    border-right: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  }
+
+  #root .v19-legacy-actions-screen.surface-agent-actions .v19-agent-action-status-more {
+    position: relative;
+    display: block;
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-80);
+    padding: var(--v19b-size-12);
+    overflow: hidden;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+    border-radius: var(--v19b-radius-panel);
+    color: var(--v19b-color-text-muted);
+    background: var(--v19b-color-panel);
+    box-shadow: var(--v19b-shadow-row-inner);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more::after {
+    display: none;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > span {
+    position: absolute;
+    top: var(--v19b-size-12);
+    right: var(--v19b-size-44);
+    left: var(--v19b-size-12);
+    overflow: hidden;
+    color: var(--v19b-admin-unified-text);
+    font-size: var(--v19b-size-11);
+    font-weight: var(--v19b-weight-title);
+    letter-spacing: var(--v19b-letter-spacing-label);
+    line-height: var(--v19b-line-height-control);
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > svg:first-child {
+    position: absolute;
+    top: var(--v19b-size-10);
+    right: var(--v19b-size-10);
+    box-sizing: border-box;
+    width: var(--v19b-size-28);
+    height: var(--v19b-size-28);
+    padding: var(--v19b-size-6);
+    border-radius: var(--v19b-radius-control);
+    color: var(--v19b-admin-unified-text);
+    background: var(--v19b-color-primary-soft-10);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > strong {
+    position: absolute;
+    bottom: var(--v19b-size-12);
+    left: var(--v19b-size-12);
+    color: var(--v19b-color-text-strong);
+    font-size: var(--v19b-size-22);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > svg:last-child {
+    position: absolute;
+    right: var(--v19b-size-12);
+    bottom: var(--v19b-size-12);
+    width: var(--v19b-size-14);
+    height: var(--v19b-size-14);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-more
+    > select {
+    position: absolute;
+    inset: var(--v19b-size-0);
+    width: var(--v19b-size-full);
+    height: var(--v19b-size-full);
+    cursor: pointer;
+    opacity: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-strip {
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), 1fr));
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    :is(.v19-agent-action-status-button, .v19-agent-action-status-more) {
+    min-height: var(--v19b-size-72);
+    border-radius: var(--v19b-radius-control);
+  }
+
+  #root
+    :is(
+      .v19-admin-review-board,
+      .v19-admin-export-workspace-v2,
+      .v19-agent-submissions-board
+    )
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    grid-template-rows: var(--v19b-size-44) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    grid-template-rows:
+      var(--v19b-size-44)
+      var(--v19b-size-44) !important;
+  }
+
+  #root .v19-access-tabs {
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), 1fr));
+    grid-template-rows: repeat(2, var(--v19b-size-44));
+  }
+
+  #root .v19-access-toolbar {
+    grid-template-rows: auto var(--v19b-size-44);
+  }
+}
+
+@media (max-width: 768px) {
+  #root .v19-access-search input {
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44);
+  }
+
+  #root .v19-access-search button {
+    width: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-44);
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-action-status-button {
+    transition: none;
+  }
+}
