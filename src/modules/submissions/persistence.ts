@@ -104,11 +104,28 @@ function seedLocalDemoStoredMedia(submissions: Submission[]): Submission[] {
       ...submission,
       files: submission.files.map((file) => {
         const demoFile = demoFilesById.get(file.id);
+        if (file.localDemoMediaStored === true) {
+          if (
+            demoFile &&
+            file.status === "accepted" &&
+            matchesBundledLocalDemoSeedIdentity(file, demoFile)
+          ) {
+            return {
+              ...file,
+              localDemoMediaStored: undefined,
+              localDemoSeedMedia: demoFile.localDemoSeedMedia,
+            };
+          }
+          return file.localDemoSeedMedia
+            ? { ...file, localDemoSeedMedia: undefined }
+            : file;
+        }
         if (!demoFile || file.status !== "accepted") return file;
 
         return {
           ...file,
           generatedFileName: demoFile.generatedFileName,
+          localDemoSeedMedia: demoFile.localDemoSeedMedia,
           mimeType: demoFile.mimeType,
           originalFileName: demoFile.originalFileName,
           reviewStatus: demoFile.reviewStatus,
@@ -121,6 +138,21 @@ function seedLocalDemoStoredMedia(submissions: Submission[]): Submission[] {
       }),
     };
   });
+}
+
+function matchesBundledLocalDemoSeedIdentity(
+  file: Submission["files"][number],
+  demoFile: Submission["files"][number],
+): boolean {
+  return (
+    file.generatedFileName === demoFile.generatedFileName &&
+    file.mimeType === demoFile.mimeType &&
+    file.originalFileName === demoFile.originalFileName &&
+    file.sizeBytes === demoFile.sizeBytes &&
+    file.storageAdapter === demoFile.storageAdapter &&
+    file.storageBucket === demoFile.storageBucket &&
+    file.storagePath === demoFile.storagePath
+  );
 }
 
 function canSeedLocalDemoStoredMedia(): boolean {
