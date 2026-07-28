@@ -1163,6 +1163,7 @@ describe("ReviewWorkspace passport section contract", () => {
       applicantId,
       generatedFileName,
       id: `${applicantId}-${type}`,
+      localDemoSeedMedia: true,
       mimeType: "image/jpeg",
       status: "pending_review",
       storageAdapter: "supabase-private",
@@ -1230,7 +1231,9 @@ describe("ReviewWorkspace passport section contract", () => {
       screen.queryByRole("button", { name: /^Подтвердить:/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getAllByRole("button", { name: "Подтвердить паспортную секцию" }),
+      screen.getAllByRole("button", {
+        name: "Подтвердить паспортную секцию",
+      }),
     ).toHaveLength(1);
   });
 
@@ -1348,7 +1351,9 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(screen.getByText("Просмотр без изменений")).toBeVisible();
     expect(screen.getAllByText(/доступен только для чтения/).length).toBeGreaterThan(0);
     expect(
-      screen.queryByRole("button", { name: "Подтвердить паспортную секцию" }),
+      screen.queryByRole("button", {
+        name: "Подтвердить паспортную секцию",
+      }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Принять на выгрузку" }),
@@ -1534,7 +1539,9 @@ describe("ReviewWorkspace passport section contract", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+      screen.getByRole("button", {
+        name: "Подтвердить паспортную секцию",
+      }),
     ).toBeDisabled();
     expect(
       screen.getByText(/Заполнены не все паспортные поля или в данных есть ошибка/),
@@ -1722,7 +1729,9 @@ describe("ReviewWorkspace passport section contract", () => {
     visitPrimaryIdentityMedia();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+        screen.getByRole("button", {
+          name: "Подтвердить паспортную секцию",
+        }),
       ).toBeEnabled(),
     );
     expect(
@@ -2103,7 +2112,9 @@ describe("ReviewWorkspace passport section contract", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     expect(
-      screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+      screen.getByRole("button", {
+        name: "Подтвердить паспортную секцию",
+      }),
     ).toBeDisabled();
     await act(async () => {
       correctedSelfie.resolve("https://example.test/legacy-secondary-selfie.jpg");
@@ -2118,7 +2129,9 @@ describe("ReviewWorkspace passport section contract", () => {
     ).not.toBeInTheDocument();
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Подтвердить паспортную секцию" }),
+        screen.getByRole("button", {
+          name: "Подтвердить паспортную секцию",
+        }),
       ).toBeEnabled(),
     );
   });

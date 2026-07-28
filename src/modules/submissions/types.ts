@@ -412,6 +412,7 @@ export type SubmissionFile = {
   uploadedAt?: string;
   linkedIssueId?: string;
   localDemoMediaStored?: true;
+  localDemoSeedMedia?: true;
 };
 
 export type CollectionDocumentUpload = {

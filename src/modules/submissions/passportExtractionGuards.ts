@@ -5,7 +5,14 @@ import type {
   SubmissionAction,
   SubmissionFile,
 } from "./types";
-import { isCompletedFileAsset } from "./fileAsset";
+import {
+  hasCanonicalPrivateStorageIdentityAtSubmissionTarget,
+  isCompletedFileAsset,
+} from "./fileAsset";
+import {
+  ADMIN_PASSPORT_REVIEW_FIELD_IDS,
+  hasAdminPassportReviewValue,
+} from "./passportReviewContract";
 
 export type PassportGateIssue = {
   applicantId: string;
@@ -127,8 +134,13 @@ function applicantPassportGateIssues(
 ): PassportGateIssue[] {
   const state = applicant.passportExtraction;
   const file = passportFileForApplicant(submission, applicant.id);
+  const hasManualAdminReview = hasApprovedManualPassportReview(
+    submission,
+    applicant,
+    file,
+  );
 
-  if (!state) {
+  if (!state && !hasManualAdminReview) {
     return hasRealPassportUpload(file)
       ? [
           issue(
@@ -140,7 +152,7 @@ function applicantPassportGateIssues(
       : [];
   }
 
-  if (state.status === "extracting") {
+  if (state?.status === "extracting") {
     return [
       issue(
         applicant,
@@ -151,11 +163,12 @@ function applicantPassportGateIssues(
   }
 
   const canUseQuestionnaireFallback =
-    state.status === "ready" ||
-    ((state.status === "failed" || state.status === "unavailable") &&
+    hasManualAdminReview ||
+    state?.status === "ready" ||
+    ((state?.status === "failed" || state?.status === "unavailable") &&
       hasRealPassportUpload(file));
 
-  if (state.status === "ready" && !state.extractedFields.length) {
+  if (state?.status === "ready" && !state.extractedFields.length) {
     return [
       issue(
         applicant,
@@ -238,7 +251,7 @@ function applicantPassportGateIssues(
 
   if (
     issues.length === 0 &&
-    state.status === "ready" &&
+    state?.status === "ready" &&
     !state.verifiedAtIso &&
     !state.dismissedAtIso &&
     !hasPersistedPassportExtractionReview(applicant)
@@ -253,6 +266,44 @@ function applicantPassportGateIssues(
   }
 
   return issues;
+}
+
+function hasApprovedManualPassportReview(
+  submission: Submission,
+  applicant: Applicant,
+  file: SubmissionFile | undefined,
+) {
+  if (
+    !file ||
+    !hasCanonicalPrivateStorageIdentityAtSubmissionTarget(file, {
+      applicantId: applicant.id,
+      fileType: "passport_scan",
+      submissionId: submission.id,
+    }) ||
+    file.status !== "accepted" ||
+    file.reviewStatus !== "accepted" ||
+    !file.reviewedAtIso ||
+    !file.reviewedBy
+  ) {
+    return false;
+  }
+
+  const fieldsById = new Map(
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .map((field) => [field.id, field] as const),
+  );
+
+  return ADMIN_PASSPORT_REVIEW_FIELD_IDS.every((fieldId) => {
+    const field = fieldsById.get(fieldId);
+    return Boolean(
+      field &&
+        hasAdminPassportReviewValue(field.value) &&
+        !field.error &&
+        field.adminReviewApprovedAtIso &&
+        field.adminReviewApprovedBy,
+    );
+  });
 }
 
 function hasPersistedPassportExtractionReview(applicant: Applicant) {

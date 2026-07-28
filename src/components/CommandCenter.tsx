@@ -795,6 +795,7 @@ export function CommandCenter({
       sizeBytes: file.size,
       uploadedAtIso,
     };
+    let localDemoTarget: ReturnType<typeof buildMediaStoragePath> | undefined;
     let metadata:
       | (typeof baseMetadata & {
           storageAdapter: "local-dev";
@@ -828,21 +829,18 @@ export function CommandCenter({
       };
       uploadedStorageTarget = target;
     } else if (__V19_LOCAL_DEMO_BUILD__) {
-      const target = buildMediaStoragePath(
+      localDemoTarget = buildMediaStoragePath(
         submission.id,
         applicantId,
         mediaSlotTypeForSubmissionFileType(fileType),
         generatedFileName,
       );
-      const { saveLocalDemoMedia } =
-        await import("../modules/submissions/localDemoMediaStorage");
-      const stored = await saveLocalDemoMedia(target, file);
       metadata = {
         ...baseMetadata,
         localDemoMediaStored: true,
         storageAdapter: "supabase-private",
-        storageBucket: target.bucket,
-        storagePath: stored.path,
+        storageBucket: localDemoTarget.bucket,
+        storagePath: localDemoTarget.path,
       };
     } else {
       metadata = { ...baseMetadata, storageAdapter: "local-dev" };
@@ -893,32 +891,57 @@ export function CommandCenter({
       };
     };
 
-    const nextSubmission = await commitUploadedMedia({
-      confirmPersisted: uploadedStorageTarget
-        ? () =>
-            readMediaPersistenceState({
-              applicantId,
-              mediaType: storageMediaType,
-              submissionId: submission.id,
-              target: uploadedStorageTarget,
-            })
-        : undefined,
-      persist: async () => {
-        const persistedSubmission = onSubmissionUpdate
-          ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
-          : applyUploadToLatest(submission);
-        if (!onSubmissionUpdate) {
-          await onSubmissionsChange?.([persistedSubmission]);
-        }
-        setCanonicalOverrides((current) => ({
-          ...current,
-          [persistedSubmission.id]: persistedSubmission,
-        }));
-        return persistedSubmission;
-      },
-      previousTarget: () => previousStorageTarget,
-      uploadedTarget: uploadedStorageTarget,
-    });
+    const persistUpload = async () => {
+      const persistedSubmission = onSubmissionUpdate
+        ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
+        : applyUploadToLatest(submission);
+      if (!onSubmissionUpdate) {
+        await onSubmissionsChange?.([persistedSubmission]);
+      }
+      return persistedSubmission;
+    };
+
+    const nextSubmission = localDemoTarget
+      ? await (
+          await import("../modules/submissions/localDemoMediaStorage")
+        ).replaceLocalDemoMediaWithCanonicalReadback({
+          file,
+          persistCanonical: persistUpload,
+          previousPath: prepared.file.localDemoMediaStored
+            ? prepared.file.storagePath
+            : undefined,
+          readCanonical: async () => {
+            if (!onSubmissionUpdate) {
+              throw new Error("Canonical submission readback is unavailable.");
+            }
+            return onSubmissionUpdate(submission.id, (current) => current);
+          },
+          referencesStoredPath: (canonical, storedPath) =>
+            canonical.files.some(
+              (candidate) =>
+                candidate.localDemoMediaStored === true &&
+                candidate.storagePath === storedPath,
+            ),
+          target: localDemoTarget,
+        })
+      : uploadedStorageTarget
+        ? await commitUploadedMedia({
+            confirmPersisted: () =>
+              readMediaPersistenceState({
+                applicantId,
+                mediaType: storageMediaType,
+                submissionId: submission.id,
+                target: uploadedStorageTarget,
+              }),
+            persist: persistUpload,
+            previousTarget: () => previousStorageTarget,
+            uploadedTarget: uploadedStorageTarget,
+          })
+        : await persistUpload();
+    setCanonicalOverrides((current) => ({
+      ...current,
+      [nextSubmission.id]: nextSubmission,
+    }));
     return nextSubmission;
   };
 

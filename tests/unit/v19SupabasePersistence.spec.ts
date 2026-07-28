@@ -320,7 +320,11 @@ function completeAgentSubmissionPackage(
     });
   }
   for (const applicant of prepared.applicants) {
-    prepared = confirmApplicantPassportReview(prepared, applicant.id);
+    prepared = confirmApplicantPassportReview(
+      prepared,
+      applicant.id,
+      agentProfile.id,
+    );
   }
 
   const submitted = applyAgentSubmitForReviewResult(

@@ -13,7 +13,11 @@ import {
 } from "./mediaStorage";
 import type { FileAssetStorageAdapter, PassportUploadDraft, Submission } from "./types";
 import type { SubmissionIntakeProgressListener } from "./submissionIntake";
-import { saveLocalDemoMedia } from "./localDemoMediaStorage";
+import {
+  saveLocalDemoMedia,
+  withLocalDemoMediaMutationLock,
+  type LocalDemoMediaMutationLock,
+} from "./localDemoMediaStorage";
 
 const passportFieldIds: Record<string, string> = {
   birthCountry: "birth-country",
@@ -48,6 +52,7 @@ export type PersistCreatedSubmissionWithPassportsInput = {
   storeLocalDemoMedia?: StoreLocalDemoMedia;
   submission: Submission;
   uploadMedia?: UploadMedia;
+  withLocalDemoMutationLock?: LocalDemoMediaMutationLock;
 };
 
 function hasPersistablePrivateUpload(file: Submission["files"][number]): boolean {
@@ -183,6 +188,7 @@ export async function persistCreatedSubmissionWithPassports({
   storeLocalDemoMedia = saveLocalDemoMedia,
   submission,
   uploadMedia = uploadMediaToStorage,
+  withLocalDemoMutationLock = withLocalDemoMediaMutationLock,
 }: PersistCreatedSubmissionWithPassportsInput): Promise<Submission> {
   if (simulatePrivateStorage && storageAdapter !== "local-dev") {
     throw new Error(
@@ -210,6 +216,7 @@ export async function persistCreatedSubmissionWithPassports({
         `Не удалось подготовить файл паспорта заявителя ${upload.applicantIndex + 1}.`,
       );
     }
+    const uploadFile = upload.file;
 
     // A retry starts by persisting the pending candidate above. Once the file
     // metadata is present, uploading the same object again would only create a
@@ -227,7 +234,7 @@ export async function persistCreatedSubmissionWithPassports({
       continue;
     }
 
-    const mimeType = mediaMimeTypeForFile(upload.file);
+    const mimeType = mediaMimeTypeForFile(uploadFile);
     if (!mimeType) {
       throw new Error(
         `Не удалось определить формат паспорта заявителя ${upload.applicantIndex + 1}.`,
@@ -249,78 +256,85 @@ export async function persistCreatedSubmissionWithPassports({
       total: passportUploads.length,
     });
 
-    let uploadedSubmission: Submission;
-    if (storageAdapter === "local-dev" && !simulatePrivateStorage) {
-      uploadedSubmission = uploadRequiredFile(nextSubmission, passportFile.id, {
-        generatedFileName,
-        mimeType,
-        originalFileName: upload.file.name,
-        sizeBytes: upload.file.size,
-        storageAdapter: "local-dev",
-        uploadedAtIso: nowIso(),
-      });
-    } else {
-      const storageTarget = buildMediaStoragePath(
-        nextSubmission.id,
-        applicant.id,
-        mediaSlotTypeForSubmissionFileType(passportFile.type),
-        generatedFileName,
-      );
-
-      let storedPath = storageTarget.path;
-      if (simulatePrivateStorage) {
-        const storedFile = await storeLocalDemoMedia(storageTarget, upload.file);
-        storedPath = storedFile.path;
+    const persistUploadedPassport = async (): Promise<Submission> => {
+      let uploadedSubmission: Submission;
+      if (storageAdapter === "local-dev" && !simulatePrivateStorage) {
+        uploadedSubmission = uploadRequiredFile(nextSubmission, passportFile.id, {
+          generatedFileName,
+          mimeType,
+          originalFileName: uploadFile.name,
+          sizeBytes: uploadFile.size,
+          storageAdapter: "local-dev",
+          uploadedAtIso: nowIso(),
+        });
       } else {
-        // A timed-out upload may have committed remotely without returning a path.
-        // Since no media metadata was constructed in that branch, the deterministic
-        // object is an orphan and can be removed safely before retry.
-        await clearAmbiguousUpload(storageTarget, attemptedStoragePaths, deleteMedia);
-        attemptedStoragePaths.add(storageTarget.path);
+        const storageTarget = buildMediaStoragePath(
+          nextSubmission.id,
+          applicant.id,
+          mediaSlotTypeForSubmissionFileType(passportFile.type),
+          generatedFileName,
+        );
 
-        const storedFile = await uploadMedia(storageTarget, upload.file);
-        if (!storedFile) {
-          throw new Error("Supabase Storage недоступен для сохранения паспорта.");
+        let storedPath = storageTarget.path;
+        if (simulatePrivateStorage) {
+          const storedFile = await storeLocalDemoMedia(storageTarget, uploadFile);
+          storedPath = storedFile.path;
+        } else {
+          // A timed-out upload may have committed remotely without returning a path.
+          // Since no media metadata was constructed in that branch, the deterministic
+          // object is an orphan and can be removed safely before retry.
+          await clearAmbiguousUpload(storageTarget, attemptedStoragePaths, deleteMedia);
+          attemptedStoragePaths.add(storageTarget.path);
+
+          const storedFile = await uploadMedia(storageTarget, uploadFile);
+          if (!storedFile) {
+            throw new Error("Supabase Storage недоступен для сохранения паспорта.");
+          }
+          storedPath = storedFile.path;
         }
-        storedPath = storedFile.path;
+
+        uploadedSubmission = uploadRequiredFile(nextSubmission, passportFile.id, {
+          generatedFileName,
+          mimeType,
+          originalFileName: uploadFile.name,
+          sizeBytes: uploadFile.size,
+          storageAdapter: "supabase-private",
+          storageBucket: storageTarget.bucket,
+          storagePath: storedPath,
+          uploadedAtIso: nowIso(),
+          ...(simulatePrivateStorage ? { localDemoMediaStored: true as const } : {}),
+        });
       }
 
-      uploadedSubmission = uploadRequiredFile(nextSubmission, passportFile.id, {
-        generatedFileName,
-        mimeType,
-        originalFileName: upload.file.name,
-        sizeBytes: upload.file.size,
-        storageAdapter: "supabase-private",
-        storageBucket: storageTarget.bucket,
-        storagePath: storedPath,
-        uploadedAtIso: nowIso(),
-        ...(simulatePrivateStorage ? { localDemoMediaStored: true as const } : {}),
-      });
-    }
-    const candidate = applyPassportExtraction(
-      uploadedSubmission,
-      upload,
-      passportFile.id,
-      nowIso(),
-    );
+      const candidate = applyPassportExtraction(
+        uploadedSubmission,
+        upload,
+        passportFile.id,
+        nowIso(),
+      );
 
-    // Publish the candidate before the save so a caller can retry the exact
-    // same idempotent RPC payload if the response is lost after commit.
-    onPendingSubmission(candidate);
-    onProgress?.({
-      applicantIndex: upload.applicantIndex,
-      current: uploadIndex + 1,
-      stage: "saving_passport_metadata",
-      total: passportUploads.length,
-    });
-    await persistSubmission(candidate);
-    if (storageAdapter === "supabase-private" || simulatePrivateStorage) {
-      const storedPath = candidate.files.find(
-        (file) => file.id === passportFile.id,
-      )?.storagePath;
-      if (storedPath) attemptedStoragePaths.delete(storedPath);
-    }
-    nextSubmission = candidate;
+      // Publish the candidate before the save so a caller can retry the exact
+      // same idempotent RPC payload if the response is lost after commit.
+      onPendingSubmission(candidate);
+      onProgress?.({
+        applicantIndex: upload.applicantIndex,
+        current: uploadIndex + 1,
+        stage: "saving_passport_metadata",
+        total: passportUploads.length,
+      });
+      await persistSubmission(candidate);
+      if (storageAdapter === "supabase-private" || simulatePrivateStorage) {
+        const storedPath = candidate.files.find(
+          (file) => file.id === passportFile.id,
+        )?.storagePath;
+        if (storedPath) attemptedStoragePaths.delete(storedPath);
+      }
+      return candidate;
+    };
+
+    nextSubmission = simulatePrivateStorage
+      ? await withLocalDemoMutationLock(persistUploadedPassport)
+      : await persistUploadedPassport();
   }
 
   onProgress?.({ stage: "complete" });

@@ -712,9 +712,21 @@ export default function App({
         if (!localDemoEnabled) return;
         if (!__V19_LOCAL_DEMO_BUILD__) return;
         const { loadSubmissions } = await import("./modules/submissions/persistence");
-        const localSubmissions = loadSubmissions();
+        let localSubmissions = loadSubmissions();
+        let cleanupError: string | undefined;
+        try {
+          const { pruneUnreferencedLocalDemoMedia } = await import(
+            "./modules/submissions/localDemoMediaStorage"
+          );
+          await pruneUnreferencedLocalDemoMedia(() => loadSubmissions());
+          localSubmissions = loadSubmissions();
+        } catch {
+          cleanupError =
+            "Не удалось очистить несвязанные локальные файлы. Канонические подачи не изменены.";
+        }
         setSubmissions(localSubmissions);
         setWorkspaceDataState({
+          error: cleanupError,
           refreshedAt: new Date().toISOString(),
           status: workspaceDataStatusForCount(localSubmissions.length),
         });
