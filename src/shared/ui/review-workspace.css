@@ -515,6 +515,53 @@
   scrollbar-color: var(--v19b-color-border-selected) transparent;
 }
 
+.v19-review-summary {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto;
+  align-items: center;
+  gap: var(--v19b-size-16);
+  margin-bottom: var(--v19b-size-16);
+  padding: var(--v19b-size-4) var(--v19b-size-0) var(--v19b-size-14);
+  border-bottom: var(--v19b-size-1) solid var(--v19b-color-border);
+}
+
+.v19-review-summary-copy {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  gap: var(--v19b-size-3);
+}
+
+.v19-review-summary-copy > span {
+  color: var(--v19b-color-primary-text);
+  font-size: var(--v19b-size-9);
+  font-weight: var(--v19b-weight-title);
+  letter-spacing: var(--v19b-letter-spacing-label);
+  text-transform: uppercase;
+}
+
+.v19-review-summary-copy strong {
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-14);
+  line-height: var(--v19b-line-height-title);
+}
+
+.v19-review-summary-copy p {
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text-faint);
+  font-size: var(--v19b-size-10);
+  line-height: var(--v19b-line-height-copy);
+}
+
+.v19-review-summary .v19-review-status-strip {
+  grid-template-columns: repeat(3, auto);
+  margin: var(--v19b-size-0);
+}
+
+.v19-review-summary .v19-review-status-strip > span {
+  min-height: var(--v19b-size-32);
+  padding-inline: var(--v19b-size-10);
+}
+
 .v19-review-status-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
@@ -663,6 +710,8 @@
 .v19-review-field-remark {
   width: var(--v19b-size-40);
   padding: var(--v19b-size-0);
+  border-color: var(--v19b-color-border-strong);
+  background: var(--v19b-color-control);
 }
 
 .v19-review-field-remark span {
@@ -733,6 +782,12 @@
   grid-column: 1 / -1;
   margin: var(--v19b-size-0);
   color: var(--v19b-status-danger-text);
+}
+
+.v19-review-inline-error {
+  margin: var(--v19b-size-10) var(--v19b-size-0) var(--v19b-size-0);
+  color: var(--v19b-status-danger-text);
+  font-size: var(--v19b-size-11);
 }
 
 .v19-review-decision {
@@ -885,6 +940,28 @@
   }
 }
 
+@media (max-width: 1279px) {
+  .v19-review-summary {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    gap: var(--v19b-size-10);
+  }
+
+  .v19-review-summary .v19-review-status-strip {
+    grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+  }
+}
+
+@media (max-width: 1023px) {
+  .v19-review-summary {
+    margin-bottom: var(--v19b-size-12);
+    padding-bottom: var(--v19b-size-12);
+  }
+
+  .v19-review-summary .v19-review-status-strip {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  }
+}
+
 @media (max-width: 767px) {
   .v19-review-header {
     position: sticky;
@@ -1006,9 +1083,7 @@
   .v19-review-details-scroll {
     padding: var(--v19b-size-10) var(--v19b-size-16)
       calc(var(--v19b-size-144) + env(safe-area-inset-bottom));
-    scroll-padding-bottom: calc(
-      var(--v19b-size-144) + env(safe-area-inset-bottom)
-    );
+    scroll-padding-bottom: calc(var(--v19b-size-144) + env(safe-area-inset-bottom));
   }
 
   .v19-review-status-strip {
@@ -1276,11 +1351,7 @@
     color-mix(in srgb, var(--v19b-dot-warning) 54%, transparent);
   border-left-width: var(--v19b-size-4);
   border-radius: var(--v19b-radius-panel);
-  background: color-mix(
-    in srgb,
-    var(--v19b-dot-warning) 9%,
-    var(--v19b-color-panel)
-  );
+  background: color-mix(in srgb, var(--v19b-dot-warning) 9%, var(--v19b-color-panel));
 }
 
 .v19-review-corrected-issues > header {
@@ -1341,11 +1412,7 @@
   border: var(--v19b-size-1) solid
     color-mix(in srgb, var(--v19b-dot-warning) 30%, var(--v19b-color-border));
   border-radius: var(--v19b-radius-control);
-  background: color-mix(
-    in srgb,
-    var(--v19b-dot-warning) 4%,
-    var(--v19b-color-control)
-  );
+  background: color-mix(in srgb, var(--v19b-dot-warning) 4%, var(--v19b-color-control));
 }
 
 .v19-review-corrected-issue-list article > div {
@@ -1512,8 +1579,6 @@
     animation-iteration-count: var(--v19b-z-base) !important;
   }
 }
-
-
 /* Readiness cockpit */
 .v19-review-readiness {
   display: grid;
@@ -1582,6 +1647,21 @@
 
 .v19-review-next-step:hover svg {
   transform: translateX(var(--v19b-size-2));
+}
+
+.v19-review-summary .v19-review-next-step {
+  width: max-content;
+  margin-top: var(--v19b-size-6);
+  padding: var(--v19b-size-0) var(--v19b-size-10);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-color-control);
+}
+
+.v19-review-summary .v19-review-next-step:hover {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control-hover);
 }
 
 .v19-review-readiness .v19-review-status-strip {
@@ -1663,10 +1743,10 @@
 /* Passport data section */
 .v19-review-section-heading {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--v19b-size-12);
-  margin: var(--v19b-size-4) var(--v19b-size-0) var(--v19b-size-8);
+  margin: var(--v19b-size-4) var(--v19b-size-0) var(--v19b-size-12);
 }
 
 .v19-review-section-heading div {
@@ -1687,7 +1767,21 @@
   font-size: var(--v19b-size-15);
 }
 
-.v19-review-section-heading > strong {
+.v19-review-section-heading p {
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text-faint);
+  font-size: var(--v19b-size-10);
+  line-height: var(--v19b-line-height-copy);
+}
+
+.v19-review-section-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--v19b-size-8);
+}
+
+.v19-review-section-controls > strong {
   display: grid;
   min-width: var(--v19b-size-48);
   min-height: var(--v19b-size-28);
@@ -1697,6 +1791,54 @@
   color: var(--v19b-color-text-muted);
   background: var(--v19b-color-control);
   font-size: var(--v19b-size-10);
+}
+
+.v19-review-section-controls button {
+  display: inline-flex;
+  min-height: var(--v19b-size-40);
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19b-size-8);
+  padding: var(--v19b-size-0) var(--v19b-size-14);
+  border: var(--v19b-size-1) solid var(--v19b-admin-green-border);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-strong);
+  background: var(--v19b-admin-emerald);
+  font: inherit;
+  font-size: var(--v19b-size-11);
+  font-weight: var(--v19b-weight-title);
+  white-space: nowrap;
+}
+
+.v19-review-section-controls button:hover {
+  background: var(--v19b-dot-success);
+}
+
+.v19-review-section-controls button:disabled {
+  cursor: not-allowed;
+  border-color: var(--v19b-color-border-strong);
+  color: var(--v19b-color-text-35);
+  background: var(--v19b-color-control);
+  opacity: var(--v19b-opacity-disabled);
+}
+
+.v19-review-section-controls.is-complete button:disabled {
+  cursor: default;
+  border-color: var(--v19b-admin-green-border);
+  color: var(--v19b-dot-success);
+  background: color-mix(
+    in srgb,
+    var(--v19b-dot-success) 10%,
+    var(--v19b-color-control)
+  );
+  opacity: var(--v19b-opacity-full);
+}
+
+.v19-review-section-controls.is-error {
+  padding: var(--v19b-size-4);
+  border-radius: var(--v19b-radius-control);
+  box-shadow: 0 0 0 var(--v19b-size-1)
+    color-mix(in srgb, var(--v19b-dot-danger) 42%, transparent);
 }
 
 .v19-review-field-card {
@@ -1805,5 +1947,32 @@
 
   .v19-review-questionnaire-entry button {
     width: var(--v19b-size-full);
+  }
+}
+
+@media (max-width: 1023px) {
+  .v19-review-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .v19-review-section-controls {
+    width: var(--v19b-size-full);
+  }
+
+  .v19-review-section-controls button,
+  .v19-review-section-controls .v19-review-read-only-badge {
+    min-height: var(--v19b-size-44);
+    flex: 1;
+  }
+
+  .v19-review-workspace .v19-review-field-remark {
+    width: var(--v19b-size-44);
+    min-width: var(--v19b-size-44);
+    min-height: var(--v19b-size-44) !important;
+  }
+
+  .v19-review-workspace .v19-review-file-remark {
+    min-height: var(--v19b-size-44);
   }
 }
