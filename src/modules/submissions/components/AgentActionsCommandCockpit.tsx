@@ -914,26 +914,6 @@ function safeCity(city: string) {
   return city.trim() || "Город не указан";
 }
 
-function priorityDisplayLabel(task: AgentActionTask) {
-  if (task.priority.label.trim()) {
-    return task.priority.label;
-  }
-
-  if (task.priority.level === "urgent") {
-    return "Срочно";
-  }
-
-  if (task.priority.level === "high") {
-    return "Высокий";
-  }
-
-  if (task.priority.level === "medium") {
-    return "Средний";
-  }
-
-  return "Низкий";
-}
-
 function stableDomId(value: string) {
   return value.replace(/[^A-Za-z0-9_-]/g, "-");
 }

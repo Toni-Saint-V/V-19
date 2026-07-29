@@ -187,6 +187,42 @@ describe("QuestionnaireScreen", () => {
     expect(nextSubmission.status).toBe("draft");
   });
 
+  test("synchronizes the applicant identity that Admin reads from questionnaire fields", async () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["OCR PERSON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onSubmissionChange = vi.fn();
+
+    render(
+      <QuestionnaireScreen
+        onBack={vi.fn()}
+        onSubmissionChange={onSubmissionChange}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    openPersonalSection();
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "VOLKOV" },
+    });
+    fireEvent.change(screen.getByLabelText("Имя"), {
+      target: { value: "ANTON" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+
+    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
+
+    const nextSubmission = onSubmissionChange.mock.calls[0]?.[0] as Submission;
+    expect(nextSubmission.applicants[0]?.fullName).toBe("ANTON VOLKOV");
+    expect(nextSubmission.title).toContain("ANTON VOLKOV");
+  });
+
   test("keeps the full save-and-exit label on the mobile action", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -216,6 +252,7 @@ describe("QuestionnaireScreen", () => {
     const submission = readySubmission("draft");
     const onAssignPublicNumber = vi.fn().mockResolvedValue({
       assignedNow: true,
+      caseRevision: 8,
       publicNumber: 1059,
     });
     const onBack = vi.fn();
@@ -256,6 +293,7 @@ describe("QuestionnaireScreen", () => {
     const submission = readySubmission("draft");
     const onAssignPublicNumber = vi.fn().mockResolvedValue({
       assignedNow: false,
+      caseRevision: 8,
       publicNumber: 1059,
     });
     const onSavedAndExit = vi.fn().mockResolvedValue(undefined);

@@ -35,6 +35,7 @@ import {
 } from "../modules/submissions/submissionIntake";
 import {
   CANONICAL_CITIES,
+  type ApplicantRole,
   type City,
   type Submission,
 } from "../modules/submissions/types";
@@ -67,6 +68,10 @@ const citySelectOptions = CANONICAL_CITIES.map((option) => ({
   label: option,
   value: option,
 }));
+const familyRoleSelectOptions = [
+  { label: "Супруг / супруга", value: "spouse" },
+  { label: "Ребёнок", value: "child" },
+] satisfies Array<{ label: string; value: Exclude<ApplicantRole, "main"> }>;
 
 const focusableSelector = [
   "a[href]",
@@ -99,31 +104,37 @@ function uniqueToken(prefix: string) {
     : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function applicantRoleLabel(index: number, type: Submission["type"]) {
+function applicantRoleLabel(
+  index: number,
+  type: Submission["type"],
+  role?: ApplicantRole,
+) {
   if (type === "single") return "Основной заявитель";
   if (index === 0) return "Основной заявитель";
-  if (index === 1) return "Супруг/супруга";
-  return `Ребёнок ${index - 1}`;
+  return role === "spouse" ? "Супруг/супруга" : "Ребёнок";
 }
 
 function applicantDisplayLabel(
   index: number,
   type: Submission["type"],
   item?: PassportIntakeItem,
+  role?: ApplicantRole,
 ) {
-  return passportIntakeApplicantName(item) || applicantRoleLabel(index, type);
+  return (
+    passportIntakeApplicantName(item) || applicantRoleLabel(index, type, role)
+  );
 }
 
 function applicantCellLabel(
   index: number,
   type: Submission["type"],
   item?: PassportIntakeItem,
+  role?: ApplicantRole,
 ) {
   const applicantName = passportIntakeApplicantName(item);
   if (applicantName) return applicantName;
   if (type === "single" || index === 0) return "Основной";
-  if (index === 1) return "Супруг/а";
-  return `Ребёнок ${index - 1}`;
+  return role === "spouse" ? "Супруг/а" : "Ребёнок";
 }
 
 function extractedValue(item: PassportIntakeItem | undefined, key: string) {
@@ -250,6 +261,9 @@ export function PreUploadScreen({
     useState<Submission["type"]>(initialPackageType);
   const [city, setCity] = useState<City | "">(initialCity ?? "");
   const [familyApplicantCount, setFamilyApplicantCount] = useState(2);
+  const [familyApplicantRoles, setFamilyApplicantRoles] = useState<ApplicantRole[]>(
+    ["main", "spouse"],
+  );
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
   const [items, setItems] = useState<PassportIntakeItem[]>([]);
   const [dropActive, setDropActive] = useState(false);
@@ -290,11 +304,16 @@ export function PreUploadScreen({
     (item) => item.status === "extracting" || item.status === "selected",
   );
   const completedOcrCount = items.length - busyItems.length;
+  const hasCustomFamilyRoles = familyApplicantRoles.some(
+    (role, index) =>
+      role !== (index === 0 ? "main" : index === 1 ? "spouse" : "child"),
+  );
   const isDirty = Boolean(
     city ||
     items.length ||
     packageType !== initialPackageType ||
-    (packageType === "family" && familyApplicantCount !== 2),
+    (packageType === "family" &&
+      (familyApplicantCount !== 2 || hasCustomFamilyRoles)),
   );
   const isBusy = actionPending || busyItems.length > 0;
   const submissionDisabledReason = actionPending
@@ -508,6 +527,13 @@ export function PreUploadScreen({
       Math.max(applicantCount, items.length + files.length, 2),
     );
     setFamilyApplicantCount(requiredCount);
+    setFamilyApplicantRoles((current) =>
+      Array.from(
+        { length: requiredCount },
+        (_, index) =>
+          current[index] ?? (index === 0 ? "main" : index === 1 ? "spouse" : "child"),
+      ),
+    );
     setPendingAssignments(
       files.map((file) => ({
         applicantIndex: "",
@@ -583,6 +609,9 @@ export function PreUploadScreen({
       })),
     );
     setFamilyApplicantCount((current) => Math.max(2, current - 1));
+    setFamilyApplicantRoles((current) =>
+      current.filter((_, index) => index !== applicantIndex),
+    );
     setActiveApplicantIndex((current) =>
       Math.min(current, Math.max(0, applicantCount - 2)),
     );
@@ -619,6 +648,7 @@ export function PreUploadScreen({
     }
     setPackageType(type);
     setFamilyApplicantCount(2);
+    setFamilyApplicantRoles(["main", "spouse"]);
     setActiveApplicantIndex(0);
   };
 
@@ -630,6 +660,7 @@ export function PreUploadScreen({
       setItems([]);
       setPackageType(confirmation.type);
       setFamilyApplicantCount(2);
+      setFamilyApplicantRoles(["main", "spouse"]);
       setActiveApplicantIndex(0);
     } else {
       removeApplicantNow(confirmation.applicantIndex);
@@ -646,6 +677,10 @@ export function PreUploadScreen({
     try {
       await onSubmit?.(
         {
+          applicantRoles:
+            packageType === "family"
+              ? familyApplicantRoles.slice(0, applicantCount)
+              : ["main"],
           city,
           destination,
           familyCount: applicantCount,
@@ -696,6 +731,7 @@ export function PreUploadScreen({
     activeApplicantIndex,
     packageType,
     activeItem,
+    familyApplicantRoles[activeApplicantIndex],
   );
 
   return (
@@ -799,6 +835,34 @@ export function PreUploadScreen({
                         variant="city"
                       />
                     </div>
+                    {packageType === "family" && activeApplicantIndex > 0 ? (
+                      <div className="v19-preupload-city-field">
+                        <span>Связь с главным заявителем</span>
+                        <AccessibleSelectMenu
+                          ariaLabel={`Связь заявителя ${activeApplicantIndex + 1}`}
+                          disabled={actionPending}
+                          onValueChange={(nextRole) => {
+                            const role = nextRole as Exclude<
+                              ApplicantRole,
+                              "main"
+                            >;
+                            setFamilyApplicantRoles((current) =>
+                              current.map((currentRole, index) => {
+                                if (index === activeApplicantIndex) return role;
+                                if (role === "spouse" && currentRole === "spouse") {
+                                  return "child";
+                                }
+                                return currentRole;
+                              }),
+                            );
+                          }}
+                          options={familyRoleSelectOptions}
+                          value={
+                            familyApplicantRoles[activeApplicantIndex] ?? "child"
+                          }
+                        />
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="v19-preupload-applicant-controls">
@@ -814,11 +878,13 @@ export function PreUploadScreen({
                           applicantIndex,
                           packageType,
                           item,
+                          familyApplicantRoles[applicantIndex],
                         );
                         const cellLabel = applicantCellLabel(
                           applicantIndex,
                           packageType,
                           item,
+                          familyApplicantRoles[applicantIndex],
                         );
                         const applicantDetails = applicantCompactDetails(item);
                         const removable =
@@ -931,11 +997,19 @@ export function PreUploadScreen({
                               busyItems.length > 0 ||
                               applicantCount >= submissionIntakeFamilyMax
                             }
-                            onClick={() =>
+                            onClick={() => {
                               setFamilyApplicantCount((current) =>
-                                Math.min(submissionIntakeFamilyMax, current + 1),
-                              )
-                            }
+                                Math.min(
+                                  submissionIntakeFamilyMax,
+                                  current + 1,
+                                ),
+                              );
+                              setFamilyApplicantRoles((current) =>
+                                current.length >= submissionIntakeFamilyMax
+                                  ? current
+                                  : [...current, "child"],
+                              );
+                            }}
                             type="button"
                           >
                             <Plus aria-hidden="true" />

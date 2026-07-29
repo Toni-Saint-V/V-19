@@ -1406,6 +1406,11 @@ describe("V-19 submission actions", () => {
     expect(draft.publicNumber).toBeNull();
     expect(Number.isNaN(Date.parse(draft.createdAt))).toBe(false);
     expect(draft.applicants).toHaveLength(3);
+    expect(draft.applicants.map((applicant) => applicant.role)).toEqual([
+      "main",
+      "spouse",
+      "child",
+    ]);
     expect(draft.files).toHaveLength(5);
     expect(
       draft.files.map((file) => [file.applicantId, file.type]),
@@ -1417,6 +1422,21 @@ describe("V-19 submission actions", () => {
       [draft.applicants[2]?.id, "passport_scan"],
     ]);
     expect(draft.history[0].source).toBe("agent");
+  });
+
+  it("persists an explicitly selected main-and-child family relationship", () => {
+    const draft = createDraftSubmission({
+      applicantRoles: ["main", "child"],
+      city: "Москва",
+      familyCount: 2,
+      submissions: initialSubmissions,
+      type: "family",
+    });
+
+    expect(draft.applicants.map((applicant) => applicant.role)).toEqual([
+      "main",
+      "child",
+    ]);
   });
 
   it("assigns a draft to the explicit current agent owner", () => {
@@ -1607,6 +1627,49 @@ describe("V-19 submission actions", () => {
       true,
     );
     expect(submitted.history[0].source).toBe("agent");
+  });
+
+  it("clears export identity and returns accepted media to review on resubmit", () => {
+    const ready = readyClone({
+      exportPackage: {
+        contentFingerprint: "fingerprint",
+        fileName: "visaflow-export.xlsx",
+        format: "xlsx",
+        idempotencyKey: "export-operation",
+        rowCount: 1,
+        submissionIds: ["ПД-RESUBMIT"],
+      },
+      exportState: "ready",
+      id: "ПД-RESUBMIT",
+      status: "ready_for_export",
+    });
+
+    const submitted = applySubmissionAction(
+      ready,
+      "submit_for_review",
+      "agent",
+      ready.agentId,
+    );
+
+    expect(submitted).toMatchObject({
+      exportState: "not_ready",
+      status: "submitted_for_review",
+    });
+    expect(submitted.exportPackage).toBeUndefined();
+    expect(
+      submitted.files.every(
+        (file) =>
+          file.status === "pending_review" &&
+          file.reviewStatus === "not_reviewed" &&
+          file.reviewedAtIso === undefined &&
+          file.reviewedBy === undefined,
+      ),
+    ).toBe(true);
+    expect(submitted.history[0]).toMatchObject({
+      fromStatus: "ready_for_export",
+      source: "agent",
+      toStatus: "submitted_for_review",
+    });
   });
 
   it("requires a completed passport upload for every family applicant", () => {

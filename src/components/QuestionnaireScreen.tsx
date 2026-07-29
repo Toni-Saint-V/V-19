@@ -11,9 +11,9 @@ import {
 import {
   createQuestionnaireSections,
   normalizeSubmissionQuestionnaire,
-  updateQuestionnaireField,
   type QuestionnaireFieldUpdate,
 } from "../modules/submissions/questionnaire";
+import { updateQuestionnaireField } from "../modules/submissions/submissionActions";
 import { defaultLocalAgentOwnerId } from "../modules/submissions/ownership";
 import { confirmApplicantPassportReview } from "../modules/submissions/passportExtraction";
 import {
@@ -290,7 +290,17 @@ function applyQuestionnairePayload(
   actorId: string,
   nowIso: string,
 ) {
-  const updates = uniqueQuestionnaireUpdates(payload.fieldUpdates);
+  const updates = uniqueQuestionnaireUpdates(payload.fieldUpdates).map(
+    (update) => {
+      const currentValue = submission.applicants
+        .find((applicant) => applicant.id === update.applicantId)
+        ?.sections.flatMap((section) => section.fields)
+        .find((field) => field.id === update.fieldId)?.value;
+      return currentValue === update.value
+        ? update
+        : { ...update, reviewSource: "manual" as const };
+    },
+  );
   const withFields = updates.reduce(
     (nextSubmission, update) =>
       updateQuestionnaireField(nextSubmission, update),

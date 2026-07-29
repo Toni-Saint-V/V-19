@@ -1,11 +1,48 @@
 import { describe, expect, test } from "vitest";
 import {
   formatPersistenceFailureForUser,
+  isDefinitivePersistenceRejection,
   mapSupabasePersistenceError,
   PersistenceObservableError,
 } from "../../src/services/persistenceObservability";
 
 describe("Supabase persistence observability", () => {
+  test("distinguishes terminal database rejection from ambiguous transport failure", () => {
+    const rejected = mapSupabasePersistenceError(
+      { code: "40001", message: "stale revision", status: 400 },
+      {
+        operation: "rpc.save_agent_submission_if_current",
+        fallbackKind: "save",
+      },
+    );
+    const ambiguous = mapSupabasePersistenceError(
+      new TypeError("Failed to fetch"),
+      {
+        operation: "rpc.save_agent_submission_if_current",
+        fallbackKind: "save",
+      },
+    );
+    const statementUnknown = mapSupabasePersistenceError(
+      { code: "40003", message: "statement completion unknown", status: 500 },
+      {
+        operation: "rpc.save_agent_submission_if_current",
+        fallbackKind: "save",
+      },
+    );
+    const connectionFailure = mapSupabasePersistenceError(
+      { code: "08006", message: "connection failure", status: 500 },
+      {
+        operation: "rpc.save_agent_submission_if_current",
+        fallbackKind: "save",
+      },
+    );
+
+    expect(isDefinitivePersistenceRejection(rejected)).toBe(true);
+    expect(isDefinitivePersistenceRejection(ambiguous)).toBe(false);
+    expect(isDefinitivePersistenceRejection(statementUnknown)).toBe(false);
+    expect(isDefinitivePersistenceRejection(connectionFailure)).toBe(false);
+  });
+
   test("maps RPC RLS denial to safe diagnostics and user copy", () => {
     const error = mapSupabasePersistenceError(
       {

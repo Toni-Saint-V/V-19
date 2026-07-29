@@ -1415,6 +1415,7 @@ export function applySubmissionActionResult(
   if (action === "submit_for_review") {
     const prepared: Submission = {
       ...submission,
+      exportPackage: undefined,
       exportState: "not_ready",
       files: submission.files.map((file) =>
         file.status === "uploaded" || file.status === "accepted"

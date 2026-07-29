@@ -50,8 +50,9 @@ import {
 } from "./fileAsset";
 import { normalizeCollectionDocuments } from "./documentCollectionIntake";
 import type {
-  City,
   AgentOwnerId,
+  ApplicantRole,
+  City,
   CommandResult,
   ExportState,
   Issue,
@@ -72,6 +73,7 @@ let supabaseDraftSequence = 0;
 
 export type CreateDraftInput = {
   agentId?: AgentOwnerId;
+  applicantRoles?: ApplicantRole[];
   city: City;
   applicantNames?: string[];
   familyCount: number;
@@ -513,6 +515,7 @@ export function generatedCockpitMediaFileName({
 export function createDraftSubmission({
   agentId = defaultLocalAgentOwnerId,
   applicantNames = [],
+  applicantRoles = [],
   city,
   familyCount,
   idScheme = "local",
@@ -529,12 +532,18 @@ export function createDraftSubmission({
 
   const applicants = Array.from({ length: applicantTotal }, (_, index) => {
     const id = applicantIdForScheme(draftIdToken, index, idScheme);
-    const fullName = draftApplicantName(index, type, applicantNames[index]);
+    const role = draftApplicantRole(index, type, applicantRoles[index]);
+    const fullName = draftApplicantName(
+      index,
+      type,
+      applicantNames[index],
+      role,
+    );
 
     return {
       id,
       fullName,
-      role: draftApplicantRole(index, type),
+      role,
       questionnaireStatus: "empty",
       fileStatus: "empty",
       sections: createQuestionnaireSections(id, fullName, "empty"),
@@ -753,7 +762,6 @@ function syncApplicantNameFromQuestionnaireUpdate(
   if (!applicant) {
     return submission;
   }
-
   const previousApplicant = previousSubmission.applicants.find(
     (candidate) => candidate.id === update.applicantId,
   );
@@ -769,7 +777,8 @@ function syncApplicantNameFromQuestionnaireUpdate(
     .join(" ");
   if (
     !isPlaceholderApplicantName(applicant.fullName) &&
-    applicant.fullName !== previousQuestionnaireName
+    applicant.fullName !== previousQuestionnaireName &&
+    update.reviewSource !== "manual"
   ) {
     return submission;
   }
@@ -777,6 +786,12 @@ function syncApplicantNameFromQuestionnaireUpdate(
   const fields = applicant.sections.flatMap((section) => section.fields);
   const firstName = fields.find((field) => field.id === "first-name")?.value.trim() ?? "";
   const surname = fields.find((field) => field.id === "surname")?.value.trim() ?? "";
+  if (
+    (!firstName || !surname) &&
+    !isPlaceholderApplicantName(applicant.fullName)
+  ) {
+    return submission;
+  }
   const fullName = [firstName, surname].filter(Boolean).join(" ");
   if (!fullName || fullName === applicant.fullName) {
     return submission;
@@ -1375,17 +1390,29 @@ function applicantIdForScheme(
     : `з-${draftIdToken}-${applicantIndex + 1}`;
 }
 
-function draftApplicantName(index: number, type: Submission["type"], input?: string) {
+function draftApplicantName(
+  index: number,
+  type: Submission["type"],
+  input?: string,
+  role?: ApplicantRole,
+) {
   const normalized = input?.trim();
   if (normalized) return normalized;
   if (type === "single") return "Новый заявитель";
   if (index === 0) return "Основной заявитель";
-  if (index === 1) return "Супруг";
-  return `Ребёнок ${index - 1}`;
+  if (role === "spouse") return "Супруг";
+  return `Ребёнок ${index}`;
 }
 
-function draftApplicantRole(index: number, type: Submission["type"]) {
+function draftApplicantRole(
+  index: number,
+  type: Submission["type"],
+  requestedRole?: ApplicantRole,
+) {
   if (index === 0) return "main" as const;
+  if (requestedRole === "spouse" || requestedRole === "child") {
+    return requestedRole;
+  }
   if (type === "family" && index === 1) return "spouse" as const;
   return "child" as const;
 }

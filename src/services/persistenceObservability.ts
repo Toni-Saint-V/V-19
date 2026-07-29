@@ -44,6 +44,7 @@ export type SupabasePersistenceOperation =
   | "status_history.insert"
   | "rpc.save_admin_submission_batch_if_current"
   | "rpc.save_submission_draft"
+  | "rpc.save_agent_submission_if_current"
   | "rpc.submit_corrections_handoff"
   | "storage.upload_media"
   | "storage.upload_agent_return_package_artifact"
@@ -147,6 +148,7 @@ function kindForOperation(
   if (operation.startsWith("auth.")) return "auth";
   if (
     operation === "rpc.save_submission_draft" ||
+    operation === "rpc.save_agent_submission_if_current" ||
     operation === "rpc.save_admin_submission_batch_if_current"
   ) {
     return "save";
@@ -272,6 +274,41 @@ export function safeDiagnosticsForPersistenceError(
 ): PersistenceFailureDiagnostics | null {
   if (error instanceof PersistenceObservableError) return error.diagnostics;
   return null;
+}
+
+export function isDefinitivePersistenceRejection(error: unknown): boolean {
+  const diagnostics = safeDiagnosticsForPersistenceError(error);
+  if (!diagnostics) return false;
+
+  const code = diagnostics.supabaseCode;
+  if (code) {
+    if (
+      code === "40003" ||
+      /^(08|53|57|58|XX)/.test(code)
+    ) {
+      return false;
+    }
+    if (
+      code === "40001" ||
+      code === "40P01" ||
+      /^(22|23|42)/.test(code) ||
+      /^P000[1-4]$/.test(code) ||
+      /^PGRST\d{3}$/.test(code)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  const status = diagnostics.httpStatus;
+  return (
+    typeof status === "number" &&
+    status >= 400 &&
+    status < 500 &&
+    status !== 408 &&
+    status !== 425 &&
+    status !== 429
+  );
 }
 
 export function formatPersistenceFailureForUser(

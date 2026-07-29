@@ -272,7 +272,7 @@ describe("V-19 domain engine", () => {
       total: 100,
     });
     expect(resubmitted.issues).toEqual(before.issues);
-    expect(resubmitted.exportPackage).toEqual(before.exportPackage);
+    expect(resubmitted.exportPackage).toBeUndefined();
     expect(resubmitted.history).toHaveLength(before.history.length + 1);
     expect(resubmitted.history[0]).toMatchObject({
       actorId: staleAccepted.agentId,

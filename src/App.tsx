@@ -799,8 +799,9 @@ export default function App({
       workspaceRefreshRequestRef.current += 1;
       workspaceRefreshCoordinatorRef.current.invalidate();
       let mutationSucceeded = false;
+      let refreshAfterMutation = false;
       try {
-        const adminSaveResult =
+        const saveResult =
           persistenceProfile.role === "admin"
             ? await saveAdminCockpitSubmissionsIfCurrent(
                 persistenceProfile,
@@ -808,23 +809,20 @@ export default function App({
                 currentOwnerIds,
                 currentCaseRevisions,
               )
-            : null;
-        const nextOwnerIds = adminSaveResult
-          ? adminSaveResult.ownerIdsBySubmissionId
-          : await saveCockpitSubmissionsForProfile(
+            : await saveCockpitSubmissionsForProfile(
               persistenceProfile,
               changedSubmissions,
               currentOwnerIds,
+              currentCaseRevisions,
             );
+        const nextOwnerIds = saveResult.ownerIdsBySubmissionId;
         fence.assertCurrent();
 
         workspaceRefreshRequestRef.current += 1;
         submissionsRef.current = nextSubmissions;
         setSubmissions(nextSubmissions);
-        if (adminSaveResult) {
-          caseRevisionsBySubmissionIdRef.current =
-            adminSaveResult.caseRevisionsBySubmissionId;
-        }
+        caseRevisionsBySubmissionIdRef.current =
+          saveResult.caseRevisionsBySubmissionId;
         ownerIdsBySubmissionIdRef.current = nextOwnerIds;
         setOwnerIdsBySubmissionId(nextOwnerIds);
         setWorkspaceDataState({
@@ -833,10 +831,11 @@ export default function App({
           status: workspaceDataStatusForCount(nextSubmissions.length),
         });
         mutationSucceeded = true;
-        return adminSaveResult?.caseRevisionsBySubmissionId;
+        return saveResult.caseRevisionsBySubmissionId;
       } catch (error) {
+        refreshAfterMutation = isAdminSubmissionConcurrencyConflict(error);
         if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
-          const errorMessage = isAdminSubmissionConcurrencyConflict(error)
+          const errorMessage = refreshAfterMutation
             ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
             : error instanceof Error
               ? error.message
@@ -855,7 +854,7 @@ export default function App({
             workspaceMutationStateRef.current.count - 1,
           );
           if (
-            mutationSucceeded &&
+            (mutationSucceeded || refreshAfterMutation) &&
             workspaceMutationStateRef.current.count === 0 &&
             fence.isCurrent()
           ) {
@@ -1149,7 +1148,12 @@ export default function App({
           if (!current) throw new Error("Подача больше не доступна.");
           const existingNumber = submissionPublicNumber(current);
           if (existingNumber !== null) {
-            resolveAssignment({ assignedNow: false, publicNumber: existingNumber });
+            resolveAssignment({
+              assignedNow: false,
+              caseRevision:
+                caseRevisionsBySubmissionIdRef.current.get(submissionId) ?? null,
+              publicNumber: existingNumber,
+            });
             return;
           }
 
@@ -1157,6 +1161,7 @@ export default function App({
             ? await ensureSubmissionPublicNumber(submissionId)
             : {
                 assignedNow: true,
+                caseRevision: null,
                 publicNumber:
                   Math.max(
                     1000,
@@ -1168,6 +1173,11 @@ export default function App({
           fence.assertCurrent();
           if (assignment.publicNumber > submissionPublicNumberMax) {
             throw new Error("Лимит номеров подач исчерпан.");
+          }
+          if (supabaseEnabled && assignment.caseRevision !== null) {
+            caseRevisionsBySubmissionIdRef.current = new Map(
+              caseRevisionsBySubmissionIdRef.current,
+            ).set(submissionId, assignment.caseRevision);
           }
 
           const nextSubmissions = submissionsRef.current.map((submission) =>
@@ -1185,6 +1195,7 @@ export default function App({
           fence.assertCurrent();
           resolveAssignment({
             assignedNow: assignment.assignedNow,
+            caseRevision: assignment.caseRevision,
             publicNumber: assignment.publicNumber,
           });
         })

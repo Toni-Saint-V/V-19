@@ -126,10 +126,10 @@ describe("operational workflow logic spine", () => {
 
     expect(accepted).toEqual(before);
     expect(resubmitted).toMatchObject({
-      exportPackage,
       exportState: "not_ready",
       status: "submitted_for_review",
     });
+    expect(resubmitted.exportPackage).toBeUndefined();
     expect(resubmitted.files.every((file) => file.status === "pending_review")).toBe(
       true,
     );

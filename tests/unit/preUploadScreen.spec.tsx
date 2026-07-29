@@ -77,12 +77,34 @@ describe("PreUploadScreen canonical intake", () => {
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0]?.[0]).toEqual({
+      applicantRoles: ["main", "spouse"],
       city: "Казань",
       destination: "questionnaire",
       familyCount: 2,
       passportUploads: [],
       type: "family",
     });
+  });
+
+  test("captures an explicit main-to-child family relationship", async () => {
+    const onSubmit = vi.fn(async () => undefined);
+    render(<PreUploadScreen onSubmit={onSubmit} />);
+    chooseCity();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Загрузить паспорт: Супруг/супруга",
+      }),
+    );
+    fireEvent.click(screen.getByLabelText("Связь заявителя 2"));
+    fireEvent.click(screen.getByRole("option", { name: "Ребёнок" }));
+    fireEvent.click(screen.getByRole("button", { name: "Продолжить без паспорта" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0].applicantRoles).toEqual([
+      "main",
+      "child",
+    ]);
   });
 
   test("keeps a neutral filename bound to its applicant while OCR is pending", async () => {
@@ -214,6 +236,45 @@ describe("PreUploadScreen canonical intake", () => {
         .mocked(invokePassportExtraction)
         .mock.calls.map(([input]) => input.applicantIndex),
     ).toEqual([0, 1]);
+  });
+
+  test("extends editable family relationships for applicants added by a batch", async () => {
+    const onSubmit = vi.fn(async () => undefined);
+    const { container } = render(<PreUploadScreen onSubmit={onSubmit} />);
+    chooseCity();
+    fireEvent.change(inputFor(container), {
+      target: {
+        files: [
+          passportFile("first.jpg"),
+          passportFile("second.jpg"),
+          passportFile("third.jpg"),
+          passportFile("fourth.jpg"),
+        ],
+      },
+    });
+
+    const selectors = screen.getAllByRole("combobox", { name: /Заявитель для/ });
+    selectors.forEach((selector, index) => {
+      fireEvent.change(selector, { target: { value: String(index) } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Распознать паспорта" }));
+    await waitFor(() => expect(screen.getAllByText("Вручную")).toHaveLength(4));
+
+    const applicantButtons = screen.getAllByRole("button", {
+      name: /паспорт: Ребёнок/,
+    });
+    fireEvent.click(applicantButtons.at(-1) as HTMLButtonElement);
+    fireEvent.click(screen.getByLabelText("Связь заявителя 4"));
+    fireEvent.click(screen.getByRole("option", { name: "Супруг / супруга" }));
+    fireEvent.click(screen.getByRole("button", { name: "Создать и открыть анкету" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0].applicantRoles).toEqual([
+      "main",
+      "child",
+      "child",
+      "spouse",
+    ]);
   });
 
   test("caps family intake at six applicants", () => {
