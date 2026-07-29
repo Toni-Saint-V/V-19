@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   businessClickContractFor,
   isBusinessClickIntent,
+  V19_ALL_SUBMISSION_ACTION_CLICK_CONTRACTS,
   V19_BUSINESS_CLICK_CONTRACTS,
   V19_BUSINESS_CLICK_CONTRACT_LIST,
   V19_SUBMISSION_ACTION_CLICK_CONTRACTS,
@@ -44,11 +45,12 @@ import {
 
 const allContracts = V19_BUSINESS_CLICK_CONTRACT_LIST;
 const actionContracts = V19_SUBMISSION_ACTION_CLICK_CONTRACTS;
+const allActionContracts = V19_ALL_SUBMISSION_ACTION_CLICK_CONTRACTS;
 
 describe("V-19 business click contract", () => {
   test("covers every SubmissionAction exactly once for future UI wiring", () => {
     const transitionActions = Object.keys(transitionMatrix).sort();
-    const contractActions = actionContracts
+    const contractActions = allActionContracts
       .map((contract) => contract.submissionAction)
       .sort();
 
@@ -57,7 +59,7 @@ describe("V-19 business click contract", () => {
   });
 
   test("keeps click contracts aligned with the canonical transition matrix", () => {
-    for (const contract of actionContracts) {
+    for (const contract of allActionContracts) {
       const transition = transitionMatrix[contract.submissionAction];
 
       expect(contract.ownerRole).toBe(transition.role);
@@ -86,6 +88,19 @@ describe("V-19 business click contract", () => {
     expect(surfaces.has("agent-applicants")).toBe(false);
     expect(surfaces.has("agent-family")).toBe(false);
     expect(surfaces.has("agent-media")).toBe(false);
+  });
+
+  test("activates the ZIP-coupled terminal export only through its canonical owner", () => {
+    expect(businessClickContractFor("mark_exported")).toMatchObject({
+      executionPath: "completeExportPackage",
+      releaseState: "enabled",
+      submissionAction: "mark_exported",
+    });
+    expect(
+      actionContracts.some(
+        (contract) => contract.submissionAction === "mark_exported",
+      ),
+    ).toBe(true);
   });
 
   test("executes the combined draft-to-review intent through the canonical lifecycle", () => {

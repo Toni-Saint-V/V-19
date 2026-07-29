@@ -30,6 +30,7 @@ import {
 import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
 import { getAdminReviewActions } from "../modules/submissions/status";
+import { questionnaireIssueFieldDisplayLabel } from "../modules/submissions/questionnaire";
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
   ADMIN_PASSPORT_REVIEW_FIELD_LABELS,
@@ -64,6 +65,7 @@ interface ReviewWorkspaceProps {
     applicant?: string,
     fileType?: SubmissionFileType,
     applicantId?: string,
+    fieldLabel?: string,
   ) => void;
   onApplicantChange?: (applicantId: string) => void;
   onApproveSection?: (input: { applicantId: string }) => boolean | Promise<boolean>;
@@ -1252,10 +1254,13 @@ export function ReviewWorkspace({
                 </p>
                 <div className="v19-review-corrected-issue-list">
                   {correctedIssuesAwaitingClosure.map((issue) => {
+                    const fieldLabel = submission
+                      ? questionnaireIssueFieldDisplayLabel(submission, issue)
+                      : issue.target.field;
                     const target = [
                       issue.target.applicantName,
                       issue.target.section,
-                      issue.target.field,
+                      fieldLabel,
                     ]
                       .filter(Boolean)
                       .join(" · ");

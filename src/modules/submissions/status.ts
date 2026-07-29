@@ -43,6 +43,7 @@ import {
   isBlsQuestionnaireFileReady,
 } from "./questionnaireBlsRules";
 import { submissionBelongsToAgent } from "./ownership";
+import { isSubmissionMediaIssueResolved } from "./adminIssueTargetContract";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -1415,6 +1416,7 @@ export function applySubmissionActionResult(
   if (action === "submit_for_review") {
     const prepared: Submission = {
       ...submission,
+      exportPackage: undefined,
       exportState: "not_ready",
       files: submission.files.map((file) =>
         file.status === "uploaded" || file.status === "accepted"
@@ -1533,9 +1535,7 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
         item.applicantId === issue.target.applicantId &&
         item.type === issue.target.fileType,
     );
-    if (!file || file.status === "missing" || file.status === "needs_replacement")
-      return false;
-    return issue.snapshot ? file.status !== issue.snapshot : true;
+    return file ? isSubmissionMediaIssueResolved(file, issue) : false;
   }
 
   if (isPassportExtractionReviewIssue(issue)) {
@@ -1549,6 +1549,16 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
   );
   if (!applicant) return false;
 
+  const fields = applicant.sections.flatMap((section) => section.fields);
+  const field = fields.find((item) =>
+    questionnaireFieldMatchesTarget(item, issue.target.field),
+  );
+  if (field) {
+    const value = field.value.trim();
+    if (!value) return false;
+    return value !== (issue.snapshot ?? "").trim();
+  }
+
   if (issue.type === "section") {
     const section = applicant.sections.find(
       (item) =>
@@ -1557,15 +1567,7 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
     return Boolean(section && section.status === "complete");
   }
 
-  const fields = applicant.sections.flatMap((section) => section.fields);
-  const field = fields.find((item) =>
-    questionnaireFieldMatchesTarget(item, issue.target.field),
-  );
-  if (!field) return false;
-
-  const value = field.value.trim();
-  if (!value) return false;
-  return issue.snapshot ? value !== issue.snapshot : true;
+  return false;
 }
 
 function isPassportExtractionReviewIssue(issue: Issue) {

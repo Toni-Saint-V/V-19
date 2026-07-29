@@ -755,6 +755,28 @@ export function questionnaireFieldMatchesTarget(
   );
 }
 
+export function questionnaireIssueFieldDisplayLabel(
+  submission: Pick<Submission, "applicants">,
+  issue: Pick<Issue, "target">,
+): string | undefined {
+  const target = issue.target.field?.trim();
+  if (!target) return undefined;
+
+  const applicant = submission.applicants.find(
+    (candidate) => candidate.id === issue.target.applicantId,
+  );
+  if (!applicant) return target;
+
+  const fields = applicant.sections.flatMap((section) => section.fields);
+  const exactIdField = fields.find((field) => field.id === target);
+  if (exactIdField) return exactIdField.label;
+
+  const matchingFields = fields.filter((field) =>
+    questionnaireFieldMatchesTarget(field, target),
+  );
+  return matchingFields.length === 1 ? matchingFields[0]?.label : target;
+}
+
 function normalizeQuestionnaireFieldLabel(value?: string) {
   return (value ?? "")
     .trim()

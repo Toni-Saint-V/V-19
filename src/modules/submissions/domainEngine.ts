@@ -26,8 +26,10 @@ import {
   isExportedTerminal,
   isIssueTransitionAllowed,
 } from "./domainContract";
-import { questionnaireFieldMatchesTarget } from "./questionnaire";
-import { requiredPassportReviewMediaTypesForApplicant } from "./passportReviewContract";
+import {
+  resolveAdminIssueTarget,
+  submissionIssueTargetSnapshot,
+} from "./adminIssueTargetContract";
 import type {
   ActionDecision,
   AgentOwnerId,
@@ -160,15 +162,19 @@ export function returnWithIssues(
   if (issues.length === 0) {
     return failure("VALIDATION_ERROR", "At least one issue is required.");
   }
-  const invalidIssue = issues.find((issue) => !isValidIssueInput(submission, issue));
-  if (invalidIssue) {
-    return failure(
-      "VALIDATION_ERROR",
-      "Issue target, reason, and comment must be valid.",
-    );
+  const canonicalIssues: IssueInput[] = [];
+  for (const issue of issues) {
+    const canonicalIssue = canonicalizeIssueInput(submission, issue);
+    if (!canonicalIssue) {
+      return failure(
+        "VALIDATION_ERROR",
+        "Issue target, reason, and comment must be valid.",
+      );
+    }
+    canonicalIssues.push(canonicalIssue);
   }
 
-  const nextIssues = issues.map((issue, index) =>
+  const nextIssues = canonicalIssues.map((issue, index) =>
     createIssueFromInput(submission, issue, index),
   );
 
@@ -596,62 +602,28 @@ function createIssueFromInput(
     status: "open",
     createdBy: "admin",
     createdAt: "сейчас",
-    snapshot: issueTargetSnapshot(submission, input),
+    snapshot: submissionIssueTargetSnapshot(submission, input),
   };
 }
 
-function isValidIssueInput(submission: Submission, input: IssueInput) {
-  const applicant = submission.applicants.find((item) => item.id === input.applicantId);
-  return Boolean(
-    applicant &&
-    input.reason.trim().length > 0 &&
-    input.comment.trim().length > 0 &&
-    isValidIssueTarget(submission, applicant, input),
-  );
-}
-
-function issueTargetSnapshot(submission: Submission, input: IssueInput) {
-  if (input.fileType) {
-    return submission.files.find(
-      (file) => file.applicantId === input.applicantId && file.type === input.fileType,
-    )?.status;
-  }
-
-  const applicant = submission.applicants.find((item) => item.id === input.applicantId);
-  return applicant?.sections
-    .flatMap((section) => section.fields)
-    .find((field) => questionnaireFieldMatchesTarget(field, input.field))?.value;
-}
-
-function isValidIssueTarget(
+function canonicalizeIssueInput(
   submission: Submission,
-  applicant: Submission["applicants"][number],
   input: IssueInput,
-) {
-  if (input.type === "file" || input.type === "media") {
-    return Boolean(
-      input.fileType &&
-      requiredPassportReviewMediaTypesForApplicant(submission, applicant.id).some(
-        (type) => type === input.fileType,
-      ),
-    );
-  }
+): IssueInput | null {
+  if (!input.reason.trim() || !input.comment.trim()) return null;
 
-  if (input.fileType) return false;
-  if (input.type === "section") {
-    const target = (input.section ?? input.field ?? "").trim();
-    return Boolean(
-      target && applicant.sections.some((section) => section.title === target),
-    );
+  try {
+    const resolvedTarget = resolveAdminIssueTarget(submission, input);
+    return {
+      ...input,
+      applicantId: resolvedTarget.applicant.id,
+      field: resolvedTarget.kind === "field" ? resolvedTarget.field : undefined,
+      fileType: resolvedTarget.kind === "media" ? resolvedTarget.fileType : undefined,
+      type: resolvedTarget.kind === "field" ? "field" : "file",
+    };
+  } catch {
+    return null;
   }
-
-  return Boolean(
-    input.type === "field" &&
-    input.field &&
-    applicant.sections
-      .flatMap((section) => section.fields)
-      .some((field) => questionnaireFieldMatchesTarget(field, input.field)),
-  );
 }
 
 function success<T>(data: T): CommandResult<T> {

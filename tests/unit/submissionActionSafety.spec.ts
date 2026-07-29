@@ -470,6 +470,7 @@ describe("submission action safety", () => {
         file.id === targetFile.id
           ? {
               ...file,
+              linkedIssueId: "issue-file-replacement",
               status: "needs_replacement",
               storageBucket: "submission-media",
               storagePath: "old/path.jpg",
@@ -494,6 +495,8 @@ describe("submission action safety", () => {
           status: "open",
           createdBy: "admin",
           createdAt: "сейчас",
+          snapshot:
+            'media-evidence:v1:["submission-media","old/path.jpg"]',
         },
       ],
     };

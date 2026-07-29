@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase/client";
 import { mapSupabasePersistenceError } from "../../services/persistenceObservability";
+import type { MediaSlotType } from "../../types/domain";
 import {
   validateMediaStorageTarget,
   type MediaStorageTarget,
@@ -77,6 +78,40 @@ export async function deleteMediaFromStorage(
       operation: "storage.delete_media",
       fallbackKind: "storage",
     });
+  }
+}
+
+export type MediaPersistenceReadback = "committed" | "unknown";
+
+export async function readMediaPersistenceState({
+  applicantId,
+  mediaType,
+  submissionId,
+  target,
+}: {
+  applicantId: string;
+  mediaType: MediaSlotType;
+  submissionId: string;
+  target: MediaStorageTarget;
+}): Promise<MediaPersistenceReadback> {
+  const client = getSupabaseClient();
+  if (!client) return "unknown";
+
+  try {
+    const { data, error } = await client
+      .from("media_assets")
+      .select("storage_bucket,storage_path")
+      .eq("submission_id", submissionId)
+      .eq("applicant_id", applicantId)
+      .eq("type", mediaType)
+      .maybeSingle();
+    if (error) return "unknown";
+    return data?.storage_bucket === target.bucket &&
+      data.storage_path === target.path
+      ? "committed"
+      : "unknown";
+  } catch {
+    return "unknown";
   }
 }
 

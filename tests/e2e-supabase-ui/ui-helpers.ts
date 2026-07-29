@@ -507,11 +507,8 @@ export async function fillQuestionnaire(
       await expect(copyShared).toBeVisible();
       await copyShared.click();
       await onFamilyCopyState?.("preview", submissionId);
-      const confirmCopy = questionnaire.getByRole("button", {
-        name: "Подтвердить копирование",
-      });
-      await expect(confirmCopy).toBeVisible();
-      await confirmCopy.click();
+      await expect(copyShared).toHaveAttribute("aria-pressed", "true");
+      await copyShared.click();
       await onFamilyCopyState?.("complete", submissionId);
     }
   }
@@ -525,7 +522,9 @@ export async function fillQuestionnaire(
   ) {
     if (applicantCount > 0) await applicants.nth(applicantIndex).click();
     await questionnaire
-      .locator(".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab")
+      .locator(
+        ".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab",
+      )
       .filter({ hasText: "Личные данные" })
       .click();
     surnameReadbacks.push({

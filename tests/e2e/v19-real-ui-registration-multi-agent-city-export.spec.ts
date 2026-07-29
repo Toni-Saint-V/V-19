@@ -527,7 +527,11 @@ export async function exportFamilyExcel(page: Page, family: FamilyDraft) {
   await expect(download.failure()).resolves.toBeNull();
   const savedPath = `${evidenceDir}/${family.fileSlug}.xlsx`;
   await download.saveAs(savedPath);
-  await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
+  const zipButton = page.getByRole("button", {
+    name: "Сформировать ZIP с Excel",
+  });
+  await expect(zipButton).toBeEnabled();
+  await zipButton.click();
   const zipLink = page.getByRole("link", { name: "Скачать ZIP" });
   await expect(zipLink).toBeVisible();
   const zipDownloadPromise = page.waitForEvent("download");
@@ -538,8 +542,9 @@ export async function exportFamilyExcel(page: Page, family: FamilyDraft) {
   await expect(page.locator("#export-action-hint")).toContainText(
     "Скачивание подтверждено, пакет зафиксирован",
   );
-  await page.getByRole("tab", { name: "История" }).click();
-  await expect(page.locator(".submission-panel").getByText(family.title)).toBeVisible();
+  await expect(
+    page.locator(".export-row").filter({ hasText: family.title }),
+  ).toBeVisible();
   return savedPath;
 }
 

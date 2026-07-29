@@ -129,7 +129,7 @@ async function verifyRemarkSubmitActionability(
   await openAdminSubmission(page, returnTarget.open);
   const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
   const addRemarkButton = reviewWorkspace.getByRole("button", {
-    name: "Добавить замечание: Номер паспорта",
+    name: "Добавить замечание: Срок действия",
   });
   await expect(addRemarkButton).toBeVisible();
   await addRemarkButton.click();
@@ -140,6 +140,10 @@ async function verifyRemarkSubmitActionability(
     .last();
   await expect(remarkDialog).toBeVisible();
   await expectWithinViewport(page, remarkDialog);
+  await expect(remarkDialog.getByLabel("Текст для клиента")).toHaveValue(
+    "Проверьте «Срок действия».",
+  );
+  await expect(remarkDialog).not.toContainText("passport-expiry-date");
 
   const submitRemarkButton = remarkDialog
     .locator('[data-testid="remark-form-submit"]')
@@ -162,7 +166,7 @@ async function verifyRemarkSubmitActionability(
   await expect(reviewWorkspace).toBeVisible();
   await expect(
     reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-  ).toContainText(/Открыто\s+1/);
+  ).toContainText(/Замечания\s+1/);
 
   const returnForCorrection = reviewWorkspace.getByRole("button", {
     name: "Отправить на исправление",
@@ -226,6 +230,11 @@ async function verifyEveryAdminDrawerSubview(
   const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
   await expect(reviewWorkspace).toBeVisible();
   await expectWithinViewport(page, reviewWorkspace);
+  const mediaStage = reviewWorkspace.locator(".v19-review-media-stage");
+  await expect(mediaStage).toBeVisible();
+  const mediaStageBox = await mediaStage.boundingBox();
+  expect(mediaStageBox, "Passport media stage must have a measurable box.").not.toBeNull();
+  expect(mediaStageBox!.height).toBeGreaterThanOrEqual(400);
   const mediaTablist = reviewWorkspace.getByRole("tablist", {
     name: "Выбор файла для проверки",
   });
@@ -301,24 +310,28 @@ test.describe("V-19 pilot admin review click flow", () => {
       {
         fileName: "review",
         heading: "Очередь на проверку",
+        headingLevel: 1,
         nav: /^Проверка$/,
         readyText: "Очередь проверки",
       },
       {
         fileName: "export",
         heading: "Центр выгрузки",
+        headingLevel: 1,
         nav: /^Выгрузка$/,
         readyText: "Пакеты к выгрузке",
       },
       {
         fileName: "users",
-        heading: "Управление пользователями",
+        heading: "Пользователи и заявки",
+        headingLevel: 2,
         nav: /^Пользователи$/,
-        readyText: "Пользователи и заявки",
+        readyText: "Заявки на доступ",
       },
       {
         fileName: "settings",
         heading: "Системные настройки",
+        headingLevel: 1,
         nav: /^Настройки$/,
         readyText: "Ощущение интерфейса",
       },
@@ -337,7 +350,10 @@ test.describe("V-19 pilot admin review click flow", () => {
       for (const screen of screens) {
         await clickWorkspaceButton(page, screen.nav);
         await expect(
-          page.getByRole("heading", { level: 1, name: screen.heading }),
+          page.getByRole("heading", {
+            level: screen.headingLevel,
+            name: screen.heading,
+          }),
         ).toBeVisible();
         await expect(
           page.getByText(screen.readyText, { exact: true }).first(),
@@ -449,7 +465,9 @@ test.describe("V-19 pilot admin review click flow", () => {
     await reviewAction.click();
     const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
     await expect(reviewWorkspace).toBeVisible();
-    await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
+    await expect(
+      reviewWorkspace.getByRole("heading", { name: "Данные паспорта" }),
+    ).toBeVisible();
     await expect(
       reviewWorkspace.getByRole("alert").getByText("Оригинал нельзя принять"),
     ).toBeVisible();
@@ -494,6 +512,10 @@ test.describe("V-19 pilot admin review click flow", () => {
     await verifyEveryAdminDrawerSubview(page, testInfo, {
       height: 844,
       width: 390,
+    });
+    await verifyEveryAdminDrawerSubview(page, testInfo, {
+      height: 900,
+      width: 768,
     });
     await verifyEveryAdminDrawerSubview(page, testInfo, {
       height: 800,
@@ -627,7 +649,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     }
 
     await expectBodyMatches(page, [
-      /Excel готов|Сформировать ZIP с Excel|Можно сформировать/i,
+      /Excel готов|Excel сформирован/i,
     ]);
 
     expect(

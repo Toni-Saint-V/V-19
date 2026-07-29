@@ -150,6 +150,9 @@ function verifyAuthProfileBoundary() {
   const accessRequestFunction = readProjectFile(
     "supabase/functions/access-request/index.ts",
   );
+  const accessRequestProvisioning = readProjectFile(
+    "supabase/functions/_shared/accessRequestProvisioning.ts",
+  );
 
   expectContains(
     authService,
@@ -212,7 +215,7 @@ function verifyAuthProfileBoundary() {
     "Supabase access approval creates agent profiles only",
   );
   expectContains(
-    accessRequestFunction,
+    accessRequestProvisioning,
     "inviteUserByEmail",
     "Supabase access approval invites Auth users server-side only",
   );

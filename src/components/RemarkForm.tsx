@@ -19,6 +19,7 @@ interface RemarkFormProps {
   defaultApplicant?: string;
   defaultApplicantId?: string;
   defaultField?: string;
+  defaultFieldLabel?: string;
   defaultFileType?: SubmissionFileType;
   isOpen: boolean;
   onClose: () => void;
@@ -26,6 +27,7 @@ interface RemarkFormProps {
     applicant?: string;
     applicantId?: string;
     field?: string;
+    fieldLabel?: string;
     fileType?: SubmissionFileType;
     message: string;
     severity: "warning" | "critical";
@@ -53,6 +55,7 @@ export function RemarkForm({
   defaultApplicant,
   defaultApplicantId,
   defaultField,
+  defaultFieldLabel,
   defaultFileType,
   isOpen,
   onClose,
@@ -63,7 +66,10 @@ export function RemarkForm({
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const submitRunRef = useRef(false);
-  const initialMessage = defaultField ? `Проверьте «${defaultField}».` : templates[0];
+  const fieldDisplayLabel = defaultFieldLabel?.trim() || defaultField;
+  const initialMessage = fieldDisplayLabel
+    ? `Проверьте «${fieldDisplayLabel}».`
+    : templates[0];
   const [message, setMessage] = useState(initialMessage);
   const [severity, setSeverity] = useState<"warning" | "critical">("warning");
   const [submitError, setSubmitError] = useState("");
@@ -160,6 +166,7 @@ export function RemarkForm({
       applicant: defaultApplicant,
       applicantId: defaultApplicantId,
       field: defaultField,
+      fieldLabel: defaultFieldLabel,
       fileType: defaultFileType,
       message: trimmedMessage,
       severity,
@@ -174,6 +181,7 @@ export function RemarkForm({
         applicant: defaultApplicant,
         applicantId: defaultApplicantId,
         field: defaultField,
+        fieldLabel: defaultFieldLabel,
         fileType: defaultFileType,
         message: trimmedMessage,
         severity,
@@ -261,7 +269,7 @@ export function RemarkForm({
                     Поле или файл
                   </div>
                   <div className="text-[13px] font-medium text-white truncate">
-                    {defaultField || defaultFileType || "Паспортная секция"}
+                    {fieldDisplayLabel || defaultFileType || "Паспортная секция"}
                   </div>
                 </div>
                 <div className="p-3 rounded-2xl bg-[#161617] border border-[#242529]">

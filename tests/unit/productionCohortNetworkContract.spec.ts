@@ -1127,7 +1127,7 @@ describe("production lifecycle mutation audit", () => {
     const addedTarget = added.applicants
       .find((item) => item.id === addedIssue.target.applicantId)
       ?.sections.flatMap((section) => section.fields.map((field) => ({ field, section })))
-      .find(({ field }) => field.label === addedIssue.target.field);
+      .find(({ field }) => field.id === addedIssue.target.field);
     if (!addedTarget) throw new Error("Expected exact added issue target.");
     expect(addedTarget.field.error).toBe(issueReason);
     expect(addedTarget.section.status).toBe("needs_fix");

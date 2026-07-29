@@ -10,6 +10,7 @@ import type {
   PassportExtractionStatus,
   PassportUploadDraft,
   Submission,
+  ApplicantRole,
 } from "./types";
 
 export const submissionIntakeFamilyMax = 6;
@@ -31,6 +32,7 @@ export type PassportIntakeItem = {
 };
 
 export type SubmissionIntakeIntent = {
+  applicantRoles?: ApplicantRole[];
   city: City;
   destination: SubmissionIntakeDestination;
   familyCount: number;

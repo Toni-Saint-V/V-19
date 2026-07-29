@@ -6,6 +6,8 @@ const e2eHost = process.env.PW_BASE_HOST ?? "localhost";
 const e2eServerHost = process.env.PW_SERVER_HOST ?? "0.0.0.0";
 const e2ePort = process.env.PW_BASE_PORT ?? "4207";
 const e2eUrl = `http://${e2eHost}:${e2ePort}`;
+const e2eBrowserChannel =
+  process.env.PW_BROWSER_CHANNEL === "chrome" ? "chrome" : undefined;
 
 export default defineConfig({
   outputDir: testArtifactPath("playwright", "fastlane"),
@@ -19,6 +21,7 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: e2eUrl,
+    channel: e2eBrowserChannel,
     trace: "off",
     screenshot: "off",
     video: "off",
@@ -37,6 +40,12 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "mobile-chromium",
+      use: {
+        ...devices["Pixel 5"],
       },
     },
   ],

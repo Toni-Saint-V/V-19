@@ -392,11 +392,17 @@ test.describe("V-19 mobile click real logic", () => {
     });
     await expect(controlPanel).toBeVisible();
     const continueExport = controlPanel.getByRole("button", {
-      name: "Сформировать ZIP с Excel",
+      name: "Сформировать Excel",
     });
     await expectCenterHitTarget(
       continueExport,
-      "390 export generate CTA",
+      "390 Excel export generate CTA",
+    );
+    await expectCenterHitTarget(
+      controlPanel.getByRole("button", {
+        name: "Сформировать ZIP с Excel",
+      }),
+      "390 ZIP export CTA",
     );
     await controlPanel
       .getByRole("button", { name: "Закрыть контроль пакета" })

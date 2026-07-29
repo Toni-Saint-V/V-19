@@ -10,14 +10,10 @@ import {
 } from "lucide-react";
 
 import { cn } from "../../../shared/ui/cn";
+import { AccessibleSelectMenu } from "../../../shared/ui/AccessibleSelectMenu";
 import { agentInteractionProps } from "../agentInteractionContract";
 
-export type AgentActionFilter =
-  | "blockers"
-  | "completed"
-  | "open"
-  | "today"
-  | "week";
+export type AgentActionFilter = "blockers" | "completed" | "open" | "today" | "week";
 
 export type AgentActionFilterCounts = Record<AgentActionFilter, number>;
 
@@ -115,36 +111,31 @@ export function AgentActionStatusStrip({
         })}
       </div>
 
-      <label
-        className={cn(
-          "v19-agent-action-status-more",
-          extraFilter && "is-active",
-        )}
-      >
+      <div className={cn("v19-agent-action-status-more", extraFilter && "is-active")}>
         <MoreHorizontal aria-hidden="true" />
         <span>{extraFilter?.label ?? "Ещё"}</span>
-        <select
-          aria-label="Дополнительный фильтр действий"
-          data-v19-interaction-id="actions.summary-filter"
+        <AccessibleSelectMenu
+          ariaLabel="Дополнительный фильтр действий"
+          className="v19-agent-action-status-more-menu"
+          options={extraFilterOptions.map((option) => ({
+            description: `Задач: ${counts[option.filter]}`,
+            label: option.label,
+            tone: option.filter === "week" ? "warning" : "default",
+            value: option.filter,
+          }))}
+          placeholder="Ещё"
           value={extraValue}
-          onChange={(event) => {
-            if (isExtraFilter(event.currentTarget.value)) {
-              onChange(event.currentTarget.value);
-            }
+          triggerProps={{
+            ...agentInteractionProps("actions.summary-filter"),
+            className: "v19-agent-action-status-more-trigger",
           }}
-        >
-          <option disabled value="">
-            Ещё
-          </option>
-          {extraFilterOptions.map((option) => (
-            <option key={option.filter} value={option.filter}>
-              {option.label}: {counts[option.filter]}
-            </option>
-          ))}
-        </select>
+          onValueChange={(nextValue) => {
+            if (isExtraFilter(nextValue)) onChange(nextValue);
+          }}
+        />
         <strong>{extraFilter ? counts[extraFilter.filter] : null}</strong>
         <ChevronDown aria-hidden="true" />
-      </label>
+      </div>
     </section>
   );
 }

@@ -84,8 +84,12 @@ import {
 import {
   buildMediaStoragePath,
   mediaMimeTypeForFile,
+  mediaStorageBucket,
+  readMediaPersistenceState,
   uploadMediaToStorage,
+  type MediaStorageTarget,
 } from "../modules/submissions/mediaStorage";
+import { commitUploadedMedia } from "../modules/submissions/mediaUploadCommit";
 import {
   applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
@@ -673,6 +677,7 @@ export function CommandCenter({
       const result = createDraft({
         agentId,
         applicantNames,
+        applicantRoles: intent.applicantRoles,
         city: intent.city,
         familyCount: intent.familyCount,
         idScheme: usesSupabase ? "supabase" : "local",
@@ -788,11 +793,13 @@ export function CommandCenter({
           storageBucket: string;
           storagePath: string;
         });
+    let uploadedStorageTarget: MediaStorageTarget | null = null;
+    const storageMediaType = mediaSlotTypeForSubmissionFileType(fileType);
     if (usesSupabase) {
       const target = buildMediaStoragePath(
         submission.id,
         applicantId,
-        mediaSlotTypeForSubmissionFileType(fileType),
+        storageMediaType,
         generatedFileName,
       );
       const uploaded = await uploadMediaToStorage(target, file, {
@@ -807,16 +814,27 @@ export function CommandCenter({
         storageBucket: target.bucket,
         storagePath: uploaded.path,
       };
+      uploadedStorageTarget = target;
     } else {
       metadata = { ...baseMetadata, storageAdapter: "local-dev" };
     }
 
+    let previousStorageTarget: MediaStorageTarget | null = null;
     const applyUploadToLatest = (latestSubmission: Submission) => {
       const latestPrepared = ensureApplicantMediaSlot(
         latestSubmission,
         applicantId,
         fileType,
       );
+      previousStorageTarget =
+        latestPrepared.file.storageAdapter === "supabase-private" &&
+        latestPrepared.file.storageBucket === mediaStorageBucket &&
+        latestPrepared.file.storagePath
+          ? {
+              bucket: mediaStorageBucket,
+              path: latestPrepared.file.storagePath,
+            }
+          : null;
       const uploadedSubmission = uploadRequiredFile(
         latestPrepared.submission,
         latestPrepared.file.id,
@@ -846,14 +864,32 @@ export function CommandCenter({
       };
     };
 
-    const nextSubmission = onSubmissionUpdate
-      ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
-      : applyUploadToLatest(submission);
-    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({
-      ...current,
-      [nextSubmission.id]: nextSubmission,
-    }));
+    const nextSubmission = await commitUploadedMedia({
+      confirmPersisted: uploadedStorageTarget
+        ? () =>
+            readMediaPersistenceState({
+              applicantId,
+              mediaType: storageMediaType,
+              submissionId: submission.id,
+              target: uploadedStorageTarget,
+            })
+        : undefined,
+      persist: async () => {
+        const persistedSubmission = onSubmissionUpdate
+          ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
+          : applyUploadToLatest(submission);
+        if (!onSubmissionUpdate) {
+          await onSubmissionsChange?.([persistedSubmission]);
+        }
+        setCanonicalOverrides((current) => ({
+          ...current,
+          [persistedSubmission.id]: persistedSubmission,
+        }));
+        return persistedSubmission;
+      },
+      previousTarget: () => previousStorageTarget,
+      uploadedTarget: uploadedStorageTarget,
+    });
     return nextSubmission;
   };
 

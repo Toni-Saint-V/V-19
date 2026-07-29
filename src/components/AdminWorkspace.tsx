@@ -5,6 +5,7 @@ import { AdminExportScreen } from "./AdminExportScreen";
 import { RemarkForm } from "./RemarkForm";
 import { ReviewWorkspace } from "./ReviewWorkspace";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
+import { buildAdminRemarkIssueInput } from "./review/adminRemarkIssueInput";
 import { AdminUsersAccessScreen } from "./AdminUsersAccessScreen";
 import { AdminSystemSettingsScreen } from "./AdminSystemSettingsScreen";
 import {
@@ -72,6 +73,7 @@ export function AdminWorkspace({
     applicantId?: string;
     applicant?: string;
     field?: string;
+    fieldLabel?: string;
     fileType?: SubmissionFileType;
   }>({});
   const reviewReturnFocusRef = useRef<HTMLElement | null>(null);
@@ -231,6 +233,7 @@ export function AdminWorkspace({
     applicant?: string,
     fileType?: SubmissionFileType,
     applicantId?: string,
+    fieldLabel?: string,
   ) => {
     const payload = {
       applicant,
@@ -241,7 +244,7 @@ export function AdminWorkspace({
     };
     bridge.onRemarkOpen?.(payload);
     emitVisaflowUiEvent(bridge, { type: "remark.open", payload });
-    setRemarkContext({ applicant, applicantId, field, fileType });
+    setRemarkContext({ applicant, applicantId, field, fieldLabel, fileType });
     setRemarkFormOpen(true);
   };
 
@@ -307,6 +310,7 @@ export function AdminWorkspace({
     applicantId?: string;
     applicant?: string;
     field?: string;
+    fieldLabel?: string;
     fileType?: SubmissionFileType;
     message: string;
     severity: "warning" | "critical";
@@ -323,20 +327,16 @@ export function AdminWorkspace({
           : undefined;
     if (!applicant) return false;
 
-    return handleAddIssue({
-      applicantId: applicant.id,
-      comment: input.message,
-      field: input.fileType ? undefined : input.field,
-      fileType: input.fileType,
-      reason: input.fileType
-        ? `Требуется заменить файл «${input.field ?? input.fileType}»`
-        : input.field
-          ? `Требуется исправить поле «${input.field}»`
-          : "Требуется исправить паспортные данные",
-      section: input.fileType ? "Файлы" : "Паспорт",
-      severity: input.severity === "critical" ? "blocker" : "warning",
-      type: input.fileType ? "file" : input.field ? "field" : "section",
-    });
+    return handleAddIssue(
+      buildAdminRemarkIssueInput({
+        applicantId: applicant.id,
+        field: input.field,
+        fieldLabel: input.fieldLabel,
+        fileType: input.fileType,
+        message: input.message,
+        severity: input.severity,
+      }),
+    );
   };
 
   const handleSignOut = () => {
@@ -486,6 +486,7 @@ export function AdminWorkspace({
         defaultApplicant={remarkContext.applicant}
         defaultApplicantId={remarkContext.applicantId}
         defaultField={remarkContext.field}
+        defaultFieldLabel={remarkContext.fieldLabel}
         defaultFileType={remarkContext.fileType}
         isOpen={remarkFormOpen}
         onClose={() => setRemarkFormOpen(false)}

@@ -272,7 +272,7 @@ describe("V-19 domain engine", () => {
       total: 100,
     });
     expect(resubmitted.issues).toEqual(before.issues);
-    expect(resubmitted.exportPackage).toEqual(before.exportPackage);
+    expect(resubmitted.exportPackage).toBeUndefined();
     expect(resubmitted.history).toHaveLength(before.history.length + 1);
     expect(resubmitted.history[0]).toMatchObject({
       actorId: staleAccepted.agentId,
@@ -642,6 +642,7 @@ describe("V-19 domain engine", () => {
       ...completeInProgressSubmission(),
       status: "submitted_for_review" as const,
     };
+    const before = structuredClone(submitted);
 
     expect(
       returnWithIssues(submitted, "admin", [
@@ -684,6 +685,20 @@ describe("V-19 domain engine", () => {
     });
     expect(
       returnWithIssues(submitted, "admin", [
+        {
+          ...firstIssueInput(submitted),
+          fileType: "passport_scan",
+        },
+      ]),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target, reason, and comment must be valid.",
+      },
+    });
+    expect(
+      returnWithIssues(submitted, "admin", [
         { ...firstIssueInput(submitted), comment: " " },
       ]),
     ).toEqual({
@@ -693,6 +708,37 @@ describe("V-19 domain engine", () => {
         message: "Issue target, reason, and comment must be valid.",
       },
     });
+    expect(submitted).toEqual(before);
+  });
+
+  it("canonicalizes a section alias to an exact field before return mutation", () => {
+    const submitted = {
+      ...completeInProgressSubmission(),
+      status: "submitted_for_review" as const,
+    };
+    const returned = unwrap(
+      returnWithIssues(submitted, "admin", [
+        {
+          ...firstIssueInput(submitted),
+          type: "section",
+        },
+      ]),
+    );
+    const issue = returned.issues[0];
+    if (!issue) throw new Error("Missing issue");
+
+    expect(issue).toMatchObject({
+      type: "field",
+      target: {
+        field: "first-entry-country",
+        fileType: undefined,
+      },
+    });
+
+    const fixed = unwrap(
+      markIssueFixed(changeRouteIssueTarget(returned), "agent", issue.id),
+    );
+    expect(fixed.issues[0]?.status).toBe("fixed_by_agent");
   });
 
   it("keeps reachable status actions aligned with canonical issue lifecycle", () => {

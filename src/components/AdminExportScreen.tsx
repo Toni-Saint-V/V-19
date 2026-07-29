@@ -64,6 +64,7 @@ import { OperationalTableHeader } from "../shared/ui/OperationalTableHeader";
 import { agentDisplayName } from "../modules/submissions/agentDirectory";
 import { cityFilterValuesForSubmissions } from "../modules/submissions/selectors";
 import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
+import { assertAdminDocumentPackageExportEnabled } from "../modules/submissions/adminExportActions";
 
 interface ExportItem {
   id: string;
@@ -709,6 +710,7 @@ export function AdminExportScreen({
     setExportError("");
     setExportNotice("");
     try {
+      assertAdminDocumentPackageExportEnabled();
       const prepared =
         preparedExport?.archiveInputSignature === selectedArchiveInputSignature
           ? preparedExport

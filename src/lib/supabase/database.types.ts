@@ -136,6 +136,7 @@ export type Database = {
         };
         Returns: {
           assignedNow: boolean;
+          caseRevision: number;
           publicNumber: number;
         };
       };
@@ -223,6 +224,26 @@ export type Database = {
             mediaAssets: number;
             statusHistory: number;
           }>;
+        };
+      };
+      save_agent_submission_if_current: {
+        Args: {
+          actor_id: string;
+          expected_revision: number | null;
+          operation_id: string;
+          payload: SubmissionDraftPersistencePayload;
+        };
+        Returns: {
+          caseRevision: number;
+          operationId: string;
+          result: {
+            submissionId: string;
+            applicants: number;
+            questionnaireAnswers?: number;
+            mediaAssets: number;
+            statusHistory: number;
+          };
+          submissionId: string;
         };
       };
       claim_access_request_review: {

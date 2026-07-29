@@ -469,7 +469,7 @@ describe("FigmaQuestionnaireScreen", () => {
         .map(([update]) => update)
         .filter((update) => update.applicantId === secondaryApplicantId),
     ).toEqual([]);
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
 
     expect(onFieldChange.mock.calls.map(([update]) => update)).toEqual(
       expect.arrayContaining([
@@ -849,11 +849,13 @@ describe("FigmaQuestionnaireScreen", () => {
         .sort(),
     );
     expect(
-      [...new Set(
-        bindings
-          .filter((binding) => blueprintFieldIds.has(binding.fieldId))
-          .map((binding) => binding.sectionId),
-      )].sort(),
+      [
+        ...new Set(
+          bindings
+            .filter((binding) => blueprintFieldIds.has(binding.fieldId))
+            .map((binding) => binding.sectionId),
+        ),
+      ].sort(),
     ).toEqual([...blueprintSectionIds].sort());
 
     const draft = fillEveryQuestionnaireField(
@@ -898,13 +900,9 @@ describe("FigmaQuestionnaireScreen", () => {
       .sort();
     expect(missingFields).toEqual(Object.keys(dispositions).sort());
     expect(
-      [...renderedFieldIds]
-        .filter((fieldId) => !blueprintFieldIds.has(fieldId))
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => !blueprintFieldIds.has(fieldId)).sort(),
     ).toEqual(
-      [...renderedFieldIds]
-        .filter((fieldId) => fieldId in legacyBindings)
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => fieldId in legacyBindings).sort(),
     );
   });
 
@@ -1881,9 +1879,9 @@ describe("FigmaQuestionnaireScreen", () => {
       fireEvent.change(screen.getByLabelText("Имя"), {
         target: { value: "MUST NOT WRITE" },
       });
-      expect(
-        onFieldChange.mock.calls.map(([update]) => update.fieldId),
-      ).toEqual(["surname"]);
+      expect(onFieldChange.mock.calls.map(([update]) => update.fieldId)).toEqual([
+        "surname",
+      ]);
 
       await act(async () => {
         save.resolve();
@@ -1936,7 +1934,9 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
       "Не удалось сохранить и выйти",
     );
-    expect(screen.queryByText("Подача недоступна текущему агенту.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Подача недоступна текущему агенту."),
+    ).not.toBeInTheDocument();
     expect(onBack).not.toHaveBeenCalled();
     expect(onSaveDraft).toHaveBeenCalledWith(
       expect.objectContaining({ saveIntent: "navigation" }),
@@ -1947,9 +1947,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       screen.getByText(/Последние несохранённые изменения будут потеряны/),
     ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Да, выйти без сохранения" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Да, выйти без сохранения" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
@@ -2053,9 +2051,7 @@ describe("FigmaQuestionnaireScreen", () => {
       expect.objectContaining({ saveIntent: "autosave" }),
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).not.toHaveBeenCalled();
 
@@ -2110,9 +2106,7 @@ describe("FigmaQuestionnaireScreen", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
 
     await act(async () => {
       autosave.reject(new Error("temporary autosave failure"));
@@ -3740,6 +3734,41 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
+  test("renders a canonical issue target as its questionnaire label", () => {
+    const submission = withQuestionnaireIssue(
+      withReadyQuestionnaireFiles(
+        fillEveryQuestionnaireField(
+          createDraftSubmission({
+            applicantNames: ["VOLKOV ANTON"],
+            city: "Москва",
+            familyCount: 1,
+            idScheme: "local",
+            submissions: [],
+            type: "single",
+          }),
+        ),
+      ),
+      "open",
+      "passport-expiry-date",
+      "Паспорт",
+    );
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Паспорт");
+    expect(screen.getByTestId("questionnaire-current-issue")).toHaveTextContent(
+      "Действителен до: Нужно уточнение",
+    );
+    expect(screen.getByTestId("questionnaire-current-issue")).not.toHaveTextContent(
+      "passport-expiry-date",
+    );
+  });
+
   test("connects a blocking combobox issue to its accessible error text", async () => {
     const submission = withQuestionnaireIssue(
       withReadyQuestionnaireFiles(
@@ -4019,11 +4048,14 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       result.container.querySelectorAll('[data-family-copy-preview="true"]').length,
     ).toBeGreaterThan(0);
-    const confirmCopyButton = screen.getByRole("button", {
-      name: "Подтвердить копирование",
+    const armedCopyButton = screen.getByRole("button", {
+      name: "Копировать для всех",
     });
-    expect(confirmCopyButton).toHaveClass("v19-questionnaire-family-copy-confirm");
-    fireEvent.click(confirmCopyButton);
+    expect(armedCopyButton).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.queryByText(/Будет скопировано заполненных пользователем полей/),
+    ).not.toBeInTheDocument();
+    fireEvent.click(armedCopyButton);
 
     const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
     const affectedApplicantCount = new Set(
@@ -4031,11 +4063,11 @@ describe("FigmaQuestionnaireScreen", () => {
     ).size;
     expect(copiedUpdates.length).toBeGreaterThan(0);
     expect(affectedApplicantCount).toBe(2);
-    expect(
-      screen.getByText(
-        `Скопировано и подтверждено после предпросмотра: ${copiedUpdates.length} полей · заявителей: ${affectedApplicantCount}.`,
-      ),
-    ).toHaveAttribute("role", "status");
+    const familyCopyStatus = screen.getByText(
+      `Скопировано и подтверждено после предпросмотра: ${copiedUpdates.length} полей · заявителей: ${affectedApplicantCount}.`,
+    );
+    expect(familyCopyStatus).toHaveAttribute("role", "status");
+    expect(familyCopyStatus).toHaveClass("sr-only");
     expect(copiedUpdates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -4135,7 +4167,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Поездка");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
 
     const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
     expect(copiedUpdates).toEqual(
@@ -4206,24 +4238,26 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    expect(
-      screen.getByRole("button", { name: "Подтвердить копирование" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Копировать для всех" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     fireEvent.change(screen.getByLabelText("Город проживания"), {
       target: { value: "Казань" },
     });
-    expect(
-      screen.queryByRole("button", { name: "Подтвердить копирование" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
-      ),
-    ).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "Копировать для всех" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    const cancelledPreviewStatus = screen.getByText(
+      "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
+    );
+    expect(cancelledPreviewStatus).toHaveAttribute("role", "status");
+    expect(cancelledPreviewStatus).toHaveClass("sr-only");
 
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
     expect(
       onFieldChange.mock.calls
         .map(([update]) => update)
@@ -4264,11 +4298,14 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
 
     expect(onFieldChange).not.toHaveBeenCalled();
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveClass("v19-questionnaire-family-copy-alert");
-    expect(alert).toHaveTextContent(
+    expect(
+      screen.getByRole("button", { name: "Нет заполненных полей" }),
+    ).toHaveAttribute("aria-invalid", "true");
+    const unavailableStatus = screen.getByText(
       "У основного заявителя нет введённых пользователем значений для копирования в этом разделе.",
     );
+    expect(unavailableStatus).toHaveAttribute("role", "status");
+    expect(unavailableStatus).toHaveClass("sr-only");
   });
 
   test("does not copy OCR or legacy values without manual provenance", () => {
@@ -4300,11 +4337,13 @@ describe("FigmaQuestionnaireScreen", () => {
 
     expect(onFieldChange).not.toHaveBeenCalled();
     expect(
-      screen.queryByRole("button", { name: "Подтвердить копирование" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "У основного заявителя нет введённых пользователем значений",
-    );
+      screen.getByRole("button", { name: "Нет заполненных полей" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(
+      screen.getByText(
+        "У основного заявителя нет введённых пользователем значений для копирования в этом разделе.",
+      ),
+    ).toHaveTextContent("У основного заявителя нет введённых пользователем значений");
   });
 
   test("uses role main for family copy when the primary applicant is not first", () => {
@@ -4316,7 +4355,9 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "family",
     });
-    const mainApplicant = draft.applicants.find((applicant) => applicant.role === "main");
+    const mainApplicant = draft.applicants.find(
+      (applicant) => applicant.role === "main",
+    );
     const secondaryApplicant = draft.applicants.find(
       (applicant) => applicant.role !== "main",
     );
@@ -4351,7 +4392,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     clickPinnedSection(result.container, "Адрес и контакты");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
 
     expect(onFieldChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -4504,7 +4545,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Отель / приглашение");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
     fireEvent.click(applicantTabs[1] as HTMLButtonElement);
     clickPinnedSection(result.container, "Отель / приглашение");
 
@@ -4600,9 +4641,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Место рождения")).toHaveClass("is-filled");
-    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass(
-      "is-filled",
-    );
+    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass("is-filled");
   });
 
   test("does not duplicate a field issue as the next blocker notice", () => {
@@ -4905,9 +4944,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Повторить сохранение" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Повторить сохранение" }));
 
     await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(2));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);

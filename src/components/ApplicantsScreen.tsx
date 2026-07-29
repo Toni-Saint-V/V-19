@@ -5,6 +5,7 @@ import {
   useState,
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { motion, useReducedMotion } from "motion/react";
@@ -380,13 +381,154 @@ type CardCallbacks = Pick<
   deleting: boolean;
   error?: string;
   now: Date;
-  onDeleteRequest: (
-    submission: Submission,
-    trigger: HTMLButtonElement,
-  ) => void;
+  onDeleteRequest: (submission: Submission, trigger: HTMLButtonElement) => void;
   onPrimaryAction: (submission: Submission) => void;
   submitting: boolean;
 };
+
+const mobileSwipeActionWidth = 88;
+const mobileSwipeOpenThreshold = mobileSwipeActionWidth / 2;
+
+function SwipeableSubmissionCard({
+  canDeleteSubmission,
+  children,
+  deleting,
+  label,
+  onDeleteRequest,
+  submission,
+}: {
+  canDeleteSubmission: boolean;
+  children: ReactNode;
+  deleting: boolean;
+  label: string;
+  onDeleteRequest: CardCallbacks["onDeleteRequest"];
+  submission: Submission;
+}) {
+  const canRevealDelete =
+    canDeleteSubmission && agentSubmissionCardArchiveDecision(submission).ok;
+  const [open, setOpen] = useState(false);
+  const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const gestureRef = useRef<{
+    pointerId: number;
+    startOffset: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+  const visibleOffset = dragOffset ?? (open ? -mobileSwipeActionWidth : 0);
+
+  const resetGesture = () => {
+    gestureRef.current = null;
+    setDragOffset(null);
+  };
+
+  const cancelGesture = () => {
+    suppressClickRef.current = false;
+    resetGesture();
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (
+      !canRevealDelete ||
+      window.innerWidth > 767 ||
+      (event.target instanceof Element &&
+        event.target.closest("button, a, input, select, textarea, label"))
+    ) {
+      return;
+    }
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      startOffset: open ? -mobileSwipeActionWidth : 0,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    suppressClickRef.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return;
+
+    const nextOffset = Math.max(
+      -mobileSwipeActionWidth,
+      Math.min(0, gesture.startOffset + deltaX),
+    );
+    if (Math.abs(deltaX) > 6) suppressClickRef.current = true;
+    setDragOffset(nextOffset);
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      setOpen(gesture.startOffset < 0);
+      suppressClickRef.current = false;
+      resetGesture();
+      return;
+    }
+    const finalOffset = Math.max(
+      -mobileSwipeActionWidth,
+      Math.min(0, gesture.startOffset + deltaX),
+    );
+    setOpen(finalOffset <= -mobileSwipeOpenThreshold);
+    resetGesture();
+  };
+
+  return (
+    <div
+      className="v19-submission-swipe-shell"
+      data-dragging={dragOffset !== null ? "true" : undefined}
+      data-open={open ? "true" : undefined}
+    >
+      <div
+        className="v19-submission-swipe-content"
+        style={{ transform: `translate3d(${visibleOffset}px, 0, 0)` }}
+        onClickCapture={(event) => {
+          if (suppressClickRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            suppressClickRef.current = false;
+            return;
+          }
+          if (open) {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        onPointerCancel={cancelGesture}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
+        {children}
+      </div>
+      {canRevealDelete ? (
+        <button
+          {...agentInteractionProps("submissions.open-delete")}
+          aria-label={`Удалить свайпом: ${label}`}
+          className="v19-submission-swipe-delete"
+          data-testid="agent-submission-swipe-delete"
+          disabled={deleting}
+          type="button"
+          onFocus={() => setOpen(true)}
+          onClick={(event) => onDeleteRequest(submission, event.currentTarget)}
+        >
+          <Trash2 aria-hidden="true" />
+          <span>Удалить</span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function openSubmissionCardFromKeyboard(
   event: ReactKeyboardEvent<HTMLElement>,
@@ -460,10 +602,7 @@ function SubmissionCardHeaderActions({
   canDeleteSubmission: boolean;
   deleting: boolean;
   label: string;
-  onDeleteRequest: (
-    submission: Submission,
-    trigger: HTMLButtonElement,
-  ) => void;
+  onDeleteRequest: (submission: Submission, trigger: HTMLButtonElement) => void;
   onOpen: () => void;
   submission: Submission;
 }) {
@@ -1015,10 +1154,7 @@ export function ApplicantsScreen({
     }
   };
 
-  const handleDeleteRequest = (
-    submission: Submission,
-    trigger: HTMLButtonElement,
-  ) => {
+  const handleDeleteRequest = (submission: Submission, trigger: HTMLButtonElement) => {
     if (!onDeleteSubmission || !agentSubmissionCardArchiveDecision(submission).ok) {
       return;
     }
@@ -1085,36 +1221,52 @@ export function ApplicantsScreen({
     onPrimaryAction: handlePrimaryAction,
     onUploadApplicantFile,
   };
-  const renderSubmissionCard = (submission: Submission) =>
-    submission.type === "family" ? (
-      <FamilySubmissionCard
-        {...cardCallbacks}
-        error={
-          submissionError?.id === submission.id &&
-          pendingReviewSubmission?.id !== submission.id
-            ? submissionError.message
-            : undefined
-        }
+  const renderSubmissionCard = (submission: Submission) => {
+    const mainApplicant =
+      submission.applicants.find((applicant) => applicant.role === "main") ??
+      submission.applicants[0];
+    const cardLabel =
+      submission.type === "family"
+        ? (familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ??
+          submission.title)
+        : (mainApplicant?.fullName ?? submission.title);
+    const error =
+      submissionError?.id === submission.id &&
+      pendingReviewSubmission?.id !== submission.id
+        ? submissionError.message
+        : undefined;
+    const deleting = deletingId === submission.id;
+    const submitting = submittingId === submission.id;
+
+    return (
+      <SwipeableSubmissionCard
+        canDeleteSubmission={cardCallbacks.canDeleteSubmission}
+        deleting={deleting}
         key={submission.id}
+        label={cardLabel}
+        onDeleteRequest={handleDeleteRequest}
         submission={submission}
-        deleting={deletingId === submission.id}
-        submitting={submittingId === submission.id}
-      />
-    ) : (
-      <IndividualSubmissionCard
-        {...cardCallbacks}
-        error={
-          submissionError?.id === submission.id &&
-          pendingReviewSubmission?.id !== submission.id
-            ? submissionError.message
-            : undefined
-        }
-        key={submission.id}
-        submission={submission}
-        deleting={deletingId === submission.id}
-        submitting={submittingId === submission.id}
-      />
+      >
+        {submission.type === "family" ? (
+          <FamilySubmissionCard
+            {...cardCallbacks}
+            deleting={deleting}
+            error={error}
+            submission={submission}
+            submitting={submitting}
+          />
+        ) : (
+          <IndividualSubmissionCard
+            {...cardCallbacks}
+            deleting={deleting}
+            error={error}
+            submission={submission}
+            submitting={submitting}
+          />
+        )}
+      </SwipeableSubmissionCard>
     );
+  };
 
   return (
     <motion.div

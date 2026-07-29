@@ -27,6 +27,7 @@ import {
   BLS_CITY_OPTIONS,
   POPULAR_RUSSIAN_CITY_OPTIONS,
   isQuestionnaireDateField,
+  questionnaireIssueFieldDisplayLabel,
   questionnaireDateIntent,
   updateQuestionnaireField,
   validateQuestionnaireFieldValue,
@@ -570,9 +571,7 @@ function normalizeDateInput(value: string, intent: QuestionnaireDateIntent) {
     const currentYear = new Date().getFullYear();
     const currentTwoDigitYear = currentYear % 100;
     return String(
-      numericYear <= currentTwoDigitYear
-        ? 2000 + numericYear
-        : 1900 + numericYear,
+      numericYear <= currentTwoDigitYear ? 2000 + numericYear : 1900 + numericYear,
     );
   };
   let day = "";
@@ -960,9 +959,7 @@ function FormField({
           deleteIndex >= 0
             ? `${value.slice(0, deleteIndex)}${value.slice(deleteIndex + 1)}`
             : value.slice(caret);
-        onChange?.(
-          formatDateInput(nextValue, "deleteContentBackward", dateIntent),
-        );
+        onChange?.(formatDateInput(nextValue, "deleteContentBackward", dateIntent));
         window.requestAnimationFrame(() => {
           const nextCaret = Math.max(0, caret - 2);
           input.setSelectionRange(nextCaret, nextCaret);
@@ -973,9 +970,7 @@ function FormField({
         event.preventDefault();
         const input = event.currentTarget;
         const nextValue = `${value.slice(0, caret + 1)}${value.slice(caret + 2)}`;
-        onChange?.(
-          formatDateInput(nextValue, "deleteContentForward", dateIntent),
-        );
+        onChange?.(formatDateInput(nextValue, "deleteContentForward", dateIntent));
         window.requestAnimationFrame(() =>
           input.setSelectionRange(caret + 1, caret + 1),
         );
@@ -1617,9 +1612,7 @@ function questionnaireUpdateKey(
   return `${update.applicantId}:${update.sectionId}:${update.fieldId}`;
 }
 
-function questionnaireCommitMutationFingerprint(
-  payload: QuestionnaireCommitPayload,
-) {
+function questionnaireCommitMutationFingerprint(payload: QuestionnaireCommitPayload) {
   const fieldUpdates = [...payload.fieldUpdates].sort((left, right) =>
     questionnaireUpdateKey(left).localeCompare(questionnaireUpdateKey(right)),
   );
@@ -2351,7 +2344,7 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
 // eslint-disable-next-line react-refresh/only-export-components
 export const questionnaireUiNonRenderedFieldDispositions = {
   "birth-citizenship": "derived from country of birth",
-  "category": "service-managed appointment value",
+  category: "service-managed appointment value",
   "cost-covered-by": "service-managed payment value",
   "final-entry-permit": "reserved optional visa field",
   "final-entry-permit-issued-by": "reserved optional visa field",
@@ -2359,7 +2352,7 @@ export const questionnaireUiNonRenderedFieldDispositions = {
   "final-entry-permit-valid-to": "reserved optional visa field",
   "home-address": "derived from structured address fields",
   "means-of-support": "service-managed payment value",
-  "nationality": "derived from passport issue country",
+  nationality: "derived from passport issue country",
   "visa-type": "service-managed appointment value",
 } as const;
 
@@ -2368,18 +2361,33 @@ export const questionnaireUiNonRenderedFieldDispositions = {
 // eslint-disable-next-line react-refresh/only-export-components
 export const questionnaireUiLegacyBindingDispositions = {
   "appointment-note": { reason: "legacy appointment note", sectionId: "appointment" },
-  "desired-date-3": { reason: "legacy third appointment date", sectionId: "appointment" },
-  "occupation-specify": { reason: "legacy free-form occupation", sectionId: "employment" },
+  "desired-date-3": {
+    reason: "legacy third appointment date",
+    sectionId: "appointment",
+  },
+  "occupation-specify": {
+    reason: "legacy free-form occupation",
+    sectionId: "employment",
+  },
   "eu-relationship": { reason: "legacy EU-relative relation", sectionId: "euRelative" },
-  "eu-relative-details": { reason: "legacy EU-relative details", sectionId: "euRelative" },
+  "eu-relative-details": {
+    reason: "legacy EU-relative details",
+    sectionId: "euRelative",
+  },
   "form-filler-contact": { reason: "legacy form-filler contact", sectionId: "filler" },
   "form-filler-name": { reason: "legacy form-filler name", sectionId: "filler" },
   "form-filler-phone": { reason: "legacy form-filler phone", sectionId: "filler" },
   "other-sponsor": { reason: "legacy sponsor identity", sectionId: "payment" },
-  "sponsor-in-host-fields": { reason: "legacy sponsor host data", sectionId: "payment" },
+  "sponsor-in-host-fields": {
+    reason: "legacy sponsor host data",
+    sectionId: "payment",
+  },
   "sponsor-means": { reason: "legacy sponsor means", sectionId: "payment" },
   "national-id": { reason: "legacy national identifier", sectionId: "personal" },
-  "other-citizenship": { reason: "legacy additional citizenship", sectionId: "personal" },
+  "other-citizenship": {
+    reason: "legacy additional citizenship",
+    sectionId: "personal",
+  },
 } as const;
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -2723,9 +2731,7 @@ export function FigmaQuestionnaireScreen({
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const completionInFlightRef = useRef(false);
   const issueResolutionPendingRef = useRef(false);
-  const issueResolutionPromiseRef = useRef<Promise<boolean> | undefined>(
-    undefined,
-  );
+  const issueResolutionPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
   const navigationPendingRef = useRef(false);
   const saveAndExitDraftReadyRef = useRef(false);
   const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
@@ -3073,8 +3079,7 @@ export function FigmaQuestionnaireScreen({
     ).length;
     const openIssueRisks = draftSubmission.issues.filter(
       (issue) =>
-        issue.status === "open" &&
-        isQuestionnaireFieldIssue(draftSubmission, issue),
+        issue.status === "open" && isQuestionnaireFieldIssue(draftSubmission, issue),
     ).length;
     const total = requiredFields.length;
     const completed = completedFields.length;
@@ -3214,6 +3219,9 @@ export function FigmaQuestionnaireScreen({
         });
     });
   }, [activeApplicantModel, activeBlockingIssues, activeSection, sections]);
+  const currentSectionIssueFieldLabel = currentSectionIssue
+    ? questionnaireIssueFieldDisplayLabel(draftSubmission, currentSectionIssue)
+    : undefined;
 
   const clearAutosaveTimer = useCallback(() => {
     if (autosaveTimerRef.current === undefined) return;
@@ -3260,6 +3268,8 @@ export function FigmaQuestionnaireScreen({
       setFamilyCopyMessage(
         "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
       );
+    } else if (familyCopyMessage) {
+      setFamilyCopyMessage(undefined);
     }
     const dependentKeys = dependentFieldKeysFor(
       key,
@@ -3473,12 +3483,6 @@ export function FigmaQuestionnaireScreen({
       `Скопировано и подтверждено после предпросмотра: ${familyCopyPreview.updates.length} полей · заявителей: ${familyCopyPreview.affectedApplicants}.`,
     );
     setFamilyCopyPreview(undefined);
-  }
-
-  function cancelFamilyCopy() {
-    if (navigationPendingRef.current || issueResolutionPendingRef.current) return;
-    setFamilyCopyPreview(undefined);
-    setFamilyCopyMessage("Копирование отменено; данные не изменены.");
   }
 
   function fieldIssue(fieldId: string, label: string) {
@@ -4168,9 +4172,7 @@ export function FigmaQuestionnaireScreen({
     setRevealRequiredErrors(true);
     setSaveStatus("idle");
     setSaveMessage(
-      target.label
-        ? `Сначала: ${target.label}`
-        : "Сначала: устраните блокер",
+      target.label ? `Сначала: ${target.label}` : "Сначала: устраните блокер",
     );
     focusQuestionnaireTarget(target);
   }
@@ -5026,31 +5028,31 @@ export function FigmaQuestionnaireScreen({
   const mobileBlockerReason = mobileBlockerTarget?.reason?.trim();
   const currentIssueCoversMobileBlocker = Boolean(
     currentSectionIssue &&
-      mobileBlockerTarget &&
-      currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
-      (!currentSectionIssue.target.section?.trim() ||
-        sameFieldLabel(
-          currentSectionIssue.target.section,
-          activeSectionContext?.title,
-        )) &&
-      questionnaireFieldBindings.some((binding) => {
-        const fieldLabel =
-          questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
-          mobileBlockerLabel;
-        return (
-          issueFieldMatches(
-            binding.fieldId,
-            fieldLabel,
-            currentSectionIssue.target.field,
-          ) &&
-          issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
-        );
-      }),
+    mobileBlockerTarget &&
+    currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
+    (!currentSectionIssue.target.section?.trim() ||
+      sameFieldLabel(
+        currentSectionIssue.target.section,
+        activeSectionContext?.title,
+      )) &&
+    questionnaireFieldBindings.some((binding) => {
+      const fieldLabel =
+        questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
+        mobileBlockerLabel;
+      return (
+        issueFieldMatches(
+          binding.fieldId,
+          fieldLabel,
+          currentSectionIssue.target.field,
+        ) && issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
+      );
+    }),
   );
   const showWorkToolbar =
     showFamilyCopyControl ||
     Boolean(currentSectionIssue) ||
     (isEditable && Boolean(mobileBlockerTarget) && !currentIssueCoversMobileBlocker);
+  const familyCopyUnavailable = familyCopyMessage === familyCopyUnavailableMessage;
   const questionnaireInteractionPending =
     navigationPending || pendingIssueResolutionId !== null;
 
@@ -5178,8 +5180,8 @@ export function FigmaQuestionnaireScreen({
                 {discardExitArmed ? (
                   <>
                     <span className="v19-questionnaire-save-error-warning">
-                      Последние несохранённые изменения будут потеряны. Уже
-                      сохранённые данные останутся.
+                      Последние несохранённые изменения будут потеряны. Уже сохранённые
+                      данные останутся.
                     </span>
                     <button
                       {...agentInteractionProps("questionnaire.back")}
@@ -5493,12 +5495,12 @@ export function FigmaQuestionnaireScreen({
                           <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
                             {currentSectionIssue.status === "fixed_by_agent"
                               ? `Исправление${
-                                  currentSectionIssue.target.field
-                                    ? ` по полю «${currentSectionIssue.target.field}»`
+                                  currentSectionIssueFieldLabel
+                                    ? ` по полю «${currentSectionIssueFieldLabel}»`
                                     : ""
                                 } отправлено, ожидает проверки администратора`
-                              : currentSectionIssue.target.field
-                                ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
+                              : currentSectionIssueFieldLabel
+                                ? `${currentSectionIssueFieldLabel}: ${currentSectionIssue.reason}`
                                 : currentSectionIssue.reason}
                           </div>
                           <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
@@ -5542,94 +5544,52 @@ export function FigmaQuestionnaireScreen({
                   {showFamilyCopyControl ? (
                     <div className="v19-questionnaire-work-toolbar-copy">
                       <button
-                        {...agentInteractionProps("questionnaire.preview-family-copy")}
+                        {...agentInteractionProps(
+                          familyCopyPreview
+                            ? "questionnaire.copy-family"
+                            : "questionnaire.preview-family-copy",
+                        )}
                         aria-describedby={
-                          !familyCopyPreview && familyCopyMessage
+                          familyCopyPreview || familyCopyMessage
                             ? familyCopyStatusId
                             : undefined
                         }
-                        className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
-                        disabled={
-                          !isEditable ||
-                          Boolean(familyCopyPreview) ||
-                          questionnaireInteractionPending
-                        }
+                        aria-invalid={familyCopyUnavailable || undefined}
+                        aria-pressed={Boolean(familyCopyPreview)}
+                        className={`v19-questionnaire-draft-button v19-questionnaire-copy-button${
+                          familyCopyPreview ? " is-copy-armed" : ""
+                        }${familyCopyUnavailable ? " is-copy-unavailable" : ""}`}
+                        disabled={!isEditable || questionnaireInteractionPending}
                         type="button"
-                        onClick={copySharedDataToFamily}
+                        onClick={
+                          familyCopyPreview ? confirmFamilyCopy : copySharedDataToFamily
+                        }
                       >
-                        <Copy aria-hidden="true" />
-                        Копировать для всех
+                        {familyCopyUnavailable ? (
+                          <AlertCircle aria-hidden="true" />
+                        ) : (
+                          <Copy aria-hidden="true" />
+                        )}
+                        {familyCopyUnavailable
+                          ? "Нет заполненных полей"
+                          : "Копировать для всех"}
                       </button>
+                      <span
+                        aria-live="polite"
+                        className="sr-only"
+                        id={familyCopyStatusId}
+                        role="status"
+                      >
+                        {familyCopyPreview
+                          ? `Выделено полей: ${familyCopyPreview.updates.length}. Повторное нажатие скопирует их членам семьи: ${familyCopyPreview.affectedApplicants}.`
+                          : familyCopyMessage}
+                      </span>
                     </div>
                   ) : null}
                 </div>
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {showFamilyCopyControl && (familyCopyPreview || familyCopyMessage) ? (
-                  <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
-                    {familyCopyPreview ? (
-                      <>
-                        <p
-                          aria-live="polite"
-                          className="v19-questionnaire-family-copy-status"
-                          role="status"
-                        >
-                          Будет скопировано заполненных пользователем полей:{" "}
-                          {familyCopyPreview.updates.length}
-                          {" · "}членов семьи: {familyCopyPreview.affectedApplicants}.
-                        </p>
-                        <button
-                          {...agentInteractionProps("questionnaire.copy-family")}
-                          className="v19-questionnaire-complete-button v19-questionnaire-family-copy-confirm is-ready"
-                          disabled={questionnaireInteractionPending}
-                          type="button"
-                          onClick={confirmFamilyCopy}
-                        >
-                          Подтвердить копирование
-                        </button>
-                        <button
-                          {...agentInteractionProps("questionnaire.cancel-family-copy")}
-                          className="v19-questionnaire-draft-button"
-                          disabled={questionnaireInteractionPending}
-                          type="button"
-                          onClick={cancelFamilyCopy}
-                        >
-                          Отмена
-                        </button>
-                      </>
-                    ) : null}
-                    {!familyCopyPreview &&
-                    familyCopyMessage === familyCopyUnavailableMessage ? (
-                      <div
-                        aria-atomic="true"
-                        className="v19-questionnaire-family-copy-alert"
-                        id={familyCopyStatusId}
-                        role="alert"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="v19-questionnaire-family-copy-alert-icon"
-                        >
-                          <AlertCircle />
-                        </span>
-                        <p>{familyCopyMessage}</p>
-                      </div>
-                    ) : null}
-                    {!familyCopyPreview &&
-                    familyCopyMessage &&
-                    familyCopyMessage !== familyCopyUnavailableMessage ? (
-                      <p
-                        aria-live="polite"
-                        className="v19-questionnaire-family-copy-status"
-                        id={familyCopyStatusId}
-                        role="status"
-                      >
-                        {familyCopyMessage}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
                 <QuestionnaireFieldUiContext.Provider
                   value={questionnaireFieldUiContract}
                 >

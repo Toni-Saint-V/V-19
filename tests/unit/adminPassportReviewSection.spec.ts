@@ -102,18 +102,20 @@ describe("admin passport review section approval", () => {
       const secondary = submission.applicants[1];
       if (!secondary) throw new Error("Expected secondary applicant.");
 
-      const withInvalidSelfieIssue = addPreciseAdminIssue(submission, {
-        applicantId: secondary.id,
-        comment: "Загрузите новое селфи.",
-        fileType,
-        reason: "Селфи требует замены",
-        section: "Файлы",
-        severity: "blocker",
-        type: "file",
-      });
-
-      expect(withInvalidSelfieIssue).toBe(submission);
-      expect(withInvalidSelfieIssue.issues).toHaveLength(0);
+      expect(() =>
+        addPreciseAdminIssue(submission, {
+          applicantId: secondary.id,
+          comment: "Загрузите новое селфи.",
+          fileType,
+          reason: "Селфи требует замены",
+          section: "Файлы",
+          severity: "blocker",
+          type: "file",
+        }),
+      ).toThrow(
+        "Admin issue target must resolve to exactly one canonical questionnaire field or media file.",
+      );
+      expect(submission.issues).toHaveLength(0);
 
       const withPassportIssue = addPreciseAdminIssue(submission, {
         applicantId: secondary.id,
@@ -163,6 +165,34 @@ describe("admin passport review section approval", () => {
     ).toBe(true);
   });
 
+  test.each(ADMIN_PASSPORT_REVIEW_FIELD_IDS)(
+    "resolves the canonical passport remark target %s without label ambiguity",
+    (fieldId) => {
+      const submission = reviewableSubmission();
+      const applicant = submission.applicants[0];
+      if (!applicant) throw new Error("Expected applicant.");
+
+      const withIssue = addPreciseAdminIssue(submission, {
+        applicantId: applicant.id,
+        comment: "Исправьте значение по оригиналу паспорта.",
+        field: fieldId,
+        reason: "Паспортное поле требует исправления",
+        section: "Паспорт",
+        severity: "warning",
+        type: "field",
+      });
+
+      expect(withIssue.issues[0]).toMatchObject({
+        target: {
+          applicantId: applicant.id,
+          field: fieldId,
+          fileType: undefined,
+        },
+        type: "field",
+      });
+    },
+  );
+
   test("approves exactly eight passport fields and the protected single-applicant media", () => {
     const submission = reviewableSubmission();
     const applicant = submission.applicants[0];
@@ -184,9 +214,7 @@ describe("admin passport review section approval", () => {
       expect.arrayContaining([...ADMIN_PASSPORT_REVIEW_FIELD_IDS]),
     );
     expect(approvedFields).toHaveLength(ADMIN_PASSPORT_REVIEW_FIELD_IDS.length);
-    expect(
-      approved.files.filter((file) => file.applicantId === applicant.id),
-    ).toEqual(
+    expect(approved.files.filter((file) => file.applicantId === applicant.id)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ status: "accepted", type: "passport_scan" }),
         expect.objectContaining({ status: "accepted", type: "selfie" }),
@@ -276,15 +304,12 @@ describe("admin passport review section approval", () => {
       ),
     );
 
-    expect(
-      approved.files.filter((file) => file.applicantId === secondary.id),
-    ).toEqual([
+    expect(approved.files.filter((file) => file.applicantId === secondary.id)).toEqual([
       expect.objectContaining({ status: "accepted", type: "passport_scan" }),
     ]);
     expect(
       approved.files.filter(
-        (file) =>
-          file.applicantId !== secondary.id && file.status === "pending_review",
+        (file) => file.applicantId !== secondary.id && file.status === "pending_review",
       ),
     ).toHaveLength(4);
   });
@@ -372,9 +397,11 @@ describe("admin passport review section approval", () => {
     const submission = reviewableSubmission("family", 2);
     const secondary = submission.applicants[1];
     const primarySelfie = submission.files.find(
-      (file) => file.applicantId === submission.applicants[0]?.id && file.type === "selfie",
+      (file) =>
+        file.applicantId === submission.applicants[0]?.id && file.type === "selfie",
     );
-    if (!secondary || !primarySelfie) throw new Error("Expected family review fixture.");
+    if (!secondary || !primarySelfie)
+      throw new Error("Expected family review fixture.");
     const legacyFileName = generatedCockpitMediaFileName({
       applicantId: secondary.id,
       fileType: "selfie",
@@ -435,9 +462,9 @@ describe("admin passport review section approval", () => {
         (file) => file.applicantId === secondary.id && file.type === "passport_scan",
       ),
     ).toMatchObject({ status: "accepted" });
-    expect(
-      rechecked.files.find((file) => file.id === legacySelfie.id),
-    ).toMatchObject({ status: "pending_review" });
+    expect(rechecked.files.find((file) => file.id === legacySelfie.id)).toMatchObject({
+      status: "pending_review",
+    });
   });
 
   test("ignores an open section issue outside the passport review scope", () => {
@@ -530,9 +557,7 @@ describe("admin passport review section approval", () => {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.data.issues).toEqual([
-        expect.objectContaining({ id, status }),
-      ]);
+      expect(result.data.issues).toEqual([expect.objectContaining({ id, status })]);
       expect(result.data.history[0]?.text).toBe(
         "Администратор подтвердил паспортную секцию",
       );

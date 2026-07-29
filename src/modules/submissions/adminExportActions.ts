@@ -1,3 +1,5 @@
+import { businessClickContractFor } from "./businessClickContract";
+
 export type AdminExportActionKind = "prepare_excel" | "download_excel" | "download_zip";
 
 export type AdminActionTone = "danger" | "info" | "success" | "warning";
@@ -8,6 +10,23 @@ export type AdminExportActionFeedback = {
   nextAction: string;
   tone: AdminActionTone;
 };
+
+export function adminDocumentPackageExportIsEnabled(
+  releaseState: "blocked" | "enabled" | undefined,
+) {
+  return releaseState === "enabled";
+}
+
+export const adminDocumentPackageExportEnabled =
+  adminDocumentPackageExportIsEnabled(
+    businessClickContractFor("mark_exported").releaseState,
+  );
+
+export function assertAdminDocumentPackageExportEnabled() {
+  if (!adminDocumentPackageExportEnabled) {
+    throw new Error("Действие недоступно в текущем статусе");
+  }
+}
 
 const actionLabel: Record<AdminExportActionKind, string> = {
   prepare_excel: "сформировать Excel",
@@ -40,6 +59,15 @@ export function describeAdminExportActionFeedback({
       message: "Идёт формирование пакета. Дождитесь завершения текущего действия.",
       nextAction: "Дождаться завершения",
       tone: "info",
+    };
+  }
+
+  if (action === "download_zip" && !adminDocumentPackageExportEnabled) {
+    return {
+      canRun: false,
+      message: "Действие недоступно в текущем статусе",
+      nextAction: "Сформировать Excel",
+      tone: "warning",
     };
   }
 

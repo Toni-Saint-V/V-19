@@ -137,9 +137,8 @@ function productionFixture() {
     "edge:access-request": "/functions/v1/access-request",
     "rpc:archive_agent_submission_card":
       "/rest/v1/rpc/archive_agent_submission_card",
-    "rpc:save_submission_draft": "/rest/v1/rpc/save_submission_draft",
-    "rpc:submit_corrections_handoff":
-      "/rest/v1/rpc/submit_corrections_handoff",
+    "rpc:save_agent_submission_if_current":
+      "/rest/v1/rpc/save_agent_submission_if_current",
     "storage:submission-media":
       "/storage/v1/object/submission-media/CODEX-E2E-verifier-fixture/file.pdf",
   } as const;

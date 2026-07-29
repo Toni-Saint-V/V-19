@@ -18,7 +18,8 @@ function exportRail(page: Page) {
 async function selectExportPackage(page: Page, submissionId: string) {
   const row = exportRowById(page, submissionId);
   await expect(row).toBeVisible();
-  await row.getByRole("checkbox").check();
+  await row.click();
+  await expect(row.getByRole("checkbox")).toBeChecked();
 }
 
 async function openMobileExportControl(page: Page) {
@@ -82,7 +83,7 @@ test.describe("V-19 export click and section matrix", () => {
     );
     await expect(zipDownload.failure()).resolves.toBeNull();
     await rail.getByRole("button", { name: "Подтвердить скачивание" }).click();
-    await expect(page.getByText(/пакет зафиксирован:/)).toBeVisible();
+    await expect(rail).toContainText(/пакет зафиксирован:/);
     await expectNoHorizontalOverflow(page, "desktop export after ZIP");
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

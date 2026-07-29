@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import {
   Check,
   Clock3,
-  Search,
   ShieldCheck,
   UserCheck,
   UserRoundX,
@@ -11,6 +10,12 @@ import {
 } from "lucide-react";
 
 import type { AccessRequest, AccessRequestStatus } from "../shared/authContract";
+import {
+  V19ListHeader,
+  V19MetricCard,
+  V19MetricStrip,
+  V19QueueToolbar,
+} from "../shared/ui/v19-design-system";
 import { Badge, Button } from "../shared/ui/primitives";
 
 const filters = ["pending", "approved", "rejected", "all"] as const;
@@ -118,66 +123,65 @@ export function AdminUsersAccessScreen({
         </div>
       </header>
 
-      <div className="v19-access-metrics" aria-label="Сводка заявок">
-        <AccessMetric
-          icon={Clock3}
-          label="Ожидают"
-          tone="amber"
-          value={totals.pending}
-        />
-        <AccessMetric
-          icon={UserCheck}
-          label="Одобрено"
-          tone="teal"
-          value={totals.approved}
-        />
-        <AccessMetric
-          icon={UserRoundX}
-          label="Отклонено"
-          tone="danger"
-          value={totals.rejected}
-        />
-        <AccessMetric icon={UsersRound} label="Всего" tone="muted" value={totals.all} />
+      <div className="v19-access-metrics-region" aria-label="Сводка заявок">
+        <V19MetricStrip className="v19-access-metrics">
+          <V19MetricCard icon={Clock3} label="Ожидают" value={totals.pending} />
+          <V19MetricCard
+            icon={UserCheck}
+            label="Одобрено"
+            tone="green"
+            value={totals.approved}
+          />
+          <V19MetricCard
+            icon={UserRoundX}
+            label="Отклонено"
+            tone="red"
+            value={totals.rejected}
+          />
+          <V19MetricCard icon={UsersRound} label="Всего" value={totals.all} />
+        </V19MetricStrip>
       </div>
 
       <div className="v19-access-board">
-        <div className="v19-access-toolbar">
-          <div className="v19-access-tabs" role="tablist" aria-label="Статус заявки">
-            {filters.map((item) => (
-              <button
-                aria-selected={filter === item}
-                className={filter === item ? "is-active" : undefined}
-                key={item}
-                role="tab"
-                type="button"
-                onClick={() => setFilter(item)}
-              >
-                {filterLabel(item)}
-                <span>{totals[item]}</span>
-              </button>
-            ))}
-          </div>
-          <label className="v19-access-search">
-            <Search aria-hidden="true" />
-            <span className="sr-only">Поиск заявок</span>
-            <input
-              aria-label="Найти пользователя или компанию"
-              placeholder="Имя, email, компания…"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
-            />
-            {query ? (
-              <button
-                aria-label="Очистить поиск"
-                type="button"
-                onClick={() => setQuery("")}
-              >
-                <X aria-hidden="true" />
-              </button>
-            ) : null}
-          </label>
-        </div>
+        <V19ListHeader
+          countLabel={`Показано ${visibleRequests.length} из ${totals.all}`}
+          title="Заявки на доступ"
+        />
+        <V19QueueToolbar
+          actionDisabled={!query}
+          actionIcon={X}
+          cityFilter="Все города"
+          cityOptions={[]}
+          controls={
+            <div className="v19-access-tabs" role="tablist" aria-label="Статус заявки">
+              {filters.map((item) => (
+                <button
+                  aria-selected={filter === item}
+                  className={filter === item ? "is-active" : undefined}
+                  key={item}
+                  role="tab"
+                  type="button"
+                  onClick={() => setFilter(item)}
+                >
+                  {filterLabel(item)}
+                  <span>{totals[item]}</span>
+                </button>
+              ))}
+            </div>
+          }
+          filterLabel="Очистить поиск"
+          interactionIds={{
+            reset: "admin-users-clear-search",
+            search: "admin-users-search",
+          }}
+          searchAriaLabel="Найти пользователя или компанию"
+          searchPlaceholder="Имя, email, компания…"
+          searchValue={query}
+          showCityFilter={false}
+          onCityFilterChange={() => undefined}
+          onFilterClick={() => setQuery("")}
+          onSearchChange={setQuery}
+        />
 
         {feedback ? (
           <div className="v19-access-feedback" role="status" aria-live="polite">
@@ -278,30 +282,6 @@ export function AdminUsersAccessScreen({
         </div>
       </div>
     </section>
-  );
-}
-
-function AccessMetric({
-  icon: Icon,
-  label,
-  tone,
-  value,
-}: {
-  icon: typeof Clock3;
-  label: string;
-  tone: "amber" | "danger" | "muted" | "teal";
-  value: number;
-}) {
-  return (
-    <div className={`v19-access-metric is-${tone}`}>
-      <span aria-hidden="true">
-        <Icon />
-      </span>
-      <div>
-        <strong>{value}</strong>
-        <small>{label}</small>
-      </div>
-    </div>
   );
 }
 

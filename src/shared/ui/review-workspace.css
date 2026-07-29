@@ -1976,3 +1976,81 @@
     min-height: var(--v19b-size-44);
   }
 }
+
+/* Minimal passport-review mode: the original document is the primary work
+   surface. Repeated guidance remains available to assistive technology without
+   displacing the media or the exact-field controls. */
+.v19-review-summary,
+.v19-review-corrected-issues {
+  position: absolute !important;
+  width: var(--v19b-size-1) !important;
+  height: var(--v19b-size-1) !important;
+  overflow: hidden !important;
+  margin: calc(var(--v19b-size-1) * -1) !important;
+  padding: var(--v19b-size-0) !important;
+  border: var(--v19b-size-0) !important;
+  clip-path: inset(var(--v19b-size-half)) !important;
+  white-space: nowrap !important;
+}
+
+.v19-review-summary .v19-review-next-step,
+.v19-review-section-heading > div:first-child > span,
+.v19-review-section-heading > div:first-child > p,
+.v19-review-applicant-progress,
+.v19-review-decision-context > p {
+  display: none !important;
+}
+
+.v19-review-details-scroll {
+  padding-top: var(--v19b-size-8);
+}
+
+.v19-review-section-heading {
+  margin-top: var(--v19b-size-0);
+}
+
+@media (max-width: 1023px) {
+  .v19-review-media-pane {
+    height: clamp(var(--v19b-size-420), 68dvh, var(--v19b-size-560));
+    min-height: clamp(var(--v19b-size-420), 68dvh, var(--v19b-size-560));
+  }
+
+  .v19-review-section-heading {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .v19-review-section-controls {
+    width: auto;
+  }
+
+  .v19-review-section-controls > strong {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .v19-review-filebar > span,
+  .v19-review-filebar > svg {
+    display: none;
+  }
+
+  .v19-review-filebar {
+    justify-content: flex-end;
+  }
+
+  .v19-review-decision-context {
+    display: none;
+  }
+
+  .v19-review-decision {
+    padding: var(--v19b-size-8) var(--v19b-size-12)
+      max(var(--v19b-size-8), env(safe-area-inset-bottom));
+  }
+
+  .v19-review-decision-actions button {
+    min-height: var(--v19b-size-52);
+    line-height: var(--v19b-line-height-row);
+    white-space: normal;
+  }
+}

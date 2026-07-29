@@ -347,7 +347,7 @@ describe("ApplicantsScreen interactions", () => {
     expect(header?.querySelector("small")).toHaveTextContent("2");
     expect(header).not.toHaveTextContent("Сначала новые");
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск по подачам" }), {
       target: { value: "VF-731" },
     });
 
@@ -402,7 +402,7 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск по подачам" }), {
       target: { value: "VF-731" },
     });
 
@@ -756,7 +756,7 @@ describe("ApplicantsScreen interactions", () => {
       }),
     );
     fireEvent.click(screen.getByRole("option", { name: "Сначала старые" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск по подачам" }), {
       target: { value: "нет такой подачи" },
     });
     expect(screen.getByRole("status")).toHaveTextContent("Ничего не найдено");

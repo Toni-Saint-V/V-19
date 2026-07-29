@@ -195,9 +195,10 @@ export function AgentActionsCommandCockpit({
             columns={
               usesInlineContext
                 ? [
-                    { key: "identity", label: "Заявитель / ID" },
+                    { key: "identity", label: "ID / Заявитель" },
                     { key: "next", label: "Следующий шаг" },
                     { key: "status", label: "Статус" },
+                    { key: "dates", label: "Даты поездки" },
                   ]
                 : [
                     { key: "submission", label: "Подача" },
@@ -428,7 +429,7 @@ function ActionTaskCard({
       aria-controls={inlineContext ? detailId : undefined}
       aria-current={selected ? "true" : undefined}
       aria-expanded={inlineContext ? selected : undefined}
-      aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. ${task.problem}. Следующее действие: ${task.nextAction.label}${task.priority.reason ? `. ${task.priority.label}: ${task.priority.reason}` : ""}`}
+      aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. ${task.problem}. Следующее действие: ${task.nextAction.label}. Даты поездки: ${dateLabel}${task.priority.reason ? `. ${task.priority.label}: ${task.priority.reason}` : ""}`}
       data-action-status={task.status}
       data-agent-action-id={task.id}
       data-submission-id={task.submission.id}
@@ -442,10 +443,12 @@ function ActionTaskCard({
       {inlineContext ? (
         <>
           <span className="v19-actions-cell-identity">
+            <small className="v19-actions-identity-id">
+              {submissionPublicId(task.submission)}
+            </small>
             <strong>
               {task.applicantName || formatSubmissionListTitle(task.submission)}
             </strong>
-            <small>{submissionPublicId(task.submission)}</small>
           </span>
           <span className="v19-actions-cell-next">
             <strong>{task.nextAction.label}</strong>
@@ -453,6 +456,7 @@ function ActionTaskCard({
           <span className="v19-actions-cell-status">
             <StatusBadge status={task.status} label={task.statusLabel} />
           </span>
+          <span className="v19-actions-cell-dates">{dateLabel}</span>
           <ChevronDown aria-hidden="true" className="v19-actions-table-chevron" />
         </>
       ) : (
@@ -499,6 +503,7 @@ function AgentActionInlineDetail({
 }) {
   const disabledReason = primaryActionDisabledReason(task);
   const disabledReasonId = `${stableDomId(task.id)}-${surface}-inline-primary-disabled-reason`;
+  const whySummary = mobileWhySummary(task);
 
   return (
     <section
@@ -521,6 +526,13 @@ function AgentActionInlineDetail({
         <p>Почему сейчас</p>
         <strong>{task.problem}</strong>
         <span>{task.reason}</span>
+        <div
+          aria-label={`${task.problem}. ${task.reason}`}
+          className="v19-actions-inline-why-compact"
+        >
+          <strong>{whySummary.label}</strong>
+          <span>{whySummary.detail}</span>
+        </div>
       </div>
 
       <div className="v19-actions-inline-readiness">
@@ -859,10 +871,10 @@ function TimelineEvent({
         onClick={onSelect}
       >
         <span className="v19-actions-mobile-identity">
+          <small className="v19-actions-identity-id">{submissionId}</small>
           <strong>
             {task.applicantName || formatSubmissionListTitle(task.submission)}
           </strong>
-          <small>{submissionId}</small>
         </span>
         <span className="v19-actions-mobile-next">
           <small>Следующий шаг</small>
@@ -902,6 +914,30 @@ function queueSubjectText(task: AgentActionTask) {
   return task.problemScope === "applicant" ? task.applicantName : "Вся подача";
 }
 
+function mobileWhySummary(task: AgentActionTask) {
+  const source = `${task.problem} ${task.reason}`.toLocaleLowerCase("ru-RU");
+  const label = source.includes("анкет")
+    ? "Анкета"
+    : source.includes("паспорт")
+      ? "Паспорт"
+      : source.includes("селфи")
+        ? "Селфи"
+        : source.includes("файл")
+          ? "Файлы"
+          : source.includes("провер")
+            ? "Проверка"
+            : "Задача";
+  const reasonSegments = task.reason
+    .split("·")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  return {
+    detail: reasonSegments.at(-1) ?? task.statusLabel,
+    label,
+  };
+}
+
 function primaryActionDisabledReason(task: AgentActionTask) {
   if (task.status === "blocked") {
     return "Действие недоступно: агент ждёт внешнее событие.";
@@ -912,26 +948,6 @@ function primaryActionDisabledReason(task: AgentActionTask) {
 
 function safeCity(city: string) {
   return city.trim() || "Город не указан";
-}
-
-function priorityDisplayLabel(task: AgentActionTask) {
-  if (task.priority.label.trim()) {
-    return task.priority.label;
-  }
-
-  if (task.priority.level === "urgent") {
-    return "Срочно";
-  }
-
-  if (task.priority.level === "high") {
-    return "Высокий";
-  }
-
-  if (task.priority.level === "medium") {
-    return "Средний";
-  }
-
-  return "Низкий";
 }
 
 function stableDomId(value: string) {
