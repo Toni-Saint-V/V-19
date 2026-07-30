@@ -101,7 +101,7 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
     const client = getSupabaseClient();
     if (!client) return [];
 
-    const { data, error } = await client
+    const { data, error, status } = await client
       .from("access_requests")
       .select(
         "id,user_id,email,full_name,company_name,city,phone,requested_role,status,created_at,updated_at,reviewed_at,reviewed_by_admin_id,rejection_reason",
@@ -110,6 +110,7 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
       .order("created_at", { ascending: true });
     if (error) {
       throw mapSupabasePersistenceError(error, {
+        httpStatus: status,
         operation: "auth.access_requests_list",
         fallbackKind: "database",
       });
@@ -122,7 +123,7 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
     const client = getSupabaseClient();
     if (!client) return [];
 
-    const { data, error } = await client
+    const { data, error, status } = await client
       .from("access_requests")
       .select(
         "id,user_id,email,full_name,company_name,city,phone,requested_role,status,created_at,updated_at,reviewed_at,reviewed_by_admin_id,rejection_reason",
@@ -130,6 +131,7 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
       .order("created_at", { ascending: false });
     if (error) {
       throw mapSupabasePersistenceError(error, {
+        httpStatus: status,
         operation: "auth.access_requests_list",
         fallbackKind: "database",
       });

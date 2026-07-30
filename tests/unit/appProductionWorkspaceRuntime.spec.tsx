@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { adminDocumentPackageExportEnabled } from "../../src/modules/submissions/adminExportActions";
 import type { SignOutCurrentSessionResult } from "../../src/services/authService";
+import { mapSupabasePersistenceError } from "../../src/services/persistenceObservability";
 import type { AccessRequest } from "../../src/shared/authContract";
 
 const releaseT9Test = adminDocumentPackageExportEnabled ? test : test.skip;
@@ -544,6 +545,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllTimers();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("App production workspace runtime", () => {
@@ -826,6 +828,151 @@ describe("App production workspace runtime", () => {
 
     expect(await screen.findByTestId("admin-workspace")).toBeInTheDocument();
     expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+  });
+
+  test("stops interval polling after HTTP 402 and resumes it after a successful manual retry", async () => {
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockRejectedValueOnce(
+      mapSupabasePersistenceError(
+        { message: "provider response intentionally omitted" },
+        {
+          httpStatus: 402,
+          operation: "submissions.list",
+          fallbackKind: "database",
+        },
+      ),
+    );
+
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Не удалось загрузить данные Supabase",
+      }),
+    ).toBeInTheDocument();
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+
+    const intervalHandler = setIntervalSpy.mock.calls.find(
+      ([, timeout]) => timeout === 10_000,
+    )?.[0];
+    expect(intervalHandler).toBeTypeOf("function");
+    await act(async () => {
+      if (typeof intervalHandler === "function") intervalHandler();
+      await Promise.resolve();
+    });
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValueOnce({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Повторить" }));
+    expect(await screen.findByTestId("admin-workspace")).toBeInTheDocument();
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValueOnce({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [loadedSubmission],
+    });
+    await act(async () => {
+      if (typeof intervalHandler === "function") intervalHandler();
+    });
+    await waitFor(() =>
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(3),
+    );
+  });
+
+  test("opens the interval circuit when the concurrent admin access request read returns HTTP 402 first", async () => {
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    const submissionsLoad = deferred<{
+      caseRevisionsBySubmissionId: Map<string, number>;
+      ownerIdsBySubmissionId: Map<string, string>;
+      submissions: typeof loadedSubmission[];
+    }>();
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockReturnValueOnce(
+      submissionsLoad.promise,
+    );
+    accessRequestMocks.listAccessRequests
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(
+        mapSupabasePersistenceError(
+          { message: "provider response intentionally omitted" },
+          {
+            httpStatus: 402,
+            operation: "auth.access_requests_list",
+            fallbackKind: "database",
+          },
+        ),
+      );
+
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Не удалось загрузить данные Supabase",
+      }),
+    ).toBeInTheDocument();
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+
+    const intervalHandler = setIntervalSpy.mock.calls.find(
+      ([, timeout]) => timeout === 10_000,
+    )?.[0];
+    await act(async () => {
+      if (typeof intervalHandler === "function") intervalHandler();
+      submissionsLoad.resolve({
+        caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+      await Promise.resolve();
+    });
+
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    expect(accessRequestMocks.listAccessRequests).toHaveBeenCalledTimes(2);
+  });
+
+  test("rechecks a queued interval refresh after an in-flight request opens the HTTP 402 circuit", async () => {
+    const setIntervalSpy = vi.spyOn(window, "setInterval");
+    const firstLoad = deferred<never>();
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockReturnValueOnce(
+      firstLoad.promise,
+    );
+
+    render(<App />);
+    await waitFor(() =>
+      expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1),
+    );
+    const intervalHandler = setIntervalSpy.mock.calls.find(
+      ([, timeout]) => timeout === 10_000,
+    )?.[0];
+    await act(async () => {
+      if (typeof intervalHandler === "function") intervalHandler();
+      await Promise.resolve();
+    });
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      firstLoad.reject(
+        mapSupabasePersistenceError(
+          { message: "provider response intentionally omitted" },
+          {
+            httpStatus: 402,
+            operation: "submissions.list",
+            fallbackKind: "database",
+          },
+        ),
+      );
+    });
+    expect(
+      await screen.findByRole("heading", {
+        name: "Не удалось загрузить данные Supabase",
+      }),
+    ).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
   });
 
   test("gates the workspace until Supabase resolves and awaits mutations with the real actor", async () => {

@@ -79,6 +79,7 @@ export interface PersistenceFailureDiagnostics {
 }
 
 interface PersistenceFailureContext {
+  httpStatus?: number;
   operation: SupabasePersistenceOperation;
   fallbackKind?: PersistenceFailureKind;
 }
@@ -232,7 +233,10 @@ export function mapSupabasePersistenceError(
   if (error instanceof PersistenceObservableError) return error;
 
   const shape = readErrorShape(error);
-  const status = numericStatus(shape.status) ?? numericStatus(shape.statusCode);
+  const status =
+    numericStatus(context.httpStatus) ??
+    numericStatus(shape.status) ??
+    numericStatus(shape.statusCode);
   const supabaseCode = stringValue(shape.code);
   const sourceName = stringValue(shape.name);
   const baseKind = kindForOperation(context.operation, context.fallbackKind);
@@ -274,6 +278,10 @@ export function safeDiagnosticsForPersistenceError(
 ): PersistenceFailureDiagnostics | null {
   if (error instanceof PersistenceObservableError) return error.diagnostics;
   return null;
+}
+
+export function isSupabaseServiceRestriction(error: unknown): boolean {
+  return safeDiagnosticsForPersistenceError(error)?.httpStatus === 402;
 }
 
 export function isDefinitivePersistenceRejection(error: unknown): boolean {

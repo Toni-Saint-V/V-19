@@ -14,6 +14,7 @@ vi.mock("../../src/lib/supabase/client", () => ({
 }));
 
 import { SupabaseAccessRequestAdapter } from "../../src/shared/supabaseAuthRegistration";
+import { PersistenceObservableError } from "../../src/services/persistenceObservability";
 
 describe("Supabase auth registration adapter", () => {
   beforeEach(() => {
@@ -130,5 +131,33 @@ describe("Supabase auth registration adapter", () => {
     ]);
     expect(from).toHaveBeenCalledWith("access_requests");
     expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
+  });
+
+  test("preserves HTTP 402 when the admin access request read is service-restricted", async () => {
+    const order = vi.fn(async () => ({
+      data: null,
+      error: { message: "provider response intentionally omitted" },
+      status: 402,
+    }));
+    const select = vi.fn(() => ({ order }));
+    const from = vi.fn(() => ({ select }));
+    supabaseMock.client = {
+      from,
+      functions: {
+        invoke: supabaseMock.invoke,
+      },
+    } as never;
+
+    try {
+      await new SupabaseAccessRequestAdapter().listAccessRequests();
+      throw new Error("Expected the restricted Supabase read to fail.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(PersistenceObservableError);
+      expect((error as PersistenceObservableError).diagnostics).toMatchObject({
+        httpStatus: 402,
+        operation: "auth.access_requests_list",
+        retryable: false,
+      });
+    }
   });
 });
