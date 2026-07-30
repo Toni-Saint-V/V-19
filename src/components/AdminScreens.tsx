@@ -1,6 +1,6 @@
 // src/components/AdminScreens.tsx
-import React, { useCallback, useMemo, useState } from "react";
-import { motion } from "motion/react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   ArrowUpDown,
   ArrowUpRight,
@@ -29,6 +29,8 @@ import {
   type AdminTriageRadarItem,
 } from "../modules/submissions/adminTriageRadar";
 import { agentOwnerDisplayName } from "../modules/submissions/ownership";
+import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
+import { useModalSheetFocus } from "../shared/ui/useModalSheetFocus";
 import {
   cityFilterValuesForSubmissions,
   questionnaireCityForSubmission,
@@ -382,12 +384,22 @@ export function ReviewScreen({
   onOpenExport,
   submissions,
 }: AdminScreenProps) {
+  const prefersReducedMotion = useReducedMotion();
+  const surfaceMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
   const [activeLane, setActiveLane] = useState<Lane | "all">("all");
   const [cityFilter, setCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<AdminReviewSort>("priority");
   const [typeFilter, setTypeFilter] = useState<AdminReviewTypeFilter>("all");
   const [mobileContextOpen, setMobileContextOpen] = useState(false);
+  const mobileContextSheetRef = useRef<HTMLElement>(null);
+  const closeMobileContext = useCallback(() => setMobileContextOpen(false), []);
+  const mobileContextModalOpen = useModalSheetFocus({
+    mediaQuery: "(max-width: 1023px)",
+    onClose: closeMobileContext,
+    open: mobileContextOpen,
+    sheetRef: mobileContextSheetRef,
+  });
   const reviewSubmissions = useMemo(
     () => (submissions ?? []).filter(isAdminReviewQueueSubmission),
     [submissions],
@@ -496,11 +508,7 @@ export function ReviewScreen({
   ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="v19-admin-screen v19-admin-review-screen"
-    >
+    <motion.div {...surfaceMotion} className="v19-admin-screen v19-admin-review-screen">
       <section className="v19-admin-review-main min-w-0 space-y-5">
         <V19MetricStrip>
           <V19MetricCard
@@ -653,7 +661,11 @@ export function ReviewScreen({
 
       <aside
         aria-label="Контекст проверки"
+        aria-modal={mobileContextModalOpen ? "true" : undefined}
         className={`v19-admin-review-rail flex min-h-0 flex-col gap-5 ${mobileContextOpen ? "is-mobile-open" : ""}`}
+        ref={mobileContextSheetRef}
+        role={mobileContextModalOpen ? "dialog" : undefined}
+        tabIndex={-1}
       >
         <div className="v19-admin-review-sheet-header">
           <div>
@@ -663,7 +675,7 @@ export function ReviewScreen({
           <button
             aria-label="Закрыть контекст проверки"
             type="button"
-            onClick={() => setMobileContextOpen(false)}
+            onClick={closeMobileContext}
           >
             <X aria-hidden="true" />
           </button>
@@ -747,13 +759,13 @@ export function ReviewScreen({
             <ShieldCheck aria-hidden="true" />
             <div>
               <h3>Правила решения</h3>
-              <small>Fail-closed контроль</small>
+              <small>Запрет при риске</small>
             </div>
           </div>
           <div className="v19-review-rules">
             <p>
               <CheckCircle2 aria-hidden="true" />
-              Не принимать пакет с открытыми blocker-замечаниями.
+              Не принимать пакет с открытыми блокирующими замечаниями.
             </p>
             <p>
               <CheckCircle2 aria-hidden="true" />
@@ -773,7 +785,7 @@ export function ReviewScreen({
           aria-label="Закрыть контекст проверки"
           className="v19-admin-review-sheet-backdrop"
           type="button"
-          onClick={() => setMobileContextOpen(false)}
+          onClick={closeMobileContext}
         />
       ) : null}
     </motion.div>

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "motion/react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -28,6 +28,8 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
+import { useModalSheetFocus } from "../shared/ui/useModalSheetFocus";
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
@@ -267,6 +269,8 @@ export function AdminExportScreen({
 }: {
   submissions?: Submission[];
 }) {
+  const prefersReducedMotion = useReducedMotion();
+  const surfaceMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
   const bridge = useVisaflowBusinessBridge();
   const realItems = useMemo(
     () => exportItemsFromSubmissions(submissions),
@@ -291,6 +295,14 @@ export function AdminExportScreen({
   const [archiveDownloadUrl, setArchiveDownloadUrl] = useState("");
   const [archiveDownloadStarted, setArchiveDownloadStarted] = useState(false);
   const [mobileControlOpen, setMobileControlOpen] = useState(false);
+  const mobileControlSheetRef = useRef<HTMLElement>(null);
+  const closeMobileControl = useCallback(() => setMobileControlOpen(false), []);
+  const mobileControlModalOpen = useModalSheetFocus({
+    mediaQuery: "(max-width: 1279px)",
+    onClose: closeMobileControl,
+    open: mobileControlOpen,
+    sheetRef: mobileControlSheetRef,
+  });
   const exportOperationLockedRef = useRef(false);
 
   const beginExportOperation = () => {
@@ -859,9 +871,7 @@ export function AdminExportScreen({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      {...surfaceMotion}
       className="v19-admin-screen v19-admin-export-screen-v2"
       data-ui-pattern="operational-table-with-context"
     >
@@ -1112,7 +1122,11 @@ export function AdminExportScreen({
 
       <aside
         aria-label="Контроль пакета"
+        aria-modal={mobileControlModalOpen ? "true" : undefined}
         className={`v19-admin-export-rail-v2 ${mobileControlOpen ? "is-mobile-open" : ""}`}
+        ref={mobileControlSheetRef}
+        role={mobileControlModalOpen ? "dialog" : undefined}
+        tabIndex={-1}
       >
         <div className="v19-admin-export-rail-head-v2">
           <div className="flex items-start justify-between gap-3">
@@ -1134,7 +1148,7 @@ export function AdminExportScreen({
               aria-label="Закрыть контроль пакета"
               className="v19-admin-export-rail-close-v2"
               type="button"
-              onClick={() => setMobileControlOpen(false)}
+              onClick={closeMobileControl}
             >
               <X aria-hidden="true" />
             </button>
@@ -1150,7 +1164,7 @@ export function AdminExportScreen({
           <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[12px] text-white/45">Активный пакет</div>
+                <div className="text-[12px] text-white/45">Пакет в фокусе</div>
                 <div className="mt-1 text-[15px] font-semibold text-white">
                   {activeItem?.title ?? "Не выбран"}
                 </div>
@@ -1242,8 +1256,8 @@ export function AdminExportScreen({
                 ))}
               </div>
               <div className="mt-3 text-[10.5px] leading-relaxed text-white/32">
-                Только подсказка: выгрузку всё равно блокируют реальные
-                pre-flight правила.
+                Только подсказка: выгрузку всё равно блокируют обязательные правила
+                готовности.
               </div>
             </div>
           ) : null}
@@ -1251,7 +1265,7 @@ export function AdminExportScreen({
           <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
             <div className="mb-3 flex items-center justify-between">
               <h4 className="text-[14px] font-semibold text-white">
-                Pre-flight checks
+                Проверка готовности
               </h4>
               <StatusPill
                 tone={
@@ -1312,13 +1326,13 @@ export function AdminExportScreen({
               />
               <ManifestRow
                 icon={FileSpreadsheet}
-                label="Excel preview"
+                label="Предпросмотр Excel"
                 value={selectedCount ? "готов" : "нет выбора"}
                 state={selectedCount ? "ok" : "neutral"}
               />
               <ManifestRow
                 icon={FileSpreadsheet}
-                label="Excel rows"
+                label="Строки Excel"
                 value={`${selectedPlan.rowCount} ${rowCountLabel(selectedPlan.rowCount)}`}
                 state={selectedCount ? "ok" : "neutral"}
               />
@@ -1336,7 +1350,7 @@ export function AdminExportScreen({
               />
               <ManifestRow
                 icon={AlertTriangle}
-                label="Warnings"
+                label="Предупреждения"
                 value={`${selectedWarnings}`}
                 state={selectedWarnings ? "warn" : "ok"}
               />
@@ -1517,7 +1531,7 @@ export function AdminExportScreen({
           aria-label="Закрыть контроль пакета"
           className="v19-admin-export-backdrop-v2"
           type="button"
-          onClick={() => setMobileControlOpen(false)}
+          onClick={closeMobileControl}
         />
       ) : null}
     </motion.div>

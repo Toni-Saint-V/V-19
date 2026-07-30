@@ -8,6 +8,7 @@ import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { buildAdminRemarkIssueInput } from "./review/adminRemarkIssueInput";
 import { AdminUsersAccessScreen } from "./AdminUsersAccessScreen";
 import { AdminSystemSettingsScreen } from "./AdminSystemSettingsScreen";
+import "../shared/ui/admin-premium-convergence.css";
 import {
   AppShell,
   PageHeader,

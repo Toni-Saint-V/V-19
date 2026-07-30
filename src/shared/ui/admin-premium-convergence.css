@@ -1,0 +1,201 @@
+/*
+ * Final, admin-only convergence layer.
+ *
+ * The production repository contains several historical CSS layers. Keep this
+ * file deliberately scoped to the authenticated admin root so review, export,
+ * and agent surfaces cannot silently affect one another.
+ */
+
+#root .v19-admin-workspace-root {
+  --v19-admin-premium-motion-fast: 140ms;
+  --v19-admin-premium-motion-standard: 180ms;
+  --v19-admin-premium-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#root .v19-admin-workspace-root .v19-admin-review-board,
+#root .v19-admin-workspace-root .v19-review-rail-card,
+#root .v19-admin-workspace-root .v19-admin-export-workspace-v2,
+#root .v19-admin-workspace-root .v19-admin-export-rail-v2 {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.022),
+    0 18px 44px rgb(0 0 0 / 0.14);
+}
+
+#root .v19-admin-workspace-root .v19-review-queue-row {
+  transition:
+    border-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease),
+    background-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease),
+    box-shadow var(--v19-admin-premium-motion-standard) var(--v19-admin-premium-ease),
+    transform var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease);
+}
+
+#root .v19-admin-workspace-root .v19-review-row-overline,
+#root .v19-admin-workspace-root .v19-review-row-identity > small,
+#root .v19-admin-workspace-root .v19-review-row-identity > em,
+#root .v19-admin-workspace-root .v19-review-row-priority > small,
+#root .v19-admin-workspace-root .v19-review-trip-label {
+  font-size: 10px;
+}
+
+#root .v19-admin-workspace-root .v19-review-row-identity > strong {
+  font-size: 16px;
+}
+
+#root .v19-admin-workspace-root .v19-review-focus-tabs {
+  grid-template-columns:
+    minmax(0, 1fr) minmax(0, 0.82fr) minmax(0, 1.3fr)
+    minmax(0, 0.94fr);
+}
+
+#root .v19-admin-workspace-root .v19-review-focus-tabs > button {
+  gap: 5px;
+  padding-inline: 8px;
+}
+
+#root .v19-admin-workspace-root .v19-review-focus-tabs > button span {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+#root .v19-admin-workspace-root .v19-review-row-open {
+  display: flex;
+  min-width: 72px;
+  min-height: 38px;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid
+    color-mix(in srgb, var(--v19-review-row-accent) 24%, var(--v19b-color-border));
+  border-radius: var(--v19b-radius-control);
+  background: color-mix(in srgb, var(--v19-review-row-accent) 7%, transparent);
+  color: var(--v19b-color-text-muted);
+  font-size: 10px;
+  transition:
+    border-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease),
+    background-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease),
+    color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #root .v19-admin-workspace-root .v19-review-queue-row:hover .v19-review-row-open {
+    border-color: color-mix(
+      in srgb,
+      var(--v19-review-row-accent) 42%,
+      var(--v19b-color-border)
+    );
+    background: color-mix(in srgb, var(--v19-review-row-accent) 11%, transparent);
+    color: var(--v19b-color-text-strong);
+  }
+}
+
+/*
+ * Tablet/mobile rows are labels, but the historical convergence layer reduced
+ * their checkbox to a clipped 1px control. Keep the whole row clickable while
+ * restoring an honest, visible selection affordance.
+ */
+@media (max-width: 1279px) {
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-screen-v2
+    .v19-admin-export-row-v2
+    > input {
+    position: relative;
+    z-index: 2;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    cursor: pointer;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 767px) {
+  #root .v19-admin-workspace-root .v19-review-row-open {
+    width: 100%;
+    min-height: 44px;
+    justify-content: space-between;
+    padding: 0 12px;
+    border-left: 1px solid
+      color-mix(in srgb, var(--v19-review-row-accent) 24%, var(--v19b-color-border));
+    font-size: 11px;
+  }
+
+  #root .v19-admin-workspace-root .v19-admin-review-rail.is-mobile-open,
+  #root .v19-admin-workspace-root .v19-admin-export-rail-v2.is-mobile-open {
+    animation: v19-admin-premium-sheet-in var(--v19-admin-premium-motion-standard)
+      var(--v19-admin-premium-ease) both;
+  }
+
+  #root .v19-admin-workspace-root .v19-admin-review-sheet-backdrop,
+  #root .v19-admin-workspace-root .v19-admin-export-backdrop-v2 {
+    animation: v19-admin-premium-backdrop-in var(--v19-admin-premium-motion-fast)
+      ease-out both;
+  }
+}
+
+@media (max-width: 479px) {
+  #root .v19-admin-workspace-root .v19-review-focus-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  #root .v19-admin-workspace-root .v19-review-focus-tabs > button {
+    min-width: 0;
+    min-height: 44px;
+    scroll-snap-align: none;
+  }
+
+  #root .v19-admin-workspace-root .v19-review-focus-tabs > button span {
+    overflow: visible;
+    line-height: 1.2;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
+@keyframes v19-admin-premium-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes v19-admin-premium-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root .v19-admin-workspace-root *,
+  #root .v19-admin-workspace-root *::before,
+  #root .v19-admin-workspace-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *,
+html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::before,
+html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
