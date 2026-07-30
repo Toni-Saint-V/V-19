@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -34,6 +34,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import { useExperienceReducedMotion } from "../../../shared/ui/experiencePreferences";
 import {
   Badge,
   BottomSheet,
@@ -2076,7 +2077,7 @@ export function AdminReviewScreen({
   const [mobileAgentFilter, setMobileAgentFilter] = useState(adminReviewAllAgents);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const unfilteredSourceList = reviewSource.length ? reviewSource : reviewList;
   const exportQueueCount = unfilteredSourceList.filter(
     (submission) => submission.status === "ready_for_export",
@@ -4287,7 +4288,7 @@ function AdminExportMobileSheet({
   selectedSubmissionCount: number;
   selectedWarnings: number;
 }) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
 
   return (
     <motion.div

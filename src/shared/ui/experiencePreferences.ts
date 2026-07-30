@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { useReducedMotion } from "motion/react";
+
 export type ExperiencePreferences = {
   compactDensity: boolean;
   highContrast: boolean;
@@ -13,6 +16,8 @@ export const experiencePreferencesDefaults: ExperiencePreferences = {
 };
 
 export const experiencePreferencesStorageKey = "v19.workspace-experience.v1";
+export const experiencePreferencesChangedEvent =
+  "v19:workspace-experience-preferences-changed";
 
 function validatedExperiencePreferences(value: unknown): ExperiencePreferences {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -61,9 +66,7 @@ export function applyExperiencePreferences(preferences: ExperiencePreferences): 
   root.dataset.v19Contrast = preferences.highContrast ? "high" : "default";
 }
 
-export function saveExperiencePreferences(
-  preferences: ExperiencePreferences,
-): boolean {
+export function saveExperiencePreferences(preferences: ExperiencePreferences): boolean {
   if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(
@@ -71,6 +74,7 @@ export function saveExperiencePreferences(
       JSON.stringify(preferences),
     );
     applyExperiencePreferences(preferences);
+    window.dispatchEvent(new Event(experiencePreferencesChangedEvent));
     return true;
   } catch {
     return false;
@@ -81,4 +85,34 @@ export function initializeExperiencePreferences(): ExperiencePreferences {
   const preferences = readExperiencePreferences();
   applyExperiencePreferences(preferences);
   return preferences;
+}
+
+export function useExperienceReducedMotion(): boolean {
+  const osReducedMotion = useReducedMotion();
+  const [productReducedMotion, setProductReducedMotion] = useState(
+    () => readExperiencePreferences().reducedMotion,
+  );
+
+  useEffect(() => {
+    const syncProductPreference = () => {
+      setProductReducedMotion(readExperiencePreferences().reducedMotion);
+    };
+    const syncStoredPreference = (event: StorageEvent) => {
+      if (event.key === experiencePreferencesStorageKey) syncProductPreference();
+    };
+
+    window.addEventListener(experiencePreferencesChangedEvent, syncProductPreference);
+    window.addEventListener("storage", syncStoredPreference);
+    syncProductPreference();
+
+    return () => {
+      window.removeEventListener(
+        experiencePreferencesChangedEvent,
+        syncProductPreference,
+      );
+      window.removeEventListener("storage", syncStoredPreference);
+    };
+  }, []);
+
+  return Boolean(osReducedMotion || productReducedMotion);
 }

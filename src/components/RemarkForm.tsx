@@ -13,6 +13,8 @@ import {
   useVisaflowBusinessBridge,
 } from "../integration/visaflowBusinessBridge";
 import type { SubmissionFileType } from "../modules/submissions/types";
+import { linearDrawerMotion } from "../shared/ui/drawer/linearDrawerMotion";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 
 interface RemarkFormProps {
@@ -63,6 +65,7 @@ export function RemarkForm({
   submissionId,
 }: RemarkFormProps) {
   const bridge = useVisaflowBusinessBridge();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const submitRunRef = useRef(false);
@@ -115,9 +118,8 @@ export function RemarkForm({
       if (event.key !== "Tab") return;
 
       const controls = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          focusableControlSelector,
-        ) ?? [],
+        dialogRef.current?.querySelectorAll<HTMLElement>(focusableControlSelector) ??
+          [],
       ).filter((control) => control.getClientRects().length > 0);
       const first = controls[0];
       const last = controls.at(-1);
@@ -213,8 +215,9 @@ export function RemarkForm({
             aria-hidden="true"
             className="v19-remark-form-backdrop fixed inset-0 bg-black/65 backdrop-blur-sm"
             exit={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
             onClick={isSubmitting ? undefined : handleRequestClose}
+            transition={prefersReducedMotion ? linearDrawerMotion.reduced : undefined}
           />
           <motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -222,11 +225,20 @@ export function RemarkForm({
             aria-labelledby={remarkFormHeadingId}
             aria-modal="true"
             className="v19-remark-form-dialog fixed inset-x-3 bottom-3 max-h-[calc(100dvh-24px)] overflow-x-hidden overflow-y-auto overscroll-contain bg-[#111113] border border-white/10 rounded-3xl shadow-[0_24px_100px_rgba(0,0,0,0.65)] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[560px] sm:-translate-x-1/2 sm:-translate-y-1/2"
-            exit={{ opacity: 0, scale: 0.98, y: 22 }}
-            initial={{ opacity: 0, scale: 0.98, y: 22 }}
+            data-reduced-motion={prefersReducedMotion ? "true" : "false"}
+            exit={
+              prefersReducedMotion
+                ? { opacity: 0, scale: 1, y: 0 }
+                : { opacity: 0, scale: 0.98, y: 22 }
+            }
+            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98, y: 22 }}
             ref={dialogRef}
             role="dialog"
-            transition={{ damping: 24, stiffness: 260, type: "spring" }}
+            transition={
+              prefersReducedMotion
+                ? linearDrawerMotion.reduced
+                : { damping: 24, stiffness: 260, type: "spring" }
+            }
           >
             <header className="v19-remark-form-header px-5 py-4 border-b border-white/10 flex items-start gap-4">
               <div className="w-11 h-11 rounded-2xl bg-white/[0.045] border border-white/10 flex items-center justify-center shrink-0">

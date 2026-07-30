@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpDown, Plus, RotateCcw, X } from "lucide-react";
 import { QuestionnaireScreen } from "./QuestionnaireScreen";
 import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
@@ -23,6 +23,7 @@ import {
 } from "../shared/ui/v19-design-system";
 import { Drawer } from "./Drawer";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
@@ -99,6 +100,7 @@ import {
 import { persistCreatedSubmissionWithPassports } from "../modules/submissions/createSubmissionPassportUseCase";
 import type { PublicNumberAssignment } from "../modules/submissions/supabasePersistence";
 import { agentInteractionProps } from "../modules/submissions/agentInteractionContract";
+import "../shared/ui/agent-premium-convergence.css";
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
@@ -180,8 +182,8 @@ export function CommandCenter({
   usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
-  const prefersReducedMotion = useReducedMotion();
-  const activeNavMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
+  const prefersReducedMotion = useExperienceReducedMotion();
+  const activeNavMotion = workspaceSurfaceMotion(prefersReducedMotion);
   const [activeNav, setActiveNav] = useState<AgentShellNavSection>("actions");
   const [createOriginNav, setCreateOriginNav] =
     useState<NonCreateAgentShellNavSection>("actions");
@@ -1225,6 +1227,7 @@ export function CommandCenter({
                 {...activeNavMotion}
                 className="v19-agent-workspace-content max-w-[1460px] mx-auto h-full"
                 data-agent-screen={activeNav}
+                data-reduced-motion={prefersReducedMotion ? "true" : "false"}
                 data-testid="agent-screen-transition"
               >
                 {activeNav === "settings" && (
@@ -1309,8 +1312,9 @@ export function CommandCenter({
           <motion.div
             animate={{ opacity: 1 }}
             className="v19-preupload-modal-overlay"
-            exit={{ opacity: 0 }}
-            initial={{ opacity: 0 }}
+            exit={prefersReducedMotion ? undefined : { opacity: 0 }}
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : undefined}
           >
             <motion.section
               aria-labelledby="create-exit-title"
@@ -1347,6 +1351,7 @@ export function CommandCenter({
               }}
               ref={createExitDialogRef}
               role="alertdialog"
+              transition={prefersReducedMotion ? { duration: 0 } : undefined}
             >
               <h2 id="create-exit-title">Выйти без сохранения?</h2>
               <p>Изменения в новой подаче будут потеряны.</p>

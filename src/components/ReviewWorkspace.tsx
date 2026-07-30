@@ -54,6 +54,8 @@ import {
   ReviewPassportFieldRow,
   type PassportReviewField,
 } from "./ReviewPassportFieldRow";
+import { linearDrawerMotion } from "../shared/ui/drawer/linearDrawerMotion";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { useReviewWorkspaceShortcuts } from "./review/useReviewWorkspaceShortcuts";
 
@@ -210,6 +212,7 @@ export function ReviewWorkspace({
   submission,
   submissionId,
 }: ReviewWorkspaceProps) {
+  const prefersReducedMotion = useExperienceReducedMotion();
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const decisionFooterRef = useRef<HTMLElement | null>(null);
   const previewPaneRef = useRef<HTMLDivElement | null>(null);
@@ -911,7 +914,7 @@ export function ReviewWorkspace({
         `[data-passport-field-id="${nextField.id}"]`,
       );
       fieldElement?.scrollIntoView({
-        behavior: "smooth",
+        behavior: prefersReducedMotion ? "auto" : "smooth",
         block: "center",
       });
       fieldElement
@@ -926,6 +929,7 @@ export function ReviewWorkspace({
   }, [
     handleMediaSelect,
     mediaPreviews,
+    prefersReducedMotion,
     confirmationMediaTypes,
     reviewFields,
     visitedMediaTypes,
@@ -950,12 +954,16 @@ export function ReviewWorkspace({
       aria-label="Сверка паспорта"
       aria-modal="true"
       className="v19-review-workspace"
-      exit={{ opacity: 0, scale: 0.985 }}
+      data-reduced-motion={prefersReducedMotion ? "true" : "false"}
+      exit={
+        prefersReducedMotion ? { opacity: 0, scale: 1 } : { opacity: 0, scale: 0.985 }
+      }
       inert={nestedDialogOpen ? true : undefined}
       initial={false}
       ref={workspaceRef}
       role="dialog"
       tabIndex={-1}
+      transition={prefersReducedMotion ? linearDrawerMotion.reduced : undefined}
     >
       <header className="v19-review-header">
         <button
@@ -1121,7 +1129,11 @@ export function ReviewWorkspace({
                         aria-hidden="true"
                         className="v19-review-media-tab-active"
                         layoutId="v19-review-media-tab-active"
-                        transition={{ duration: 0.18, ease: "easeOut" }}
+                        transition={
+                          prefersReducedMotion
+                            ? linearDrawerMotion.reduced
+                            : { duration: 0.18, ease: "easeOut" }
+                        }
                       />
                     ) : null}
                     <span className="v19-review-media-tab-label">

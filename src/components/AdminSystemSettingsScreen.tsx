@@ -97,7 +97,9 @@ export function WorkspaceExperienceSettingsScreen({
   return (
     <section
       className={
-        isAdmin ? "v19-system-settings is-admin-workstation" : "v19-system-settings"
+        isAdmin
+          ? "v19-system-settings is-admin-workstation"
+          : "v19-system-settings is-agent-workstation"
       }
       aria-labelledby="v19-settings-title"
     >
@@ -105,15 +107,15 @@ export function WorkspaceExperienceSettingsScreen({
         <div>
           <span className="v19-settings-eyebrow">
             <MonitorCog aria-hidden="true" />
-            {isAdmin ? "Рабочее место администратора" : "Experience control"}
+            {isAdmin ? "Рабочее место администратора" : "Рабочее место агента"}
           </span>
           <h2 id="v19-settings-title">
-            {isAdmin ? "Интерфейс и доступность" : "Системные настройки"}
+            {isAdmin ? "Интерфейс и доступность" : "Интерфейс и помощники"}
           </h2>
           <p>
             {isAdmin
               ? "Параметры применяются сразу и сохраняются только в этом браузере."
-              : "Управляйте плотностью, доступностью и AI-контекстом интерфейса. Изменения применяются сразу и сохраняются только в этом браузере."}
+              : "Настройте плотность, доступность и подсказки. Изменения применяются сразу и сохраняются только в этом браузере."}
           </p>
         </div>
         <div
@@ -137,13 +139,9 @@ export function WorkspaceExperienceSettingsScreen({
             </span>
             <div>
               <h3 id="appearance-settings">
-                {isAdmin ? "Интерфейс в этом браузере" : "Ощущение интерфейса"}
+                {isAdmin ? "Интерфейс в этом браузере" : "Работа с подачами"}
               </h3>
-              <p>
-                {isAdmin
-                  ? "Для всех рабочих экранов и аккаунтов в этом браузере."
-                  : "Параметры применяются ко всем рабочим экранам."}
-              </p>
+              <p>Для всех рабочих экранов и аккаунтов в этом браузере.</p>
             </div>
           </div>
 
@@ -225,15 +223,7 @@ export function WorkspaceExperienceSettingsScreen({
           <RuntimeRow
             icon={Database}
             label="Хранилище"
-            value={
-              usesSupabase
-                ? isAdmin
-                  ? "Рабочий контур Supabase"
-                  : "Supabase workspace"
-                : isAdmin
-                  ? "Локальная демо-среда"
-                  : "Local demo"
-            }
+            value={usesSupabase ? "Рабочий контур Supabase" : "Локальная демо-среда"}
             tone={usesSupabase ? "live" : "local"}
           />
           <RuntimeRow
@@ -251,9 +241,7 @@ export function WorkspaceExperienceSettingsScreen({
           <div className="v19-settings-guardrail">
             <Sparkles aria-hidden="true" />
             <div>
-              <strong>
-                {isAdmin ? "Контроль AI включён" : "AI guardrail активен"}
-              </strong>
+              <strong>Контроль AI включён</strong>
               <p>
                 Сводки объясняют приоритет и готовят план, но не меняют подачу и не
                 принимают решение за администратора.

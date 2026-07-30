@@ -34,7 +34,7 @@ const actionFilterOptions: AgentActionFilterOption[] = [
   {
     filter: "blockers",
     icon: CircleAlert,
-    label: "Исправления",
+    label: "Правки",
     mobilePrimary: true,
   },
   {

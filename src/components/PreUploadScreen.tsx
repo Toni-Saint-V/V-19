@@ -7,7 +7,7 @@ import {
   type DragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   BookUser,
   Plus,
@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { agentInteractionProps } from "../modules/submissions/agentInteractionContract";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import type { PassportExtractionField } from "../modules/submissions/passportExtractionContract";
 import {
   passportIntakeApplicantName,
@@ -238,7 +239,7 @@ export function PreUploadScreen({
   onNavigationStateChange,
   onSubmit,
 }: PreUploadScreenProps) {
-  const reduceMotion = Boolean(useReducedMotion());
+  const reduceMotion = useExperienceReducedMotion();
   const [packageType, setPackageType] =
     useState<Submission["type"]>(initialPackageType);
   const [city, setCity] = useState<City | "">(initialCity ?? "");
@@ -696,6 +697,7 @@ export function PreUploadScreen({
       animate={{ opacity: 1, y: 0 }}
       aria-labelledby="new-submission-workspace-title"
       className="v19-preupload-screen text-[var(--v19-depth-text)]"
+      data-reduced-motion={reduceMotion ? "true" : "false"}
       data-testid="preupload-workspace"
       exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
       initial={false}
@@ -707,21 +709,6 @@ export function PreUploadScreen({
         <div className="v19-preupload-layout">
           <section className="v19-preupload-primary">
             <motion.div className="v19-preupload-card">
-              <motion.div
-                animate={
-                  reduceMotion
-                    ? undefined
-                    : { opacity: [0.55, 0.8, 0.55], scale: [1, 1.12, 1] }
-                }
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[var(--v19-depth-accent-soft)] blur-3xl"
-                transition={
-                  reduceMotion
-                    ? { duration: 0 }
-                    : { duration: 4, ease: "easeInOut", repeat: Infinity }
-                }
-              />
-
               <div className="v19-preupload-card-body">
                 <div className="v19-preupload-card-intro relative z-10">
                   <h2
@@ -1087,7 +1074,7 @@ export function PreUploadScreen({
                   {submissionDisabledReason && !actionPending ? (
                     <p
                       aria-live="polite"
-                      className="sr-only"
+                      className="v19-preupload-disabled-reason"
                       id="preupload-disabled-reason"
                     >
                       {submissionDisabledReason}
@@ -1148,8 +1135,9 @@ export function PreUploadScreen({
               <motion.div
                 animate={{ opacity: 1 }}
                 className="v19-preupload-prefill-overlay"
-                exit={{ opacity: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
                 initial={reduceMotion ? false : { opacity: 0 }}
+                transition={reduceMotion ? { duration: 0 } : undefined}
               >
                 <button
                   {...agentInteractionProps("new-submission.toggle-prefill")}
@@ -1209,8 +1197,9 @@ export function PreUploadScreen({
               <motion.div
                 animate={{ opacity: 1 }}
                 className="v19-preupload-modal-overlay"
-                exit={{ opacity: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
                 initial={false}
+                transition={reduceMotion ? { duration: 0 } : undefined}
               >
                 <motion.section
                   aria-labelledby="passport-assignment-title"
@@ -1312,8 +1301,9 @@ export function PreUploadScreen({
               <motion.div
                 animate={{ opacity: 1 }}
                 className="v19-preupload-modal-overlay"
-                exit={{ opacity: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
                 initial={false}
+                transition={reduceMotion ? { duration: 0 } : undefined}
               >
                 <motion.section
                   aria-labelledby="preupload-confirmation-title"

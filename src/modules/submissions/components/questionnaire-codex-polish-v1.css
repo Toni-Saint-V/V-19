@@ -1500,7 +1500,9 @@
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-screen-header {
-    display: none !important;
+    display: flex !important;
+    min-height: var(--v19b-size-56) !important;
+    padding-inline: var(--v19b-size-12) !important;
   }
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-tourist-switcher {
@@ -1735,6 +1737,43 @@
   /* The listbox portal is a body child; keep it above the legacy fullscreen shell. */
   .v19-select-menu-popover.is-questionnaire-tourist[aria-label="Выбрать заявителя — нижняя панель"] {
     z-index: 2147483100;
+  }
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-title-copy {
+  display: grid;
+  min-width: var(--v19b-size-0);
+  gap: var(--v19b-size-2);
+}
+
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-title-context {
+  min-width: var(--v19b-size-0);
+  overflow: hidden;
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-11);
+  line-height: var(--v19b-size-14);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-title-context {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-title-wrap {
+    flex: 1 1 auto;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-tourist-switcher,
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-header-actions {
+    display: none !important;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-title {
+    font-size: var(--v19b-size-15) !important;
   }
 }
 

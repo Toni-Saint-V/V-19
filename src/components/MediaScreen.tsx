@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Submission } from '../modules/submissions/types';
 import { mediaRowsFromSubmissions } from './v19BusinessScreenAdapter';
 import { motion, AnimatePresence } from 'motion/react';
+import { useExperienceReducedMotion } from '../shared/ui/experiencePreferences';
 import { 
   Search, Filter, Download, MoreVertical, FileText, 
   Image as ImageIcon, CheckCircle2, AlertCircle, Clock 
@@ -32,6 +33,7 @@ const mockFiles: MediaFile[] = [
 ];
 
 export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
+  const prefersReducedMotion = useExperienceReducedMotion();
   const [activeTab, setActiveTab] = useState<FileCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const sourceFiles = useMemo(() => {
@@ -54,9 +56,10 @@ export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: prefersReducedMotion ? 0.01 : 0.3 }}
+      data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
       className="space-y-6 lg:space-y-8 h-full flex flex-col"
     >
       {/* Top Controls */}
@@ -103,10 +106,15 @@ export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
           <AnimatePresence>
             {filteredFiles.map((file) => (
               <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
+                layout={!prefersReducedMotion}
+                initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                exit={
+                  prefersReducedMotion
+                    ? { opacity: 0, scale: 1 }
+                    : { opacity: 0, scale: 0.95 }
+                }
+                transition={{ duration: prefersReducedMotion ? 0.01 : 0.3 }}
                 key={file.id}
                 className="group flex flex-col bg-[#161617] border border-[#242529] rounded-2xl overflow-hidden hover:border-[#6f64ff]/40 transition-all cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                 tabIndex={0}

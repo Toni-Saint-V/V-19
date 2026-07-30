@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import type { Submission } from '../modules/submissions/types';
+import { useExperienceReducedMotion } from '../shared/ui/experiencePreferences';
 import { issueRowsFromSubmissions } from './v19BusinessScreenAdapter';
 import { AlertCircle, FileWarning, ArrowRight, User, Check } from 'lucide-react';
 
@@ -52,6 +53,7 @@ interface IssuesScreenProps {
 }
 
 export function IssuesScreen({ onOpenDrawer, submissions }: IssuesScreenProps) {
+  const prefersReducedMotion = useExperienceReducedMotion();
   const issues = useMemo<Issue[]>(() => {
     const rows = issueRowsFromSubmissions(submissions);
     return rows.length ? rows : mockIssues;
@@ -61,9 +63,10 @@ export function IssuesScreen({ onOpenDrawer, submissions }: IssuesScreenProps) {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: prefersReducedMotion ? 0.01 : 0.3 }}
+      data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
       className="space-y-6 lg:space-y-8 max-w-[900px]"
     >
       {/* Overview Cards */}

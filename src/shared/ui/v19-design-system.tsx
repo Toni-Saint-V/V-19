@@ -38,7 +38,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useExperienceReducedMotion } from "./experiencePreferences";
 import visaflowLogo from "../../assets/v-logo-premium-black-style.webp";
 import { cn } from "./cn";
 import { Badge, Button, IconButton } from "./primitives";
@@ -298,7 +299,7 @@ export function V19SideMenu({
   sidebarId,
 }: V19SideMenuProps) {
   const signOutPendingRef = useRef(false);
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useExperienceReducedMotion();
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const menuItems =
