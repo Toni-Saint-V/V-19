@@ -18,6 +18,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Columns3,
@@ -26,9 +27,10 @@ import {
   Flame,
   Folder,
   List,
+  LogOut,
   MapPin,
-  Menu,
   FileText,
+  Plus,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -40,7 +42,6 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useExperienceReducedMotion } from "./experiencePreferences";
-import visaflowLogo from "../../assets/v-logo-premium-black-style.webp";
 import { cn } from "./cn";
 import { Badge, Button, IconButton } from "./primitives";
 
@@ -271,6 +272,7 @@ export type V19SideMenuProps = {
   mobileTitle: string;
   onCommandSearch?: () => void;
   onCloseMobile: () => void;
+  onDisplayModeChange?: (mode: V19SideMenuMode) => void;
   onResetWorkspace: () => void | Promise<void>;
   onSwitchWorkspace?: () => void | Promise<void>;
   role: V19SideMenuRole;
@@ -292,6 +294,7 @@ export function V19SideMenu({
   mobileTitle,
   onCommandSearch,
   onCloseMobile,
+  onDisplayModeChange,
   onResetWorkspace,
   onSwitchWorkspace,
   role,
@@ -307,25 +310,7 @@ export function V19SideMenu({
   const [signOutError, setSignOutError] = useState("");
   const [workspaceSwitchPending, setWorkspaceSwitchPending] = useState(false);
   const [workspaceSwitchError, setWorkspaceSwitchError] = useState("");
-  const menuItems =
-    role === "agent" &&
-    createAction &&
-    !items.some((item) => item.id === "agent-create")
-      ? [
-          ...items.slice(0, 2),
-          {
-            active: createAction.active,
-            icon: "+",
-            id: "agent-create",
-            interactionId: "shell.create-submission",
-            label: createAction.label,
-            meta: "Создание подачи",
-            onClick: createAction.onClick,
-          },
-          ...items.slice(2),
-        ]
-      : items;
-  const navItems = menuItems.map((item) => ({
+  const navItems = items.map((item) => ({
     ...item,
     onClick: () => {
       item.onClick();
@@ -399,22 +384,31 @@ export function V19SideMenu({
           <strong>{mobileTitle}</strong>
           <span aria-hidden="true">VF</span>
         </div>
-        <div className="ops-brand opsu-brand flex items-center gap-2.5 px-2 pb-4 mb-2">
-          <img
-            src={visaflowLogo}
-            alt="VisaFlow"
-            className="ops-brand-logo h-8 w-8 shrink-0 rounded-lg object-cover"
-          />
-          <div className="ops-brand-copy opsu-brand-copy flex-1 min-w-0">
-            <strong className="opsu-wordmark vf-brand-wordmark text-sm font-semibold tracking-tight">
-              VisaFlow V-19
-            </strong>
-            <small className="v19-ds-side-menu-subtitle text-[11px] text-white/50">
-              {role === "agent" ? "Кабинет агента" : "Кабинет администратора"}
-            </small>
-          </div>
+        <header className="v19-side-menu-profile-header">
+          <Button
+            data-v19-interaction-id={
+              role === "agent" ? "shell.navigate-settings" : undefined
+            }
+            aria-label="Открыть профиль"
+            className="v19-side-menu-profile-trigger"
+            title={displayMode === "compact" ? sessionDisplayName : undefined}
+            variant="ghost"
+            onClick={() => {
+              settingsItem?.onClick();
+              onCloseMobile();
+            }}
+          >
+            <span className="v19-side-menu-avatar" aria-hidden="true">
+              {sessionInitials}
+            </span>
+            <span className="v19-side-menu-profile-copy">
+              <small>{sessionRoleLabel}</small>
+              <strong>{sessionDisplayName}</strong>
+            </span>
+          </Button>
           <IconButton
             className="ops-mobile-close opsu-mobile-close"
+            data-v19-side-menu-control="mobile-close"
             icon={
               <X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />
             }
@@ -424,23 +418,64 @@ export function V19SideMenu({
             }
             onClick={onCloseMobile}
           />
+          {onDisplayModeChange ? (
+            <IconButton
+              className="v19-side-menu-mode-toggle"
+              icon={
+                displayMode === "compact" ? (
+                  <ChevronRight
+                    aria-hidden="true"
+                    focusable="false"
+                    size={17}
+                    strokeWidth={1.8}
+                  />
+                ) : (
+                  <ChevronLeft
+                    aria-hidden="true"
+                    focusable="false"
+                    size={17}
+                    strokeWidth={1.8}
+                  />
+                )
+              }
+              label={displayMode === "compact" ? "Развернуть меню" : "Свернуть меню"}
+              onClick={() =>
+                onDisplayModeChange(displayMode === "compact" ? "regular" : "compact")
+              }
+            />
+          ) : null}
+        </header>
+        <div className="v19-side-menu-section-heading">
+          <span>{role === "agent" ? "РАБОТА" : "УПРАВЛЕНИЕ"}</span>
+          {onCommandSearch ? (
+            <Button
+              aria-keyshortcuts="Meta+K Control+K"
+              aria-label="Открыть командную палитру"
+              data-v19-interaction-id={
+                role === "agent" ? "shell.open-command-palette" : undefined
+              }
+              className="v19-side-menu-search"
+              title="Поиск команд (⌘K)"
+              variant="ghost"
+              onClick={onCommandSearch}
+            >
+              <Search
+                aria-hidden="true"
+                focusable="false"
+                size={15}
+                strokeWidth={1.8}
+              />
+              <span className="v19-side-menu-search-copy" aria-hidden="true">
+                Поиск
+              </span>
+              <kbd className="v19-side-menu-search-shortcut" aria-hidden="true">
+                ⌘K
+              </kbd>
+            </Button>
+          ) : null}
         </div>
-        <button
-          data-v19-interaction-id={
-            role === "agent" ? "shell.open-command-palette" : undefined
-          }
-          className="ops-sidebar-search"
-          type="button"
-          aria-label="Открыть командную палитру"
-          onClick={onCommandSearch}
-        >
-          <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
-          <span>Поиск...</span>
-          <kbd>⌘K</kbd>
-        </button>
         <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
-          <span className="ops-nav-group-label">Работа</span>
-          {navItems.map((item, index) => (
+          {navItems.map((item) => (
             <Button
               aria-current={item.active ? "page" : undefined}
               aria-label={item.label}
@@ -453,6 +488,7 @@ export function V19SideMenu({
               data-v19-interaction-id={item.interactionId}
               disabled={item.disabled}
               key={item.id}
+              title={displayMode === "compact" ? item.label : undefined}
               variant="ghost"
               onClick={item.onClick}
             >
@@ -463,11 +499,18 @@ export function V19SideMenu({
                 )}
                 aria-hidden="true"
               >
-                <V19SideMenuIcon index={index} fallback={item.icon} />
+                <V19SideMenuIcon itemId={item.id} fallback={item.icon} />
               </span>
               <span className="ops-nav-copy opsu-nav-copy">
                 <strong>{item.label}</strong>
+                <small>{item.meta}</small>
               </span>
+              {displayMode === "compact" ? (
+                <span className="v19-side-menu-compact-flyout" aria-hidden="true">
+                  <strong>{item.label}</strong>
+                  <small>{item.meta}</small>
+                </span>
+              ) : null}
               {typeof item.count === "number" ? (
                 <span
                   className={cn(
@@ -486,35 +529,34 @@ export function V19SideMenu({
           ))}
         </nav>
         <div className="ops-sidebar-footer opsu-sidebar-footer">
-          <Button
-            data-v19-interaction-id={
-              role === "agent" ? "shell.navigate-settings" : undefined
-            }
-            className="ops-session v19-ds-side-menu-profile v19-agent-sidebar-profile"
-            aria-label="Открыть профиль"
-            variant="ghost"
-            onClick={() => {
-              settingsItem?.onClick();
-              onCloseMobile();
-            }}
-          >
-            <span className="v19-agent-sidebar-avatar">{sessionInitials}</span>
-            <div>
-              <strong>{sessionDisplayName}</strong>
-              <small className="v19-agent-sidebar-profile-meta">
-                {sessionRoleLabel}
-              </small>
-            </div>
-            <SlidersHorizontal
-              className="ops-user-more v19-agent-sidebar-profile-icon"
-              aria-hidden="true"
-            />
-          </Button>
-          {signOutError ? (
-            <p
-              className="m-0 px-2 text-[12px] leading-snug text-[var(--v19b-status-danger-text)]"
-              role="alert"
+          {role === "agent" && createAction ? (
+            <Button
+              aria-current={createAction.active ? "page" : undefined}
+              aria-label={createAction.label}
+              className={cn(
+                "v19-side-menu-create-card",
+                createAction.active && "is-active",
+              )}
+              data-v19-interaction-id="shell.create-submission"
+              title={displayMode === "compact" ? createAction.label : undefined}
+              variant="ghost"
+              onClick={() => {
+                createAction.onClick();
+                onCloseMobile();
+              }}
             >
+              <span className="v19-side-menu-create-copy">
+                <strong>Начать новую подачу</strong>
+                <small>Создайте пакет заявителя</small>
+              </span>
+              <span className="v19-side-menu-create-action" aria-hidden="true">
+                <Plus size={17} strokeWidth={1.9} />
+                <span>{createAction.label}</span>
+              </span>
+            </Button>
+          ) : null}
+          {signOutError ? (
+            <p className="v19-side-menu-error" role="alert">
               {signOutError}
             </p>
           ) : null}
@@ -552,10 +594,12 @@ export function V19SideMenu({
             aria-label="Выйти"
             aria-busy={signOutPending || undefined}
             disabled={signOutPending}
+            title={displayMode === "compact" ? "Выйти" : undefined}
             variant="secondary"
             onClick={() => void handleSignOut()}
           >
-            {signOutPending ? "Выходим…" : "Выйти"}
+            <LogOut aria-hidden="true" focusable="false" size={17} strokeWidth={1.8} />
+            <span>{signOutPending ? "Выходим…" : "Выйти"}</span>
           </Button>
         </div>
       </motion.aside>
@@ -585,10 +629,18 @@ export function V19SideMenu({
   );
 }
 
-const v19SideMenuSlotIcons: LucideIcon[] = [Menu, FileText, Users, SlidersHorizontal];
+const v19SideMenuIcons: Record<string, LucideIcon> = {
+  "admin-export": FileText,
+  "admin-review": ShieldCheck,
+  "admin-settings": SlidersHorizontal,
+  "admin-users": Users,
+  "agent-actions": FileCheck2,
+  "agent-settings": SlidersHorizontal,
+  "agent-submissions": FileText,
+};
 
-function V19SideMenuIcon({ fallback, index }: { fallback: string; index: number }) {
-  const Icon = v19SideMenuSlotIcons[index];
+function V19SideMenuIcon({ fallback, itemId }: { fallback: string; itemId: string }) {
+  const Icon = v19SideMenuIcons[itemId];
   if (!Icon) return <span>{fallback}</span>;
   return <Icon aria-hidden="true" focusable="false" size={17} strokeWidth={1.8} />;
 }

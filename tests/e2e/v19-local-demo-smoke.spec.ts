@@ -1,7 +1,16 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { join } from "node:path";
 
 const blockedText =
   /is blocked|doesn.t allow you to view this site|ERR_BLOCKED_BY_ADMINISTRATOR|ERR_BLOCKED_BY_CLIENT/i;
+
+function evidencePath(
+  testInfo: { outputPath: (name: string) => string },
+  name: string,
+) {
+  const externalRoot = process.env.V19_TEST_ARTIFACTS_DIR?.trim();
+  return externalRoot ? join(externalRoot, name) : testInfo.outputPath(name);
+}
 
 async function assertNotPolicyBlocked(page: Page): Promise<void> {
   const bodyText = await page
@@ -95,15 +104,24 @@ async function expectUnifiedSideMenuFinish(
   expect(menuBox?.width).toBeGreaterThanOrEqual(minimumMenuWidth);
   expect((menuBox?.x ?? 0) + (menuBox?.width ?? 0)).toBeLessThanOrEqual(viewportWidth);
 
-  const brandLogo = sideMenu.locator("img.ops-brand-logo");
-  await expect(brandLogo).toBeVisible();
-  await expect(brandLogo).toHaveAttribute("alt", "VisaFlow");
+  const profileAvatar = sideMenu.locator(".v19-side-menu-avatar");
+  const profileCopy = sideMenu.locator(".v19-side-menu-profile-copy");
+  await expect(profileAvatar).toBeVisible();
+  await expect(profileCopy).toBeVisible();
 
   const createButton = sideMenu.getByRole("button", { name: "Новая подача" });
   if ((await createButton.count()) > 0) {
     await expect(createButton).toBeVisible();
-    await expect(createButton.locator("strong")).toHaveText("Новая подача");
-    await expect(createButton).toHaveCSS("background-color", "rgb(91, 96, 201)");
+    await expect(createButton.locator("strong")).toHaveText("Начать новую подачу");
+    await expect(createButton.locator(".v19-side-menu-create-action")).toHaveCSS(
+      "background-color",
+      "rgb(91, 96, 201)",
+    );
+    await expect(
+      sideMenu
+        .getByRole("navigation", { name: "Операционные разделы" })
+        .getByRole("button", { name: "Новая подача" }),
+    ).toHaveCount(0);
     await expect
       .poll(() =>
         createButton
@@ -115,14 +133,14 @@ async function expectUnifiedSideMenuFinish(
 
   const activeItem = sideMenu.locator('.ops-nav-item[aria-current="page"]');
   const navIconBox = await activeItem.locator(".ops-nav-icon").boundingBox();
-  const navTextBox = await activeItem.locator(".ops-nav-copy strong").boundingBox();
+  const navCopyBox = await activeItem.locator(".ops-nav-copy").boundingBox();
   expect(navIconBox).not.toBeNull();
-  expect(navTextBox).not.toBeNull();
+  expect(navCopyBox).not.toBeNull();
   expect(
     Math.abs(
       (navIconBox?.y ?? 0) +
         (navIconBox?.height ?? 0) / 2 -
-        ((navTextBox?.y ?? 0) + (navTextBox?.height ?? 0) / 2),
+        ((navCopyBox?.y ?? 0) + (navCopyBox?.height ?? 0) / 2),
     ),
   ).toBeLessThanOrEqual(1);
 
@@ -163,16 +181,18 @@ async function expectUnifiedSideMenuFinish(
       };
     })
     .toEqual({
-      activeBackground: "rgb(39, 39, 43)",
-      activeBorder: "rgba(0, 0, 0, 0)",
-      inactiveText: "rgba(255, 255, 255, 0.7)",
+      activeBackground: "rgba(91, 96, 201, 0.16)",
+      activeBorder: "rgba(173, 182, 255, 0.36)",
+      inactiveText: "rgba(242, 243, 245, 0.62)",
       menuBackground: "rgb(22, 22, 23)",
-      menuText: "rgba(255, 255, 255, 0.7)",
+      menuText: "rgba(242, 243, 245, 0.92)",
     });
 
   const session = sideMenu.getByRole("button", { name: "Открыть профиль" });
-  const avatarBox = await session.locator(":scope > span").boundingBox();
-  const sessionTextBox = await session.locator(":scope > div").boundingBox();
+  const avatarBox = await session.locator(".v19-side-menu-avatar").boundingBox();
+  const sessionTextBox = await session
+    .locator(".v19-side-menu-profile-copy")
+    .boundingBox();
   expect(avatarBox).not.toBeNull();
   expect(sessionTextBox).not.toBeNull();
   expect(sessionTextBox?.x).toBeGreaterThanOrEqual(
@@ -182,10 +202,10 @@ async function expectUnifiedSideMenuFinish(
 
 async function expectMyActionsActiveMenuState(sideMenu: Locator): Promise<void> {
   const activeItem = sideMenu.locator('.ops-nav-item[aria-current="page"]');
-  await expect(activeItem).toHaveCSS("background-color", "rgb(39, 39, 43)");
+  await expect(activeItem).toHaveCSS("background-color", "rgba(91, 96, 201, 0.16)");
   await expect(activeItem.locator(".ops-nav-copy strong")).toHaveCSS(
     "color",
-    "rgb(255, 255, 255)",
+    "rgb(242, 243, 245)",
   );
 }
 
@@ -227,6 +247,34 @@ test.describe("V-19 local-demo smoke", () => {
     await expect(sideMenu).toBeVisible();
     await expect(sideMenu).toHaveAttribute("data-side-menu-mode", "regular");
     await expectMyActionsActiveMenuState(sideMenu);
+    await page.screenshot({
+      fullPage: false,
+      path: evidencePath(testInfo, "agent-desktop-menu.png"),
+    });
+    const collapseMenu = sideMenu.getByRole("button", {
+      name: "Свернуть меню",
+    });
+    await expect(collapseMenu).toBeVisible();
+    await collapseMenu.click();
+    await expect(sideMenu).toHaveAttribute("data-side-menu-mode", "compact");
+    await expect
+      .poll(async () => Math.round((await sideMenu.boundingBox())?.width ?? 0))
+      .toBe(104);
+    await expect(sideMenu.locator(".ops-nav-copy").first()).toBeHidden();
+    const compactActionsItem = sideMenu.getByRole("button", {
+      exact: true,
+      name: "Мои действия",
+    });
+    await compactActionsItem.hover();
+    await expect(
+      compactActionsItem.locator(".v19-side-menu-compact-flyout"),
+    ).toBeVisible();
+    await page.screenshot({
+      fullPage: false,
+      path: evidencePath(testInfo, "agent-desktop-menu-compact.png"),
+    });
+    await sideMenu.getByRole("button", { name: "Развернуть меню" }).click();
+    await expect(sideMenu).toHaveAttribute("data-side-menu-mode", "regular");
     const desktopMenuTrigger = page.getByRole("button", {
       exact: true,
       name: "Меню",
@@ -240,12 +288,32 @@ test.describe("V-19 local-demo smoke", () => {
     await page.setViewportSize({ height: 844, width: 390 });
     const menuTrigger = page.getByRole("button", { exact: true, name: "Меню" });
     await expect(menuTrigger).toBeVisible();
+    await menuTrigger.focus();
     await menuTrigger.click();
 
     const menuDialog = page.getByRole("dialog", { name: "Меню агента" });
     await expect(menuDialog).toBeVisible();
     await expect(sideMenu).toHaveCount(1);
     await expectUnifiedSideMenuFinish(page, menuDialog, 390);
+    const firstMenuControl = menuDialog.getByRole("button", {
+      name: "Открыть профиль",
+    });
+    const lastMenuControl = menuDialog.getByRole("button", { name: "Выйти" });
+    const workspace = page.locator(".workspace");
+    await expect(firstMenuControl).toBeFocused();
+    await expect(workspace).toHaveAttribute("aria-hidden", "true");
+    await expect(workspace).toHaveAttribute("inert", "");
+    await page.keyboard.press("Shift+Tab");
+    await expect(lastMenuControl).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(firstMenuControl).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(menuDialog).toBeHidden();
+    await expect(menuTrigger).toBeFocused();
+    await expect(workspace).not.toHaveAttribute("aria-hidden");
+    await expect(workspace).not.toHaveAttribute("inert");
+    await menuTrigger.click();
+    await expect(menuDialog).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -253,7 +321,79 @@ test.describe("V-19 local-demo smoke", () => {
       .toBe(true);
     await page.screenshot({
       fullPage: false,
-      path: testInfo.outputPath("agent-mobile-menu.png"),
+      path: evidencePath(testInfo, "agent-mobile-menu.png"),
+    });
+    await closeVisibleAgentMenu(page);
+    await expect(menuDialog).toBeHidden();
+    await menuTrigger.click();
+    await expect(menuDialog).toBeVisible();
+    await menuDialog.getByRole("button", { name: "Открыть командную палитру" }).click();
+    await expect(menuDialog).toBeHidden();
+    const agentPalette = page.getByRole("dialog", {
+      name: "Командная палитра агента",
+    });
+    await expect(agentPalette).toBeVisible();
+    await expect(agentPalette.getByRole("combobox")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(agentPalette).toBeHidden();
+    await expect(menuDialog).toBeHidden();
+    await expect(menuTrigger).toBeFocused();
+    await menuTrigger.click();
+    await expect(menuDialog).toBeVisible();
+    await menuDialog.getByRole("button", { name: "Открыть командную палитру" }).click();
+    await expect(agentPalette).toBeVisible();
+    await page.keyboard.press("Control+K");
+    await expect(agentPalette).toBeHidden();
+    await expect(menuDialog).toBeHidden();
+    await expect(menuTrigger).toBeFocused();
+
+    await page.setViewportSize({ height: 390, width: 844 });
+    await expect(menuTrigger).toBeVisible();
+    await menuTrigger.click();
+    await expect(menuDialog).toBeVisible();
+    await expectUnifiedSideMenuFinish(page, menuDialog, 844);
+
+    const shortLandscapeNav = menuDialog.getByRole("navigation", {
+      name: "Операционные разделы",
+    });
+    const lastShortLandscapeNavItem = shortLandscapeNav.locator(".ops-nav-item").last();
+    const shortLandscapeNavMetrics = await shortLandscapeNav.evaluate((element) => {
+      const computed = getComputedStyle(element);
+      return {
+        clientHeight: element.clientHeight,
+        overflowY: computed.overflowY,
+        scrollHeight: element.scrollHeight,
+      };
+    });
+    expect(shortLandscapeNavMetrics.overflowY).toBe("auto");
+    expect(shortLandscapeNavMetrics.scrollHeight).toBeGreaterThan(
+      shortLandscapeNavMetrics.clientHeight,
+    );
+    await shortLandscapeNav.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect
+      .poll(() => shortLandscapeNav.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+    await expect(lastShortLandscapeNavItem).toBeInViewport();
+
+    await expect(
+      menuDialog.getByRole("button", { name: "Новая подача" }),
+    ).toBeVisible();
+    await expect(menuDialog.locator(".v19-side-menu-create-copy")).toBeHidden();
+    await expect(menuDialog.getByRole("button", { name: "Выйти" })).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document.body.scrollWidth <= innerWidth &&
+            document.documentElement.scrollWidth <= innerWidth,
+        ),
+      )
+      .toBe(true);
+    await page.screenshot({
+      fullPage: false,
+      path: evidencePath(testInfo, "agent-short-landscape-menu.png"),
     });
     await closeVisibleAgentMenu(page);
     await expect(menuDialog).toBeHidden();
@@ -274,7 +414,18 @@ test.describe("V-19 local-demo smoke", () => {
       await expect(menuDialog).toBeHidden();
     }
 
+    await page.setViewportSize({ height: 800, width: 1024 });
+    await expect(menuTrigger).toBeVisible();
+    await menuTrigger.click();
+    await expect(menuDialog).toBeVisible();
+    await menuDialog.getByRole("button", { name: "Закрыть меню" }).focus();
     await page.setViewportSize({ height: 800, width: 1025 });
+    await expect(menuDialog).toBeHidden();
+    await expect(menuTrigger).toBeHidden();
+    await expect(
+      sideMenu.getByRole("button", { name: "Открыть профиль" }),
+    ).toBeFocused();
+
     await expect(sideMenu).toBeVisible();
     await expect(menuTrigger).toBeHidden();
     await expectUnifiedSideMenuFinish(page, sideMenu, 1025);
@@ -307,7 +458,7 @@ test.describe("V-19 local-demo smoke", () => {
     await expectMyActionsActiveMenuState(sideMenu);
     await page.screenshot({
       fullPage: false,
-      path: testInfo.outputPath("admin-desktop-menu.png"),
+      path: evidencePath(testInfo, "admin-desktop-menu.png"),
     });
     await expect(
       page.getByRole("button", { name: "Открыть меню администратора" }),
@@ -335,8 +486,28 @@ test.describe("V-19 local-demo smoke", () => {
       .toBe(true);
     await page.screenshot({
       fullPage: false,
-      path: testInfo.outputPath("admin-mobile-menu.png"),
+      path: evidencePath(testInfo, "admin-mobile-menu.png"),
     });
+    await menuDialog.getByRole("button", { name: "Открыть командную палитру" }).click();
+    await expect(menuDialog).toBeHidden();
+    const adminPalette = page.getByRole("dialog", {
+      name: "Командная палитра администратора",
+    });
+    await expect(adminPalette).toBeVisible();
+    await expect(adminPalette.getByRole("combobox")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(adminPalette).toBeHidden();
+    await expect(menuTrigger).toBeFocused();
+    await menuTrigger.click();
+    await expect(menuDialog).toBeVisible();
+    await menuDialog.getByRole("button", { name: "Открыть командную палитру" }).click();
+    await expect(adminPalette).toBeVisible();
+    await page.keyboard.press("Control+K");
+    await expect(adminPalette).toBeHidden();
+    await expect(menuDialog).toBeHidden();
+    await expect(menuTrigger).toBeFocused();
+    await menuTrigger.click();
+    await expect(menuDialog).toBeVisible();
     await menuDialog.getByRole("button", { exact: true, name: "Проверка" }).click();
     await expect(menuDialog).toBeHidden();
     await expect(page.locator(".v19-page-header h1")).toHaveText("Очередь на проверку");
