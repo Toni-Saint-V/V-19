@@ -7,6 +7,7 @@ import { ReviewWorkspace } from "./ReviewWorkspace";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { AdminUsersAccessScreen } from "./AdminUsersAccessScreen";
 import { AdminSystemSettingsScreen } from "./AdminSystemSettingsScreen";
+import "../shared/ui/admin-premium-convergence.css";
 import {
   AppShell,
   PageHeader,
