@@ -17,6 +17,7 @@ const responsiveViewports: ViewportProof[] = [
   { height: 900, label: "1440", width: 1440 },
   { height: 768, label: "1024", width: 1024 },
   { height: 1024, label: "768", width: 768 },
+  { height: 932, label: "430", width: 430 },
   { height: 844, label: "390", width: 390 },
   { height: 812, label: "375", width: 375 },
   {
@@ -24,6 +25,12 @@ const responsiveViewports: ViewportProof[] = [
     label: "360",
     maxCreateInnerOverflowPx: 10,
     width: 360,
+  },
+  {
+    height: 720,
+    label: "320",
+    maxCreateInnerOverflowPx: 10,
+    width: 320,
   },
 ];
 
@@ -189,6 +196,27 @@ async function expectDrawerFitsViewport(
 }
 
 async function screenshot(page: Page, viewport: ViewportProof, name: string) {
+  const activeAgentSurface = page.locator(
+    '[data-testid="agent-screen-transition"]:visible',
+  );
+  if ((await activeAgentSurface.count()) > 0) {
+    await expect
+      .poll(
+        () =>
+          activeAgentSurface.first().evaluate((element) => {
+            const style = getComputedStyle(element);
+            const transform = new DOMMatrixReadOnly(style.transform);
+            return (
+              Number.parseFloat(style.opacity || "0") >= 0.99 &&
+              Math.abs(transform.m41) <= 0.1 &&
+              Math.abs(transform.m42) <= 0.1
+            );
+          }),
+        { message: `${name}: agent screen transition is visually settled` },
+      )
+      .toBe(true);
+  }
+
   mkdirSync(responsiveEvidenceRoot, { recursive: true });
   await page.screenshot({
     fullPage: true,
@@ -217,7 +245,7 @@ async function clickOperationalNav(page: Page, name: RegExp) {
 
 async function expectSettingsReady(page: Page) {
   await expect(
-    page.getByRole("heading", { level: 2, name: "Системные настройки" }),
+    page.getByRole("heading", { level: 2, name: "Интерфейс и помощники" }),
   ).toBeVisible();
   await expect(
     page.getByRole("switch", { name: "Компактная плотность" }),
@@ -225,6 +253,140 @@ async function expectSettingsReady(page: Page) {
   await expect(
     page.getByRole("switch", { name: "AI-контекст в работе" }),
   ).toBeVisible();
+}
+
+async function expectCreateStageRhythm(page: Page, context: string) {
+  const operational = page.locator(
+    '[data-agent-screen="create"] .v19-preupload-operational-card',
+  );
+  const upload = page.locator(
+    '[data-agent-screen="create"] .v19-preupload-upload-panel',
+  );
+  await expect(operational).toBeVisible();
+  await expect(upload).toBeVisible();
+
+  const [operationalBox, uploadBox] = await Promise.all([
+    operational.boundingBox(),
+    upload.boundingBox(),
+  ]);
+  expect(operationalBox, `${context}: operational stage geometry`).not.toBeNull();
+  expect(uploadBox, `${context}: upload stage geometry`).not.toBeNull();
+
+  const gap = uploadBox!.y - (operationalBox!.y + operationalBox!.height);
+  expect(gap, `${context}: adjacent create stage gap`).toBeGreaterThanOrEqual(0);
+  expect(gap, `${context}: adjacent create stage gap`).toBeLessThanOrEqual(24);
+  await expect(page.locator("#preupload-disabled-reason")).toBeVisible();
+}
+
+async function expectMobileActionDensity(page: Page, context: string) {
+  const cards = page.locator(
+    '[data-agent-screen="actions"] .v19-actions-timeline-event:visible',
+  );
+  await expect(cards).toHaveCount(8);
+  await expect(
+    page.locator('[data-agent-screen="actions"] .v19-actions-timeline-node:visible'),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(
+      '[data-agent-screen="actions"] .v19-agent-action-status-button > svg:visible',
+    ),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(
+      '[data-agent-screen="actions"] .v19-agent-action-status-more > svg:first-child:visible',
+    ),
+  ).toHaveCount(0);
+
+  const viewport = page.viewportSize();
+  expect(viewport, `${context}: viewport`).not.toBeNull();
+  const firstThree = await cards.evaluateAll((elements) =>
+    elements.slice(0, 3).map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { bottom: rect.bottom, top: rect.top };
+    }),
+  );
+  expect(firstThree, `${context}: first three action cards`).toHaveLength(3);
+  for (const [index, box] of firstThree.entries()) {
+    expect(box.top, `${context}: action card ${index + 1} top`).toBeGreaterThanOrEqual(
+      0,
+    );
+    expect(
+      box.bottom,
+      `${context}: action card ${index + 1} fits first viewport`,
+    ).toBeLessThanOrEqual(viewport!.height + 1);
+  }
+
+  const nextStepStyle = await cards
+    .first()
+    .locator(".v19-actions-mobile-next")
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        borderBottomWidth: style.borderBottomWidth,
+        borderLeftWidth: style.borderLeftWidth,
+        borderRightWidth: style.borderRightWidth,
+      };
+    });
+  expect(nextStepStyle, `${context}: next step is not a nested card`).toEqual({
+    backgroundColor: "rgba(0, 0, 0, 0)",
+    borderBottomWidth: "0px",
+    borderLeftWidth: "0px",
+    borderRightWidth: "0px",
+  });
+}
+
+async function expectSettingsPanelsDoNotOverlap(page: Page, context: string) {
+  const panels = page.locator(
+    ".v19-system-settings.is-agent-workstation .v19-settings-grid > *",
+  );
+  await expect(panels).toHaveCount(2);
+  const boxes = await panels.evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+      };
+    }),
+  );
+  const horizontalSeparation =
+    boxes[0].right <= boxes[1].left + 1 || boxes[1].right <= boxes[0].left + 1;
+  const verticalSeparation =
+    boxes[0].bottom <= boxes[1].top + 1 || boxes[1].bottom <= boxes[0].top + 1;
+  expect(
+    horizontalSeparation || verticalSeparation,
+    `${context}: settings panels do not overlap`,
+  ).toBe(true);
+}
+
+async function expectQuestionnaireFooterClear(page: Page, context: string) {
+  const scroll = page.locator(".v19-questionnaire-scroll");
+  const fields = page.locator(".v19-questionnaire-field-cell:visible");
+  const footer = page.locator(".v19-questionnaire-mobile-footer:visible");
+  await expect(scroll).toBeVisible();
+  await expect(fields.first()).toBeVisible();
+  await expect(footer).toBeVisible();
+
+  await scroll.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect
+    .poll(() => scroll.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+
+  const [lastFieldBox, footerBox] = await Promise.all([
+    fields.last().boundingBox(),
+    footer.boundingBox(),
+  ]);
+  expect(lastFieldBox, `${context}: last questionnaire field`).not.toBeNull();
+  expect(footerBox, `${context}: questionnaire footer`).not.toBeNull();
+  expect(
+    lastFieldBox!.y + lastFieldBox!.height,
+    `${context}: footer does not cover last questionnaire field`,
+  ).toBeLessThanOrEqual(footerBox!.y + 1);
 }
 
 async function expectElementStartsAbove(
@@ -353,7 +515,7 @@ test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(180_000);
+    test.setTimeout(240_000);
     test.skip(testInfo.project.name !== "chromium", "single-project viewport proof");
 
     const problems = collectBrowserProblems(page);
@@ -376,6 +538,9 @@ test.describe("V-19 responsive proof", () => {
       ).toBeVisible();
       await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent actions`);
+      if (viewport.width < 768) {
+        await expectMobileActionDensity(page, `${viewport.label}: agent actions`);
+      }
       await screenshot(page, viewport, "agent-actions");
 
       await clickOperationalNav(page, /^Мои подачи/);
@@ -403,6 +568,7 @@ test.describe("V-19 responsive proof", () => {
         viewport.label,
         viewport.maxCreateInnerOverflowPx,
       );
+      await expectCreateStageRhythm(page, viewport.label);
       await screenshot(page, viewport, "create-submission-workspace");
 
       await createWorkspace.getByLabel("Город подачи").click();
@@ -442,12 +608,50 @@ test.describe("V-19 responsive proof", () => {
       });
       await questionnaireTab.click();
       await expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
+      const openQuestionnaire = dialog
+        .getByRole("button", { name: "Открыть анкету" })
+        .first();
+      await expect(openQuestionnaire).toBeVisible();
+      await openQuestionnaire.click();
+      const questionnaire = page.locator(".vf-figma-questionnaire-screen");
+      await expect(questionnaire).toBeVisible();
+      await expect(
+        questionnaire.getByRole("heading", {
+          level: 1,
+          name: /^Анкета:/,
+        }),
+      ).toBeVisible();
+      await expect(
+        questionnaire.locator(".v19-questionnaire-progress-shimmer"),
+      ).toHaveCount(0);
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: questionnaire`,
+      );
+      await screenshot(page, viewport, "questionnaire");
+      if (viewport.width < 768) {
+        await expectQuestionnaireFooterClear(page, `${viewport.label}: questionnaire`);
+      }
+      await questionnaire.getByRole("button", { name: "Назад" }).click();
+      await expect(questionnaire).toHaveCount(0);
+      await expect(dialog).toBeVisible();
       const overviewTab = dialog.getByRole("tab", {
         exact: true,
         name: "Обзор",
       });
       await overviewTab.click();
       await expect(overviewTab).toHaveAttribute("aria-selected", "true");
+      const overviewPanel = dialog.locator(
+        '#submission-drawer-panel-overview[role="tabpanel"]',
+      );
+      await expect(overviewPanel).toBeVisible();
+      await expect
+        .poll(() =>
+          overviewPanel.evaluate((element) =>
+            Number.parseFloat(getComputedStyle(element).opacity || "0"),
+          ),
+        )
+        .toBeGreaterThanOrEqual(0.99);
       await screenshot(page, viewport, "submission-drawer");
       await closeButton.click();
       await expect(dialog).toHaveCount(0);
@@ -461,6 +665,7 @@ test.describe("V-19 responsive proof", () => {
         page,
         `${viewport.label}: agent settings`,
       );
+      await expectSettingsPanelsDoNotOverlap(page, `${viewport.label}: agent settings`);
       await screenshot(page, viewport, "agent-settings");
 
       await openFreshWorkspace(page, {

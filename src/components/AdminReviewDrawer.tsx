@@ -5,7 +5,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   X,
   CheckCircle2,
@@ -27,6 +27,7 @@ import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
 } from "../integration/visaflowBusinessBridge";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import {
   fileStatusLabels,
   fileTypeLabels,
@@ -153,13 +154,19 @@ function fileDomId(fileId: string) {
   return `admin-review-file-${fileId}`;
 }
 
-function focusReviewTarget(target: HTMLElement | null) {
+function focusReviewTarget(
+  target: HTMLElement | null,
+  prefersReducedMotion: boolean,
+) {
   if (!target) {
     return;
   }
 
   if (typeof target.scrollIntoView === "function") {
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "center",
+    });
   }
   target.focus({ preventScroll: true });
 }
@@ -379,7 +386,7 @@ function ApplicantsTab({
   onVerifyDocument: AdminReviewDrawerProps["onVerifyDocument"];
 }) {
   const [activePanel, setActivePanel] = useState<ApplicantPanelId>("overview");
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
 
   useEffect(() => {
     const issue = reviewTarget?.issue;
@@ -727,6 +734,7 @@ function QuestionnaireTab({
   onApproveQuestionnaireField?: AdminReviewDrawerProps["onApproveQuestionnaireField"];
   onSelectedApplicantIdChange: (applicantId: string) => void;
 }) {
+  const prefersReducedMotion = useExperienceReducedMotion();
   const [isApplicantMenuOpen, setApplicantMenuOpen] = useState(false);
   const [pendingApprovalKey, setPendingApprovalKey] = useState("");
   const [pendingSectionId, setPendingSectionId] = useState("");
@@ -799,11 +807,16 @@ function QuestionnaireTab({
       if (section instanceof HTMLDetailsElement) {
         section.open = true;
       }
-      focusReviewTarget(target);
+      focusReviewTarget(target, prefersReducedMotion);
     });
 
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [reviewTarget, selectedApplicantId, submission]);
+  }, [
+    prefersReducedMotion,
+    reviewTarget,
+    selectedApplicantId,
+    submission,
+  ]);
 
   if (!submission) {
     return (
@@ -840,7 +853,7 @@ function QuestionnaireTab({
     document
       .getElementById(questionnaireFieldDomId(applicant.id, target.id))
       ?.scrollIntoView({
-        behavior: "smooth",
+        behavior: prefersReducedMotion ? "auto" : "smooth",
         block: "center",
       });
   };
@@ -1113,6 +1126,7 @@ function MediaTab({
   reviewTarget: ReviewTargetRequest | null;
   submission: Submission | null;
 }) {
+  const prefersReducedMotion = useExperienceReducedMotion();
   useEffect(() => {
     const issue = reviewTarget?.issue;
     if (!issue || !issueTargetsFile(issue)) {
@@ -1129,11 +1143,14 @@ function MediaTab({
     }
 
     const animationFrame = window.requestAnimationFrame(() => {
-      focusReviewTarget(document.getElementById(fileDomId(targetFile.id)));
+      focusReviewTarget(
+        document.getElementById(fileDomId(targetFile.id)),
+        prefersReducedMotion,
+      );
     });
 
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [reviewTarget, submission]);
+  }, [prefersReducedMotion, reviewTarget, submission]);
 
   if (!submission) {
     return (

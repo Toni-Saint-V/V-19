@@ -1,6 +1,6 @@
 // src/components/AdminScreens.tsx
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import {
   ArrowUpDown,
   ArrowUpRight,
@@ -24,6 +24,7 @@ import {
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
 import { V19MetricCard, V19MetricStrip } from "../shared/ui/v19-design-system";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import {
   buildAdminTriageRadar,
   type AdminTriageRadarItem,
@@ -384,7 +385,7 @@ export function ReviewScreen({
   onOpenExport,
   submissions,
 }: AdminScreenProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const surfaceMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
   const [activeLane, setActiveLane] = useState<Lane | "all">("all");
   const [cityFilter, setCityFilter] = useState("Все города");

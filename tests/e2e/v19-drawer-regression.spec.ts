@@ -342,9 +342,12 @@ test.describe("Linear submission Drawer regression", () => {
           await selectSubmissionStatus(page, "Выгружено");
         }
 
-        await submissionsScreen
-          .locator(`.v19-agent-shared-card[data-submission-id="${fixture.id}"]`)
-          .click();
+        const submissionCard = submissionsScreen.locator(
+          `.v19-agent-shared-card[data-submission-id="${fixture.id}"]`,
+        );
+        await submissionCard.focus();
+        await expect(submissionCard).toBeFocused();
+        await submissionCard.press("Enter");
         const submissionDrawer = drawer(page);
         await expect(submissionDrawer.getByTestId("drawer-status-badge")).toHaveText(
           fixture.status,

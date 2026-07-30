@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   drawerMotion,
   drawerPanelExit as getDrawerPanelExit,
@@ -18,6 +18,7 @@ import {
   drawerTabInitial as getDrawerTabInitial,
   useDrawerDesktopQuery,
 } from "../../../shared/ui/drawer/drawerMotion";
+import { useExperienceReducedMotion } from "../../../shared/ui/experiencePreferences";
 import {
   AlertCircle,
   Briefcase,
@@ -5789,7 +5790,7 @@ export function FigmaSubmissionDrawer({
   const drawerTabsRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const isDesktopDrawer = useDrawerDesktopQuery();
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const data = useMemo(() => buildDetail(submission), [submission]);
   const primaryAction = getPrimaryAction(submission, role, surface);
   const pendingTargetRef = useRef<WorkspaceTarget | null>(null);

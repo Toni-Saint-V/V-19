@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
+import { useExperienceReducedMotion } from "../../../shared/ui/experiencePreferences";
 import type { AgentOwnerId, Submission } from "../types";
 import {
   BLS_CITY_OPTIONS,
@@ -195,6 +196,7 @@ type QuestionnaireFieldUiContract = {
   focused: (fieldId: string) => boolean;
   revealRequiredErrors: boolean;
   required: (fieldId: string) => boolean;
+  reducedMotion: boolean;
   reviewSource: (fieldId: string, label: string) => string | undefined;
   state: (fieldId: string, label: string) => FieldState;
 };
@@ -686,6 +688,7 @@ function FormField({
   value,
 }: FormFieldProps) {
   const fieldContract = useContext(QuestionnaireFieldUiContext);
+  const reducedMotion = fieldContract?.reducedMotion ?? false;
   const [isOpen, setIsOpen] = useState(false);
   const [quickOptionsExpanded, setQuickOptionsExpanded] = useState(() => !value);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
@@ -1117,9 +1120,9 @@ function FormField({
                 <motion.div
                   animate={{ opacity: 1, y: 0 }}
                   className="v19-questionnaire-dropdown"
-                  exit={{ opacity: 0, y: -4 }}
-                  initial={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15 }}
+                  exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+                  initial={reducedMotion ? false : { opacity: 0, y: -4 }}
+                  transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
                 >
                   {usesOptionSearch ? (
                     <input
@@ -1276,11 +1279,11 @@ function FormField({
               <motion.div
                 animate={{ opacity: 1, y: 0 }}
                 className="v19-questionnaire-dropdown"
-                exit={{ opacity: 0, y: -4 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
                 id={suggestionsId}
-                initial={{ opacity: 0, y: -4 }}
+                initial={reducedMotion ? false : { opacity: 0, y: -4 }}
                 role="listbox"
-                transition={{ duration: 0.15 }}
+                transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
               >
                 {visibleInputSuggestions.map((suggestion, index) => (
                   <button
@@ -2732,7 +2735,7 @@ export function FigmaQuestionnaireScreen({
   const [discardExitArmed, setDiscardExitArmed] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
   const familyCopyStatusId = useId();
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const autosaveRevisionRef = useRef(0);
   const failedSaveRevisionRef = useRef<number | undefined>(undefined);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
@@ -2809,11 +2812,11 @@ export function FigmaQuestionnaireScreen({
 
   useEffect(() => {
     activeApplicantTabRef.current?.scrollIntoView?.({
-      behavior: "smooth",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
       block: "nearest",
       inline: "center",
     });
-  }, [activeApplicant]);
+  }, [activeApplicant, prefersReducedMotion]);
 
   useEffect(() => {
     for (const element of [
@@ -2821,12 +2824,12 @@ export function FigmaQuestionnaireScreen({
       activeSidebarSectionTabRef.current,
     ]) {
       element?.scrollIntoView?.({
-        behavior: "smooth",
+        behavior: prefersReducedMotion ? "auto" : "smooth",
         block: "nearest",
         inline: "center",
       });
     }
-  }, [activeSection]);
+  }, [activeSection, prefersReducedMotion]);
 
   const activeApplicantModel = useMemo(
     () =>
@@ -2866,7 +2869,10 @@ export function FigmaQuestionnaireScreen({
       );
       if (focusedFile) {
         focusedFile.focus({ preventScroll: true });
-        focusedFile.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        focusedFile.scrollIntoView?.({
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "center",
+        });
         initialFocusAppliedRef.current = true;
         return;
       }
@@ -2883,7 +2889,10 @@ export function FigmaQuestionnaireScreen({
         );
         if (target) {
           target.focus({ preventScroll: true });
-          element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+          element?.scrollIntoView?.({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+            block: "center",
+          });
           initialFocusAppliedRef.current = true;
           return;
         }
@@ -2906,7 +2915,7 @@ export function FigmaQuestionnaireScreen({
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [activeApplicantModel, activeSection, initialFieldTarget]);
+  }, [activeApplicantModel, activeSection, initialFieldTarget, prefersReducedMotion]);
 
   const selectOptions = useMemo(
     () => ({
@@ -3982,7 +3991,10 @@ export function FigmaQuestionnaireScreen({
         "input, textarea, button, [tabindex]",
       );
       target?.focus({ preventScroll: true });
-      element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      element?.scrollIntoView?.({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
     }, 0);
   }
 
@@ -5126,6 +5138,7 @@ export function FigmaQuestionnaireScreen({
       (initialFocus?.applicantId ?? activeApplicant) === activeApplicant,
     revealRequiredErrors,
     required: fieldIsRequired,
+    reducedMotion: prefersReducedMotion,
     reviewSource: fieldReviewSource,
     state: fieldReviewState,
   };
@@ -5180,6 +5193,7 @@ export function FigmaQuestionnaireScreen({
       className={`vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell questionnaire-screen codex-polish-v1${
         isEditable ? "" : " is-read-only"
       }`}
+      data-reduced-motion={prefersReducedMotion ? "true" : "false"}
       data-submission-id={draftSubmission.id}
       exit={{ opacity: 0 }}
       initial={prefersReducedMotion ? false : { opacity: 0 }}
@@ -5199,9 +5213,21 @@ export function FigmaQuestionnaireScreen({
         </button>
 
         <div className="v19-questionnaire-title-wrap">
-          <h1 className="sr-only">
-            Анкета: {draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}
-          </h1>
+          <div className="v19-questionnaire-title-copy">
+            <h1
+              aria-label={`Анкета: ${
+                draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`
+              }`}
+              className="v19-questionnaire-title"
+            >
+              Анкета
+            </h1>
+            <span className="v19-questionnaire-title-context">
+              {activeApplicantContext?.name ??
+                draftSubmission.title?.trim() ??
+                `Подача ${draftSubmission.id}`}
+            </span>
+          </div>
           <AccessibleSelectMenu
             ariaLabel="Выбрать туриста"
             className="v19-questionnaire-tourist-switcher"
@@ -5265,15 +5291,7 @@ export function FigmaQuestionnaireScreen({
               ? { duration: 0 }
               : { delay: 0.1, duration: 1.2, ease: "easeOut" }
           }
-        >
-          {!prefersReducedMotion ? (
-            <motion.div
-              animate={{ x: ["-100%", "200%"] }}
-              className="v19-questionnaire-progress-shimmer absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-              transition={{ duration: 2.5, ease: "linear", repeat: Infinity }}
-            />
-          ) : null}
-        </motion.div>
+        ></motion.div>
       </div>
 
       <p aria-atomic="true" aria-live="polite" className="sr-only" role="status">
