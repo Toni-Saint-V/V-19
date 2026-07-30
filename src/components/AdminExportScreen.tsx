@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -28,6 +28,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
 import { useModalSheetFocus } from "../shared/ui/useModalSheetFocus";
 import {
@@ -268,7 +269,7 @@ export function AdminExportScreen({
 }: {
   submissions?: Submission[];
 }) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const surfaceMotion = workspaceSurfaceMotion(Boolean(prefersReducedMotion));
   const bridge = useVisaflowBusinessBridge();
   const realItems = useMemo(

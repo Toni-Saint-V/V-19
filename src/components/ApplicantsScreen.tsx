@@ -7,7 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import {
   AlertCircle,
   ArrowUpDown,
@@ -23,6 +23,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import { ConfirmationDialog } from "../modules/submissions/components/Primitives";
 import {
   applicantWorkflowActions,
@@ -766,7 +767,7 @@ export function ApplicantsScreen({
   submissions,
   typeFilter: controlledTypeFilter,
 }: ApplicantsScreenProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const [internalTypeFilter, setInternalTypeFilter] =
     useState<SubmissionTypeFilter>("single");
   const typeFilter = controlledTypeFilter ?? internalTypeFilter;
@@ -983,8 +984,9 @@ export function ApplicantsScreen({
     <motion.div
       animate={{ opacity: 1, y: 0 }}
       className="v19-agent-shared-screen"
+      data-reduced-motion={prefersReducedMotion ? "true" : "false"}
       initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
-      transition={{ duration: 0.3 }}
+      transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.3 }}
     >
       <V19MetricStrip>
         <V19MetricCard

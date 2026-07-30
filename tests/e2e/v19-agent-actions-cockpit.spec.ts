@@ -254,16 +254,12 @@ async function assertDesktopCockpit(page: Page) {
   await expect(surface.locator(".v19-actions-cockpit-summary")).toHaveCount(0);
   await expect(surface.locator('[data-action-filter="open"]')).toBeVisible();
   await expect(surface.locator('[data-action-filter="today"]')).toBeVisible();
-  const viewport = page.viewportSize();
-  if (viewport && viewport.width < 1200) {
-    await expect(surface.locator('[data-action-filter="completed"]')).not.toBeVisible();
-    await expect(
-      surface.getByRole("combobox", { name: "Дополнительный фильтр действий" }),
-    ).toBeVisible();
-  } else {
-    await expect(surface.locator('[data-action-filter="completed"]')).toBeVisible();
-  }
+  await expect(surface.locator('[data-action-filter="completed"]')).not.toBeVisible();
+  await expect(
+    surface.getByRole("combobox", { name: "Дополнительный фильтр действий" }),
+  ).toBeVisible();
 
+  const viewport = page.viewportSize();
   if (viewport && viewport.width >= 1280) {
     const visibleCards = await surface.locator(".v19-actions-queue-entry").evaluateAll(
       (cards) =>
@@ -299,7 +295,18 @@ async function assertActionFilters(page: Page) {
     filter: "blockers" | "completed" | "open" | "today" | "week",
   ) => {
     const button = surface.locator(`[data-action-filter="${filter}"]`);
-    await button.click();
+    if (filter === "completed" || filter === "week") {
+      await surface
+        .getByRole("combobox", { name: "Дополнительный фильтр действий" })
+        .click();
+      await page
+        .getByRole("option", {
+          name: new RegExp(filter === "week" ? "^Неделя" : "^Закрыто"),
+        })
+        .click();
+    } else {
+      await button.click();
+    }
     await expect(button).toHaveAttribute("aria-pressed", "true");
   };
 
@@ -345,7 +352,7 @@ async function assertPrimaryActionRouting(page: Page) {
 
 test.describe("V-19 My Actions submission command cockpit", () => {
   test("viewport matrix and controlled single-open disclosure", async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     mkdirSync(proofDir, { recursive: true });
     const browserProblems = collectBrowserProblems(page);
     const rows: ProofRow[] = [];

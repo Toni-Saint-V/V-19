@@ -7,7 +7,7 @@ import {
   type DragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   BookUser,
   Plus,
@@ -18,12 +18,12 @@ import {
   X,
 } from "lucide-react";
 import { agentInteractionProps } from "../modules/submissions/agentInteractionContract";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import type { PassportExtractionField } from "../modules/submissions/passportExtractionContract";
 import {
   passportIntakeApplicantName,
   passportIntakePreviewFields,
   passportScanUploadAccept,
-  passportScanUploadFormatLabel,
   passportUploadFromIntakeItem,
   submissionIntakeApplicantCount,
   submissionIntakeFamilyMax,
@@ -196,13 +196,7 @@ function PrefillPreviewList({
   fields: PassportIntakePreviewField[];
   reduceMotion: boolean;
 }) {
-  if (!fields.length) {
-    return (
-      <p className="v19-preupload-prefill-empty">
-        После распознавания здесь появятся данные из паспорта.
-      </p>
-    );
-  }
+  if (!fields.length) return null;
 
   return (
     <div className="v19-preupload-prefill-list">
@@ -245,7 +239,7 @@ export function PreUploadScreen({
   onNavigationStateChange,
   onSubmit,
 }: PreUploadScreenProps) {
-  const reduceMotion = Boolean(useReducedMotion());
+  const reduceMotion = useExperienceReducedMotion();
   const [packageType, setPackageType] =
     useState<Submission["type"]>(initialPackageType);
   const [city, setCity] = useState<City | "">(initialCity ?? "");
@@ -703,6 +697,7 @@ export function PreUploadScreen({
       animate={{ opacity: 1, y: 0 }}
       aria-labelledby="new-submission-workspace-title"
       className="v19-preupload-screen text-[var(--v19-depth-text)]"
+      data-reduced-motion={reduceMotion ? "true" : "false"}
       data-testid="preupload-workspace"
       exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
       initial={false}
@@ -714,21 +709,6 @@ export function PreUploadScreen({
         <div className="v19-preupload-layout">
           <section className="v19-preupload-primary">
             <motion.div className="v19-preupload-card">
-              <motion.div
-                animate={
-                  reduceMotion
-                    ? undefined
-                    : { opacity: [0.55, 0.8, 0.55], scale: [1, 1.12, 1] }
-                }
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[var(--v19-depth-accent-soft)] blur-3xl"
-                transition={
-                  reduceMotion
-                    ? { duration: 0 }
-                    : { duration: 4, ease: "easeInOut", repeat: Infinity }
-                }
-              />
-
               <div className="v19-preupload-card-body">
                 <div className="v19-preupload-card-intro relative z-10">
                   <h2
@@ -742,12 +722,6 @@ export function PreUploadScreen({
                 </div>
 
                 <div className="v19-preupload-operational-card relative z-10">
-                  <div className="v19-preupload-section-heading">
-                    <div>
-                      <h3>Заявители</h3>
-                      <p>Настройте состав подачи и добавьте паспорта.</p>
-                    </div>
-                  </div>
                   <div className="v19-preupload-setup-row">
                     <div
                       aria-label="Тип подачи"
@@ -783,7 +757,6 @@ export function PreUploadScreen({
                     </div>
 
                     <div className="v19-preupload-city-field">
-                      <span>Город подачи</span>
                       <AccessibleSelectMenu
                         ariaLabel="Город подачи"
                         disabled={actionPending}
@@ -948,12 +921,6 @@ export function PreUploadScreen({
                 </div>
 
                 <div className="v19-preupload-upload-panel">
-                  <div className="v19-preupload-section-heading">
-                    <div>
-                      <h3>Паспорт</h3>
-                      <p>Добавьте файл для выбранного заявителя.</p>
-                    </div>
-                  </div>
                   <div className="v19-preupload-upload-group">
                     {busyItems.length ? (
                       <div
@@ -1066,8 +1033,8 @@ export function PreUploadScreen({
                           : `Паспорт: ${activeApplicantLabel}`}
                       </h3>
                       <p className="v19-preupload-dropzone-copy">
-                        {passportScanUploadFormatLabel}, до 50 МБ. Распознаём данные на
-                        этом устройстве. Файл загрузится только после сохранения.
+                        Загрузите паспорт, программа извлечет данные и подставит сразу в
+                        анкету
                       </p>
                     </button>
                     <input
@@ -1097,52 +1064,53 @@ export function PreUploadScreen({
                     </button>
                   ) : null}
                 </div>
-              </div>
 
-              <div className="v19-preupload-footer">
-                {actionError ? (
-                  <p className="v19-preupload-action-error" role="alert">
-                    {actionError}
-                  </p>
-                ) : null}
-                {submissionDisabledReason && !actionPending ? (
-                  <p
-                    className="v19-preupload-disabled-reason"
-                    id="preupload-disabled-reason"
+                <div className="v19-preupload-footer">
+                  {actionError ? (
+                    <p className="v19-preupload-action-error" role="alert">
+                      {actionError}
+                    </p>
+                  ) : null}
+                  {submissionDisabledReason && !actionPending ? (
+                    <p
+                      aria-live="polite"
+                      className="v19-preupload-disabled-reason"
+                      id="preupload-disabled-reason"
+                    >
+                      {submissionDisabledReason}
+                    </p>
+                  ) : null}
+                  <button
+                    {...agentInteractionProps("new-submission.save-draft")}
+                    aria-describedby={
+                      submitDisabled ? "preupload-disabled-reason" : undefined
+                    }
+                    className="v19-preupload-secondary-action"
+                    disabled={submitDisabled}
+                    onClick={() => void submit("list")}
+                    type="button"
                   >
-                    {submissionDisabledReason}
-                  </p>
-                ) : null}
-                <button
-                  {...agentInteractionProps("new-submission.save-draft")}
-                  aria-describedby={
-                    submitDisabled ? "preupload-disabled-reason" : undefined
-                  }
-                  className="v19-preupload-secondary-action"
-                  disabled={submitDisabled}
-                  onClick={() => void submit("list")}
-                  type="button"
-                >
-                  {actionPending
-                    ? persistenceLabel(persistenceProgress)
-                    : "Сохранить черновик"}
-                </button>
-                <button
-                  {...agentInteractionProps("new-submission.continue")}
-                  aria-describedby={
-                    submitDisabled ? "preupload-disabled-reason" : undefined
-                  }
-                  className="v19-preupload-primary-action"
-                  disabled={submitDisabled}
-                  onClick={() => void submit("questionnaire")}
-                  type="button"
-                >
-                  {actionPending
-                    ? persistenceLabel(persistenceProgress)
-                    : items.length
-                      ? "Создать и открыть анкету"
-                      : "Продолжить без паспорта"}
-                </button>
+                    {actionPending
+                      ? persistenceLabel(persistenceProgress)
+                      : "Сохранить черновик"}
+                  </button>
+                  <button
+                    {...agentInteractionProps("new-submission.continue")}
+                    aria-describedby={
+                      submitDisabled ? "preupload-disabled-reason" : undefined
+                    }
+                    className="v19-preupload-primary-action"
+                    disabled={submitDisabled}
+                    onClick={() => void submit("questionnaire")}
+                    type="button"
+                  >
+                    {actionPending
+                      ? persistenceLabel(persistenceProgress)
+                      : items.length
+                        ? "Создать и открыть анкету"
+                        : "Продолжить без паспорта"}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </section>
@@ -1167,8 +1135,9 @@ export function PreUploadScreen({
               <motion.div
                 animate={{ opacity: 1 }}
                 className="v19-preupload-prefill-overlay"
-                exit={{ opacity: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
                 initial={reduceMotion ? false : { opacity: 0 }}
+                transition={reduceMotion ? { duration: 0 } : undefined}
               >
                 <button
                   {...agentInteractionProps("new-submission.toggle-prefill")}
@@ -1228,8 +1197,9 @@ export function PreUploadScreen({
               <motion.div
                 animate={{ opacity: 1 }}
                 className="v19-preupload-modal-overlay"
-                exit={{ opacity: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
                 initial={false}
+                transition={reduceMotion ? { duration: 0 } : undefined}
               >
                 <motion.section
                   aria-labelledby="passport-assignment-title"
@@ -1331,8 +1301,9 @@ export function PreUploadScreen({
               <motion.div
                 animate={{ opacity: 1 }}
                 className="v19-preupload-modal-overlay"
-                exit={{ opacity: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0 }}
                 initial={false}
+                transition={reduceMotion ? { duration: 0 } : undefined}
               >
                 <motion.section
                   aria-labelledby="preupload-confirmation-title"

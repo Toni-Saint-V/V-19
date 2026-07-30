@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import type { LucideIcon } from "lucide-react";
 import { useDrawerDesktopQuery } from "../shared/ui/drawer/drawerMotion";
 import { linearDrawerMotion } from "../shared/ui/drawer/linearDrawerMotion";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
 import {
   AlertCircle,
   ArrowRight,
@@ -1215,8 +1216,7 @@ export function Drawer({
   const scrollSubmissionIdRef = useRef(submission.id);
   const tabScrollPositionsRef = useRef(new Map<TabId, number>());
   const isDesktop = useDrawerDesktopQuery();
-  const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = Boolean(prefersReducedMotion);
+  const shouldReduceMotion = useExperienceReducedMotion();
   reviewConfirmationOpenRef.current = reviewConfirmationOpen;
   const panelInitial = shouldReduceMotion
     ? { opacity: 1, x: 0, y: 0 }
@@ -1667,6 +1667,7 @@ export function Drawer({
             aria-modal="true"
             animate={{ opacity: 1, x: 0, y: 0 }}
             className="v19-submission-drawer v19-agent-drawer fixed z-50 flex flex-col"
+            data-reduced-motion={shouldReduceMotion ? "true" : "false"}
             exit={panelExit}
             initial={panelInitial}
             data-v19-linear-drawer="true"

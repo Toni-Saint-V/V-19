@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -35,6 +35,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { useExperienceReducedMotion } from "../../../shared/ui/experiencePreferences";
 import { invokeAiHelperEdge } from "../../../services/aiEdgeClient";
 import {
   adminAiActor,
@@ -250,7 +251,7 @@ export function AdminReviewDrawer({
   const onCloseRef = useRef(onClose);
   const remarkContextRef = useRef(remarkContext);
   const passportWorkspaceOpenRef = useRef(passportWorkspaceOpen);
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
 
   onCloseRef.current = onClose;
   remarkContextRef.current = remarkContext;
@@ -891,6 +892,7 @@ export function AdminReviewDrawer({
               ) : activeReviewTab === "questionnaire" ? (
                 <QuestionnaireReviewTab
                   focusTarget={questionnaireFocusTarget}
+                  prefersReducedMotion={prefersReducedMotion}
                   selectedApplicant={selectedApplicant}
                   submission={submission}
                   onFieldRemark={openQuestionnaireRemark}
@@ -1888,12 +1890,14 @@ function SelfieReviewTab({
 
 function QuestionnaireReviewTab({
   focusTarget,
+  prefersReducedMotion,
   selectedApplicant,
   submission,
   onFieldRemark,
   onVerifyPassport,
 }: {
   focusTarget?: WorkspaceTarget;
+  prefersReducedMotion: boolean;
   selectedApplicant?: Applicant;
   submission: Submission;
   onFieldRemark: (row: ReviewFieldRow) => void;
@@ -1921,13 +1925,16 @@ function QuestionnaireReviewTab({
     const timer = window.setTimeout(() => {
       const element = document.getElementById(targetElementId(focusTarget));
       if (!element) return;
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
       element.classList.add("is-ai-focus");
       window.setTimeout(() => element.classList.remove("is-ai-focus"), 1800);
     }, 100);
 
     return () => window.clearTimeout(timer);
-  }, [focusTarget, selectedApplicant]);
+  }, [focusTarget, prefersReducedMotion, selectedApplicant]);
 
   const passportRows = reviewSections[0]?.rows ?? [];
   const reviewedCount = passportRows.filter(

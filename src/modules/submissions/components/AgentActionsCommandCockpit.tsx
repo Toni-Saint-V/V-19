@@ -869,7 +869,10 @@ function TimelineEvent({
           <strong>{task.nextAction.label}</strong>
         </span>
         <span className="v19-actions-mobile-status-row">
-          <StatusBadge status={task.status} label={task.statusLabel} />
+          <StatusBadge
+            status={task.status}
+            label={task.status === "error" ? "Нужны правки" : task.statusLabel}
+          />
           <ChevronDown aria-hidden="true" className="v19-actions-table-chevron" />
         </span>
       </button>

@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -22,11 +22,13 @@ import {
   UsersRound,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
-import type { Submission } from "../types";
+import { useExperienceReducedMotion } from "../../../shared/ui/experiencePreferences";
+import type { AgentOwnerId, Submission } from "../types";
 import {
   BLS_CITY_OPTIONS,
   POPULAR_RUSSIAN_CITY_OPTIONS,
   isQuestionnaireDateField,
+  questionnaireIssueFieldDisplayLabel,
   questionnaireDateIntent,
   updateQuestionnaireField,
   validateQuestionnaireFieldValue,
@@ -34,7 +36,9 @@ import {
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
 import {
+  buildAutomaticQuestionnaireFamilyCopyUpdates,
   buildQuestionnaireFamilyCopyPlan,
+  isQuestionnaireFamilyCopyField,
   type QuestionnaireFamilyCopyPlan,
 } from "../questionnaireFamilyCopy";
 import {
@@ -53,6 +57,7 @@ import {
   passportReviewMediaTypeForIssue,
   primaryApplicantIdForPassportReview,
 } from "../passportReviewContract";
+import { canConfirmApplicantPassportReview } from "../passportExtraction";
 import { suggestedRussianAddress } from "../russianAddress";
 import {
   composeQuestionnaireHomeAddress,
@@ -152,12 +157,12 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
 const familyCopyUnavailableMessage =
   "У основного заявителя нет введённых пользователем значений для копирования в этом разделе.";
 
-const familyCopySectionIds = new Set<SectionId>([
-  "appointment",
-  "contact",
-  "hotel",
-  "trip",
-]);
+const familyCopySectionIds = new Set<SectionId>(["appointment", "contact", "hotel"]);
+const familyCopyButtonLabels: Partial<Record<SectionId, string>> = {
+  appointment: "Копировать данные записи для всех",
+  contact: "Копировать адрес в России для всех",
+  hotel: "Копировать адрес в Испании для всех",
+};
 
 type FormFieldProps = {
   addressAssist?: boolean;
@@ -191,6 +196,7 @@ type QuestionnaireFieldUiContract = {
   focused: (fieldId: string) => boolean;
   revealRequiredErrors: boolean;
   required: (fieldId: string) => boolean;
+  reducedMotion: boolean;
   reviewSource: (fieldId: string, label: string) => string | undefined;
   state: (fieldId: string, label: string) => FieldState;
 };
@@ -200,11 +206,12 @@ const QuestionnaireFieldUiContext = createContext<QuestionnaireFieldUiContract |
 );
 
 type FigmaQuestionnaireScreenProps = {
+  commandActorId?: AgentOwnerId;
   initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
   onSaveAndExit?: () => void | Promise<void>;
   onComplete: (values: QuestionnaireCommitPayload) => void | Promise<void>;
-  onConfirmPassportReview?: (applicantId: string) => void | Promise<void>;
+  onConfirmPassportReview?: (applicantId: string) => Submission | Promise<Submission>;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
   onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
   onOpenDocuments?: (filter?: QuestionnaireDocumentsFilter) => void;
@@ -570,9 +577,7 @@ function normalizeDateInput(value: string, intent: QuestionnaireDateIntent) {
     const currentYear = new Date().getFullYear();
     const currentTwoDigitYear = currentYear % 100;
     return String(
-      numericYear <= currentTwoDigitYear
-        ? 2000 + numericYear
-        : 1900 + numericYear,
+      numericYear <= currentTwoDigitYear ? 2000 + numericYear : 1900 + numericYear,
     );
   };
   let day = "";
@@ -683,6 +688,7 @@ function FormField({
   value,
 }: FormFieldProps) {
   const fieldContract = useContext(QuestionnaireFieldUiContext);
+  const reducedMotion = fieldContract?.reducedMotion ?? false;
   const [isOpen, setIsOpen] = useState(false);
   const [quickOptionsExpanded, setQuickOptionsExpanded] = useState(() => !value);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
@@ -960,9 +966,7 @@ function FormField({
           deleteIndex >= 0
             ? `${value.slice(0, deleteIndex)}${value.slice(deleteIndex + 1)}`
             : value.slice(caret);
-        onChange?.(
-          formatDateInput(nextValue, "deleteContentBackward", dateIntent),
-        );
+        onChange?.(formatDateInput(nextValue, "deleteContentBackward", dateIntent));
         window.requestAnimationFrame(() => {
           const nextCaret = Math.max(0, caret - 2);
           input.setSelectionRange(nextCaret, nextCaret);
@@ -973,9 +977,7 @@ function FormField({
         event.preventDefault();
         const input = event.currentTarget;
         const nextValue = `${value.slice(0, caret + 1)}${value.slice(caret + 2)}`;
-        onChange?.(
-          formatDateInput(nextValue, "deleteContentForward", dateIntent),
-        );
+        onChange?.(formatDateInput(nextValue, "deleteContentForward", dateIntent));
         window.requestAnimationFrame(() =>
           input.setSelectionRange(caret + 1, caret + 1),
         );
@@ -1118,9 +1120,9 @@ function FormField({
                 <motion.div
                   animate={{ opacity: 1, y: 0 }}
                   className="v19-questionnaire-dropdown"
-                  exit={{ opacity: 0, y: -4 }}
-                  initial={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15 }}
+                  exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+                  initial={reducedMotion ? false : { opacity: 0, y: -4 }}
+                  transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
                 >
                   {usesOptionSearch ? (
                     <input
@@ -1151,7 +1153,6 @@ function FormField({
                         id={`${optionsListboxId}-option-${index}`}
                         key={option}
                         role="option"
-                        style={{ blockSize: 45, paddingBlock: 11 }}
                         tabIndex={-1}
                         type="button"
                         onMouseDown={(event) => event.preventDefault()}
@@ -1278,11 +1279,11 @@ function FormField({
               <motion.div
                 animate={{ opacity: 1, y: 0 }}
                 className="v19-questionnaire-dropdown"
-                exit={{ opacity: 0, y: -4 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
                 id={suggestionsId}
-                initial={{ opacity: 0, y: -4 }}
+                initial={reducedMotion ? false : { opacity: 0, y: -4 }}
                 role="listbox"
-                transition={{ duration: 0.15 }}
+                transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
               >
                 {visibleInputSuggestions.map((suggestion, index) => (
                   <button
@@ -1294,7 +1295,6 @@ function FormField({
                     id={`${suggestionsId}-option-${index}`}
                     key={suggestion}
                     role="option"
-                    style={{ blockSize: 45, paddingBlock: 11 }}
                     tabIndex={-1}
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
@@ -1617,9 +1617,7 @@ function questionnaireUpdateKey(
   return `${update.applicantId}:${update.sectionId}:${update.fieldId}`;
 }
 
-function questionnaireCommitMutationFingerprint(
-  payload: QuestionnaireCommitPayload,
-) {
+function questionnaireCommitMutationFingerprint(payload: QuestionnaireCommitPayload) {
   const fieldUpdates = [...payload.fieldUpdates].sort((left, right) =>
     questionnaireUpdateKey(left).localeCompare(questionnaireUpdateKey(right)),
   );
@@ -2351,7 +2349,7 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
 // eslint-disable-next-line react-refresh/only-export-components
 export const questionnaireUiNonRenderedFieldDispositions = {
   "birth-citizenship": "derived from country of birth",
-  "category": "service-managed appointment value",
+  category: "service-managed appointment value",
   "cost-covered-by": "service-managed payment value",
   "final-entry-permit": "reserved optional visa field",
   "final-entry-permit-issued-by": "reserved optional visa field",
@@ -2359,7 +2357,7 @@ export const questionnaireUiNonRenderedFieldDispositions = {
   "final-entry-permit-valid-to": "reserved optional visa field",
   "home-address": "derived from structured address fields",
   "means-of-support": "service-managed payment value",
-  "nationality": "derived from passport issue country",
+  nationality: "derived from passport issue country",
   "visa-type": "service-managed appointment value",
 } as const;
 
@@ -2368,18 +2366,33 @@ export const questionnaireUiNonRenderedFieldDispositions = {
 // eslint-disable-next-line react-refresh/only-export-components
 export const questionnaireUiLegacyBindingDispositions = {
   "appointment-note": { reason: "legacy appointment note", sectionId: "appointment" },
-  "desired-date-3": { reason: "legacy third appointment date", sectionId: "appointment" },
-  "occupation-specify": { reason: "legacy free-form occupation", sectionId: "employment" },
+  "desired-date-3": {
+    reason: "legacy third appointment date",
+    sectionId: "appointment",
+  },
+  "occupation-specify": {
+    reason: "legacy free-form occupation",
+    sectionId: "employment",
+  },
   "eu-relationship": { reason: "legacy EU-relative relation", sectionId: "euRelative" },
-  "eu-relative-details": { reason: "legacy EU-relative details", sectionId: "euRelative" },
+  "eu-relative-details": {
+    reason: "legacy EU-relative details",
+    sectionId: "euRelative",
+  },
   "form-filler-contact": { reason: "legacy form-filler contact", sectionId: "filler" },
   "form-filler-name": { reason: "legacy form-filler name", sectionId: "filler" },
   "form-filler-phone": { reason: "legacy form-filler phone", sectionId: "filler" },
   "other-sponsor": { reason: "legacy sponsor identity", sectionId: "payment" },
-  "sponsor-in-host-fields": { reason: "legacy sponsor host data", sectionId: "payment" },
+  "sponsor-in-host-fields": {
+    reason: "legacy sponsor host data",
+    sectionId: "payment",
+  },
   "sponsor-means": { reason: "legacy sponsor means", sectionId: "payment" },
   "national-id": { reason: "legacy national identifier", sectionId: "personal" },
-  "other-citizenship": { reason: "legacy additional citizenship", sectionId: "personal" },
+  "other-citizenship": {
+    reason: "legacy additional citizenship",
+    sectionId: "personal",
+  },
 } as const;
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -2644,8 +2657,10 @@ function departedSectionContext(key: string) {
 }
 
 export function FigmaQuestionnaireScreen({
+  commandActorId,
   initialFocus,
   onBack,
+  onConfirmPassportReview,
   onFieldChange,
   onMarkIssueFixed,
   onSaveDraft,
@@ -2708,6 +2723,9 @@ export function FigmaQuestionnaireScreen({
   const [pendingIssueResolutionId, setPendingIssueResolutionId] = useState<
     string | null
   >(null);
+  const [passportReviewPendingApplicantId, setPassportReviewPendingApplicantId] =
+    useState<string | null>(null);
+  const [passportReviewError, setPassportReviewError] = useState("");
   const [saveMessage, setSaveMessage] = useState("Изменений нет");
   const [saveStatus, setSaveStatus] = useState<
     "dirty" | "error" | "idle" | "saved" | "saving"
@@ -2717,15 +2735,13 @@ export function FigmaQuestionnaireScreen({
   const [discardExitArmed, setDiscardExitArmed] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
   const familyCopyStatusId = useId();
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useExperienceReducedMotion();
   const autosaveRevisionRef = useRef(0);
   const failedSaveRevisionRef = useRef<number | undefined>(undefined);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const completionInFlightRef = useRef(false);
   const issueResolutionPendingRef = useRef(false);
-  const issueResolutionPromiseRef = useRef<Promise<boolean> | undefined>(
-    undefined,
-  );
+  const issueResolutionPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
   const navigationPendingRef = useRef(false);
   const saveAndExitDraftReadyRef = useRef(false);
   const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
@@ -2796,11 +2812,11 @@ export function FigmaQuestionnaireScreen({
 
   useEffect(() => {
     activeApplicantTabRef.current?.scrollIntoView?.({
-      behavior: "smooth",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
       block: "nearest",
       inline: "center",
     });
-  }, [activeApplicant]);
+  }, [activeApplicant, prefersReducedMotion]);
 
   useEffect(() => {
     for (const element of [
@@ -2808,12 +2824,12 @@ export function FigmaQuestionnaireScreen({
       activeSidebarSectionTabRef.current,
     ]) {
       element?.scrollIntoView?.({
-        behavior: "smooth",
+        behavior: prefersReducedMotion ? "auto" : "smooth",
         block: "nearest",
         inline: "center",
       });
     }
-  }, [activeSection]);
+  }, [activeSection, prefersReducedMotion]);
 
   const activeApplicantModel = useMemo(
     () =>
@@ -2822,6 +2838,13 @@ export function FigmaQuestionnaireScreen({
       ) ?? draftSubmission.applicants[0],
     [activeApplicant, draftSubmission.applicants],
   );
+  const canConfirmActiveApplicantPassport = activeApplicantModel
+    ? canConfirmApplicantPassportReview(
+        draftSubmission,
+        activeApplicantModel.id,
+        commandActorId ?? "",
+      )
+    : false;
 
   useEffect(() => {
     if (initialFocusAppliedRef.current) return;
@@ -2846,7 +2869,10 @@ export function FigmaQuestionnaireScreen({
       );
       if (focusedFile) {
         focusedFile.focus({ preventScroll: true });
-        focusedFile.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        focusedFile.scrollIntoView?.({
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "center",
+        });
         initialFocusAppliedRef.current = true;
         return;
       }
@@ -2863,7 +2889,10 @@ export function FigmaQuestionnaireScreen({
         );
         if (target) {
           target.focus({ preventScroll: true });
-          element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+          element?.scrollIntoView?.({
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+            block: "center",
+          });
           initialFocusAppliedRef.current = true;
           return;
         }
@@ -2886,7 +2915,7 @@ export function FigmaQuestionnaireScreen({
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [activeApplicantModel, activeSection, initialFieldTarget]);
+  }, [activeApplicantModel, activeSection, initialFieldTarget, prefersReducedMotion]);
 
   const selectOptions = useMemo(
     () => ({
@@ -3073,8 +3102,7 @@ export function FigmaQuestionnaireScreen({
     ).length;
     const openIssueRisks = draftSubmission.issues.filter(
       (issue) =>
-        issue.status === "open" &&
-        isQuestionnaireFieldIssue(draftSubmission, issue),
+        issue.status === "open" && isQuestionnaireFieldIssue(draftSubmission, issue),
     ).length;
     const total = requiredFields.length;
     const completed = completedFields.length;
@@ -3182,6 +3210,14 @@ export function FigmaQuestionnaireScreen({
     Boolean(primaryApplicant) &&
     familyCopyRecipients.length > 0;
   const canCopyCurrentSection = familyCopySectionIds.has(activeSection);
+  const automaticFamilyCopyEnabled = (sectionId: string) => {
+    const preferences = draftSubmission.familyCopyPreferences;
+    if (!preferences || activeApplicant !== primaryApplicant?.id) return false;
+    if (sectionId === "contacts") return preferences.sameHomeAddress;
+    if (sectionId === "hotel") return preferences.sameSpainStay;
+    if (sectionId === "appointment") return preferences.appointment;
+    return false;
+  };
   const showFamilyCopyControl =
     isEditable &&
     canCopyFamilyWide &&
@@ -3214,6 +3250,9 @@ export function FigmaQuestionnaireScreen({
         });
     });
   }, [activeApplicantModel, activeBlockingIssues, activeSection, sections]);
+  const currentSectionIssueFieldLabel = currentSectionIssue
+    ? questionnaireIssueFieldDisplayLabel(draftSubmission, currentSectionIssue)
+    : undefined;
 
   const clearAutosaveTimer = useCallback(() => {
     if (autosaveTimerRef.current === undefined) return;
@@ -3260,6 +3299,8 @@ export function FigmaQuestionnaireScreen({
       setFamilyCopyMessage(
         "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
       );
+    } else if (familyCopyMessage) {
+      setFamilyCopyMessage(undefined);
     }
     const dependentKeys = dependentFieldKeysFor(
       key,
@@ -3298,7 +3339,35 @@ export function FigmaQuestionnaireScreen({
       buildUpdate(key, value),
       ...dependentKeys.map((dependentKey) => buildUpdate(dependentKey, "")),
     ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
-    const updates = directUpdates;
+    const automaticUpdates = directUpdates.flatMap(({ binding, update }) => {
+      if (
+        !primaryApplicant ||
+        !automaticFamilyCopyEnabled(binding.sectionId) ||
+        !isQuestionnaireFamilyCopyField(binding.sectionId, binding.fieldId)
+      ) {
+        return [];
+      }
+
+      const familyUpdates = buildAutomaticQuestionnaireFamilyCopyUpdates({
+        binding: {
+          candidateFieldIds: [
+            binding.fieldId,
+            ...(questionnaireFieldAliasesByFormKey[binding.formKey] ?? []),
+          ],
+          canonicalFieldId: binding.fieldId,
+          sectionId: binding.sectionId,
+        },
+        recipients: familyCopyRecipients,
+        sourceApplicant: primaryApplicant,
+        sourceUpdate: update,
+        validate: validationMessageForQuestionnaireField,
+      });
+      return familyUpdates.map((familyUpdate) => ({
+        binding,
+        update: familyUpdate,
+      }));
+    });
+    const updates = [...directUpdates, ...automaticUpdates];
     const nextFormData = { ...formDataRef.current, [key]: value };
     for (const dependentKey of dependentKeys) nextFormData[dependentKey] = "";
     formDataRef.current = nextFormData;
@@ -3430,7 +3499,11 @@ export function FigmaQuestionnaireScreen({
 
     const plan = buildQuestionnaireFamilyCopyPlan({
       bindings: questionnaireFieldBindings
-        .filter((binding) => binding.sectionId === canonicalSectionId)
+        .filter(
+          (binding) =>
+            binding.sectionId === canonicalSectionId &&
+            isQuestionnaireFamilyCopyField(binding.sectionId, binding.fieldId),
+        )
         .map((binding) => ({
           candidateFieldIds: [
             binding.fieldId,
@@ -3473,12 +3546,6 @@ export function FigmaQuestionnaireScreen({
       `Скопировано и подтверждено после предпросмотра: ${familyCopyPreview.updates.length} полей · заявителей: ${familyCopyPreview.affectedApplicants}.`,
     );
     setFamilyCopyPreview(undefined);
-  }
-
-  function cancelFamilyCopy() {
-    if (navigationPendingRef.current || issueResolutionPendingRef.current) return;
-    setFamilyCopyPreview(undefined);
-    setFamilyCopyMessage("Копирование отменено; данные не изменены.");
   }
 
   function fieldIssue(fieldId: string, label: string) {
@@ -3924,7 +3991,10 @@ export function FigmaQuestionnaireScreen({
         "input, textarea, button, [tabindex]",
       );
       target?.focus({ preventScroll: true });
-      element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      element?.scrollIntoView?.({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
     }, 0);
   }
 
@@ -4168,9 +4238,7 @@ export function FigmaQuestionnaireScreen({
     setRevealRequiredErrors(true);
     setSaveStatus("idle");
     setSaveMessage(
-      target.label
-        ? `Сначала: ${target.label}`
-        : "Сначала: устраните блокер",
+      target.label ? `Сначала: ${target.label}` : "Сначала: устраните блокер",
     );
     focusQuestionnaireTarget(target);
   }
@@ -4315,6 +4383,44 @@ export function FigmaQuestionnaireScreen({
     onBack();
   }
 
+  async function confirmCurrentApplicantPassportReview() {
+    if (
+      !isEditable ||
+      !onConfirmPassportReview ||
+      !activeApplicantModel ||
+      passportReviewPendingApplicantId
+    ) {
+      return;
+    }
+
+    setPassportReviewPendingApplicantId(activeApplicantModel.id);
+    setPassportReviewError("");
+    try {
+      await saveDraftFromButton();
+      const confirmedSubmission = await onConfirmPassportReview(
+        activeApplicantModel.id,
+      );
+      const confirmedApplicant = confirmedSubmission.applicants.find(
+        (applicant) => applicant.id === activeApplicantModel.id,
+      );
+      if (!confirmedApplicant?.passportExtraction?.verifiedAtIso) {
+        throw new Error(
+          "Паспорт ещё нельзя подтвердить: дождитесь загрузки и завершения обработки.",
+        );
+      }
+      setSaveStatus("saved");
+      setSaveMessage("Ручная проверка паспорта подтверждена");
+    } catch (error) {
+      setPassportReviewError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось подтвердить ручную проверку паспорта.",
+      );
+    } finally {
+      setPassportReviewPendingApplicantId(null);
+    }
+  }
+
   function renderSectionFields() {
     if (activeSection === "appointment") {
       return (
@@ -4452,6 +4558,32 @@ export function FigmaQuestionnaireScreen({
             value={formData.passportIssuePlace}
             onChange={(value) => updateField("passportIssuePlace", value)}
           />
+          {onConfirmPassportReview && canConfirmActiveApplicantPassport ? (
+            <div className="col-span-1 md:col-span-2 flex flex-col items-start gap-2">
+              <button
+                {...agentInteractionProps("questionnaire.update-field")}
+                aria-busy={
+                  passportReviewPendingApplicantId === activeApplicantModel?.id
+                }
+                className="v19-questionnaire-complete-button is-ready"
+                disabled={
+                  !isEditable ||
+                  passportReviewPendingApplicantId === activeApplicantModel?.id
+                }
+                type="button"
+                onClick={() => void confirmCurrentApplicantPassportReview()}
+              >
+                {passportReviewPendingApplicantId === activeApplicantModel?.id
+                  ? "Подтверждаем…"
+                  : "Подтвердить ручную проверку паспорта"}
+              </button>
+              {passportReviewError ? <p role="alert">{passportReviewError}</p> : null}
+            </div>
+          ) : activeApplicantModel?.passportExtraction?.verifiedAtIso ? (
+            <p className="col-span-1 md:col-span-2" role="status">
+              Ручная проверка паспорта подтверждена.
+            </p>
+          ) : null}
         </>
       );
     }
@@ -5006,6 +5138,7 @@ export function FigmaQuestionnaireScreen({
       (initialFocus?.applicantId ?? activeApplicant) === activeApplicant,
     revealRequiredErrors,
     required: fieldIsRequired,
+    reducedMotion: prefersReducedMotion,
     reviewSource: fieldReviewSource,
     state: fieldReviewState,
   };
@@ -5026,31 +5159,31 @@ export function FigmaQuestionnaireScreen({
   const mobileBlockerReason = mobileBlockerTarget?.reason?.trim();
   const currentIssueCoversMobileBlocker = Boolean(
     currentSectionIssue &&
-      mobileBlockerTarget &&
-      currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
-      (!currentSectionIssue.target.section?.trim() ||
-        sameFieldLabel(
-          currentSectionIssue.target.section,
-          activeSectionContext?.title,
-        )) &&
-      questionnaireFieldBindings.some((binding) => {
-        const fieldLabel =
-          questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
-          mobileBlockerLabel;
-        return (
-          issueFieldMatches(
-            binding.fieldId,
-            fieldLabel,
-            currentSectionIssue.target.field,
-          ) &&
-          issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
-        );
-      }),
+    mobileBlockerTarget &&
+    currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
+    (!currentSectionIssue.target.section?.trim() ||
+      sameFieldLabel(
+        currentSectionIssue.target.section,
+        activeSectionContext?.title,
+      )) &&
+    questionnaireFieldBindings.some((binding) => {
+      const fieldLabel =
+        questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
+        mobileBlockerLabel;
+      return (
+        issueFieldMatches(
+          binding.fieldId,
+          fieldLabel,
+          currentSectionIssue.target.field,
+        ) && issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
+      );
+    }),
   );
   const showWorkToolbar =
     showFamilyCopyControl ||
     Boolean(currentSectionIssue) ||
     (isEditable && Boolean(mobileBlockerTarget) && !currentIssueCoversMobileBlocker);
+  const familyCopyUnavailable = familyCopyMessage === familyCopyUnavailableMessage;
   const questionnaireInteractionPending =
     navigationPending || pendingIssueResolutionId !== null;
 
@@ -5060,6 +5193,7 @@ export function FigmaQuestionnaireScreen({
       className={`vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell questionnaire-screen codex-polish-v1${
         isEditable ? "" : " is-read-only"
       }`}
+      data-reduced-motion={prefersReducedMotion ? "true" : "false"}
       data-submission-id={draftSubmission.id}
       exit={{ opacity: 0 }}
       initial={prefersReducedMotion ? false : { opacity: 0 }}
@@ -5079,9 +5213,21 @@ export function FigmaQuestionnaireScreen({
         </button>
 
         <div className="v19-questionnaire-title-wrap">
-          <h1 className="sr-only">
-            Анкета: {draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`}
-          </h1>
+          <div className="v19-questionnaire-title-copy">
+            <h1
+              aria-label={`Анкета: ${
+                draftSubmission.title?.trim() || `Подача ${draftSubmission.id}`
+              }`}
+              className="v19-questionnaire-title"
+            >
+              Анкета
+            </h1>
+            <span className="v19-questionnaire-title-context">
+              {activeApplicantContext?.name ??
+                draftSubmission.title?.trim() ??
+                `Подача ${draftSubmission.id}`}
+            </span>
+          </div>
           <AccessibleSelectMenu
             ariaLabel="Выбрать туриста"
             className="v19-questionnaire-tourist-switcher"
@@ -5145,15 +5291,7 @@ export function FigmaQuestionnaireScreen({
               ? { duration: 0 }
               : { delay: 0.1, duration: 1.2, ease: "easeOut" }
           }
-        >
-          {!prefersReducedMotion ? (
-            <motion.div
-              animate={{ x: ["-100%", "200%"] }}
-              className="v19-questionnaire-progress-shimmer absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-              transition={{ duration: 2.5, ease: "linear", repeat: Infinity }}
-            />
-          ) : null}
-        </motion.div>
+        ></motion.div>
       </div>
 
       <p aria-atomic="true" aria-live="polite" className="sr-only" role="status">
@@ -5178,8 +5316,8 @@ export function FigmaQuestionnaireScreen({
                 {discardExitArmed ? (
                   <>
                     <span className="v19-questionnaire-save-error-warning">
-                      Последние несохранённые изменения будут потеряны. Уже
-                      сохранённые данные останутся.
+                      Последние несохранённые изменения будут потеряны. Уже сохранённые
+                      данные останутся.
                     </span>
                     <button
                       {...agentInteractionProps("questionnaire.back")}
@@ -5493,12 +5631,12 @@ export function FigmaQuestionnaireScreen({
                           <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
                             {currentSectionIssue.status === "fixed_by_agent"
                               ? `Исправление${
-                                  currentSectionIssue.target.field
-                                    ? ` по полю «${currentSectionIssue.target.field}»`
+                                  currentSectionIssueFieldLabel
+                                    ? ` по полю «${currentSectionIssueFieldLabel}»`
                                     : ""
                                 } отправлено, ожидает проверки администратора`
-                              : currentSectionIssue.target.field
-                                ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
+                              : currentSectionIssueFieldLabel
+                                ? `${currentSectionIssueFieldLabel}: ${currentSectionIssue.reason}`
                                 : currentSectionIssue.reason}
                           </div>
                           <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
@@ -5542,94 +5680,52 @@ export function FigmaQuestionnaireScreen({
                   {showFamilyCopyControl ? (
                     <div className="v19-questionnaire-work-toolbar-copy">
                       <button
-                        {...agentInteractionProps("questionnaire.preview-family-copy")}
+                        {...agentInteractionProps(
+                          familyCopyPreview
+                            ? "questionnaire.copy-family"
+                            : "questionnaire.preview-family-copy",
+                        )}
                         aria-describedby={
-                          !familyCopyPreview && familyCopyMessage
+                          familyCopyPreview || familyCopyMessage
                             ? familyCopyStatusId
                             : undefined
                         }
-                        className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
-                        disabled={
-                          !isEditable ||
-                          Boolean(familyCopyPreview) ||
-                          questionnaireInteractionPending
-                        }
+                        aria-invalid={familyCopyUnavailable || undefined}
+                        aria-pressed={Boolean(familyCopyPreview)}
+                        className={`v19-questionnaire-draft-button v19-questionnaire-copy-button${
+                          familyCopyPreview ? " is-copy-armed" : ""
+                        }${familyCopyUnavailable ? " is-copy-unavailable" : ""}`}
+                        disabled={!isEditable || questionnaireInteractionPending}
                         type="button"
-                        onClick={copySharedDataToFamily}
+                        onClick={
+                          familyCopyPreview ? confirmFamilyCopy : copySharedDataToFamily
+                        }
                       >
-                        <Copy aria-hidden="true" />
-                        Копировать для всех
+                        {familyCopyUnavailable ? (
+                          <AlertCircle aria-hidden="true" />
+                        ) : (
+                          <Copy aria-hidden="true" />
+                        )}
+                        {familyCopyUnavailable
+                          ? "Нет заполненных полей"
+                          : "Копировать для всех"}
                       </button>
+                      <span
+                        aria-live="polite"
+                        className="sr-only"
+                        id={familyCopyStatusId}
+                        role="status"
+                      >
+                        {familyCopyPreview
+                          ? `Выделено полей: ${familyCopyPreview.updates.length}. Повторное нажатие скопирует их членам семьи: ${familyCopyPreview.affectedApplicants}.`
+                          : familyCopyMessage}
+                      </span>
                     </div>
                   ) : null}
                 </div>
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {showFamilyCopyControl && (familyCopyPreview || familyCopyMessage) ? (
-                  <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
-                    {familyCopyPreview ? (
-                      <>
-                        <p
-                          aria-live="polite"
-                          className="v19-questionnaire-family-copy-status"
-                          role="status"
-                        >
-                          Будет скопировано заполненных пользователем полей:{" "}
-                          {familyCopyPreview.updates.length}
-                          {" · "}членов семьи: {familyCopyPreview.affectedApplicants}.
-                        </p>
-                        <button
-                          {...agentInteractionProps("questionnaire.copy-family")}
-                          className="v19-questionnaire-complete-button v19-questionnaire-family-copy-confirm is-ready"
-                          disabled={questionnaireInteractionPending}
-                          type="button"
-                          onClick={confirmFamilyCopy}
-                        >
-                          Подтвердить копирование
-                        </button>
-                        <button
-                          {...agentInteractionProps("questionnaire.cancel-family-copy")}
-                          className="v19-questionnaire-draft-button"
-                          disabled={questionnaireInteractionPending}
-                          type="button"
-                          onClick={cancelFamilyCopy}
-                        >
-                          Отмена
-                        </button>
-                      </>
-                    ) : null}
-                    {!familyCopyPreview &&
-                    familyCopyMessage === familyCopyUnavailableMessage ? (
-                      <div
-                        aria-atomic="true"
-                        className="v19-questionnaire-family-copy-alert"
-                        id={familyCopyStatusId}
-                        role="alert"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="v19-questionnaire-family-copy-alert-icon"
-                        >
-                          <AlertCircle />
-                        </span>
-                        <p>{familyCopyMessage}</p>
-                      </div>
-                    ) : null}
-                    {!familyCopyPreview &&
-                    familyCopyMessage &&
-                    familyCopyMessage !== familyCopyUnavailableMessage ? (
-                      <p
-                        aria-live="polite"
-                        className="v19-questionnaire-family-copy-status"
-                        id={familyCopyStatusId}
-                        role="status"
-                      >
-                        {familyCopyMessage}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
                 <QuestionnaireFieldUiContext.Provider
                   value={questionnaireFieldUiContract}
                 >

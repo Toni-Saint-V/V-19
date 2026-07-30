@@ -3,10 +3,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
-import {
-  normalizeTestEvidenceRunId,
-  testArtifactPath,
-} from "../support/artifacts";
+import { normalizeTestEvidenceRunId, testArtifactPath } from "../support/artifacts";
 import {
   clickFirstVisible,
   collectBrowserProblems,
@@ -50,9 +47,7 @@ async function signOutAndLoginWithoutClearingWorkspaceState(
         name: /^Меню (агента|администратора)$/,
       }),
     );
-  await clickFirstVisible(
-    workspaceMenu.getByRole("button", { name: "Выйти" }),
-  );
+  await clickFirstVisible(workspaceMenu.getByRole("button", { name: "Выйти" }));
   await expect(
     page.getByRole("main", { name: "Вход в рабочий кабинет" }),
   ).toBeVisible();
@@ -74,10 +69,7 @@ async function signOutAndLoginWithoutClearingWorkspaceState(
   ).toBeVisible();
 }
 
-async function openQuestionnaire(
-  page: Page,
-  options: { withSpouse?: boolean } = {},
-) {
+async function openQuestionnaire(page: Page, options: { withSpouse?: boolean } = {}) {
   await openFreshWorkspace(page, { heading: "Мои действия" });
 
   const ownedByCurrentLocalAgent = initialSubmissions.map((submission) => {
@@ -289,14 +281,20 @@ async function expectMobileQuestionnaireLayout(
   });
 
   expect(geometry.borderRadius).toBe("0px");
-  expect(geometry.headerDisplay).toBe("none");
+  expect(geometry.headerDisplay).toBe("flex");
   expect(geometry.applicantBarDisplay).toBe("none");
   expect(geometry.footer).not.toBeNull();
   expect(geometry.footer?.height ?? 0).toBeGreaterThanOrEqual(56);
   expect(geometry.footer?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(96);
-  expect(geometry.header?.height ?? Number.POSITIVE_INFINITY).toBe(0);
-  expect(geometry.scroll?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(1);
-  expect(geometry.scroll?.height ?? 0).toBeGreaterThan(viewport.height * 0.8);
+  expect(geometry.header?.height ?? 0).toBeGreaterThanOrEqual(56);
+  expect(geometry.header?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(64);
+  expect(geometry.scroll?.y ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    (geometry.header?.height ?? 0) + 1,
+  );
+  expect(geometry.scroll?.y ?? 0).toBeGreaterThanOrEqual(
+    (geometry.header?.height ?? 0) - 1,
+  );
+  expect(geometry.scroll?.height ?? 0).toBeGreaterThan(viewport.height * 0.72);
   expect(
     (geometry.scroll?.y ?? 0) + (geometry.scroll?.height ?? 0),
   ).toBeLessThanOrEqual((geometry.footer?.y ?? viewport.height) + 1);
@@ -414,7 +412,10 @@ test.describe("V-19 questionnaire live sanity", () => {
     await openQuestionnaire(page, { withSpouse: true });
     await expectMobileQuestionnaireLayout(page, { height: 844, width: 390 });
 
-    await expect(page.locator(".v19-questionnaire-screen-header")).toBeHidden();
+    await expect(page.locator(".v19-questionnaire-screen-header")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /^Анкета:/ }),
+    ).toBeVisible();
     await expect(page.locator(".v19-questionnaire-header-actions")).toBeHidden();
     const mobileFooter = page.getByTestId("questionnaire-mobile-footer");
     await expect(mobileFooter).toBeVisible();
@@ -767,7 +768,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     { height: 812, width: 375 },
     { height: 932, width: 430 },
   ]) {
-    test(`mobile ${viewport.width} keeps a fullscreen shell and a 75dvh work area`, async ({
+    test(`mobile ${viewport.width} keeps a fullscreen shell, compact header and a 75dvh work area`, async ({
       page,
     }, testInfo) => {
       const browserProblems = collectBrowserProblems(page);
@@ -835,13 +836,9 @@ test.describe("V-19 questionnaire live sanity", () => {
     const approvedHttpOrigin = approvedUrl.origin;
     const approvedWebSocketOrigin = `${approvedUrl.protocol === "https:" ? "wss:" : "ws:"}//${approvedUrl.host}`;
     const proofRunId = normalizeTestEvidenceRunId(
-      process.env.V19_PROOF_RUN_ID?.trim() ||
-        `run-${Date.now()}-${process.pid}`,
+      process.env.V19_PROOF_RUN_ID?.trim() || `run-${Date.now()}-${process.pid}`,
     );
-    const proofDirectory = testArtifactPath(
-      "questionnaire-runtime-proof",
-      proofRunId,
-    );
+    const proofDirectory = testArtifactPath("questionnaire-runtime-proof", proofRunId);
     mkdirSync(proofDirectory, { recursive: true });
     const viewportReceipts = [];
 
@@ -979,11 +976,9 @@ test.describe("V-19 questionnaire live sanity", () => {
 
       const saveAndExit =
         viewport.width <= 767
-          ? page
-              .getByTestId("questionnaire-mobile-footer")
-              .getByRole("button", {
-                name: "Сохранить и выйти — нижняя панель",
-              })
+          ? page.getByTestId("questionnaire-mobile-footer").getByRole("button", {
+              name: "Сохранить и выйти — нижняя панель",
+            })
           : page.getByRole("button", {
               exact: true,
               name: "Сохранить и выйти",
@@ -1005,11 +1000,9 @@ test.describe("V-19 questionnaire live sanity", () => {
 
       const saveReadback =
         viewport.width <= 767
-          ? page
-              .getByTestId("questionnaire-mobile-footer")
-              .getByRole("button", {
-                name: "Сохранить и выйти — нижняя панель",
-              })
+          ? page.getByTestId("questionnaire-mobile-footer").getByRole("button", {
+              name: "Сохранить и выйти — нижняя панель",
+            })
           : page.getByRole("button", {
               exact: true,
               name: "Сохранить и выйти",
@@ -1027,9 +1020,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       });
       await expect
         .poll(() =>
-          page.evaluate(() =>
-            localStorage.getItem("visaflow.v19.submissions.v1"),
-          ),
+          page.evaluate(() => localStorage.getItem("visaflow.v19.submissions.v1")),
         )
         .toBe(persistedDraftBeforeRoleRoundTrip);
       await expect(
@@ -1044,9 +1035,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       });
       await expect
         .poll(() =>
-          page.evaluate(() =>
-            localStorage.getItem("visaflow.v19.submissions.v1"),
-          ),
+          page.evaluate(() => localStorage.getItem("visaflow.v19.submissions.v1")),
         )
         .toBe(persistedDraftBeforeRoleRoundTrip);
       await openQuestionnaireFromAction(page);

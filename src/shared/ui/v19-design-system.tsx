@@ -38,7 +38,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useExperienceReducedMotion } from "./experiencePreferences";
 import visaflowLogo from "../../assets/v-logo-premium-black-style.webp";
 import { cn } from "./cn";
 import { Badge, Button, IconButton } from "./primitives";
@@ -271,6 +272,7 @@ export type V19SideMenuProps = {
   onCommandSearch?: () => void;
   onCloseMobile: () => void;
   onResetWorkspace: () => void | Promise<void>;
+  onSwitchWorkspace?: () => void | Promise<void>;
   role: V19SideMenuRole;
   sessionDisplayName: string;
   sessionInitials: string;
@@ -291,6 +293,7 @@ export function V19SideMenu({
   onCommandSearch,
   onCloseMobile,
   onResetWorkspace,
+  onSwitchWorkspace,
   role,
   sessionDisplayName,
   sessionInitials,
@@ -298,9 +301,12 @@ export function V19SideMenu({
   sidebarId,
 }: V19SideMenuProps) {
   const signOutPendingRef = useRef(false);
-  const reduceMotion = useReducedMotion();
+  const workspaceSwitchPendingRef = useRef(false);
+  const reduceMotion = useExperienceReducedMotion();
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+  const [workspaceSwitchPending, setWorkspaceSwitchPending] = useState(false);
+  const [workspaceSwitchError, setWorkspaceSwitchError] = useState("");
   const menuItems =
     role === "agent" &&
     createAction &&
@@ -342,6 +348,24 @@ export function V19SideMenu({
     } finally {
       signOutPendingRef.current = false;
       setSignOutPending(false);
+    }
+  };
+
+  const handleWorkspaceSwitch = async () => {
+    if (!onSwitchWorkspace || workspaceSwitchPendingRef.current) return;
+    workspaceSwitchPendingRef.current = true;
+    setWorkspaceSwitchPending(true);
+    setWorkspaceSwitchError("");
+    try {
+      await onSwitchWorkspace();
+      onCloseMobile();
+    } catch {
+      setWorkspaceSwitchError(
+        "Не удалось переключить рабочую роль. Повторите попытку.",
+      );
+    } finally {
+      workspaceSwitchPendingRef.current = false;
+      setWorkspaceSwitchPending(false);
     }
   };
 
@@ -493,6 +517,34 @@ export function V19SideMenu({
             >
               {signOutError}
             </p>
+          ) : null}
+          {workspaceSwitchError ? (
+            <p
+              className="m-0 px-2 text-[12px] leading-snug text-[var(--v19b-status-danger-text)]"
+              role="alert"
+            >
+              {workspaceSwitchError}
+            </p>
+          ) : null}
+          {onSwitchWorkspace ? (
+            <Button
+              className="v19-ds-side-menu-signout v19-ds-side-menu-switch"
+              aria-label={
+                role === "agent"
+                  ? "Переключиться в кабинет администратора"
+                  : "Переключиться в кабинет агента"
+              }
+              aria-busy={workspaceSwitchPending || undefined}
+              disabled={workspaceSwitchPending}
+              variant="secondary"
+              onClick={() => void handleWorkspaceSwitch()}
+            >
+              {workspaceSwitchPending
+                ? "Переключаем…"
+                : role === "agent"
+                  ? "Кабинет администратора"
+                  : "Кабинет агента"}
+            </Button>
           ) : null}
           <Button
             data-v19-interaction-id={role === "agent" ? "shell.sign-out" : undefined}
@@ -1210,6 +1262,7 @@ export function V19QueueToolbar({
           <input
             aria-label={searchAriaLabel ?? searchPlaceholder}
             name="queue-search"
+            type="search"
             className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[11px] font-medium text-white/70 placeholder:text-[#525151] outline-none focus:border-[#6f64ff]/55"
             data-v19-interaction-id={interactionIds?.search}
             placeholder={searchPlaceholder}
