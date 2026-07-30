@@ -187,7 +187,9 @@ test.describe("V-19 P0 admin document review", () => {
       path: testInfo.outputPath("mobile-390-files-entry.png"),
     });
 
-    await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
+    await expect(
+      reviewWorkspace.getByRole("heading", { name: "Данные паспорта" }),
+    ).toBeVisible();
     await expect(
       reviewWorkspace.getByRole("alert").getByText("Оригинал нельзя принять"),
     ).toBeVisible();

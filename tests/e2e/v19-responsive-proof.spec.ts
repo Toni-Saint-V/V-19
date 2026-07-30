@@ -258,6 +258,84 @@ async function selectReadyExportPackage(page: Page) {
     .first();
 }
 
+async function expectMobileSheetKeyboardContract(
+  page: Page,
+  {
+    closeName,
+    dialogName,
+    toggleName,
+  }: {
+    closeName: string;
+    dialogName: string;
+    toggleName: RegExp;
+  },
+) {
+  const toggle = page.getByRole("button", { name: toggleName }).first();
+  if (!(await toggle.isVisible())) return;
+
+  await toggle.focus();
+  await toggle.press("Enter");
+
+  const dialog = page.getByRole("dialog", { name: dialogName });
+  const closeButton = dialog.getByRole("button", { name: closeName });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect(closeButton).toBeFocused();
+
+  await page.keyboard.press("Shift+Tab");
+  await expect
+    .poll(() =>
+      dialog.evaluate((element) =>
+        element.contains(element.ownerDocument.activeElement),
+      ),
+    )
+    .toBe(true);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+}
+
+async function expectModalDeactivatesAcrossBreakpoint(
+  page: Page,
+  {
+    desktopViewport,
+    dialogName,
+    mobileViewport,
+    toggleName,
+  }: {
+    desktopViewport: { height: number; width: number };
+    dialogName: string;
+    mobileViewport: { height: number; width: number };
+    toggleName: RegExp;
+  },
+) {
+  const toggle = page.getByRole("button", { name: toggleName }).first();
+  await expect(toggle).toBeVisible();
+  await toggle.focus();
+  await toggle.press("Enter");
+
+  const rail = page.locator(`aside[aria-label="${dialogName}"]`);
+  await expect(rail).toHaveAttribute("role", "dialog");
+  await expect(rail).toHaveAttribute("aria-modal", "true");
+
+  await page.setViewportSize(desktopViewport);
+  await expect(rail).not.toHaveAttribute("role", "dialog");
+  await expect(rail).not.toHaveAttribute("aria-modal", "true");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const active = document.activeElement;
+        return active instanceof HTMLElement && active.getClientRects().length > 0;
+      }),
+    )
+    .toBe(true);
+
+  await page.setViewportSize(mobileViewport);
+  await expect(rail).not.toHaveAttribute("role", "dialog");
+  await expect(toggle).toBeVisible();
+}
+
 test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
@@ -382,6 +460,19 @@ test.describe("V-19 responsive proof", () => {
       await expect(page.getByRole("button", { name: "Новая подача" })).toHaveCount(0);
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
       await screenshot(page, viewport, "admin-review");
+      await expectMobileSheetKeyboardContract(page, {
+        closeName: "Закрыть контекст проверки",
+        dialogName: "Контекст проверки",
+        toggleName: /^Контекст проверки/,
+      });
+      if (viewport.width === 768) {
+        await expectModalDeactivatesAcrossBreakpoint(page, {
+          desktopViewport: { height: 768, width: 1024 },
+          dialogName: "Контекст проверки",
+          mobileViewport: { height: viewport.height, width: viewport.width },
+          toggleName: /^Контекст проверки/,
+        });
+      }
 
       await selectAdminReviewLane(page, "Ревью");
       await expect(
@@ -428,6 +519,19 @@ test.describe("V-19 responsive proof", () => {
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
+      await expectMobileSheetKeyboardContract(page, {
+        closeName: "Закрыть контроль пакета",
+        dialogName: "Контроль пакета",
+        toggleName: /^Контроль пакета/,
+      });
+      if (viewport.width === 1024) {
+        await expectModalDeactivatesAcrossBreakpoint(page, {
+          desktopViewport: { height: 800, width: 1280 },
+          dialogName: "Контроль пакета",
+          mobileViewport: { height: viewport.height, width: viewport.width },
+          toggleName: /^Контроль пакета/,
+        });
+      }
       const generateButton = await selectReadyExportPackage(page);
       await generateButton.scrollIntoViewIfNeeded();
       await expect(generateButton).toBeEnabled();
