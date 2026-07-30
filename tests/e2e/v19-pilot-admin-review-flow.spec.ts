@@ -233,7 +233,10 @@ async function verifyEveryAdminDrawerSubview(
   const mediaStage = reviewWorkspace.locator(".v19-review-media-stage");
   await expect(mediaStage).toBeVisible();
   const mediaStageBox = await mediaStage.boundingBox();
-  expect(mediaStageBox, "Passport media stage must have a measurable box.").not.toBeNull();
+  expect(
+    mediaStageBox,
+    "Passport media stage must have a measurable box.",
+  ).not.toBeNull();
   expect(mediaStageBox!.height).toBeGreaterThanOrEqual(400);
   const mediaTablist = reviewWorkspace.getByRole("tablist", {
     name: "Выбор файла для проверки",
@@ -323,17 +326,17 @@ test.describe("V-19 pilot admin review click flow", () => {
       },
       {
         fileName: "users",
-        heading: "Пользователи и заявки",
+        heading: "Заявки и роли",
         headingLevel: 2,
         nav: /^Пользователи$/,
         readyText: "Заявки на доступ",
       },
       {
         fileName: "settings",
-        heading: "Системные настройки",
-        headingLevel: 1,
+        heading: "Интерфейс и доступность",
+        headingLevel: 2,
         nav: /^Настройки$/,
-        readyText: "Ощущение интерфейса",
+        readyText: "Интерфейс в этом браузере",
       },
     ] as const;
 
@@ -398,7 +401,10 @@ test.describe("V-19 pilot admin review click flow", () => {
       await clickWorkspaceButton(page, /^Настройки$/);
 
       await expect(
-        page.getByRole("heading", { level: 2, name: "Системные настройки" }),
+        page.getByRole("heading", {
+          level: 2,
+          name: "Интерфейс и доступность",
+        }),
       ).toBeVisible();
       const compactDensity = page.getByRole("switch", {
         name: "Компактная плотность",
@@ -648,9 +654,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       await prepareButton.click();
     }
 
-    await expectBodyMatches(page, [
-      /Excel готов|Excel сформирован/i,
-    ]);
+    await expectBodyMatches(page, [/Excel готов|Excel сформирован/i]);
 
     expect(
       blockingBrowserProblems(browserProblems),

@@ -52,9 +52,7 @@ describe("premium product experience screens", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("heading", { name: "Пользователи и заявки" }),
-    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Заявки и роли" })).toBeVisible();
     expect(screen.getByText("Мария Соколова")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Одобрить" }));
 
@@ -85,7 +83,16 @@ describe("premium product experience screens", () => {
     });
     expect(screen.getByText("Совпадений нет")).toBeVisible();
 
-    fireEvent.click(screen.getByRole("tab", { name: /одобрено/i }));
+    const approvedMetric = screen.getByRole("button", {
+      exact: true,
+      name: "Одобрено",
+    });
+    fireEvent.click(approvedMetric);
+    expect(approvedMetric).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: /одобрено/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getByText("Антон Волков")).toBeVisible();
     expect(screen.queryByText("Мария Соколова")).not.toBeInTheDocument();
   });
