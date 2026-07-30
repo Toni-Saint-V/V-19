@@ -20,6 +20,7 @@ import {
 import {
   v19SideMenuDesktopMinWidth,
   v19SideMenuId,
+  type V19SideMenuMode,
 } from "../shared/ui/v19-design-system";
 import { Drawer } from "./Drawer";
 import { workspaceSurfaceMotion } from "./workspaceSurfaceMotion";
@@ -167,6 +168,14 @@ function normalizeAgentNav(
   return section;
 }
 
+function restoreCommandPaletteFocus(origin: HTMLElement | null) {
+  window.requestAnimationFrame(() => {
+    if (origin?.isConnected && !origin.closest("[inert]")) {
+      origin.focus({ preventScroll: true });
+    }
+  });
+}
+
 export function CommandCenter({
   agentId,
   onAssignPublicNumber,
@@ -201,6 +210,7 @@ export function CommandCenter({
   const [submissionFocusRequest, setSubmissionFocusRequest] =
     useState<ApplicantFocusRequest>();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sideMenuMode, setSideMenuMode] = useState<V19SideMenuMode>("regular");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] =
     useState<AgentActionFilter>("open");
@@ -212,6 +222,7 @@ export function CommandCenter({
   const questionnaireOriginSurfaceRef = useRef<"drawer" | "workspace">("workspace");
   const questionnaireSubmissionSnapshotRef = useRef<Submission | undefined>(undefined);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
+  const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null);
   const createExitFocusOriginRef = useRef<HTMLElement | null>(null);
   const createExitDialogRef = useRef<HTMLElement | null>(null);
   const [canonicalOverrides, setCanonicalOverrides] = useState<
@@ -377,15 +388,29 @@ export function CommandCenter({
 
       event.preventDefault();
       if (createNavigationState.busy || pendingCreateExit) return;
+      if (commandPaletteOpen) {
+        setCommandPaletteOpen(false);
+        restoreCommandPaletteFocus(commandPaletteFocusOriginRef.current);
+        return;
+      }
       commandPaletteFocusOriginRef.current =
-        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        mobileNavOpen && mobileNavTriggerRef.current
+          ? mobileNavTriggerRef.current
+          : document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
       setMobileNavOpen(false);
       setCommandPaletteOpen(true);
     };
 
     window.addEventListener("keydown", handleCommandPaletteShortcut);
     return () => window.removeEventListener("keydown", handleCommandPaletteShortcut);
-  }, [createNavigationState.busy, pendingCreateExit]);
+  }, [
+    commandPaletteOpen,
+    createNavigationState.busy,
+    mobileNavOpen,
+    pendingCreateExit,
+  ]);
 
   useEffect(() => {
     if (!pendingCreateExit) return;
@@ -447,7 +472,11 @@ export function CommandCenter({
   const openCommandPalette = () => {
     if (createNavigationState.busy || pendingCreateExit) return;
     commandPaletteFocusOriginRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      mobileNavOpen && mobileNavTriggerRef.current
+        ? mobileNavTriggerRef.current
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
     setMobileNavOpen(false);
     setCommandPaletteOpen(true);
   };
@@ -456,10 +485,7 @@ export function CommandCenter({
     setCommandPaletteOpen(open);
     if (open) return;
 
-    window.requestAnimationFrame(() => {
-      const origin = commandPaletteFocusOriginRef.current;
-      if (origin?.isConnected) origin.focus({ preventScroll: true });
-    });
+    restoreCommandPaletteFocus(commandPaletteFocusOriginRef.current);
   };
 
   const handleRowClick = (id: string) => {
@@ -1184,7 +1210,10 @@ export function CommandCenter({
                   {...agentInteractionProps("shell.toggle-mobile-menu")}
                   controls={v19SideMenuId}
                   disabled={createNavigationState.busy}
-                  onClick={() => setMobileNavOpen((open) => !open)}
+                  onClick={(event) => {
+                    mobileNavTriggerRef.current = event.currentTarget;
+                    setMobileNavOpen((open) => !open);
+                  }}
                   open={mobileNavOpen}
                 />
               }
@@ -1193,6 +1222,7 @@ export function CommandCenter({
           }
           label="Рабочая область агента"
           mobileNavOpen={mobileNavOpen}
+          onSideMenuModeChange={setSideMenuMode}
           role="agent"
           sideMenu={{
             ariaLabel: "Меню агента",
@@ -1201,7 +1231,6 @@ export function CommandCenter({
               label: "Новая подача",
               onClick: createPackage,
             },
-            displayMode: "regular",
             inactive: createNavigationState.busy,
             items: sideMenuItems,
             mobileOpen: mobileNavOpen,
@@ -1214,7 +1243,7 @@ export function CommandCenter({
             sessionInitials: agentAvatar,
             sessionRoleLabel: agentAgency,
           }}
-          sideMenuMode="regular"
+          sideMenuMode={sideMenuMode}
           surface={surface}
           workspaceInactive={currentView !== "main"}
         >

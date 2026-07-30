@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { AdminWorkspace } from "../../src/components/AdminWorkspace";
 import { buildAdminRemarkIssueInput } from "../../src/components/review/adminRemarkIssueInput";
@@ -75,9 +75,7 @@ function submissionFixture(
     exportState: status === "ready_for_export" ? "ready" : "not_ready",
   };
   return status === "ready_for_export"
-    ? adminAcceptRequiredMediaForTest(
-        withCanonicalPrivateMediaIdentityForTest(fixture),
-      )
+    ? adminAcceptRequiredMediaForTest(withCanonicalPrivateMediaIdentityForTest(fixture))
     : fixture;
 }
 
@@ -166,6 +164,18 @@ const adminProfile: AppProfile = {
   organizationName: "VisaFlow",
   role: "admin",
 };
+
+beforeAll(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class ResizeObserver {
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    },
+  );
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+});
 
 beforeEach(() => {
   persistenceRuntime.rpc.mockClear();
@@ -509,11 +519,88 @@ describe("AdminWorkspace production navigation", () => {
     });
     await waitFor(() => expect(closeButton).toHaveFocus());
 
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.keyDown(closeButton, { key: "Escape" });
 
     await waitFor(() => {
       expect(trigger).toHaveAttribute("aria-expanded", "false");
       expect(trigger).toHaveFocus();
+    });
+  });
+
+  test("closes the mobile menu before opening the command palette and restores its visible trigger", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+
+    render(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={vi.fn()}
+        submissions={[]}
+        usesSupabase
+      />,
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: "Открыть меню администратора",
+    });
+    fireEvent.click(trigger);
+
+    const menu = await screen.findByRole("dialog", {
+      name: "Меню администратора",
+    });
+    fireEvent.click(
+      within(menu).getByRole("button", {
+        name: "Открыть командную палитру",
+      }),
+    );
+
+    const palette = await screen.findByRole("dialog", {
+      name: "Командная палитра администратора",
+    });
+    expect(
+      screen.queryByRole("dialog", { name: "Меню администратора" }),
+    ).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(within(palette).getByRole("combobox")).toHaveFocus());
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", {
+          name: "Командная палитра администратора",
+        }),
+      ).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+    });
+
+    fireEvent.click(trigger);
+    fireEvent.click(
+      within(
+        await screen.findByRole("dialog", {
+          name: "Меню администратора",
+        }),
+      ).getByRole("button", {
+        name: "Открыть командную палитру",
+      }),
+    );
+    await screen.findByRole("dialog", {
+      name: "Командная палитра администратора",
+    });
+
+    fireEvent.keyDown(document, { ctrlKey: true, key: "k" });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("dialog", {
+          name: "Командная палитра администратора",
+        }),
+      ).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
     });
   });
 });
