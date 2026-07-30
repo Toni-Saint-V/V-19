@@ -121,7 +121,7 @@ async function logoutThroughUi(page: Page) {
 async function approveAccessRequests(page: Page, emails: string[]) {
   await login(page, "2@2.ru", "22");
   await clickWorkspaceButton(page, /Пользователи/);
-  const queue = page.getByRole("region", { name: "Пользователи и заявки" });
+  const queue = page.getByRole("region", { name: "Заявки и роли" });
   await expect(queue).toBeVisible();
 
   for (const email of emails) {
@@ -595,7 +595,7 @@ test.describe("V-19 real UI multi-agent intake", () => {
 
     await login(page, agents[0].email);
     const singleSubmissionId = await createSingleDraft(page, "Москва");
-      await logoutThroughUi(page);
+    await logoutThroughUi(page);
 
     await login(page, agents[0].email);
     await openMySubmissions(page);

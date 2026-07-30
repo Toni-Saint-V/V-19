@@ -91,6 +91,328 @@
 }
 
 /*
+ * Admin governance surfaces.
+ *
+ * Access and workstation settings used to open with large decorative hero
+ * cards. The admin shell already owns the page title, so keep these areas as
+ * compact context rails and move the real controls above the fold.
+ */
+#root
+  .v19-admin-workspace-root
+  :is(.v19-access-screen, .v19-system-settings.is-admin-workstation) {
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+#root .v19-admin-workspace-root .v19-access-screen {
+  grid-template-rows: auto auto minmax(310px, 1fr);
+}
+
+#root .v19-admin-workspace-root .v19-system-settings.is-admin-workstation {
+  min-height: 0;
+  grid-template-rows: auto auto;
+  align-content: start;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-access-hero, .v19-system-settings.is-admin-workstation .v19-settings-hero) {
+  display: grid;
+  min-height: 84px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-color: var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-panel);
+  background: var(--v19b-color-panel);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.022),
+    0 14px 34px rgb(0 0 0 / 0.11);
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(
+    .v19-access-hero,
+    .v19-system-settings.is-admin-workstation .v19-settings-hero
+  )::after {
+  display: none;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-access-hero, .v19-system-settings.is-admin-workstation .v19-settings-hero)
+  > div:first-child {
+  gap: 4px;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(
+    .v19-access-eyebrow,
+    .v19-system-settings.is-admin-workstation .v19-settings-eyebrow
+  ) {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-access-hero, .v19-system-settings.is-admin-workstation .v19-settings-hero)
+  h2 {
+  font-size: 17px;
+  font-weight: 680;
+  letter-spacing: -0.016em;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-access-hero, .v19-system-settings.is-admin-workstation .v19-settings-hero)
+  p {
+  max-width: 680px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+#root .v19-admin-workspace-root .v19-access-runtime {
+  min-width: 232px;
+  min-height: 48px;
+  padding: 8px 11px;
+  border-color: var(--v19b-color-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.018);
+}
+
+#root .v19-admin-workspace-root .v19-access-runtime small {
+  font-size: 8.5px;
+  letter-spacing: 0.035em;
+}
+
+#root .v19-admin-workspace-root .v19-access-runtime strong {
+  font-size: 11px;
+}
+
+#root .v19-admin-workspace-root .v19-access-metrics .v19-metric-card {
+  min-height: 80px;
+  transition:
+    border-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease),
+    background-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease),
+    box-shadow var(--v19-admin-premium-motion-standard) var(--v19-admin-premium-ease),
+    transform var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-access-metrics
+  button.v19-metric-card:focus-visible {
+  outline: 2px solid var(--v19b-color-focus);
+  outline-offset: 2px;
+}
+
+#root .v19-admin-workspace-root .v19-access-board,
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  :is(.v19-settings-panel, .v19-settings-runtime) {
+  border-color: var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-panel);
+  background: var(--v19b-color-panel);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.022),
+    0 18px 44px rgb(0 0 0 / 0.14);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-score {
+  display: grid;
+  width: auto;
+  min-width: 108px;
+  height: auto;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr);
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-color: var(--v19b-color-border-selected);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-score
+  span {
+  font-size: 18px;
+  font-weight: 680;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-score
+  small {
+  margin: 0;
+  font-size: 8.5px;
+  line-height: 1.25;
+  text-align: left;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-grid {
+  grid-template-columns: minmax(0, 1.42fr) minmax(300px, 0.72fr);
+  gap: 12px;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  :is(.v19-settings-panel-head, .v19-settings-runtime-head) {
+  min-height: 68px;
+  padding: 13px 16px;
+  border-bottom-color: var(--v19b-color-border);
+  background: var(--v19b-color-panel);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-preference-row {
+  min-height: 76px;
+  padding: 11px 16px;
+  border-bottom-color: var(--v19b-color-border-faint);
+  transition: background-color var(--v19-admin-premium-motion-fast)
+    var(--v19-admin-premium-ease);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-preference-row
+  > button[role="switch"] {
+  width: 48px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-preference-row
+  > button[role="switch"]::before {
+  position: absolute;
+  top: 10px;
+  left: 3px;
+  width: 42px;
+  height: 24px;
+  border: 1px solid var(--v19-polish-line-hover);
+  border-radius: var(--v19b-radius-pill);
+  background: var(--v19-depth-control);
+  content: "";
+  transition:
+    border-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease),
+    background-color var(--v19-admin-premium-motion-fast) var(--v19-admin-premium-ease);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-preference-row
+  > button[role="switch"]
+  span {
+  top: 13px;
+  left: 6px;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-preference-row
+  > button[role="switch"].is-on {
+  border: 0;
+  background: transparent;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-preference-row
+  > button[role="switch"].is-on::before {
+  border-color: var(--v19-depth-accent-border);
+  background: var(--v19-depth-accent);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-preference-row
+  > button[role="switch"]:focus-visible {
+  outline: 2px solid var(--v19b-color-focus);
+  outline-offset: 0;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-panel-footer {
+  min-height: 56px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--v19b-color-border-faint);
+  background: var(--v19b-color-panel);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-panel-footer
+  .mp-button {
+  min-height: 38px;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-runtime-row {
+  min-height: 66px;
+  padding: 10px 14px;
+  border-bottom-color: var(--v19b-color-border-faint);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-system-settings.is-admin-workstation
+  .v19-settings-guardrail {
+  margin: 12px;
+  padding: 12px;
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-control);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #root .v19-admin-workspace-root .v19-access-metrics button.v19-metric-card:hover {
+    border-color: var(--v19b-color-border-selected);
+    background: var(--v19b-color-control-hover);
+    transform: translateY(-1px);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-preference-row:hover {
+    background: rgb(255 255 255 / 0.014);
+  }
+}
+
+/*
  * Tablet/mobile rows are labels, but the historical convergence layer reduced
  * their checkbox to a clipped 1px control. Keep the whole row clickable while
  * restoring an honest, visible selection affordance.
@@ -115,6 +437,180 @@
 }
 
 @media (max-width: 767px) {
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-users
+    > .workspace
+    > .topbar.v19-page-header {
+    display: grid !important;
+    grid-template-columns:
+      var(--v19b-size-44)
+      minmax(0, 1fr)
+      var(--v19b-size-44) !important;
+    align-items: center !important;
+    column-gap: var(--v19b-size-12) !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-users
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-topbar-menu {
+    grid-column: 1 !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-users
+    > .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading {
+    grid-column: 2 !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-users
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions {
+    grid-column: 3 !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-users
+    .v19-page-header
+    .topbar-heading
+    h1 {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    font-size: 18px !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell:is(.surface-admin-users, .surface-settings)
+    .v19-admin-workspace-scroll {
+    padding: 12px !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-settings
+    .v19-page-header
+    .topbar-heading
+    h1 {
+    display: block !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    :is(
+      .v19-access-hero,
+      .v19-system-settings.is-admin-workstation .v19-settings-hero
+    ) {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  #root .v19-admin-workspace-root .v19-access-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 10px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    :is(.v19-access-hero, .v19-system-settings.is-admin-workstation .v19-settings-hero)
+    h2 {
+    font-size: 16px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    :is(.v19-access-hero, .v19-system-settings.is-admin-workstation .v19-settings-hero)
+    p {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  #root .v19-admin-workspace-root .v19-access-runtime {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-score {
+    min-width: 94px;
+    min-height: 44px;
+    padding: 7px 9px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    :is(.v19-settings-panel-head, .v19-settings-runtime-head) {
+    min-height: 64px;
+    padding: 11px 12px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-preference-row {
+    min-height: 72px;
+    grid-template-columns: 34px minmax(0, 1fr) 48px;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-panel-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-panel-footer
+    .mp-button {
+    width: auto;
+    min-width: 112px;
+    min-height: 44px;
+  }
+
+  #root .v19-admin-workspace-root .v19-access-actions .mp-button {
+    min-height: 44px;
+  }
+
   #root .v19-admin-workspace-root .v19-review-row-open {
     width: 100%;
     min-height: 44px;
@@ -139,6 +635,29 @@
 }
 
 @media (max-width: 479px) {
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-hero
+    p {
+    max-width: 210px;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-panel-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-system-settings.is-admin-workstation
+    .v19-settings-panel-footer
+    .mp-button {
+    width: 100%;
+  }
+
   #root .v19-admin-workspace-root .v19-review-focus-tabs {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { openFreshWorkspace } from "./v19-pilot-helpers";
+import { clickWorkspaceButton, openFreshWorkspace } from "./v19-pilot-helpers";
 import { testRunArtifactPath } from "../support/artifacts";
 
 type ViewportProof = {
@@ -200,19 +200,19 @@ async function screenshot(page: Page, viewport: ViewportProof, name: string) {
 }
 
 async function clickOperationalNav(page: Page, name: RegExp) {
-  const buttons = page.getByRole("button", { name });
-  const buttonCount = await buttons.count();
+  await clickWorkspaceButton(page, name);
+  const backdrop = page.locator(".ops-mobile-menu-backdrop").first();
 
-  for (let index = 0; index < buttonCount; index += 1) {
-    const candidate = buttons.nth(index);
-    if (await candidate.isVisible()) {
-      await candidate.click();
-      return;
-    }
+  if ((await backdrop.count()) > 0) {
+    await expect
+      .poll(async () => {
+        if ((await backdrop.count()) === 0) return 0;
+        return backdrop.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).opacity || "0"),
+        );
+      })
+      .toBeLessThanOrEqual(0.03);
   }
-
-  await page.getByRole("button", { name: "Меню" }).click();
-  await page.getByRole("button", { name }).first().click();
 }
 
 async function expectSettingsReady(page: Page) {
@@ -225,6 +225,19 @@ async function expectSettingsReady(page: Page) {
   await expect(
     page.getByRole("switch", { name: "AI-контекст в работе" }),
   ).toBeVisible();
+}
+
+async function expectElementStartsAbove(
+  page: Page,
+  locator: Locator,
+  maxTop: number,
+  context: string,
+) {
+  await expect(locator, context).toBeVisible();
+  const box = await locator.boundingBox();
+
+  expect(box, `${context}: bounding box`).not.toBeNull();
+  expect(box!.y, `${context}: top position`).toBeLessThanOrEqual(maxTop);
 }
 
 async function selectAdminReviewLane(page: Page, name: "Ревью" | "Правки") {
@@ -340,7 +353,7 @@ test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     test.skip(testInfo.project.name !== "chromium", "single-project viewport proof");
 
     const problems = collectBrowserProblems(page);
@@ -515,6 +528,151 @@ test.describe("V-19 responsive proof", () => {
         `${viewport.label}: admin corrections filter`,
       );
       await screenshot(page, viewport, "admin-corrections-filter");
+
+      await clickOperationalNav(page, /^Пользователи/);
+      await expect(
+        page.getByRole("heading", {
+          level: 1,
+          name: "Пользователи и доступ",
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Заявки и роли" }),
+      ).toBeVisible();
+      await expectElementStartsAbove(
+        page,
+        page.locator(".v19-access-board"),
+        Math.floor(viewport.height * 0.5),
+        `${viewport.label}: admin access controls`,
+      );
+      const allAccessRequests = page.getByRole("tab", { name: /^Все/ }).first();
+      const pendingAccessRequests = page.getByRole("tab", { name: /^Ожидают/ }).first();
+      if (viewport.width > 767) {
+        const allMetric = page.getByRole("button", { exact: true, name: "Всего" });
+        await allMetric.click();
+        await expect(allMetric).toHaveAttribute("aria-pressed", "true");
+        await expect(allAccessRequests).toHaveAttribute("aria-selected", "true");
+
+        const pendingMetric = page.getByRole("button", {
+          exact: true,
+          name: "Ожидают",
+        });
+        await pendingMetric.click();
+        await expect(pendingMetric).toHaveAttribute("aria-pressed", "true");
+        await expect(pendingAccessRequests).toHaveAttribute("aria-selected", "true");
+      } else {
+        await allAccessRequests.click();
+        await expect(allAccessRequests).toHaveAttribute("aria-selected", "true");
+        await pendingAccessRequests.click();
+        await expect(pendingAccessRequests).toHaveAttribute("aria-selected", "true");
+      }
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin users`);
+      await screenshot(page, viewport, "admin-users");
+
+      await clickOperationalNav(page, /^Настройки/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Настройки" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", {
+          level: 2,
+          name: "Интерфейс и доступность",
+        }),
+      ).toBeVisible();
+      await expectElementStartsAbove(
+        page,
+        page.locator(".v19-settings-grid"),
+        280,
+        `${viewport.label}: admin workstation controls`,
+      );
+      const contrastSwitch = page.getByRole("switch", {
+        name: "Повышенный контраст",
+      });
+      const initialContrast = await contrastSwitch.getAttribute("aria-checked");
+      await contrastSwitch.click();
+      await expect(contrastSwitch).toHaveAttribute(
+        "aria-checked",
+        initialContrast === "true" ? "false" : "true",
+      );
+      await contrastSwitch.click();
+      await expect(contrastSwitch).toHaveAttribute(
+        "aria-checked",
+        initialContrast ?? "false",
+      );
+      const preferenceSwitches = page.getByRole("switch");
+      for (let index = 0; index < (await preferenceSwitches.count()); index += 1) {
+        const target = preferenceSwitches.nth(index);
+        const box = await target.boundingBox();
+        expect(box, `${viewport.label}: preference target ${index}`).not.toBeNull();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+      if (viewport.width === 1440) {
+        const preferenceRow = page.locator(".v19-preference-row").first();
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        await expect
+          .poll(() =>
+            preferenceRow.evaluate((element) => {
+              const durations = getComputedStyle(element)
+                .transitionDuration.split(",")
+                .map((value) => value.trim())
+                .map((value) =>
+                  value.endsWith("ms")
+                    ? Number.parseFloat(value)
+                    : Number.parseFloat(value) * 1_000,
+                );
+              return Math.max(...durations);
+            }),
+          )
+          .toBeLessThanOrEqual(0.011);
+        await page.emulateMedia({ reducedMotion: "no-preference" });
+
+        const motionSwitch = page.getByRole("switch", {
+          name: "Минимум анимации",
+        });
+        await motionSwitch.click();
+        await expect(motionSwitch).toHaveAttribute("aria-checked", "true");
+        await expect
+          .poll(() =>
+            page.evaluate(() => document.documentElement.dataset.v19ReducedMotion),
+          )
+          .toBe("on");
+        await expect
+          .poll(() =>
+            preferenceRow.evaluate((element) => {
+              const durations = getComputedStyle(element)
+                .transitionDuration.split(",")
+                .map((value) => value.trim())
+                .map((value) =>
+                  value.endsWith("ms")
+                    ? Number.parseFloat(value)
+                    : Number.parseFloat(value) * 1_000,
+                );
+              return Math.max(...durations);
+            }),
+          )
+          .toBeLessThanOrEqual(0.011);
+        await motionSwitch.click();
+        await expect(motionSwitch).toHaveAttribute("aria-checked", "false");
+        await expect
+          .poll(() =>
+            page.evaluate(() => document.documentElement.dataset.v19ReducedMotion),
+          )
+          .toBe("off");
+        await expect
+          .poll(() =>
+            motionSwitch.locator("span").evaluate((element) => {
+              const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+              return matrix.m41;
+            }),
+          )
+          .toBe(0);
+      }
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin settings`,
+      );
+      await screenshot(page, viewport, "admin-settings");
 
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();

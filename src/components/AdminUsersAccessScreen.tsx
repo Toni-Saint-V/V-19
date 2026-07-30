@@ -108,16 +108,15 @@ export function AdminUsersAccessScreen({
             <ShieldCheck aria-hidden="true" />
             Контроль доступа
           </span>
-          <h2 id="v19-access-title">Пользователи и заявки</h2>
-          <p>
-            Одно место для регистрации агентов, статусов одобрения и аудита доступа.
-            Решения применяются только после явного действия администратора.
-          </p>
+          <h2 id="v19-access-title">Заявки и роли</h2>
+          <p>Доступ меняется только после явного решения администратора.</p>
         </div>
         <div className="v19-access-runtime" aria-label="Текущий контур доступа">
           <span className={usesSupabase ? "is-live" : "is-local"} />
           <div>
-            <small>{usesSupabase ? "Supabase workspace" : "Локальная среда"}</small>
+            <small>
+              {usesSupabase ? "Рабочий контур Supabase" : "Локальная демо-среда"}
+            </small>
             <strong>{currentIdentity}</strong>
           </div>
         </div>
@@ -125,20 +124,40 @@ export function AdminUsersAccessScreen({
 
       <div className="v19-access-metrics-region" aria-label="Сводка заявок">
         <V19MetricStrip className="v19-access-metrics">
-          <V19MetricCard icon={Clock3} label="Ожидают" value={totals.pending} />
           <V19MetricCard
+            active={filter === "pending"}
+            icon={Clock3}
+            interactionId="admin-users-filter-pending"
+            label="Ожидают"
+            value={totals.pending}
+            onClick={() => setFilter("pending")}
+          />
+          <V19MetricCard
+            active={filter === "approved"}
             icon={UserCheck}
+            interactionId="admin-users-filter-approved"
             label="Одобрено"
             tone="green"
             value={totals.approved}
+            onClick={() => setFilter("approved")}
           />
           <V19MetricCard
+            active={filter === "rejected"}
             icon={UserRoundX}
+            interactionId="admin-users-filter-rejected"
             label="Отклонено"
             tone="red"
             value={totals.rejected}
+            onClick={() => setFilter("rejected")}
           />
-          <V19MetricCard icon={UsersRound} label="Всего" value={totals.all} />
+          <V19MetricCard
+            active={filter === "all"}
+            icon={UsersRound}
+            interactionId="admin-users-filter-all"
+            label="Всего"
+            value={totals.all}
+            onClick={() => setFilter("all")}
+          />
         </V19MetricStrip>
       </div>
 

@@ -107,10 +107,10 @@ test.describe("V-19 premium polish contract", () => {
 
     await clickWorkspaceButton(page, "Пользователи");
     await expect(
-      page.getByRole("heading", { level: 1, name: "Управление пользователями" }),
+      page.getByRole("heading", { level: 1, name: "Пользователи и доступ" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { level: 2, name: "Пользователи и заявки" }),
+      page.getByRole("heading", { level: 2, name: "Заявки и роли" }),
     ).toBeVisible();
     await expect(page.getByLabel("Сводка заявок")).toBeVisible();
     await expect(page.getByRole("tablist", { name: "Статус заявки" })).toBeVisible();
@@ -119,15 +119,18 @@ test.describe("V-19 premium polish contract", () => {
 
     await clickWorkspaceButton(page, "Настройки");
     await expect(
-      page.getByRole("heading", { level: 1, name: "Системные настройки" }),
+      page.getByRole("heading", { level: 1, name: "Настройки" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { level: 2, name: "Системные настройки" }),
+      page.getByRole("heading", {
+        level: 2,
+        name: "Интерфейс и доступность",
+      }),
     ).toBeVisible();
     await expect(
       page.getByRole("switch", { name: "AI-контекст в работе" }),
     ).toBeVisible();
-    await expect(page.getByLabel("Состояние системы")).toBeVisible();
+    await expect(page.getByLabel("Состояние рабочего места")).toBeVisible();
 
     await page.setViewportSize({ height: 844, width: 390 });
     await expectNoHorizontalOverflow(page);
