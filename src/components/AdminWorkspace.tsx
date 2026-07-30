@@ -16,6 +16,7 @@ import {
 import {
   v19SideMenuDesktopMinWidth,
   v19SideMenuId,
+  type V19SideMenuMode,
 } from "../shared/ui/v19-design-system";
 import { CommandPalette } from "../modules/submissions/components/CommandPalette";
 import type { AccessRequest } from "../shared/authContract";
@@ -35,6 +36,14 @@ import {
 
 type AdminNavSection = BridgeAdminNavSection | "users";
 type AdminViewState = "main" | "review_workspace";
+
+function restoreCommandPaletteFocus(origin: HTMLElement | null) {
+  window.requestAnimationFrame(() => {
+    if (origin?.isConnected && !origin.closest("[inert]")) {
+      origin.focus({ preventScroll: true });
+    }
+  });
+}
 
 interface AdminWorkspaceProps {
   accessRequests?: AccessRequest[];
@@ -66,6 +75,7 @@ export function AdminWorkspace({
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [reviewApplicantId, setReviewApplicantId] = useState<string>();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sideMenuMode, setSideMenuMode] = useState<V19SideMenuMode>("regular");
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
   const [adminAsyncError, setAdminAsyncError] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -129,71 +139,40 @@ export function AdminWorkspace({
         event.key.toLowerCase() === "k"
       ) {
         event.preventDefault();
-        if (!commandPaletteOpen) {
-          commandPaletteFocusOriginRef.current =
-            document.activeElement instanceof HTMLElement
+        if (commandPaletteOpen) {
+          setCommandPaletteOpen(false);
+          restoreCommandPaletteFocus(commandPaletteFocusOriginRef.current);
+          return;
+        }
+        commandPaletteFocusOriginRef.current =
+          mobileNavOpen && mobileNavTriggerRef.current
+            ? mobileNavTriggerRef.current
+            : document.activeElement instanceof HTMLElement
               ? document.activeElement
               : null;
-        }
-        setCommandPaletteOpen((open) => !open);
+        setMobileNavOpen(false);
+        setCommandPaletteOpen(true);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [commandPaletteOpen, currentView]);
-
-  useEffect(() => {
-    if (!mobileNavOpen) return;
-    const panel = document.getElementById(v19SideMenuId);
-    const trigger = mobileNavTriggerRef.current;
-    const frame = window.requestAnimationFrame(() => {
-      panel
-        ?.querySelector<HTMLButtonElement>('[aria-label="Закрыть меню администратора"]')
-        ?.focus({ preventScroll: true });
-    });
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setMobileNavOpen(false);
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const controls = Array.from(
-        panel?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      ).filter((control) => control.getClientRects().length > 0);
-      const first = controls[0];
-      const last = controls.at(-1);
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", handleKeyDown);
-      trigger?.focus({ preventScroll: true });
-    };
-  }, [mobileNavOpen]);
+  }, [commandPaletteOpen, currentView, mobileNavOpen]);
 
   const openCommandPalette = () => {
     commandPaletteFocusOriginRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      mobileNavOpen && mobileNavTriggerRef.current
+        ? mobileNavTriggerRef.current
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    setMobileNavOpen(false);
     setCommandPaletteOpen(true);
   };
 
   const handleCommandPaletteOpenChange = (open: boolean) => {
     setCommandPaletteOpen(open);
     if (!open) {
-      window.requestAnimationFrame(() => {
-        commandPaletteFocusOriginRef.current?.focus({ preventScroll: true });
-      });
+      restoreCommandPaletteFocus(commandPaletteFocusOriginRef.current);
     }
   };
 
@@ -539,11 +518,12 @@ export function AdminWorkspace({
           }
           inactive={currentView === "review_workspace"}
           label="Рабочая область администратора"
+          mobileNavInitialFocus="close-control"
           mobileNavOpen={mobileNavOpen}
+          onSideMenuModeChange={setSideMenuMode}
           role="admin"
           sideMenu={{
             ariaLabel: "Меню администратора",
-            displayMode: "regular",
             inactive: currentView === "review_workspace",
             items: sideMenuItems,
             mobileCloseLabel: "Закрыть меню администратора",
@@ -557,7 +537,7 @@ export function AdminWorkspace({
             sessionInitials: adminInitials,
             sessionRoleLabel: "Администратор",
           }}
-          sideMenuMode="regular"
+          sideMenuMode={sideMenuMode}
           surface={surface}
           workspaceInactive={currentView === "review_workspace"}
         >
