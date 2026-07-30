@@ -26,16 +26,19 @@ import {
 } from "../modules/submissions/agentInteractionContract";
 
 export type WorkspaceExperienceSettingsScreenProps = {
+  audience?: "admin" | "agent";
   currentIdentity: string;
   instrumentAgentInteractions?: boolean;
   usesSupabase?: boolean;
 };
 
 export function WorkspaceExperienceSettingsScreen({
+  audience = "agent",
   currentIdentity,
   instrumentAgentInteractions = false,
   usesSupabase = false,
 }: WorkspaceExperienceSettingsScreenProps) {
+  const isAdmin = audience === "admin";
   const [preferences, setPreferences] = useState<ExperiencePreferences>(() => {
     const current = readExperiencePreferences();
     applyExperiencePreferences(current);
@@ -87,29 +90,42 @@ export function WorkspaceExperienceSettingsScreen({
 
   const preferenceInteractionId: AgentInteractionId | undefined =
     instrumentAgentInteractions ? "settings.toggle-preference" : undefined;
-  const resetInteractionId: AgentInteractionId | undefined =
-    instrumentAgentInteractions ? "settings.reset-preferences" : undefined;
+  const resetInteractionId: AgentInteractionId | undefined = instrumentAgentInteractions
+    ? "settings.reset-preferences"
+    : undefined;
 
   return (
-    <section className="v19-system-settings" aria-labelledby="v19-settings-title">
+    <section
+      className={
+        isAdmin ? "v19-system-settings is-admin-workstation" : "v19-system-settings"
+      }
+      aria-labelledby="v19-settings-title"
+    >
       <header className="v19-settings-hero">
         <div>
           <span className="v19-settings-eyebrow">
             <MonitorCog aria-hidden="true" />
-            Experience control
+            {isAdmin ? "Рабочее место администратора" : "Experience control"}
           </span>
-          <h2 id="v19-settings-title">Системные настройки</h2>
+          <h2 id="v19-settings-title">
+            {isAdmin ? "Интерфейс и доступность" : "Системные настройки"}
+          </h2>
           <p>
-            Управляйте плотностью, доступностью и AI-контекстом интерфейса. Изменения
-            применяются сразу и сохраняются только в этом браузере.
+            {isAdmin
+              ? "Параметры применяются сразу и сохраняются только в этом браузере."
+              : "Управляйте плотностью, доступностью и AI-контекстом интерфейса. Изменения применяются сразу и сохраняются только в этом браузере."}
           </p>
         </div>
         <div
           className="v19-settings-score"
-          aria-label={`${activeCount} активных параметра`}
+          aria-label={
+            isAdmin
+              ? `Активно параметров: ${activeCount} из 4`
+              : `${activeCount} активных параметра`
+          }
         >
           <span>{activeCount}</span>
-          <small>активно</small>
+          <small>{isAdmin ? "из 4 включено" : "активно"}</small>
         </div>
       </header>
 
@@ -120,8 +136,14 @@ export function WorkspaceExperienceSettingsScreen({
               <Gauge />
             </span>
             <div>
-              <h3 id="appearance-settings">Ощущение интерфейса</h3>
-              <p>Параметры применяются ко всем рабочим экранам.</p>
+              <h3 id="appearance-settings">
+                {isAdmin ? "Интерфейс в этом браузере" : "Ощущение интерфейса"}
+              </h3>
+              <p>
+                {isAdmin
+                  ? "Для всех рабочих экранов и аккаунтов в этом браузере."
+                  : "Параметры применяются ко всем рабочим экранам."}
+              </p>
             </div>
           </div>
 
@@ -136,7 +158,11 @@ export function WorkspaceExperienceSettingsScreen({
             />
             <PreferenceRow
               checked={preferences.showAiContext}
-              description="Показывает Case Copilot и AI-пульс на рабочих экранах."
+              description={
+                isAdmin
+                  ? "Показывает AI-контекст и подсказки на рабочих экранах."
+                  : "Показывает Case Copilot и AI-пульс на рабочих экранах."
+              }
               icon={Bot}
               label="AI-контекст в работе"
               interactionId={preferenceInteractionId}
@@ -161,10 +187,7 @@ export function WorkspaceExperienceSettingsScreen({
           </div>
 
           <footer className="v19-settings-panel-footer">
-            <span
-              aria-live="polite"
-              role={saveError ? "alert" : "status"}
-            >
+            <span aria-live="polite" role={saveError ? "alert" : "status"}>
               {saveError ? (
                 saveError
               ) : saved ? (
@@ -176,9 +199,7 @@ export function WorkspaceExperienceSettingsScreen({
               )}
             </span>
             <Button
-              {...(resetInteractionId
-                ? agentInteractionProps(resetInteractionId)
-                : {})}
+              {...(resetInteractionId ? agentInteractionProps(resetInteractionId) : {})}
               variant="secondary"
               onClick={reset}
             >
@@ -188,20 +209,31 @@ export function WorkspaceExperienceSettingsScreen({
           </footer>
         </section>
 
-        <aside className="v19-settings-runtime" aria-label="Состояние системы">
+        <aside
+          className="v19-settings-runtime"
+          aria-label={isAdmin ? "Состояние рабочего места" : "Состояние системы"}
+        >
           <div className="v19-settings-runtime-head">
             <span aria-hidden="true">
               <ShieldCheck />
             </span>
             <div>
-              <h3>Состояние контура</h3>
+              <h3>{isAdmin ? "Рабочий контур" : "Состояние контура"}</h3>
               <p>Текущая конфигурация рабочего места.</p>
             </div>
           </div>
           <RuntimeRow
             icon={Database}
             label="Хранилище"
-            value={usesSupabase ? "Supabase workspace" : "Local demo"}
+            value={
+              usesSupabase
+                ? isAdmin
+                  ? "Рабочий контур Supabase"
+                  : "Supabase workspace"
+                : isAdmin
+                  ? "Локальная демо-среда"
+                  : "Local demo"
+            }
             tone={usesSupabase ? "live" : "local"}
           />
           <RuntimeRow
@@ -219,7 +251,9 @@ export function WorkspaceExperienceSettingsScreen({
           <div className="v19-settings-guardrail">
             <Sparkles aria-hidden="true" />
             <div>
-              <strong>AI guardrail активен</strong>
+              <strong>
+                {isAdmin ? "Контроль AI включён" : "AI guardrail активен"}
+              </strong>
               <p>
                 Сводки объясняют приоритет и готовят план, но не меняют подачу и не
                 принимают решение за администратора.
@@ -272,9 +306,12 @@ function PreferenceRow({
 }
 
 export function AdminSystemSettingsScreen(
-  props: Omit<WorkspaceExperienceSettingsScreenProps, "instrumentAgentInteractions">,
+  props: Omit<
+    WorkspaceExperienceSettingsScreenProps,
+    "audience" | "instrumentAgentInteractions"
+  >,
 ) {
-  return <WorkspaceExperienceSettingsScreen {...props} />;
+  return <WorkspaceExperienceSettingsScreen {...props} audience="admin" />;
 }
 
 function RuntimeRow({

@@ -1,12 +1,17 @@
-import { expect, test, type Page } from "@playwright/test";
-import { openFreshWorkspace } from "./v19-pilot-helpers";
-import { testArtifactPath } from "../support/artifacts";
+import { mkdirSync } from "node:fs";
+
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { clickWorkspaceButton, openFreshWorkspace } from "./v19-pilot-helpers";
+import { testRunArtifactPath } from "../support/artifacts";
 
 type ViewportProof = {
   height: number;
   label: string;
+  maxCreateInnerOverflowPx?: number;
   width: number;
 };
+
+const responsiveEvidenceRoot = testRunArtifactPath("responsive-proof");
 
 const responsiveViewports: ViewportProof[] = [
   { height: 900, label: "1440", width: 1440 },
@@ -14,6 +19,12 @@ const responsiveViewports: ViewportProof[] = [
   { height: 1024, label: "768", width: 768 },
   { height: 844, label: "390", width: 390 },
   { height: 812, label: "375", width: 375 },
+  {
+    height: 800,
+    label: "360",
+    maxCreateInnerOverflowPx: 10,
+    width: 360,
+  },
 ];
 
 function collectBrowserProblems(page: Page) {
@@ -48,7 +59,11 @@ async function expectNoHorizontalDocumentOverflow(page: Page, context: string) {
   expect(metrics.scrollWidth, context).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
-async function expectCreateContentFitsWithoutScroll(page: Page, context: string) {
+async function expectCreateContentFitsWithinOverflowBudget(
+  page: Page,
+  context: string,
+  maxOverflowPx = 1,
+) {
   const body = page.locator('[data-agent-screen="create"] .v19-preupload-card-body');
   await expect(body, `${context}: create content body`).toBeVisible();
   const metrics = await body.evaluate((element) => {
@@ -78,10 +93,11 @@ async function expectCreateContentFitsWithoutScroll(page: Page, context: string)
       cardTop: rect?.top ?? 0,
     };
   });
+  const overflowPx = Math.max(0, metrics.bodyScrollHeight - metrics.bodyClientHeight);
   expect(
-    metrics.bodyScrollHeight,
-    `${context}: create content should fit without inner scroll ${JSON.stringify(metrics)}`,
-  ).toBeLessThanOrEqual(metrics.bodyClientHeight + 1);
+    overflowPx,
+    `${context}: create content inner overflow ${JSON.stringify(metrics)}`,
+  ).toBeLessThanOrEqual(maxOverflowPx);
 }
 
 async function expectAgentNoDocumentScroll(page: Page, context: string) {
@@ -127,13 +143,11 @@ async function expectDrawerFitsViewport(
   page: Page,
   context: string,
   closeButtonName = "Закрыть подачу",
-) {
+): Promise<{ closeButton: Locator; dialog: Locator }> {
   const dialog = page.getByRole("dialog").first();
   await expect(dialog).toBeVisible();
   const closeButton = dialog.getByRole("button", { name: closeButtonName }).first();
-  if (await closeButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    await expect(closeButton).toBeVisible();
-  }
+  await expect(closeButton).toBeVisible();
 
   const viewport = page.viewportSize();
 
@@ -154,29 +168,51 @@ async function expectDrawerFitsViewport(
       { message: `${context}: drawer settles within the viewport` },
     )
     .toBe(true);
+  await expect
+    .poll(
+      async () => {
+        const box = await closeButton.boundingBox();
+        if (!box) return false;
+
+        return (
+          box.x >= -1 &&
+          box.y >= -1 &&
+          box.x + box.width <= viewport!.width + 1 &&
+          box.y + box.height <= viewport!.height + 1
+        );
+      },
+      { message: `${context}: close control stays within the viewport` },
+    )
+    .toBe(true);
+
+  return { closeButton, dialog };
 }
 
 async function screenshot(page: Page, viewport: ViewportProof, name: string) {
+  mkdirSync(responsiveEvidenceRoot, { recursive: true });
   await page.screenshot({
     fullPage: true,
-    path: testArtifactPath(`2026-06-21-v19-responsive-${viewport.label}-${name}.png`),
+    path: testRunArtifactPath(
+      "responsive-proof",
+      `v19-responsive-${viewport.width}x${viewport.height}-${name}.png`,
+    ),
   });
 }
 
 async function clickOperationalNav(page: Page, name: RegExp) {
-  const buttons = page.getByRole("button", { name });
-  const buttonCount = await buttons.count();
+  await clickWorkspaceButton(page, name);
+  const backdrop = page.locator(".ops-mobile-menu-backdrop").first();
 
-  for (let index = 0; index < buttonCount; index += 1) {
-    const candidate = buttons.nth(index);
-    if (await candidate.isVisible()) {
-      await candidate.click();
-      return;
-    }
+  if ((await backdrop.count()) > 0) {
+    await expect
+      .poll(async () => {
+        if ((await backdrop.count()) === 0) return 0;
+        return backdrop.evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).opacity || "0"),
+        );
+      })
+      .toBeLessThanOrEqual(0.03);
   }
-
-  await page.getByRole("button", { name: "Меню" }).click();
-  await page.getByRole("button", { name }).first().click();
 }
 
 async function expectSettingsReady(page: Page) {
@@ -189,6 +225,19 @@ async function expectSettingsReady(page: Page) {
   await expect(
     page.getByRole("switch", { name: "AI-контекст в работе" }),
   ).toBeVisible();
+}
+
+async function expectElementStartsAbove(
+  page: Page,
+  locator: Locator,
+  maxTop: number,
+  context: string,
+) {
+  await expect(locator, context).toBeVisible();
+  const box = await locator.boundingBox();
+
+  expect(box, `${context}: bounding box`).not.toBeNull();
+  expect(box!.y, `${context}: top position`).toBeLessThanOrEqual(maxTop);
 }
 
 async function selectAdminReviewLane(page: Page, name: "Ревью" | "Правки") {
@@ -304,7 +353,7 @@ test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     test.skip(testInfo.project.name !== "chromium", "single-project viewport proof");
 
     const problems = collectBrowserProblems(page);
@@ -349,7 +398,11 @@ test.describe("V-19 responsive proof", () => {
         page,
         `${viewport.label}: create workspace`,
       );
-      await expectCreateContentFitsWithoutScroll(page, viewport.label);
+      await expectCreateContentFitsWithinOverflowBudget(
+        page,
+        viewport.label,
+        viewport.maxCreateInnerOverflowPx,
+      );
       await screenshot(page, viewport, "create-submission-workspace");
 
       await createWorkspace.getByLabel("Город подачи").click();
@@ -378,11 +431,26 @@ test.describe("V-19 responsive proof", () => {
         .first();
       await expect(submissionRow).toBeVisible();
       await submissionRow.press("Enter");
-      await expectDrawerFitsViewport(page, `${viewport.label}: submission drawer`);
+      const { closeButton, dialog } = await expectDrawerFitsViewport(
+        page,
+        `${viewport.label}: submission drawer`,
+      );
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: drawer`);
+      const questionnaireTab = dialog.getByRole("tab", {
+        exact: true,
+        name: "Анкета",
+      });
+      await questionnaireTab.click();
+      await expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
+      const overviewTab = dialog.getByRole("tab", {
+        exact: true,
+        name: "Обзор",
+      });
+      await overviewTab.click();
+      await expect(overviewTab).toHaveAttribute("aria-selected", "true");
       await screenshot(page, viewport, "submission-drawer");
-      await page.keyboard.press("Escape");
-      await expect(page.getByRole("dialog")).toHaveCount(0);
+      await closeButton.click();
+      await expect(dialog).toHaveCount(0);
 
       await clickOperationalNav(page, /^Настройки/);
       await expect(
@@ -460,6 +528,151 @@ test.describe("V-19 responsive proof", () => {
         `${viewport.label}: admin corrections filter`,
       );
       await screenshot(page, viewport, "admin-corrections-filter");
+
+      await clickOperationalNav(page, /^Пользователи/);
+      await expect(
+        page.getByRole("heading", {
+          level: 1,
+          name: "Пользователи и доступ",
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 2, name: "Заявки и роли" }),
+      ).toBeVisible();
+      await expectElementStartsAbove(
+        page,
+        page.locator(".v19-access-board"),
+        Math.floor(viewport.height * 0.5),
+        `${viewport.label}: admin access controls`,
+      );
+      const allAccessRequests = page.getByRole("tab", { name: /^Все/ }).first();
+      const pendingAccessRequests = page.getByRole("tab", { name: /^Ожидают/ }).first();
+      if (viewport.width > 767) {
+        const allMetric = page.getByRole("button", { exact: true, name: "Всего" });
+        await allMetric.click();
+        await expect(allMetric).toHaveAttribute("aria-pressed", "true");
+        await expect(allAccessRequests).toHaveAttribute("aria-selected", "true");
+
+        const pendingMetric = page.getByRole("button", {
+          exact: true,
+          name: "Ожидают",
+        });
+        await pendingMetric.click();
+        await expect(pendingMetric).toHaveAttribute("aria-pressed", "true");
+        await expect(pendingAccessRequests).toHaveAttribute("aria-selected", "true");
+      } else {
+        await allAccessRequests.click();
+        await expect(allAccessRequests).toHaveAttribute("aria-selected", "true");
+        await pendingAccessRequests.click();
+        await expect(pendingAccessRequests).toHaveAttribute("aria-selected", "true");
+      }
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin users`);
+      await screenshot(page, viewport, "admin-users");
+
+      await clickOperationalNav(page, /^Настройки/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Настройки" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", {
+          level: 2,
+          name: "Интерфейс и доступность",
+        }),
+      ).toBeVisible();
+      await expectElementStartsAbove(
+        page,
+        page.locator(".v19-settings-grid"),
+        280,
+        `${viewport.label}: admin workstation controls`,
+      );
+      const contrastSwitch = page.getByRole("switch", {
+        name: "Повышенный контраст",
+      });
+      const initialContrast = await contrastSwitch.getAttribute("aria-checked");
+      await contrastSwitch.click();
+      await expect(contrastSwitch).toHaveAttribute(
+        "aria-checked",
+        initialContrast === "true" ? "false" : "true",
+      );
+      await contrastSwitch.click();
+      await expect(contrastSwitch).toHaveAttribute(
+        "aria-checked",
+        initialContrast ?? "false",
+      );
+      const preferenceSwitches = page.getByRole("switch");
+      for (let index = 0; index < (await preferenceSwitches.count()); index += 1) {
+        const target = preferenceSwitches.nth(index);
+        const box = await target.boundingBox();
+        expect(box, `${viewport.label}: preference target ${index}`).not.toBeNull();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+      if (viewport.width === 1440) {
+        const preferenceRow = page.locator(".v19-preference-row").first();
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        await expect
+          .poll(() =>
+            preferenceRow.evaluate((element) => {
+              const durations = getComputedStyle(element)
+                .transitionDuration.split(",")
+                .map((value) => value.trim())
+                .map((value) =>
+                  value.endsWith("ms")
+                    ? Number.parseFloat(value)
+                    : Number.parseFloat(value) * 1_000,
+                );
+              return Math.max(...durations);
+            }),
+          )
+          .toBeLessThanOrEqual(0.011);
+        await page.emulateMedia({ reducedMotion: "no-preference" });
+
+        const motionSwitch = page.getByRole("switch", {
+          name: "Минимум анимации",
+        });
+        await motionSwitch.click();
+        await expect(motionSwitch).toHaveAttribute("aria-checked", "true");
+        await expect
+          .poll(() =>
+            page.evaluate(() => document.documentElement.dataset.v19ReducedMotion),
+          )
+          .toBe("on");
+        await expect
+          .poll(() =>
+            preferenceRow.evaluate((element) => {
+              const durations = getComputedStyle(element)
+                .transitionDuration.split(",")
+                .map((value) => value.trim())
+                .map((value) =>
+                  value.endsWith("ms")
+                    ? Number.parseFloat(value)
+                    : Number.parseFloat(value) * 1_000,
+                );
+              return Math.max(...durations);
+            }),
+          )
+          .toBeLessThanOrEqual(0.011);
+        await motionSwitch.click();
+        await expect(motionSwitch).toHaveAttribute("aria-checked", "false");
+        await expect
+          .poll(() =>
+            page.evaluate(() => document.documentElement.dataset.v19ReducedMotion),
+          )
+          .toBe("off");
+        await expect
+          .poll(() =>
+            motionSwitch.locator("span").evaluate((element) => {
+              const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+              return matrix.m41;
+            }),
+          )
+          .toBe(0);
+      }
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin settings`,
+      );
+      await screenshot(page, viewport, "admin-settings");
 
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();

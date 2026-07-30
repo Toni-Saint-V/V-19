@@ -406,8 +406,8 @@ export function AdminWorkspace({
       : activeNav === "export"
         ? "Центр выгрузки"
         : activeNav === "users"
-          ? "Управление пользователями"
-          : "Системные настройки";
+          ? "Пользователи и доступ"
+          : "Настройки";
   const sideMenuItems = [
     {
       active: activeNav === "review",
@@ -440,7 +440,7 @@ export function AdminWorkspace({
       icon: "⚙",
       id: "admin-settings",
       label: "Настройки",
-      meta: "Правила системы",
+      meta: "Интерфейс и доступность",
       onClick: () => navigateTo("settings"),
     },
   ];
