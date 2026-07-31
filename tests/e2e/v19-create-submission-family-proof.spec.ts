@@ -84,7 +84,7 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   });
   await expect(saveButton).toBeDisabled();
   await expect(continueWithoutPassport).toBeDisabled();
-  await expect(workspace.getByText("Выберите город подачи.")).toBeVisible();
+  await expect(workspace.getByText("Выберите город подачи.")).toBeHidden();
 
   await chooseCity(page, workspace, "Казань");
   await expect(continueWithoutPassport).toBeEnabled();
@@ -118,9 +118,7 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
 
   await primary.click();
   await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
-  await expect(
-    page.getByRole("group", { name: "Разделы анкеты" }),
-  ).toBeVisible();
+  await expect(page.getByRole("group", { name: "Разделы анкеты" })).toBeVisible();
   await clickFirstVisible(
     page.getByRole("combobox", {
       name: /Выбрать (туриста|заявителя)/,
@@ -145,9 +143,7 @@ async function verifySingleCreateFlow(page: Page) {
   await continueWithoutPassport.click();
 
   await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
-  await expect(
-    page.getByRole("group", { name: "Разделы анкеты" }),
-  ).toBeVisible();
+  await expect(page.getByRole("group", { name: "Разделы анкеты" })).toBeVisible();
   const questionnaireHeading = page.getByRole("heading", {
     level: 1,
     name: /^Анкета:/,

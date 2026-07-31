@@ -284,12 +284,12 @@ async function assertDesktopCockpit(page: Page) {
   await expect(activeDetail).toContainText("Следующее действие");
   await expect(surface.locator(".v19-actions-summary-metric")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-cockpit-summary")).toHaveCount(0);
-  await expect(surface.locator('[data-action-filter="open"]')).toBeVisible();
-  await expect(surface.locator('[data-action-filter="today"]')).toBeVisible();
-  await expect(surface.locator('[data-action-filter="completed"]')).not.toBeVisible();
+  await expect(surface.locator('[data-v19-metric-id="open"]')).toBeVisible();
+  await expect(surface.locator('[data-v19-metric-id="today"]')).toBeVisible();
+  await expect(surface.locator('[data-v19-metric-id="completed"]')).toBeVisible();
   await expect(
-    surface.getByRole("combobox", { name: "Дополнительный фильтр действий" }),
-  ).toBeVisible();
+    surface.locator(".v19-agent-action-metrics .v19-metric-card"),
+  ).toHaveCount(5);
 
   const viewport = page.viewportSize();
   if (viewport && viewport.width >= 1280) {
@@ -326,19 +326,8 @@ async function assertActionFilters(page: Page) {
   const chooseFilter = async (
     filter: "blockers" | "completed" | "open" | "today" | "week",
   ) => {
-    const button = surface.locator(`[data-action-filter="${filter}"]`);
-    if (filter === "completed" || filter === "week") {
-      await surface
-        .getByRole("combobox", { name: "Дополнительный фильтр действий" })
-        .click();
-      await page
-        .getByRole("option", {
-          name: new RegExp(filter === "week" ? "^Неделя" : "^Закрыто"),
-        })
-        .click();
-    } else {
-      await button.click();
-    }
+    const button = surface.locator(`[data-v19-metric-id="${filter}"]`);
+    await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
   };
 

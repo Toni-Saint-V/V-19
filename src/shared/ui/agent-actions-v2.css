@@ -809,10 +809,10 @@
   #root
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-actions-desktop-grid.is-inline-context
-    .v19-actions-table-head,
+    .v19-actions-table-head:has(> :nth-child(5):last-child),
   #root
     .v19-legacy-actions-screen.surface-agent-actions
-    .v19-actions-table-row.is-inline-context {
+    .v19-actions-table-row.is-inline-context:has(> .v19-actions-cell-applicant) {
     grid-template-columns:
       var(--v19b-size-28)
       minmax(var(--v19b-size-92), 0.75fr)
@@ -1744,6 +1744,40 @@
   }
 }
 
+/* The action summary now uses the same operational metric cards as the other
+   workspaces. Keep all five filters visible and let narrow screens scroll one
+   calm, single-row component instead of switching to a second card design. */
+#root
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-metric-strip.v19-agent-action-metrics {
+  grid-template-columns: repeat(5, minmax(var(--v19b-size-112), 1fr));
+}
+
+@media (max-width: 767px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-metric-strip.v19-agent-action-metrics {
+    grid-template-columns: repeat(5, minmax(var(--v19b-size-112), 1fr)) !important;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: none;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-metric-strip.v19-agent-action-metrics::-webkit-scrollbar {
+    display: none;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-metric-strip.v19-agent-action-metrics
+    > .v19-metric-card {
+    scroll-snap-align: start;
+  }
+}
+
 /* Keep compact queue metrics optically grouped at tablet and mobile widths. */
 @media (max-width: 1199px) {
   #root
@@ -2115,5 +2149,48 @@
     .v19-actions-mobile-detail
     .v19-actions-readiness-line {
     min-height: var(--v19b-size-44);
+  }
+}
+
+/* Final desktop alignment contract: keep this at the physical end of the file
+   because this stylesheet still contains historical table column rules. */
+@media (min-width: 768px) {
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-table-head,
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-table-row.is-inline-context {
+    grid-template-columns:
+      14%
+      24%
+      17%
+      15%
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19b-size-20) !important;
+    gap: var(--v19b-size-12) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-table-head
+    > span {
+    justify-self: stretch;
+    text-align: left;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-table-row.is-inline-context {
+    overflow: hidden !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-table-row.is-inline-context
+    > * {
+    min-width: 0;
   }
 }

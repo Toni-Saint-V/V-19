@@ -8,17 +8,17 @@ const preUploadCss = readFileSync(
 );
 
 describe("pre-upload responsive layout contract", () => {
-  it("balances the compact create surface only on tall tablet layouts", () => {
+  it("stretches the create surface through the available tablet and desktop area", () => {
     const tabletRules = preUploadCss.match(
-      /@media \(min-width: 480px\) and \(max-width: 1279px\) and \(min-height: 900px\) \{([\s\S]*?)\n\}\n\n@media \(max-width: 767px\)/,
+      /@media \(min-width: 768px\) \{([\s\S]*?)\n\}\n\n@media \(max-width: 767px\)/,
     );
 
     expect(tabletRules?.[1]).toBeDefined();
     expect(tabletRules?.[1].replace(/\s+/g, " ")).toContain(
-      '.v19-agent-workspace-content[data-agent-screen="create"] { display: grid; align-items: center;',
+      '.v19-agent-workspace-content[data-agent-screen="create"] { display: grid; min-height: 100%; align-items: stretch;',
     );
     expect(tabletRules?.[1].replace(/\s+/g, " ")).toContain(
-      ".v19-preupload-screen { min-height: 0; padding-block: clamp(12px, 3vh, 32px);",
+      ".v19-preupload-card { height: 100%; min-height: 100%;",
     );
   });
 });

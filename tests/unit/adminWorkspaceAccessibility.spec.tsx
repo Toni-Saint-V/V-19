@@ -457,7 +457,8 @@ describe("AdminWorkspace production navigation", () => {
 
     expect(await screen.findByText(/Не удалось выйти из аккаунта/)).toBeInTheDocument();
     expect(onSignOut).toHaveBeenCalledTimes(1);
-    expect(screen.getByTitle("qa-admin@example.test")).toBeInTheDocument();
+    expect(screen.getByText("qa-admin@example.test")).toBeInTheDocument();
+    expect(screen.getByAltText("VisaFlow")).toBeInTheDocument();
   });
 
   test("uses real counts and identity in the inserted admin shell", () => {
@@ -477,7 +478,8 @@ describe("AdminWorkspace production navigation", () => {
     expect(
       within(screen.getByRole("button", { name: "Выгрузка" })).getByText("0"),
     ).toBeInTheDocument();
-    expect(screen.getByTitle("qa-admin@example.test")).toBeInTheDocument();
+    expect(screen.getByText("qa-admin@example.test")).toBeInTheDocument();
+    expect(screen.getByAltText("VisaFlow")).toBeInTheDocument();
     expect(screen.queryByText("Алексей Дмитриев")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Настройки" })).toBeVisible();
   });

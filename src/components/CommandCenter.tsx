@@ -1109,7 +1109,7 @@ export function CommandCenter({
                 interactionId="actions.sort"
                 label="Сортировка"
                 options={[
-                  { label: "По дате вылета", value: "tripDate" },
+                  { label: "Дата вылета", value: "tripDate" },
                   { label: "По дате создания", value: "createdAt" },
                 ]}
                 value={actionSort}

@@ -52,7 +52,7 @@ describe("PreUploadScreen canonical intake", () => {
     render(<PreUploadScreen />);
 
     expect(prewarmLocalPassportOcr).not.toHaveBeenCalled();
-    expect(screen.getByText("Выберите город подачи.")).toBeVisible();
+    expect(screen.getByText("Выберите город подачи.")).not.toBeVisible();
     expect(screen.getByRole("button", { name: "Сохранить черновик" })).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "Продолжить без паспорта" }),

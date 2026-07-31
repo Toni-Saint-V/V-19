@@ -1071,13 +1071,19 @@ export function PreUploadScreen({
                     </p>
                   ) : null}
                   {submissionDisabledReason && !actionPending ? (
-                    <p
-                      aria-live="polite"
-                      className="v19-preupload-disabled-reason"
-                      id="preupload-disabled-reason"
-                    >
-                      {submissionDisabledReason}
-                    </p>
+                    submissionDisabledReason === "Выберите город подачи." ? (
+                      <span className="sr-only" hidden id="preupload-disabled-reason">
+                        {submissionDisabledReason}
+                      </span>
+                    ) : (
+                      <p
+                        aria-live="polite"
+                        className="v19-preupload-disabled-reason"
+                        id="preupload-disabled-reason"
+                      >
+                        {submissionDisabledReason}
+                      </p>
+                    )
                   ) : null}
                   <button
                     {...agentInteractionProps("new-submission.save-draft")}

@@ -370,6 +370,43 @@ function SubmissionCreatedAt({ createdAt, now }: { createdAt: string; now: Date 
   );
 }
 
+function SubmissionFooterMeta({
+  canDeleteSubmission,
+  deleting,
+  label,
+  now,
+  onDeleteRequest,
+  submission,
+}: {
+  canDeleteSubmission: boolean;
+  deleting: boolean;
+  label: string;
+  now: Date;
+  onDeleteRequest: (submission: Submission, trigger: HTMLButtonElement) => void;
+  submission: Submission;
+}) {
+  const canArchive =
+    canDeleteSubmission && agentSubmissionCardArchiveDecision(submission).ok;
+
+  return (
+    <div className="v19-applicant-card-footer-meta">
+      <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
+      {canArchive ? (
+        <button
+          {...agentInteractionProps("submissions.open-delete")}
+          aria-label={`Удалить подачу: ${label}`}
+          className="v19-applicant-delete-footer-action"
+          disabled={deleting}
+          type="button"
+          onClick={(event) => onDeleteRequest(submission, event.currentTarget)}
+        >
+          Удалить
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 type CardCallbacks = Pick<
   ApplicantsScreenProps,
   | "onOpenDrawer"
@@ -593,41 +630,15 @@ function SubmissionStatusLabel({
 }
 
 function SubmissionCardHeaderActions({
-  canDeleteSubmission,
-  deleting,
-  label,
-  onDeleteRequest,
   onOpen,
   submission,
 }: {
-  canDeleteSubmission: boolean;
-  deleting: boolean;
-  label: string;
-  onDeleteRequest: (submission: Submission, trigger: HTMLButtonElement) => void;
   onOpen: () => void;
   submission: Submission;
 }) {
-  const archiveDecision = agentSubmissionCardArchiveDecision(submission);
-
   return (
     <div className="v19-applicant-card-head-actions">
       <SubmissionStatusLabel onOpen={onOpen} submission={submission} />
-      {canDeleteSubmission && archiveDecision.ok ? (
-        <button
-          {...agentInteractionProps("submissions.open-delete")}
-          aria-label={`Удалить карточку подачи: ${label}`}
-          className="v19-applicant-delete-card-action"
-          disabled={deleting}
-          title="Удалить карточку"
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDeleteRequest(submission, event.currentTarget);
-          }}
-        >
-          <Trash2 aria-hidden="true" />
-        </button>
-      ) : null}
     </div>
   );
 }
@@ -761,10 +772,6 @@ function FamilySubmissionCard({
           </div>
         </div>
         <SubmissionCardHeaderActions
-          canDeleteSubmission={canDeleteSubmission}
-          deleting={deleting}
-          label={title}
-          onDeleteRequest={onDeleteRequest}
           onOpen={() => onOpenDrawer(submission.id)}
           submission={submission}
         />
@@ -798,7 +805,14 @@ function FamilySubmissionCard({
       </div>
 
       <div className="v19-applicant-card-footer">
-        <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
+        <SubmissionFooterMeta
+          canDeleteSubmission={canDeleteSubmission}
+          deleting={deleting}
+          label={title}
+          now={now}
+          onDeleteRequest={onDeleteRequest}
+          submission={submission}
+        />
         <SubmissionPrimaryAction
           canSubmitForReview={canSubmitForReview}
           label={title}
@@ -875,17 +889,20 @@ function IndividualSubmissionCard({
           </div>
         </div>
         <SubmissionCardHeaderActions
-          canDeleteSubmission={canDeleteSubmission}
-          deleting={deleting}
-          label={name}
-          onDeleteRequest={onDeleteRequest}
           onOpen={() => onOpenDrawer(submission.id)}
           submission={submission}
         />
       </div>
 
       <div className="v19-applicant-card-footer">
-        <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
+        <SubmissionFooterMeta
+          canDeleteSubmission={canDeleteSubmission}
+          deleting={deleting}
+          label={name}
+          now={now}
+          onDeleteRequest={onDeleteRequest}
+          submission={submission}
+        />
         {applicant ? (
           <SubmissionWorkflowSwitch
             action={

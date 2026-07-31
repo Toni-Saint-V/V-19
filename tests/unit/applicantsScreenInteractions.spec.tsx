@@ -802,13 +802,20 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     expect(
-      screen.getByRole("button", {
+      screen.queryByRole("button", {
         name: `Удалить карточку подачи: ${draft.applicants[0]!.fullName}`,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: `Удалить подачу: ${draft.applicants[0]!.fullName}`,
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole("button", { name: /Удалить карточку подачи:/ }),
-    ).toHaveLength(1);
+      screen.getByRole("button", {
+        name: `Удалить свайпом: ${draft.applicants[0]!.fullName}`,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("confirms an audited Supabase card archive without opening the drawer", async () => {
@@ -827,7 +834,7 @@ describe("ApplicantsScreen interactions", () => {
     );
 
     const deleteButton = screen.getByRole("button", {
-      name: `Удалить карточку подачи: ${draft.applicants[0]!.fullName}`,
+      name: `Удалить подачу: ${draft.applicants[0]!.fullName}`,
     });
     fireEvent.click(deleteButton);
 
@@ -843,7 +850,7 @@ describe("ApplicantsScreen interactions", () => {
     fireEvent.click(cancelButton);
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
     const restoredDeleteButton = screen.getByRole("button", {
-      name: `Удалить карточку подачи: ${draft.applicants[0]!.fullName}`,
+      name: `Удалить подачу: ${draft.applicants[0]!.fullName}`,
     });
     expect(restoredDeleteButton).toHaveFocus();
 
@@ -879,7 +886,7 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Удалить карточку подачи:/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Удалить свайпом:/ }));
     const dialog = screen.getByRole("dialog", {
       name: `Удалить карточку «${draft.applicants[0]!.fullName}»?`,
     });

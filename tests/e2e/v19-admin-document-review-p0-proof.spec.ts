@@ -91,8 +91,7 @@ test.describe("V-19 P0 admin document review", () => {
         workspaceEmail: "admin@visaflow.local",
       });
 
-      await expect(page.locator(".v19-review-focus-tabs")).toHaveCount(0);
-      await expect(page.locator(".v19-admin-review-list-head")).toBeVisible();
+      await expect(page.locator(".v19-review-focus-tabs")).toBeVisible();
       const submission = page.locator('[data-submission-id="ПД-1055"]').first();
       await expect(submission).toBeVisible();
       await submission.click();

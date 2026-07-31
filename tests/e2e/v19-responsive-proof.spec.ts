@@ -275,7 +275,23 @@ async function expectCreateStageRhythm(page: Page, context: string) {
   const gap = uploadBox!.y - (operationalBox!.y + operationalBox!.height);
   expect(gap, `${context}: adjacent create stage gap`).toBeGreaterThanOrEqual(0);
   expect(gap, `${context}: adjacent create stage gap`).toBeLessThanOrEqual(24);
-  await expect(page.locator("#preupload-disabled-reason")).toBeVisible();
+  await expect(page.locator("#preupload-disabled-reason")).toBeHidden();
+
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
+    const lowerSlack = await page
+      .locator('[data-agent-screen="create"] .v19-preupload-card-body')
+      .evaluate((element) => {
+        const footer = element.querySelector<HTMLElement>(".v19-preupload-footer");
+        if (!footer) return Number.POSITIVE_INFINITY;
+        return (
+          element.getBoundingClientRect().bottom - footer.getBoundingClientRect().bottom
+        );
+      });
+    expect(
+      lowerSlack,
+      `${context}: footer anchors the full-height card`,
+    ).toBeLessThanOrEqual(20);
+  }
 }
 
 async function expectMobileActionDensity(page: Page, context: string) {
@@ -288,14 +304,9 @@ async function expectMobileActionDensity(page: Page, context: string) {
   ).toHaveCount(0);
   await expect(
     page.locator(
-      '[data-agent-screen="actions"] .v19-agent-action-status-button > svg:visible',
+      '[data-agent-screen="actions"] .v19-agent-action-metrics .v19-metric-card',
     ),
-  ).toHaveCount(0);
-  await expect(
-    page.locator(
-      '[data-agent-screen="actions"] .v19-agent-action-status-more > svg:first-child:visible',
-    ),
-  ).toHaveCount(0);
+  ).toHaveCount(5);
 
   const viewport = page.viewportSize();
   expect(viewport, `${context}: viewport`).not.toBeNull();
@@ -333,6 +344,89 @@ async function expectMobileActionDensity(page: Page, context: string) {
     borderBottomWidth: "0px",
     borderLeftWidth: "0px",
     borderRightWidth: "0px",
+  });
+}
+
+async function expectDesktopActionTableContract(
+  page: Page,
+  viewportWidth: number,
+  context: string,
+) {
+  const header = page.locator(".v19-actions-table-head").first();
+  const row = page.locator(".v19-actions-table-row.is-inline-context").first();
+  await expect(header, `${context}: table header`).toBeVisible();
+  await expect(row, `${context}: first table row`).toBeVisible();
+
+  if (viewportWidth < 900) {
+    await expect(
+      header.locator(":scope > span").nth(2),
+      `${context}: dates header`,
+    ).toBeHidden();
+    await expect(
+      header.locator(":scope > span").nth(3),
+      `${context}: city header`,
+    ).toBeVisible();
+    await expect(row.locator(".v19-actions-cell-dates")).toBeHidden();
+    await expect(row.locator(".v19-actions-cell-city")).toBeVisible();
+
+    const tracks = await Promise.all([
+      header.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
+      row.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
+    ]);
+    expect(tracks[1], `${context}: compact row tracks match header tracks`).toBe(
+      tracks[0],
+    );
+
+    const [headerLefts, rowLefts] = await Promise.all([
+      header
+        .locator(":scope > span:visible")
+        .evaluateAll((elements) =>
+          elements.map((element) => element.getBoundingClientRect().left),
+        ),
+      row
+        .locator(
+          ":scope > .v19-actions-cell-id:visible, :scope > .v19-actions-cell-applicant:visible, :scope > .v19-actions-cell-city:visible, :scope > .v19-actions-cell-action:visible",
+        )
+        .evaluateAll((elements) =>
+          elements.map((element) => element.getBoundingClientRect().left),
+        ),
+    ]);
+    expect(rowLefts).toHaveLength(4);
+    headerLefts.forEach((left, index) => {
+      expect(
+        Math.abs(rowLefts[index] - left),
+        `${context}: compact column ${index + 1} left alignment`,
+      ).toBeLessThanOrEqual(1);
+    });
+    return;
+  }
+
+  const tracks = await Promise.all([
+    header.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
+    row.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
+  ]);
+  expect(tracks[1], `${context}: row tracks match header tracks`).toBe(tracks[0]);
+
+  const [headerLefts, rowLefts] = await Promise.all([
+    header
+      .locator(":scope > span")
+      .evaluateAll((elements) =>
+        elements.map((element) => element.getBoundingClientRect().left),
+      ),
+    row
+      .locator(
+        ":scope > .v19-actions-cell-id, :scope > .v19-actions-cell-applicant, :scope > .v19-actions-cell-dates, :scope > .v19-actions-cell-city, :scope > .v19-actions-cell-action",
+      )
+      .evaluateAll((elements) =>
+        elements.map((element) => element.getBoundingClientRect().left),
+      ),
+  ]);
+  expect(rowLefts).toHaveLength(5);
+  headerLefts.slice(0, 5).forEach((left, index) => {
+    expect(
+      Math.abs(rowLefts[index] - left),
+      `${context}: column ${index + 1} left alignment`,
+    ).toBeLessThanOrEqual(1);
   });
 }
 
@@ -540,6 +634,12 @@ test.describe("V-19 responsive proof", () => {
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent actions`);
       if (viewport.width < 768) {
         await expectMobileActionDensity(page, `${viewport.label}: agent actions`);
+      } else {
+        await expectDesktopActionTableContract(
+          page,
+          viewport.width,
+          `${viewport.label}: agent actions`,
+        );
       }
       await screenshot(page, viewport, "agent-actions");
 
@@ -549,6 +649,16 @@ test.describe("V-19 responsive proof", () => {
       await expect(
         page.getByRole("button", { name: "Новая подача" }).first(),
       ).toBeVisible();
+      await expect(page.locator(".v19-applicant-delete-card-action")).toHaveCount(0);
+      if (viewport.width >= 768) {
+        await expect(
+          page.locator(".v19-applicant-delete-footer-action").first(),
+        ).toBeVisible();
+      } else {
+        await expect(
+          page.locator(".v19-applicant-delete-footer-action").first(),
+        ).toBeHidden();
+      }
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent submissions`);
       await screenshot(page, viewport, "agent-submissions");
 

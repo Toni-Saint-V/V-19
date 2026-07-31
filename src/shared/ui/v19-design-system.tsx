@@ -897,16 +897,20 @@ export function V19SubmissionTripDates({
 }
 
 export function V19MetricStrip({
+  ariaLabel,
   children,
   className,
 }: {
+  ariaLabel?: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <div
+      aria-label={ariaLabel}
       className={cn("v19-metric-strip", className)}
       data-v19-component="operational-metrics"
+      role={ariaLabel ? "group" : undefined}
     >
       {children}
     </div>
@@ -915,19 +919,23 @@ export function V19MetricStrip({
 
 export function V19MetricCard({
   active = false,
+  ariaLabel,
   detail,
   icon,
   interactionId,
   label,
+  metricId,
   onClick,
   tone = "neutral",
   value,
 }: {
   active?: boolean;
+  ariaLabel?: string;
   detail?: ReactNode;
   icon: V19SurfaceIcon;
   interactionId?: string;
   label: string;
+  metricId?: string;
   onClick?: () => void;
   tone?: string;
   value: ReactNode;
@@ -951,10 +959,11 @@ export function V19MetricCard({
   if (onClick) {
     return (
       <button
-        aria-label={label}
+        aria-label={ariaLabel ?? label}
         aria-pressed={active}
         className={cn("v19-metric-card", `tone-${mappedTone}`, active && "is-active")}
         data-v19-interaction-id={interactionId}
+        data-v19-metric-id={metricId}
         type="button"
         onClick={onClick}
       >
@@ -965,8 +974,9 @@ export function V19MetricCard({
 
   return (
     <div
-      aria-label={label}
+      aria-label={ariaLabel ?? label}
       className={cn("v19-metric-card", `tone-${mappedTone}`)}
+      data-v19-metric-id={metricId}
       role="group"
     >
       {content}

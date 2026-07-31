@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
 import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
 import { RemarkForm } from "./RemarkForm";
@@ -493,12 +494,12 @@ export function AdminWorkspace({
                     <span>Поиск</span>
                     <kbd>⌘K</kbd>
                   </button>
-                  <div
-                    aria-label={adminIdentity}
-                    className="v19-admin-header-identity"
-                    title={adminIdentity}
-                  >
-                    {adminInitials}
+                  <div className="v19-admin-header-identity" title="VisaFlow">
+                    <img
+                      alt="VisaFlow"
+                      className="v19-admin-header-brand-logo"
+                      src={visaflowLogo}
+                    />
                   </div>
                 </div>
               }
