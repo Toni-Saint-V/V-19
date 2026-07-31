@@ -192,7 +192,7 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     intent: "export_package",
     ownerRole: "admin",
     productionLogic: "src/modules/submissions/exportWorkflow.completeExportPackage",
-    releaseState: "enabled",
+    releaseState: "blocked",
     submissionAction: "mark_exported",
     surfaces: ["export", "excel-preview"],
     transition: { from: ["ready_for_export"], to: "exported" },

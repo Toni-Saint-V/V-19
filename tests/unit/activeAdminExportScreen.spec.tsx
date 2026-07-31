@@ -95,14 +95,13 @@ describe("active admin export screen", () => {
     expect(screen.getByRole("button", { name: "Сформировать Excel" })).toBeEnabled();
     expect(
       screen.getByText(
-        "Состав, проверки, Excel и обязательные документы перед скачиванием.",
+        "Состав, проверки и Excel; пакет документов T9 недоступен.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("ZIP медиа")).toBeInTheDocument();
+    expect(screen.getByText("Только Excel (T8)")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Сформировать ZIP с Excel" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/T9|Integration Contract/)).not.toBeInTheDocument();
+      screen.queryByRole("button", { name: "Сформировать ZIP с Excel" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Скачать ZIP/ })).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Подтвердить скачивание" }),

@@ -90,17 +90,17 @@ describe("V-19 business click contract", () => {
     expect(surfaces.has("agent-media")).toBe(false);
   });
 
-  test("activates the ZIP-coupled terminal export only through its canonical owner", () => {
+  test("keeps the ZIP-coupled terminal export blocked for this release", () => {
     expect(businessClickContractFor("mark_exported")).toMatchObject({
       executionPath: "completeExportPackage",
-      releaseState: "enabled",
+      releaseState: "blocked",
       submissionAction: "mark_exported",
     });
     expect(
       actionContracts.some(
         (contract) => contract.submissionAction === "mark_exported",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test("executes the combined draft-to-review intent through the canonical lifecycle", () => {

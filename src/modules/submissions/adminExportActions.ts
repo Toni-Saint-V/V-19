@@ -24,7 +24,9 @@ export const adminDocumentPackageExportEnabled =
 
 export function assertAdminDocumentPackageExportEnabled() {
   if (!adminDocumentPackageExportEnabled) {
-    throw new Error("Действие недоступно в текущем статусе");
+    throw new Error(
+      "Пакет документов T9 недоступен; Excel T8 остаётся доступным.",
+    );
   }
 }
 
@@ -65,8 +67,9 @@ export function describeAdminExportActionFeedback({
   if (action === "download_zip" && !adminDocumentPackageExportEnabled) {
     return {
       canRun: false,
-      message: "Действие недоступно в текущем статусе",
-      nextAction: "Сформировать Excel",
+      message:
+        "ZIP документов (T9) заблокирован каноническим контрактом. Доступен только Excel (T8).",
+      nextAction: "Только Excel",
       tone: "warning",
     };
   }
