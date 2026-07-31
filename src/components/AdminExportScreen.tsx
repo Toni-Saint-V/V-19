@@ -67,10 +67,7 @@ import { OperationalTableHeader } from "../shared/ui/OperationalTableHeader";
 import { agentDisplayName } from "../modules/submissions/agentDirectory";
 import { cityFilterValuesForSubmissions } from "../modules/submissions/selectors";
 import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
-import {
-  adminDocumentPackageExportEnabled,
-  assertAdminDocumentPackageExportEnabled,
-} from "../modules/submissions/adminExportActions";
+import { assertAdminDocumentPackageExportEnabled } from "../modules/submissions/adminExportActions";
 
 interface ExportItem {
   id: string;
@@ -1142,9 +1139,7 @@ export function AdminExportScreen({
                 Контроль пакета
               </h3>
               <p className="mt-2 text-[12px] leading-relaxed text-white/45">
-                {adminDocumentPackageExportEnabled
-                  ? "Состав, проверки, Excel и обязательные документы перед скачиванием."
-                  : "Состав, проверки и Excel; пакет документов T9 недоступен."}
+                Состав, проверки, Excel и обязательные документы перед скачиванием.
               </p>
             </div>
             <div className="v19-admin-export-rail-icon-v2">
@@ -1342,29 +1337,12 @@ export function AdminExportScreen({
                 value={`${selectedPlan.rowCount} ${rowCountLabel(selectedPlan.rowCount)}`}
                 state={selectedCount ? "ok" : "neutral"}
               />
-              {adminDocumentPackageExportEnabled ? (
-                <ManifestRow
-                  icon={FileArchive}
-                  label="ZIP медиа"
-                  value={`${selectedFiles} ${fileCountLabel(selectedFiles)}`}
-                  state={selectedCount ? "ok" : "neutral"}
-                />
-              ) : (
-                <>
-                  <ManifestRow
-                    icon={FileArchive}
-                    label="Документы T9"
-                    value="заблокирован"
-                    state="warn"
-                  />
-                  <ManifestRow
-                    icon={FolderCheck}
-                    label="Файлы пакета"
-                    value={`${selectedFiles} ${fileCountLabel(selectedFiles)}`}
-                    state={selectedCount ? "ok" : "neutral"}
-                  />
-                </>
-              )}
+              <ManifestRow
+                icon={FileArchive}
+                label="ZIP медиа"
+                value={`${selectedFiles} ${fileCountLabel(selectedFiles)}`}
+                state={selectedCount ? "ok" : "neutral"}
+              />
               <ManifestRow
                 icon={Lock}
                 label="Состояние экспорта"
@@ -1478,21 +1456,7 @@ export function AdminExportScreen({
         </div>
 
         <div className="shrink-0 border-t border-[#242529] bg-[#1a1a1d] p-4">
-          {!adminDocumentPackageExportEnabled ? (
-            <div
-              className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 text-center"
-              data-testid="document-package-export-blocked"
-            >
-              <div className="flex items-center justify-center gap-2 text-[12px] font-semibold text-white/75">
-                <Lock className="h-4 w-4" />
-                Только Excel (T8)
-              </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-white/40">
-                ZIP документов и терминальная фиксация T9 заблокированы
-                каноническим контрактом.
-              </p>
-            </div>
-          ) : preparedArchive && archiveDownloadUrl && archiveDownloadStarted ? (
+          {preparedArchive && archiveDownloadUrl && archiveDownloadStarted ? (
             <div className="space-y-2">
               <button
                 className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-wait disabled:opacity-60"
@@ -1550,9 +1514,7 @@ export function AdminExportScreen({
             <Clock3 className="h-3.5 w-3.5" />{" "}
             {exportError ||
               exportNotice ||
-              (!adminDocumentPackageExportEnabled
-                ? "Excel T8 доступен; пакет документов T9 заблокирован"
-                : selectedCount
+              (selectedCount
                 ? hasExportBlockers
                   ? selectedPlan.blockers[0]?.reason ??
                     "Уберите ограничения перед выгрузкой"
@@ -1561,7 +1523,7 @@ export function AdminExportScreen({
                     : preparedExport
                       ? "Excel готов и будет добавлен в ZIP"
                       : "ZIP включает Excel и обязательные документы"
-                  : "Выберите хотя бы одну подачу")}
+                : "Выберите хотя бы одну подачу")}
           </div>
         </div>
       </aside>

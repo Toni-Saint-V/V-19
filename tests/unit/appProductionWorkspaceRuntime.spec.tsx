@@ -1170,7 +1170,7 @@ describe("App production workspace runtime", () => {
     expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
     expect(externalAction).not.toHaveBeenCalled();
     expect(runtime.lastMutationError?.message).toContain(
-      "Пакет документов T9 недоступен",
+      "Действие недоступно в текущем статусе",
     );
   });
 

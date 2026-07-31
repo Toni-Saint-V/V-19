@@ -17,12 +17,13 @@ describe("admin export integration contract", () => {
 
     expect(feedback).toMatchObject({
       canRun: false,
-      nextAction: "Только Excel",
+      message: "Действие недоступно в текущем статусе",
+      nextAction: "Сформировать Excel",
       tone: "warning",
     });
-    expect(feedback.message).toMatch(/T9|каноническим контрактом/);
+    expect(feedback.message).not.toMatch(/T9|Integration Contract/);
     expect(() => assertAdminDocumentPackageExportEnabled()).toThrow(
-      /T9.*Excel T8/,
+      "Действие недоступно в текущем статусе",
     );
   });
 
