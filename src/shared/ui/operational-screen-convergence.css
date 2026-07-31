@@ -1321,6 +1321,27 @@
   }
 }
 
+@media (min-width: 480px) and (max-width: 767px) {
+  #root .ops-shell.surface-agent-submissions .v19-applicant-family-header {
+    grid-template-columns: minmax(var(--v19b-size-0), 1fr) auto !important;
+    align-items: center;
+  }
+
+  #root
+    .ops-shell.surface-agent-submissions
+    .v19-applicant-family-header
+    .v19-applicant-card-head-actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  #root .ops-shell.surface-agent-submissions .v19-applicant-family-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+
 @media (max-width: 640px) {
   #root .v19-access-metrics.v19-metric-strip .v19-metric-card {
     min-height: var(--v19b-size-80);

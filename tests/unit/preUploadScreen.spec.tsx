@@ -57,6 +57,16 @@ describe("PreUploadScreen canonical intake", () => {
     expect(
       screen.getByRole("button", { name: "Продолжить без паспорта" }),
     ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Сохранить черновик" }),
+    ).toHaveTextContent("Сохранить");
+    expect(
+      screen.getByRole("button", { name: "Продолжить без паспорта" }),
+    ).toHaveTextContent("Продолжить");
+    expect(screen.getByText("Паспорт — Основной заявитель")).toBeVisible();
+    expect(
+      screen.getByText("Загрузите паспорт — данные появятся в анкете."),
+    ).toBeVisible();
     const firstApplicant = screen.getAllByRole("listitem")[0];
     expect(
       firstApplicant?.querySelectorAll(".v19-preupload-applicant-state"),
