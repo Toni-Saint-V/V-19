@@ -24,12 +24,21 @@ function mergeAriaIds(
   return merged || undefined;
 }
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "icon" | "plain";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "outline"
+  | "ghost"
+  | "icon"
+  | "plain";
+
+export type ButtonSize = "compact" | "default" | "large";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   danger?: boolean;
   loading?: boolean;
   ref?: Ref<HTMLButtonElement>;
+  size?: ButtonSize;
   variant?: ButtonVariant;
   wide?: boolean;
 }
@@ -41,6 +50,7 @@ export function Button({
   disabled,
   loading = false,
   ref,
+  size = "default",
   type = "button",
   variant = "primary",
   wide = false,
@@ -49,21 +59,25 @@ export function Button({
   const variantClass =
     variant === "secondary"
       ? "secondary-button"
-      : variant === "ghost"
-        ? "ghost-button"
-        : variant === "icon"
-          ? "icon-button"
-          : variant === "plain"
-            ? false
-            : "primary-button";
+      : variant === "outline"
+        ? "outline-button"
+        : variant === "ghost"
+          ? "ghost-button"
+          : variant === "icon"
+            ? "icon-button"
+            : variant === "plain"
+              ? "plain-button"
+              : "primary-button";
 
   return (
     <button
       {...props}
       ref={ref}
+      aria-busy={loading ? true : props["aria-busy"]}
       className={cn(
         "mp-button",
         variantClass,
+        `button-size-${size}`,
         danger && "danger-action",
         wide && "wide",
         loading && "is-loading",
@@ -72,7 +86,6 @@ export function Button({
       disabled={disabled || loading}
       type={type}
     >
-      {loading ? <span aria-hidden="true">...</span> : null}
       {children}
     </button>
   );
@@ -86,6 +99,7 @@ export interface IconButtonProps extends Omit<
   label: string;
   pressed?: boolean;
   ref?: Ref<HTMLButtonElement>;
+  size?: Exclude<ButtonSize, "large">;
   tooltip?: string;
 }
 
@@ -95,6 +109,7 @@ export function IconButton({
   label,
   pressed,
   ref,
+  size = "default",
   tooltip,
   ...props
 }: IconButtonProps) {
@@ -105,6 +120,7 @@ export function IconButton({
       aria-label={label}
       aria-pressed={typeof pressed === "boolean" ? pressed : undefined}
       className={className}
+      size={size}
       title={tooltip ?? label}
       variant="icon"
     >

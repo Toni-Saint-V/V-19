@@ -213,6 +213,40 @@
   --v19-submission-status-chip-padding-x: 12px;
   --v19-input-height: 44px;
   --v19-button-height: 40px;
+  /* Linear Indigo button kit. These tokens are intentionally separate from
+     --v19-radius-button because that legacy token is also consumed by
+     non-button surfaces. */
+  --v19-linear-button-radius: 8px;
+  --v19-linear-button-height-compact: 32px;
+  --v19-linear-button-height-default: 40px;
+  --v19-linear-button-height-large: 48px;
+  --v19-linear-button-padding-inline: 16px;
+  --v19-linear-button-gap: 6px;
+  --v19-linear-button-primary-start: #818dff;
+  --v19-linear-button-primary-end: #4b5bf1;
+  --v19-linear-button-primary-edge-start: rgb(255 255 255 / 0.72);
+  --v19-linear-button-primary-edge-end: #2430a6;
+  --v19-linear-button-primary-background: linear-gradient(
+    180deg,
+    var(--v19-linear-button-primary-start),
+    var(--v19-linear-button-primary-end)
+  );
+  --v19-linear-button-primary-edge: linear-gradient(
+    180deg,
+    var(--v19-linear-button-primary-edge-start),
+    var(--v19-linear-button-primary-edge-end)
+  );
+  --v19-linear-button-secondary-background: #1e1e21;
+  --v19-linear-button-secondary-border: #242529;
+  --v19-linear-button-secondary-hover: #27272b;
+  --v19-linear-button-halo: 0 0 0 3px rgb(91 96 201 / 0.16);
+  --v19-linear-button-focus-halo: 0 0 0 3px rgb(173 182 255 / 0.2);
+  --v19-linear-button-disabled-opacity: 0.52;
+  --v19-linear-button-press-offset: 1px;
+  --v19-linear-button-spinner-size: 14px;
+  --v19-linear-button-spinner-border: 2px;
+  --v19-linear-button-spinner-duration: 700ms;
+  --v19-linear-button-spinner-turn: 1turn;
   --v19-upload-panel-padding: 42px 28px 34px;
   --v19-upload-panel-padding-mobile: 34px 18px 28px;
   --v19-upload-visual-width: 136px;

@@ -1,0 +1,516 @@
+/* Linear Indigo button kit.
+   This is deliberately the final UI layer and targets only the shared
+   primitive plus an explicit allowlist of established CTA classes. */
+
+@layer v19-linear-buttons {
+  :is(
+    .mp-button:not(.plain-button),
+    .primary-button,
+    .secondary-button,
+    .outline-button,
+    .ghost-button,
+    .icon-button,
+    .access-submit,
+    .access-back-button,
+    .access-secondary-link,
+    .access-password-toggle,
+    .v19-action-surface-create,
+    .v19-create-cancel-action,
+    .ops-sidebar-create,
+    .v19-questionnaire-back-button,
+    .v19-questionnaire-next-button,
+    .v19-questionnaire-save-button,
+    .v19-questionnaire-mobile-footer-save,
+    .v19-questionnaire-copy-button,
+    .v19-drawer-footer-action--primary,
+    .v19-drawer-footer-action--ghost,
+    .v19-drawer-file-action,
+    .v19-preupload-primary-action,
+    .v19-preupload-secondary-action,
+    .admin-review-primary,
+    .admin-review-secondary,
+    button.v17-admin-row-action,
+    .v19-export-primary-action,
+    .v19-review-back,
+    .v19-review-download,
+    .v19-review-media-controls button,
+    .v19-review-confirmation button,
+    .v19-review-return,
+    .v19-review-accept,
+    .v19-review-next-step
+  ) {
+    position: relative;
+    display: inline-flex;
+    min-height: var(--v19-linear-button-height-default);
+    align-items: center;
+    justify-content: center;
+    gap: var(--v19-linear-button-gap) !important;
+    padding-inline: var(--v19-linear-button-padding-inline) !important;
+    border-radius: var(--v19-linear-button-radius) !important;
+    font-family: var(--v19-font-family);
+    line-height: var(--v19b-line-height-control);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition:
+      background-color var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      border-color var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      box-shadow var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      color var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      transform var(--v19b-motion-soft-duration) var(--v19b-ease-standard) !important;
+  }
+
+  .mp-button:not(.plain-button).button-size-compact {
+    min-height: var(--v19-linear-button-height-compact) !important;
+    height: var(--v19-linear-button-height-compact) !important;
+  }
+
+  .mp-button:not(.plain-button).button-size-default {
+    min-height: var(--v19-linear-button-height-default) !important;
+    height: var(--v19-linear-button-height-default) !important;
+  }
+
+  .mp-button:not(.plain-button).button-size-large {
+    min-height: var(--v19-linear-button-height-large) !important;
+    height: var(--v19-linear-button-height-large) !important;
+  }
+
+  :is(.icon-button, .mp-button.icon-button) {
+    width: var(--v19-linear-button-height-default);
+    min-width: var(--v19-linear-button-height-default);
+    padding-inline: 0 !important;
+  }
+
+  .access-password-toggle {
+    padding-inline: 0 !important;
+  }
+
+  .mp-button.icon-button.button-size-compact {
+    width: var(--v19-linear-button-height-compact);
+    min-width: var(--v19-linear-button-height-compact);
+  }
+
+  :is(
+    .primary-button,
+    .access-submit,
+    .v19-action-surface-create,
+    .ops-sidebar-create,
+    .v19-questionnaire-next-button,
+    .v19-review-confirmation button,
+    .v19-review-accept,
+    .v19-review-next-step,
+    .v19-drawer-footer-action--primary,
+    .v19-preupload-primary-action,
+    .admin-review-primary:not(.is-return),
+    .v19-export-primary-action
+  ) {
+    border: var(--vf-ref-size-1px) solid transparent !important;
+    background:
+      var(--v19-linear-button-primary-background) padding-box,
+      var(--v19-linear-button-primary-edge) border-box !important;
+    color: var(--v19-depth-text-strong) !important;
+  }
+
+  :is(
+    .secondary-button,
+    .access-secondary-link,
+    .v19-create-cancel-action,
+    .v19-questionnaire-back-button,
+    .v19-questionnaire-save-button,
+    .v19-questionnaire-mobile-footer-save,
+    .v19-review-download,
+    .v19-review-return,
+    .v19-drawer-footer-action--ghost,
+    .v19-preupload-secondary-action,
+    .admin-review-secondary,
+    .admin-review-primary.is-return
+  ) {
+    border: var(--vf-ref-size-1px) solid var(--v19-linear-button-secondary-border) !important;
+    background: var(--v19-linear-button-secondary-background) !important;
+    color: var(--v19-depth-text) !important;
+  }
+
+  :is(.admin-review-primary.is-return, .v19-review-return) {
+    border-color: var(--v19b-admin-orange-border) !important;
+    background: var(--v19-linear-button-secondary-background) !important;
+    color: var(--v19b-admin-orange) !important;
+  }
+
+  :is(.outline-button, .v19-questionnaire-copy-button) {
+    border: var(--vf-ref-size-1px) solid var(--v19-linear-button-secondary-border) !important;
+    background: transparent !important;
+    color: var(--v19-depth-text) !important;
+  }
+
+  :is(
+    .ghost-button,
+    .access-back-button,
+    .access-password-toggle,
+    .icon-button,
+    .v19-drawer-file-action,
+    button.v17-admin-row-action,
+    .v19-review-back,
+    .v19-review-media-controls button
+  ) {
+    border: var(--vf-ref-size-1px) solid transparent !important;
+    background: transparent !important;
+    color: var(--v19-depth-text-muted) !important;
+  }
+
+  :is(
+    .v19-questionnaire-next-button,
+    .v19-preupload-primary-action,
+    .access-submit,
+    .v19-export-primary-action
+  ) {
+    min-height: var(--v19-linear-button-height-large) !important;
+  }
+
+  :is(
+    button.v17-admin-row-action,
+    .v19-drawer-file-action,
+    .v19-active-filters-reset,
+    .v19-toolbar-tools .icon-button,
+    .v19-review-media-controls button
+  ) {
+    min-height: var(--v19-linear-button-height-compact) !important;
+    height: var(--v19-linear-button-height-compact) !important;
+  }
+
+  .v19-toolbar-tools .icon-button {
+    width: var(--v19-linear-button-height-compact) !important;
+    min-width: var(--v19-linear-button-height-compact) !important;
+  }
+
+  :is(
+      .primary-button,
+      .access-submit,
+      .v19-action-surface-create,
+      .ops-sidebar-create,
+      .v19-questionnaire-next-button,
+      .v19-review-confirmation button,
+      .v19-review-accept,
+      .v19-review-next-step,
+      .v19-drawer-footer-action--primary,
+      .v19-preupload-primary-action,
+      .admin-review-primary:not(.is-return),
+      .v19-export-primary-action
+    ):not(:disabled, [aria-disabled="true"]):hover {
+    border-color: transparent !important;
+    background:
+      var(--v19-linear-button-primary-background) padding-box,
+      var(--v19-linear-button-primary-edge) border-box !important;
+    box-shadow: var(--v19-linear-button-halo) !important;
+    transform: translateY(var(--vf-ref-size-neg-1px)) !important;
+  }
+
+  :is(.admin-review-primary.is-return, .v19-review-return):not(
+      :disabled,
+      [aria-disabled="true"]
+    ):hover {
+    border-color: var(--v19b-admin-orange-border) !important;
+    background: var(--v19-linear-button-secondary-hover) !important;
+    color: var(--v19b-admin-orange) !important;
+  }
+
+  :is(
+      .secondary-button,
+      .outline-button,
+      .v19-questionnaire-copy-button,
+      .ghost-button,
+      .icon-button,
+      .access-back-button,
+      .access-secondary-link,
+      .access-password-toggle,
+      .v19-create-cancel-action,
+      .v19-questionnaire-back-button,
+      .v19-questionnaire-save-button,
+      .v19-questionnaire-mobile-footer-save,
+      .v19-review-download,
+      .v19-drawer-footer-action--ghost,
+      .v19-drawer-file-action,
+      .v19-preupload-secondary-action,
+      .admin-review-secondary,
+      button.v17-admin-row-action,
+      .v19-review-back,
+      .v19-review-media-controls button
+    ):not(:disabled, [aria-disabled="true"]):hover {
+    border-color: var(--v19-linear-button-secondary-border) !important;
+    background: var(--v19-linear-button-secondary-hover) !important;
+    color: var(--v19-depth-text-strong) !important;
+    box-shadow: var(--v19-linear-button-halo) !important;
+    transform: translateY(var(--vf-ref-size-neg-1px)) !important;
+  }
+
+  :is(
+      .mp-button:not(.plain-button),
+      .primary-button,
+      .secondary-button,
+      .outline-button,
+      .ghost-button,
+      .icon-button,
+      .access-submit,
+      .access-back-button,
+      .access-secondary-link,
+      .access-password-toggle,
+      .v19-action-surface-create,
+      .v19-create-cancel-action,
+      .ops-sidebar-create,
+      .v19-questionnaire-back-button,
+      .v19-questionnaire-next-button,
+      .v19-questionnaire-save-button,
+      .v19-questionnaire-mobile-footer-save,
+      .v19-questionnaire-copy-button,
+      .v19-drawer-footer-action--primary,
+      .v19-drawer-footer-action--ghost,
+      .v19-drawer-file-action,
+      .v19-preupload-primary-action,
+      .v19-preupload-secondary-action,
+      .admin-review-primary,
+      .admin-review-secondary,
+      button.v17-admin-row-action,
+      .v19-export-primary-action,
+      .v19-review-back,
+      .v19-review-download,
+      .v19-review-media-controls button,
+      .v19-review-confirmation button,
+      .v19-review-return,
+      .v19-review-accept,
+      .v19-review-next-step
+    ):not(:disabled, [aria-disabled="true"]):active {
+    box-shadow: none !important;
+    transform: translateY(var(--v19-linear-button-press-offset)) !important;
+  }
+
+  :is(
+    .mp-button:not(.plain-button),
+    .access-submit,
+    .access-back-button,
+    .access-secondary-link,
+    .access-password-toggle,
+    .v19-action-surface-create,
+    .v19-create-cancel-action,
+    .ops-sidebar-create,
+    .v19-questionnaire-back-button,
+    .v19-questionnaire-next-button,
+    .v19-questionnaire-save-button,
+    .v19-questionnaire-mobile-footer-save,
+    .v19-questionnaire-copy-button,
+    .v19-drawer-footer-action--primary,
+    .v19-drawer-footer-action--ghost,
+    .v19-drawer-file-action,
+    .v19-preupload-primary-action,
+    .v19-preupload-secondary-action,
+    .admin-review-primary,
+    .admin-review-secondary,
+    button.v17-admin-row-action,
+    .v19-export-primary-action,
+    .v19-review-back,
+    .v19-review-download,
+    .v19-review-media-controls button,
+    .v19-review-confirmation button,
+    .v19-review-return,
+    .v19-review-accept,
+    .v19-review-next-step
+  ):focus-visible {
+    outline: var(--vf-ref-size-2px) solid var(--v19-depth-focus) !important;
+    outline-offset: var(--vf-ref-size-2px) !important;
+    box-shadow: var(--v19-linear-button-focus-halo) !important;
+  }
+
+  :is(
+    .mp-button:not(.plain-button),
+    .access-submit,
+    .access-back-button,
+    .access-secondary-link,
+    .access-password-toggle,
+    .v19-action-surface-create,
+    .v19-create-cancel-action,
+    .ops-sidebar-create,
+    .v19-questionnaire-back-button,
+    .v19-questionnaire-next-button,
+    .v19-questionnaire-save-button,
+    .v19-questionnaire-mobile-footer-save,
+    .v19-questionnaire-copy-button,
+    .v19-drawer-footer-action--primary,
+    .v19-drawer-footer-action--ghost,
+    .v19-drawer-file-action,
+    .v19-preupload-primary-action,
+    .v19-preupload-secondary-action,
+    .admin-review-primary,
+    .admin-review-secondary,
+    button.v17-admin-row-action,
+    .v19-export-primary-action,
+    .v19-review-back,
+    .v19-review-download,
+    .v19-review-media-controls button,
+    .v19-review-confirmation button,
+    .v19-review-return,
+    .v19-review-accept,
+    .v19-review-next-step
+  ):is(:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed !important;
+    opacity: var(--v19-linear-button-disabled-opacity) !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  :is(
+    .primary-button,
+    .access-submit,
+    .v19-action-surface-create,
+    .ops-sidebar-create,
+    .v19-questionnaire-next-button,
+    .v19-review-confirmation button,
+    .v19-review-accept,
+    .v19-review-next-step,
+    .v19-drawer-footer-action--primary,
+    .v19-preupload-primary-action,
+    .admin-review-primary:not(.is-return),
+    .v19-export-primary-action
+  ):is(:disabled, [aria-disabled="true"]) {
+    border-color: var(--v19-linear-button-secondary-border) !important;
+    background: var(--v19-linear-button-secondary-background) !important;
+    color: var(--v19-depth-text-faint) !important;
+  }
+
+  .danger-action {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--vf-red-soft-text) !important;
+    box-shadow: none !important;
+  }
+
+  .danger-action:not(:disabled, [aria-disabled="true"]):hover {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--vf-red) !important;
+    box-shadow: none !important;
+  }
+
+  .mp-button.is-loading {
+    color: transparent !important;
+    pointer-events: none;
+  }
+
+  .mp-button.is-loading > :is(svg, span) {
+    opacity: var(--v19b-opacity-zero);
+  }
+
+  .mp-button.is-loading::after {
+    position: absolute;
+    width: var(--v19-linear-button-spinner-size);
+    height: var(--v19-linear-button-spinner-size);
+    border: var(--v19-linear-button-spinner-border) solid var(--v19-depth-text-strong);
+    border-right-color: transparent;
+    border-radius: var(--v19b-size-half);
+    content: "";
+    animation: v19-linear-button-spin var(--v19-linear-button-spinner-duration) linear
+      infinite;
+  }
+
+  @keyframes v19-linear-button-spin {
+    to {
+      transform: rotate(var(--v19-linear-button-spinner-turn));
+    }
+  }
+
+  @media (max-width: 767px) {
+    :is(
+      .mp-button:not(.plain-button),
+      .access-submit,
+      .access-back-button,
+      .access-secondary-link,
+      .access-password-toggle,
+      .v19-action-surface-create,
+      .v19-create-cancel-action,
+      .ops-sidebar-create,
+      .v19-questionnaire-back-button,
+      .v19-questionnaire-next-button,
+      .v19-questionnaire-save-button,
+      .v19-questionnaire-mobile-footer-save,
+      .v19-questionnaire-copy-button,
+      .v19-drawer-footer-action--primary,
+      .v19-drawer-footer-action--ghost,
+      .v19-drawer-file-action,
+      .v19-preupload-primary-action,
+      .v19-preupload-secondary-action,
+      .admin-review-primary,
+      .admin-review-secondary,
+      button.v17-admin-row-action,
+      .v19-export-primary-action,
+      .v19-review-back,
+      .v19-review-download,
+      .v19-review-media-controls button,
+      .v19-review-confirmation button,
+      .v19-review-return,
+      .v19-review-accept,
+      .v19-review-next-step
+    ) {
+      min-height: var(--v19b-size-44) !important;
+    }
+
+    :is(.icon-button, .access-password-toggle) {
+      width: var(--v19b-size-44) !important;
+      min-width: var(--v19b-size-44) !important;
+    }
+
+    :is(
+      .mp-button:not(.plain-button).button-size-compact,
+      .mp-button:not(.plain-button).button-size-default,
+      button.v17-admin-row-action,
+      .v19-drawer-file-action,
+      .v19-active-filters-reset,
+      .v19-toolbar-tools .icon-button,
+      .v19-review-media-controls button
+    ) {
+      height: var(--v19b-size-44) !important;
+    }
+
+    .v19-toolbar-tools .icon-button {
+      width: var(--v19b-size-44) !important;
+      min-width: var(--v19b-size-44) !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(
+      .mp-button:not(.plain-button),
+      .access-submit,
+      .access-back-button,
+      .access-secondary-link,
+      .access-password-toggle,
+      .v19-action-surface-create,
+      .v19-create-cancel-action,
+      .ops-sidebar-create,
+      .v19-questionnaire-back-button,
+      .v19-questionnaire-next-button,
+      .v19-questionnaire-save-button,
+      .v19-questionnaire-mobile-footer-save,
+      .v19-questionnaire-copy-button,
+      .v19-drawer-footer-action--primary,
+      .v19-drawer-footer-action--ghost,
+      .v19-drawer-file-action,
+      .v19-preupload-primary-action,
+      .v19-preupload-secondary-action,
+      .admin-review-primary,
+      .admin-review-secondary,
+      button.v17-admin-row-action,
+      .v19-export-primary-action,
+      .v19-review-back,
+      .v19-review-download,
+      .v19-review-media-controls button,
+      .v19-review-confirmation button,
+      .v19-review-return,
+      .v19-review-accept,
+      .v19-review-next-step
+    ) {
+      transition: none !important;
+    }
+
+    .mp-button.is-loading::after {
+      animation: none;
+    }
+  }
+}
