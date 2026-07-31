@@ -21,6 +21,42 @@ describe("RemarkForm", () => {
     ).toHaveClass("v19-remark-form-close");
   });
 
+  test("keeps a canonical target ID out of Admin and Agent-facing copy", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    render(
+      <RemarkForm
+        defaultApplicant="Нина Волкова"
+        defaultApplicantId="з-1053-1"
+        defaultField="passport-expiry-date"
+        defaultFieldLabel="Срок действия"
+        isOpen
+        onClose={() => undefined}
+        onSubmit={onSubmit}
+        submissionId="ПД-1053"
+      />,
+    );
+
+    expect(screen.getByLabelText("Текст для клиента")).toHaveValue(
+      "Проверьте «Срок действия».",
+    );
+    expect(screen.getByRole("dialog")).not.toHaveTextContent(
+      "passport-expiry-date",
+    );
+    fireEvent.click(screen.getByTestId("remark-form-submit"));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        applicant: "Нина Волкова",
+        applicantId: "з-1053-1",
+        field: "passport-expiry-date",
+        fieldLabel: "Срок действия",
+        fileType: undefined,
+        message: "Проверьте «Срок действия».",
+        severity: "warning",
+      }),
+    );
+  });
+
   test("returns focus to the exact remark trigger after the exit animation", async () => {
     function FocusFixture() {
       const [isOpen, setIsOpen] = useState(false);

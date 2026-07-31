@@ -85,6 +85,23 @@ describe("PreUploadScreen canonical intake", () => {
     });
   });
 
+  test("keeps the frozen family intake surface without a new relationship selector", async () => {
+    const onSubmit = vi.fn(async () => undefined);
+    render(<PreUploadScreen onSubmit={onSubmit} />);
+    chooseCity();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Загрузить паспорт: Супруг/супруга",
+      }),
+    );
+    expect(screen.queryByLabelText("Связь заявителя 2")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Продолжить без паспорта" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("applicantRoles");
+  });
+
   test("keeps a neutral filename bound to its applicant while OCR is pending", async () => {
     let resolveExtraction:
       | ((value: Awaited<ReturnType<typeof invokePassportExtraction>>) => void)
@@ -214,6 +231,43 @@ describe("PreUploadScreen canonical intake", () => {
         .mocked(invokePassportExtraction)
         .mock.calls.map(([input]) => input.applicantIndex),
     ).toEqual([0, 1]);
+  });
+
+  test("keeps batch-added applicants on the frozen family intake surface", async () => {
+    const onSubmit = vi.fn(async () => undefined);
+    const { container } = render(<PreUploadScreen onSubmit={onSubmit} />);
+    chooseCity();
+    fireEvent.change(inputFor(container), {
+      target: {
+        files: [
+          passportFile("first.jpg"),
+          passportFile("second.jpg"),
+          passportFile("third.jpg"),
+          passportFile("fourth.jpg"),
+        ],
+      },
+    });
+
+    const selectors = screen.getAllByRole("combobox", { name: /Заявитель для/ });
+    selectors.forEach((selector, index) => {
+      fireEvent.change(selector, { target: { value: String(index) } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Распознать паспорта" }));
+    await waitFor(() => expect(screen.getAllByText("Вручную")).toHaveLength(4));
+
+    const applicantButtons = screen.getAllByRole("button", {
+      name: /паспорт: Ребёнок/,
+    });
+    fireEvent.click(applicantButtons.at(-1) as HTMLButtonElement);
+    expect(screen.queryByLabelText("Связь заявителя 4")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Создать и открыть анкету" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      familyCount: 4,
+      type: "family",
+    });
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("applicantRoles");
   });
 
   test("caps family intake at six applicants", () => {

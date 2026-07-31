@@ -41,6 +41,7 @@ import {
   statusLabelFor,
 } from "../modules/submissions/status";
 import { requiredPassportReviewMediaSlots } from "../modules/submissions/passportReviewContract";
+import { questionnaireIssueFieldDisplayLabel } from "../modules/submissions/questionnaire";
 import { buildSubmissionNextStepBrief } from "../modules/submissions/submissionNextStepEngine";
 import type {
   DrawerTab,
@@ -779,12 +780,15 @@ const QuestionnaireTab = ({
   );
 };
 
-function issueTargetLabel(issue: Issue) {
+function issueTargetLabel(submission: Submission, issue: Issue) {
   if (issue.target.fileType) {
     return `${issue.target.applicantName} • ${fileLabel(issue.target.fileType)}`;
   }
 
-  return [issue.target.applicantName, issue.target.field ?? issue.target.section]
+  return [
+    issue.target.applicantName,
+    questionnaireIssueFieldDisplayLabel(submission, issue) ?? issue.target.section,
+  ]
     .filter(Boolean)
     .join(" • ");
 }
@@ -899,7 +903,9 @@ const IssuesTab = ({
             <h4 id={`${issueElementId}-title`}>{issue.reason}</h4>
             <span>{issueBadgeLabel(issue)}</span>
           </div>
-          <div className="v19-agent-drawer-issue-target">{issueTargetLabel(issue)}</div>
+          <div className="v19-agent-drawer-issue-target">
+            {issueTargetLabel(submission, issue)}
+          </div>
           <p>{issue.comment || issue.reason}</p>
           {feedback ? (
             <p
@@ -953,7 +959,7 @@ const IssuesTab = ({
               {...agentInteractionProps("drawer.upload-file")}
               accept={acceptedFileTypes(issue.target.fileType)}
               aria-hidden="true"
-              aria-label={`Выбрать файл: ${issueTargetLabel(issue)}`}
+              aria-label={`Выбрать файл: ${issueTargetLabel(submission, issue)}`}
               hidden
               id={uploadInputId}
               tabIndex={-1}

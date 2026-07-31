@@ -1426,7 +1426,7 @@ test.describe("V-19 operations workspace", () => {
     await expectDrawerStatus(page, "Возвращено");
   });
 
-  test("admin accepts corrections and completes the export sequence", async ({
+  test("admin accepts corrections and completes the Excel plus ZIP export", async ({
     page,
   }) => {
     await switchToAdmin(page);
@@ -1467,39 +1467,11 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.locator("#export-action-hint")).toContainText(
       "Скачивание Excel начато:",
     );
-    await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
-    const zipLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(zipLink).toBeVisible();
-    const zipDownloadPromise = page.waitForEvent("download");
-    await zipLink.click();
-    await zipDownloadPromise;
-    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание подтверждено, пакет зафиксирован",
-    );
-
-    await clickExportTab(page, "История");
-    await expect(
-      page
-        .locator(".export-history-table .export-row")
-        .filter({ hasText: "Семья Петровых" }),
-    ).toBeVisible();
-
-    const exportedFamilyRow = page
+    await generateDownloadAndConfirmZip(page);
+    const readyForExportFamilyRow = page
       .locator(".export-row")
       .filter({ hasText: "Семья Петровых" });
-    await expect(
-      exportedFamilyRow.getByRole("button", { name: /^(Открыть|Проверить) PDF$/ }),
-    ).toHaveCount(0);
-    await expect(exportedFamilyRow.getByText("Нужна проверка PDF")).toBeVisible();
-    await expect(exportedFamilyRow.getByText("PDF записи отсутствует.")).toBeVisible();
-    await exportedFamilyRow.getByRole("button", { name: /Семья Петровых/ }).click();
-    await expect(drawer(page).getByText("Семья Петровых").first()).toBeVisible();
-    await expect(
-      drawer(page).getByRole("button", {
-        name: /Передача агентам недоступна:/,
-      }),
-    ).toHaveCount(0);
+    await expect(readyForExportFamilyRow).toBeVisible();
   });
 
   test("admin can return corrected submission again after adding a new issue", async ({
@@ -1711,23 +1683,9 @@ test.describe("V-19 operations workspace", () => {
     const refreshedExcelDownload = page.waitForEvent("download");
     await refreshedExcelLink.click();
     await refreshedExcelDownload;
-    await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
-    const refreshedZipLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(refreshedZipLink).toBeVisible();
-    const refreshedZipDownload = page.waitForEvent("download");
-    await refreshedZipLink.click();
-    await refreshedZipDownload;
-    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание подтверждено, пакет зафиксирован",
-    );
-
-    await clickExportTab(page, "История");
-    const exportedHistoryRow = page.getByLabel(/Выгруженный пакет Новая подача/);
-
-    await expect(exportedHistoryRow).toBeVisible();
+    await generateDownloadAndConfirmZip(page);
     await expect(
-      exportedHistoryRow.getByRole("button", { name: /Новая подача/ }),
+      page.locator(".export-row").filter({ hasText: "Новая подача" }),
     ).toBeVisible();
   });
 
@@ -1928,12 +1886,14 @@ test.describe("V-19 operations workspace", () => {
       await generateDownloadAndConfirmZip(page);
     });
 
-    await test.step("export history contains all generated packages", async () => {
-      await clickExportTab(page, "История");
-      const historyRegion = page.getByRole("region", { name: "История выгрузки" });
-      await expect(historyRegion.getByText(secondFamilyTitle)).toBeVisible();
-      await expect(historyRegion.getByText(firstSingle)).toBeVisible();
-      await expect(historyRegion.getByText(secondSingle)).toBeVisible();
+    await test.step("Excel-only export leaves packages ready for future T9", async () => {
+      await clickExportTab(page, "Пакеты");
+      await expect(
+        page.locator(".export-row").filter({ hasText: firstSingle }),
+      ).toBeVisible();
+      await expect(
+        page.locator(".export-row").filter({ hasText: secondSingle }),
+      ).toBeVisible();
     });
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

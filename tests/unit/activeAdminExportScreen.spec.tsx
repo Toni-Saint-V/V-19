@@ -10,6 +10,7 @@ import {
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { AdminExportScreen } from "../../src/components/AdminExportScreen";
+import { VisaflowBusinessBridgeProvider } from "../../src/integration/visaflowBusinessBridge";
 import {
   buildExportPackageIdentity,
   exportSummary,
@@ -75,6 +76,53 @@ function changeQuestionnaireField(
 }
 
 describe("active admin export screen", () => {
+  test("keeps the frozen Admin export presentation while T9 authority stays outside the screen", () => {
+    const submission = readySubmission();
+    const onExportPackages = vi.fn();
+
+    render(
+      <VisaflowBusinessBridgeProvider bridge={{ onExportPackages }}>
+        <AdminExportScreen submissions={[submission]} />
+      </VisaflowBusinessBridgeProvider>,
+    );
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `Выбрать ${submission.listTitle ?? submission.title}`,
+      }),
+    );
+
+    expect(screen.getByRole("button", { name: "Сформировать Excel" })).toBeEnabled();
+    expect(
+      screen.getByText(
+        "Состав, проверки, Excel и обязательные документы перед скачиванием.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("ZIP медиа")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Сформировать ZIP с Excel" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/T9|Integration Contract/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Скачать ZIP/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Подтвердить скачивание" }),
+    ).not.toBeInTheDocument();
+    expect(onExportPackages).not.toHaveBeenCalled();
+  });
+
+  test("shows the canonical submission city used by export package rules", () => {
+    const submission = initialSubmissions.find((item) => item.id === "SUB-1103");
+    if (!submission) {
+      throw new Error("Missing cross-city export fixture SUB-1103");
+    }
+
+    render(<AdminExportScreen submissions={[submission]} />);
+
+    const row = screen.getByTestId(`admin-export-row-${submission.id}`);
+    expect(within(row).getByText("Санкт-Петербург")).toBeInTheDocument();
+    expect(within(row).queryByText("Москва")).not.toBeInTheDocument();
+  });
+
   test("renders the selected package Excel Preview with all 56 contract columns and values", async () => {
     const submission = readySubmission();
     const preview = exportSummary([submission]).preview;

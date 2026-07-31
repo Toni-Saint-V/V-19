@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase/client";
 import type {
+  AgentSubmissionCardArchiveRow,
   ApplicantInsert,
   ApplicantRow,
   CorrectionInsert,
@@ -42,6 +43,10 @@ import {
   normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
 } from "./domainContract";
+import {
+  resolveAdminIssueTarget,
+  submissionIssueTargetSnapshot,
+} from "./adminIssueTargetContract";
 import {
   isPersistablePrivateFileAsset,
   withRecomputedFileCompletion,
@@ -105,10 +110,81 @@ export interface AdminCockpitSaveResult {
   ownerIdsBySubmissionId: Map<string, string>;
 }
 
+export interface AgentCockpitSaveResult {
+  caseRevisionsBySubmissionId: Map<string, number>;
+  operationIdsBySubmissionId: Map<string, string>;
+  ownerIdsBySubmissionId: Map<string, string>;
+}
+
 export type PublicNumberAssignment = {
   assignedNow: boolean;
+  caseRevision: number | null;
   publicNumber: number;
 };
+
+export type AgentSubmissionCardArchiveResult = {
+  archivedAt: string;
+  caseRevision: number;
+  idempotent: boolean;
+  submissionId: string;
+};
+
+function agentSubmissionCardArchiveResultFromRpc(
+  value: unknown,
+): AgentSubmissionCardArchiveResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Supabase вернул некорректный результат удаления карточки.");
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.archivedAt !== "string" ||
+    !Number.isFinite(Date.parse(record.archivedAt)) ||
+    typeof record.caseRevision !== "number" ||
+    !Number.isSafeInteger(record.caseRevision) ||
+    record.caseRevision < 0 ||
+    typeof record.idempotent !== "boolean" ||
+    typeof record.submissionId !== "string" ||
+    record.submissionId.trim().length === 0
+  ) {
+    throw new Error("Supabase вернул некорректный результат удаления карточки.");
+  }
+
+  return {
+    archivedAt: record.archivedAt,
+    caseRevision: record.caseRevision,
+    idempotent: record.idempotent,
+    submissionId: record.submissionId,
+  };
+}
+
+export async function archiveAgentSubmissionCard(
+  submissionId: string,
+  expectedCaseRevision: number,
+): Promise<AgentSubmissionCardArchiveResult> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase недоступен для удаления карточки подачи.");
+  }
+  const { data, error } = await client.rpc("archive_agent_submission_card", {
+    expected_case_revision: expectedCaseRevision,
+    submission_id: submissionId,
+  });
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "rpc.archive_agent_submission_card",
+      fallbackKind: "rpc",
+    });
+  }
+  return agentSubmissionCardArchiveResultFromRpc(data);
+}
+
+export function isAgentSubmissionCardArchiveConflict(error: unknown): boolean {
+  return (
+    error instanceof PersistenceObservableError &&
+    error.diagnostics.operation === "rpc.archive_agent_submission_card" &&
+    error.diagnostics.supabaseCode === "40001"
+  );
+}
 
 function publicNumberAssignmentFromRpc(value: unknown): PublicNumberAssignment {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -117,6 +193,9 @@ function publicNumberAssignmentFromRpc(value: unknown): PublicNumberAssignment {
   const record = value as Record<string, unknown>;
   if (
     typeof record.assignedNow !== "boolean" ||
+    typeof record.caseRevision !== "number" ||
+    !Number.isSafeInteger(record.caseRevision) ||
+    record.caseRevision < 0 ||
     typeof record.publicNumber !== "number" ||
     !Number.isSafeInteger(record.publicNumber) ||
     record.publicNumber < submissionPublicNumberMin ||
@@ -126,6 +205,7 @@ function publicNumberAssignmentFromRpc(value: unknown): PublicNumberAssignment {
   }
   return {
     assignedNow: record.assignedNow,
+    caseRevision: record.caseRevision,
     publicNumber: record.publicNumber,
   };
 }
@@ -482,6 +562,7 @@ function attachQuestionnaireAnswerRows(
 
 function fileStatusFromMediaAssetRow(
   row: CockpitMediaAssetRow,
+  submissionStatus: Submission["status"],
 ): SubmissionFile["status"] {
   if (row.review_status === "accepted") return "accepted";
   if (
@@ -489,6 +570,13 @@ function fileStatusFromMediaAssetRow(
     row.review_status === "poor_quality"
   ) {
     return "needs_replacement";
+  }
+  if (
+    submissionStatus === "submitted_for_review" &&
+    row.review_status === "not_reviewed" &&
+    row.upload_status === "uploaded"
+  ) {
+    return "pending_review";
   }
   return row.upload_status === "uploaded" ? "uploaded" : "missing";
 }
@@ -504,6 +592,7 @@ function submissionFileTypeFromMediaAssetRow(
 
 function submissionFileFromMediaAssetRow(
   row: CockpitMediaAssetRow,
+  submissionStatus: Submission["status"],
 ): SubmissionFile | null {
   const type = submissionFileTypeFromMediaAssetRow(row);
   if (!type) return null;
@@ -512,7 +601,7 @@ function submissionFileFromMediaAssetRow(
     id: row.id,
     applicantId: row.applicant_id,
     type,
-    status: fileStatusFromMediaAssetRow(row),
+    status: fileStatusFromMediaAssetRow(row, submissionStatus),
     generatedFileName: row.generated_file_name ?? undefined,
     mimeType: row.mime_type ?? undefined,
     originalFileName: row.original_file_name ?? undefined,
@@ -538,7 +627,7 @@ export function attachDurableMediaAssetRows(
   if (!mediaRows.length) return withRecomputedFileCompletion(submission);
 
   const durableFiles = mediaRows
-    .map(submissionFileFromMediaAssetRow)
+    .map((row) => submissionFileFromMediaAssetRow(row, submission.status))
     .filter((file): file is SubmissionFile => Boolean(file));
   if (!durableFiles.length) return withRecomputedFileCompletion(submission);
 
@@ -703,6 +792,12 @@ function attachExportPackageRow(
 ): Submission {
   const durableExportState = exportStateFromDurableRowStatus(rowStatus);
   if (durableExportState === "not_ready") {
+    if (rowStatus === "submitted_for_review" && submission.exportPackage) {
+      return {
+        ...submission,
+        exportState: "not_ready",
+      };
+    }
     return clearSnapshotExportPackage(submission, rowStatus);
   }
 
@@ -918,12 +1013,6 @@ function issueStatusToCorrectionStatus(
   return "open";
 }
 
-function mediaTypeForIssue(type: SubmissionFileType | undefined) {
-  if (!type) return null;
-  const mediaType = toCanonicalStorageMediaType(type);
-  return mediaType.ok ? mediaType.data : null;
-}
-
 function mediaTypeForFile(type: SubmissionFileType): MediaAssetInsert["type"] | null {
   const mediaType = toCanonicalStorageMediaType(type);
   return mediaType.ok ? mediaType.data : null;
@@ -933,7 +1022,7 @@ function applicantRoleLabel(role: Applicant["role"]): string {
   if (role === "main") return "Основной заявитель";
   if (role === "spouse") return "Супруг";
   if (role === "child") return "Ребёнок";
-  return "Заявитель";
+  throw new Error(`Unknown canonical applicant role: ${String(role)}`);
 }
 
 function questionnaireFieldValue(applicant: Applicant, ...fieldIds: string[]) {
@@ -951,6 +1040,46 @@ function questionnaireDateValue(value: string | null) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const dotted = /^(\d{2})[.-](\d{2})[.-](\d{4})$/.exec(value);
   return dotted ? `${dotted[3]}-${dotted[2]}-${dotted[1]}` : null;
+}
+
+function canonicalizeSubmissionIssueTargetsForPersistence(
+  submission: Submission,
+): Submission {
+  if (submission.issues.length === 0) return submission;
+
+  return {
+    ...submission,
+    issues: submission.issues.map((issue) => {
+      const resolvedTarget = resolveAdminIssueTarget(submission, {
+        applicantId: issue.target.applicantId,
+        field: issue.target.field,
+        fileType: issue.target.fileType,
+        type: issue.type,
+      });
+      return {
+        ...issue,
+        snapshot:
+          issue.snapshot ??
+          submissionIssueTargetSnapshot(submission, {
+            applicantId: resolvedTarget.applicant.id,
+            field:
+              resolvedTarget.kind === "field" ? resolvedTarget.field : undefined,
+            fileType:
+              resolvedTarget.kind === "media"
+                ? resolvedTarget.fileType
+                : undefined,
+          }),
+        type: resolvedTarget.kind === "field" ? "field" : "file",
+        target: {
+          ...issue.target,
+          field:
+            resolvedTarget.kind === "field" ? resolvedTarget.field : undefined,
+          fileType:
+            resolvedTarget.kind === "media" ? resolvedTarget.fileType : undefined,
+        },
+      };
+    }),
+  };
 }
 
 function toApplicantInsert(
@@ -992,13 +1121,29 @@ function toCorrectionInsert(
   issue: Issue,
   actorId: string,
 ): CorrectionInsert {
+  const resolvedTarget = resolveAdminIssueTarget(submission, {
+    applicantId: issue.target.applicantId,
+    field: issue.target.field,
+    fileType: issue.target.fileType,
+    type: issue.type,
+  });
+  if (
+    (resolvedTarget.kind === "field" &&
+      issue.target.field !== resolvedTarget.field) ||
+    (resolvedTarget.kind === "media" &&
+      issue.target.fileType !== resolvedTarget.fileType)
+  ) {
+    throw new Error("Persistence issue target was not canonicalized.");
+  }
+
   return {
     id: stableUuid(`correction:${submission.id}:${issue.id}`),
     submission_id: submission.id,
-    applicant_id: issue.target.applicantId,
-    scope: issue.type === "file" || issue.type === "media" ? "media" : "field",
-    field_key: issue.target.field ?? null,
-    media_type: mediaTypeForIssue(issue.target.fileType),
+    applicant_id: resolvedTarget.applicant.id,
+    scope: resolvedTarget.kind,
+    field_key: resolvedTarget.kind === "field" ? issue.target.field ?? null : null,
+    media_type:
+      resolvedTarget.kind === "media" ? issue.target.fileType ?? null : null,
     reason: `${issue.reason}${issue.comment ? ` — ${issue.comment}` : ""}`,
     severity: issue.severity === "blocker" ? "blocking" : "note",
     status: issueStatusToCorrectionStatus(issue.status),
@@ -1106,9 +1251,11 @@ export function toCockpitDraftPersistencePayload(
   actorHistorySource: Extract<SubmissionHistorySource, "agent" | "admin"> =
     actorId === ownerId ? "agent" : "admin",
 ): SubmissionDraftPersistencePayload {
-  const ownedSubmission = assignSubmissionOwner(
-    ensureSubmissionOwner(submission, ownerId),
-    ownerId,
+  const ownedSubmission = canonicalizeSubmissionIssueTargetsForPersistence(
+    assignSubmissionOwner(
+      ensureSubmissionOwner(submission, ownerId),
+      ownerId,
+    ),
   );
   const persistenceTimestamp = timestampOrNow(ownedSubmission.updatedAt);
 
@@ -1164,14 +1311,6 @@ export function toCockpitDraftPersistencePayload(
       .filter((item) => item.source === actorHistorySource)
       .map((item) => toStatusHistoryInsert(ownedSubmission, item, actorId)),
   };
-}
-
-function requiresCorrectionHandoff(submission: Submission, role: Role): boolean {
-  return (
-    role === "agent" &&
-    submission.status === "corrections_received" &&
-    submission.issues.some((issue) => issue.status === "fixed_by_agent")
-  );
 }
 
 export function reviewHandoffPersistenceIssues(
@@ -1258,9 +1397,7 @@ function assertReviewHandoffPersistenceConsistency(
 
   const issues = reviewHandoffPersistenceIssues(submission, role);
   if (issues.length === 0) return;
-  const operation = requiresCorrectionHandoff(submission, role)
-    ? "rpc.submit_corrections_handoff"
-    : "rpc.save_submission_draft";
+  const operation = "rpc.save_agent_submission_if_current";
 
   throw new PersistenceObservableError(
     `${operation} failed safely (${operation}:save:HANDOFF_CONSISTENCY).`,
@@ -1645,10 +1782,7 @@ function questionnaireAnswerJsonForField(field: QuestionnaireField): Json {
 
 function questionnaireAnswerFieldValue(value: Json): QuestionnaireAnswerValueResult {
   if (isRecord(value) && value.kind === questionnaireAnswerEnvelopeKind) {
-    if (
-      value.version !== undefined &&
-      value.version !== questionnaireAnswerEnvelopeVersion
-    ) {
+    if (value.version !== questionnaireAnswerEnvelopeVersion) {
       return { value: typeof value.value === "string" ? value.value : "" };
     }
 
@@ -1768,6 +1902,13 @@ export async function loadCockpitSubmissionsForProfile(
       operation: "submissions.list",
       fallbackKind: "database",
     });
+  }
+
+  if (profile.role === "agent" && rows.length) {
+    const archivedSubmissionIds = await loadAgentArchivedSubmissionIds(
+      rows.map((row) => row.id),
+    );
+    rows = rows.filter((row) => !archivedSubmissionIds.has(row.id));
   }
 
   if (!rows.length) {
@@ -2021,6 +2162,46 @@ export async function loadCockpitSubmissionsForProfile(
   };
 }
 
+async function loadAgentArchivedSubmissionIds(
+  submissionIds: readonly string[],
+): Promise<Set<string>> {
+  const client = getSupabaseClient();
+  if (!client || submissionIds.length === 0) return new Set();
+
+  const archivedSubmissionIds = new Set<string>();
+  for (const submissionIdChunk of chunkedSubmissionIds(submissionIds)) {
+    const { data, error } = await client
+      .from("agent_submission_card_archives")
+      .select("submission_id")
+      .in("submission_id", submissionIdChunk);
+
+    if (error && isMissingAgentSubmissionCardArchivesTable(error)) {
+      return new Set();
+    }
+    if (error) {
+      throw mapSupabasePersistenceError(error, {
+        operation: "agent_submission_card_archives.list",
+        fallbackKind: "database",
+      });
+    }
+
+    for (const row of (data ?? []) as Pick<
+      AgentSubmissionCardArchiveRow,
+      "submission_id"
+    >[]) {
+      archivedSubmissionIds.add(row.submission_id);
+    }
+  }
+
+  return archivedSubmissionIds;
+}
+
+function isMissingAgentSubmissionCardArchivesTable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown };
+  return record.code === "42P01" || record.code === "PGRST205";
+}
+
 function isMissingCaseRevisionColumn(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const record = error as { code?: unknown; message?: unknown };
@@ -2110,13 +2291,45 @@ function adminCaseRevisionsFromRpc(
   return revisions;
 }
 
+function agentCaseRevisionFromRpc(
+  value: unknown,
+  submissionId: string,
+  operationId: string,
+): number {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Supabase вернул некорректный результат Agent concurrency RPC.");
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    record.operationId !== operationId ||
+    record.submissionId !== submissionId
+  ) {
+    throw new Error("Supabase вернул результат другой Agent mutation operation.");
+  }
+  if (
+    typeof record.caseRevision !== "number" ||
+    !Number.isSafeInteger(record.caseRevision) ||
+    record.caseRevision < 0
+  ) {
+    throw new Error(
+      `Supabase вернул некорректную revision для подачи ${submissionId}.`,
+    );
+  }
+  return record.caseRevision;
+}
+
 export function isAdminSubmissionConcurrencyConflict(error: unknown): boolean {
   return (
     error instanceof PersistenceObservableError &&
-    error.diagnostics.operation ===
-      "rpc.save_admin_submission_batch_if_current" &&
-    error.diagnostics.supabaseCode === "40001"
+    error.diagnostics.supabaseCode === "40001" &&
+    (error.diagnostics.operation ===
+      "rpc.save_admin_submission_batch_if_current" ||
+      error.diagnostics.operation === "rpc.save_agent_submission_if_current")
   );
+}
+
+export function isSubmissionConcurrencyConflict(error: unknown): boolean {
+  return isAdminSubmissionConcurrencyConflict(error);
 }
 
 export async function saveAdminCockpitSubmissionsIfCurrent(
@@ -2224,16 +2437,21 @@ export async function saveCockpitSubmissionsForProfile(
   profile: AppProfile,
   submissions: Submission[],
   ownerIdsBySubmissionId: ReadonlyMap<string, string>,
-): Promise<Map<string, string>> {
+  caseRevisionsBySubmissionId: ReadonlyMap<string, number>,
+): Promise<AgentCockpitSaveResult> {
   if (profile.role === "admin") {
     throw new Error(
       "Administrators must use the revision-checked admin concurrency writer.",
     );
   }
   const client = getSupabaseClient();
-  if (!client) return new Map(ownerIdsBySubmissionId);
+  if (!client) {
+    throw new Error("Supabase Agent concurrency writer is unavailable.");
+  }
 
   const nextOwnerIds = new Map(ownerIdsBySubmissionId);
+  const nextCaseRevisions = new Map(caseRevisionsBySubmissionId);
+  const operationIdsBySubmissionId = new Map<string, string>();
 
   for (const submission of submissions) {
     assertReviewHandoffPersistenceConsistency(submission, profile.role);
@@ -2245,18 +2463,32 @@ export async function saveCockpitSubmissionsForProfile(
       ownerId,
       profile.role,
     );
-    const correctionHandoff = requiresCorrectionHandoff(submission, profile.role);
-    const operation = correctionHandoff
-      ? "rpc.submit_corrections_handoff"
-      : "rpc.save_submission_draft";
-    const invokeSave = async (): Promise<{ error: unknown | null }> => {
+    const operation = "rpc.save_agent_submission_if_current";
+    const expectedRevision = caseRevisionsBySubmissionId.get(submission.id);
+    if (
+      expectedRevision === undefined &&
+      ownerIdsBySubmissionId.has(submission.id)
+    ) {
+      throw new Error(
+        `Подача ${submission.id} не имеет server revision. Обновите данные после применения migration.`,
+      );
+    }
+    const operationId = crypto.randomUUID();
+    operationIdsBySubmissionId.set(submission.id, operationId);
+    const invokeSave = async (): Promise<{
+      data: unknown;
+      error: unknown | null;
+    }> => {
       try {
-        const { error } = correctionHandoff
-          ? await client.rpc("submit_corrections_handoff", { payload })
-          : await client.rpc("save_submission_draft", { payload });
-        return { error };
+        const response = await client.rpc("save_agent_submission_if_current", {
+          actor_id: profile.id,
+          expected_revision: expectedRevision ?? null,
+          operation_id: operationId,
+          payload,
+        });
+        return { data: response.data, error: response.error };
       } catch (error) {
-        return { error };
+        return { data: null, error };
       }
     };
 
@@ -2266,7 +2498,7 @@ export async function saveCockpitSubmissionsForProfile(
         operation,
         fallbackKind: "save",
       });
-      if (!correctionHandoff && failure.diagnostics.retryable) {
+      if (failure.diagnostics.retryable) {
         result = await invokeSave();
         if (result.error) {
           failure = mapSupabasePersistenceError(result.error, {
@@ -2277,9 +2509,25 @@ export async function saveCockpitSubmissionsForProfile(
       }
       if (result.error) throw failure;
     }
+    if (!result.data) {
+      throw mapSupabasePersistenceError(null, {
+        operation,
+        fallbackKind: "save",
+      });
+    }
 
+    const returnedRevision = agentCaseRevisionFromRpc(
+      result.data,
+      submission.id,
+      operationId,
+    );
+    nextCaseRevisions.set(submission.id, returnedRevision);
     nextOwnerIds.set(submission.id, ownerId);
   }
 
-  return nextOwnerIds;
+  return {
+    caseRevisionsBySubmissionId: nextCaseRevisions,
+    operationIdsBySubmissionId,
+    ownerIdsBySubmissionId: nextOwnerIds,
+  };
 }

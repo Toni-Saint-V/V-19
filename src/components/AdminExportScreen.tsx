@@ -62,11 +62,9 @@ import {
 } from "../shared/ui/v19-design-system";
 import { OperationalTableHeader } from "../shared/ui/OperationalTableHeader";
 import { agentDisplayName } from "../modules/submissions/agentDirectory";
-import {
-  cityFilterValuesForSubmissions,
-  questionnaireCityForSubmission,
-} from "../modules/submissions/selectors";
+import { cityFilterValuesForSubmissions } from "../modules/submissions/selectors";
 import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
+import { assertAdminDocumentPackageExportEnabled } from "../modules/submissions/adminExportActions";
 
 interface ExportItem {
   id: string;
@@ -118,13 +116,13 @@ function StatusPill({
   tone,
   children,
 }: {
-  tone: "green" | "orange" | "blue" | "neutral";
+  tone: "green" | "danger" | "blue" | "neutral";
   children: React.ReactNode;
 }) {
   const toneClass = {
     green:
       "bg-[var(--v19b-status-success-bg)] text-[var(--v19b-dot-success)] border-[var(--v19b-status-success-border)]",
-    orange: "bg-white/[0.045] text-white/62 border-white/10",
+    danger: "tone-danger",
     blue:
       "bg-[var(--v19b-color-primary-soft-20)] text-[var(--v19b-color-primary-text)] border-[var(--v19b-color-primary-soft-30)]",
     neutral: "bg-white/5 text-white/55 border-white/10",
@@ -132,7 +130,7 @@ function StatusPill({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium ${toneClass}`}
+      className={`v19-admin-export-status-pill-v2 inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium ${toneClass}`}
     >
       {children}
     </span>
@@ -188,7 +186,7 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
         type: submission.type,
         applicantsCount: submission.applicants.length,
         country: submission.country,
-        city: questionnaireCityForSubmission(submission),
+        city: submission.city.trim(),
         appointmentDate: `${submission.tripDateFrom} – ${submission.tripDateTo}`,
         approvedDate: submission.updatedAt,
         selected: false,
@@ -712,6 +710,7 @@ export function AdminExportScreen({
     setExportError("");
     setExportNotice("");
     try {
+      assertAdminDocumentPackageExportEnabled();
       const prepared =
         preparedExport?.archiveInputSignature === selectedArchiveInputSignature
           ? preparedExport
@@ -1160,7 +1159,7 @@ export function AdminExportScreen({
                 <StatusPill
                   tone={
                     activeItem.blockers > 0
-                      ? "orange"
+                      ? "danger"
                       : activeItem.warnings > 0
                         ? "blue"
                         : "green"
@@ -1259,7 +1258,7 @@ export function AdminExportScreen({
                   selectedCount === 0
                     ? "neutral"
                     : hasExportBlockers
-                      ? "orange"
+                      ? "danger"
                       : "green"
                 }
               >

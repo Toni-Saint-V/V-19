@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { AdminWorkspace } from "../../src/components/AdminWorkspace";
+import { buildAdminRemarkIssueInput } from "../../src/components/review/adminRemarkIssueInput";
 import { VisaflowBusinessBridgeProvider } from "../../src/integration/visaflowBusinessBridge";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { addPreciseAdminIssue } from "../../src/modules/submissions/submissionActions";
@@ -179,6 +180,16 @@ afterEach(() => {
 });
 
 describe("AdminWorkspace production navigation", () => {
+  test("rejects a generic passport-section remark without a concrete field target", () => {
+    expect(() =>
+      buildAdminRemarkIssueInput({
+        applicantId: "applicant-main",
+        message: "Проверьте паспортные данные",
+        severity: "warning",
+      }),
+    ).toThrow("Замечание должно быть привязано к конкретному полю или файлу.");
+  });
+
   test("moves canonical cards out of Review and into Export without duplication", async () => {
     const review = submissionFixture(
       "submitted_for_review",

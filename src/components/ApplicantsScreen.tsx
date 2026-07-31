@@ -5,6 +5,7 @@ import {
   useState,
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { motion, useReducedMotion } from "motion/react";
@@ -19,6 +20,7 @@ import {
   IdCard,
   ListFilter,
   RotateCcw,
+  Trash2,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -38,6 +40,7 @@ import {
   resolveSubmissionCreatedAt,
   submissionCreatedAtDateTime,
 } from "../modules/submissions/relativeCreatedAt";
+import { agentSubmissionCardArchiveDecision } from "../modules/submissions/agentSubmissionCardArchive";
 import {
   cityFilterValuesForSubmissions,
   filterAgentSubmissionQueue,
@@ -83,6 +86,7 @@ interface ApplicantsScreenProps {
   onOpenDrawer: (id: string) => void;
   onOpenQuestionnaire?: (id: string, initialFocus?: QuestionnaireInitialFocus) => void;
   onOpenWorkspaceTarget?: (id: string, target: WorkspaceTarget) => void;
+  onDeleteSubmission?: (id: string) => Promise<void>;
   onSubmitForReview?: (id: string) => Promise<void>;
   onTypeFilterChange?: (filter: SubmissionTypeFilter) => void;
   onUploadApplicantFile?: (
@@ -372,12 +376,159 @@ type CardCallbacks = Pick<
   | "onOpenWorkspaceTarget"
   | "onUploadApplicantFile"
 > & {
+  canDeleteSubmission: boolean;
   canSubmitForReview: boolean;
+  deleting: boolean;
   error?: string;
   now: Date;
+  onDeleteRequest: (submission: Submission, trigger: HTMLButtonElement) => void;
   onPrimaryAction: (submission: Submission) => void;
   submitting: boolean;
 };
+
+const mobileSwipeActionWidth = 88;
+const mobileSwipeOpenThreshold = mobileSwipeActionWidth / 2;
+
+function SwipeableSubmissionCard({
+  canDeleteSubmission,
+  children,
+  deleting,
+  label,
+  onDeleteRequest,
+  submission,
+}: {
+  canDeleteSubmission: boolean;
+  children: ReactNode;
+  deleting: boolean;
+  label: string;
+  onDeleteRequest: CardCallbacks["onDeleteRequest"];
+  submission: Submission;
+}) {
+  const canRevealDelete =
+    canDeleteSubmission && agentSubmissionCardArchiveDecision(submission).ok;
+  const [open, setOpen] = useState(false);
+  const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const gestureRef = useRef<{
+    pointerId: number;
+    startOffset: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+  const visibleOffset = dragOffset ?? (open ? -mobileSwipeActionWidth : 0);
+
+  const resetGesture = () => {
+    gestureRef.current = null;
+    setDragOffset(null);
+  };
+
+  const cancelGesture = () => {
+    suppressClickRef.current = false;
+    resetGesture();
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (
+      !canRevealDelete ||
+      window.innerWidth > 767 ||
+      (event.target instanceof Element &&
+        event.target.closest("button, a, input, select, textarea, label"))
+    ) {
+      return;
+    }
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      startOffset: open ? -mobileSwipeActionWidth : 0,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    suppressClickRef.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return;
+
+    const nextOffset = Math.max(
+      -mobileSwipeActionWidth,
+      Math.min(0, gesture.startOffset + deltaX),
+    );
+    if (Math.abs(deltaX) > 6) suppressClickRef.current = true;
+    setDragOffset(nextOffset);
+  };
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      setOpen(gesture.startOffset < 0);
+      suppressClickRef.current = false;
+      resetGesture();
+      return;
+    }
+    const finalOffset = Math.max(
+      -mobileSwipeActionWidth,
+      Math.min(0, gesture.startOffset + deltaX),
+    );
+    setOpen(finalOffset <= -mobileSwipeOpenThreshold);
+    resetGesture();
+  };
+
+  return (
+    <div
+      className="v19-submission-swipe-shell"
+      data-dragging={dragOffset !== null ? "true" : undefined}
+      data-open={open ? "true" : undefined}
+    >
+      <div
+        className="v19-submission-swipe-content"
+        style={{ transform: `translate3d(${visibleOffset}px, 0, 0)` }}
+        onClickCapture={(event) => {
+          if (suppressClickRef.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            suppressClickRef.current = false;
+            return;
+          }
+          if (open) {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        onPointerCancel={cancelGesture}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
+        {children}
+      </div>
+      {canRevealDelete ? (
+        <button
+          {...agentInteractionProps("submissions.open-delete")}
+          aria-label={`Удалить свайпом: ${label}`}
+          className="v19-submission-swipe-delete"
+          data-testid="agent-submission-swipe-delete"
+          disabled={deleting}
+          type="button"
+          onFocus={() => setOpen(true)}
+          onClick={(event) => onDeleteRequest(submission, event.currentTarget)}
+        >
+          <Trash2 aria-hidden="true" />
+          <span>Удалить</span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function openSubmissionCardFromKeyboard(
   event: ReactKeyboardEvent<HTMLElement>,
@@ -438,6 +589,46 @@ function SubmissionStatusLabel({
   }
 
   return <span className={className}>{statusLabelFor(submission.status, "full")}</span>;
+}
+
+function SubmissionCardHeaderActions({
+  canDeleteSubmission,
+  deleting,
+  label,
+  onDeleteRequest,
+  onOpen,
+  submission,
+}: {
+  canDeleteSubmission: boolean;
+  deleting: boolean;
+  label: string;
+  onDeleteRequest: (submission: Submission, trigger: HTMLButtonElement) => void;
+  onOpen: () => void;
+  submission: Submission;
+}) {
+  const archiveDecision = agentSubmissionCardArchiveDecision(submission);
+
+  return (
+    <div className="v19-applicant-card-head-actions">
+      <SubmissionStatusLabel onOpen={onOpen} submission={submission} />
+      {canDeleteSubmission && archiveDecision.ok ? (
+        <button
+          {...agentInteractionProps("submissions.open-delete")}
+          aria-label={`Удалить карточку подачи: ${label}`}
+          className="v19-applicant-delete-card-action"
+          disabled={deleting}
+          title="Удалить карточку"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDeleteRequest(submission, event.currentTarget);
+          }}
+        >
+          <Trash2 aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function SubmissionPrimaryAction({
@@ -505,19 +696,19 @@ function canSubmitForReviewFromList(
 ) {
   if (!canSubmitForReview) return false;
   const completionDecision = agentQuestionnaireCompletionDecision(submission);
-  return (
-    completionDecision.action === "submit_for_review" &&
-    completionDecision.ok
-  );
+  return completionDecision.action === "submit_for_review" && completionDecision.ok;
 }
 
 function FamilySubmissionCard({
+  canDeleteSubmission,
   canSubmitForReview,
+  deleting,
   error,
   now,
   onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
+  onDeleteRequest,
   onPrimaryAction,
   onUploadApplicantFile,
   submission,
@@ -538,6 +729,7 @@ function FamilySubmissionCard({
       aria-label={`Подача ${title}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      data-testid="agent-submission-card"
       tabIndex={0}
       onClick={(event) => {
         if (
@@ -567,7 +759,11 @@ function FamilySubmissionCard({
             </p>
           </div>
         </div>
-        <SubmissionStatusLabel
+        <SubmissionCardHeaderActions
+          canDeleteSubmission={canDeleteSubmission}
+          deleting={deleting}
+          label={title}
+          onDeleteRequest={onDeleteRequest}
           onOpen={() => onOpenDrawer(submission.id)}
           submission={submission}
         />
@@ -621,12 +817,15 @@ function FamilySubmissionCard({
 }
 
 function IndividualSubmissionCard({
+  canDeleteSubmission,
   canSubmitForReview,
+  deleting,
   error,
   now,
   onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
+  onDeleteRequest,
   onPrimaryAction,
   onUploadApplicantFile,
   submission,
@@ -644,6 +843,7 @@ function IndividualSubmissionCard({
       aria-label={`Подача ${name}`}
       className="v19-agent-shared-card group"
       data-submission-id={submission.id}
+      data-testid="agent-submission-card"
       tabIndex={0}
       onClick={(event) => {
         if (
@@ -673,7 +873,11 @@ function IndividualSubmissionCard({
             </p>
           </div>
         </div>
-        <SubmissionStatusLabel
+        <SubmissionCardHeaderActions
+          canDeleteSubmission={canDeleteSubmission}
+          deleting={deleting}
+          label={name}
+          onDeleteRequest={onDeleteRequest}
           onOpen={() => onOpenDrawer(submission.id)}
           submission={submission}
         />
@@ -760,6 +964,7 @@ export function ApplicantsScreen({
   onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
+  onDeleteSubmission,
   onSubmitForReview,
   onTypeFilterChange,
   onUploadApplicantFile,
@@ -777,6 +982,11 @@ export function ApplicantsScreen({
   const [relativeNow, setRelativeNow] = useState(() => Date.now());
   const [pendingReviewSubmission, setPendingReviewSubmission] =
     useState<Submission | null>(null);
+  const [pendingDeleteSubmission, setPendingDeleteSubmission] =
+    useState<Submission | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteDialogError, setDeleteDialogError] = useState<string | null>(null);
+  const [deleteStatusMessage, setDeleteStatusMessage] = useState("");
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<{
     id: string;
@@ -786,6 +996,9 @@ export function ApplicantsScreen({
     null,
   );
   const submissionRequestRef = useRef<string | null>(null);
+  const deleteRequestRef = useRef<string | null>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const submissionsListRef = useRef<HTMLDivElement | null>(null);
   const canonicalSubmissions = submissions ?? emptySubmissions;
   const focusSubmissionId = focusRequest?.submissionId;
   const focusRevision = focusRequest?.revision;
@@ -941,43 +1154,119 @@ export function ApplicantsScreen({
     }
   };
 
+  const handleDeleteRequest = (submission: Submission, trigger: HTMLButtonElement) => {
+    if (!onDeleteSubmission || !agentSubmissionCardArchiveDecision(submission).ok) {
+      return;
+    }
+    deleteTriggerRef.current = trigger;
+    setDeleteDialogError(null);
+    setPendingDeleteSubmission(submission);
+  };
+
+  const restoreDeleteTriggerFocus = (submissionId: string) => {
+    window.requestAnimationFrame(() => {
+      const trigger = deleteTriggerRef.current;
+      if (trigger?.isConnected) {
+        trigger.focus({ preventScroll: true });
+      } else {
+        const card = Array.from(
+          document.querySelectorAll<HTMLElement>("[data-submission-id]"),
+        ).find((candidate) => candidate.dataset.submissionId === submissionId);
+        card
+          ?.querySelector<HTMLButtonElement>(
+            '[data-v19-interaction-id="submissions.open-delete"]',
+          )
+          ?.focus({ preventScroll: true });
+      }
+      deleteTriggerRef.current = null;
+    });
+  };
+
+  const confirmDeleteSubmission = async () => {
+    const submission = pendingDeleteSubmission;
+    if (!submission || !onDeleteSubmission || deleteRequestRef.current !== null) {
+      return;
+    }
+
+    deleteRequestRef.current = submission.id;
+    setDeleteDialogError(null);
+    setDeleteStatusMessage("");
+    setDeletingId(submission.id);
+    try {
+      await onDeleteSubmission(submission.id);
+      setPendingDeleteSubmission(null);
+      setDeleteStatusMessage("Карточка удалена из «Моих подач».");
+      window.requestAnimationFrame(() => {
+        submissionsListRef.current?.focus({ preventScroll: true });
+      });
+    } catch (error) {
+      setDeleteDialogError(
+        error instanceof Error ? error.message : "Не удалось удалить карточку подачи.",
+      );
+    } finally {
+      deleteRequestRef.current = null;
+      setDeletingId(null);
+    }
+  };
+
   const cardCallbacks = {
+    canDeleteSubmission: Boolean(onDeleteSubmission),
     canSubmitForReview: Boolean(onSubmitForReview),
+    deleting: false,
     now,
+    onDeleteRequest: handleDeleteRequest,
     onOpenDrawer,
     onOpenQuestionnaire,
     onOpenWorkspaceTarget,
     onPrimaryAction: handlePrimaryAction,
     onUploadApplicantFile,
   };
-  const renderSubmissionCard = (submission: Submission) =>
-    submission.type === "family" ? (
-      <FamilySubmissionCard
-        {...cardCallbacks}
-        error={
-          submissionError?.id === submission.id &&
-          pendingReviewSubmission?.id !== submission.id
-            ? submissionError.message
-            : undefined
-        }
+  const renderSubmissionCard = (submission: Submission) => {
+    const mainApplicant =
+      submission.applicants.find((applicant) => applicant.role === "main") ??
+      submission.applicants[0];
+    const cardLabel =
+      submission.type === "family"
+        ? (familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ??
+          submission.title)
+        : (mainApplicant?.fullName ?? submission.title);
+    const error =
+      submissionError?.id === submission.id &&
+      pendingReviewSubmission?.id !== submission.id
+        ? submissionError.message
+        : undefined;
+    const deleting = deletingId === submission.id;
+    const submitting = submittingId === submission.id;
+
+    return (
+      <SwipeableSubmissionCard
+        canDeleteSubmission={cardCallbacks.canDeleteSubmission}
+        deleting={deleting}
         key={submission.id}
+        label={cardLabel}
+        onDeleteRequest={handleDeleteRequest}
         submission={submission}
-        submitting={submittingId === submission.id}
-      />
-    ) : (
-      <IndividualSubmissionCard
-        {...cardCallbacks}
-        error={
-          submissionError?.id === submission.id &&
-          pendingReviewSubmission?.id !== submission.id
-            ? submissionError.message
-            : undefined
-        }
-        key={submission.id}
-        submission={submission}
-        submitting={submittingId === submission.id}
-      />
+      >
+        {submission.type === "family" ? (
+          <FamilySubmissionCard
+            {...cardCallbacks}
+            deleting={deleting}
+            error={error}
+            submission={submission}
+            submitting={submitting}
+          />
+        ) : (
+          <IndividualSubmissionCard
+            {...cardCallbacks}
+            deleting={deleting}
+            error={error}
+            submission={submission}
+            submitting={submitting}
+          />
+        )}
+      </SwipeableSubmissionCard>
     );
+  };
 
   return (
     <motion.div
@@ -1095,11 +1384,14 @@ export function ApplicantsScreen({
         />
 
         <div
+          ref={submissionsListRef}
+          aria-label="Список подач"
           className={`v19-agent-submissions-list${
             typeFilter === "all" && displayedSubmissionGroups.length > 1
               ? " is-type-columns"
               : ""
           }`}
+          tabIndex={-1}
         >
           {!displayedSubmissions.length ? (
             <div className="v19-applicant-empty-state" role="status">
@@ -1127,6 +1419,11 @@ export function ApplicantsScreen({
             ))
           )}
         </div>
+        {deleteStatusMessage ? (
+          <span aria-live="polite" className="sr-only" role="status">
+            {deleteStatusMessage}
+          </span>
+        ) : null}
 
         {pendingReviewSubmission ? (
           <ConfirmationDialog
@@ -1153,6 +1450,43 @@ export function ApplicantsScreen({
               }
             }}
             onConfirm={() => void confirmSubmissionForReview()}
+          />
+        ) : null}
+
+        {pendingDeleteSubmission ? (
+          <ConfirmationDialog
+            busy={deletingId === pendingDeleteSubmission.id}
+            cancelLabel="Отмена"
+            cancelInteractionId="submissions.cancel-delete"
+            confirmDanger
+            confirmLabel="Удалить карточку"
+            confirmInteractionId="submissions.confirm-delete"
+            description="Карточка исчезнет из «Моих подач». Данные и файлы останутся в Supabase для аудита."
+            error={
+              deleteDialogError ? (
+                <span className="v19-applicant-submit-error">{deleteDialogError}</span>
+              ) : undefined
+            }
+            kicker="Удаление карточки"
+            title={`Удалить карточку «${
+              pendingDeleteSubmission.type === "family"
+                ? (familyDisplayTitleFromMainApplicantName(
+                    pendingDeleteSubmission.applicants.find(
+                      (applicant) => applicant.role === "main",
+                    )?.fullName,
+                  ) ?? pendingDeleteSubmission.title)
+                : (pendingDeleteSubmission.applicants[0]?.fullName ??
+                  pendingDeleteSubmission.title)
+            }»?`}
+            onCancel={() => {
+              if (deletingId !== pendingDeleteSubmission.id) {
+                const submissionId = pendingDeleteSubmission.id;
+                setPendingDeleteSubmission(null);
+                setDeleteDialogError(null);
+                restoreDeleteTriggerFocus(submissionId);
+              }
+            }}
+            onConfirm={() => void confirmDeleteSubmission()}
           />
         ) : null}
       </div>

@@ -23,6 +23,17 @@ import {
   fillRequiredQuestionnaireForTest,
 } from "./helpers/questionnaireTestFill";
 
+vi.mock("../../src/lib/supabase/config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/lib/supabase/config")>();
+  return {
+    ...actual,
+    supabaseRuntimeConfig: {
+      ...actual.supabaseRuntimeConfig,
+      target: "supabase",
+    },
+  };
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -612,7 +623,7 @@ describe("ReviewWorkspace perceived feedback", () => {
 
     fireEvent.click(confirmButton);
 
-    const confirmation = container.querySelector(".v19-review-confirmation");
+    const confirmation = container.querySelector(".v19-review-section-controls");
     expect(confirmation).toHaveClass("is-pending");
     expect(confirmation).toHaveAttribute("aria-busy", "true");
     expect(confirmButton).toHaveAttribute("aria-busy", "true");

@@ -176,12 +176,14 @@ test.describe("V-19 registration admin approval", () => {
 
     await logout(page);
     await login(page, "2@2.ru", "22");
-    await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
-    await clickWorkspaceButton(page, /^Настройки$/);
-    await page
-      .getByRole("button", { name: /Входящие заявки на регистрацию/ })
-      .click();
-    const queue = page.getByTestId("admin-access-queue");
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: /^(Проверка|Очередь на проверку)$/,
+      }),
+    ).toBeVisible();
+    await clickWorkspaceButton(page, /^Пользователи$/);
+    const queue = page.getByTestId("admin-users-access-requests");
     await expect(queue).toBeVisible();
     await expect(queue.getByText(userEmail)).toBeVisible();
     await expect(queue.getByText("Анна Петрова")).toBeVisible();
@@ -209,11 +211,13 @@ test.describe("V-19 registration admin approval", () => {
 
     await logout(page);
     await login(page, "2@2.ru", "22");
-    await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
-    await clickWorkspaceButton(page, /^Настройки$/);
-    await page
-      .getByRole("button", { name: /Входящие заявки на регистрацию/ })
-      .click();
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: /^(Проверка|Очередь на проверку)$/,
+      }),
+    ).toBeVisible();
+    await clickWorkspaceButton(page, /^Пользователи$/);
     await expect(queue.getByText(secondAgentEmail)).toBeVisible();
     await queue
       .filter({ hasText: secondAgentEmail })
@@ -221,13 +225,14 @@ test.describe("V-19 registration admin approval", () => {
       .click();
     await expect(queue.getByText(secondAgentEmail)).toHaveCount(0);
 
-    await clickWorkspaceButton(page, /^Пользователи$/);
     const usersPanel = page.getByTestId("admin-users-access-requests");
     await expect(usersPanel).toBeVisible();
-    await usersPanel.getByRole("button", { name: /^История [1-9]/ }).click();
+    await usersPanel.getByRole("tab", { name: /^Одобрено [1-9]/ }).click();
     await expect(usersPanel.getByText(userEmail)).toBeVisible();
     await expect(usersPanel.getByText(secondAgentEmail)).toBeVisible();
-    await expect(usersPanel.getByText("Доступ выдан")).toHaveCount(2);
+    await expect(
+      usersPanel.locator(".v19-access-row").getByText("Одобрено"),
+    ).toHaveCount(2);
     await expectNoHorizontalOverflow(page, "admin users access history");
     const usersHistoryScreenshot = testInfo.outputPath("admin-users-access-history.png");
     await page.screenshot({ path: usersHistoryScreenshot });

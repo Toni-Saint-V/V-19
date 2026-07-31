@@ -13,6 +13,7 @@ export type BusinessClickExecutionPath =
   | "createDraft"
   | "updateQuestionnaireField"
   | "uploadRequiredFile"
+  | "archiveAgentSubmissionCard"
   | "addPreciseAdminIssue"
   | "markSubmissionIssueFixedResult"
   | "exportSummary"
@@ -32,6 +33,7 @@ export type BusinessClickContract = {
     | "create_submission";
   ownerRole: Role;
   productionLogic: string;
+  releaseState?: "blocked" | "enabled";
   submissionAction?: SubmissionAction;
   surfaces: readonly BusinessClickSurface[];
   transition?: {
@@ -47,6 +49,14 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     ownerRole: "agent",
     productionLogic: "src/modules/submissions/domainEngine.createDraft",
     surfaces: ["agent-submissions", "new-submission", "submission-drawer"],
+  },
+  archive_submission_card: {
+    executionPath: "archiveAgentSubmissionCard",
+    intent: "submission_lifecycle",
+    ownerRole: "agent",
+    productionLogic:
+      "src/modules/submissions/supabasePersistence.archiveAgentSubmissionCard",
+    surfaces: ["agent-submissions"],
   },
   save_progress: {
     executionPath: "applySubmissionActionResult",
@@ -182,6 +192,7 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     intent: "export_package",
     ownerRole: "admin",
     productionLogic: "src/modules/submissions/exportWorkflow.completeExportPackage",
+    releaseState: "enabled",
     submissionAction: "mark_exported",
     surfaces: ["export", "excel-preview"],
     transition: { from: ["ready_for_export"], to: "exported" },
@@ -203,12 +214,17 @@ export const V19_BUSINESS_CLICK_CONTRACT_LIST = Object.values(
   V19_BUSINESS_CLICK_CONTRACTS,
 ) as readonly BusinessClickContract[];
 
-export const V19_SUBMISSION_ACTION_CLICK_CONTRACTS =
+export const V19_ALL_SUBMISSION_ACTION_CLICK_CONTRACTS =
   V19_BUSINESS_CLICK_CONTRACT_LIST.filter(
     (
       contract,
     ): contract is BusinessClickContract & { submissionAction: SubmissionAction } =>
       Boolean(contract.submissionAction),
+  );
+
+export const V19_SUBMISSION_ACTION_CLICK_CONTRACTS =
+  V19_ALL_SUBMISSION_ACTION_CLICK_CONTRACTS.filter(
+    (contract) => contract.releaseState !== "blocked",
   );
 
 export function businessClickContractFor(

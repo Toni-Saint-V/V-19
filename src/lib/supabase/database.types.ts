@@ -37,6 +37,12 @@ export type Database = {
         Update: Partial<SubmissionInsert>;
         Relationships: [];
       };
+      agent_submission_card_archives: {
+        Row: AgentSubmissionCardArchiveRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       applicants: {
         Row: ApplicantRow;
         Insert: ApplicantInsert;
@@ -130,8 +136,16 @@ export type Database = {
         };
         Returns: {
           assignedNow: boolean;
+          caseRevision: number;
           publicNumber: number;
         };
+      };
+      archive_agent_submission_card: {
+        Args: {
+          expected_case_revision: number;
+          submission_id: string;
+        };
+        Returns: AgentSubmissionCardArchiveResult;
       };
       complete_export_package: {
         Args: {
@@ -210,6 +224,26 @@ export type Database = {
             mediaAssets: number;
             statusHistory: number;
           }>;
+        };
+      };
+      save_agent_submission_if_current: {
+        Args: {
+          actor_id: string;
+          expected_revision: number | null;
+          operation_id: string;
+          payload: SubmissionDraftPersistencePayload;
+        };
+        Returns: {
+          caseRevision: number;
+          operationId: string;
+          result: {
+            submissionId: string;
+            applicants: number;
+            questionnaireAnswers?: number;
+            mediaAssets: number;
+            statusHistory: number;
+          };
+          submissionId: string;
         };
       };
       claim_access_request_review: {
@@ -374,6 +408,20 @@ export type SubmissionInsert = Omit<
   exported_at?: string | null;
   updated_at?: string;
 };
+
+export interface AgentSubmissionCardArchiveRow extends DbRecord {
+  submission_id: string;
+  agent_id: string;
+  case_revision: number;
+  archived_at: string;
+}
+
+export interface AgentSubmissionCardArchiveResult extends DbRecord {
+  submissionId: string;
+  caseRevision: number;
+  archivedAt: string;
+  idempotent: boolean;
+}
 
 export interface ApplicantRow extends DbRecord {
   id: string;

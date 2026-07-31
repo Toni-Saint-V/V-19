@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   businessClickContractFor,
   isBusinessClickIntent,
+  V19_ALL_SUBMISSION_ACTION_CLICK_CONTRACTS,
   V19_BUSINESS_CLICK_CONTRACTS,
   V19_BUSINESS_CLICK_CONTRACT_LIST,
   V19_SUBMISSION_ACTION_CLICK_CONTRACTS,
@@ -44,11 +45,12 @@ import {
 
 const allContracts = V19_BUSINESS_CLICK_CONTRACT_LIST;
 const actionContracts = V19_SUBMISSION_ACTION_CLICK_CONTRACTS;
+const allActionContracts = V19_ALL_SUBMISSION_ACTION_CLICK_CONTRACTS;
 
 describe("V-19 business click contract", () => {
   test("covers every SubmissionAction exactly once for future UI wiring", () => {
     const transitionActions = Object.keys(transitionMatrix).sort();
-    const contractActions = actionContracts
+    const contractActions = allActionContracts
       .map((contract) => contract.submissionAction)
       .sort();
 
@@ -57,7 +59,7 @@ describe("V-19 business click contract", () => {
   });
 
   test("keeps click contracts aligned with the canonical transition matrix", () => {
-    for (const contract of actionContracts) {
+    for (const contract of allActionContracts) {
       const transition = transitionMatrix[contract.submissionAction];
 
       expect(contract.ownerRole).toBe(transition.role);
@@ -88,6 +90,19 @@ describe("V-19 business click contract", () => {
     expect(surfaces.has("agent-media")).toBe(false);
   });
 
+  test("activates the ZIP-coupled terminal export only through its canonical owner", () => {
+    expect(businessClickContractFor("mark_exported")).toMatchObject({
+      executionPath: "completeExportPackage",
+      releaseState: "enabled",
+      submissionAction: "mark_exported",
+    });
+    expect(
+      actionContracts.some(
+        (contract) => contract.submissionAction === "mark_exported",
+      ),
+    ).toBe(true);
+  });
+
   test("executes the combined draft-to-review intent through the canonical lifecycle", () => {
     expect(businessClickContractFor("prepare_and_submit_for_review")).toMatchObject({
       executionPath: "applyAgentSubmitForReviewResult",
@@ -101,7 +116,7 @@ describe("V-19 business click contract", () => {
 
     const result = applyAgentSubmitForReviewResult(
       draftReady,
-      "00000000-0000-4000-8000-000000000901",
+      draftReady.agentId,
     );
 
     expect(result.ok).toBe(true);
@@ -111,6 +126,17 @@ describe("V-19 business click contract", () => {
       "submitted_for_review",
       "in_progress",
     ]);
+  });
+
+  test("binds agent card archive to the canonical Supabase persistence owner", () => {
+    expect(businessClickContractFor("archive_submission_card")).toMatchObject({
+      executionPath: "archiveAgentSubmissionCard",
+      intent: "submission_lifecycle",
+      ownerRole: "agent",
+      productionLogic:
+        "src/modules/submissions/supabasePersistence.archiveAgentSubmissionCard",
+      surfaces: ["agent-submissions"],
+    });
   });
 
   test("runs every submission lifecycle click through guard and mutation logic", () => {
@@ -146,6 +172,7 @@ describe("V-19 business click contract", () => {
         fixture,
         contract.submissionAction,
         contract.ownerRole,
+        contract.ownerRole === "agent" ? fixture.agentId : "admin-reviewer",
       );
 
       expect(result.ok, contract.submissionAction).toBe(true);
@@ -380,10 +407,12 @@ function inProgressReadyFixture(): Submission {
 }
 
 function submittedFixture(): Submission {
+  const submission = inProgressReadyFixture();
   const result = applySubmissionActionResult(
-    inProgressReadyFixture(),
+    submission,
     "submit_for_review",
     "agent",
+    submission.agentId,
   );
   if (!result.ok) throw new Error(result.error.message);
   return result.data;

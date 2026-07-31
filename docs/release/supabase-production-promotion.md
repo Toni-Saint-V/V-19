@@ -80,6 +80,9 @@ Apply migrations only in the repository order declared by
 - `20260722001000_admin_submission_batch_concurrency.sql`
 - `20260722002000_access_request_review_claim.sql`
 - `20260722003000_atomic_return_package_artifact_upload.sql`
+- `20260728191313_archive_agent_submission_cards.sql`
+- `20260729050000_agent_submission_concurrency.sql`
+- `20260729060000_harden_t9_server_authority.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

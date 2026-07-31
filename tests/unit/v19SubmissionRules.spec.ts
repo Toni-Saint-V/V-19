@@ -147,9 +147,7 @@ function testStorage() {
 function readyClone(patch: Partial<Submission>): Submission {
   return adminAcceptRequiredMediaForTest(
     adminApproveQuestionnaireForTest({
-      ...fillRequiredQuestionnaireForTest(
-        canonicalMediaSubmission(byId("ПД-1056")),
-      ),
+      ...fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
       id: patch.id ?? "ПД-ТЕСТ",
       title: patch.title ?? "Тестовая подача",
       ...patch,
@@ -294,9 +292,7 @@ describe("V-19 submission status rules", () => {
   it("blocks role-incompatible actions", () => {
     const submitted = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(
-        canonicalMediaSubmission(
-          fillRequiredQuestionnaireForTest(byId("ПД-1053")),
-        ),
+        canonicalMediaSubmission(fillRequiredQuestionnaireForTest(byId("ПД-1053"))),
       ),
     );
 
@@ -352,7 +348,7 @@ describe("V-19 submission status rules", () => {
     expect(incompleteQuestionnaire.status).toBe("submitted_for_review");
   });
 
-  it("does not close or accept a corrected issue outside passport review scope", () => {
+  it("closes corrected issues across questionnaire and passport review scopes", () => {
     const corrected = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(byId("ПД-1055")),
     );
@@ -385,10 +381,7 @@ describe("V-19 submission status rules", () => {
     expect(hasMissingRequiredWork(correctedWithForeignIssue)).toBe(false);
     expect(
       canPerformAction(correctedWithForeignIssue, "close_issues_accept", "admin"),
-    ).toEqual({
-      ok: false,
-      reason: "Есть исправленные замечания вне паспортной проверки",
-    });
+    ).toEqual({ ok: true });
 
     const accepted = applySubmissionAction(
       correctedWithForeignIssue,
@@ -397,14 +390,13 @@ describe("V-19 submission status rules", () => {
       "local-demo-admin",
     );
 
-    expect(accepted).toEqual(correctedWithForeignIssue);
-    expect(accepted.status).toBe("corrections_received");
-    expect(accepted.issues.every((issue) => issue.status === "fixed_by_agent")).toBe(
+    expect(accepted.status).toBe("ready_for_export");
+    expect(accepted.issues.every((issue) => issue.status === "closed_by_admin")).toBe(
       true,
     );
   });
 
-  it("closes only an exact fixed passport issue during corrected acceptance", () => {
+  it("closes an exact fixed passport issue during corrected acceptance", () => {
     const source = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(byId("ПД-1055")),
     );
@@ -569,9 +561,7 @@ describe("V-19 export rules", () => {
         sections: applicant.sections.map((section) => ({
           ...section,
           fields: section.fields.map((field) =>
-            field.id === "main-destination"
-              ? { ...field, value: "Portugal" }
-              : field,
+            field.id === "main-destination" ? { ...field, value: "Portugal" } : field,
           ),
         })),
       })),
@@ -1001,13 +991,10 @@ describe("V-19 export rules", () => {
       throw new Error("Expected export persistence timestamp.");
     }
     expect(Date.parse(persistedUpdatedAt)).not.toBeNaN();
-    expect(exportDraftPayload.submission.accepted_at).toBe(
-      persistedUpdatedAt,
-    );
+    expect(exportDraftPayload.submission.accepted_at).toBe(persistedUpdatedAt);
     expect(
-      readCockpitSnapshot(
-        exportDraftPayload.submission.family_intelligence as Json,
-      )?.updatedAt,
+      readCockpitSnapshot(exportDraftPayload.submission.family_intelligence as Json)
+        ?.updatedAt,
     ).toBe("сейчас");
     expect(generated[0]?.history).toEqual(submissions[0]?.history);
     expect(downloaded[0]?.history).toEqual(submissions[0]?.history);
@@ -1134,9 +1121,7 @@ describe("V-19 submission actions", () => {
         id: `queue-matrix-${status}`,
         status,
         applicants: source.applicants.map((applicant, index) =>
-          index === 0
-            ? { ...applicant, questionnaireStatus: "partial" }
-            : applicant,
+          index === 0 ? { ...applicant, questionnaireStatus: "partial" } : applicant,
         ),
         files: source.files.map((file, index) =>
           index === 0 ? { ...file, status: "missing" } : file,
@@ -1147,9 +1132,7 @@ describe("V-19 submission actions", () => {
       expect(queue.open).toHaveLength(openCount);
       expect(queue.completed).toHaveLength(completedCount);
       expect(queue.open.every((action) => action.completed === false)).toBe(true);
-      expect(queue.completed.every((action) => action.completed === true)).toBe(
-        true,
-      );
+      expect(queue.completed.every((action) => action.completed === true)).toBe(true);
       if (status === "exported") {
         expect(queue.completed[0]).toMatchObject({
           context: "Пакет выгружен",
@@ -1195,11 +1178,11 @@ describe("V-19 submission actions", () => {
     expect(fileErrorTask?.importanceText).toBe("Без этого подачу нельзя продолжить.");
     expect(fileErrorTask?.reason).toContain("файл требует замены");
     expect(fileErrorTask?.readiness.files.label).toContain("Файлы:");
-    expect(fileErrorTask?.readiness.finalResult.label).toBe(
-      "Итог: нельзя продолжить",
-    );
+    expect(fileErrorTask?.readiness.finalResult.label).toBe("Итог: нельзя продолжить");
 
-    const questionnaireTask = tasks.find((task) => task.id.startsWith("questionnaire-"));
+    const questionnaireTask = tasks.find((task) =>
+      task.id.startsWith("questionnaire-"),
+    );
     expect(questionnaireTask).toMatchObject({
       nextAction: { label: "Открыть анкету", tab: "questionnaire", target: "form" },
       priority: { label: "Срочно", reason: "Дедлайн сегодня" },
@@ -1352,9 +1335,7 @@ describe("V-19 submission actions", () => {
     const withFixedIssues = withVerifiedPassport;
     const queue = agentActionQueue([withFixedIssues]);
 
-    expect(
-      canPerformAction(withFixedIssues, "submit_corrections", "agent"),
-    ).toEqual({
+    expect(canPerformAction(withFixedIssues, "submit_corrections", "agent")).toEqual({
       ok: true,
     });
     expect(queue.open).toHaveLength(1);
@@ -1410,10 +1391,13 @@ describe("V-19 submission actions", () => {
     expect(draft.publicNumber).toBeNull();
     expect(Number.isNaN(Date.parse(draft.createdAt))).toBe(false);
     expect(draft.applicants).toHaveLength(3);
+    expect(draft.applicants.map((applicant) => applicant.role)).toEqual([
+      "main",
+      "spouse",
+      "child",
+    ]);
     expect(draft.files).toHaveLength(5);
-    expect(
-      draft.files.map((file) => [file.applicantId, file.type]),
-    ).toEqual([
+    expect(draft.files.map((file) => [file.applicantId, file.type])).toEqual([
       [draft.applicants[0]?.id, "passport_scan"],
       [draft.applicants[0]?.id, "selfie"],
       [draft.applicants[0]?.id, "selfie_2"],
@@ -1421,6 +1405,21 @@ describe("V-19 submission actions", () => {
       [draft.applicants[2]?.id, "passport_scan"],
     ]);
     expect(draft.history[0].source).toBe("agent");
+  });
+
+  it("persists an explicitly selected main-and-child family relationship", () => {
+    const draft = createDraftSubmission({
+      applicantRoles: ["main", "child"],
+      city: "Москва",
+      familyCount: 2,
+      submissions: initialSubmissions,
+      type: "family",
+    });
+
+    expect(draft.applicants.map((applicant) => applicant.role)).toEqual([
+      "main",
+      "child",
+    ]);
   });
 
   it("assigns a draft to the explicit current agent owner", () => {
@@ -1600,12 +1599,60 @@ describe("V-19 submission actions", () => {
     expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
       ok: true,
     });
-    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      inProgress,
+      "submit_for_review",
+      "agent",
+      inProgress.agentId,
+    );
     expect(submitted.status).toBe("submitted_for_review");
     expect(submitted.files.every((file) => file.status === "pending_review")).toBe(
       true,
     );
     expect(submitted.history[0].source).toBe("agent");
+  });
+
+  it("clears export identity and returns accepted media to review on resubmit", () => {
+    const ready = readyClone({
+      exportPackage: {
+        contentFingerprint: "fingerprint",
+        fileName: "visaflow-export.xlsx",
+        format: "xlsx",
+        idempotencyKey: "export-operation",
+        rowCount: 1,
+        submissionIds: ["ПД-RESUBMIT"],
+      },
+      exportState: "ready",
+      id: "ПД-RESUBMIT",
+      status: "ready_for_export",
+    });
+
+    const submitted = applySubmissionAction(
+      ready,
+      "submit_for_review",
+      "agent",
+      ready.agentId,
+    );
+
+    expect(submitted).toMatchObject({
+      exportState: "not_ready",
+      status: "submitted_for_review",
+    });
+    expect(submitted.exportPackage).toBeUndefined();
+    expect(
+      submitted.files.every(
+        (file) =>
+          file.status === "pending_review" &&
+          file.reviewStatus === "not_reviewed" &&
+          file.reviewedAtIso === undefined &&
+          file.reviewedBy === undefined,
+      ),
+    ).toBe(true);
+    expect(submitted.history[0]).toMatchObject({
+      fromStatus: "ready_for_export",
+      source: "agent",
+      toStatus: "submitted_for_review",
+    });
   });
 
   it("requires a completed passport upload for every family applicant", () => {
@@ -1802,7 +1849,10 @@ describe("V-19 submission actions", () => {
     const firstFile = draft.files[0];
     if (!firstFile) throw new Error("Missing draft file");
 
-    const updated = uploadRequiredFile(fillRequiredQuestionnaireForTest(draft), firstFile.id);
+    const updated = uploadRequiredFile(
+      fillRequiredQuestionnaireForTest(draft),
+      firstFile.id,
+    );
 
     expect(updated.files[0]?.status).toBe("uploaded");
     expect(updated.completeness.files).toBe(33);
@@ -2005,12 +2055,13 @@ describe("V-19 submission actions", () => {
         }),
       ]),
     );
-    expect(autofilled.applicants[0]?.sections.flatMap((section) => section.fields)).not
-      .toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: "passport-no", value: "752869613" }),
-        ]),
-      );
+    expect(
+      autofilled.applicants[0]?.sections.flatMap((section) => section.fields),
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "passport-no", value: "752869613" }),
+      ]),
+    );
   });
 
   it("blocks file uploads after the submission leaves editable agent states", () => {
@@ -2143,18 +2194,146 @@ describe("V-19 submission actions", () => {
       target: {
         applicantName: "Нина Волкова",
         section: "Анкета",
-        field: "Маршрут поездки",
+        field: "first-entry-country",
       },
     });
     expect(updated.history[0].source).toBe("admin");
   });
 
+  it("canonicalizes a section alias to a field issue that the Agent can resolve", () => {
+    const submission = canonicalMediaSubmission(byId("ПД-1053"));
+    const withIssue = addPreciseAdminIssue(submission, {
+      ...routeIssueInput(submission),
+      type: "section",
+    });
+    const applicant = withIssue.applicants[0];
+    const tripSection = applicant?.sections.find(
+      (section) => section.title === "Поездка",
+    );
+    const routeField = tripSection?.fields.find(
+      (field) => field.id === "first-entry-country",
+    );
+    const issue = withIssue.issues[0];
+    if (!applicant || !tripSection || !routeField || !issue) {
+      throw new Error("Missing canonical field issue fixture");
+    }
+
+    expect(issue).toMatchObject({
+      type: "field",
+      target: {
+        field: "first-entry-country",
+        fileType: undefined,
+      },
+    });
+
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
+    const edited = updateQuestionnaireField(returned, {
+      applicantId: applicant.id,
+      sectionId: tripSection.id,
+      fieldId: routeField.id,
+      value: "Madrid, Barcelona, Madrid",
+    });
+    expect(markSubmissionIssueFixedResult(edited, issue.id, "agent")).toMatchObject({
+      ok: true,
+      data: {
+        issues: [expect.objectContaining({ id: issue.id, status: "fixed_by_agent" })],
+      },
+    });
+  });
+
+  it("rejects an admin issue without a concrete field or file target", () => {
+    const submission = canonicalMediaSubmission(byId("ПД-1053"));
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+
+    expect(() =>
+      addPreciseAdminIssue(submission, {
+        applicantId: applicant.id,
+        comment: "Проверьте данные.",
+        reason: "Требуется уточнение",
+        section: "Паспорт",
+        severity: "warning",
+        type: "section",
+      }),
+    ).toThrow(
+      "Admin issue target must resolve to exactly one canonical questionnaire field or media file.",
+    );
+    expect(submission.issues).toHaveLength(0);
+  });
+
+  it.each([
+    {
+      name: "mixed field and media targets",
+      patch: {
+        field: "Маршрут поездки",
+        fileType: "passport_scan" as const,
+        type: "field" as const,
+      },
+    },
+    {
+      name: "legacy media type",
+      patch: {
+        field: undefined,
+        fileType: "photo" as const,
+        type: "file" as const,
+      },
+    },
+    {
+      name: "nonexistent questionnaire field",
+      patch: {
+        field: "Несуществующее поле анкеты",
+        fileType: undefined,
+        type: "field" as const,
+      },
+    },
+  ])("rejects $name without mutating the submission", ({ patch }) => {
+    const submission = canonicalMediaSubmission(byId("ПД-1053"));
+
+    expect(() =>
+      addPreciseAdminIssue(submission, {
+        ...routeIssueInput(submission),
+        ...patch,
+      }),
+    ).toThrow(
+      "Admin issue target must resolve to exactly one canonical questionnaire field or media file.",
+    );
+    expect(submission.issues).toHaveLength(0);
+    expect(submission.files.some((file) => file.status === "needs_replacement")).toBe(
+      false,
+    );
+  });
+
+  it("rejects a canonical media target that has no exact applicant file", () => {
+    const submission = canonicalMediaSubmission(byId("ПД-1053"));
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const withoutPassport: Submission = {
+      ...submission,
+      files: submission.files.filter(
+        (file) => file.applicantId !== applicant.id || file.type !== "passport_scan",
+      ),
+    };
+
+    expect(() =>
+      addPreciseAdminIssue(withoutPassport, {
+        applicantId: applicant.id,
+        comment: "Загрузите новый скан паспорта.",
+        fileType: "passport_scan",
+        reason: "Скан требует замены",
+        section: "Файлы",
+        severity: "blocker",
+        type: "file",
+      }),
+    ).toThrow(
+      "Admin issue target must resolve to exactly one canonical questionnaire field or media file.",
+    );
+    expect(withoutPassport.issues).toHaveLength(0);
+  });
+
   it("requires reviewed media before acceptance and preserves its reviewer", () => {
     const adminProfileId = "00000000-0000-4000-8000-000000000002";
     const submission = adminApprovePassportFieldsForTest(
-      canonicalMediaSubmission(
-        fillRequiredQuestionnaireForTest(byId("ПД-1053")),
-      ),
+      canonicalMediaSubmission(fillRequiredQuestionnaireForTest(byId("ПД-1053"))),
     );
     const blocked = applySubmissionAction(
       submission,
@@ -2165,16 +2344,9 @@ describe("V-19 submission actions", () => {
     expect(blocked).toBe(submission);
 
     const reviewed = adminAcceptRequiredMediaForTest(submission);
-    const reviewableFiles = reviewed.files.filter((file) =>
-      file.status === "accepted",
-    );
+    const reviewableFiles = reviewed.files.filter((file) => file.status === "accepted");
 
-    const accepted = applySubmissionAction(
-      reviewed,
-      "accept",
-      "admin",
-      adminProfileId,
-    );
+    const accepted = applySubmissionAction(reviewed, "accept", "admin", adminProfileId);
 
     expect(accepted.status).toBe("ready_for_export");
     expect(reviewableFiles.length).toBeGreaterThan(0);
@@ -2208,7 +2380,12 @@ describe("V-19 submission actions", () => {
     });
     const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const inProgress = applySubmissionAction(filled, "save_progress", "agent");
-    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      inProgress,
+      "submit_for_review",
+      "agent",
+      inProgress.agentId,
+    );
     const applicant = submitted.applicants[0];
     if (!applicant) throw new Error("Missing applicant");
 
@@ -2279,11 +2456,7 @@ describe("V-19 submission actions", () => {
       "agent",
     );
     if (!fixed.ok) throw new Error(fixed.error.code);
-    const corrected = applySubmissionAction(
-      fixed.data,
-      "submit_corrections",
-      "agent",
-    );
+    const corrected = applySubmissionAction(fixed.data, "submit_corrections", "agent");
 
     expect(corrected.issues[0]?.status).toBe("fixed_by_agent");
     expect(
@@ -2327,7 +2500,7 @@ describe("V-19 submission actions", () => {
     });
     const returned = applySubmissionAction(edited, "return_with_issues", "admin");
     const routeIssue = returned.issues.find(
-      (issue) => issue.target.field === "Маршрут поездки",
+      (issue) => issue.target.field === "first-entry-country",
     );
     if (!routeIssue) throw new Error("Missing route issue");
 
@@ -2336,18 +2509,17 @@ describe("V-19 submission actions", () => {
 
     expect(
       fixed.data.issues.find(
-        (issue) => issue.target.field === "Основная страна назначения",
+        (issue) => issue.target.field === "main-destination",
       ),
     ).toMatchObject({ status: "open" });
     expect(
       fixed.data.applicants[0]?.sections
         .find((section) => section.title === "Поездка")
-        ?.fields.find((field) => field.label === "Основная страна назначения")
-        ?.error,
+        ?.fields.find((field) => field.label === "Основная страна назначения")?.error,
     ).toBe("Нужно подтвердить основную страну назначения");
   });
 
-  it("captures the fallback target snapshot for a general admin issue", () => {
+  it("normalizes and snapshots an explicit admin issue target", () => {
     const submission = byId("ПД-1053");
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Missing applicant");
@@ -2355,6 +2527,7 @@ describe("V-19 submission actions", () => {
     const withIssue = addPreciseAdminIssue(submission, {
       applicantId: applicant.id,
       comment: "Уточните данные анкеты.",
+      field: " Маршрут поездки ",
       reason: "Требуется уточнение",
       section: "Анкета",
       severity: "blocker",
@@ -2366,7 +2539,7 @@ describe("V-19 submission actions", () => {
       .flatMap((section) => section.fields)
       .find((field) => field.id === "first-entry-country")?.value;
 
-    expect(issue.target.field).toBe("Маршрут поездки");
+    expect(issue.target.field).toBe("first-entry-country");
     expect(issue.snapshot).toBe(routeValue);
 
     const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
@@ -2382,11 +2555,7 @@ describe("V-19 submission actions", () => {
   it("blocks marking a returned issue fixed until its target changes", () => {
     const submission = byId("ПД-1053");
     const withIssue = addPreciseAdminIssue(submission, routeIssueInput(submission));
-    const returned = applySubmissionAction(
-      withIssue,
-      "return_with_issues",
-      "admin",
-    );
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
     const issueId = returned.issues[0]?.id;
     if (!issueId) throw new Error("Missing issue");
 
@@ -2396,6 +2565,124 @@ describe("V-19 submission actions", () => {
         code: "VALIDATION_ERROR",
         message: "Issue target must be corrected before it can be marked fixed.",
       },
+    });
+  });
+
+  it("requires a non-blank correction when the Admin field snapshot was empty", () => {
+    const submission = byId("ПД-1053");
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const blankRoute: Submission = {
+      ...submission,
+      applicants: submission.applicants.map((candidate) => ({
+        ...candidate,
+        sections: candidate.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            candidate.id === applicant.id && field.id === "first-entry-country"
+              ? { ...field, value: "" }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const withIssue = addPreciseAdminIssue(blankRoute, routeIssueInput(blankRoute));
+    const issue = withIssue.issues[0];
+    if (!issue) throw new Error("Missing issue");
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
+
+    expect(issue).toMatchObject({
+      snapshot: "",
+      target: { field: "first-entry-country" },
+    });
+    expect(markSubmissionIssueFixedResult(returned, issue.id, "agent").ok).toBe(
+      false,
+    );
+
+    const corrected = updateQuestionnaireField(returned, {
+      applicantId: applicant.id,
+      fieldId: "first-entry-country",
+      sectionId:
+        applicant.sections.find((section) =>
+          section.fields.some((field) => field.id === "first-entry-country"),
+        )?.id ?? "",
+      value: "France",
+    });
+    expect(markSubmissionIssueFixedResult(corrected, issue.id, "agent")).toMatchObject(
+      {
+        ok: true,
+        data: {
+          issues: [expect.objectContaining({ id: issue.id, status: "fixed_by_agent" })],
+        },
+      },
+    );
+  });
+
+  it("fixes a media issue only after the private Storage identity changes", () => {
+    const submission = byId("ПД-1053");
+    const applicant = submission.applicants[0];
+    const targetFile = submission.files.find(
+      (file) => file.applicantId === applicant?.id && file.type === "passport_scan",
+    );
+    if (!applicant || !targetFile) throw new Error("Missing media target");
+    const oldPath = `submissions/${submission.id}/applicants/${applicant.id}/passport_scan/old-passport.jpg`;
+    const withDurableFile: Submission = {
+      ...submission,
+      files: submission.files.map((file) =>
+        file.id === targetFile.id
+          ? {
+              ...file,
+              generatedFileName: "old-passport.jpg",
+              reviewStatus: "accepted",
+              status: "accepted",
+              storageAdapter: "supabase-private",
+              storageBucket: "submission-media",
+              storagePath: oldPath,
+              uploadStatus: "uploaded",
+              uploadedAtIso: "2026-07-28T10:00:00.000Z",
+            }
+          : file,
+      ),
+    };
+    const withIssue = addPreciseAdminIssue(withDurableFile, {
+      applicantId: applicant.id,
+      comment: "Загрузите новый скан.",
+      fileType: "passport_scan",
+      reason: "Скан нечитаемый",
+      section: "Файлы",
+      severity: "blocker",
+      type: "file",
+    });
+    const issue = withIssue.issues[0];
+    if (!issue) throw new Error("Missing media issue");
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
+    const baseMetadata = {
+      generatedFileName: "old-passport.jpg",
+      mimeType: "image/jpeg",
+      originalFileName: "passport.jpg",
+      sizeBytes: 2048,
+      storageAdapter: "supabase-private" as const,
+      storageBucket: "submission-media",
+      uploadedAtIso: "2026-07-29T10:00:00.000Z",
+    };
+
+    expect(issue.snapshot).toContain(oldPath);
+    const reusedPath = uploadRequiredFile(returned, targetFile.id, {
+      ...baseMetadata,
+      storagePath: oldPath,
+    });
+    expect(reusedPath.issues[0]?.status).toBe("open");
+
+    const newPath = `submissions/${submission.id}/applicants/${applicant.id}/passport_scan/new-passport.jpg`;
+    const replaced = uploadRequiredFile(returned, targetFile.id, {
+      ...baseMetadata,
+      generatedFileName: "new-passport.jpg",
+      storagePath: newPath,
+    });
+    expect(replaced.issues[0]?.status).toBe("fixed_by_agent");
+    expect(replaced.files.find((file) => file.id === targetFile.id)).toMatchObject({
+      storagePath: newPath,
+      uploadStatus: "uploaded",
     });
   });
 
@@ -2516,7 +2803,7 @@ describe("V-19 ББ helper suggestions", () => {
     });
   });
 
-  it("lets reviewed passport OCR resolve a ББ passport review issue", () => {
+  it("keeps a virtual passport ББ suggestion out of the issue lifecycle", () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -2528,8 +2815,7 @@ describe("V-19 ББ helper suggestions", () => {
     const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const passportFile = filled.files.find(
       (file) =>
-        file.type === "passport_scan" &&
-        file.applicantId === filled.applicants[0]?.id,
+        file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
     );
     if (!passportFile) throw new Error("Missing passport file");
 
@@ -2568,28 +2854,78 @@ describe("V-19 ББ helper suggestions", () => {
         suggestion.target.section === "Паспорт" &&
         suggestion.target.field === "Распознанные данные паспорта",
     );
-    if (!passportReviewSuggestion) throw new Error("Missing passport review suggestion");
+    if (!passportReviewSuggestion)
+      throw new Error("Missing passport review suggestion");
 
-    const withIssue = acceptAiSuggestionAsIssue(
+    const next = acceptAiSuggestionAsIssue(
       reviewed,
       passportReviewSuggestion.id,
       "admin",
     );
-    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
-    const verified = markPassportExtractionReviewed(returned, "verified");
-    const fixed = markSubmissionIssueFixedResult(
-      verified,
-      withIssue.issues[0]?.id ?? "",
-      "agent",
+
+    expect(next).toBe(reviewed);
+    expect(next.issues).toEqual(reviewed.issues);
+    expect(
+      next.aiSuggestions?.find(
+        (suggestion) => suggestion.id === passportReviewSuggestion.id,
+      )?.status,
+    ).toBe("suggested");
+  });
+
+  it("keeps a generated section ББ suggestion out of the issue lifecycle", () => {
+    const reviewed = runAiReview({
+      ...byId("ПД-1051"),
+      status: "submitted_for_review",
+    });
+    const sectionSuggestion = activeAiSuggestions(reviewed).find(
+      (suggestion) => suggestion.type === "section",
+    );
+    if (!sectionSuggestion) throw new Error("Missing section suggestion");
+
+    const next = acceptAiSuggestionAsIssue(reviewed, sectionSuggestion.id, "admin");
+
+    expect(next).toBe(reviewed);
+    expect(next.issues).toEqual(reviewed.issues);
+    expect(
+      next.aiSuggestions?.find((suggestion) => suggestion.id === sectionSuggestion.id)
+        ?.status,
+    ).toBe("suggested");
+  });
+
+  it("rejects a mixed field and media ББ target before mutation", () => {
+    const reviewed = runAiReview(byId("ПД-1053"));
+    const fileSuggestion = activeAiSuggestions(reviewed).find(
+      (suggestion) => suggestion.target.fileType === "selfie",
+    );
+    if (!fileSuggestion) throw new Error("Missing file suggestion");
+    const withMixedSuggestion: Submission = {
+      ...reviewed,
+      aiSuggestions: reviewed.aiSuggestions?.map((suggestion) =>
+        suggestion.id === fileSuggestion.id
+          ? {
+              ...suggestion,
+              target: {
+                ...suggestion.target,
+                field: "Маршрут поездки",
+              },
+              type: "field",
+            }
+          : suggestion,
+      ),
+    };
+
+    const next = acceptAiSuggestionAsIssue(
+      withMixedSuggestion,
+      fileSuggestion.id,
+      "admin",
     );
 
-    expect(returned.status).toBe("returned");
-    expect(fixed).toMatchObject({
-      ok: true,
-      data: {
-        issues: [expect.objectContaining({ status: "fixed_by_agent" })],
-      },
-    });
+    expect(next).toBe(withMixedSuggestion);
+    expect(next.issues).toEqual(reviewed.issues);
+    expect(
+      next.aiSuggestions?.find((suggestion) => suggestion.id === fileSuggestion.id)
+        ?.status,
+    ).toBe("suggested");
   });
 
   it("does not duplicate suggestions that already have open issues", () => {
@@ -2655,6 +2991,7 @@ describe("V-19 ББ helper suggestions", () => {
       createdBy: "admin",
       status: "open",
       severity: "warning",
+      type: "file",
       target: {
         applicantName: "Нина Волкова",
         section: "Файлы",
@@ -2670,6 +3007,18 @@ describe("V-19 ББ helper suggestions", () => {
       text: "Подсказка ББ принята администратором",
       detail: "Нина Волкова · Файлы · Селфи 1",
       source: "bb",
+    });
+    expect(
+      toCockpitDraftPersistencePayload(
+        next,
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000001",
+        "admin",
+      ).corrections[0],
+    ).toMatchObject({
+      field_key: null,
+      media_type: "selfie",
+      scope: "media",
     });
   });
 

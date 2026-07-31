@@ -876,7 +876,7 @@ export function productionDraftSnapshotMutationFromBaseline(
       issue.reason !== intent.reason ||
       issue.comment !== intent.comment ||
       issue.target.applicantId !== target.applicantId ||
-      issue.target.field !== target.field.label ||
+      issue.target.field !== target.field.id ||
       !expectedContentDigest ||
       !projectionDigests
     ) {

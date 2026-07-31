@@ -26,15 +26,19 @@ import {
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
 } from "./modules/submissions/exportRules";
+import { assertAdminDocumentPackageExportEnabled } from "./modules/submissions/adminExportActions";
 import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submissions/exportPackageDocumentCommit";
 import {
+  archiveAgentSubmissionCard,
   ensureSubmissionPublicNumber,
+  isAgentSubmissionCardArchiveConflict,
   isAdminSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
   saveAdminCockpitSubmissionsIfCurrent,
   saveCockpitSubmissionsForProfile,
   type PublicNumberAssignment,
 } from "./modules/submissions/supabasePersistence";
+import { agentSubmissionCardArchiveDecision } from "./modules/submissions/agentSubmissionCardArchive";
 import {
   PostCommitBridgePolicy,
   type VisaflowPostCommitEvent,
@@ -796,8 +800,9 @@ export default function App({
       workspaceRefreshRequestRef.current += 1;
       workspaceRefreshCoordinatorRef.current.invalidate();
       let mutationSucceeded = false;
+      let refreshAfterMutation = false;
       try {
-        const adminSaveResult =
+        const saveResult =
           persistenceProfile.role === "admin"
             ? await saveAdminCockpitSubmissionsIfCurrent(
                 persistenceProfile,
@@ -805,23 +810,20 @@ export default function App({
                 currentOwnerIds,
                 currentCaseRevisions,
               )
-            : null;
-        const nextOwnerIds = adminSaveResult
-          ? adminSaveResult.ownerIdsBySubmissionId
-          : await saveCockpitSubmissionsForProfile(
+            : await saveCockpitSubmissionsForProfile(
               persistenceProfile,
               changedSubmissions,
               currentOwnerIds,
+              currentCaseRevisions,
             );
+        const nextOwnerIds = saveResult.ownerIdsBySubmissionId;
         fence.assertCurrent();
 
         workspaceRefreshRequestRef.current += 1;
         submissionsRef.current = nextSubmissions;
         setSubmissions(nextSubmissions);
-        if (adminSaveResult) {
-          caseRevisionsBySubmissionIdRef.current =
-            adminSaveResult.caseRevisionsBySubmissionId;
-        }
+        caseRevisionsBySubmissionIdRef.current =
+          saveResult.caseRevisionsBySubmissionId;
         ownerIdsBySubmissionIdRef.current = nextOwnerIds;
         setOwnerIdsBySubmissionId(nextOwnerIds);
         setWorkspaceDataState({
@@ -830,10 +832,11 @@ export default function App({
           status: workspaceDataStatusForCount(nextSubmissions.length),
         });
         mutationSucceeded = true;
-        return adminSaveResult?.caseRevisionsBySubmissionId;
+        return saveResult.caseRevisionsBySubmissionId;
       } catch (error) {
+        refreshAfterMutation = isAdminSubmissionConcurrencyConflict(error);
         if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
-          const errorMessage = isAdminSubmissionConcurrencyConflict(error)
+          const errorMessage = refreshAfterMutation
             ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
             : error instanceof Error
               ? error.message
@@ -852,7 +855,7 @@ export default function App({
             workspaceMutationStateRef.current.count - 1,
           );
           if (
-            mutationSucceeded &&
+            (mutationSucceeded || refreshAfterMutation) &&
             workspaceMutationStateRef.current.count === 0 &&
             fence.isCurrent()
           ) {
@@ -902,7 +905,19 @@ export default function App({
         throw new Error("Только активный агент может изменить свои подачи.");
       }
       await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+        const ownerAgentId = session.ownerAgentId ?? session.userId;
         const currentSubmissions = submissionsRef.current;
+        for (const submission of nextVisibleSubmissions) {
+          if (submission.agentId !== ownerAgentId) {
+            throw new Error("Нельзя сохранить подачу от имени другого агента.");
+          }
+          const existing = currentSubmissions.find(
+            (candidate) => candidate.id === submission.id,
+          );
+          if (existing && existing.agentId !== ownerAgentId) {
+            throw new Error("Номер подачи уже принадлежит другому агенту.");
+          }
+        }
         const nextById = new Map(
           nextVisibleSubmissions.map((submission) => [submission.id, submission]),
         );
@@ -921,6 +936,153 @@ export default function App({
       });
     },
     [activeApprovedSession, enqueueWorkspaceSubmissionMutation, persistSubmissions],
+  );
+
+  const deleteVisibleAgentSubmission = useCallback(
+    (submissionId: string): Promise<void> => {
+      const session = activeApprovedSession;
+      if (!session || session.role !== "agent") {
+        return Promise.reject(
+          new Error("Только активный агент может удалить свою карточку подачи."),
+        );
+      }
+
+      return enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+        const ownerAgentId = session.ownerAgentId ?? session.userId;
+        const currentSubmission = submissionsRef.current.find(
+          (submission) => submission.id === submissionId,
+        );
+        if (!currentSubmission || currentSubmission.agentId !== ownerAgentId) {
+          throw new Error("Подача недоступна текущему агенту.");
+        }
+        const archiveDecision =
+          agentSubmissionCardArchiveDecision(currentSubmission);
+        if (!archiveDecision.ok) {
+          throw new Error(archiveDecision.reason);
+        }
+        if (quarantinedSubmissionIdsRef.current.has(submissionId)) {
+          throw new Error(
+            "Карточка доступна только для чтения: данные требуют восстановления.",
+          );
+        }
+
+        if (!supabaseEnabled) {
+          if (!localDemoEnabled) {
+            throw new Error("Supabase недоступен для удаления карточки подачи.");
+          }
+          const nextSubmissions = submissionsRef.current.filter(
+            (submission) => submission.id !== submissionId,
+          );
+          if (__V19_LOCAL_DEMO_BUILD__) {
+            const { saveSubmissions } = await import(
+              "./modules/submissions/persistence"
+            );
+            fence.assertCurrent();
+            const saveResult = saveSubmissions(nextSubmissions);
+            if (!saveResult.ok) throw new Error(saveResult.message);
+          }
+          fence.assertCurrent();
+          submissionsRef.current = nextSubmissions;
+          setSubmissions(nextSubmissions);
+          return;
+        }
+
+        if (!activeProfile || activeProfile.role !== "agent") {
+          throw new Error("Профиль Supabase ещё загружается. Повторите действие.");
+        }
+        const expectedCaseRevision =
+          caseRevisionsBySubmissionIdRef.current.get(submissionId);
+        if (expectedCaseRevision === undefined) {
+          throw new Error(
+            "Не удалось подтвердить актуальность подачи. Обновите страницу и повторите действие.",
+          );
+        }
+
+        const persistenceProfile =
+          supabaseProfile?.id === activeProfile.id ? supabaseProfile : activeProfile;
+        if (workspaceMutationStateRef.current.generation !== fence.token.generation) {
+          workspaceMutationStateRef.current = {
+            count: 0,
+            generation: fence.token.generation,
+          };
+        }
+        workspaceMutationStateRef.current.count += 1;
+        workspaceRefreshRequestRef.current += 1;
+        workspaceRefreshCoordinatorRef.current.invalidate();
+
+        try {
+          const archived = await archiveAgentSubmissionCard(
+            submissionId,
+            expectedCaseRevision,
+          );
+          fence.assertCurrent();
+          if (archived.submissionId !== submissionId) {
+            throw new Error(
+              "Supabase подтвердил удаление другой карточки. Обновите страницу.",
+            );
+          }
+
+          const loaded =
+            await loadCockpitSubmissionsForProfile(persistenceProfile);
+          fence.assertCurrent();
+          if (
+            loaded.submissions.some(
+              (submission) => submission.id === submissionId,
+            )
+          ) {
+            throw new Error(
+              "Supabase не подтвердил удаление карточки после повторной загрузки.",
+            );
+          }
+
+          submissionsRef.current = loaded.submissions;
+          caseRevisionsBySubmissionIdRef.current =
+            loaded.caseRevisionsBySubmissionId;
+          quarantinedSubmissionIdsRef.current =
+            loaded.quarantinedSubmissionIds;
+          ownerIdsBySubmissionIdRef.current = loaded.ownerIdsBySubmissionId;
+          setOwnerIdsBySubmissionId(loaded.ownerIdsBySubmissionId);
+          setSubmissions(loaded.submissions);
+          setWorkspaceDataState({
+            refreshedAt: new Date().toISOString(),
+            sessionUserId: fence.token.userId,
+            status: workspaceDataStatusForCount(loaded.submissions.length),
+          });
+        } catch (error) {
+          if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
+            const message = isAgentSubmissionCardArchiveConflict(error)
+              ? "Подача изменилась в другой сессии. Обновите список и повторите удаление."
+              : error instanceof Error
+                ? error.message
+                : "Не удалось удалить карточку подачи.";
+            setWorkspaceDataState({
+              error: message,
+              sessionUserId: fence.token.userId,
+              status: "error",
+            });
+          }
+          throw error;
+        } finally {
+          if (
+            workspaceMutationStateRef.current.generation ===
+            fence.token.generation
+          ) {
+            workspaceMutationStateRef.current.count = Math.max(
+              0,
+              workspaceMutationStateRef.current.count - 1,
+            );
+          }
+        }
+      });
+    },
+    [
+      activeApprovedSession,
+      activeProfile,
+      enqueueWorkspaceSubmissionMutation,
+      localDemoEnabled,
+      supabaseEnabled,
+      supabaseProfile,
+    ],
   );
 
   const updateVisibleAgentSubmission = useCallback(
@@ -987,7 +1149,12 @@ export default function App({
           if (!current) throw new Error("Подача больше не доступна.");
           const existingNumber = submissionPublicNumber(current);
           if (existingNumber !== null) {
-            resolveAssignment({ assignedNow: false, publicNumber: existingNumber });
+            resolveAssignment({
+              assignedNow: false,
+              caseRevision:
+                caseRevisionsBySubmissionIdRef.current.get(submissionId) ?? null,
+              publicNumber: existingNumber,
+            });
             return;
           }
 
@@ -995,6 +1162,7 @@ export default function App({
             ? await ensureSubmissionPublicNumber(submissionId)
             : {
                 assignedNow: true,
+                caseRevision: null,
                 publicNumber:
                   Math.max(
                     1000,
@@ -1006,6 +1174,11 @@ export default function App({
           fence.assertCurrent();
           if (assignment.publicNumber > submissionPublicNumberMax) {
             throw new Error("Лимит номеров подач исчерпан.");
+          }
+          if (supabaseEnabled && assignment.caseRevision !== null) {
+            caseRevisionsBySubmissionIdRef.current = new Map(
+              caseRevisionsBySubmissionIdRef.current,
+            ).set(submissionId, assignment.caseRevision);
           }
 
           const nextSubmissions = submissionsRef.current.map((submission) =>
@@ -1023,6 +1196,7 @@ export default function App({
           fence.assertCurrent();
           resolveAssignment({
             assignedNow: assignment.assignedNow,
+            caseRevision: assignment.caseRevision,
             publicNumber: assignment.publicNumber,
           });
         })
@@ -1438,6 +1612,13 @@ export default function App({
     () => ({
       ...bridge,
       onSubmissionAction: async ({ submissionId, action, source }) => {
+        if (action === "mark_exported") {
+          assertAdminDocumentPackageExportEnabled();
+          throw new Error(
+            "Export completion requires the document package callback.",
+          );
+        }
+
         const session = activeApprovedSession;
         if (!session) throw new WorkspaceSessionChangedError();
         const fence = createWorkspaceMutationFence(session.userId);
@@ -1596,6 +1777,8 @@ export default function App({
         packageIdentity,
         submissionIds,
       }) => {
+        assertAdminDocumentPackageExportEnabled();
+
         const session = activeApprovedSession;
         if (
           workspace !== "admin" ||
@@ -1962,8 +2145,10 @@ export default function App({
         agentWorkspaceProps={{
           agentId: activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId,
           onAssignPublicNumber: assignVisibleAgentSubmissionPublicNumber,
+          onDeleteSubmission: deleteVisibleAgentSubmission,
           onSubmissionUpdate: updateVisibleAgentSubmission,
           onSubmissionsChange: persistVisibleAgentSubmissions,
+          reservedSubmissionIds: submissions.map((submission) => submission.id),
           submissions: visibleSubmissions,
           usesSupabase: supabaseEnabled,
           onSignOut: handleSignOut,

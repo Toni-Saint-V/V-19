@@ -84,8 +84,12 @@ import {
 import {
   buildMediaStoragePath,
   mediaMimeTypeForFile,
+  mediaStorageBucket,
+  readMediaPersistenceState,
   uploadMediaToStorage,
+  type MediaStorageTarget,
 } from "../modules/submissions/mediaStorage";
+import { commitUploadedMedia } from "../modules/submissions/mediaUploadCommit";
 import {
   applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
@@ -118,11 +122,13 @@ const initialCreateNavigationState: CreateNavigationState = {
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
   onAssignPublicNumber?: (submissionId: string) => Promise<PublicNumberAssignment>;
+  onDeleteSubmission?: (submissionId: string) => Promise<void>;
   onSubmissionUpdate?: (
     submissionId: string,
     update: (submission: Submission) => Submission,
   ) => Promise<Submission>;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
+  reservedSubmissionIds?: readonly Submission["id"][];
   submissions?: Submission[];
   onSignOut?: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
@@ -164,8 +170,10 @@ function normalizeAgentNav(
 export function CommandCenter({
   agentId,
   onAssignPublicNumber,
+  onDeleteSubmission,
   onSubmissionUpdate,
   onSubmissionsChange,
+  reservedSubmissionIds,
   submissions: canonicalSubmissions,
   onSignOut,
   onNavigateSettings,
@@ -669,9 +677,11 @@ export function CommandCenter({
       const result = createDraft({
         agentId,
         applicantNames,
+        applicantRoles: intent.applicantRoles,
         city: intent.city,
         familyCount: intent.familyCount,
         idScheme: usesSupabase ? "supabase" : "local",
+        reservedSubmissionIds,
         submissions: effectiveCanonicalSubmissions,
         type: intent.type,
       });
@@ -783,11 +793,13 @@ export function CommandCenter({
           storageBucket: string;
           storagePath: string;
         });
+    let uploadedStorageTarget: MediaStorageTarget | null = null;
+    const storageMediaType = mediaSlotTypeForSubmissionFileType(fileType);
     if (usesSupabase) {
       const target = buildMediaStoragePath(
         submission.id,
         applicantId,
-        mediaSlotTypeForSubmissionFileType(fileType),
+        storageMediaType,
         generatedFileName,
       );
       const uploaded = await uploadMediaToStorage(target, file, {
@@ -802,16 +814,27 @@ export function CommandCenter({
         storageBucket: target.bucket,
         storagePath: uploaded.path,
       };
+      uploadedStorageTarget = target;
     } else {
       metadata = { ...baseMetadata, storageAdapter: "local-dev" };
     }
 
+    let previousStorageTarget: MediaStorageTarget | null = null;
     const applyUploadToLatest = (latestSubmission: Submission) => {
       const latestPrepared = ensureApplicantMediaSlot(
         latestSubmission,
         applicantId,
         fileType,
       );
+      previousStorageTarget =
+        latestPrepared.file.storageAdapter === "supabase-private" &&
+        latestPrepared.file.storageBucket === mediaStorageBucket &&
+        latestPrepared.file.storagePath
+          ? {
+              bucket: mediaStorageBucket,
+              path: latestPrepared.file.storagePath,
+            }
+          : null;
       const uploadedSubmission = uploadRequiredFile(
         latestPrepared.submission,
         latestPrepared.file.id,
@@ -841,14 +864,32 @@ export function CommandCenter({
       };
     };
 
-    const nextSubmission = onSubmissionUpdate
-      ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
-      : applyUploadToLatest(submission);
-    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({
-      ...current,
-      [nextSubmission.id]: nextSubmission,
-    }));
+    const nextSubmission = await commitUploadedMedia({
+      confirmPersisted: uploadedStorageTarget
+        ? () =>
+            readMediaPersistenceState({
+              applicantId,
+              mediaType: storageMediaType,
+              submissionId: submission.id,
+              target: uploadedStorageTarget,
+            })
+        : undefined,
+      persist: async () => {
+        const persistedSubmission = onSubmissionUpdate
+          ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
+          : applyUploadToLatest(submission);
+        if (!onSubmissionUpdate) {
+          await onSubmissionsChange?.([persistedSubmission]);
+        }
+        setCanonicalOverrides((current) => ({
+          ...current,
+          [persistedSubmission.id]: persistedSubmission,
+        }));
+        return persistedSubmission;
+      },
+      previousTarget: () => previousStorageTarget,
+      uploadedTarget: uploadedStorageTarget,
+    });
     return nextSubmission;
   };
 
@@ -1205,6 +1246,7 @@ export function CommandCenter({
                     <AgentReturnPackagesPanel enabled={usesSupabase} />
                     <ApplicantsScreen
                       focusRequest={submissionFocusRequest}
+                      onDeleteSubmission={onDeleteSubmission}
                       onOpenDrawer={handleRowClick}
                       onOpenQuestionnaire={handleOpenQuestionnaire}
                       onOpenWorkspaceTarget={handleOpenWorkspaceTarget}

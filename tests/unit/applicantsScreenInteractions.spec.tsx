@@ -6,6 +6,7 @@ import {
   within,
   waitFor,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApplicantsScreen } from "../../src/components/ApplicantsScreen";
@@ -346,7 +347,7 @@ describe("ApplicantsScreen interactions", () => {
     expect(header?.querySelector("small")).toHaveTextContent("2");
     expect(header).not.toHaveTextContent("Сначала новые");
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск по подачам" }), {
       target: { value: "VF-731" },
     });
 
@@ -401,7 +402,7 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск по подачам" }), {
       target: { value: "VF-731" },
     });
 
@@ -612,7 +613,7 @@ describe("ApplicantsScreen interactions", () => {
     ).toBe(true);
   });
 
-  it("resubmits an accepted legacy package without reopening completed intake gates", async () => {
+  it("keeps export-ready resubmission fail-closed when canonical intake data drifts", () => {
     const ready = readySubmission("single");
     const acceptedLegacy: Submission = {
       ...ready,
@@ -632,9 +633,9 @@ describe("ApplicantsScreen interactions", () => {
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
-    expect(
-      canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok,
-    ).toBe(true);
+    expect(canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok).toBe(
+      false,
+    );
 
     render(
       <ApplicantsScreen
@@ -645,20 +646,23 @@ describe("ApplicantsScreen interactions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
-    await waitFor(() =>
-      expect(onSubmitForReview).toHaveBeenCalledWith(acceptedLegacy.id),
-    );
+    expect(
+      screen.queryByRole("button", { name: /Отправить на проверку:/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Отправить на проверку администратору?",
+      }),
+    ).not.toBeInTheDocument();
+    expect(onSubmitForReview).not.toHaveBeenCalled();
     expect(onOpenDrawer).not.toHaveBeenCalled();
 
-    const transition = applyAgentSubmitForReviewResult(
-      acceptedLegacy,
-      acceptedLegacy.agentId,
-    );
-    expect(transition.ok).toBe(true);
-    if (!transition.ok) return;
-    expect(transition.data.status).toBe("submitted_for_review");
+    expect(
+      applyAgentSubmitForReviewResult(acceptedLegacy, acceptedLegacy.agentId),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "VALIDATION_ERROR" },
+    });
   });
 
   it("opens an export-ready package from its visible status action", () => {
@@ -752,7 +756,7 @@ describe("ApplicantsScreen interactions", () => {
       }),
     );
     fireEvent.click(screen.getByRole("option", { name: "Сначала старые" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Поиск по подачам" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Поиск по подачам" }), {
       target: { value: "нет такой подачи" },
     });
     expect(screen.getByRole("status")).toHaveTextContent("Ничего не найдено");
@@ -776,5 +780,118 @@ describe("ApplicantsScreen interactions", () => {
     expect(scrolledElements).toContain(
       document.querySelector(`[data-submission-id="${focused.id}"]`),
     );
+  });
+
+  it("offers card deletion only before the submission is handed to review", () => {
+    const draft = createSubmission("single");
+    const returned = {
+      ...createSubmission("single"),
+      status: "returned" as const,
+    };
+    const submitted = {
+      ...createSubmission("single"),
+      status: "submitted_for_review" as const,
+    };
+    render(
+      <ApplicantsScreen
+        onDeleteSubmission={vi.fn().mockResolvedValue(undefined)}
+        onOpenDrawer={vi.fn()}
+        submissions={[draft, returned, submitted]}
+        typeFilter="single"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: `Удалить карточку подачи: ${draft.applicants[0]!.fullName}`,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /Удалить карточку подачи:/ }),
+    ).toHaveLength(1);
+  });
+
+  it("confirms an audited Supabase card archive without opening the drawer", async () => {
+    const draft = createSubmission("single");
+    const onDeleteSubmission = vi.fn().mockResolvedValue(undefined);
+    const onOpenDrawer = vi.fn();
+    render(
+      <StrictMode>
+        <ApplicantsScreen
+          onDeleteSubmission={onDeleteSubmission}
+          onOpenDrawer={onOpenDrawer}
+          submissions={[draft]}
+          typeFilter="single"
+        />
+      </StrictMode>,
+    );
+
+    const deleteButton = screen.getByRole("button", {
+      name: `Удалить карточку подачи: ${draft.applicants[0]!.fullName}`,
+    });
+    fireEvent.click(deleteButton);
+
+    expect(onOpenDrawer).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("dialog", {
+      name: `Удалить карточку «${draft.applicants[0]!.fullName}»?`,
+    });
+    expect(dialog).toHaveTextContent("Данные и файлы останутся в Supabase для аудита.");
+    const cancelButton = within(dialog).getByRole("button", { name: "Отмена" });
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    expect(cancelButton).toHaveFocus();
+
+    fireEvent.click(cancelButton);
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    const restoredDeleteButton = screen.getByRole("button", {
+      name: `Удалить карточку подачи: ${draft.applicants[0]!.fullName}`,
+    });
+    expect(restoredDeleteButton).toHaveFocus();
+
+    fireEvent.click(restoredDeleteButton);
+    const reopenedDialog = screen.getByRole("dialog", {
+      name: `Удалить карточку «${draft.applicants[0]!.fullName}»?`,
+    });
+    fireEvent.click(
+      within(reopenedDialog).getByRole("button", { name: "Удалить карточку" }),
+    );
+    await waitFor(() => expect(onDeleteSubmission).toHaveBeenCalledWith(draft.id));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", {
+          name: `Удалить карточку «${draft.applicants[0]!.fullName}»?`,
+        }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("keeps a failed card archive visible and retryable", async () => {
+    const draft = createSubmission("single");
+    const onDeleteSubmission = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Supabase временно недоступен"))
+      .mockResolvedValueOnce(undefined);
+    render(
+      <ApplicantsScreen
+        onDeleteSubmission={onDeleteSubmission}
+        onOpenDrawer={vi.fn()}
+        submissions={[draft]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Удалить карточку подачи:/ }));
+    const dialog = screen.getByRole("dialog", {
+      name: `Удалить карточку «${draft.applicants[0]!.fullName}»?`,
+    });
+    const confirm = within(dialog).getByRole("button", {
+      name: "Удалить карточку",
+    });
+    fireEvent.click(confirm);
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Supabase временно недоступен",
+    );
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onDeleteSubmission).toHaveBeenCalledTimes(2));
   });
 });

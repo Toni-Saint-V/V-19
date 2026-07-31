@@ -1,7 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { adminDocumentPackageExportEnabled } from "../../src/modules/submissions/adminExportActions";
 import type { SignOutCurrentSessionResult } from "../../src/services/authService";
 import type { AccessRequest } from "../../src/shared/authContract";
+
+const releaseT9Test = adminDocumentPackageExportEnabled ? test : test.skip;
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -236,6 +239,20 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
             }
           >
             Accept submission
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              capture(
+                bridge.onSubmissionAction?.({
+                  action: "mark_exported",
+                  source: "admin",
+                  submissionId: "submission-1",
+                }),
+              )
+            }
+          >
+            Mark exported through generic action
           </button>
           <button
             type="button"
@@ -979,7 +996,38 @@ describe("App production workspace runtime", () => {
     );
   });
 
-  test("fences a deferred admin A export before admin B terminal RPC and bridge", async () => {
+  test("keeps generic mark_exported outside the document package callback", async () => {
+    const externalAction = vi.fn(async () => undefined);
+    render(<App bridge={{ onSubmissionAction: externalAction }} />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        caseRevisionsBySubmissionId: new Map([["submission-1", 1]]),
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Mark exported through generic action",
+      }),
+    );
+    await act(async () => runtime.lastMutationPromise);
+
+    expect(runtime.actionActorId).toBe("");
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).not.toHaveBeenCalled();
+    expect(externalAction).not.toHaveBeenCalled();
+    expect(runtime.lastMutationError?.message).toContain(
+      "Export completion requires the document package callback.",
+    );
+  });
+
+  releaseT9Test("fences a deferred admin A export before admin B terminal RPC and bridge", async () => {
     const externalExport = vi.fn(async () => undefined);
     render(<App bridge={{ onExportPackages: externalExport }} />);
     await screen.findByText("Загрузка данных Supabase...");
@@ -1037,7 +1085,7 @@ describe("App production workspace runtime", () => {
     expect(externalExport).not.toHaveBeenCalled();
   });
 
-  test("does not roll back or bridge an export committed while admin A logs out", async () => {
+  releaseT9Test("does not roll back or bridge an export committed while admin A logs out", async () => {
     const terminalCommit = deferred<{
       batch: { id: string };
       commit: { duplicate: boolean };
@@ -1208,7 +1256,7 @@ describe("App production workspace runtime", () => {
     expect(runtime.lastMutationError?.message).toBe("Supabase mutation failed safely");
   });
 
-  test("persists file_downloaded before the atomic export RPC and refreshes canonical state without a terminal draft save", async () => {
+  releaseT9Test("persists file_downloaded before the atomic export RPC and refreshes canonical state without a terminal draft save", async () => {
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
     );
@@ -1254,7 +1302,7 @@ describe("App production workspace runtime", () => {
     expect(firstPersistenceOrder).toBeLessThan(rpcOrder ?? 0);
   });
 
-  test("resumes terminal export from a canonical file_downloaded checkpoint", async () => {
+  releaseT9Test("resumes terminal export from a canonical file_downloaded checkpoint", async () => {
     runtime.loadPromise = Promise.resolve({
       caseRevisionsBySubmissionId: new Map([["submission-1", 4]]),
       ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
@@ -1282,7 +1330,7 @@ describe("App production workspace runtime", () => {
     expect(runtime.lastMutationError).toBeNull();
   });
 
-  test("fails closed before persistence when a canonical refresh makes the prepared ZIP identity stale", async () => {
+  releaseT9Test("fails closed before persistence when a canonical refresh makes the prepared ZIP identity stale", async () => {
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
     );
@@ -1330,7 +1378,7 @@ describe("App production workspace runtime", () => {
     );
   });
 
-  test("fails closed when canonical questionnaire data changes outside the Excel identity", async () => {
+  releaseT9Test("fails closed when canonical questionnaire data changes outside the Excel identity", async () => {
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
     );
@@ -1378,7 +1426,7 @@ describe("App production workspace runtime", () => {
     );
   });
 
-  test("restores a retryable export state only when canonical reconciliation proves the RPC did not commit", async () => {
+  releaseT9Test("restores a retryable export state only when canonical reconciliation proves the RPC did not commit", async () => {
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
     );
@@ -1427,7 +1475,7 @@ describe("App production workspace runtime", () => {
     );
   });
 
-  test("pins rollback to the checkpoint revision and preserves a refreshed canonical payload", async () => {
+  releaseT9Test("pins rollback to the checkpoint revision and preserves a refreshed canonical payload", async () => {
     const terminalCommit = deferred<never>();
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
@@ -1480,7 +1528,7 @@ describe("App production workspace runtime", () => {
     ).toEqual(new Map([["submission-1", 2]]));
   });
 
-  test("keeps committed export state when the atomic RPC response is lost", async () => {
+  releaseT9Test("keeps committed export state when the atomic RPC response is lost", async () => {
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
     );
@@ -1522,7 +1570,7 @@ describe("App production workspace runtime", () => {
     expect(exportMocks.reconcileExportPackageCompletion).toHaveBeenCalledTimes(1);
   });
 
-  test("does not roll back an export whose canonical RPC outcome remains unknown", async () => {
+  releaseT9Test("does not roll back an export whose canonical RPC outcome remains unknown", async () => {
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
     );

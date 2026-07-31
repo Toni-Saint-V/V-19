@@ -24,6 +24,7 @@ type ReviewPassportFieldRowProps = {
     applicant?: string,
     fileType?: SubmissionFileType,
     applicantId?: string,
+    fieldLabel?: string,
   ) => void;
 };
 
@@ -70,8 +71,15 @@ export function ReviewPassportFieldRow({
           aria-label={`Добавить замечание: ${field.label}`}
           className="v19-admin-passport-field-remark v19-review-field-remark"
           onClick={() =>
-            onAddRemark(field.sourceLabel, applicant?.fullName, undefined, applicant?.id)
+            onAddRemark(
+              field.id,
+              applicant?.fullName,
+              undefined,
+              applicant?.id,
+              field.label,
+            )
           }
+          title={`Добавить замечание: ${field.label}`}
           type="button"
         >
           <MessageSquarePlus aria-hidden="true" />

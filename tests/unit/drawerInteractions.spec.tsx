@@ -558,6 +558,37 @@ describe("Drawer interactions", () => {
     expect(screen.getByText("Исправлено, ждёт проверки")).toBeInTheDocument();
   });
 
+  test("shows a canonical field target as a human questionnaire label", () => {
+    const source = returnedSubmission();
+    const applicant = source.applicants[0];
+    const sourceIssue = source.issues[0];
+    if (!applicant || !sourceIssue) {
+      throw new Error("Expected applicant and issue fixture.");
+    }
+    const submission: Submission = {
+      ...source,
+      issues: [
+        {
+          ...sourceIssue,
+          target: {
+            ...sourceIssue.target,
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "passport-expiry-date",
+            fileType: undefined,
+            section: "Паспорт",
+          },
+          type: "field",
+        },
+      ],
+    };
+
+    renderDrawer({ activeTab: "issues", submission });
+
+    expect(screen.getByText(/Действителен до/)).toBeInTheDocument();
+    expect(screen.queryByText(/passport-expiry-date/)).not.toBeInTheDocument();
+  });
+
   test("keeps submission B pending when submission A settles after the drawer switches", async () => {
     const actionA = deferred<void>();
     const actionB = deferred<void>();

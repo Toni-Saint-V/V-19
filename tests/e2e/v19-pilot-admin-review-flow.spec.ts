@@ -1,4 +1,7 @@
+import { mkdirSync } from "node:fs";
+
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
+import { testRunArtifactPath } from "../support/artifacts";
 import {
   clearExportSelection,
   clickWorkspaceButton,
@@ -111,12 +114,22 @@ async function verifyRemarkSubmitActionability(
   if (viewport.width >= 768) {
     await clickWorkspaceButton(page, /Проверка|Работа|Очередь/);
   }
-  await expectBodyMatches(page, [/Нина Волкова|ПД-1053|Проверка|Очередь/i]);
+  const returnTarget =
+    viewport.width >= 768
+      ? {
+          cardName: /Ручная проверка заявки Елена Смирнова/,
+          open: /Елена Смирнова|ПД-1055/,
+        }
+      : {
+          cardName: /Ручная проверка заявки Нина Волкова/,
+          open: /Нина Волкова|ПД-1053/,
+        };
+  await expectBodyMatches(page, [returnTarget.open, /Проверка|Очередь/i]);
 
-  await openAdminSubmission(page, /Нина Волкова|ПД-1053|Смирнов|Петров|Волков/i);
+  await openAdminSubmission(page, returnTarget.open);
   const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
   const addRemarkButton = reviewWorkspace.getByRole("button", {
-    name: "Добавить замечание: Номер паспорта",
+    name: "Добавить замечание: Срок действия",
   });
   await expect(addRemarkButton).toBeVisible();
   await addRemarkButton.click();
@@ -127,6 +140,10 @@ async function verifyRemarkSubmitActionability(
     .last();
   await expect(remarkDialog).toBeVisible();
   await expectWithinViewport(page, remarkDialog);
+  await expect(remarkDialog.getByLabel("Текст для клиента")).toHaveValue(
+    "Проверьте «Срок действия».",
+  );
+  await expect(remarkDialog).not.toContainText("passport-expiry-date");
 
   const submitRemarkButton = remarkDialog
     .locator('[data-testid="remark-form-submit"]')
@@ -150,6 +167,38 @@ async function verifyRemarkSubmitActionability(
   await expect(
     reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
   ).toContainText(/Замечания\s+1/);
+
+  const returnForCorrection = reviewWorkspace.getByRole("button", {
+    name: "Отправить на исправление",
+  });
+  await expect(returnForCorrection).toBeEnabled();
+  await returnForCorrection.click();
+  await expect(
+    reviewWorkspace.getByText("Возврат на исправление сохранён."),
+  ).toBeVisible();
+  await expect(reviewWorkspace.getByText("Просмотр без изменений")).toBeVisible();
+  const returnReadbackRoot = testRunArtifactPath("admin-return-readback");
+  mkdirSync(returnReadbackRoot, { recursive: true });
+  await page.screenshot({
+    fullPage: true,
+    path: `${returnReadbackRoot}/${evidenceLabel}-workspace.png`,
+  });
+
+  await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Очередь на проверку" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Очередь на проверку" }),
+  ).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: `${returnReadbackRoot}/${evidenceLabel}.png`,
+  });
+  await expect(page.getByRole("button", { name: returnTarget.cardName })).toHaveCount(
+    0,
+  );
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
     [],
@@ -179,6 +228,13 @@ async function verifyEveryAdminDrawerSubview(
   await openAdminSubmission(page, /Нина Волкова|ПД-1053/);
 
   const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
+  await expect(reviewWorkspace).toBeVisible();
+  await expectWithinViewport(page, reviewWorkspace);
+  const mediaStage = reviewWorkspace.locator(".v19-review-media-stage");
+  await expect(mediaStage).toBeVisible();
+  const mediaStageBox = await mediaStage.boundingBox();
+  expect(mediaStageBox, "Passport media stage must have a measurable box.").not.toBeNull();
+  expect(mediaStageBox!.height).toBeGreaterThanOrEqual(400);
   const mediaTablist = reviewWorkspace.getByRole("tablist", {
     name: "Выбор файла для проверки",
   });
@@ -200,16 +256,19 @@ async function verifyEveryAdminDrawerSubview(
   await expect(passportTab).toHaveAttribute("aria-selected", "true");
   await expect(passportTab).toBeFocused();
 
+  const screenshotRoot = testRunArtifactPath("admin-review-workspace");
+  mkdirSync(screenshotRoot, { recursive: true });
   for (const [id, label] of mediaTabs) {
     const tab = mediaTablist.getByRole("tab", { name: label, exact: true });
+    await expectWithinViewport(page, tab);
     await tab.click();
     await expect(tab).toHaveAttribute("aria-selected", "true");
     await expect(reviewWorkspace.getByRole("tabpanel")).toBeVisible();
     await expect
       .poll(() =>
-        reviewWorkspace.locator(
-          ".v19-review-preview-state.is-unavailable:visible",
-        ).count(),
+        reviewWorkspace
+          .locator(".v19-review-preview-state.is-unavailable:visible")
+          .count(),
       )
       .toBeGreaterThan(0);
 
@@ -223,14 +282,18 @@ async function verifyEveryAdminDrawerSubview(
       }),
     ).toBe(true);
 
-    const screenshotPath = testInfo.outputPath(
-      `admin-review-workspace-${viewport.width}-${id}.png`,
+    const screenshotPath = testRunArtifactPath(
+      "admin-review-workspace",
+      `admin-review-workspace-${viewport.width}x${viewport.height}-${id}.png`,
     );
     await page.screenshot({ path: screenshotPath });
-    await testInfo.attach(`admin-review-workspace-${viewport.width}-${id}`, {
-      contentType: "image/png",
-      path: screenshotPath,
-    });
+    await testInfo.attach(
+      `admin-review-workspace-${viewport.width}x${viewport.height}-${id}`,
+      {
+        contentType: "image/png",
+        path: screenshotPath,
+      },
+    );
   }
 
   expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
@@ -247,24 +310,28 @@ test.describe("V-19 pilot admin review click flow", () => {
       {
         fileName: "review",
         heading: "Очередь на проверку",
+        headingLevel: 1,
         nav: /^Проверка$/,
         readyText: "Очередь проверки",
       },
       {
         fileName: "export",
         heading: "Центр выгрузки",
+        headingLevel: 1,
         nav: /^Выгрузка$/,
         readyText: "Пакеты к выгрузке",
       },
       {
         fileName: "users",
-        heading: "Управление пользователями",
+        heading: "Пользователи и заявки",
+        headingLevel: 2,
         nav: /^Пользователи$/,
-        readyText: "Пользователи и заявки",
+        readyText: "Заявки на доступ",
       },
       {
         fileName: "settings",
         heading: "Системные настройки",
+        headingLevel: 1,
         nav: /^Настройки$/,
         readyText: "Ощущение интерфейса",
       },
@@ -283,7 +350,10 @@ test.describe("V-19 pilot admin review click flow", () => {
       for (const screen of screens) {
         await clickWorkspaceButton(page, screen.nav);
         await expect(
-          page.getByRole("heading", { level: 1, name: screen.heading }),
+          page.getByRole("heading", {
+            level: screen.headingLevel,
+            name: screen.heading,
+          }),
         ).toBeVisible();
         await expect(
           page.getByText(screen.readyText, { exact: true }).first(),
@@ -337,9 +407,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       await compactDensity.click();
       await expect(compactDensity).toHaveAttribute("aria-checked", "true");
       await expect
-        .poll(() =>
-          page.evaluate(() => document.documentElement.dataset.v19Density),
-        )
+        .poll(() => page.evaluate(() => document.documentElement.dataset.v19Density))
         .toBe("compact");
 
       await page.reload();
@@ -380,7 +448,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     ).toEqual([]);
   });
 
-  test("admin passport reconciliation stays blocked without protected evidence", async ({
+  test("admin passport reconciliation rejects an unusable original and stays blocked on incomplete fields", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
@@ -397,11 +465,11 @@ test.describe("V-19 pilot admin review click flow", () => {
     await reviewAction.click();
     const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
     await expect(reviewWorkspace).toBeVisible();
-    await expect(reviewWorkspace.getByText("Паспортная секция")).toBeVisible();
     await expect(
-      reviewWorkspace
-        .getByText(/Защищённый оригинал недоступен|Файл не загружен/)
-        .first(),
+      reviewWorkspace.getByRole("heading", { name: "Данные паспорта" }),
+    ).toBeVisible();
+    await expect(
+      reviewWorkspace.getByRole("alert").getByText("Оригинал нельзя принять"),
     ).toBeVisible();
     await expect(
       reviewWorkspace.getByRole("button", {
@@ -422,9 +490,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       }),
     ).toBe(true);
 
-    await reviewWorkspace
-      .getByRole("button", { name: "Вернуться к очереди" })
-      .click();
+    await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
     await expect(reviewWorkspace).toBeHidden();
     await expect(
       page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
@@ -447,6 +513,14 @@ test.describe("V-19 pilot admin review click flow", () => {
       height: 844,
       width: 390,
     });
+    await verifyEveryAdminDrawerSubview(page, testInfo, {
+      height: 900,
+      width: 768,
+    });
+    await verifyEveryAdminDrawerSubview(page, testInfo, {
+      height: 800,
+      width: 360,
+    });
   });
 
   for (const [label, viewport] of [
@@ -459,6 +533,76 @@ test.describe("V-19 pilot admin review click flow", () => {
       await verifyRemarkSubmitActionability(page, testInfo, label, viewport);
     });
   }
+
+  test("admin closes corrected issues and accepts the package for export", async ({
+    page,
+  }) => {
+    const browserProblems = collectBrowserProblems(page);
+
+    await openFreshWorkspace(page, {
+      heading: "Очередь на проверку",
+      workspaceEmail: "admin@visaflow.local",
+    });
+    await openAdminSubmission(page, /Смирновы|ПД-1055/);
+
+    const reviewWorkspace = page.getByRole("dialog", {
+      name: "Сверка паспорта",
+    });
+    const correctedIssues = reviewWorkspace.getByRole("region", {
+      name: "Исправления к закрытию",
+    });
+    await expect(correctedIssues).toBeVisible();
+    await expect(correctedIssues).toContainText("Адрес отеля был неполным");
+    const acceptButton = reviewWorkspace.getByRole("button", {
+      name: "Закрыть исправления и принять",
+    });
+
+    const applicantSelect = reviewWorkspace.getByRole("combobox", {
+      name: "Заявитель для проверки",
+    });
+    for (const mediaTab of await reviewWorkspace
+      .getByRole("tablist", { name: "Выбор файла для проверки" })
+      .getByRole("tab")
+      .all()) {
+      await mediaTab.click();
+    }
+    await expect(
+      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
+    ).toContainText(/Оригиналы\s+3\/3/);
+    await reviewWorkspace
+      .getByRole("button", { name: "Подтвердить паспортную секцию" })
+      .click();
+
+    await applicantSelect.selectOption({ label: "Алексей Смирнов" });
+    await expect(
+      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
+    ).toContainText(/Оригиналы\s+1\/1/);
+    await reviewWorkspace
+      .getByRole("button", { name: "Подтвердить паспортную секцию" })
+      .click();
+
+    await expect(acceptButton).toBeEnabled();
+    await acceptButton.click();
+    await expect(
+      reviewWorkspace.getByText("Подача принята и сохранена."),
+    ).toBeVisible();
+    await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
+    ).toBeVisible();
+    await clickWorkspaceButton(page, /Выгрузка/);
+    await expect(page.getByTestId("admin-export-row-ПД-1055")).toBeVisible();
+
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
+  });
 
   test("admin export surface selects a ready package and prepares Excel", async ({
     page,
@@ -505,7 +649,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     }
 
     await expectBodyMatches(page, [
-      /Excel готов|Сформировать ZIP с Excel|Можно сформировать/i,
+      /Excel готов|Excel сформирован/i,
     ]);
 
     expect(

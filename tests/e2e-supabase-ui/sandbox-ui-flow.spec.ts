@@ -190,7 +190,9 @@ async function createAndSubmitSubmission(
   for (const baseline of surnameReadbacks) {
     await applicantTabs.nth(baseline.applicantIndex).click();
     await questionnaire
-      .locator(".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab")
+      .locator(
+        ".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab",
+      )
       .filter({ hasText: "Личные данные" })
       .click();
     const value = await questionnaire
@@ -202,9 +204,7 @@ async function createAndSubmitSubmission(
       value,
     });
   }
-  const interactionMarkerSha256 = createHash("sha256")
-    .update(runId)
-    .digest("hex");
+  const interactionMarkerSha256 = createHash("sha256").update(runId).digest("hex");
   const interactionEvidence: AgentInteractionEvidenceRecord = {
     assertions: {
       "network-readback": {
@@ -217,8 +217,10 @@ async function createAndSubmitSubmission(
       },
     },
     expectedEffect: {
-      description: "Persist current progress exactly once and return to My submissions.",
-      detail: "Save & Exit closed the questionnaire and the canonical reopen matched exact surname values.",
+      description:
+        "Persist current progress exactly once and return to My submissions.",
+      detail:
+        "Save & Exit closed the questionnaire and the canonical reopen matched exact surname values.",
       passed: true,
     },
     execution: {
@@ -231,14 +233,13 @@ async function createAndSubmitSubmission(
       submissionStatuses: ["draft"],
       synthetic: {
         actor: { id: `synthetic-agent:${runId}`, role: "agent" },
-        entities:
-          V19_AGENT_INTERACTION_CONTRACTS[
-            "questionnaire.save-exit"
-          ].writeScope.requiredCheckedTargets.map((target) => ({
-            id: target === "submissions" ? submissionId : `${submissionId}:${target}`,
-            ownerActorId: `synthetic-agent:${runId}`,
-            target,
-          })),
+        entities: V19_AGENT_INTERACTION_CONTRACTS[
+          "questionnaire.save-exit"
+        ].writeScope.requiredCheckedTargets.map((target) => ({
+          id: target === "submissions" ? submissionId : `${submissionId}:${target}`,
+          ownerActorId: `synthetic-agent:${runId}`,
+          target,
+        })),
         markerSha256: interactionMarkerSha256,
         operationId: `operation:${runId}:${type}:questionnaire.save-exit`,
         primaryEntityId: `${submissionId}:questionnaire_answers`,
@@ -261,29 +262,26 @@ async function createAndSubmitSubmission(
         checkedTargets:
           V19_AGENT_INTERACTION_CONTRACTS["questionnaire.save-exit"].writeScope
             .requiredCheckedTargets,
-        targetSnapshots:
-          V19_AGENT_INTERACTION_CONTRACTS[
-            "questionnaire.save-exit"
-          ].writeScope.requiredCheckedTargets.map((target) => {
-            const beforeSha256 = createHash("sha256")
-              .update(`${runId}:${type}:${submissionId}:${target}:before`)
-              .digest("hex");
-            return {
-              afterSha256:
-                target === "questionnaire_answers"
-                  ? createHash("sha256")
-                      .update(`${runId}:${type}:${submissionId}:${target}:after`)
-                      .digest("hex")
-                  : beforeSha256,
-              beforeSha256,
-              entityIds: [
-                target === "submissions"
-                  ? submissionId
-                  : `${submissionId}:${target}`,
-              ],
-              target,
-            };
-          }),
+        targetSnapshots: V19_AGENT_INTERACTION_CONTRACTS[
+          "questionnaire.save-exit"
+        ].writeScope.requiredCheckedTargets.map((target) => {
+          const beforeSha256 = createHash("sha256")
+            .update(`${runId}:${type}:${submissionId}:${target}:before`)
+            .digest("hex");
+          return {
+            afterSha256:
+              target === "questionnaire_answers"
+                ? createHash("sha256")
+                    .update(`${runId}:${type}:${submissionId}:${target}:after`)
+                    .digest("hex")
+                : beforeSha256,
+            beforeSha256,
+            entityIds: [
+              target === "submissions" ? submissionId : `${submissionId}:${target}`,
+            ],
+            target,
+          };
+        }),
       },
     },
     network: {
@@ -307,11 +305,9 @@ async function createAndSubmitSubmission(
     testCase: testInfo.titlePath.join(" > "),
   };
   expect(
-    auditAgentInteractionEvidence(
-      [interactionEvidence],
-      ["questionnaire.save-exit"],
-      { statusFixtureCoverage: "provided-records" },
-    ),
+    auditAgentInteractionEvidence([interactionEvidence], ["questionnaire.save-exit"], {
+      statusFixtureCoverage: "provided-records",
+    }),
   ).toEqual([]);
   await questionnaire.getByRole("button", { name: "Назад" }).click();
   await expect(questionnaire).toHaveCount(0);
@@ -339,9 +335,7 @@ async function createAndSubmitSubmission(
     submissionId,
     testInfo,
   });
-  await clickAndWaitForSupabaseWrite(page, () =>
-    submitForReview.click(),
-  );
+  await clickAndWaitForSupabaseWrite(page, () => submitForReview.click());
   await clickWorkspaceButton(page, /Мои подачи/);
   await openSubmissionById(page, submissionId);
 
@@ -1004,7 +998,9 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     expect(browserProblems()).toEqual([]);
   });
 
-  test("admin opens return packages without sandbox writes", async ({ page }, testInfo) => {
+  test("admin opens return packages without sandbox writes", async ({
+    page,
+  }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
     const mutations = collectSupabaseMutations(page);
     const viewportWidth = page.viewportSize()?.width ?? 0;
@@ -1538,7 +1534,7 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     expect(browserProblems()).toEqual([]);
   });
 
-  test("admin accepts the corrected submission and downloads its export package through the UI", async ({
+  test("admin accepts the corrected submission and completes Excel plus ZIP export", async ({
     page,
   }, testInfo) => {
     test.skip(
@@ -1591,18 +1587,29 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
       testInfo,
     });
     await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    const prepareZipButton = page.getByRole("button", {
+    const downloadLink = page.getByRole("link", { name: "Скачать Excel" });
+    await expect(downloadLink).toBeVisible({ timeout: 120_000 });
+    const zipButton = page.getByRole("button", {
       name: "Сформировать ZIP с Excel",
     });
-    await expect(prepareZipButton).toBeEnabled();
-    await prepareZipButton.click();
-    const downloadLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(downloadLink).toBeVisible({ timeout: 120_000 });
+    await expect(zipButton).toBeEnabled();
+    await zipButton.click();
+    const zipLink = page.getByRole("link", { name: "Скачать ZIP" });
+    await expect(zipLink).toBeVisible();
+    const zipDownloadPromise = page.waitForEvent("download");
+    await zipLink.click();
+    const zipDownload = await zipDownloadPromise;
+    await expect(zipDownload.failure()).resolves.toBeNull();
+    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+    await expect(page.locator("#export-action-hint")).toContainText(
+      "Скачивание подтверждено, пакет зафиксирован",
+    );
     await captureUiEvidence({
-      description: "Excel сформирован через UI; ZIP download CTA доступен.",
+      description:
+        "Excel и ZIP сформированы через UI; browser download подтверждён и terminal package commit завершён.",
       page,
       role: "admin",
-      step: "07-export-ready-to-download",
+      step: "07-excel-ready-to-download",
       submissionId: singleSubmissionId,
       testInfo,
     });
@@ -1610,17 +1617,16 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     await downloadLink.click();
     const download = await downloadPromise;
     await expect(download.failure()).resolves.toBeNull();
-    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+/);
-    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
     await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание подтверждено, пакет зафиксирован",
+      "Скачивание Excel начато:",
     );
     await captureUiEvidence({
       description:
-        "ZIP download инициирован реальным кликом и завершился без browser download failure.",
+        "Excel download инициирован реальным кликом; статус подачи не переводится в exported.",
       page,
       role: "admin",
-      step: "07-export-downloaded",
+      step: "07-excel-downloaded",
       submissionId: singleSubmissionId,
       testInfo,
     });
@@ -1692,9 +1698,7 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     await expect(received).toBeVisible();
     await expect(received).toContainText("PDF-список");
     await expect(received).toContainText("Готовая анкета");
-    const downloadButton = received
-      .getByRole("button", { name: /^Скачать /u })
-      .first();
+    const downloadButton = received.getByRole("button", { name: /^Скачать /u }).first();
     const downloadPromise = page.waitForEvent("download");
     await downloadButton.click();
     const returnedPdf = await downloadPromise;

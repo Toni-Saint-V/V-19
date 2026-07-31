@@ -48,10 +48,16 @@ import {
   fileCompletenessPercent,
   isPersistablePrivateFileAssetAtSubmissionTarget,
 } from "./fileAsset";
+import {
+  isSubmissionMediaIssueResolved,
+  resolveAdminIssueTarget,
+  submissionIssueTargetSnapshot,
+} from "./adminIssueTargetContract";
 import { normalizeCollectionDocuments } from "./documentCollectionIntake";
 import type {
-  City,
   AgentOwnerId,
+  ApplicantRole,
+  City,
   CommandResult,
   ExportState,
   Issue,
@@ -72,11 +78,13 @@ let supabaseDraftSequence = 0;
 
 export type CreateDraftInput = {
   agentId?: AgentOwnerId;
+  applicantRoles?: ApplicantRole[];
   city: City;
   applicantNames?: string[];
   familyCount: number;
   idScheme?: "local" | "supabase";
   preliminaryIntake?: PreliminaryIntakeDraft;
+  reservedSubmissionIds?: readonly Submission["id"][];
   submissions: Submission[];
   type: Submission["type"];
 };
@@ -512,27 +520,35 @@ export function generatedCockpitMediaFileName({
 export function createDraftSubmission({
   agentId = defaultLocalAgentOwnerId,
   applicantNames = [],
+  applicantRoles = [],
   city,
   familyCount,
   idScheme = "local",
   preliminaryIntake,
+  reservedSubmissionIds = [],
   submissions,
   type,
 }: CreateDraftInput): Submission {
   const nowIso = new Date().toISOString();
-  const nextIndex = nextSubmissionIndex(submissions);
+  const nextIndex = nextSubmissionIndex(submissions, reservedSubmissionIds);
   const draftIdToken = draftIdTokenForScheme(nextIndex, idScheme);
   const applicantTotal = type === "family" ? familyCount : 1;
   const submissionId = submissionIdForScheme(draftIdToken, idScheme);
 
   const applicants = Array.from({ length: applicantTotal }, (_, index) => {
     const id = applicantIdForScheme(draftIdToken, index, idScheme);
-    const fullName = draftApplicantName(index, type, applicantNames[index]);
+    const role = draftApplicantRole(index, type, applicantRoles[index]);
+    const fullName = draftApplicantName(
+      index,
+      type,
+      applicantNames[index],
+      role,
+    );
 
     return {
       id,
       fullName,
-      role: draftApplicantRole(index, type),
+      role,
       questionnaireStatus: "empty",
       fileStatus: "empty",
       sections: createQuestionnaireSections(id, fullName, "empty"),
@@ -767,7 +783,8 @@ function syncApplicantNameFromQuestionnaireUpdate(
     .join(" ");
   if (
     !isPlaceholderApplicantName(applicant.fullName) &&
-    applicant.fullName !== previousQuestionnaireName
+    applicant.fullName !== previousQuestionnaireName &&
+    update.reviewSource !== "manual"
   ) {
     return submission;
   }
@@ -775,6 +792,12 @@ function syncApplicantNameFromQuestionnaireUpdate(
   const fields = applicant.sections.flatMap((section) => section.fields);
   const firstName = fields.find((field) => field.id === "first-name")?.value.trim() ?? "";
   const surname = fields.find((field) => field.id === "surname")?.value.trim() ?? "";
+  if (
+    (!firstName || !surname) &&
+    !isPlaceholderApplicantName(applicant.fullName)
+  ) {
+    return submission;
+  }
   const fullName = [firstName, surname].filter(Boolean).join(" ");
   if (!fullName || fullName === applicant.fullName) {
     return submission;
@@ -943,7 +966,10 @@ export function uploadRequiredFile(
   const applicant = submission.applicants.find(
     (item) => item.id === targetFile.applicantId,
   );
-  const issues = markReplacementIssuesPendingAdminReview(submission.issues, targetFile);
+  const issues = markReplacementIssuesPendingAdminReview(
+    { ...submission, files },
+    targetFile,
+  );
 
   return withRecalculatedSubmissionProgress({
     ...submission,
@@ -1003,14 +1029,17 @@ export function ensureApplicantMediaSlot(
 }
 
 function markReplacementIssuesPendingAdminReview(
-  issues: Issue[],
+  submission: Submission,
   targetFile: SubmissionFile,
 ) {
-  return issues.map((issue) => {
+  const uploadedTarget = submission.files.find((file) => file.id === targetFile.id);
+  return submission.issues.map((issue) => {
     if (
+      uploadedTarget &&
       issue.status === "open" &&
       issue.target.applicantId === targetFile.applicantId &&
-      issue.target.fileType === targetFile.type
+      issue.target.fileType === targetFile.type &&
+      isSubmissionMediaIssueResolved(uploadedTarget, issue)
     ) {
       return { ...issue, status: "fixed_by_agent" as const };
     }
@@ -1060,37 +1089,19 @@ export function addPreciseAdminIssue(
 ): Submission {
   if (!canAddAdminIssue(submission, "admin")) return submission;
 
-  const firstApplicant = submission.applicants[0];
-  if (!firstApplicant) return submission;
   const reason = input.reason.trim();
   const comment = input.comment.trim();
   if (!reason || !comment) return submission;
 
-  const hasExplicitIssueTarget = Boolean(input.fileType || input.field);
-  const issueInput = hasExplicitIssueTarget
-    ? input
-    : { ...input, field: "Маршрут поездки" };
-  const applicant = submission.applicants.find(
-    (item) => item.id === issueInput.applicantId,
-  );
-  if (!applicant) return submission;
-
-  const passportReviewMediaType =
-    issueInput.fileType === "passport_scan" ||
-    issueInput.fileType === "selfie" ||
-    issueInput.fileType === "selfie_2"
-      ? issueInput.fileType
-      : undefined;
-  if (
-    passportReviewMediaType &&
-    !requiredPassportReviewMediaTypesForApplicant(
-      submission,
-      applicant.id,
-    ).includes(passportReviewMediaType)
-  ) {
-    return submission;
-  }
-
+  const resolvedTarget = resolveAdminIssueTarget(submission, input);
+  const applicant = resolvedTarget.applicant;
+  const issueInput: IssueInput = {
+    ...input,
+    field: resolvedTarget.kind === "field" ? resolvedTarget.field : undefined,
+    fileType:
+      resolvedTarget.kind === "media" ? resolvedTarget.fileType : undefined,
+    type: resolvedTarget.kind === "field" ? "field" : "file",
+  };
   const newIssue: Issue = {
     id: `зм-${submission.id}-новое-${submission.issues.length + 1}`,
     type: issueInput.type,
@@ -1107,17 +1118,20 @@ export function addPreciseAdminIssue(
     status: "open",
     createdBy: "admin",
     createdAt: "сейчас",
-    snapshot: issueSnapshot(submission, issueInput),
+    snapshot: submissionIssueTargetSnapshot(submission, issueInput),
   };
 
-  const withTargetFlag = newIssue.target.fileType
-    ? markIssueFileForReplacement(submission, newIssue, actorId)
-    : flagQuestionnaireField(
-          submission,
-          applicant.id,
-          newIssue.target.field ?? "Маршрут поездки",
-          newIssue.reason,
-      );
+  let withTargetFlag: Submission;
+  if (resolvedTarget.kind === "media") {
+    withTargetFlag = markIssueFileForReplacement(submission, newIssue, actorId);
+  } else {
+    withTargetFlag = flagQuestionnaireField(
+      submission,
+      applicant.id,
+      resolvedTarget.field,
+      newIssue.reason,
+    );
+  }
 
   return {
     ...withTargetFlag,
@@ -1309,9 +1323,12 @@ export function markSelectedExported(submissions: Submission[], selectedIds: str
   );
 }
 
-function nextSubmissionIndex(submissions: Submission[]) {
-  const indexes = submissions
-    .map((submission) => submissionIndexFromId(submission.id))
+function nextSubmissionIndex(
+  submissions: Submission[],
+  reservedSubmissionIds: readonly Submission["id"][] = [],
+) {
+  const indexes = [...submissions.map((submission) => submission.id), ...reservedSubmissionIds]
+    .map(submissionIndexFromId)
     .filter(Number.isFinite);
   return Math.max(1058, ...indexes) + 1;
 }
@@ -1370,17 +1387,29 @@ function applicantIdForScheme(
     : `з-${draftIdToken}-${applicantIndex + 1}`;
 }
 
-function draftApplicantName(index: number, type: Submission["type"], input?: string) {
+function draftApplicantName(
+  index: number,
+  type: Submission["type"],
+  input?: string,
+  role?: ApplicantRole,
+) {
   const normalized = input?.trim();
   if (normalized) return normalized;
   if (type === "single") return "Новый заявитель";
   if (index === 0) return "Основной заявитель";
-  if (index === 1) return "Супруг";
-  return `Ребёнок ${index - 1}`;
+  if (role === "spouse") return "Супруг";
+  return `Ребёнок ${index}`;
 }
 
-function draftApplicantRole(index: number, type: Submission["type"]) {
+function draftApplicantRole(
+  index: number,
+  type: Submission["type"],
+  requestedRole?: ApplicantRole,
+) {
   if (index === 0) return "main" as const;
+  if (requestedRole === "spouse" || requestedRole === "child") {
+    return requestedRole;
+  }
   if (type === "family" && index === 1) return "spouse" as const;
   return "child" as const;
 }
@@ -1558,19 +1587,6 @@ function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {
     .map(([, file]) => file);
 
   return [...requiredFiles, ...optionalExistingFiles];
-}
-
-function issueSnapshot(submission: Submission, input: IssueInput) {
-  if (input.fileType) {
-    return submission.files.find(
-      (file) => file.applicantId === input.applicantId && file.type === input.fileType,
-    )?.status;
-  }
-
-  const applicant = submission.applicants.find((item) => item.id === input.applicantId);
-  const fields = applicant?.sections.flatMap((section) => section.fields) ?? [];
-  return fields.find((field) => questionnaireFieldMatchesTarget(field, input.field))
-    ?.value;
 }
 
 function markIssueFileForReplacement(

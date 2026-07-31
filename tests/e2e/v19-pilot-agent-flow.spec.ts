@@ -54,9 +54,9 @@ test.describe("V-19 pilot agent click flow", () => {
       page.getByRole("heading", { level: 1, name: "Мои подачи" }),
     ).toBeVisible();
 
-    const newSubmissionButton = page
-      .getByRole("button", { name: "Новая подача" })
-      .first();
+    const newSubmissionButton = page.locator(
+      'button.v19-action-surface-create[aria-label="Новая подача"]',
+    );
 
     await expect(newSubmissionButton).toBeVisible();
     await newSubmissionButton.click();
@@ -83,13 +83,7 @@ test.describe("V-19 pilot agent click flow", () => {
       page.getByRole("heading", { level: 1, name: "Мои подачи" }),
     ).toBeVisible();
 
-    const preferredCard = page.locator('[data-submission-id="ПД-1048"]').first();
-    const anyCard = page
-      .locator("[data-submission-id]")
-      .filter({ hasText: /ПД-|SUB-|Семья|заявител|Испания/i })
-      .first();
-
-    const targetCard = (await isVisible(preferredCard)) ? preferredCard : anyCard;
+    const targetCard = page.getByTestId("agent-submission-card").first();
     await expect(targetCard).toBeVisible();
     await targetCard.click();
 

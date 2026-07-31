@@ -1,4 +1,9 @@
 import { generateAiSuggestions } from "./aiRules";
+import {
+  resolveAdminIssueTarget,
+  type ResolvedAdminIssueTarget,
+} from "./adminIssueTargetContract";
+import { questionnaireFieldMatchesTarget } from "./questionnaire";
 import { fileTypeLabels } from "./status";
 import type { AiSuggestion, Issue, Role, Submission, SubmissionFile } from "./types";
 
@@ -72,15 +77,24 @@ export function acceptAiSuggestionAsIssue(
   if (!canManageAiSuggestions(submission, role)) return submission;
 
   const suggestion = submission.aiSuggestions?.find((item) => item.id === suggestionId);
-  if (
-    !suggestion ||
-    suggestion.status !== "suggested" ||
-    hasMatchingIssue(submission, suggestion)
-  ) {
+  if (!suggestion || suggestion.status !== "suggested") {
     return submission;
   }
 
-  const issue = issueFromSuggestion(submission, suggestion);
+  let resolvedTarget: ResolvedAdminIssueTarget;
+  try {
+    resolvedTarget = resolveAdminIssueTarget(submission, {
+      applicantId: suggestion.target.applicantId,
+      field: suggestion.target.field,
+      fileType: suggestion.target.fileType,
+      type: suggestion.type,
+    });
+  } catch {
+    return submission;
+  }
+
+  const issue = issueFromSuggestion(submission, suggestion, resolvedTarget);
+  if (hasMatchingIssue(submission, issue)) return submission;
   const withTargetFlag = markSuggestionTargetForReplacement(submission, issue);
 
   return {
@@ -139,18 +153,37 @@ export function activeAiSuggestions(submission: Submission) {
   );
 }
 
-function issueFromSuggestion(submission: Submission, suggestion: AiSuggestion): Issue {
+function issueFromSuggestion(
+  submission: Submission,
+  suggestion: AiSuggestion,
+  resolvedTarget: ResolvedAdminIssueTarget,
+): Issue {
+  const target =
+    resolvedTarget.kind === "field"
+      ? {
+          applicantId: resolvedTarget.applicant.id,
+          applicantName: resolvedTarget.applicant.fullName,
+          field: resolvedTarget.field,
+          section: suggestion.target.section,
+        }
+      : {
+          applicantId: resolvedTarget.applicant.id,
+          applicantName: resolvedTarget.applicant.fullName,
+          fileType: resolvedTarget.fileType,
+          section: suggestion.target.section,
+        };
+
   return {
     id: `зм-${submission.id}-бб-${submission.issues.length + 1}`,
-    type: suggestion.type,
-    target: suggestion.target,
+    type: resolvedTarget.kind === "field" ? "field" : "file",
+    target,
     reason: suggestion.title,
     comment: `${suggestion.reason} Рекомендация требует человеческого подтверждения.`,
     severity: suggestion.severity,
     status: "open",
     createdBy: "admin",
     createdAt: "сейчас",
-    snapshot: suggestionSnapshot(submission, suggestion),
+    snapshot: suggestionSnapshot(submission, target),
   };
 }
 
@@ -164,32 +197,30 @@ function suggestionAuditTarget(suggestion: AiSuggestion) {
   return parts.filter(Boolean).join(" · ");
 }
 
-function hasMatchingIssue(submission: Submission, suggestion: AiSuggestion) {
+function hasMatchingIssue(submission: Submission, candidate: Issue) {
   return submission.issues.some(
     (issue) =>
-      issue.target.applicantId === suggestion.target.applicantId &&
-      issue.target.section === suggestion.target.section &&
-      issue.target.field === suggestion.target.field &&
-      issue.target.fileType === suggestion.target.fileType &&
+      issue.target.applicantId === candidate.target.applicantId &&
+      issue.target.field === candidate.target.field &&
+      issue.target.fileType === candidate.target.fileType &&
       issue.status !== "closed_by_admin",
   );
 }
 
-function suggestionSnapshot(submission: Submission, suggestion: AiSuggestion) {
-  if (suggestion.target.fileType) {
+function suggestionSnapshot(submission: Submission, target: Issue["target"]) {
+  if (target.fileType) {
     return submission.files.find(
       (file) =>
-        file.applicantId === suggestion.target.applicantId &&
-        file.type === suggestion.target.fileType,
+        file.applicantId === target.applicantId && file.type === target.fileType,
     )?.status;
   }
 
   const applicant = submission.applicants.find(
-    (item) => item.id === suggestion.target.applicantId,
+    (item) => item.id === target.applicantId,
   );
   return applicant?.sections
     .flatMap((section) => section.fields)
-    .find((field) => field.label === suggestion.target.field)?.value;
+    .find((field) => questionnaireFieldMatchesTarget(field, target.field))?.value;
 }
 
 function markSuggestionTargetForReplacement(

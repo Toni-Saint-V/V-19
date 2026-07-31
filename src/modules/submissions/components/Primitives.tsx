@@ -131,6 +131,8 @@ export function ConfirmationDialog({
 }) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const focusRestoreFrameRef = useRef<number | null>(null);
+  const focusRestoreTargetRef = useRef<HTMLElement | null>(null);
   const busyRef = useRef(busy);
   const onCancelRef = useRef(onCancel);
   const onConfirmRef = useRef(onConfirm);
@@ -143,8 +145,14 @@ export function ConfirmationDialog({
   onConfirmRef.current = onConfirm;
 
   useEffect(() => {
-    const previouslyFocusedElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (focusRestoreFrameRef.current !== null) {
+      window.cancelAnimationFrame(focusRestoreFrameRef.current);
+      focusRestoreFrameRef.current = null;
+    }
+    if (!focusRestoreTargetRef.current?.isConnected) {
+      focusRestoreTargetRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     cancelButtonRef.current?.focus({ preventScroll: true });
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -194,7 +202,10 @@ export function ConfirmationDialog({
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown, true);
-      window.requestAnimationFrame(() => {
+      focusRestoreFrameRef.current = window.requestAnimationFrame(() => {
+        focusRestoreFrameRef.current = null;
+        const previouslyFocusedElement = focusRestoreTargetRef.current;
+        focusRestoreTargetRef.current = null;
         if (
           previouslyFocusedElement?.isConnected &&
           !previouslyFocusedElement.matches(":disabled") &&

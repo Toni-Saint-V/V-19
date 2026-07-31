@@ -11,9 +11,9 @@ import {
 import {
   createQuestionnaireSections,
   normalizeSubmissionQuestionnaire,
-  updateQuestionnaireField,
   type QuestionnaireFieldUpdate,
 } from "../modules/submissions/questionnaire";
+import { updateQuestionnaireField } from "../modules/submissions/submissionActions";
 import { defaultLocalAgentOwnerId } from "../modules/submissions/ownership";
 import { confirmApplicantPassportReview } from "../modules/submissions/passportExtraction";
 import {
@@ -290,7 +290,17 @@ function applyQuestionnairePayload(
   actorId: string,
   nowIso: string,
 ) {
-  const updates = uniqueQuestionnaireUpdates(payload.fieldUpdates);
+  const updates = uniqueQuestionnaireUpdates(payload.fieldUpdates).map(
+    (update) => {
+      const currentValue = submission.applicants
+        .find((applicant) => applicant.id === update.applicantId)
+        ?.sections.flatMap((section) => section.fields)
+        .find((field) => field.id === update.fieldId)?.value;
+      return currentValue === update.value
+        ? update
+        : { ...update, reviewSource: "manual" as const };
+    },
+  );
   const withFields = updates.reduce(
     (nextSubmission, update) =>
       updateQuestionnaireField(nextSubmission, update),
@@ -360,6 +370,7 @@ export function QuestionnaireScreen({
   onSubmitForReview,
 }: QuestionnaireScreenProps) {
   const bridge = useVisaflowBusinessBridge();
+  const commandActorId = agentId ?? defaultLocalAgentOwnerId;
   const sourceSubmission = useMemo(
     () =>
       normalizeSubmissionQuestionnaire(
@@ -394,7 +405,7 @@ export function QuestionnaireScreen({
         const preparedSubmission = applyQuestionnairePayload(
           currentSubmission,
           payload,
-          currentSubmission.agentId,
+          commandActorId,
           new Date().toISOString(),
         );
 
@@ -404,18 +415,17 @@ export function QuestionnaireScreen({
       });
       await onSaveDraft?.(nextSubmission.id);
     },
-    [onSaveDraft, persistSubmissionUpdate],
+    [commandActorId, onSaveDraft, persistSubmissionUpdate],
   );
 
   const handleComplete = useCallback(
     async (payload: QuestionnaireCommitPayload) => {
       const nextSubmission = await persistSubmissionUpdate((currentSubmission) => {
         const nowIso = new Date().toISOString();
-        const actorId = currentSubmission.agentId;
         const preparedSubmission = applyQuestionnairePayload(
           currentSubmission,
           payload,
-          actorId,
+          commandActorId,
           nowIso,
         );
         const savedResult =
@@ -424,7 +434,7 @@ export function QuestionnaireScreen({
                 preparedSubmission,
                 "save_progress",
                 "agent",
-                actorId,
+                commandActorId,
               )
             : { ok: true as const, data: preparedSubmission };
         if (!savedResult.ok) throw new Error(savedResult.error.message);
@@ -436,7 +446,7 @@ export function QuestionnaireScreen({
           savedResult.data,
           completionAction,
           "agent",
-          actorId,
+          commandActorId,
         );
         if (!submittedResult.ok) throw new Error(submittedResult.error.message);
         return submittedResult.data;
@@ -461,7 +471,7 @@ export function QuestionnaireScreen({
         },
       });
     },
-    [bridge, onSubmitForReview, persistSubmissionUpdate],
+    [bridge, commandActorId, onSubmitForReview, persistSubmissionUpdate],
   );
 
   const handleMarkIssueFixed = useCallback(

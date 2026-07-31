@@ -6,6 +6,8 @@ import type { Json } from "../../src/lib/supabase/database.types";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const mockState = vi.hoisted(() => ({
+  archivedSubmissionError: null as unknown | null,
+  archivedSubmissionRows: [] as unknown[],
   applicantRows: [] as unknown[],
   correctionRows: [] as unknown[],
   exportBatchRows: [] as unknown[],
@@ -24,7 +26,7 @@ const mockState = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/lib/supabase/client", () => {
-  function queryResult(rows: unknown[]) {
+  function queryResult(rows: unknown[], error: unknown | null = null) {
     const fieldValue = (row: unknown, column: string) =>
       typeof row === "object" && row !== null
         ? (row as Record<string, unknown>)[column]
@@ -76,14 +78,14 @@ vi.mock("../../src/lib/supabase/client", () => {
         return result;
       },
       then(
-        resolve: (value: { data: unknown[]; error: null }) => unknown,
+        resolve: (value: { data: unknown[]; error: unknown | null }) => unknown,
         reject?: (reason: unknown) => unknown,
       ) {
         const rangedRows = range
           ? filteredRows.slice(range[0], range[1] + 1)
           : filteredRows;
         const data = rowLimit === null ? rangedRows : rangedRows.slice(0, rowLimit);
-        return Promise.resolve({ data, error: null }).then(resolve, reject);
+        return Promise.resolve({ data, error }).then(resolve, reject);
       },
     };
     return result;
@@ -94,10 +96,12 @@ vi.mock("../../src/lib/supabase/client", () => {
       from: (table: string) => {
         mockState.fromCalls.push(table);
         return {
-          select: () =>
-            queryResult(
+          select: () => {
+            const rows =
               table === "submissions"
                 ? mockState.submissionRows
+                : table === "agent_submission_card_archives"
+                  ? mockState.archivedSubmissionRows
                 : table === "applicants"
                   ? mockState.applicantRows
                   : table === "questionnaire_answers"
@@ -110,13 +114,40 @@ vi.mock("../../src/lib/supabase/client", () => {
                       ? mockState.statusHistoryRows
                       : table === "profiles"
                         ? mockState.profileRows
-                      : mockState.exportBatchRows,
-            ),
+                        : mockState.exportBatchRows;
+            return queryResult(
+              rows,
+              table === "agent_submission_card_archives"
+                ? mockState.archivedSubmissionError
+                : null,
+            );
+          },
         };
       },
       rpc: (name: string, args: Record<string, unknown>) => {
         mockState.rpcCalls.push({ args, name });
-        return Promise.resolve(mockState.rpcResults.shift() ?? { error: null });
+        const queued = mockState.rpcResults.shift();
+        if (queued?.error) return Promise.resolve(queued);
+        if (name === "save_agent_submission_if_current") {
+          const payload = args.payload as {
+            submission: { id: string };
+          };
+          return Promise.resolve({
+            data:
+              queued?.data ??
+              {
+                caseRevision:
+                  typeof args.expected_revision === "number"
+                    ? args.expected_revision + 1
+                    : 0,
+                operationId: args.operation_id,
+                result: {},
+                submissionId: payload.submission.id,
+              },
+            error: null,
+          });
+        }
+        return Promise.resolve(queued ?? { error: null });
       },
     }),
   };
@@ -126,8 +157,25 @@ import {
   buildExportPackageIdentity,
   exportSummaryForSelectedIds,
 } from "../../src/modules/submissions/exportRules";
-import { normalizeSubmissionForCanonicalRuntime } from "../../src/modules/submissions/submissionActions";
+import { submitForReview } from "../../src/modules/submissions/domainEngine";
 import {
+  createDraftSubmission,
+  generatedCockpitMediaFileName,
+  normalizeSubmissionForCanonicalRuntime,
+  updateQuestionnaireField,
+  uploadRequiredFile,
+} from "../../src/modules/submissions/submissionActions";
+import {
+  buildMediaStoragePath,
+  mediaStorageBucket,
+} from "../../src/modules/submissions/mediaStoragePolicy";
+import { confirmApplicantPassportReview } from "../../src/modules/submissions/passportExtraction";
+import {
+  applyAgentSubmitForReviewResult,
+  markSubmissionIssueFixedResult,
+} from "../../src/modules/submissions/status";
+import {
+  archiveAgentSubmissionCard,
   changedCockpitSubmissions,
   cockpitSnapshotKey,
   cockpitSnapshotStatus,
@@ -185,7 +233,88 @@ function draftPayload(submission: Submission) {
   return toCockpitDraftPersistencePayload(submission, agentProfile.id, agentProfile.id);
 }
 
+function completeAgentSubmissionPackage(
+  type: Submission["type"],
+  applicantNames: string[],
+) {
+  const draft = createDraftSubmission({
+    agentId: agentProfile.id,
+    applicantNames,
+    city: "Санкт-Петербург",
+    familyCount: applicantNames.length,
+    idScheme: "supabase",
+    submissions: [],
+    type,
+  });
+  let filled = fillRequiredQuestionnaireForTest(draft);
+  for (const [index, applicant] of filled.applicants.entries()) {
+    const passportSection = applicant.sections.find((section) =>
+      section.fields.some((field) => field.id === "passport-no"),
+    );
+    if (!passportSection) {
+      throw new Error("Expected applicant passport number field.");
+    }
+    filled = updateQuestionnaireField(filled, {
+      applicantId: applicant.id,
+      fieldId: "passport-no",
+      sectionId: passportSection.id,
+      value: `76543210${index}`,
+    });
+  }
+  const primary = filled.applicants[0];
+  const surnameSection = primary?.sections.find((section) =>
+    section.fields.some((field) => field.id === "surname"),
+  );
+  if (!primary || !surnameSection) {
+    throw new Error("Expected primary applicant surname field.");
+  }
+
+  let prepared = updateQuestionnaireField(filled, {
+    applicantId: primary.id,
+    fieldId: "surname",
+    sectionId: surnameSection.id,
+    value: "UPDATED-SURNAME",
+  });
+  for (const file of prepared.files) {
+    const generatedFileName = generatedCockpitMediaFileName({
+      applicantId: file.applicantId,
+      fileType: file.type,
+      mimeType: "image/jpeg",
+      submissionId: prepared.id,
+    });
+    const target = buildMediaStoragePath(
+      prepared.id,
+      file.applicantId,
+      file.type,
+      generatedFileName,
+    );
+    prepared = uploadRequiredFile(prepared, file.id, {
+      generatedFileName,
+      mimeType: "image/jpeg",
+      originalFileName:
+        file.type === "selfie" ? "selfie_1.jpg" : `${file.type}.jpg`,
+      sizeBytes: 2_048,
+      storageAdapter: "supabase-private",
+      storageBucket: mediaStorageBucket,
+      storagePath: target.path,
+      uploadedAtIso: "2026-07-29T10:00:00.000Z",
+    });
+  }
+  for (const applicant of prepared.applicants) {
+    prepared = confirmApplicantPassportReview(prepared, applicant.id);
+  }
+
+  const submitted = applyAgentSubmitForReviewResult(
+    prepared,
+    agentProfile.id,
+  );
+  if (!submitted.ok) throw new Error(submitted.error.message);
+  return submitted.data;
+}
+
 beforeEach(() => {
+  mockState.archivedSubmissionError = null;
+  mockState.archivedSubmissionRows = [];
   mockState.applicantRows = [];
   mockState.correctionRows = [];
   mockState.exportBatchRows = [];
@@ -205,16 +334,519 @@ afterEach(() => {
 });
 
 describe("V-19 Supabase cockpit persistence", () => {
+  it("rejects corrupt correction targets before building a Supabase payload", () => {
+    const submission = normalizeSubmissionForCanonicalRuntime({
+      ...(initialSubmissions.find((item) => item.id === "ПД-1053") as Submission),
+      agentId: agentProfile.id,
+    });
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const baseIssue: Submission["issues"][number] = {
+      comment: "Исправьте точную цель.",
+      createdAt: "сейчас",
+      createdBy: "admin",
+      id: "зм-invalid-target",
+      reason: "Некорректная цель замечания",
+      severity: "blocker",
+      status: "open",
+      target: {
+        applicantId: applicant.id,
+        applicantName: applicant.fullName,
+        section: "Анкета",
+      },
+      type: "field",
+    };
+    const invalidIssues: Submission["issues"] = [
+      {
+        ...baseIssue,
+        id: "зм-mixed-target",
+        target: {
+          ...baseIssue.target,
+          field: "Маршрут поездки",
+          fileType: "passport_scan",
+        },
+      },
+      {
+        ...baseIssue,
+        id: "зм-legacy-media-target",
+        target: { ...baseIssue.target, fileType: "photo" },
+        type: "file",
+      },
+      {
+        ...baseIssue,
+        id: "зм-missing-field-target",
+        target: {
+          ...baseIssue.target,
+          field: "Несуществующее поле анкеты",
+        },
+      },
+      {
+        ...baseIssue,
+        id: "зм-missing-file-target",
+        target: { ...baseIssue.target, fileType: "passport_scan" },
+        type: "file",
+      },
+    ];
+
+    for (const issue of invalidIssues) {
+      const candidate: Submission = {
+        ...submission,
+        files:
+          issue.id === "зм-missing-file-target"
+            ? submission.files.filter(
+                (file) =>
+                  file.applicantId !== applicant.id ||
+                  file.type !== "passport_scan",
+              )
+            : submission.files,
+        issues: [issue],
+      };
+
+      expect(() =>
+        toCockpitDraftPersistencePayload(
+          candidate,
+          adminProfile.id,
+          candidate.agentId,
+        ),
+      ).toThrow(
+        "Admin issue target must resolve to exactly one canonical questionnaire field or media file.",
+      );
+    }
+  });
+
+  it("archives one card through the revision-aware Supabase RPC", async () => {
+    mockState.rpcResults = [
+      {
+        data: {
+          archivedAt: "2026-07-28T16:30:00.000Z",
+          caseRevision: 7,
+          idempotent: false,
+          submissionId: "submission-archive-1",
+        },
+        error: null,
+      },
+    ];
+
+    await expect(
+      archiveAgentSubmissionCard("submission-archive-1", 7),
+    ).resolves.toEqual({
+      archivedAt: "2026-07-28T16:30:00.000Z",
+      caseRevision: 7,
+      idempotent: false,
+      submissionId: "submission-archive-1",
+    });
+    expect(mockState.rpcCalls).toEqual([
+      {
+        args: {
+          expected_case_revision: 7,
+          submission_id: "submission-archive-1",
+        },
+        name: "archive_agent_submission_card",
+      },
+    ]);
+  });
+
+  it("filters archived cards from an agent readback without hiding them from admin audit", async () => {
+    const submission = {
+      ...(initialSubmissions[0] as Submission),
+      agentId: agentProfile.id,
+      id: "submission-archive-readback",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        case_revision: 4,
+        created_at: submission.createdAt,
+        updated_at: submission.updatedAt,
+      },
+    ];
+    mockState.archivedSubmissionRows = [
+      {
+        agent_id: agentProfile.id,
+        archived_at: "2026-07-28T16:30:00.000Z",
+        case_revision: 4,
+        submission_id: submission.id,
+      },
+    ];
+
+    const agentLoaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    expect(agentLoaded.submissions).toEqual([]);
+    expect(mockState.fromCalls).toContain("agent_submission_card_archives");
+
+    mockState.fromCalls = [];
+    const adminLoaded = await loadCockpitSubmissionsForProfile(adminProfile);
+    expect(adminLoaded.submissions).toHaveLength(1);
+    expect(mockState.fromCalls).not.toContain("agent_submission_card_archives");
+  });
+
+  it("fails closed when archive visibility is denied instead of re-exposing cards", async () => {
+    const submission = {
+      ...(initialSubmissions[0] as Submission),
+      agentId: agentProfile.id,
+      id: "submission-archive-permission-denied",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        case_revision: 4,
+        created_at: submission.createdAt,
+        updated_at: submission.updatedAt,
+      },
+    ];
+    mockState.archivedSubmissionError = {
+      code: "42501",
+      message:
+        "permission denied for table agent_submission_card_archives",
+    };
+
+    await expect(
+      loadCockpitSubmissionsForProfile(agentProfile),
+    ).rejects.toBeInstanceOf(PersistenceObservableError);
+  });
+
+  it.each(["42P01", "PGRST205"])(
+    "uses the staged compatibility fallback only for exact missing-schema code %s",
+    async (code) => {
+      const submission = {
+        ...(initialSubmissions[0] as Submission),
+        agentId: agentProfile.id,
+        id: `submission-archive-missing-${code}`,
+      };
+      const payload = toCockpitDraftPersistencePayload(
+        submission,
+        agentProfile.id,
+        agentProfile.id,
+      );
+      mockState.submissionRows = [
+        {
+          ...payload.submission,
+          case_revision: 4,
+          created_at: submission.createdAt,
+          updated_at: submission.updatedAt,
+        },
+      ];
+      mockState.archivedSubmissionError = {
+        code,
+        message: "agent_submission_card_archives is unavailable",
+      };
+
+      const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+      expect(loaded.submissions).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    {
+      applicantNames: ["ANTON VOLKOV"],
+      expectedMediaCount: 3,
+      expectedRoles: ["main"],
+      label: "single",
+      type: "single" as const,
+    },
+    {
+      applicantNames: ["ANTON VOLKOV", "MARIA VOLKOVA", "IVAN VOLKOV"],
+      expectedMediaCount: 5,
+      expectedRoles: ["main", "spouse", "child"],
+      label: "family",
+      type: "family" as const,
+    },
+  ])(
+    "persists and admin-reloads the complete $label agent package",
+    async ({
+      applicantNames,
+      expectedMediaCount,
+      expectedRoles,
+      type,
+    }) => {
+      const submitted = completeAgentSubmissionPackage(type, applicantNames);
+      const payload = toCockpitDraftPersistencePayload(
+        submitted,
+        agentProfile.id,
+        agentProfile.id,
+      );
+      const expectedQuestionnaireRows = submitted.applicants.reduce(
+        (total, applicant) =>
+          total +
+          applicant.sections.reduce(
+            (sectionTotal, section) => sectionTotal + section.fields.length,
+            0,
+          ),
+        0,
+      );
+      const questionnaireAnswers = payload.questionnaire_answers ?? [];
+
+      expect(submitted.id).toMatch(/^VF-/);
+      expect(new Set(submitted.applicants.map((applicant) => applicant.id)).size).toBe(
+        submitted.applicants.length,
+      );
+      expect(submitted.applicants.map((applicant) => applicant.role)).toEqual(
+        expectedRoles,
+      );
+      expect(payload.submission).toMatchObject({
+        agent_id: agentProfile.id,
+        city: "Санкт-Петербург",
+        id: submitted.id,
+        status: "waiting_review",
+        type,
+      });
+      expect(payload.submission.submitted_at).toMatch(
+        /^\d{4}-\d{2}-\d{2}T/,
+      );
+      expect(payload.submission.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(payload.applicants).toHaveLength(applicantNames.length);
+      expect(
+        payload.applicants.every(
+          (applicant) => applicant.submission_id === submitted.id,
+        ),
+      ).toBe(true);
+      expect(questionnaireAnswers).toHaveLength(expectedQuestionnaireRows);
+      expect(
+        questionnaireAnswers.find(
+          (answer) =>
+            answer.applicant_id === submitted.applicants[0]?.id &&
+            answer.field_id === "surname",
+        )?.value,
+      ).toBe("UPDATED-SURNAME");
+      expect(payload.media_assets).toHaveLength(expectedMediaCount);
+      expect(new Set(payload.media_assets.map((asset) => asset.type))).toEqual(
+        new Set(["passport_scan", "selfie", "selfie_2"]),
+      );
+      expect(
+        payload.media_assets.every(
+          (asset) =>
+            asset.storage_bucket === mediaStorageBucket &&
+            asset.storage_path.startsWith(
+              `submissions/${submitted.id}/applicants/${asset.applicant_id}/${asset.type}/`,
+            ),
+        ),
+      ).toBe(true);
+      expect(payload.status_history.map((row) => row.to_status)).toEqual([
+        "submitted_for_review",
+        "in_progress",
+      ]);
+      expect(reviewHandoffPersistenceIssues(submitted, "agent")).toEqual([]);
+
+      const saved = await saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [submitted],
+        new Map(),
+        new Map(),
+      );
+      expect(rpcNames()).toEqual(["save_agent_submission_if_current"]);
+      expect(mockState.rpcCalls[0]?.args).toMatchObject({
+        actor_id: agentProfile.id,
+        expected_revision: null,
+        operation_id: expect.any(String),
+      });
+      expect(saved.caseRevisionsBySubmissionId.get(submitted.id)).toBe(0);
+      expect(saved.ownerIdsBySubmissionId.get(submitted.id)).toBe(agentProfile.id);
+      expect(saved.operationIdsBySubmissionId.get(submitted.id)).toBe(
+        mockState.rpcCalls[0]?.args.operation_id,
+      );
+      expect(mockState.rpcCalls[0]?.args.payload).toMatchObject({
+        applicants: payload.applicants,
+        media_assets: payload.media_assets,
+        questionnaire_answers: payload.questionnaire_answers,
+        submission: {
+          agent_id: agentProfile.id,
+          id: submitted.id,
+          status: "waiting_review",
+        },
+        status_history: [
+          expect.objectContaining({
+            from_status: "in_progress",
+            to_status: "submitted_for_review",
+          }),
+          expect.objectContaining({
+            from_status: "draft",
+            to_status: "in_progress",
+          }),
+        ],
+      });
+
+      mockState.submissionRows = [
+        {
+          ...payload.submission,
+          created_at: submitted.createdAt,
+          updated_at: payload.submission.updated_at,
+        },
+      ];
+      mockState.applicantRows = payload.applicants;
+      mockState.questionnaireRows = questionnaireAnswers;
+      mockState.mediaAssetRows = payload.media_assets;
+      mockState.statusHistoryRows = payload.status_history;
+      mockState.profileRows = [
+        {
+          display_name: agentProfile.displayName,
+          id: agentProfile.id,
+        },
+      ];
+
+      const adminReadback = await loadCockpitSubmissionsForProfile(adminProfile);
+      const restored = adminReadback.submissions[0];
+
+      expect(adminReadback.ownerIdsBySubmissionId.get(submitted.id)).toBe(
+        agentProfile.id,
+      );
+      expect(restored).toMatchObject({
+        agentDisplayName: agentProfile.displayName,
+        city: "Санкт-Петербург",
+        createdAt: submitted.createdAt,
+        id: submitted.id,
+        status: "submitted_for_review",
+        type,
+      });
+      expect(restored?.applicants.map((applicant) => applicant.role)).toEqual(
+        expectedRoles,
+      );
+      expect(
+        restored?.applicants[0]?.sections
+          .flatMap((section) => section.fields)
+          .find((field) => field.id === "surname")?.value,
+      ).toBe("UPDATED-SURNAME");
+      expect(restored?.files).toHaveLength(expectedMediaCount);
+      expect(
+        restored?.files.every(
+          (file) =>
+            file.storageAdapter === "supabase-private" &&
+            file.storagePath?.startsWith(
+              `submissions/${submitted.id}/applicants/${file.applicantId}/${file.type}/`,
+            ),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it("retries an atomic review handoff after a transient transport failure", async () => {
+    const submitted = completeAgentSubmissionPackage("single", [
+      "ANTON VOLKOV",
+    ]);
+    mockState.rpcResults = [
+      {
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+      { error: null },
+    ];
+
+    await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [submitted],
+      new Map(),
+      new Map(),
+    );
+
+    expect(rpcNames()).toEqual([
+      "save_agent_submission_if_current",
+      "save_agent_submission_if_current",
+    ]);
+    expect(mockState.rpcCalls[1]?.args).toEqual(mockState.rpcCalls[0]?.args);
+  });
+
+  it("persists explicit family relationships for Admin readback", () => {
+    const family = createDraftSubmission({
+      agentId: agentProfile.id,
+      applicantNames: ["PARENT PERSON", "CHILD PERSON"],
+      applicantRoles: ["main", "child"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "supabase",
+      submissions: [],
+      type: "family",
+    });
+    const payload = toCockpitDraftPersistencePayload(
+      family,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    expect(payload.applicants.map((applicant) => applicant.role)).toEqual([
+      "Основной заявитель",
+      "Ребёнок",
+    ]);
+    expect(
+      payload.applicants.every((applicant) => applicant.role_confirmed),
+    ).toBe(true);
+  });
+
+  it("reloads an accepted resubmission with pending media and inactive package identity", async () => {
+    const acceptedBase = normalizeSubmissionForCanonicalRuntime(
+      fillRequiredQuestionnaireForTest({
+        ...(initialSubmissions.find((item) => item.id === "ПД-1056") as Submission),
+        agentId: agentProfile.id,
+        id: "ПД-ACCEPTED-RESUBMISSION-RELOAD",
+      }),
+    );
+    const exportPackage = buildExportPackageIdentity([acceptedBase]);
+    if (!exportPackage) throw new Error("Expected export package identity");
+    const accepted: Submission = {
+      ...acceptedBase,
+      exportPackage,
+    };
+    const result = submitForReview(accepted, "agent", agentProfile.id);
+    if (!result.ok) throw new Error(result.error.message);
+    const payload = toCockpitDraftPersistencePayload(
+      result.data,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-07-26T12:00:00.000Z",
+        updated_at: "2026-07-26T12:01:00.000Z",
+      },
+    ];
+    mockState.mediaAssetRows = payload.media_assets;
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const reloaded = loaded.submissions[0];
+
+    expect(reloaded).toMatchObject({
+      exportState: "not_ready",
+      status: "submitted_for_review",
+    });
+    expect(reloaded?.exportPackage).toBeUndefined();
+    expect(
+      reloaded?.files.every(
+        (file) =>
+          file.status === "pending_review" &&
+          file.reviewStatus === "not_reviewed" &&
+          file.reviewedAtIso === undefined &&
+          file.reviewedBy === undefined,
+      ),
+    ).toBe(true);
+    expect(reloaded?.history[0]).toMatchObject({
+      actorId: agentProfile.id,
+      fromStatus: "ready_for_export",
+      toStatus: "submitted_for_review",
+    });
+  });
+
   it("assigns a submission public number through the protected RPC", async () => {
     mockState.rpcResults = [
       {
-        data: { assignedNow: true, publicNumber: 1059 },
+        data: { assignedNow: true, caseRevision: 8, publicNumber: 1059 },
         error: null,
       },
     ];
 
     await expect(ensureSubmissionPublicNumber("VF-DRAFT-1059")).resolves.toEqual({
       assignedNow: true,
+      caseRevision: 8,
       publicNumber: 1059,
     });
     expect(mockState.rpcCalls).toEqual([
@@ -227,8 +859,9 @@ describe("V-19 Supabase cockpit persistence", () => {
 
   it.each([
     null,
-    { assignedNow: true, publicNumber: "1059" },
-    { assignedNow: true, publicNumber: 10_000 },
+    { assignedNow: true, publicNumber: 1059 },
+    { assignedNow: true, caseRevision: 8, publicNumber: "1059" },
+    { assignedNow: true, caseRevision: 8, publicNumber: 10_000 },
   ])("rejects an invalid public-number RPC payload: %j", async (data) => {
     mockState.rpcResults = [{ data, error: null }];
 
@@ -441,14 +1074,53 @@ describe("V-19 Supabase cockpit persistence", () => {
       agentProfile,
       [changedSubmission],
       new Map(),
+      new Map(),
     );
 
-    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(rpcNames()).toEqual(["save_agent_submission_if_current"]);
     expect(payloadSubmission()).toMatchObject({
       agent_id: agentProfile.id,
       id: changedSubmission.id,
       title: changedSubmission.title,
     });
+  });
+
+  it("sends and advances the loaded Agent case revision", async () => {
+    const changedSubmission = {
+      ...(initialSubmissions[0] as Submission),
+      title: "Revision checked",
+    };
+
+    const saved = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [changedSubmission],
+      new Map([[changedSubmission.id, agentProfile.id]]),
+      new Map([[changedSubmission.id, 8]]),
+    );
+
+    expect(mockState.rpcCalls[0]?.args).toMatchObject({
+      actor_id: agentProfile.id,
+      expected_revision: 8,
+      operation_id: expect.any(String),
+    });
+    expect(saved.caseRevisionsBySubmissionId.get(changedSubmission.id)).toBe(9);
+  });
+
+  it("fails closed when an existing Agent submission has no server revision", async () => {
+    const changedSubmission = {
+      ...(initialSubmissions[0] as Submission),
+      title: "Missing revision",
+    };
+
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [changedSubmission],
+        new Map([[changedSubmission.id, agentProfile.id]]),
+        new Map(),
+      ),
+    ).rejects.toThrow("не имеет server revision");
+    expect(rpcNames()).toEqual([]);
   });
 
   it("retries a transient idempotent draft save once", async () => {
@@ -470,11 +1142,12 @@ describe("V-19 Supabase cockpit persistence", () => {
       agentProfile,
       [changedSubmission],
       new Map(),
+      new Map(),
     );
 
     expect(rpcNames()).toEqual([
-      "save_submission_draft",
-      "save_submission_draft",
+      "save_agent_submission_if_current",
+      "save_agent_submission_if_current",
     ]);
   });
 
@@ -559,14 +1232,19 @@ describe("V-19 Supabase cockpit persistence", () => {
       agentProfile,
       [firstAgentSubmission],
       new Map(),
+      new Map(),
     );
     await saveCockpitSubmissionsForProfile(
       otherAgentProfile,
       [secondAgentSubmission],
       new Map(),
+      new Map(),
     );
 
-    expect(rpcNames()).toEqual(["save_submission_draft", "save_submission_draft"]);
+    expect(rpcNames()).toEqual([
+      "save_agent_submission_if_current",
+      "save_agent_submission_if_current",
+    ]);
     expect(payloadSubmission(0)).toMatchObject({
       agent_id: agentProfile.id,
       id: firstAgentSubmission.id,
@@ -594,10 +1272,13 @@ describe("V-19 Supabase cockpit persistence", () => {
         file.linkedIssueId
           ? {
               ...file,
-              reviewStatus: "accepted",
-              status: "accepted",
-              storageBucket: "visa-documents",
-              storagePath: `submissions/${returnedSubmission.id}/${file.id}`,
+              generatedFileName: `replacement-${file.id}.jpg`,
+              reviewStatus: "not_reviewed",
+              status: "uploaded",
+              storageAdapter: "supabase-private",
+              storageBucket: "submission-media",
+              storagePath: `submissions/${returnedSubmission.id}/applicants/${file.applicantId}/${file.type}/replacement-${file.id}.jpg`,
+              uploadStatus: "uploaded",
               uploadedAtIso: "2026-06-27T10:00:00.000Z",
             }
           : file,
@@ -619,13 +1300,15 @@ describe("V-19 Supabase cockpit persistence", () => {
       agentProfile,
       [correctedSubmission],
       new Map(),
+      new Map(),
     );
 
-    expect(rpcNames()).toEqual(["submit_corrections_handoff"]);
+    expect(rpcNames()).toEqual(["save_agent_submission_if_current"]);
     expect(
       (
-        mockState.rpcCalls.find((call) => call.name === "submit_corrections_handoff")
-          ?.args.payload as {
+        mockState.rpcCalls.find(
+          (call) => call.name === "save_agent_submission_if_current",
+        )?.args.payload as {
           submission: { status: string };
         }
     ).submission.status,
@@ -647,10 +1330,13 @@ describe("V-19 Supabase cockpit persistence", () => {
         file.linkedIssueId
           ? {
               ...file,
-              reviewStatus: "accepted",
-              status: "accepted",
-              storageBucket: "visa-documents",
-              storagePath: `submissions/${returnedSubmission.id}/${file.id}`,
+              generatedFileName: `replacement-${file.id}.jpg`,
+              reviewStatus: "not_reviewed",
+              status: "uploaded",
+              storageAdapter: "supabase-private",
+              storageBucket: "submission-media",
+              storagePath: `submissions/${returnedSubmission.id}/applicants/${file.applicantId}/${file.type}/replacement-${file.id}.jpg`,
+              uploadStatus: "uploaded",
               uploadedAtIso: "2026-06-27T10:00:00.000Z",
             }
           : file,
@@ -729,16 +1415,17 @@ describe("V-19 Supabase cockpit persistence", () => {
         agentProfile,
         [invalidCorrections],
         new Map(),
+        new Map(),
       ),
     ).rejects.toMatchObject({
       diagnostics: {
-        safeCode: "rpc.submit_corrections_handoff:save:HANDOFF_CONSISTENCY",
+        safeCode: "rpc.save_agent_submission_if_current:save:HANDOFF_CONSISTENCY",
       },
     });
     expect(rpcNames()).toEqual([]);
   });
 
-  it("persists admin return handoff history as a matching status row", async () => {
+  it("canonicalizes a label target across Admin snapshot, correction, and Agent fix", async () => {
     const submitted = initialSubmissions.find(
       (submission) => submission.status === "submitted_for_review",
     ) as Submission;
@@ -801,17 +1488,72 @@ describe("V-19 Supabase cockpit persistence", () => {
     );
 
     expect(rpcNames()).toEqual(["save_admin_submission_batch_if_current"]);
+    const persistedPayload = (
+      mockState.rpcCalls[0]?.args.payloads as Array<{
+        corrections: Array<{ field_key: string | null }>;
+        submission: { family_intelligence: Json | null };
+        status_history: Array<{
+          from_status: string | null;
+          note: string | null;
+          source: string;
+          to_status: string;
+        }>;
+      }>
+    )[0];
+    if (!persistedPayload) throw new Error("Missing Admin persistence payload");
+    const persistedSnapshot = readCockpitSnapshot(
+      persistedPayload.submission.family_intelligence,
+    );
+    const persistedIssue = persistedSnapshot?.issues[0];
+    const persistedApplicant = persistedSnapshot?.applicants[0];
+    const persistedTarget = persistedApplicant?.sections
+      .flatMap((section) =>
+        section.fields.map((field) => ({ field, sectionId: section.id })),
+      )
+      .find(({ field }) => field.id === "first-entry-country");
+    if (
+      !persistedSnapshot ||
+      !persistedIssue ||
+      !persistedApplicant ||
+      !persistedTarget
+    ) {
+      throw new Error("Missing canonical Admin issue readback");
+    }
+    expect(persistedIssue).toMatchObject({
+      snapshot: persistedTarget.field.value,
+      target: { field: "first-entry-country" },
+    });
+    expect(persistedPayload.corrections[0]?.field_key).toBe(
+      "first-entry-country",
+    );
+
+    const corrected = updateQuestionnaireField(persistedSnapshot, {
+      applicantId: persistedApplicant.id,
+      fieldId: persistedTarget.field.id,
+      sectionId: persistedTarget.sectionId,
+      value: `${persistedTarget.field.value} · исправлено`,
+    });
+    const fixed = markSubmissionIssueFixedResult(
+      corrected,
+      persistedIssue.id,
+      "agent",
+    );
+    if (!fixed.ok) throw new Error(fixed.error.message);
+    const agentPayload = toCockpitDraftPersistencePayload(
+      fixed.data,
+      persistedSnapshot.agentId,
+      persistedSnapshot.agentId,
+    );
+    const agentSnapshot = readCockpitSnapshot(
+      agentPayload.submission.family_intelligence as Json,
+    );
+    expect(agentSnapshot?.issues[0]).toMatchObject({
+      status: "fixed_by_agent",
+      target: { field: "first-entry-country" },
+    });
+    expect(agentPayload.corrections[0]?.field_key).toBe("first-entry-country");
     expect(
-      (
-        mockState.rpcCalls[0]?.args.payloads as Array<{
-          status_history: Array<{
-            from_status: string | null;
-            note: string | null;
-            source: string;
-            to_status: string;
-          }>;
-        }>
-      )[0]?.status_history[0],
+      persistedPayload.status_history[0],
     ).toMatchObject({
       from_status: "submitted_for_review",
       note: "Нужно уточнить маршрут.",
@@ -863,7 +1605,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       ),
     ).rejects.toMatchObject({
       diagnostics: {
-        safeCode: "rpc.save_submission_draft:save:HANDOFF_CONSISTENCY",
+        safeCode: "rpc.save_agent_submission_if_current:save:HANDOFF_CONSISTENCY",
       },
     });
     expect(rpcNames()).toEqual([]);
@@ -963,7 +1705,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       ),
     ).rejects.toMatchObject({
       diagnostics: {
-        safeCode: "rpc.save_submission_draft:save:HANDOFF_CONSISTENCY",
+        safeCode: "rpc.save_agent_submission_if_current:save:HANDOFF_CONSISTENCY",
       },
     });
     expect(rpcNames()).toEqual([]);
@@ -1059,6 +1801,7 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(mockState.fromCalls).toEqual([
       "submissions",
+      "agent_submission_card_archives",
       "applicants",
       "questionnaire_answers",
       "media_assets",
@@ -1408,6 +2151,62 @@ describe("V-19 Supabase cockpit persistence", () => {
     });
     expect(unsupportedVersionField?.reviewSource).toBeUndefined();
     expect(unsupportedVersionField?.reviewState).toBeUndefined();
+
+    mockState.questionnaireRows = [
+      {
+        ...sourceAnswer,
+        id: "00000000-0000-4000-8000-000000000447",
+        value: {
+          adminReviewApprovedAtIso: "2026-06-27T08:30:00.000Z",
+          adminReviewApprovedBy: "unversioned-admin",
+          kind: "v19_questionnaire_field",
+          reviewSource: "passport_ocr",
+          reviewState: "confirmed",
+          value: "UNVERSIONED VALUE",
+        },
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-27T08:30:00.000Z",
+      },
+    ];
+
+    const loadedUnversioned =
+      await loadCockpitSubmissionsForProfile(agentProfile);
+    const unversionedField =
+      loadedUnversioned.submissions[0]?.applicants[0]?.sections
+        .flatMap((section) => section.fields)
+        .find((candidate) => candidate.id === sourceField.id);
+
+    expect(unversionedField).toMatchObject({
+      id: sourceField.id,
+      value: "UNVERSIONED VALUE",
+    });
+    expect(unversionedField?.adminReviewApprovedAtIso).toBeUndefined();
+    expect(unversionedField?.adminReviewApprovedBy).toBeUndefined();
+    expect(unversionedField?.reviewSource).toBeUndefined();
+    expect(unversionedField?.reviewState).toBeUndefined();
+  });
+
+  it("rejects an unknown applicant role before building a Supabase write", () => {
+    const sourceSubmission = initialSubmissions[0] as Submission;
+    const submissionWithUnknownRole: Submission = {
+      ...sourceSubmission,
+      applicants: sourceSubmission.applicants.map((applicant, index) =>
+        index === 0
+          ? {
+              ...applicant,
+              role: "guardian" as Submission["applicants"][number]["role"],
+            }
+          : applicant,
+      ),
+    };
+
+    expect(() =>
+      toCockpitDraftPersistencePayload(
+        submissionWithUnknownRole,
+        agentProfile.id,
+        agentProfile.id,
+      ),
+    ).toThrow(/Unknown canonical applicant role/);
   });
 
   it("does not reuse normalized applicant rows after loading remote data", async () => {
@@ -1988,6 +2787,7 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(mockState.fromCalls).toEqual([
       "submissions",
+      "agent_submission_card_archives",
       "applicants",
       "questionnaire_answers",
       "media_assets",
@@ -2290,7 +3090,12 @@ describe("V-19 Supabase cockpit persistence", () => {
     ]);
 
     await expect(
-      saveCockpitSubmissionsForProfile(adminProfile, [changedSubmission], ownerIds),
+      saveCockpitSubmissionsForProfile(
+        adminProfile,
+        [changedSubmission],
+        ownerIds,
+        new Map(),
+      ),
     ).rejects.toThrow(
       "Administrators must use the revision-checked admin concurrency writer.",
     );
@@ -2377,6 +3182,32 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(isAdminSubmissionConcurrencyConflict(conflict)).toBe(true);
     expect(mockState.rpcCalls).toHaveLength(1);
+  });
+
+  it("reports a stale Agent snapshot as the same canonical concurrency conflict", async () => {
+    const operationId = "00000000-0000-4000-8000-000000000904";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(operationId);
+    const submission = initialSubmissions[0] as Submission;
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          code: "40001",
+          message: "V19_AGENT_SUBMISSION_CONFLICT",
+        },
+      },
+    ];
+
+    const conflict = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [submission],
+      new Map([[submission.id, agentProfile.id]]),
+      new Map([[submission.id, 7]]),
+    ).catch((error: unknown) => error);
+
+    expect(isAdminSubmissionConcurrencyConflict(conflict)).toBe(true);
+    expect(mockState.rpcCalls).toHaveLength(1);
+    expect(mockState.rpcCalls[0]?.args.operation_id).toBe(operationId);
   });
 
   it("retries a lost admin CAS response once with the same durable operation id", async () => {

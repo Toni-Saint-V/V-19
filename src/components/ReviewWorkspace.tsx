@@ -12,6 +12,7 @@ import { motion } from "motion/react";
 import "../shared/ui/review-workspace.css";
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   Download,
   FileText,
@@ -26,8 +27,10 @@ import {
   createMediaSignedUrl,
   mediaStorageBucket,
 } from "../modules/submissions/mediaStorage";
+import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
 import { getAdminReviewActions } from "../modules/submissions/status";
+import { questionnaireIssueFieldDisplayLabel } from "../modules/submissions/questionnaire";
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
   ADMIN_PASSPORT_REVIEW_FIELD_LABELS,
@@ -51,7 +54,6 @@ import {
   ReviewPassportFieldRow,
   type PassportReviewField,
 } from "./ReviewPassportFieldRow";
-import { ReviewReadinessPanel } from "./review/ReviewReadinessPanel";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { useReviewWorkspaceShortcuts } from "./review/useReviewWorkspaceShortcuts";
 
@@ -63,6 +65,7 @@ interface ReviewWorkspaceProps {
     applicant?: string,
     fileType?: SubmissionFileType,
     applicantId?: string,
+    fieldLabel?: string,
   ) => void;
   onApplicantChange?: (applicantId: string) => void;
   onApproveSection?: (input: { applicantId: string }) => boolean | Promise<boolean>;
@@ -173,11 +176,11 @@ function reviewFieldsForApplicant(applicant?: Applicant): PassportReviewField[] 
 
 function reviewFileName(target: ReviewMediaTarget, file?: SubmissionFile) {
   const missingFileLabel =
-    target.type === "passport_scan" ? "Паспорт не загружен" : `${target.label} не загружен`;
+    target.type === "passport_scan"
+      ? "Паспорт не загружен"
+      : `${target.label} не загружен`;
 
-  return (
-    file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel
-  );
+  return file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel;
 }
 
 function sectionActionLabel(accepted: boolean, pending: boolean) {
@@ -240,10 +243,7 @@ export function ReviewWorkspace({
   const requiredMediaTypes = useMemo(
     () =>
       submission && selectedApplicantId
-        ? requiredPassportReviewMediaTypesForApplicant(
-            submission,
-            selectedApplicantId,
-          )
+        ? requiredPassportReviewMediaTypesForApplicant(submission, selectedApplicantId)
         : (["passport_scan"] as const),
     [selectedApplicantId, submission],
   );
@@ -349,8 +349,8 @@ export function ReviewWorkspace({
     activePreview.status === "ready" ? activePreview.url : undefined;
   const activeMediaIsPdf = Boolean(
     activeMediaFile?.mimeType === "application/pdf" ||
-      activeMediaFile?.originalFileName?.toLocaleLowerCase().endsWith(".pdf") ||
-      activeMediaFile?.generatedFileName?.toLocaleLowerCase().endsWith(".pdf"),
+    activeMediaFile?.originalFileName?.toLocaleLowerCase().endsWith(".pdf") ||
+    activeMediaFile?.generatedFileName?.toLocaleLowerCase().endsWith(".pdf"),
   );
   const activeMediaSupportsTransform = Boolean(activePreviewUrl && !activeMediaIsPdf);
   const passportMediaTarget = mediaTargetsByType.passport_scan;
@@ -396,9 +396,6 @@ export function ReviewWorkspace({
       };
     });
   }, [submission]);
-  const approvedApplicantCount = applicantReviewStates.filter(
-    (state) => state.completed,
-  ).length;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -548,13 +545,16 @@ export function ReviewWorkspace({
       void (async () => {
         let preview: ReviewMediaPreviewState = unavailablePreview;
         try {
-          const url = await createMediaSignedUrl({
-            bucket: mediaStorageBucket,
-            path: protectedFile.storagePath,
-          });
-          preview = url
-            ? { status: "ready", url }
-            : unavailablePreview;
+          const url =
+            __V19_LOCAL_DEMO_BUILD__ && supabaseRuntimeConfig.target === "local-demo"
+              ? (
+                  await import("../modules/submissions/exportMediaZipLocalDemo")
+                ).localDemoReviewMediaUrl(target.type)
+              : await createMediaSignedUrl({
+                  bucket: mediaStorageBucket,
+                  path: protectedFile.storagePath,
+                });
+          preview = url ? { status: "ready", url } : unavailablePreview;
         } catch {
           preview = unavailablePreview;
         }
@@ -601,10 +601,18 @@ export function ReviewWorkspace({
     submission?.issues.filter(
       (issue) => issue.status === "fixed_by_agent" && passportIssueInScope(issue),
     ).length ?? 0;
-  const closedPassportIssueCount =
-    submission?.issues.filter(
-      (issue) => issue.status === "closed_by_admin" && passportIssueInScope(issue),
-    ).length ?? 0;
+  const correctedIssuesAwaitingClosure =
+    submission?.issues.filter((issue) => issue.status === "fixed_by_agent") ?? [];
+  const openSubmissionIssueCount =
+    submission?.issues.filter((issue) => issue.status === "open").length ?? 0;
+  const fixedSubmissionIssueCount = correctedIssuesAwaitingClosure.length;
+  const reviewDecisionIssueLabel =
+    [
+      openSubmissionIssueCount > 0 ? `Открыто ${openSubmissionIssueCount}` : "",
+      fixedSubmissionIssueCount > 0 ? `К закрытию ${fixedSubmissionIssueCount}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ") || "Без замечаний";
   const hasOpenPassportIssue = openPassportIssueCount > 0;
   const hasUnambiguousPrimaryApplicant = Boolean(
     submission && hasUnambiguousPrimaryApplicantForPassportReview(submission),
@@ -675,13 +683,20 @@ export function ReviewWorkspace({
   const readyMediaCount = confirmationMediaStates.filter(
     (status) => status === "ready",
   ).length;
+  const mediaStatusLabel = [
+    unavailableMediaCount > 0 ? `недоступно ${unavailableMediaCount}` : "",
+    loadingMediaCount > 0 ? `загружается ${loadingMediaCount}` : "",
+    pendingMediaReviewCount > 0 ? `не просмотрено ${pendingMediaReviewCount}` : "",
+    `доступно ${readyMediaCount} из ${confirmationMediaTypes.length}`,
+  ]
+    .filter(Boolean)
+    .join("; ");
   const requiredMediaLabel = requiredMediaTypes.includes("selfie")
     ? "паспорт и оба селфи"
     : confirmationMediaTypes.length > requiredMediaTypes.length
       ? "паспорт и файлы исправлений"
       : "паспорт";
-  let completionReason =
-    `Сверьте все ${ADMIN_PASSPORT_REVIEW_FIELD_IDS.length} паспортных полей и ${requiredMediaLabel} перед подтверждением секции.`;
+  let completionReason = `Сверьте все ${ADMIN_PASSPORT_REVIEW_FIELD_IDS.length} паспортных полей и ${requiredMediaLabel} перед подтверждением секции.`;
   if (!selectedApplicantId) {
     completionReason = "Не выбран заявитель. Подтверждение недоступно.";
   } else if (!hasUnambiguousPrimaryApplicant) {
@@ -690,8 +705,7 @@ export function ReviewWorkspace({
   } else if (!isEditableReviewStatus) {
     completionReason = `Статус «${submission?.status ?? "неизвестно"}» доступен только для чтения.`;
   } else if (!allFieldsFilled) {
-    completionReason =
-      "Заполнены не все паспортные поля или в данных есть ошибка.";
+    completionReason = "Заполнены не все паспортные поля или в данных есть ошибка.";
   } else if (unavailableMediaCount > 0) {
     completionReason = requiredMediaTypes.includes("selfie")
       ? "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи."
@@ -713,6 +727,13 @@ export function ReviewWorkspace({
   } else if (sectionApprovalPending) {
     completionReason = "Сохраняем подтверждение паспортной секции…";
   }
+  const sectionReviewHeadline = !isEditableReviewStatus
+    ? "Просмотр без изменений"
+    : sectionAlreadyAccepted
+      ? "Паспортная секция принята"
+      : canConfirmSection
+        ? "Секция готова к принятию"
+        : "Завершите сверку паспорта";
 
   const returnDecision = adminReviewActions?.returnForCorrection;
   const acceptDecision = adminReviewActions?.acceptForExport;
@@ -873,8 +894,7 @@ export function ReviewWorkspace({
 
   const handleNextReviewStep = useCallback(() => {
     const nextMediaType = confirmationMediaTypes.find(
-      (type) =>
-        mediaPreviews[type]?.status !== "ready" || !visitedMediaTypes.has(type),
+      (type) => mediaPreviews[type]?.status !== "ready" || !visitedMediaTypes.has(type),
     );
     if (nextMediaType) {
       handleMediaSelect(nextMediaType);
@@ -884,9 +904,7 @@ export function ReviewWorkspace({
 
     const nextField = reviewFields.find(
       (field) =>
-        !field.sectionId ||
-        !hasAdminPassportReviewValue(field.value) ||
-        field.hasError,
+        !field.sectionId || !hasAdminPassportReviewValue(field.value) || field.hasError,
     );
     if (nextField) {
       const fieldElement = workspaceRef.current?.querySelector<HTMLElement>(
@@ -1163,30 +1181,137 @@ export function ReviewWorkspace({
           ) : null}
 
           <div className="v19-review-details-scroll">
-            <ReviewReadinessPanel
-              closedIssueCount={closedPassportIssueCount}
-              filledFieldCount={filledFieldCount}
-              fixedIssueCount={fixedPassportIssueCount}
-              mediaReadyCount={readyMediaCount}
-              mediaTotal={confirmationMediaTypes.length}
-              mediaLoadingCount={loadingMediaCount}
-              mediaPendingReviewCount={pendingMediaReviewCount}
-              mediaUnavailableCount={unavailableMediaCount}
-              onNextStep={handleNextReviewStep}
-              openIssueCount={openPassportIssueCount}
-              packageGuardReason={acceptDecision?.reason ?? reviewDecisionReason}
-              readOnly={!isEditableReviewStatus}
-              totalFieldCount={ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-            />
+            <section
+              aria-label="Готовность паспортной проверки"
+              className="v19-review-summary"
+            >
+              <div className="v19-review-summary-copy">
+                <span>Сверка документа</span>
+                <strong>{sectionReviewHeadline}</strong>
+                <p id="passport-review-completion-reason">{completionReason}</p>
+                {isEditableReviewStatus ? (
+                  <button
+                    aria-label="Перейти к следующему незавершённому шагу"
+                    className="v19-review-next-step"
+                    onClick={handleNextReviewStep}
+                    type="button"
+                  >
+                    Следующий шаг
+                    <ArrowRight aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+              <div
+                aria-label="Состояние проверки"
+                className="v19-review-status-strip"
+                role="status"
+              >
+                <span>
+                  Поля{" "}
+                  <strong>
+                    {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
+                  </strong>
+                </span>
+                <span className={openPassportIssueCount ? "has-warning" : undefined}>
+                  Замечания{" "}
+                  <strong>{openPassportIssueCount + fixedPassportIssueCount}</strong>
+                </span>
+                <span
+                  aria-label={`Оригиналы: ${mediaStatusLabel}`}
+                  className={
+                    unavailableMediaCount > 0
+                      ? "has-warning"
+                      : loadingMediaCount > 0
+                        ? "is-loading"
+                        : pendingMediaReviewCount > 0
+                          ? "is-pending"
+                          : undefined
+                  }
+                >
+                  Оригиналы{" "}
+                  <strong>
+                    {readyMediaCount}/{confirmationMediaTypes.length}
+                  </strong>
+                </span>
+              </div>
+            </section>
+
+            {correctedIssuesAwaitingClosure.length > 0 ? (
+              <section
+                aria-label="Исправления к закрытию"
+                className="v19-review-corrected-issues"
+              >
+                <header>
+                  <div>
+                    <span>Решение администратора</span>
+                    <h2>Исправления к закрытию</h2>
+                  </div>
+                  <strong>{correctedIssuesAwaitingClosure.length}</strong>
+                </header>
+                <p>
+                  Сверьте исправленные значения. Команда «Закрыть исправления и принять»
+                  закроет перечисленные замечания и передаст пакет на выгрузку.
+                </p>
+                <div className="v19-review-corrected-issue-list">
+                  {correctedIssuesAwaitingClosure.map((issue) => {
+                    const fieldLabel = submission
+                      ? questionnaireIssueFieldDisplayLabel(submission, issue)
+                      : issue.target.field;
+                    const target = [
+                      issue.target.applicantName,
+                      issue.target.section,
+                      fieldLabel,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+
+                    return (
+                      <article key={issue.id}>
+                        <div>
+                          <strong>{issue.reason}</strong>
+                          {target ? <span>{target}</span> : null}
+                        </div>
+                        <p>{issue.comment}</p>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             <header className="v19-review-section-heading">
               <div>
-                <span>Источник решения</span>
-                <h2>Все поля паспорта</h2>
+                <span>Паспортная секция</span>
+                <h2>Данные паспорта</h2>
+                <p>Сверьте каждую графу с оригиналом паспорта.</p>
               </div>
-              <strong>
-                {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-              </strong>
+              <div
+                aria-busy={sectionApprovalPending}
+                aria-live="polite"
+                className={`v19-review-section-controls${sectionApprovalPending ? " is-pending" : ""}${sectionAlreadyAccepted ? " is-complete" : ""}${acceptanceError ? " is-error" : ""}${canConfirmSection ? " is-ready" : ""}`}
+              >
+                <strong
+                  aria-label={`Заполнено ${filledFieldCount} из ${ADMIN_PASSPORT_REVIEW_FIELD_IDS.length} паспортных полей`}
+                >
+                  {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
+                </strong>
+                {isEditableReviewStatus ? (
+                  <button
+                    aria-busy={sectionApprovalPending}
+                    aria-describedby="passport-review-completion-reason"
+                    disabled={!canConfirmSection}
+                    id="passport-review-confirm-button"
+                    onClick={() => void handleConfirmSection()}
+                    title={!canConfirmSection ? completionReason : undefined}
+                    type="button"
+                  >
+                    <CheckCircle2 aria-hidden="true" />
+                    {sectionActionLabel(sectionAlreadyAccepted, sectionApprovalPending)}
+                  </button>
+                ) : (
+                  <span className="v19-review-read-only-badge">Только просмотр</span>
+                )}
+              </div>
             </header>
 
             <div className="v19-review-field-grid">
@@ -1201,36 +1326,11 @@ export function ReviewWorkspace({
               ))}
             </div>
 
-            <section
-              aria-busy={sectionApprovalPending}
-              aria-live="polite"
-              className={`v19-review-confirmation${sectionApprovalPending ? " is-pending" : ""}${sectionAlreadyAccepted ? " is-complete" : ""}${acceptanceError ? " is-error" : ""}${canConfirmSection ? " is-ready" : ""}`}
-            >
-              <div>
-                <strong>Паспортная секция</strong>
-                <p id="passport-review-completion-reason">{completionReason}</p>
-              </div>
-              {isEditableReviewStatus ? (
-                <button
-                  aria-busy={sectionApprovalPending}
-                  aria-describedby="passport-review-completion-reason"
-                  disabled={!canConfirmSection}
-                  id="passport-review-confirm-button"
-                  onClick={() => void handleConfirmSection()}
-                  type="button"
-                >
-                  <CheckCircle2 aria-hidden="true" />
-                  {sectionActionLabel(sectionAlreadyAccepted, sectionApprovalPending)}
-                </button>
-              ) : (
-                <span className="v19-review-read-only-badge">Только просмотр</span>
-              )}
-              {acceptanceError ? (
-                <p className="v19-review-inline-error" role="alert">
-                  {acceptanceError}
-                </p>
-              ) : null}
-            </section>
+            {acceptanceError ? (
+              <p className="v19-review-inline-error" role="alert">
+                {acceptanceError}
+              </p>
+            ) : null}
           </div>
 
           <footer
@@ -1241,10 +1341,8 @@ export function ReviewWorkspace({
           >
             <div className="v19-review-decision-context">
               <div className="v19-review-decision-title">
-                <strong>Решение</strong>
-                <span>
-                  {approvedApplicantCount}/{applicantReviewStates.length} секций
-                </span>
+                <strong>Решение по подаче</strong>
+                <span>{reviewDecisionIssueLabel}</span>
               </div>
               {applicantReviewStates.length > 1 ? (
                 <div
@@ -1276,50 +1374,50 @@ export function ReviewWorkspace({
             </div>
 
             {isEditableReviewStatus ? (
-            <div className="v19-review-decision-actions">
-              <button
-                aria-busy={Boolean(reviewActionPending)}
-                aria-describedby="admin-review-decision-reason"
-                className="v19-review-return"
-                disabled={Boolean(
-                  !returnDecision ||
-                  returnDecision.disabled ||
-                  !onReviewAction ||
-                  reviewActionPending,
-                )}
-                onClick={() => void handleReviewDecision(returnDecision)}
-                type="button"
-              >
-                <MessageSquarePlus aria-hidden="true" />
-                {reviewActionLabel(
-                  returnDecision,
-                  reviewActionPending,
-                  "На исправление",
-                  "Возвращаем…",
-                )}
-              </button>
-              <button
-                aria-busy={Boolean(reviewActionPending)}
-                aria-describedby="admin-review-decision-reason"
-                className="v19-review-accept"
-                disabled={Boolean(
-                  !acceptDecision ||
-                  acceptDecision.disabled ||
-                  !onReviewAction ||
-                  reviewActionPending,
-                )}
-                onClick={() => void handleReviewDecision(acceptDecision)}
-                type="button"
-              >
-                <CheckCircle2 aria-hidden="true" />
-                {reviewActionLabel(
-                  acceptDecision,
-                  reviewActionPending,
-                  "Принять",
-                  "Принимаем…",
-                )}
-              </button>
-            </div>
+              <div className="v19-review-decision-actions">
+                <button
+                  aria-busy={Boolean(reviewActionPending)}
+                  aria-describedby="admin-review-decision-reason"
+                  className="v19-review-return"
+                  disabled={Boolean(
+                    !returnDecision ||
+                    returnDecision.disabled ||
+                    !onReviewAction ||
+                    reviewActionPending,
+                  )}
+                  onClick={() => void handleReviewDecision(returnDecision)}
+                  type="button"
+                >
+                  <MessageSquarePlus aria-hidden="true" />
+                  {reviewActionLabel(
+                    returnDecision,
+                    reviewActionPending,
+                    "На исправление",
+                    "Возвращаем…",
+                  )}
+                </button>
+                <button
+                  aria-busy={Boolean(reviewActionPending)}
+                  aria-describedby="admin-review-decision-reason"
+                  className="v19-review-accept"
+                  disabled={Boolean(
+                    !acceptDecision ||
+                    acceptDecision.disabled ||
+                    !onReviewAction ||
+                    reviewActionPending,
+                  )}
+                  onClick={() => void handleReviewDecision(acceptDecision)}
+                  type="button"
+                >
+                  <CheckCircle2 aria-hidden="true" />
+                  {reviewActionLabel(
+                    acceptDecision,
+                    reviewActionPending,
+                    "Принять",
+                    "Принимаем…",
+                  )}
+                </button>
+              </div>
             ) : (
               <span className="v19-review-read-only-badge">Мутации недоступны</span>
             )}

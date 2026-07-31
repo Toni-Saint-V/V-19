@@ -117,16 +117,54 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   });
 
   await primary.click();
-  await expect(page.getByRole("heading", { level: 1, name: /Анкета:/ })).toBeVisible();
   await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
-  await page.getByLabel("Выбрать туриста").click();
   await expect(
-    page.getByRole("listbox", { name: "Выбрать туриста" }).getByRole("option"),
+    page.getByRole("group", { name: "Разделы анкеты" }),
+  ).toBeVisible();
+  await clickFirstVisible(
+    page.getByRole("combobox", {
+      name: /Выбрать (туриста|заявителя)/,
+    }),
+  );
+  await expect(
+    page.locator('[role="listbox"]:visible').getByRole("option"),
   ).toHaveCount(2);
+}
+
+async function verifySingleCreateFlow(page: Page) {
+  const workspace = await openCreateSubmission(page, false);
+  const singleType = workspace.getByRole("radio", { name: "Заявитель" });
+  await singleType.click();
+  await expect(singleType).toHaveAttribute("aria-checked", "true");
+  await chooseCity(page, workspace, "Москва");
+
+  const continueWithoutPassport = workspace.getByRole("button", {
+    name: "Продолжить без паспорта",
+  });
+  await expect(continueWithoutPassport).toBeEnabled();
+  await continueWithoutPassport.click();
+
+  await expect(page.locator('[data-agent-screen="create"]')).toHaveCount(0);
+  await expect(
+    page.getByRole("group", { name: "Разделы анкеты" }),
+  ).toBeVisible();
+  const questionnaireHeading = page.getByRole("heading", {
+    level: 1,
+    name: /^Анкета:/,
+  });
+  await expect(questionnaireHeading).toBeVisible();
+  await expect(questionnaireHeading).not.toContainText("Семья");
 }
 
 test.describe("V-19 canonical family intake", () => {
   test.beforeAll(() => mkdirSync(qaDir, { recursive: true }));
+
+  test("creates a single submission on desktop", async ({ page }) => {
+    const browserProblems = collectBrowserProblems(page);
+    await page.setViewportSize({ height: 960, width: 1440 });
+    await verifySingleCreateFlow(page);
+    expect(browserProblems).toEqual([]);
+  });
 
   test("creates a family submission on desktop", async ({ page }) => {
     const browserProblems = collectBrowserProblems(page);
