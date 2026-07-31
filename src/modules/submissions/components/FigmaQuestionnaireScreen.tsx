@@ -158,11 +158,6 @@ const familyCopyUnavailableMessage =
   "У основного заявителя нет введённых пользователем значений для копирования в этом разделе.";
 
 const familyCopySectionIds = new Set<SectionId>(["appointment", "contact", "hotel"]);
-const familyCopyButtonLabels: Partial<Record<SectionId, string>> = {
-  appointment: "Копировать данные записи для всех",
-  contact: "Копировать адрес в России для всех",
-  hotel: "Копировать адрес в Испании для всех",
-};
 
 type FormFieldProps = {
   addressAssist?: boolean;
