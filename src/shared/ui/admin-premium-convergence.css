@@ -446,7 +446,7 @@
     grid-template-columns:
       var(--v19b-size-44)
       minmax(0, 1fr)
-      var(--v19b-size-44) !important;
+      auto !important;
     align-items: center !important;
     column-gap: var(--v19b-size-12) !important;
   }
