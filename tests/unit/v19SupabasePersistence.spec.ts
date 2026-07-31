@@ -16,17 +16,25 @@ const mockState = vi.hoisted(() => ({
   mediaAssetRows: [] as unknown[],
   profileRows: [] as unknown[],
   questionnaireRows: [] as unknown[],
+  relatedErrors: {} as Record<string, unknown>,
+  relatedStatuses: {} as Record<string, number>,
   rpcCalls: [] as Array<{
     args: Record<string, unknown>;
     name: string;
   }>,
   rpcResults: [] as Array<{ data?: unknown; error: unknown | null }>,
+  submissionError: null as unknown | null,
   submissionRows: [] as unknown[],
+  submissionStatus: 200,
   statusHistoryRows: [] as unknown[],
 }));
 
 vi.mock("../../src/lib/supabase/client", () => {
-  function queryResult(rows: unknown[], error: unknown | null = null) {
+  function queryResult(
+    rows: unknown[],
+    error: unknown | null = null,
+    status = error ? 400 : 200,
+  ) {
     const fieldValue = (row: unknown, column: string) =>
       typeof row === "object" && row !== null
         ? (row as Record<string, unknown>)[column]
@@ -78,14 +86,18 @@ vi.mock("../../src/lib/supabase/client", () => {
         return result;
       },
       then(
-        resolve: (value: { data: unknown[]; error: unknown | null }) => unknown,
+        resolve: (value: {
+          data: unknown[];
+          error: unknown | null;
+          status: number;
+        }) => unknown,
         reject?: (reason: unknown) => unknown,
       ) {
         const rangedRows = range
           ? filteredRows.slice(range[0], range[1] + 1)
           : filteredRows;
         const data = rowLimit === null ? rangedRows : rangedRows.slice(0, rowLimit);
-        return Promise.resolve({ data, error }).then(resolve, reject);
+        return Promise.resolve({ data, error, status }).then(resolve, reject);
       },
     };
     return result;
@@ -115,11 +127,18 @@ vi.mock("../../src/lib/supabase/client", () => {
                       : table === "profiles"
                         ? mockState.profileRows
                         : mockState.exportBatchRows;
+            const error =
+              mockState.relatedErrors[table] ??
+              (table === "submissions"
+                ? mockState.submissionError
+                : table === "agent_submission_card_archives"
+                  ? mockState.archivedSubmissionError
+                  : null);
             return queryResult(
               rows,
-              table === "agent_submission_card_archives"
-                ? mockState.archivedSubmissionError
-                : null,
+              error,
+              mockState.relatedStatuses[table] ??
+                (table === "submissions" ? mockState.submissionStatus : undefined),
             );
           },
         };
@@ -323,9 +342,13 @@ beforeEach(() => {
   mockState.mediaAssetRows = [];
   mockState.profileRows = [];
   mockState.questionnaireRows = [];
+  mockState.relatedErrors = {};
+  mockState.relatedStatuses = {};
   mockState.rpcCalls = [];
   mockState.rpcResults = [];
+  mockState.submissionError = null;
   mockState.submissionRows = [];
+  mockState.submissionStatus = 200;
   mockState.statusHistoryRows = [];
 });
 
@@ -334,6 +357,62 @@ afterEach(() => {
 });
 
 describe("V-19 Supabase cockpit persistence", () => {
+  it("preserves the PostgREST HTTP 402 status for the workspace circuit breaker", async () => {
+    mockState.submissionError = {
+      message: "provider response intentionally omitted",
+    };
+    mockState.submissionStatus = 402;
+
+    try {
+      await loadCockpitSubmissionsForProfile(agentProfile);
+      throw new Error("Expected the restricted Supabase read to fail.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(PersistenceObservableError);
+      expect((error as PersistenceObservableError).diagnostics).toMatchObject({
+        httpStatus: 402,
+        operation: "submissions.list",
+        retryable: false,
+      });
+    }
+  });
+
+  it("preserves HTTP 402 from a related canonical read after submissions load", async () => {
+    const submission = {
+      ...(initialSubmissions[0] as Submission),
+      agentId: agentProfile.id,
+      id: "submission-related-read-402",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        case_revision: 4,
+        created_at: submission.createdAt,
+        updated_at: submission.updatedAt,
+      },
+    ];
+    mockState.relatedErrors.applicants = {
+      message: "provider response intentionally omitted",
+    };
+    mockState.relatedStatuses.applicants = 402;
+
+    try {
+      await loadCockpitSubmissionsForProfile(agentProfile);
+      throw new Error("Expected the related restricted Supabase read to fail.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(PersistenceObservableError);
+      expect((error as PersistenceObservableError).diagnostics).toMatchObject({
+        httpStatus: 402,
+        operation: "applicants.list",
+        retryable: false,
+      });
+    }
+  });
+
   it("rejects corrupt correction targets before building a Supabase payload", () => {
     const submission = normalizeSubmissionForCanonicalRuntime({
       ...(initialSubmissions.find((item) => item.id === "ПД-1053") as Submission),

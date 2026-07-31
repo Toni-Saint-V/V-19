@@ -11,6 +11,8 @@ export type WorkspaceDataStatus =
   | "loading"
   | "ready";
 
+export type WorkspaceRefreshTrigger = "interval" | "recovery";
+
 export type WorkspaceSessionToken = {
   generation: number;
   userId: string;
@@ -99,6 +101,13 @@ export function canRefreshVisibleWorkspace(
   visibilityState: "hidden" | "prerender" | "unloaded" | "visible" | undefined,
 ): boolean {
   return visibilityState === undefined || visibilityState === "visible";
+}
+
+export function shouldRequestWorkspaceRefresh(
+  trigger: WorkspaceRefreshTrigger,
+  serviceRestricted: boolean,
+): boolean {
+  return trigger === "recovery" || !serviceRestricted;
 }
 
 export function isLatestWorkspaceResponse(

@@ -329,6 +329,7 @@ type QuestionnaireAnswerValueResult = {
 type PagedRowsResult<Row> = {
   data: Row[];
   error: unknown | null;
+  httpStatus?: number;
 };
 
 async function collectPagedRows<Row>(
@@ -341,7 +342,13 @@ async function collectPagedRows<Row>(
   const data: Row[] = [];
   for (let from = 0; ; from += pageSize) {
     const page = await fetchPage(from, from + pageSize - 1);
-    if (page.error) return { data: [], error: page.error };
+    if (page.error) {
+      return {
+        data: [],
+        error: page.error,
+        ...(page.httpStatus ? { httpStatus: page.httpStatus } : {}),
+      };
+    }
     data.push(...page.data);
     if (page.data.length < pageSize) return { data, error: null };
   }
@@ -360,7 +367,13 @@ async function collectIdKeysetPagedRows<Row extends { id: string }>(
 
   for (;;) {
     const page = await fetchPage(afterId, pageSize);
-    if (page.error) return { data: [], error: page.error };
+    if (page.error) {
+      return {
+        data: [],
+        error: page.error,
+        ...(page.httpStatus ? { httpStatus: page.httpStatus } : {}),
+      };
+    }
 
     for (const row of page.data) {
       if (!row.id || seenIds.has(row.id) || (afterId !== null && row.id <= afterId)) {
@@ -412,7 +425,15 @@ async function collectRowsForSubmissionIds<Row>(
       (from, to) => fetchPage(submissionIdChunk, from, to),
       relatedRowPageSize,
     );
-    if (chunkRows.error) return { data: [], error: chunkRows.error };
+    if (chunkRows.error) {
+      return {
+        data: [],
+        error: chunkRows.error,
+        ...(chunkRows.httpStatus
+          ? { httpStatus: chunkRows.httpStatus }
+          : {}),
+      };
+    }
     data.push(...chunkRows.data);
   }
   return { data, error: null };
@@ -1843,8 +1864,12 @@ export async function loadCockpitSubmissionsForProfile(
         .limit(limit);
       if (profile.role === "agent") query = query.eq("agent_id", profile.id);
       if (afterId) query = query.gt("id", afterId);
-      const { data, error } = await query;
-      return { data: (data ?? []) as SubmissionRow[], error };
+      const { data, error, status } = await query;
+      return {
+        data: (data ?? []) as SubmissionRow[],
+        error,
+        httpStatus: status,
+      };
     }, submissionPageSize);
   const runPreConcurrencyQuery = () =>
     collectIdKeysetPagedRows<SubmissionRow>(async (afterId, limit) => {
@@ -1855,13 +1880,14 @@ export async function loadCockpitSubmissionsForProfile(
         .limit(limit);
       if (profile.role === "agent") query = query.eq("agent_id", profile.id);
       if (afterId) query = query.gt("id", afterId);
-      const { data, error } = await query;
+      const { data, error, status } = await query;
       return {
         data: (data ?? []).map((row) => ({
           ...row,
           case_revision: null,
         })) as SubmissionRow[],
         error,
+        httpStatus: status,
       };
     }, submissionPageSize);
   const runLegacyQuery = () =>
@@ -1873,7 +1899,7 @@ export async function loadCockpitSubmissionsForProfile(
         .limit(limit);
       if (profile.role === "agent") query = query.eq("agent_id", profile.id);
       if (afterId) query = query.gt("id", afterId);
-      const { data, error } = await query;
+      const { data, error, status } = await query;
       return {
         data: (data ?? []).map((row) => ({
           ...row,
@@ -1881,24 +1907,28 @@ export async function loadCockpitSubmissionsForProfile(
           public_number: null,
         })) as SubmissionRow[],
         error,
+        httpStatus: status,
       };
     }, submissionPageSize);
-  let { data: rows, error } = await runCurrentQuery();
+  let { data: rows, error, httpStatus } = await runCurrentQuery();
 
   if (isMissingCaseRevisionColumn(error)) {
     const preConcurrencyResult = await runPreConcurrencyQuery();
     error = preConcurrencyResult.error;
     rows = preConcurrencyResult.data;
+    httpStatus = preConcurrencyResult.httpStatus;
   }
 
   if (isMissingPublicNumberColumn(error)) {
     const legacyResult = await runLegacyQuery();
     error = legacyResult.error;
     rows = legacyResult.data;
+    httpStatus = legacyResult.httpStatus;
   }
 
   if (error) {
     throw mapSupabasePersistenceError(error, {
+      httpStatus,
       operation: "submissions.list",
       fallbackKind: "database",
     });
@@ -1934,56 +1964,72 @@ export async function loadCockpitSubmissionsForProfile(
     collectRowsForSubmissionIds<CockpitApplicantRow>(
       submissionIds,
       async (submissionIdChunk, from, to) => {
-        const { data, error } = await client
+        const { data, error, status } = await client
           .from("applicants")
           .select(applicantSelect)
           .in("submission_id", submissionIdChunk)
           .order("id", { ascending: true })
           .range(from, to);
-        return { data: (data ?? []) as CockpitApplicantRow[], error };
+        return {
+          data: (data ?? []) as CockpitApplicantRow[],
+          error,
+          httpStatus: status,
+        };
       },
     ),
     collectRowsForSubmissionIds<CockpitQuestionnaireAnswerRow>(
       submissionIds,
       async (submissionIdChunk, from, to) => {
-        const { data, error } = await client
+        const { data, error, status } = await client
           .from("questionnaire_answers")
           .select(questionnaireAnswerSelect)
           .in("submission_id", submissionIdChunk)
           .order("id", { ascending: true })
           .range(from, to);
-        return { data: (data ?? []) as CockpitQuestionnaireAnswerRow[], error };
+        return {
+          data: (data ?? []) as CockpitQuestionnaireAnswerRow[],
+          error,
+          httpStatus: status,
+        };
       },
     ),
     collectRowsForSubmissionIds<CockpitMediaAssetRow>(
       submissionIds,
       async (submissionIdChunk, from, to) => {
-        const { data, error } = await client
+        const { data, error, status } = await client
           .from("media_assets")
           .select(mediaAssetSelect)
           .in("submission_id", submissionIdChunk)
           .order("id", { ascending: true })
           .range(from, to);
-        return { data: (data ?? []) as CockpitMediaAssetRow[], error };
+        return {
+          data: (data ?? []) as CockpitMediaAssetRow[],
+          error,
+          httpStatus: status,
+        };
       },
     ),
     collectRowsForSubmissionIds<CockpitCorrectionRow>(
       submissionIds,
       async (submissionIdChunk, from, to) => {
-        const { data, error } = await client
+        const { data, error, status } = await client
           .from("corrections")
           .select(correctionSelect)
           .in("submission_id", submissionIdChunk)
           .order("created_at", { ascending: true })
           .order("id", { ascending: true })
           .range(from, to);
-        return { data: (data ?? []) as CockpitCorrectionRow[], error };
+        return {
+          data: (data ?? []) as CockpitCorrectionRow[],
+          error,
+          httpStatus: status,
+        };
       },
     ),
     collectRowsForSubmissionIds<CockpitStatusHistoryRow>(
       submissionIds,
       async (submissionIdChunk, from, to) => {
-        const { data, error } = await client
+        const { data, error, status } = await client
           .from("status_history")
           .select(statusHistorySelect)
           .eq("entity_type", "submission")
@@ -1991,7 +2037,11 @@ export async function loadCockpitSubmissionsForProfile(
           .order("changed_at", { ascending: false })
           .order("id", { ascending: true })
           .range(from, to);
-        return { data: (data ?? []) as CockpitStatusHistoryRow[], error };
+        return {
+          data: (data ?? []) as CockpitStatusHistoryRow[],
+          error,
+          httpStatus: status,
+        };
       },
     ),
     profile.role === "admin"
@@ -2001,7 +2051,7 @@ export async function loadCockpitSubmissionsForProfile(
       ? collectRowsForSubmissionIds<{ id: string; display_name: string }>(
           agentIds,
           async (agentIdChunk, from, to) => {
-            const { data, error } = await client
+            const { data, error, status } = await client
               .from("profiles")
               .select(agentProfileSelect)
               .in("id", agentIdChunk)
@@ -2010,25 +2060,46 @@ export async function loadCockpitSubmissionsForProfile(
             return {
               data: (data ?? []) as { id: string; display_name: string }[],
               error,
+              httpStatus: status,
             };
           },
         )
       : Promise.resolve({
           data: [{ id: profile.id, display_name: profile.displayName }],
           error: null,
+          httpStatus: undefined,
         }),
   ]);
 
-  const { data: applicantRows, error: applicantError } = applicantResult;
-  const { data: questionnaireRows, error: questionnaireError } =
-    questionnaireResult;
-  const { data: mediaRows, error: mediaError } = mediaResult;
-  const { data: correctionRows, error: correctionError } = correctionResult;
-  const { data: statusHistoryRows, error: statusHistoryError } =
-    statusHistoryResult;
+  const {
+    data: applicantRows,
+    error: applicantError,
+    httpStatus: applicantHttpStatus,
+  } = applicantResult;
+  const {
+    data: questionnaireRows,
+    error: questionnaireError,
+    httpStatus: questionnaireHttpStatus,
+  } = questionnaireResult;
+  const {
+    data: mediaRows,
+    error: mediaError,
+    httpStatus: mediaHttpStatus,
+  } = mediaResult;
+  const {
+    data: correctionRows,
+    error: correctionError,
+    httpStatus: correctionHttpStatus,
+  } = correctionResult;
+  const {
+    data: statusHistoryRows,
+    error: statusHistoryError,
+    httpStatus: statusHistoryHttpStatus,
+  } = statusHistoryResult;
 
   if (applicantError) {
     throw mapSupabasePersistenceError(applicantError, {
+      httpStatus: applicantHttpStatus,
       operation: "applicants.list",
       fallbackKind: "database",
     });
@@ -2036,6 +2107,7 @@ export async function loadCockpitSubmissionsForProfile(
 
   if (questionnaireError) {
     throw mapSupabasePersistenceError(questionnaireError, {
+      httpStatus: questionnaireHttpStatus,
       operation: "questionnaire_answers.list",
       fallbackKind: "database",
     });
@@ -2043,6 +2115,7 @@ export async function loadCockpitSubmissionsForProfile(
 
   if (mediaError) {
     throw mapSupabasePersistenceError(mediaError, {
+      httpStatus: mediaHttpStatus,
       operation: "media_assets.list",
       fallbackKind: "database",
     });
@@ -2050,6 +2123,7 @@ export async function loadCockpitSubmissionsForProfile(
 
   if (correctionError) {
     throw mapSupabasePersistenceError(correctionError, {
+      httpStatus: correctionHttpStatus,
       operation: "corrections.list",
       fallbackKind: "database",
     });
@@ -2057,6 +2131,7 @@ export async function loadCockpitSubmissionsForProfile(
 
   if (statusHistoryError) {
     throw mapSupabasePersistenceError(statusHistoryError, {
+      httpStatus: statusHistoryHttpStatus,
       operation: "status_history.list",
       fallbackKind: "database",
     });
@@ -2064,6 +2139,7 @@ export async function loadCockpitSubmissionsForProfile(
 
   if (agentProfilesResult.error) {
     throw mapSupabasePersistenceError(agentProfilesResult.error, {
+      httpStatus: agentProfilesResult.httpStatus,
       operation: "profiles.agent-list",
       fallbackKind: "database",
     });
@@ -2170,7 +2246,7 @@ async function loadAgentArchivedSubmissionIds(
 
   const archivedSubmissionIds = new Set<string>();
   for (const submissionIdChunk of chunkedSubmissionIds(submissionIds)) {
-    const { data, error } = await client
+    const { data, error, status } = await client
       .from("agent_submission_card_archives")
       .select("submission_id")
       .in("submission_id", submissionIdChunk);
@@ -2180,6 +2256,7 @@ async function loadAgentArchivedSubmissionIds(
     }
     if (error) {
       throw mapSupabasePersistenceError(error, {
+        httpStatus: status,
         operation: "agent_submission_card_archives.list",
         fallbackKind: "database",
       });
@@ -2232,19 +2309,24 @@ async function loadExportBatchRowsForSubmissions(
   const result = await collectRowsForSubmissionIds<CockpitExportBatchRow>(
     submissionIds,
     async (submissionIdChunk, from, to) => {
-      const { data, error } = await client
+      const { data, error, status } = await client
         .from("export_batches")
         .select(exportBatchSelect)
         .overlaps("submission_ids", submissionIdChunk)
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .range(from, to);
-      return { data: (data ?? []) as CockpitExportBatchRow[], error };
+      return {
+        data: (data ?? []) as CockpitExportBatchRow[],
+        error,
+        httpStatus: status,
+      };
     },
   );
 
   if (result.error) {
     throw mapSupabasePersistenceError(result.error, {
+      httpStatus: result.httpStatus,
       operation: "export_batches.list",
       fallbackKind: "database",
     });

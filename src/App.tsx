@@ -68,10 +68,12 @@ import {
 import { completeSupabasePasswordRecovery } from "./services/supabasePasswordRecovery";
 import { fetchCurrentProfile } from "./services/profileService";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
+import { isSupabaseServiceRestriction } from "./services/persistenceObservability";
 import {
   canRefreshVisibleWorkspace,
   isCurrentWorkspaceSession,
   isLatestWorkspaceResponse,
+  shouldRequestWorkspaceRefresh,
   shouldBlockLocalDemoDataSource,
   waitForWorkspaceMutationQueueDrain,
   WorkspaceRefreshCoordinator,
@@ -79,6 +81,7 @@ import {
   workspaceInitialGate,
   workspaceRefreshIntervalMs,
   type WorkspaceDataStatus,
+  type WorkspaceRefreshTrigger,
   type WorkspaceSessionToken,
 } from "./lib/supabase/workspaceRuntime";
 import type { Role, Submission, SubmissionAction } from "./modules/submissions/types";
@@ -283,6 +286,7 @@ export default function App({
   const postCommitBridgePolicyRef = useRef(new PostCommitBridgePolicy());
   const workspaceRefreshRequestRef = useRef(0);
   const workspaceRefreshCoordinatorRef = useRef(new WorkspaceRefreshCoordinator());
+  const workspaceServiceRestrictedRef = useRef(false);
   const signOutPendingRef = useRef(false);
   const workspaceSessionGenerationRef = useRef(0);
   const workspaceSessionUserIdRef = useRef<string | null>(null);
@@ -305,6 +309,7 @@ export default function App({
     workspaceSessionUserIdRef.current = nextUserId;
     workspaceRefreshRequestRef.current += 1;
     workspaceRefreshCoordinatorRef.current.invalidate();
+    workspaceServiceRestrictedRef.current = false;
     workspaceSessionNeedsQueueDrainRef.current = true;
     workspaceMutationStateRef.current = {
       count: 0,
@@ -533,6 +538,7 @@ export default function App({
       setOwnerIdsBySubmissionId(loaded.ownerIdsBySubmissionId);
       setSubmissions(loaded.submissions);
       setAccessRequests(nextAccessRequests);
+      workspaceServiceRestrictedRef.current = false;
       setWorkspaceDataState({
         refreshedAt: new Date().toISOString(),
         sessionUserId: sessionToken.userId,
@@ -540,6 +546,9 @@ export default function App({
       });
     } catch (error) {
       if (!isCurrentResponse()) return;
+      if (isSupabaseServiceRestriction(error)) {
+        workspaceServiceRestrictedRef.current = true;
+      }
       setWorkspaceDataState({
         error:
           error instanceof Error
@@ -554,16 +563,36 @@ export default function App({
     [activeApprovedSession, activeProfile, loadAccessRequests, supabaseEnabled],
   );
 
-  const refreshCanonicalSubmissions = useCallback(() => {
-    const mutationState = workspaceMutationStateRef.current;
-    const blockedByMutation =
-      mutationState.generation === workspaceSessionGenerationRef.current &&
-      mutationState.count > 0;
-    return workspaceRefreshCoordinatorRef.current.request(
-      runCanonicalSubmissionsRefresh,
-      blockedByMutation,
-    );
-  }, [runCanonicalSubmissionsRefresh]);
+  const refreshCanonicalSubmissions = useCallback(
+    (trigger: WorkspaceRefreshTrigger = "recovery") => {
+      if (
+        !shouldRequestWorkspaceRefresh(
+          trigger,
+          workspaceServiceRestrictedRef.current,
+        )
+      ) {
+        return Promise.resolve();
+      }
+
+      const mutationState = workspaceMutationStateRef.current;
+      const blockedByMutation =
+        mutationState.generation === workspaceSessionGenerationRef.current &&
+        mutationState.count > 0;
+      const run = () => {
+        if (
+          !shouldRequestWorkspaceRefresh(
+            trigger,
+            workspaceServiceRestrictedRef.current,
+          )
+        ) {
+          return Promise.resolve();
+        }
+        return runCanonicalSubmissionsRefresh();
+      };
+      return workspaceRefreshCoordinatorRef.current.request(run, blockedByMutation);
+    },
+    [runCanonicalSubmissionsRefresh],
+  );
 
   useEffect(() => {
     refreshCanonicalSubmissionsRef.current = refreshCanonicalSubmissions;
@@ -709,19 +738,23 @@ export default function App({
     if (!supabaseEnabled || !activeApprovedSession) return;
     if (typeof window === "undefined" || typeof document === "undefined") return;
 
-    const refreshIfVisible = () => {
+    const refreshIfVisible = (trigger: WorkspaceRefreshTrigger) => {
       if (!canRefreshVisibleWorkspace(document.visibilityState)) return;
-      void refreshCanonicalSubmissions();
+      void refreshCanonicalSubmissions(trigger);
     };
-    const onVisibilityChange = () => refreshIfVisible();
-    const interval = window.setInterval(refreshIfVisible, workspaceRefreshIntervalMs);
+    const onFocus = () => refreshIfVisible("recovery");
+    const onVisibilityChange = () => refreshIfVisible("recovery");
+    const interval = window.setInterval(
+      () => refreshIfVisible("interval"),
+      workspaceRefreshIntervalMs,
+    );
 
-    window.addEventListener("focus", refreshIfVisible);
+    window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", refreshIfVisible);
+      window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [activeApprovedSession, refreshCanonicalSubmissions, supabaseEnabled]);

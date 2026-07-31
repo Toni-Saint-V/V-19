@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   formatPersistenceFailureForUser,
   isDefinitivePersistenceRejection,
+  isSupabaseServiceRestriction,
   mapSupabasePersistenceError,
   PersistenceObservableError,
 } from "../../src/services/persistenceObservability";
@@ -149,5 +150,34 @@ describe("Supabase persistence observability", () => {
     expect(formatPersistenceFailureForUser(error, "fallback")).toBe(
       "Unable to sign in. Check email, password, and Supabase profile. Reference: auth.sign_in_password:auth:NETWORK.",
     );
+  });
+
+  test("identifies only HTTP 402 as a Supabase service restriction", () => {
+    const restricted = mapSupabasePersistenceError(
+      { message: "provider response intentionally omitted" },
+      {
+        httpStatus: 402,
+        operation: "submissions.list",
+        fallbackKind: "database",
+      },
+    );
+    const forbidden = mapSupabasePersistenceError(
+      { status: 403 },
+      {
+        operation: "submissions.list",
+        fallbackKind: "database",
+      },
+    );
+    const unavailable = mapSupabasePersistenceError(
+      { status: 503 },
+      {
+        operation: "submissions.list",
+        fallbackKind: "database",
+      },
+    );
+
+    expect(isSupabaseServiceRestriction(restricted)).toBe(true);
+    expect(isSupabaseServiceRestriction(forbidden)).toBe(false);
+    expect(isSupabaseServiceRestriction(unavailable)).toBe(false);
   });
 });

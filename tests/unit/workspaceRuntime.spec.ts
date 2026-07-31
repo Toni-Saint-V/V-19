@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   canRefreshVisibleWorkspace,
   isLatestWorkspaceResponse,
+  shouldRequestWorkspaceRefresh,
   shouldBlockLocalDemoDataSource,
   waitForWorkspaceMutationQueueDrain,
   workspaceDataState,
@@ -45,6 +46,12 @@ describe("workspace runtime production guard", () => {
     expect(canRefreshVisibleWorkspace("hidden")).toBe(false);
     expect(isLatestWorkspaceResponse(3, 3)).toBe(true);
     expect(isLatestWorkspaceResponse(2, 3)).toBe(false);
+  });
+
+  test("opens the automatic refresh circuit only for a confirmed service restriction", () => {
+    expect(shouldRequestWorkspaceRefresh("interval", true)).toBe(false);
+    expect(shouldRequestWorkspaceRefresh("recovery", true)).toBe(true);
+    expect(shouldRequestWorkspaceRefresh("interval", false)).toBe(true);
   });
 
   test("maps loaded Supabase result counts to deterministic UI states", () => {
