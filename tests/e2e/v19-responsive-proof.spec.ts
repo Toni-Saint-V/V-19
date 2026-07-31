@@ -420,12 +420,28 @@ async function expectMobileAdminReviewDensity(page: Page, context: string) {
   ).toBeGreaterThanOrEqual(120);
 
   const mobileFilters = page.locator(".v19-review-mobile-filters");
-  await expect(mobileFilters.locator("summary")).toBeVisible();
-  await mobileFilters.locator("summary").click();
+  const mobileFiltersTrigger = mobileFilters.locator("summary");
+  await expect(mobileFiltersTrigger).toBeVisible();
+  const queueToolbarControls = page.locator(
+    ".v19-admin-review-board .v19-admin-queue-toolbar-search:visible, .v19-admin-review-board .v19-admin-toolbar-select:visible, .v19-admin-review-board .v19-review-mobile-filters > summary:visible",
+  );
+  await expect(queueToolbarControls).toHaveCount(3);
+  const toolbarControlCenters = await queueToolbarControls.evaluateAll((elements) =>
+    elements.map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return Math.round(bounds.top + bounds.height / 2);
+    }),
+  );
+  expect(
+    new Set(toolbarControlCenters).size,
+    `${context}: search, sorting and filters stay on one row`,
+  ).toBe(1);
+
+  await mobileFiltersTrigger.click();
   await expect(mobileFilters.locator(".v19-admin-toolbar-select:visible")).toHaveCount(
     2,
   );
-  await mobileFilters.locator("summary").click();
+  await mobileFiltersTrigger.click();
 
   const firstCard = page.locator(".v19-admin-review-card:visible").first();
   await expect(firstCard).toBeVisible();
