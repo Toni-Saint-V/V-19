@@ -19,12 +19,12 @@ const entryCssRawKbBaseline = 2300;
 const entryCssRawKbAllowance = 2;
 const entryCssGzipKbBaseline = 250;
 const entryCssGzipKbAllowance = 1;
-// Clean HEAD measures 2405.8 KiB raw / 262.8 KiB gzip across all CSS. The
-// narrow allowance covers the current reviewed flow fixes without granting
-// room for another unreviewed global layer.
-const totalCssRawKbBaseline = 2406;
+// The integration preview intentionally combines the reviewed operational,
+// admin-premium, and agent-premium convergence layers in one runtime. Keep the
+// measured merged composition as the new no-growth baseline.
+const totalCssRawKbBaseline = 2497;
 const totalCssRawKbAllowance = 3;
-const totalCssGzipKbBaseline = 263;
+const totalCssGzipKbBaseline = 273;
 const totalCssGzipKbAllowance = 1;
 const cssChunkCountLimit = 8;
 const totalJsRawKbBaseline = 1054;

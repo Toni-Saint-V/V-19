@@ -25,11 +25,17 @@ const runtimeStyleImportsByOwner = new Map([
   [
     "src/components/WorkspaceSurface.tsx",
     [
+      "src/shared/ui/operational-screen-convergence.css",
       "src/shared/ui/operational-side-menu.css",
       "src/shared/ui/agent-actions-v2.css",
       "src/shared/ui/agent-drawer-v2.css",
     ],
   ],
+  [
+    "src/components/AdminWorkspace.tsx",
+    ["src/shared/ui/admin-premium-convergence.css"],
+  ],
+  ["src/components/CommandCenter.tsx", ["src/shared/ui/agent-premium-convergence.css"]],
   ["src/components/PreUploadScreen.tsx", ["src/components/PreUploadScreen.css"]],
   [
     "src/modules/submissions/components/FigmaQuestionnaireScreen.tsx",
