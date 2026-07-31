@@ -425,26 +425,65 @@
 }
 
 /*
- * The queue header owns four data columns while each row also owns a disclosure
- * chevron. Keep their tracks identical instead of squeezing trip dates into the
- * chevron track. At the narrowest desktop width, dates stay in the accessible
- * row label but leave the visual table so status labels remain readable.
+ * The queue header and every row share five data columns plus one disclosure
+ * track. The explicit contract prevents names and action labels from drifting
+ * into neighbouring cells at desktop and tablet widths.
  */
 #root
   .is-agent-shell-source-actions
   .v19-legacy-actions-screen.surface-agent-actions
   .v19-actions-desktop-grid.is-inline-context
-  .v19-actions-table-head,
+  .v19-actions-table-head:has(> :nth-child(5):last-child),
 #root
   .is-agent-shell-source-actions
   .v19-legacy-actions-screen.surface-agent-actions
-  .v19-actions-table-row.is-inline-context {
+  .v19-actions-table-row.is-inline-context:has(> .v19-actions-cell-applicant) {
   grid-template-columns:
-    minmax(var(--v19b-size-160), 1.45fr)
-    minmax(var(--v19b-size-160), 1.2fr)
-    minmax(var(--v19b-size-112), 0.72fr)
-    minmax(var(--v19b-size-112), 0.8fr)
+    14%
+    24%
+    17%
+    15%
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
     var(--v19b-size-20) !important;
+  gap: var(--v19b-size-12) !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-desktop-grid.is-inline-context
+  .v19-actions-table-head {
+  padding-inline: var(--v19b-size-16) !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-desktop-grid.is-inline-context
+  .v19-actions-table-head
+  > span:nth-child(n + 2),
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-table-row.is-inline-context
+  :is(
+    .v19-actions-cell-applicant,
+    .v19-actions-cell-dates,
+    .v19-actions-cell-city,
+    .v19-actions-cell-action
+  ) {
+  padding-inline-start: var(--v19b-size-0) !important;
+  border-inline-start: var(--v19b-size-0) !important;
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context
+    .v19-actions-table-head {
+    padding-inline: var(--v19b-size-12) !important;
+  }
 }
 
 @media (min-width: 768px) and (max-width: 899px) {
@@ -461,6 +500,7 @@
       minmax(var(--v19b-size-152), 1.32fr)
       minmax(var(--v19b-size-144), 1.12fr)
       minmax(var(--v19b-size-128), 0.84fr)
+      minmax(var(--v19b-size-112), 0.8fr)
       var(--v19b-size-20) !important;
   }
 
@@ -469,13 +509,13 @@
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-actions-desktop-grid.is-inline-context
     .v19-actions-table-head
-    > span:nth-child(4),
+    > span:nth-child(3),
   #root
     .is-agent-shell-source-actions
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-actions-table-row.is-inline-context
     .v19-actions-cell-dates {
-    display: none;
+    display: none !important;
   }
 }
 

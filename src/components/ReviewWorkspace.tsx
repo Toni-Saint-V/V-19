@@ -30,10 +30,7 @@ import {
 } from "../modules/submissions/mediaStorage";
 import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
-import {
-  getAdminReviewActions,
-  statusLabelFor,
-} from "../modules/submissions/status";
+import { getAdminReviewActions, statusLabelFor } from "../modules/submissions/status";
 import { questionnaireIssueFieldDisplayLabel } from "../modules/submissions/questionnaire";
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
@@ -586,11 +583,7 @@ export function ReviewWorkspace({
             __V19_LOCAL_DEMO_BUILD__ && supabaseRuntimeConfig.target === "local-demo"
               ? (
                   await import("../modules/submissions/exportMediaZipLocalDemo")
-                ).localDemoReviewMediaUrl(
-                  target.type,
-                  protectedFile,
-                  submissionId,
-                )
+                ).localDemoReviewMediaUrl(target.type, protectedFile, submissionId)
               : await createMediaSignedUrl({
                   bucket: mediaStorageBucket,
                   path: protectedFile.storagePath,
@@ -1090,43 +1083,6 @@ export function ReviewWorkspace({
       tabIndex={-1}
       transition={prefersReducedMotion ? linearDrawerMotion.reduced : undefined}
     >
-      <header className="v19-review-header">
-        <button
-          aria-label="Вернуться к очереди"
-          className="v19-review-back"
-          onClick={onBack}
-          type="button"
-        >
-          <ArrowLeft aria-hidden="true" />
-        </button>
-        <div className="v19-review-heading">
-          <span>{selectedApplicant?.fullName ?? "Проверка документов"}</span>
-          <div>
-            <h1 aria-label={`Сверка паспорта · ${submissionId}`}>Сверка паспорта</h1>
-            <code title={submissionId}>{submissionId}</code>
-            {submission ? (
-              <span data-testid="review-workspace-status">
-                {statusLabelFor(submission.status, "full")}
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <a
-          aria-disabled={!activePreviewUrl}
-          className={`v19-review-download${activePreviewUrl ? "" : " is-disabled"}`}
-          download={
-            activeMediaFile
-              ? reviewFileName(activeMediaTarget, activeMediaFile)
-              : undefined
-          }
-          href={activePreviewUrl}
-          tabIndex={activePreviewUrl ? undefined : -1}
-        >
-          <Download aria-hidden="true" />
-          <span>Скачать</span>
-        </a>
-      </header>
-
       <main className="v19-review-main">
         <section aria-label="Оригиналы документов" className="v19-review-media-pane">
           <div className="v19-review-media-toolbar">
@@ -1139,7 +1095,27 @@ export function ReviewWorkspace({
               <span title={reviewFileName(activeMediaTarget, activeMediaFile)}>
                 {activeMediaTarget.shortLabel}
               </span>
+              {selectedApplicant || submission ? (
+                <div
+                  aria-label="Контекст проверки подачи"
+                  className="v19-review-file-identity"
+                >
+                  <span>{selectedApplicant?.fullName ?? "Заявитель"}</span>
+                  <code>{submissionId}</code>
+                  {submission ? (
+                    <em>{statusLabelFor(submission.status, "full")}</em>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="v19-review-media-controls">
+                <button
+                  aria-label="Вернуться к очереди"
+                  className="v19-review-back v19-review-toolbar-back"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ArrowLeft aria-hidden="true" />
+                </button>
                 <button
                   aria-label="Уменьшить изображение"
                   disabled={!activeMediaSupportsTransform || zoom <= 60}
@@ -1174,6 +1150,20 @@ export function ReviewWorkspace({
                 >
                   <Maximize2 aria-hidden="true" />
                 </button>
+                <a
+                  aria-disabled={!activePreviewUrl}
+                  aria-label="Скачать файл"
+                  className={`v19-review-download v19-review-toolbar-download${activePreviewUrl ? "" : " is-disabled"}`}
+                  download={
+                    activeMediaFile
+                      ? reviewFileName(activeMediaTarget, activeMediaFile)
+                      : undefined
+                  }
+                  href={activePreviewUrl}
+                  tabIndex={activePreviewUrl ? undefined : -1}
+                >
+                  <Download aria-hidden="true" />
+                </a>
               </div>
             </div>
           </div>
@@ -1424,12 +1414,7 @@ export function ReviewWorkspace({
               </section>
             ) : null}
 
-            <header className="v19-review-section-heading">
-              <div>
-                <span>Паспортная секция</span>
-                <h2>Данные паспорта</h2>
-                <p>Сверьте каждую графу с оригиналом паспорта.</p>
-              </div>
+            <header className="v19-review-section-heading is-controls-only">
               <div
                 aria-busy={sectionApprovalPending}
                 aria-live="polite"

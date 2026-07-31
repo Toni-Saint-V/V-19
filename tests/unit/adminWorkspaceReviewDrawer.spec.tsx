@@ -1445,7 +1445,10 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(onApplicantChange).toHaveBeenLastCalledWith(replacementApplicant.id),
     );
-    expect(screen.getByText(replacementApplicant.fullName)).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Сверка паспорта" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Контекст проверки подачи")).toHaveTextContent(
+      `${replacementApplicant.fullName}${refreshedSubmission.id}`,
+    );
   });
 
   test("uses canonical review guards for final production decisions", async () => {
@@ -2107,8 +2110,12 @@ describe("AdminReviewDrawer document comparison", () => {
       await screen.findByRole("dialog", { name: "Сверка паспорта" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: `Сверка паспорта · ${submission.id}` }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: `Сверка паспорта · ${submission.id}` }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Контекст проверки подачи")).toHaveTextContent(
+      `${submission.applicants[0]?.fullName}${submission.id}`,
+    );
+    expect(screen.getByLabelText("Скачать файл")).toBeInTheDocument();
     expect(
       screen.queryByRole("dialog", { name: "Добавить замечание" }),
     ).not.toBeInTheDocument();

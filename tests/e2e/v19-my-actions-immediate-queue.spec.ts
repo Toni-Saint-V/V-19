@@ -140,7 +140,7 @@ test.describe("V-19 My Actions immediate queue", () => {
         ).toBeVisible();
         await expect(
           page
-            .getByRole("button", { name: /Сортировка действий: По дате вылета/ })
+            .getByRole("button", { name: /Сортировка действий: Дата вылета/ })
             .locator(".v19-admin-toolbar-select-value"),
         ).toBeVisible();
         await expect(
@@ -176,10 +176,7 @@ test.describe("V-19 My Actions immediate queue", () => {
         await page.screenshot({
           animations: "disabled",
           fullPage: false,
-          path: join(
-            evidenceDirectory,
-            `${viewport.label}-submission-files-after.png`,
-          ),
+          path: join(evidenceDirectory, `${viewport.label}-submission-files-after.png`),
         });
       }
 
@@ -189,7 +186,6 @@ test.describe("V-19 My Actions immediate queue", () => {
       );
       expect(metrics.rowOpacity).toEqual(Array(metrics.rowCount).fill("1"));
       expect(metrics.animationRecords.filter((record) => record.delay > 0)).toEqual([]);
-
     }
 
     writeFileSync(

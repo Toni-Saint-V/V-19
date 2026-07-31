@@ -551,6 +551,34 @@
   }
 }
 
+#root .ops-shell.surface-agent-submissions .v19-applicant-delete-footer-action {
+  display: none;
+  min-height: var(--v19b-size-24);
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--v19b-size-2);
+  padding: var(--v19b-size-0) var(--v19b-size-6);
+  border: var(--v19b-size-0);
+  border-radius: var(--v19b-radius-segmented);
+  color: var(--v19b-color-text-muted);
+  background: transparent;
+  font-size: var(--v19b-size-10);
+  font-weight: var(--v19b-weight-control);
+}
+
+@media (min-width: 768px) {
+  #root .ops-shell.surface-agent-submissions .v19-applicant-delete-footer-action {
+    display: inline-flex;
+  }
+}
+
+#root
+  .ops-shell.surface-agent-submissions
+  .v19-applicant-delete-footer-action:is(:hover, :focus-visible) {
+  color: color-mix(in srgb, var(--v19b-dot-danger) 78%, var(--v19b-color-text));
+  background: color-mix(in srgb, var(--v19b-dot-danger) 10%, var(--v19b-color-control));
+}
+
 @media (max-width: 1024px) {
   #root .ops-shell.has-unified-side-menu.is-v19-collection-surface {
     grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
@@ -1358,4 +1386,20 @@
     .v19-agent-action-status-button {
     transition: none;
   }
+}
+
+#root
+  .ops-shell.surface-agent-submissions
+  .v19-agent-submissions-board
+  .v19-agent-submissions-group
+  > h2 {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: var(--v19b-size-36);
+  align-items: center;
+  margin: 0 !important;
+  padding: var(--v19b-size-8) var(--v19b-size-12) !important;
+  overflow: visible;
+  line-height: 1.2;
 }
