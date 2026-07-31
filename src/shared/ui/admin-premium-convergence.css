@@ -984,9 +984,23 @@
   #root
     .v19-admin-workspace-root
     .ops-shell.surface-admin-review
+    .v19-admin-review-board
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    grid-template-columns:
+      minmax(0, 1fr) var(--v19b-size-128)
+      var(--v19b-size-44) !important;
+    grid-template-rows: var(--v19b-size-44) !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
     .v19-two-row-toolbar-filters {
+    grid-column: 2;
+    grid-row: 1;
     width: var(--v19b-size-128) !important;
     min-width: var(--v19b-size-128) !important;
+    height: var(--v19b-size-44) !important;
   }
 
   #root
@@ -995,6 +1009,7 @@
     .v19-admin-toolbar-controls {
     display: block !important;
     width: var(--v19b-size-128) !important;
+    height: var(--v19b-size-44) !important;
   }
 
   #root
@@ -1004,6 +1019,8 @@
     > .v19-admin-toolbar-select:first-child {
     width: var(--v19b-size-128) !important;
     min-width: var(--v19b-size-128) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
   }
 
   #root
@@ -1014,6 +1031,8 @@
     .v19-admin-toolbar-select-trigger {
     width: var(--v19b-size-128) !important;
     min-width: var(--v19b-size-128) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
     grid-template-columns: var(--v19b-size-16) minmax(0, 1fr) !important;
     gap: var(--v19b-size-8) !important;
     padding: 0 var(--v19b-size-10) !important;
@@ -1069,6 +1088,8 @@
     .v19-review-mobile-filters {
     position: relative;
     display: block;
+    grid-column: 3;
+    grid-row: 1;
     width: var(--v19b-size-44);
     min-width: var(--v19b-size-44);
     height: var(--v19b-size-44);
