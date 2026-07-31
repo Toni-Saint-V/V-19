@@ -186,10 +186,22 @@ function reviewFileName(target: ReviewMediaTarget, file?: SubmissionFile) {
   return file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel;
 }
 
-function sectionActionLabel(accepted: boolean, pending: boolean) {
+function sectionActionLabel(accepted: boolean, pending: boolean, canConfirm: boolean) {
   if (accepted) return "Секция подтверждена";
   if (pending) return "Сохраняем…";
-  return "Подтвердить паспортную секцию";
+  return canConfirm ? "Подтвердить паспортную секцию" : "Перейти к следующему шагу";
+}
+
+function sectionActionAccessibleLabel(
+  accepted: boolean,
+  pending: boolean,
+  canConfirm: boolean,
+) {
+  if (accepted) return "Перейти к решению по подаче: секция подтверждена";
+  if (pending) return "Сохраняется подтверждение паспортной секции";
+  return canConfirm
+    ? "Подтвердить паспортную секцию"
+    : "Перейти к следующему шагу в паспортной секции";
 }
 
 function reviewActionLabel(
@@ -823,10 +835,13 @@ export function ReviewWorkspace({
   const handleConfirmSection = async () => {
     if (
       sectionApprovalPendingRef.current ||
-      !canConfirmSection ||
       !selectedApplicantId ||
       !onApproveSection
     ) {
+      return;
+    }
+    if (!canConfirmSection) {
+      handleNextReviewStep();
       return;
     }
     const approvalRun = sectionApprovalRunRef.current + 1;
@@ -881,6 +896,7 @@ export function ReviewWorkspace({
           ? "Подача принята и сохранена."
           : "Возврат на исправление сохранён.",
       );
+      onBack();
     } catch (error) {
       if (!mountedRef.current || reviewActionRunRef.current !== actionRun) return;
       setReviewActionError(
@@ -1291,6 +1307,20 @@ export function ReviewWorkspace({
                   <span>Замечание</span>
                 </button>
               ) : null}
+              <a
+                aria-disabled={!activePreviewUrl}
+                aria-label="Скачать текущий файл"
+                className={`v19-review-mobile-download${activePreviewUrl ? "" : " is-disabled"}`}
+                download={
+                  activeMediaFile
+                    ? reviewFileName(activeMediaTarget, activeMediaFile)
+                    : undefined
+                }
+                href={activePreviewUrl}
+                tabIndex={activePreviewUrl ? undefined : -1}
+              >
+                <Download aria-hidden="true" />
+              </a>
             </div>
           </div>
         </section>
@@ -1427,16 +1457,24 @@ export function ReviewWorkspace({
                 </strong>
                 {isEditableReviewStatus ? (
                   <button
+                    aria-label={sectionActionAccessibleLabel(
+                      sectionAlreadyAccepted,
+                      sectionApprovalPending,
+                      canConfirmSection,
+                    )}
                     aria-busy={sectionApprovalPending}
                     aria-describedby="passport-review-completion-reason"
-                    disabled={!canConfirmSection}
                     id="passport-review-confirm-button"
                     onClick={() => void handleConfirmSection()}
                     title={!canConfirmSection ? completionReason : undefined}
                     type="button"
                   >
                     <CheckCircle2 aria-hidden="true" />
-                    {sectionActionLabel(sectionAlreadyAccepted, sectionApprovalPending)}
+                    {sectionActionLabel(
+                      sectionAlreadyAccepted,
+                      sectionApprovalPending,
+                      canConfirmSection,
+                    )}
                   </button>
                 ) : (
                   <span className="v19-review-read-only-badge">Только просмотр</span>

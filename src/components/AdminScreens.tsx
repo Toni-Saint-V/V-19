@@ -9,10 +9,12 @@ import {
   Clock,
   ListChecks,
   MessageSquareWarning,
+  MapPin,
   Plane,
   RotateCcw,
   ShieldCheck,
   Shapes,
+  SlidersHorizontal,
   User,
   Users,
   X,
@@ -263,9 +265,11 @@ function ReviewQueueCard({
           <span className="v19-review-row-overline">
             <span className="v19-admin-review-card-id">{item.publicId}</span>
             <span aria-hidden="true">·</span>
-            <span>{item.city}</span>
-            <span aria-hidden="true">·</span>
-            <span>{shortQueueTime}</span>
+            <span className="v19-review-row-city">{item.city}</span>
+            <span className="v19-review-row-time-separator" aria-hidden="true">
+              ·
+            </span>
+            <span className="v19-review-row-time">{shortQueueTime}</span>
           </span>
           <strong>{item.title}</strong>
           <small>
@@ -501,11 +505,32 @@ export function ReviewScreen({
     count: number;
     id: Lane | "all";
     label: string;
+    mobileLabel: string;
   }> = [
-    { count: filteredReviews.length, id: "all", label: "Вся очередь" },
-    { count: laneCounts.urgent, id: "urgent", label: "Критично" },
-    { count: laneCounts.review, id: "review", label: "Первичная проверка" },
-    { count: laneCounts.returned, id: "returned", label: "Исправления" },
+    {
+      count: filteredReviews.length,
+      id: "all",
+      label: "Вся очередь",
+      mobileLabel: "Все",
+    },
+    {
+      count: laneCounts.urgent,
+      id: "urgent",
+      label: "Критично",
+      mobileLabel: "Срочно",
+    },
+    {
+      count: laneCounts.review,
+      id: "review",
+      label: "Первичная проверка",
+      mobileLabel: "Первич.",
+    },
+    {
+      count: laneCounts.returned,
+      id: "returned",
+      label: "Исправления",
+      mobileLabel: "Правки",
+    },
   ];
 
   return (
@@ -572,6 +597,7 @@ export function ReviewScreen({
           >
             {focusTabs.map((tab) => (
               <button
+                aria-label={`${tab.label} ${tab.count}`}
                 aria-selected={activeLane === tab.id}
                 className={activeLane === tab.id ? "is-active" : ""}
                 key={tab.id}
@@ -579,7 +605,10 @@ export function ReviewScreen({
                 type="button"
                 onClick={() => setActiveLane(tab.id)}
               >
-                <span>{tab.label}</span>
+                <span className="v19-review-focus-label">{tab.label}</span>
+                <span className="v19-review-focus-label-mobile" aria-hidden="true">
+                  {tab.mobileLabel}
+                </span>
                 <strong>{tab.count}</strong>
               </button>
             ))}
@@ -620,6 +649,43 @@ export function ReviewScreen({
             onCityFilterChange={setCityFilter}
             onFilterClick={resetQueueView}
             onSearchChange={setSearchQuery}
+            searchAction={
+              <details className="v19-review-mobile-filters">
+                <summary aria-label="Дополнительные фильтры">
+                  <SlidersHorizontal aria-hidden="true" />
+                  <span className="sr-only">Фильтры</span>
+                  {typeFilter !== "all" || cityFilter !== "Все города" ? (
+                    <strong>
+                      {Number(typeFilter !== "all") +
+                        Number(cityFilter !== "Все города")}
+                    </strong>
+                  ) : null}
+                </summary>
+                <div>
+                  <AdminToolbarSelect<AdminReviewTypeFilter>
+                    icon={Shapes}
+                    label="Тип"
+                    value={typeFilter}
+                    onChange={setTypeFilter}
+                    options={[
+                      { value: "all", label: "Все типы" },
+                      { value: "family", label: "Семьи" },
+                      { value: "single", label: "Заявители" },
+                    ]}
+                  />
+                  <AdminToolbarSelect<string>
+                    icon={MapPin}
+                    label="Город"
+                    value={cityFilter}
+                    onChange={setCityFilter}
+                    options={cityOptions.map((city) => ({
+                      value: city,
+                      label: city,
+                    }))}
+                  />
+                </div>
+              </details>
+            }
             searchPlaceholder="ID, семья или агент"
             searchValue={searchQuery}
           />
