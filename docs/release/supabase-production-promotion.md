@@ -83,6 +83,7 @@ Apply migrations only in the repository order declared by
 - `20260728191313_archive_agent_submission_cards.sql`
 - `20260729050000_agent_submission_concurrency.sql`
 - `20260729060000_harden_t9_server_authority.sql`
+- `20260731000000_block_t9_until_approved_contract.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 
