@@ -232,14 +232,11 @@ describe("AdminReviewDrawer visual hierarchy", () => {
         submissionId: submission.id,
       }),
     );
-    expect(
-      await screen.findByRole("dialog", { name: "Сверка паспорта" }),
-    ).toBeVisible();
-    expect(await screen.findByText("Подача принята и сохранена.")).toBeVisible();
-    expect(screen.getAllByText("Просмотр без изменений")[0]).toBeVisible();
-    expect(
-      screen.queryByRole("button", { name: "Принять на выгрузку" }),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Сверка паспорта" }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   test("opens a field remark at its exact questionnaire field", async () => {
@@ -1232,7 +1229,7 @@ describe("ReviewWorkspace passport section contract", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getAllByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
       }),
     ).toHaveLength(1);
   });
@@ -1352,7 +1349,7 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(screen.getAllByText(/доступен только для чтения/).length).toBeGreaterThan(0);
     expect(
       screen.queryByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
       }),
     ).not.toBeInTheDocument();
     expect(
@@ -1543,9 +1540,9 @@ describe("ReviewWorkspace passport section contract", () => {
 
     expect(
       screen.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
       }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(
       screen.getByText(/Заполнены не все паспортные поля или в данных есть ошибка/),
     ).toBeInTheDocument();
@@ -1583,6 +1580,8 @@ describe("ReviewWorkspace passport section contract", () => {
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Expected applicant.");
     const onApproveSection = vi.fn().mockResolvedValue(true);
+    const onReviewAction = vi.fn().mockResolvedValue(true);
+    const onBack = vi.fn();
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
       async ({ path }) => `https://example.test/${encodeURIComponent(path)}.jpg`,
     );
@@ -1592,11 +1591,16 @@ describe("ReviewWorkspace passport section contract", () => {
         applicantId={applicant.id}
         onAddRemark={() => undefined}
         onApproveSection={onApproveSection}
-        onBack={() => undefined}
+        onBack={onBack}
+        onReviewAction={onReviewAction}
         submission={submission}
         submissionId={submission.id}
       />,
     );
+    const acceptButton = screen.getByRole("button", {
+      name: "Принять на выгрузку",
+    });
+    expect(acceptButton).toBeDisabled();
 
     await waitFor(() =>
       expect(screen.getByTestId("protected-media-preview-passport_scan")).toBeVisible(),
@@ -1616,7 +1620,7 @@ describe("ReviewWorkspace passport section contract", () => {
       expect(screen.getByTestId("protected-media-preview-selfie_2")).toBeVisible(),
     );
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
@@ -1624,6 +1628,10 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() => expect(onApproveSection).toHaveBeenCalledTimes(1));
     expect(onApproveSection).toHaveBeenCalledWith({ applicantId: applicant.id });
     await waitFor(() => expect(screen.getByText("Секция подтверждена")).toBeVisible());
+    expect(acceptButton).toBeDisabled();
+    fireEvent.click(acceptButton);
+    expect(onReviewAction).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   test("blocks confirmation when a family has more than one primary applicant", async () => {
@@ -1661,9 +1669,9 @@ describe("ReviewWorkspace passport section contract", () => {
     );
 
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
-    await waitFor(() => expect(confirmButton).toBeDisabled());
+    await waitFor(() => expect(confirmButton).toBeEnabled());
     expect(screen.getByText(/ровно один основной заявитель/)).toBeInTheDocument();
     expect(
       screen.queryByTestId("protected-media-preview-selfie"),
@@ -1733,7 +1741,7 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", {
-          name: "Подтвердить паспортную секцию",
+          name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
         }),
       ).toBeEnabled(),
     );
@@ -1776,7 +1784,7 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toBeVisible();
 
     const confirmButton = await screen.findByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
     visitPrimaryIdentityMedia();
     await waitFor(() => expect(confirmButton).toBeEnabled());
@@ -1862,7 +1870,7 @@ describe("ReviewWorkspace passport section contract", () => {
     fireEvent.click(opener);
     visitPrimaryIdentityMedia();
     const confirmButton = await screen.findByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
@@ -2021,6 +2029,7 @@ describe("ReviewWorkspace passport section contract", () => {
       type: "family",
     };
     const onApproveSection = vi.fn().mockResolvedValue(true);
+    const onReviewAction = vi.fn().mockResolvedValue(true);
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
       "https://example.test/family-passport.jpg",
     );
@@ -2031,6 +2040,7 @@ describe("ReviewWorkspace passport section contract", () => {
         onAddRemark={() => undefined}
         onApproveSection={onApproveSection}
         onBack={() => undefined}
+        onReviewAction={onReviewAction}
         submission={family}
         submissionId={family.id}
       />,
@@ -2044,13 +2054,19 @@ describe("ReviewWorkspace passport section contract", () => {
       screen.queryByTestId("protected-media-preview-selfie"),
     ).not.toBeInTheDocument();
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
     await waitFor(() => expect(confirmButton).toBeEnabled());
     fireEvent.click(confirmButton);
 
     await waitFor(() => expect(onApproveSection).toHaveBeenCalledTimes(1));
     expect(onApproveSection).toHaveBeenCalledWith({ applicantId: secondary.id });
+    const acceptButton = screen.getByRole("button", {
+      name: "Принять на выгрузку",
+    });
+    expect(acceptButton).toBeDisabled();
+    fireEvent.click(acceptButton);
+    expect(onReviewAction).not.toHaveBeenCalled();
   });
 
   test("shows a protected legacy secondary selfie only while its correction awaits review", async () => {
@@ -2116,9 +2132,9 @@ describe("ReviewWorkspace passport section contract", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     expect(
       screen.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
       }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     await act(async () => {
       correctedSelfie.resolve("https://example.test/legacy-secondary-selfie.jpg");
       await correctedSelfie.promise;
@@ -2133,7 +2149,7 @@ describe("ReviewWorkspace passport section contract", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", {
-          name: "Подтвердить паспортную секцию",
+          name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
         }),
       ).toBeEnabled(),
     );

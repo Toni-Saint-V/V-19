@@ -277,21 +277,253 @@ async function expectCreateStageRhythm(page: Page, context: string) {
   expect(gap, `${context}: adjacent create stage gap`).toBeLessThanOrEqual(24);
   await expect(page.locator("#preupload-disabled-reason")).toBeHidden();
 
-  if ((page.viewportSize()?.width ?? 0) >= 768) {
-    const lowerSlack = await page
-      .locator('[data-agent-screen="create"] .v19-preupload-card-body')
-      .evaluate((element) => {
-        const footer = element.querySelector<HTMLElement>(".v19-preupload-footer");
-        if (!footer) return Number.POSITIVE_INFINITY;
-        return (
-          element.getBoundingClientRect().bottom - footer.getBoundingClientRect().bottom
-        );
-      });
-    expect(
-      lowerSlack,
-      `${context}: footer anchors the full-height card`,
-    ).toBeLessThanOrEqual(20);
-  }
+  const verticalRhythm = await page
+    .locator('[data-agent-screen="create"] .v19-preupload-card-body')
+    .evaluate((element) => {
+      const card = element.closest<HTMLElement>(".v19-preupload-card");
+      const workspace = element.closest<HTMLElement>('[data-agent-screen="create"]');
+      const dropzone = element.querySelector<HTMLElement>(".v19-preupload-dropzone");
+      const footer = element.querySelector<HTMLElement>(".v19-preupload-footer");
+      if (!card || !workspace || !dropzone || !footer) return null;
+      const bodyRect = element.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const workspaceRect = workspace.getBoundingClientRect();
+      const uploadGroup = element.querySelector<HTMLElement>(
+        ".v19-preupload-upload-group",
+      );
+      const dropzoneRect = dropzone.getBoundingClientRect();
+      const uploadGroupRect = uploadGroup?.getBoundingClientRect();
+      const footerRect = footer.getBoundingClientRect();
+      return {
+        cardBottomSlack: workspaceRect.bottom - cardRect.bottom,
+        dropzoneHeight: dropzoneRect.height,
+        dropzoneWidthSlack: uploadGroupRect
+          ? Math.abs(uploadGroupRect.width - dropzoneRect.width)
+          : Number.POSITIVE_INFINITY,
+        dropzoneXSlack: uploadGroupRect
+          ? Math.abs(uploadGroupRect.left - dropzoneRect.left)
+          : Number.POSITIVE_INFINITY,
+        footerBottomSlack: bodyRect.bottom - footerRect.bottom,
+        footerFollowsUpload: footerRect.top >= dropzoneRect.bottom,
+      };
+    });
+  expect(verticalRhythm, `${context}: create vertical rhythm`).not.toBeNull();
+  expect(
+    Math.abs(verticalRhythm!.cardBottomSlack),
+    `${context}: create card fills the available workspace`,
+  ).toBeLessThanOrEqual(16);
+  expect(
+    verticalRhythm!.dropzoneHeight,
+    `${context}: passport upload keeps a usable target`,
+  ).toBeGreaterThanOrEqual(142);
+  expect(
+    verticalRhythm!.dropzoneWidthSlack,
+    `${context}: passport upload fills its panel`,
+  ).toBeLessThanOrEqual(2);
+  expect(
+    verticalRhythm!.dropzoneXSlack,
+    `${context}: passport upload aligns to its panel`,
+  ).toBeLessThanOrEqual(2);
+  expect(
+    verticalRhythm!.footerBottomSlack,
+    `${context}: footer anchors the full-height card`,
+  ).toBeLessThanOrEqual(20);
+  expect(
+    verticalRhythm!.footerFollowsUpload,
+    `${context}: footer stays below the passport upload`,
+  ).toBe(true);
+}
+
+async function expectMobileSubmissionHeaderAlignment(page: Page, context: string) {
+  const familyHeader = page
+    .locator('[data-agent-screen="submissions"] .v19-applicant-family-header:visible')
+    .first();
+  if ((await familyHeader.count()) === 0) return;
+  await expect(familyHeader).toBeVisible();
+
+  const layout = await familyHeader.evaluate((element) => {
+    const title = element.querySelector<HTMLElement>(".v19-applicant-family-copy h3");
+    const status = element.querySelector<HTMLElement>(".v19-applicant-card-status");
+    const publicId = element.querySelector<HTMLElement>(".v19-applicant-public-id");
+    if (!title || !status || !publicId) return null;
+    const titleRect = title.getBoundingClientRect();
+    const statusRect = status.getBoundingClientRect();
+    const publicIdRect = publicId.getBoundingClientRect();
+    return {
+      publicIdTop: publicIdRect.top,
+      statusTop: statusRect.top,
+      titleBottom: titleRect.bottom,
+      titleClientWidth: title.clientWidth,
+      titleScrollWidth: title.scrollWidth,
+      titleTop: titleRect.top,
+    };
+  });
+  expect(layout, `${context}: family header geometry`).not.toBeNull();
+  expect(
+    Math.abs(layout!.titleTop - layout!.statusTop),
+    `${context}: family name and status share a baseline row`,
+  ).toBeLessThanOrEqual(4);
+  expect(
+    layout!.titleScrollWidth,
+    `${context}: long family name is contained`,
+  ).toBeLessThanOrEqual(layout!.titleClientWidth + 1);
+  expect(
+    layout!.publicIdTop,
+    `${context}: public ID sits on the metadata row`,
+  ).toBeGreaterThanOrEqual(layout!.titleBottom);
+}
+
+async function expectMobileHeaderRhythm(page: Page, context: string) {
+  const header = page.locator(".workspace > .topbar.v19-page-header");
+  const menu = header.getByRole("button", { name: "Меню" });
+  const title = header.locator(".topbar-heading");
+  const geometry = await header.evaluate((element) => {
+    const menuElement = element.querySelector<HTMLElement>(".v19-topbar-menu");
+    const titleElement = element.querySelector<HTMLElement>(".topbar-heading");
+    if (!menuElement || !titleElement) return null;
+    const headerRect = element.getBoundingClientRect();
+    const menuRect = menuElement.getBoundingClientRect();
+    const titleRect = titleElement.getBoundingClientRect();
+    return {
+      leadingInset: menuRect.left - headerRect.left,
+      titleGap: titleRect.left - menuRect.right,
+    };
+  });
+  await expect(menu).toBeVisible();
+  await expect(title).toBeVisible();
+  expect(geometry, `${context}: mobile header geometry`).not.toBeNull();
+  expect(
+    geometry!.leadingInset,
+    `${context}: menu uses the leading edge`,
+  ).toBeLessThanOrEqual(4);
+  expect(geometry!.titleGap, `${context}: title follows at 16px`).toBeCloseTo(16, 0);
+}
+
+async function expectMobileAdminReviewDensity(page: Page, context: string) {
+  const focusTabs = page.locator(".v19-review-focus-tabs > button:visible");
+  await expect(focusTabs).toHaveCount(4);
+  const tabTops = await focusTabs.evaluateAll((elements) =>
+    elements.map((element) => Math.round(element.getBoundingClientRect().top)),
+  );
+  expect(new Set(tabTops).size, `${context}: focus tabs stay on one row`).toBe(1);
+
+  await expect(
+    page.locator(".v19-admin-review-board .v19-admin-toolbar-select:visible"),
+  ).toHaveCount(1);
+  const sortTrigger = page.locator(
+    ".v19-admin-review-board .v19-admin-toolbar-select:visible .v19-admin-toolbar-select-trigger",
+  );
+  await expect(sortTrigger).toContainText(/По приоритету|По дате/);
+  expect(
+    await sortTrigger.evaluate((element) => element.getBoundingClientRect().width),
+    `${context}: sort control is a labeled button`,
+  ).toBeGreaterThanOrEqual(120);
+
+  const mobileFilters = page.locator(".v19-review-mobile-filters");
+  await expect(mobileFilters.locator("summary")).toBeVisible();
+  await mobileFilters.locator("summary").click();
+  await expect(mobileFilters.locator(".v19-admin-toolbar-select:visible")).toHaveCount(
+    2,
+  );
+  await mobileFilters.locator("summary").click();
+
+  const firstCard = page.locator(".v19-admin-review-card:visible").first();
+  await expect(firstCard).toBeVisible();
+  await expect(firstCard.locator(".v19-review-row-time")).toBeHidden();
+  await expect(firstCard.locator(".v19-review-row-identity > em")).toBeHidden();
+  await expect(firstCard.locator(".v19-review-row-priority > small")).toBeHidden();
+}
+
+async function expectMobileExportRowComposition(page: Page, context: string) {
+  const row = page.locator(".v19-admin-export-row-v2:visible").first();
+  await expect(row).toBeVisible();
+  await expect(row.locator(".v19-admin-export-row-agent-v2")).toBeHidden();
+  const composition = await row.evaluate((element) => {
+    const checkbox = element.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    const city = element.querySelector<HTMLElement>(".v19-admin-export-row-city-v2");
+    const cityIcon = city?.querySelector<HTMLElement>(".v19-admin-export-row-icon-v2");
+    const dates = element.querySelector<HTMLElement>(".v19-admin-export-row-dates-v2");
+    const publicId = element.querySelector<HTMLElement>(
+      ".v19-admin-export-row-public-id-v2",
+    );
+    const title = element.querySelector<HTMLElement>(".v19-admin-export-row-title-v2");
+    if (!checkbox || !city || !cityIcon || !dates || !publicId || !title) return null;
+    const checkboxRect = checkbox.getBoundingClientRect();
+    const datesRect = dates.getBoundingClientRect();
+    const idRect = publicId.getBoundingClientRect();
+    const titleRect = title.getBoundingClientRect();
+    const cityRect = city.getBoundingClientRect();
+    const titleStyle = getComputedStyle(title);
+    const checkboxStyle = getComputedStyle(checkbox);
+    const rowStyle = getComputedStyle(element);
+    const headerAction = document.querySelector<HTMLElement>(
+      ".v19-admin-export-list-head-v2 > button",
+    );
+    const headerActionRect = headerAction?.getBoundingClientRect();
+    return {
+      checkboxAlignedWithName:
+        Math.abs(
+          checkboxRect.top +
+            checkboxRect.height / 2 -
+            (titleRect.top + titleRect.height / 2),
+        ) <= 4,
+      cityAlignedWithDates:
+        Math.abs(cityRect.top - datesRect.top) <= 1 &&
+        Math.abs(cityRect.height - datesRect.height) <= 1,
+      cityColumnGap: Number.parseFloat(getComputedStyle(city).columnGap),
+      cityIconWidth: cityIcon.getBoundingClientRect().width,
+      idAfterName: idRect.left >= titleRect.right,
+      idWidth: idRect.width,
+      checkboxWidth: checkboxRect.width,
+      checkboxOpacity: Number.parseFloat(checkboxStyle.opacity),
+      rowBackground: rowStyle.backgroundColor,
+      headerActionHeight: headerActionRect?.height ?? 0,
+      headerActionRadius: headerAction
+        ? Number.parseFloat(getComputedStyle(headerAction).borderRadius)
+        : 0,
+      headerActionWidth: headerActionRect?.width ?? 0,
+      titleFontSize: Number.parseFloat(titleStyle.fontSize),
+      titleFontWeight: titleStyle.fontWeight,
+    };
+  });
+  expect(composition, `${context}: export row composition`).not.toBeNull();
+  expect(
+    composition!.checkboxAlignedWithName,
+    `${context}: checkbox aligns with the applicant name`,
+  ).toBe(true);
+  expect(
+    composition!.cityAlignedWithDates,
+    `${context}: city and dates share one divided control`,
+  ).toBe(true);
+  expect(composition!.cityColumnGap, `${context}: compact city icon gap`).toBe(2);
+  expect(
+    composition!.cityIconWidth,
+    `${context}: compact city icon`,
+  ).toBeLessThanOrEqual(18);
+  expect(composition!.idAfterName, `${context}: public ID follows the name`).toBe(true);
+  expect(composition!.idWidth, `${context}: compact public ID tag`).toBeLessThanOrEqual(
+    88,
+  );
+  expect(composition!.checkboxWidth, `${context}: calm checkbox size`).toBe(18);
+  expect(
+    composition!.checkboxOpacity,
+    `${context}: calm checkbox emphasis`,
+  ).toBeLessThanOrEqual(0.82);
+  expect(
+    composition!.rowBackground,
+    `${context}: unselected rows keep a dark-grey surface`,
+  ).not.toBe("rgba(0, 0, 0, 0)");
+  expect(composition!.titleFontSize, `${context}: compact applicant name`).toBe(15);
+  expect(composition!.titleFontWeight, `${context}: calm applicant weight`).toBe("500");
+  expect(composition!.headerActionWidth, `${context}: compact all action width`).toBe(
+    60,
+  );
+  expect(composition!.headerActionHeight, `${context}: compact all action height`).toBe(
+    36,
+  );
+  expect(composition!.headerActionRadius, `${context}: compact all action radius`).toBe(
+    20,
+  );
 }
 
 async function expectMobileActionDensity(page: Page, context: string) {
@@ -307,6 +539,56 @@ async function expectMobileActionDensity(page: Page, context: string) {
       '[data-agent-screen="actions"] .v19-agent-action-metrics .v19-metric-card',
     ),
   ).toHaveCount(5);
+
+  const metricVisibility = await page
+    .locator('[data-agent-screen="actions"] .v19-agent-action-metrics')
+    .evaluate((strip) => {
+      const stripRect = strip.getBoundingClientRect();
+      const cards = [...strip.querySelectorAll<HTMLElement>(".v19-metric-card")];
+      const cardRects = cards.map((card) => card.getBoundingClientRect());
+      const fullyVisible = cardRects.filter(
+        (rect) => rect.left >= stripRect.left - 1 && rect.right <= stripRect.right + 1,
+      ).length;
+      const partiallyVisible = cardRects.filter((rect) => {
+        const intersects = rect.right > stripRect.left && rect.left < stripRect.right;
+        const fullyInside =
+          rect.left >= stripRect.left - 1 && rect.right <= stripRect.right + 1;
+        return intersects && !fullyInside;
+      }).length;
+      return {
+        fullyVisible,
+        partiallyVisible,
+        scrollLeft: strip.scrollLeft,
+      };
+    });
+  expect(metricVisibility.scrollLeft, `${context}: metrics start position`).toBe(0);
+  expect(
+    metricVisibility.fullyVisible,
+    `${context}: complete metric cards at rest`,
+  ).toBe((page.viewportSize()?.width ?? 0) < 360 ? 2 : 3);
+  expect(
+    metricVisibility.partiallyVisible,
+    `${context}: no clipped metric card at rest`,
+  ).toBe(0);
+
+  const selectedAccent = await page
+    .locator('[data-agent-screen="actions"] .v19-actions-timeline-event')
+    .first()
+    .evaluate((event) => {
+      const wasSelected = event.classList.contains("is-selected");
+      event.classList.add("is-selected");
+      const hit = event.querySelector<HTMLElement>(".v19-actions-timeline-hit");
+      const result = {
+        inset: hit ? getComputedStyle(hit).boxShadow : "none",
+        pseudoContent: getComputedStyle(event, "::after").content,
+      };
+      if (!wasSelected) event.classList.remove("is-selected");
+      return result;
+    });
+  expect(selectedAccent.pseudoContent, `${context}: one selected accent`).toBe("none");
+  expect(selectedAccent.inset, `${context}: selected accent remains visible`).not.toBe(
+    "none",
+  );
 
   const viewport = page.viewportSize();
   expect(viewport, `${context}: viewport`).not.toBeNull();
@@ -609,7 +891,7 @@ test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
     test.skip(testInfo.project.name !== "chromium", "single-project viewport proof");
 
     const problems = collectBrowserProblems(page);
@@ -633,6 +915,7 @@ test.describe("V-19 responsive proof", () => {
       await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent actions`);
       if (viewport.width < 768) {
+        await expectMobileHeaderRhythm(page, `${viewport.label}: agent actions`);
         await expectMobileActionDensity(page, `${viewport.label}: agent actions`);
       } else {
         await expectDesktopActionTableContract(
@@ -658,6 +941,10 @@ test.describe("V-19 responsive proof", () => {
         await expect(
           page.locator(".v19-applicant-delete-footer-action").first(),
         ).toBeHidden();
+        await expectMobileSubmissionHeaderAlignment(
+          page,
+          `${viewport.label}: agent submissions`,
+        );
       }
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent submissions`);
       await screenshot(page, viewport, "agent-submissions");
@@ -787,6 +1074,9 @@ test.describe("V-19 responsive proof", () => {
       ).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Новая подача" })).toHaveCount(0);
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
+      if (viewport.width < 768) {
+        await expectMobileAdminReviewDensity(page, `${viewport.label}: admin review`);
+      }
       await screenshot(page, viewport, "admin-review");
       await expectMobileSheetKeyboardContract(page, {
         closeName: "Закрыть контекст проверки",
@@ -851,9 +1141,15 @@ test.describe("V-19 responsive proof", () => {
           name: "Пользователи и доступ",
         }),
       ).toBeVisible();
-      await expect(
-        page.getByRole("heading", { level: 2, name: "Заявки и роли" }),
-      ).toBeVisible();
+      const accessHeroTitle = page.getByRole("heading", {
+        level: 2,
+        name: "Заявки и роли",
+      });
+      if (viewport.width < 768) {
+        await expect(accessHeroTitle).toBeHidden();
+      } else {
+        await expect(accessHeroTitle).toBeVisible();
+      }
       await expectElementStartsAbove(
         page,
         page.locator(".v19-access-board"),
@@ -888,12 +1184,21 @@ test.describe("V-19 responsive proof", () => {
       await expect(
         page.getByRole("heading", { level: 1, name: "Настройки" }),
       ).toBeVisible();
-      await expect(
-        page.getByRole("heading", {
-          level: 2,
-          name: "Интерфейс и доступность",
-        }),
-      ).toBeVisible();
+      const settingsHeroTitle = page.getByRole("heading", {
+        level: 2,
+        name: "Интерфейс и доступность",
+      });
+      if (viewport.width < 768) {
+        await expect(settingsHeroTitle).toBeHidden();
+        const motionPreference = page
+          .locator(".v19-preference-row")
+          .filter({ hasText: "Минимум анимации" });
+        await expect(motionPreference).toHaveCSS("min-height", "76px");
+        await expect(motionPreference.locator("p")).toHaveCSS("font-size", "11px");
+        await expect(motionPreference.locator("p")).toHaveCSS("font-weight", "500");
+      } else {
+        await expect(settingsHeroTitle).toBeVisible();
+      }
       await expectElementStartsAbove(
         page,
         page.locator(".v19-settings-grid"),
@@ -992,6 +1297,9 @@ test.describe("V-19 responsive proof", () => {
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
+      if (viewport.width < 768) {
+        await expectMobileExportRowComposition(page, `${viewport.label}: export`);
+      }
       await expectMobileSheetKeyboardContract(page, {
         closeName: "Закрыть контроль пакета",
         dialogName: "Контроль пакета",

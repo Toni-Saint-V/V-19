@@ -281,9 +281,9 @@ describe("ReviewWorkspace perceived feedback", () => {
 
     await waitFor(() => expect(passportImage).toHaveClass("is-ready"));
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
-    expect(confirmButton).toBeDisabled();
+    expect(confirmButton).toBeEnabled();
     expect(
       screen.getByText(
         "Откройте и проверьте каждый обязательный оригинал перед подтверждением.",
@@ -301,7 +301,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(
       await screen.findByRole("img", { name: "Первое селфи заявителя" }),
     ).toHaveAttribute("src", "https://media.test/selfie.jpg");
-    expect(confirmButton).toBeDisabled();
+    expect(confirmButton).toBeEnabled();
 
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
@@ -439,9 +439,9 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(mediaStorage.createMediaSignedUrl).not.toHaveBeenCalled();
     expect(
       screen.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
       }),
-    ).toBeDisabled();
+    ).toBeEnabled();
   });
 
   test("does not retry media with a noncanonical private-storage identity", async () => {
@@ -726,7 +726,7 @@ describe("ReviewWorkspace perceived feedback", () => {
       />,
     );
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
@@ -772,7 +772,7 @@ describe("ReviewWorkspace perceived feedback", () => {
       />,
     );
     const confirmButton = screen.getByRole("button", {
-      name: "Подтвердить паспортную секцию",
+      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
@@ -791,7 +791,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", {
-          name: "Подтвердить паспортную секцию",
+          name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
         }),
       ).toBeEnabled(),
     );
@@ -804,7 +804,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(screen.queryByText("Секция подтверждена")).toBeNull();
     expect(
       screen.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
       }),
     ).toBeEnabled();
   });

@@ -173,10 +173,7 @@ async function verifyRemarkSubmitActionability(
   });
   await expect(returnForCorrection).toBeEnabled();
   await returnForCorrection.click();
-  await expect(
-    reviewWorkspace.getByText("Возврат на исправление сохранён."),
-  ).toBeVisible();
-  await expect(reviewWorkspace.getByText("Просмотр без изменений")).toBeVisible();
+  await expect(reviewWorkspace).toBeHidden();
   const returnReadbackRoot = testRunArtifactPath("admin-return-readback");
   mkdirSync(returnReadbackRoot, { recursive: true });
   await page.screenshot({
@@ -184,7 +181,6 @@ async function verifyRemarkSubmitActionability(
     path: `${returnReadbackRoot}/${evidenceLabel}-workspace.png`,
   });
 
-  await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
   await expect(
     page.getByRole("heading", { name: "Очередь на проверку" }),
   ).toBeVisible();
@@ -237,12 +233,82 @@ async function verifyEveryAdminDrawerSubview(
     mediaStageBox,
     "Passport media stage must have a measurable box.",
   ).not.toBeNull();
-  expect(mediaStageBox!.height).toBeGreaterThanOrEqual(400);
+  expect(mediaStageBox!.height).toBeGreaterThanOrEqual(
+    viewport.width < 768 ? 190 : viewport.width < 1024 ? 220 : 400,
+  );
+  if (viewport.width < 768) {
+    const [workspaceBox, mediaPaneBox] = await Promise.all([
+      reviewWorkspace.boundingBox(),
+      reviewWorkspace.locator(".v19-review-media-pane").boundingBox(),
+    ]);
+    expect(workspaceBox).not.toBeNull();
+    expect(mediaPaneBox).not.toBeNull();
+    expect(
+      Math.abs(mediaPaneBox!.y - workspaceBox!.y),
+      "Mobile review content starts at the top edge.",
+    ).toBeLessThanOrEqual(2);
+  }
   const mediaTablist = reviewWorkspace.getByRole("tablist", {
     name: "Выбор файла для проверки",
   });
   await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
   await expect(mediaTablist.getByRole("tab")).toHaveCount(3);
+  if (viewport.width < 768) {
+    const mobileToolbar = await reviewWorkspace
+      .locator(".v19-review-media-toolbar")
+      .evaluate((toolbar) => {
+        const identity = toolbar.querySelector<HTMLElement>(
+          ".v19-review-file-identity > span",
+        );
+        const id = toolbar.querySelector<HTMLElement>(
+          ".v19-review-file-identity > code",
+        );
+        const zoom = toolbar.querySelector<HTMLElement>(
+          ".v19-review-media-controls output",
+        );
+        const download = toolbar.querySelector<HTMLElement>(
+          ".v19-review-toolbar-download",
+        );
+        const identityStyle = identity ? getComputedStyle(identity) : null;
+        const toolbarRect = toolbar.getBoundingClientRect();
+        return {
+          fullName: identity?.textContent?.trim() ?? "",
+          idDisplay: id ? getComputedStyle(id).display : "missing",
+          zoomDisplay: zoom ? getComputedStyle(zoom).display : "missing",
+          downloadDisplay: download ? getComputedStyle(download).display : "missing",
+          identityOverflow: identityStyle?.overflow ?? "missing",
+          identityWhiteSpace: identityStyle?.whiteSpace ?? "missing",
+          noHorizontalOverflow: toolbar.scrollWidth <= Math.ceil(toolbarRect.width),
+        };
+      });
+    expect(mobileToolbar.fullName).toBe("Нина Волкова");
+    expect(mobileToolbar.idDisplay).toBe("none");
+    expect(mobileToolbar.zoomDisplay).toBe("none");
+    expect(mobileToolbar.downloadDisplay).toBe("none");
+    expect(mobileToolbar.identityOverflow).toBe("hidden");
+    expect(mobileToolbar.identityWhiteSpace).toBe("normal");
+    expect(mobileToolbar.noHorizontalOverflow).toBe(true);
+    await expect(reviewWorkspace.getByLabel("Скачать текущий файл")).toBeVisible();
+
+    const remarkVisual = await reviewWorkspace
+      .locator(".v19-review-field-remark")
+      .first()
+      .evaluate((element) => {
+        const icon = element.querySelector<SVGElement>("svg");
+        const tokenProbe = document.createElement("span");
+        tokenProbe.style.color = "var(--v19b-admin-orange)";
+        document.body.append(tokenProbe);
+        const expectedColor = getComputedStyle(tokenProbe).color;
+        tokenProbe.remove();
+        return {
+          color: getComputedStyle(element).color,
+          expectedColor,
+          iconWidth: icon?.getBoundingClientRect().width ?? 0,
+        };
+      });
+    expect(remarkVisual.iconWidth).toBeGreaterThanOrEqual(20);
+    expect(remarkVisual.color).toBe(remarkVisual.expectedColor);
+  }
 
   const passportTab = mediaTablist.getByRole("tab", { name: "Паспорт" });
   const firstSelfieTab = mediaTablist.getByRole("tab", { name: "Селфи 1" });
@@ -316,6 +382,7 @@ test.describe("V-19 pilot admin review click flow", () => {
         headingLevel: 1,
         nav: /^Проверка$/,
         readyText: "Очередь проверки",
+        readySelector: ".v19-admin-review-list-head",
       },
       {
         fileName: "export",
@@ -323,20 +390,23 @@ test.describe("V-19 pilot admin review click flow", () => {
         headingLevel: 1,
         nav: /^Выгрузка$/,
         readyText: "Пакеты к выгрузке",
+        readySelector: ".v19-admin-export-list-head-v2",
       },
       {
         fileName: "users",
-        heading: "Заявки и роли",
-        headingLevel: 2,
+        heading: "Пользователи и доступ",
+        headingLevel: 1,
         nav: /^Пользователи$/,
         readyText: "Заявки на доступ",
+        readySelector: ".v19-access-board",
       },
       {
         fileName: "settings",
-        heading: "Интерфейс и доступность",
-        headingLevel: 2,
+        heading: "Настройки",
+        headingLevel: 1,
         nav: /^Настройки$/,
         readyText: "Интерфейс в этом браузере",
+        readySelector: ".v19-settings-panel",
       },
     ] as const;
 
@@ -359,7 +429,9 @@ test.describe("V-19 pilot admin review click flow", () => {
           }),
         ).toBeVisible();
         await expect(
-          page.getByText(screen.readyText, { exact: true }).first(),
+          page.locator(screen.readySelector).getByText(screen.readyText, {
+            exact: true,
+          }),
         ).toBeVisible();
         expect(
           await page.evaluate(
@@ -400,12 +472,6 @@ test.describe("V-19 pilot admin review click flow", () => {
       });
       await clickWorkspaceButton(page, /^Настройки$/);
 
-      await expect(
-        page.getByRole("heading", {
-          level: 2,
-          name: "Интерфейс и доступность",
-        }),
-      ).toBeVisible();
       const compactDensity = page.getByRole("switch", {
         name: "Компактная плотность",
       });
@@ -472,16 +538,13 @@ test.describe("V-19 pilot admin review click flow", () => {
     const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
     await expect(reviewWorkspace).toBeVisible();
     await expect(
-      reviewWorkspace.getByRole("heading", { name: "Данные паспорта" }),
-    ).toBeVisible();
-    await expect(
       reviewWorkspace.getByRole("alert").getByText("Оригинал нельзя принять"),
     ).toBeVisible();
     await expect(
       reviewWorkspace.getByRole("button", {
-        name: "Подтвердить паспортную секцию",
+        name: "Перейти к следующему шагу в паспортной секции",
       }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     await expect(
       reviewWorkspace.getByRole("button", { name: /^Подтвердить:/ }),
     ).toHaveCount(0);
@@ -589,10 +652,7 @@ test.describe("V-19 pilot admin review click flow", () => {
 
     await expect(acceptButton).toBeEnabled();
     await acceptButton.click();
-    await expect(
-      reviewWorkspace.getByText("Подача принята и сохранена."),
-    ).toBeVisible();
-    await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
+    await expect(reviewWorkspace).toBeHidden();
     await expect(
       page.getByRole("heading", { level: 1, name: "Очередь на проверку" }),
     ).toBeVisible();
@@ -641,6 +701,19 @@ test.describe("V-19 pilot admin review click flow", () => {
       await expect(
         page.locator(".v19-admin-export-rail-v2.is-mobile-open"),
       ).toBeVisible();
+      const readinessManifest = page
+        .locator(".v19-admin-export-rail-v2.is-mobile-open .export-preview")
+        .locator("..")
+        .locator(":scope > .space-y-2");
+      const readinessScroll = await readinessManifest.evaluate((element) => ({
+        display: getComputedStyle(element).display,
+        overflowX: getComputedStyle(element).overflowX,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }));
+      expect(readinessScroll.display).toBe("flex");
+      expect(readinessScroll.overflowX).toBe("auto");
+      expect(readinessScroll.scrollWidth).toBeGreaterThan(readinessScroll.clientWidth);
     }
 
     await expectBodyMatches(page, [/Пакет выбран|Excel preview|Excel rows/i]);

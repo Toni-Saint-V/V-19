@@ -1267,6 +1267,7 @@ export function V19QueueToolbar({
   onCityFilterChange,
   onFilterClick,
   onSearchChange,
+  searchAction,
   searchAriaLabel,
   searchPlaceholder,
   searchValue,
@@ -1286,6 +1287,7 @@ export function V19QueueToolbar({
   onCityFilterChange: (city: string) => void;
   onFilterClick?: () => void;
   onSearchChange: (value: string) => void;
+  searchAction?: ReactNode;
   searchAriaLabel?: string;
   searchPlaceholder: string;
   searchValue: string;
@@ -1334,18 +1336,23 @@ export function V19QueueToolbar({
         </div>
       }
       action={
-        onFilterClick ? (
-          <button
-            aria-label={filterLabel}
-            title={filterLabel}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-            data-v19-interaction-id={interactionIds?.reset}
-            disabled={actionDisabled}
-            type="button"
-            onClick={onFilterClick}
-          >
-            <ActionIcon className="h-3.5 w-3.5" />
-          </button>
+        searchAction || onFilterClick ? (
+          <>
+            {searchAction}
+            {onFilterClick ? (
+              <button
+                aria-label={filterLabel}
+                title={filterLabel}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                data-v19-interaction-id={interactionIds?.reset}
+                disabled={actionDisabled}
+                type="button"
+                onClick={onFilterClick}
+              >
+                <ActionIcon className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </>
         ) : undefined
       }
     />

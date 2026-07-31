@@ -605,6 +605,181 @@
 
 @media (max-width: 767px) {
   #root
+    .ops-shell.role-agent.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header {
+    display: grid !important;
+    grid-template-columns:
+      var(--v19b-size-44)
+      minmax(0, 1fr)
+      auto !important;
+    align-items: center !important;
+    column-gap: var(--v19b-size-16) !important;
+    padding-left: var(--v19b-size-4) !important;
+  }
+
+  #root
+    .ops-shell.role-agent.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .v19-topbar-menu {
+    width: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
+    margin: 0 !important;
+  }
+
+  #root
+    .ops-shell.role-agent.has-unified-side-menu
+    > .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading {
+    min-width: 0;
+    margin: 0 !important;
+  }
+
+  #root .v19-agent-workspace-content[data-agent-screen="create"],
+  #root
+    .v19-agent-workspace-content[data-agent-screen="create"]
+    :is(
+      .v19-preupload-screen,
+      .v19-preupload-main,
+      .v19-preupload-layout,
+      .v19-preupload-primary
+    ) {
+    height: 100%;
+    min-height: 100%;
+  }
+
+  #root .v19-agent-workspace-content[data-agent-screen="create"] .v19-preupload-layout {
+    align-items: stretch;
+  }
+
+  #root .v19-agent-workspace-content[data-agent-screen="create"] .v19-preupload-card {
+    height: 100%;
+    min-height: calc(
+      100svh - var(--v19-mobile-header-height) - (var(--v19-mobile-page-padding) * 2) -
+        var(--v19b-size-8) - var(--v19b-size-32)
+    );
+  }
+
+  #root
+    .v19-agent-workspace-content[data-agent-screen="create"]
+    .v19-preupload-card-body {
+    height: 100%;
+    min-height: 100%;
+  }
+
+  #root
+    .v19-agent-workspace-content[data-agent-screen="create"]
+    .v19-preupload-upload-panel {
+    min-height: 180px;
+    flex: 1 1 auto;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  #root
+    .v19-agent-workspace-content[data-agent-screen="create"]
+    .v19-preupload-upload-group {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    justify-content: stretch;
+  }
+
+  #root
+    .v19-agent-workspace-content[data-agent-screen="create"]
+    .v19-preupload-dropzone {
+    width: 100%;
+    height: 100%;
+  }
+
+  #root .ops-shell.surface-agent-submissions .v19-applicant-family-header {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start;
+  }
+
+  #root .ops-shell.surface-agent-submissions .v19-applicant-family-main {
+    width: 100%;
+    min-width: 0;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-items: flex-start;
+  }
+
+  #root
+    .ops-shell.surface-agent-submissions
+    .v19-applicant-family-header
+    .v19-applicant-card-head-actions {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: start;
+  }
+
+  #root .ops-shell.surface-agent-submissions .v19-applicant-family-copy > h3 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #root .ops-shell.surface-agent-submissions .v19-applicant-family-meta {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  #root
+    .ops-shell.surface-agent-submissions
+    .v19-applicant-family-meta
+    .v19-applicant-public-id {
+    width: max-content;
+    grid-column: 1 / -1;
+    margin-top: var(--v19b-size-4);
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-metric-strip.v19-agent-action-metrics {
+    grid-template-columns: repeat(5, calc((100% - var(--v19b-size-16)) / 3)) !important;
+    scroll-snap-type: inline mandatory;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline-event.is-selected::after {
+    content: none !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline-event.is-selected {
+    position: relative;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline-event.is-selected::before {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--v19b-size-3);
+    border-radius: var(--v19b-radius-pill);
+    background: var(--v19b-color-primary-bright);
+    pointer-events: none;
+  }
+
+  #root
     .is-agent-shell-source-actions
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-actions-timeline::before,
@@ -613,6 +788,12 @@
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-actions-timeline-node {
     display: none;
+  }
+
+  #root
+    .ops-shell.has-unified-side-menu.is-mobile-nav-open
+    .v19-preupload-prefill-trigger {
+    display: none !important;
   }
 
   #root
@@ -751,6 +932,15 @@
     .v19-settings-panel-footer {
     min-height: 52px;
     padding-inline: 12px;
+  }
+}
+
+@media (max-width: 359px) {
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-metric-strip.v19-agent-action-metrics {
+    grid-template-columns: repeat(5, calc((100% - var(--v19b-size-8)) / 2)) !important;
   }
 }
 
