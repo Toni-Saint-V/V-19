@@ -1486,7 +1486,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Запись");
     expect(dropdownTrigger(result.container, "Город подачи")).toHaveTextContent(
-      "Выберите город",
+      "Москва",
     );
     clickPinnedSection(result.container, "Поездка");
     expect(

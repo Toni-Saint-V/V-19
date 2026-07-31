@@ -838,9 +838,11 @@ export function PreUploadScreen({
                                     {applicantDetails}
                                   </span>
                                 ) : null}
-                                <span className="v19-preupload-applicant-state">
-                                  {statusLabel(item)}
-                                </span>
+                                {item?.status !== "ready" ? (
+                                  <span className="v19-preupload-applicant-state">
+                                    {statusLabel(item)}
+                                  </span>
+                                ) : null}
                               </span>
                             </button>
                             <button

@@ -44,15 +44,30 @@ function reviewReadySubmission(): Submission {
 
 function submittedReviewReadySubmission(): Submission {
   const ready = reviewReadySubmission();
-  return applySubmissionAction(
-    ready,
-    "submit_for_review",
-    "agent",
-    ready.agentId,
-  );
+  return applySubmissionAction(ready, "submit_for_review", "agent", ready.agentId);
 }
 
 describe("submission action safety", () => {
+  test("prefills the appointment city for every applicant in a new draft", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["Ирина Петрова", "Павел Петров"],
+      city: "Санкт-Петербург",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+
+    expect(
+      draft.applicants.map(
+        (applicant) =>
+          applicant.sections
+            .flatMap((section) => section.fields)
+            .find((field) => field.id === "appointment-city")?.value,
+      ),
+    ).toEqual(["Санкт-Петербург", "Санкт-Петербург"]);
+  });
+
   test("does not allow history view action to export a submission under review", () => {
     const submitted = submittedReviewReadySubmission();
 
@@ -270,9 +285,7 @@ describe("submission action safety", () => {
       ok: false,
       reason: "Формирование Excel выполняется только через пакет выгрузки",
     });
-    expect(
-      applySubmissionActionResult(accepted, "generate_export", "admin"),
-    ).toEqual({
+    expect(applySubmissionActionResult(accepted, "generate_export", "admin")).toEqual({
       ok: false,
       error: {
         code: "EXPORT_NOT_READY",
@@ -405,7 +418,8 @@ describe("submission action safety", () => {
       ...reviewReadySubmission(),
       applicants: [
         {
-          ...(reviewReadySubmission().applicants[0] as Submission["applicants"][number]),
+          ...(reviewReadySubmission()
+            .applicants[0] as Submission["applicants"][number]),
           sections: [],
         },
       ],
@@ -495,8 +509,7 @@ describe("submission action safety", () => {
           status: "open",
           createdBy: "admin",
           createdAt: "сейчас",
-          snapshot:
-            'media-evidence:v1:["submission-media","old/path.jpg"]',
+          snapshot: 'media-evidence:v1:["submission-media","old/path.jpg"]',
         },
       ],
     };

@@ -161,16 +161,13 @@ test.describe("V-19 UX state proof", () => {
     if (await selectedExport.count()) {
       await selectedExport.uncheck();
     }
-    await expect(
-      page.locator(".export-preview").getByText("Пакет не выбран"),
-    ).toBeVisible();
+    await expect(page.locator(".export-preview")).toHaveCount(0);
     await expect(page.locator("#export-action-hint")).toContainText(
       "Выберите хотя бы одну подачу",
     );
     await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
+      page.getByRole("button", { name: "Сформировать ZIP с Excel" }),
     ).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
     await saveScreenshot(page, "export-disabled-reason");
 
     expect(problems).toEqual([]);

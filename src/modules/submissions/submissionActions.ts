@@ -531,12 +531,7 @@ export function createDraftSubmission({
   const applicants = Array.from({ length: applicantTotal }, (_, index) => {
     const id = applicantIdForScheme(draftIdToken, index, idScheme);
     const role = draftApplicantRole(index, type, applicantRoles[index]);
-    const fullName = draftApplicantName(
-      index,
-      type,
-      applicantNames[index],
-      role,
-    );
+    const fullName = draftApplicantName(index, type, applicantNames[index], role);
 
     return {
       id,
@@ -600,10 +595,21 @@ export function createDraftSubmission({
     ],
   };
 
-  if (!preliminaryIntake) return submission;
+  const cityPrefilledSubmission = submission.applicants.reduce(
+    (current, applicant) =>
+      updateQuestionnaireFieldInSubmission(current, {
+        applicantId: applicant.id,
+        fieldId: "appointment-city",
+        sectionId: `${applicant.id}-appointment`,
+        value: city,
+      }),
+    submission,
+  );
+
+  if (!preliminaryIntake) return cityPrefilledSubmission;
 
   return applyPreliminaryIntakeToSubmission(
-    normalizeSubmissionQuestionnaire(submission),
+    normalizeSubmissionQuestionnaire(cityPrefilledSubmission),
     preliminaryIntake,
   );
 }
@@ -791,10 +797,7 @@ function syncApplicantNameFromQuestionnaireUpdate(
   const firstName =
     fields.find((field) => field.id === "first-name")?.value.trim() ?? "";
   const surname = fields.find((field) => field.id === "surname")?.value.trim() ?? "";
-  if (
-    (!firstName || !surname) &&
-    !isPlaceholderApplicantName(applicant.fullName)
-  ) {
+  if ((!firstName || !surname) && !isPlaceholderApplicantName(applicant.fullName)) {
     return submission;
   }
   const fullName = [firstName, surname].filter(Boolean).join(" ");
@@ -1098,8 +1101,7 @@ export function addPreciseAdminIssue(
   const issueInput: IssueInput = {
     ...input,
     field: resolvedTarget.kind === "field" ? resolvedTarget.field : undefined,
-    fileType:
-      resolvedTarget.kind === "media" ? resolvedTarget.fileType : undefined,
+    fileType: resolvedTarget.kind === "media" ? resolvedTarget.fileType : undefined,
     type: resolvedTarget.kind === "field" ? "field" : "file",
   };
   const newIssue: Issue = {
