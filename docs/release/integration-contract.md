@@ -709,6 +709,34 @@ fail-closed для любого будущего изменения таблиц
   review/issue/Excel surfaces; production mutating cross-flow этим не
   подменяется.
 
+### T9 canonical release boundary reconciliation — 2026-07-31
+
+Статус: **LOCAL INTEGRATION ONLY / PRODUCTION NOT APPLIED**.
+
+Этот поздний amendment заменяет для текущего integration preview прежний
+`T9 document ZIP activation amendment — 2026-07-29`. При расхождении
+приоритет имеет `docs/release/canonical-domain-contract.md`: активным export
+artifact остаётся только Excel T8, а ZIP/package и terminal T9 требуют
+отдельного последующего owner-approved контракта.
+
+Точный delta:
+
+- canonical `mark_exported.releaseState` остаётся `blocked`;
+- frozen Admin export presentation, controls, labels, layout и CSS не
+  меняются; ZIP action останавливается общим action-authority guard до чтения
+  Storage и создания Blob;
+- migration
+  `20260731000000_block_t9_until_approved_contract.sql` выполняется после
+  historical T9 hardening и отзывает client `EXECUTE` у public wrapper и
+  private core для `public`, `anon` и `authenticated`;
+- T9 function bodies, tables, status machine и данные не переписываются;
+- `requiredRemoteMigrationOrder` и production evidence не меняются без
+  отдельного owner-approved apply и canonical readback.
+
+Rollback локального preview: revert этого amendment вместе с migration/code
+commit. Возвращать `EXECUTE`, активировать T9 или применять migration в
+production этим rollback-описанием не разрешается.
+
 ### Approved Agent CAS integration amendment — 2026-07-29
 
 Статус amendment: **APPROVED FOR LOCAL INTEGRATION / PRODUCTION NOT APPLIED**.
