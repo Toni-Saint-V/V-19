@@ -1030,11 +1030,10 @@ export function PreUploadScreen({
                       <h3 className="text-[18px] font-semibold text-white">
                         {activeItem
                           ? `Заменить паспорт: ${activeApplicantLabel}`
-                          : `Паспорт: ${activeApplicantLabel}`}
+                          : `Паспорт — ${activeApplicantLabel}`}
                       </h3>
                       <p className="v19-preupload-dropzone-copy">
-                        Загрузите паспорт, программа извлечет данные и подставит сразу в
-                        анкету
+                        Загрузите паспорт — данные появятся в анкете.
                       </p>
                     </button>
                     <input
@@ -1082,6 +1081,11 @@ export function PreUploadScreen({
                   ) : null}
                   <button
                     {...agentInteractionProps("new-submission.save-draft")}
+                    aria-label={
+                      actionPending
+                        ? persistenceLabel(persistenceProgress)
+                        : "Сохранить черновик"
+                    }
                     aria-describedby={
                       submitDisabled ? "preupload-disabled-reason" : undefined
                     }
@@ -1092,10 +1096,17 @@ export function PreUploadScreen({
                   >
                     {actionPending
                       ? persistenceLabel(persistenceProgress)
-                      : "Сохранить черновик"}
+                      : "Сохранить"}
                   </button>
                   <button
                     {...agentInteractionProps("new-submission.continue")}
+                    aria-label={
+                      actionPending
+                        ? persistenceLabel(persistenceProgress)
+                        : items.length
+                          ? "Создать и открыть анкету"
+                          : "Продолжить без паспорта"
+                    }
                     aria-describedby={
                       submitDisabled ? "preupload-disabled-reason" : undefined
                     }
@@ -1107,8 +1118,8 @@ export function PreUploadScreen({
                     {actionPending
                       ? persistenceLabel(persistenceProgress)
                       : items.length
-                        ? "Создать и открыть анкету"
-                        : "Продолжить без паспорта"}
+                        ? "Открыть анкету"
+                        : "Продолжить"}
                   </button>
                 </div>
               </div>

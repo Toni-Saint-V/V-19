@@ -727,6 +727,22 @@
   }
 }
 
+@media (min-width: 480px) and (max-width: 1279px) and (min-height: 900px) {
+  #root .v19-agent-workspace-content[data-agent-screen="create"] {
+    display: grid;
+    align-items: center;
+  }
+
+  .v19-preupload-screen {
+    min-height: 0;
+    padding-block: clamp(12px, 3vh, 32px);
+  }
+
+  .v19-preupload-main {
+    width: 100%;
+  }
+}
+
 @media (max-width: 767px) {
   .v19-preupload-card {
     border-radius: 16px;
