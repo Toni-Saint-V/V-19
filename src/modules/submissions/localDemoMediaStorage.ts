@@ -15,9 +15,7 @@ type StoredMediaMetadata = {
   storedAtEpochMs: number;
 };
 
-export type LocalDemoMediaMutationLock = <T>(
-  operation: () => Promise<T>,
-) => Promise<T>;
+export type LocalDemoMediaMutationLock = <T>(operation: () => Promise<T>) => Promise<T>;
 
 let inProcessMutationTail: Promise<void> = Promise.resolve();
 
@@ -80,10 +78,7 @@ async function runTransaction<T>(
 }
 
 async function runMediaWriteTransaction(
-  operation: (
-    mediaStore: IDBObjectStore,
-    metadataStore: IDBObjectStore,
-  ) => void,
+  operation: (mediaStore: IDBObjectStore, metadataStore: IDBObjectStore) => void,
 ): Promise<void> {
   const database = await openLocalDemoMediaDatabase();
 
@@ -183,7 +178,9 @@ async function listLocalDemoMediaPaths(): Promise<string[]> {
   return keys.filter((key): key is string => typeof key === "string");
 }
 
-async function localDemoMediaStoredAtEpochMs(path: string): Promise<number | undefined> {
+async function localDemoMediaStoredAtEpochMs(
+  path: string,
+): Promise<number | undefined> {
   const metadata = await runTransaction<StoredMediaMetadata | undefined>(
     metadataStoreName,
     "readonly",
@@ -201,10 +198,7 @@ async function backfillLocalDemoMediaStoredAtEpochMs(
   if (paths.length === 0 || !indexedDbFactory()) return;
   await runMediaWriteTransaction((_mediaStore, metadataStore) => {
     for (const path of paths) {
-      metadataStore.put(
-        { storedAtEpochMs } satisfies StoredMediaMetadata,
-        path,
-      );
+      metadataStore.put({ storedAtEpochMs } satisfies StoredMediaMetadata, path);
     }
   });
 }
@@ -260,10 +254,7 @@ export async function pruneUnreferencedLocalDemoMedia(
           : await Promise.all(
               existingPaths.map(
                 async (path) =>
-                  [
-                    path,
-                    await localDemoMediaStoredAtEpochMs(path),
-                  ] as const,
+                  [path, await localDemoMediaStoredAtEpochMs(path)] as const,
               ),
             )),
     );

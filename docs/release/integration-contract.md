@@ -305,7 +305,7 @@ Superseded snapshot:
   `ef1370e98bd0f828e5d9fc393e6a3bce4e6cae4e0d1e016a6725fa2de8a07e55`
   не принимается, не коммитится и не деплоится;
 - независимый RED-TEAM доказал, что production policy `profiles read own or
-  admin` скрывает Admin creator row от Agent внутри `SECURITY INVOKER`
+admin` скрывает Admin creator row от Agent внутри `SECURITY INVOKER`
   `save_agent_submission_if_current`;
 - прежний PostgreSQL harness не включал production-equivalent `profiles` RLS,
   поэтому легитимная open → fixed correction давала ложный `PASS`;
@@ -545,7 +545,7 @@ deployed function bodies:
   - wrapper под row lock связывает каждый exact `document_asset` с ровно одним
     существующим `storage.objects` row по
     `(bucket_id, name) = (document_assets.bucket,
-    document_assets.storage_path)`, требует bucket `submission-media` и
+document_assets.storage_path)`, требует bucket `submission-media` и
     distinct object count, равный exact asset count;
 - migration допускает только два цельных определения: exact reviewed legacy
   state или уже hardened state. Missing/null-unsafe Admin guard, лишнее
@@ -765,7 +765,7 @@ production, переключение Vercel alias или live mutation.
 2. Все Agent aggregate writes переводятся на один
    `SECURITY INVOKER` RPC:
    `public.save_agent_submission_if_current(payload, expected_revision,
-   actor_id, operation_id)`.
+actor_id, operation_id)`.
 3. Execute для revision-blind Agent RPC
    `save_submission_draft(jsonb)`, `submit_corrections_handoff(jsonb)` и
    `upsert_questionnaire_answers(jsonb)` отзывается у
@@ -1765,18 +1765,18 @@ Legacy read aliases допускаются только на read boundary:
 
 ### 7.3 Допустимые переходы и actor
 
-| ID  | Action                | Кто меняет                                 | From                              | To                     | Обязательные guards                                                                                                                                                                                          |
-| --- | --------------------- | ------------------------------------------ | --------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| T0  | Create draft          | Agent                                      | none                              | `draft`                | Authenticated Agent становится owner; canonical initial data.                                                                                                                                                |
-| T1  | Save/start            | Owning Agent                               | `draft`                           | `in_progress`          | Минимум один applicant; incomplete package разрешён.                                                                                                                                                         |
-| T2  | Submit/re-submit      | Owning Agent                               | `in_progress`, `ready_for_export` | `submitted_for_review` | Полный package; нет unresolved issue; re-submit очищает export readiness и требует нового review.                                                                                                            |
-| T3  | Return with issues    | Admin                                      | `submitted_for_review`            | `returned`             | Минимум один новый valid `open` issue; нет export commit.                                                                                                                                                    |
-| T4  | Accept first review   | Admin                                      | `submitted_for_review`            | `ready_for_export`     | Нет open/fixed issues; полный package; восемь passport fields каждого applicant имеют current Admin approval; required media имеют accepted status + persisted review actor/time + private storage identity. |
-| T5  | Submit corrections    | Owning Agent                               | `returned`                        | `corrections_received` | Каждое open issue конкретно исправлено и стало `fixed_by_agent`; package остаётся полным.                                                                                                                    |
-| T6  | Close and accept      | Admin                                      | `corrections_received`            | `ready_for_export`     | Все fixes проверены и закрыты; open отсутствуют; исправленные passport fields повторно подтверждены; required media имеют accepted status + persisted review actor/time + private storage identity.          |
-| T7  | Return again          | Admin                                      | `corrections_received`            | `returned`             | Создан минимум один новый valid open issue; closed issues не переоткрываются.                                                                                                                                |
-| T8  | Prepare Excel export           | Admin-initiated, authorized system         | `ready_for_export`                | `ready_for_export`     | Excel-only, status-preserving; unique submission set; exact applicant row count; one city/travel-date group; identity/idempotency/fingerprint guards; нет issues.                                                                                                            |
-| T9  | Complete document ZIP package  | Admin-initiated, authorized system commits | `ready_for_export`                | `exported`             | Exact Excel + accepted private media ZIP was prepared and handed to the browser; Admin confirmed download; exact selection/identity/fingerprint/media set; one atomic RPC writes batch/member/event/assets/status/history/`exported_at`; no partial writes.                    |
+| ID  | Action                        | Кто меняет                                 | From                              | To                     | Обязательные guards                                                                                                                                                                                                                                         |
+| --- | ----------------------------- | ------------------------------------------ | --------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T0  | Create draft                  | Agent                                      | none                              | `draft`                | Authenticated Agent становится owner; canonical initial data.                                                                                                                                                                                               |
+| T1  | Save/start                    | Owning Agent                               | `draft`                           | `in_progress`          | Минимум один applicant; incomplete package разрешён.                                                                                                                                                                                                        |
+| T2  | Submit/re-submit              | Owning Agent                               | `in_progress`, `ready_for_export` | `submitted_for_review` | Полный package; нет unresolved issue; re-submit очищает export readiness и требует нового review.                                                                                                                                                           |
+| T3  | Return with issues            | Admin                                      | `submitted_for_review`            | `returned`             | Минимум один новый valid `open` issue; нет export commit.                                                                                                                                                                                                   |
+| T4  | Accept first review           | Admin                                      | `submitted_for_review`            | `ready_for_export`     | Нет open/fixed issues; полный package; восемь passport fields каждого applicant имеют current Admin approval; required media имеют accepted status + persisted review actor/time + private storage identity.                                                |
+| T5  | Submit corrections            | Owning Agent                               | `returned`                        | `corrections_received` | Каждое open issue конкретно исправлено и стало `fixed_by_agent`; package остаётся полным.                                                                                                                                                                   |
+| T6  | Close and accept              | Admin                                      | `corrections_received`            | `ready_for_export`     | Все fixes проверены и закрыты; open отсутствуют; исправленные passport fields повторно подтверждены; required media имеют accepted status + persisted review actor/time + private storage identity.                                                         |
+| T7  | Return again                  | Admin                                      | `corrections_received`            | `returned`             | Создан минимум один новый valid open issue; closed issues не переоткрываются.                                                                                                                                                                               |
+| T8  | Prepare Excel export          | Admin-initiated, authorized system         | `ready_for_export`                | `ready_for_export`     | Excel-only, status-preserving; unique submission set; exact applicant row count; one city/travel-date group; identity/idempotency/fingerprint guards; нет issues.                                                                                           |
+| T9  | Complete document ZIP package | Admin-initiated, authorized system commits | `ready_for_export`                | `exported`             | Exact Excel + accepted private media ZIP was prepared and handed to the browser; Admin confirmed download; exact selection/identity/fingerprint/media set; one atomic RPC writes batch/member/event/assets/status/history/`exported_at`; no partial writes. |
 
 Любой неуказанный переход запрещён.
 
@@ -1784,7 +1784,7 @@ Canonical command boundary:
 
 - Agent draft/save/submit/correction handoff:
   `public.save_agent_submission_if_current(payload, expected_revision,
-  actor_id, operation_id)`;
+actor_id, operation_id)`;
 - Agent card archive:
   `public.archive_agent_submission_card(submission_id,
 expected_case_revision)`;
@@ -1835,29 +1835,29 @@ Forbidden:
 
 ## 8. Entity ownership and write rights
 
-| Entity / field group                                                | Owner                                      | Кто читает                                                     | Кто меняет                                                                                      |
-| ------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `profiles` identity/role                                            | Trusted provisioning                       | Self/Admin as permitted                                        | Trusted provisioning only                                                                       |
-| `submissions.agent_id`, `id`, `type`                                | System assignment + owning Agent aggregate | Owning Agent, Admin                                            | Create command only; immutable after creation                                                   |
-| Submission intake fields, applicants, questionnaire semantic values | Owning Agent                               | Owning Agent, Admin                                            | Owning Agent only in `draft`, `in_progress`, `returned`; canonical command boundary             |
-| Questionnaire intake provenance/confirmation metadata               | Owning Agent/system workflow               | Owning Agent, Admin                                            | Approved Agent/system intake commands; semantic change invalidates stale approvals              |
-| Passport field `adminReviewApproved*` metadata                      | Admin                                      | Owning Agent, Admin                                            | Admin only during `submitted_for_review`, `corrections_received`; never changes semantic answer |
-| Media binary + upload metadata                                      | Owning Agent                               | Owning Agent, Admin                                            | Owning Agent in editable state; replacement clears review                                       |
-| Media review fields                                                 | Admin                                      | Owning Agent, Admin                                            | Admin only during review                                                                        |
-| Issue creation/reason/target/severity                               | Admin                                      | Owning Agent, Admin                                            | Admin/system creates new issue; existing target/history immutable                               |
-| Issue fix evidence/state                                            | Owning Agent                               | Owning Agent, Admin                                            | Agent only `open → fixed_by_agent` during correction handoff                                    |
-| Issue closure                                                       | Admin                                      | Owning Agent, Admin                                            | Admin only `fixed_by_agent → closed_by_admin`                                                   |
-| Canonical status                                                    | Domain command                             | Owning Agent, Admin                                            | Actor from transition table only                                                                |
-| `status_history`                                                    | Audit/system                               | Owning Agent, Admin                                            | Append by successful canonical command; no manual rewrite                                       |
-| `agent_submission_card_archives`                                    | Owning Agent visibility state              | Owning Agent, Admin                                            | Owning Agent via revision-aware archive RPC; no direct update/delete                            |
-| Agent mutation receipt                                              | Agent CAS RPC/system                        | Owning Agent operation through RPC only                        | CAS RPC only; no direct product UI access                                                       |
-| `case_revision`                                                     | System                                     | Owning Agent, Admin                                            | Atomic persistence RPC only                                                                     |
-| `public_number`                                                     | Submission aggregate                       | Owning Agent, Admin                                            | `ensure_submission_public_number` only after complete questionnaire; then immutable             |
-| Admin mutation receipt                                              | Admin RPC/system                           | Owning Admin operation through RPC only                        | Batch RPC only; no direct UI access                                                             |
-| `document_assets`                                                   | Derived system projection                  | Admin; owning Agent only where downstream policy permits        | Trigger/system projection; exact `ready → exported` set only inside approved T9 RPC              |
-| Excel export batch/member data                                      | Admin-initiated system command             | Admin; owning Agent downstream view via immutable snapshot      | Approved atomic T9 command and after-insert member snapshot trigger only                         |
-| ZIP/document event data                                             | Admin-initiated system audit               | Admin; owning Agent only where downstream policy permits        | One exact idempotent `DOCUMENT_EXPORT_CREATED` event inside approved T9 RPC only                 |
-| `exported_at`                                                       | System commit                              | Owning Agent, Admin                                            | Approved atomic T9 RPC only; direct mutation blocked                                             |
+| Entity / field group                                                | Owner                                      | Кто читает                                                 | Кто меняет                                                                                      |
+| ------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `profiles` identity/role                                            | Trusted provisioning                       | Self/Admin as permitted                                    | Trusted provisioning only                                                                       |
+| `submissions.agent_id`, `id`, `type`                                | System assignment + owning Agent aggregate | Owning Agent, Admin                                        | Create command only; immutable after creation                                                   |
+| Submission intake fields, applicants, questionnaire semantic values | Owning Agent                               | Owning Agent, Admin                                        | Owning Agent only in `draft`, `in_progress`, `returned`; canonical command boundary             |
+| Questionnaire intake provenance/confirmation metadata               | Owning Agent/system workflow               | Owning Agent, Admin                                        | Approved Agent/system intake commands; semantic change invalidates stale approvals              |
+| Passport field `adminReviewApproved*` metadata                      | Admin                                      | Owning Agent, Admin                                        | Admin only during `submitted_for_review`, `corrections_received`; never changes semantic answer |
+| Media binary + upload metadata                                      | Owning Agent                               | Owning Agent, Admin                                        | Owning Agent in editable state; replacement clears review                                       |
+| Media review fields                                                 | Admin                                      | Owning Agent, Admin                                        | Admin only during review                                                                        |
+| Issue creation/reason/target/severity                               | Admin                                      | Owning Agent, Admin                                        | Admin/system creates new issue; existing target/history immutable                               |
+| Issue fix evidence/state                                            | Owning Agent                               | Owning Agent, Admin                                        | Agent only `open → fixed_by_agent` during correction handoff                                    |
+| Issue closure                                                       | Admin                                      | Owning Agent, Admin                                        | Admin only `fixed_by_agent → closed_by_admin`                                                   |
+| Canonical status                                                    | Domain command                             | Owning Agent, Admin                                        | Actor from transition table only                                                                |
+| `status_history`                                                    | Audit/system                               | Owning Agent, Admin                                        | Append by successful canonical command; no manual rewrite                                       |
+| `agent_submission_card_archives`                                    | Owning Agent visibility state              | Owning Agent, Admin                                        | Owning Agent via revision-aware archive RPC; no direct update/delete                            |
+| Agent mutation receipt                                              | Agent CAS RPC/system                       | Owning Agent operation through RPC only                    | CAS RPC only; no direct product UI access                                                       |
+| `case_revision`                                                     | System                                     | Owning Agent, Admin                                        | Atomic persistence RPC only                                                                     |
+| `public_number`                                                     | Submission aggregate                       | Owning Agent, Admin                                        | `ensure_submission_public_number` only after complete questionnaire; then immutable             |
+| Admin mutation receipt                                              | Admin RPC/system                           | Owning Admin operation through RPC only                    | Batch RPC only; no direct UI access                                                             |
+| `document_assets`                                                   | Derived system projection                  | Admin; owning Agent only where downstream policy permits   | Trigger/system projection; exact `ready → exported` set only inside approved T9 RPC             |
+| Excel export batch/member data                                      | Admin-initiated system command             | Admin; owning Agent downstream view via immutable snapshot | Approved atomic T9 command and after-insert member snapshot trigger only                        |
+| ZIP/document event data                                             | Admin-initiated system audit               | Admin; owning Agent only where downstream policy permits   | One exact idempotent `DOCUMENT_EXPORT_CREATED` event inside approved T9 RPC only                |
+| `exported_at`                                                       | System commit                              | Owning Agent, Admin                                        | Approved atomic T9 RPC only; direct mutation blocked                                            |
 
 Role isolation rules:
 
@@ -2017,7 +2017,7 @@ Fresh immutable-snapshot inputs immediately before independent review:
 - `npm run verify:auth-data-readiness` — PASS, 216 checks;
 - `npm run verify:supabase-release` — PASS, 285 checks;
 - `node tests/integration/exportPackageCompletionPostgres.mjs
-  public.ecr.aws/supabase/postgres:17.6.1.127` — PASS on PostgreSQL 17,
+public.ecr.aws/supabase/postgres:17.6.1.127` — PASS on PostgreSQL 17,
   включая повторный idempotent migration apply, single/family commit,
   exact five-asset family graph, duplicate replay, CSV/non-XLSX denial,
   missing Storage denial, normalized/no-snapshot denial, secondary-selfie

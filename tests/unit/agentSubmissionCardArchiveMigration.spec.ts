@@ -27,9 +27,7 @@ describe("agent submission card archive migration", () => {
   });
 
   it("limits agent archives to owned draft or filling rows at the current revision", () => {
-    expect(migration).toContain(
-      "actor_role is distinct from 'agent'",
-    );
+    expect(migration).toContain("actor_role is distinct from 'agent'");
     expect(migration).toContain("submission.agent_id = (select auth.uid())");
     expect(migration).toContain("submission.status in ('draft', 'filling')");
     expect(migration).toContain("submission.case_revision = case_revision");
@@ -74,24 +72,13 @@ describe("agent submission card archive migration", () => {
       "from public.submissions submission\n  where submission.id = target_submission_id",
     );
     expect(migration).toContain("for update;");
-    expect(migration).toContain(
-      "v19_agent_submission_archived_mutation_blocked",
-    );
-    expect(migration).toContain(
-      "v19_agent_submission_archived_reassign_blocked",
-    );
-    expect(migration).toContain(
-      "new.agent_id is distinct from old.agent_id",
-    );
+    expect(migration).toContain("v19_agent_submission_archived_mutation_blocked");
+    expect(migration).toContain("v19_agent_submission_archived_reassign_blocked");
+    expect(migration).toContain("new.agent_id is distinct from old.agent_id");
     expect(migration).toContain(
       "create or replace function app_private.status_history_parent_submission_id",
     );
-    for (const entityType of [
-      "submission",
-      "applicant",
-      "media",
-      "appointment",
-    ]) {
+    for (const entityType of ["submission", "applicant", "media", "appointment"]) {
       expect(migration).toContain(`when '${entityType}' then`);
     }
 
@@ -105,9 +92,7 @@ describe("agent submission card archive migration", () => {
       "status_history",
       "submission_files",
     ]) {
-      expect(migration).toContain(
-        `create trigger ${table}_agent_card_archive_fence`,
-      );
+      expect(migration).toContain(`create trigger ${table}_agent_card_archive_fence`);
     }
   });
 

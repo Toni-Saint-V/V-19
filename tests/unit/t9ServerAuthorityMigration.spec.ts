@@ -19,9 +19,7 @@ describe("T9 server-authority hardening migration", () => {
     expect(sql).toContain(
       "if batch_record.format is distinct from 'xlsx' then raise exception 'export package format must be xlsx'",
     );
-    expect(sql).toContain(
-      "right(lower(batch_record.file_name), 5) <> '.xlsx'",
-    );
+    expect(sql).toContain("right(lower(batch_record.file_name), 5) <> '.xlsx'");
     expect(sql).toContain(
       "right(lower(document_record.workbook_file_name), 5) <> '.xlsx'",
     );
@@ -66,13 +64,9 @@ describe("T9 server-authority hardening migration", () => {
     expect(sql).toContain(
       "t9 wrapper does not match one complete reviewed storage state",
     );
-    expect(sql).toContain(
-      "if actor_role is distinct from ''admin'' then",
-    );
+    expect(sql).toContain("if actor_role is distinct from ''admin'' then");
     expect(sql).toContain("position(unsafe_admin_guard in core_definition) > 0");
-    expect(sql).toContain(
-      "position(unsafe_admin_guard in wrapper_definition) > 0",
-    );
+    expect(sql).toContain("position(unsafe_admin_guard in wrapper_definition) > 0");
     expect(sql).toContain(
       "revoke all on function app_private.complete_export_package_core(jsonb) from public, anon, authenticated",
     );

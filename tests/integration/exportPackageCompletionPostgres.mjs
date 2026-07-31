@@ -181,8 +181,7 @@ function waitForPostgres() {
       ["exec", containerName, "pg_isready", "-U", databaseUser],
       { encoding: "utf8" },
     );
-    consecutiveReadyChecks =
-      result.status === 0 ? consecutiveReadyChecks + 1 : 0;
+    consecutiveReadyChecks = result.status === 0 ? consecutiveReadyChecks + 1 : 0;
     if (consecutiveReadyChecks >= 3) return;
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
   }
