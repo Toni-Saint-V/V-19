@@ -196,8 +196,11 @@ function sectionActionAccessibleLabel(
   accepted: boolean,
   pending: boolean,
   canConfirm: boolean,
+  completedActionLabel?: string,
 ) {
-  if (accepted) return "Перейти к решению по подаче: секция подтверждена";
+  if (accepted) {
+    return completedActionLabel ?? "Перейти к решению по подаче: секция подтверждена";
+  }
   if (pending) return "Сохраняется подтверждение паспортной секции";
   return canConfirm
     ? "Подтвердить паспортную секцию"
@@ -815,6 +818,22 @@ export function ReviewWorkspace({
 
   const returnDecision = adminReviewActions?.returnForCorrection;
   const acceptDecision = adminReviewActions?.acceptForExport;
+  const nextIncompleteApplicant = applicantReviewStates.find(
+    (state) => state.id !== selectedApplicantId && !state.completed,
+  );
+  const completedSectionDecisionSelector =
+    acceptDecision && !acceptDecision.disabled
+      ? ".v19-review-accept:not([disabled])"
+      : returnDecision && !returnDecision.disabled
+        ? ".v19-review-return:not([disabled])"
+        : "";
+  const completedSectionNextApplicant =
+    !completedSectionDecisionSelector && onApplicantChange
+      ? nextIncompleteApplicant
+      : undefined;
+  const completedSectionActionLabel = completedSectionNextApplicant
+    ? `Перейти к следующему заявителю: ${completedSectionNextApplicant.name}`
+    : "Перейти к решению по подаче: секция подтверждена";
   let reviewDecisionReason = "Проверка готова к решению.";
   if (!isEditableReviewStatus) {
     reviewDecisionReason = `Статус «${submission?.status ?? "неизвестно"}» доступен только для чтения.`;
@@ -980,6 +999,32 @@ export function ReviewWorkspace({
   );
 
   const handleNextReviewStep = useCallback(() => {
+    if (sectionAlreadyAccepted) {
+      const decision = completedSectionDecisionSelector
+        ? decisionFooterRef.current?.querySelector<HTMLButtonElement>(
+            completedSectionDecisionSelector,
+          )
+        : undefined;
+      if (decision) {
+        decision.scrollIntoView?.({
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "nearest",
+        });
+        decision.focus({ preventScroll: true });
+        return;
+      }
+      if (completedSectionNextApplicant && onApplicantChange) {
+        onApplicantChange(completedSectionNextApplicant.id);
+        return;
+      }
+      decisionFooterRef.current?.scrollIntoView?.({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "nearest",
+      });
+      decisionFooterRef.current?.focus({ preventScroll: true });
+      return;
+    }
+
     const nextMediaType =
       confirmationMediaTypes.find((type) => !visitedMediaTypes.has(type)) ??
       confirmationMediaTypes.find((type) => mediaPreviews[type]?.status !== "ready");
@@ -1027,7 +1072,7 @@ export function ReviewWorkspace({
     }
 
     const decision = decisionFooterRef.current?.querySelector<HTMLButtonElement>(
-      "button:not([disabled])",
+      ".v19-review-accept:not([disabled]), .v19-review-return:not([disabled])",
     );
     decision?.scrollIntoView?.({
       behavior: prefersReducedMotion ? "auto" : "smooth",
@@ -1036,10 +1081,14 @@ export function ReviewWorkspace({
     decision?.focus({ preventScroll: true });
   }, [
     confirmationMediaTypes,
+    completedSectionDecisionSelector,
+    completedSectionNextApplicant,
     handleMediaSelect,
     mediaPreviews,
+    onApplicantChange,
     prefersReducedMotion,
     reviewFields,
+    sectionAlreadyAccepted,
     visitedMediaTypes,
   ]);
 
@@ -1461,6 +1510,7 @@ export function ReviewWorkspace({
                       sectionAlreadyAccepted,
                       sectionApprovalPending,
                       canConfirmSection,
+                      completedSectionActionLabel,
                     )}
                     aria-busy={sectionApprovalPending}
                     aria-describedby="passport-review-completion-reason"
@@ -1506,6 +1556,7 @@ export function ReviewWorkspace({
             aria-live="polite"
             className={`v19-review-decision${reviewActionPending ? " is-pending" : ""}${reviewActionError ? " is-error" : ""}`}
             ref={decisionFooterRef}
+            tabIndex={-1}
           >
             <div className="v19-review-decision-context">
               <div className="v19-review-decision-title">
