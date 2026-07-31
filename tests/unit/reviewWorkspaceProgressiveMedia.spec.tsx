@@ -118,6 +118,53 @@ function decisionReadySubmission(): Submission {
   return adminAcceptRequiredMediaForTest(submission);
 }
 
+function familyPartiallyReadySubmission(): Submission {
+  const ready = decisionReadySubmission();
+  const pending = reviewSubmission("з-1056-2");
+  const readyApplicant = ready.applicants[0];
+  const pendingApplicant = pending.applicants[0];
+  if (!readyApplicant || !pendingApplicant) {
+    throw new Error("Expected family review applicants");
+  }
+
+  return {
+    ...ready,
+    applicants: [
+      { ...readyApplicant, role: "main" },
+      { ...pendingApplicant, fullName: "Павел Петров", role: "spouse" },
+    ],
+    files: [...ready.files, ...pending.files],
+    type: "family",
+  };
+}
+
+function familyPartiallyReadySubmissionWithIssue(): Submission {
+  const submission = familyPartiallyReadySubmission();
+  const pendingApplicant = submission.applicants[1];
+  if (!pendingApplicant) throw new Error("Expected pending family applicant");
+
+  return {
+    ...submission,
+    issues: [
+      {
+        comment: "Уточнить данные второго заявителя.",
+        createdAt: "2026-07-31T10:00:00.000Z",
+        createdBy: "admin",
+        id: "family-pending-applicant-issue",
+        reason: "Нужна ручная проверка",
+        severity: "warning",
+        status: "open",
+        target: {
+          applicantId: pendingApplicant.id,
+          applicantName: pendingApplicant.fullName,
+          section: "Личные данные заявителя",
+        },
+        type: "section",
+      },
+    ],
+  };
+}
+
 describe("ReviewWorkspace perceived feedback", () => {
   test("keeps the complete passport frame at the default zoom and restores it after zooming", async () => {
     const submission = reviewSubmission();
@@ -749,6 +796,95 @@ describe("ReviewWorkspace perceived feedback", () => {
     await waitFor(() => expect(confirmation).toHaveClass("is-complete"));
     expect(screen.getByText("Секция подтверждена")).toBeVisible();
     expect(confirmation).toHaveAttribute("aria-busy", "false");
+  });
+
+  test("moves the completed section control to the available decision", () => {
+    const submission = decisionReadySubmission();
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        onReviewAction={vi.fn()}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Перейти к решению по подаче: секция подтверждена",
+      }),
+    );
+    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toHaveFocus();
+  });
+
+  test("moves a completed family section to the next incomplete applicant", () => {
+    const submission = familyPartiallyReadySubmission();
+    const nextApplicant = submission.applicants[1];
+    if (!nextApplicant) throw new Error("Expected the next family applicant");
+    const onApplicantChange = vi.fn();
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApplicantChange={onApplicantChange}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        onReviewAction={vi.fn()}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Перейти к следующему заявителю: ${nextApplicant.fullName}`,
+      }),
+    );
+    expect(onApplicantChange).toHaveBeenCalledWith(nextApplicant.id);
+  });
+
+  test("keeps the completed-section label aligned with an available return decision", () => {
+    const submission = familyPartiallyReadySubmissionWithIssue();
+    const onApplicantChange = vi.fn();
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
+      () => new Promise(() => undefined),
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApplicantChange={onApplicantChange}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        onReviewAction={vi.fn()}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Перейти к решению по подаче: секция подтверждена",
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Отправить на исправление" }),
+    ).toHaveFocus();
+    expect(onApplicantChange).not.toHaveBeenCalled();
   });
 
   test("ignores a section approval that resolves after switching applicants", async () => {
