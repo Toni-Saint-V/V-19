@@ -1414,7 +1414,7 @@ export function AdminExportScreen({
           {preparedArchive && archiveDownloadUrl && archiveDownloadStarted ? (
             <div className="space-y-2">
               <button
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-wait disabled:opacity-60"
+                className="v19-export-primary-action flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-wait disabled:opacity-60"
                 data-testid="confirm-export-download"
                 disabled={isExporting}
                 onClick={handleConfirmArchiveDownload}
@@ -1437,7 +1437,7 @@ export function AdminExportScreen({
           ) : preparedArchive && archiveDownloadUrl ? (
             <a
               aria-disabled={isExporting}
-              className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${isExporting ? "cursor-wait opacity-60" : ""}`}
+              className={`v19-export-primary-action flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${isExporting ? "cursor-wait opacity-60" : ""}`}
               data-testid="export-download"
               download={preparedArchive.artifact.fileName}
               href={archiveDownloadUrl}
@@ -1451,7 +1451,7 @@ export function AdminExportScreen({
             <button
               onClick={handlePrepareArchive}
               disabled={selectedCount === 0 || isExporting || hasExportBlockers}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
+              className="v19-export-primary-action flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
             >
               {isExporting ? (
                 <UploadCloud className="h-4 w-4 animate-pulse" />
