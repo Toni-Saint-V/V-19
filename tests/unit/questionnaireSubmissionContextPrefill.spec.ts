@@ -1,27 +1,21 @@
 import { describe, expect, test } from "vitest";
 
 import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
-import {
-  createDraftSubmission,
-  updateQuestionnaireField,
-} from "../../src/modules/submissions/submissionActions";
+import { createDraftSubmission, updateQuestionnaireField } from "../../src/modules/submissions/submissionActions";
 
 function appointmentCityValue(submission: ReturnType<typeof createDraftSubmission>) {
   const applicant = submission.applicants[0];
   const section = applicant?.sections.find((candidate) =>
     candidate.fields.some((field) => field.id === "appointment-city"),
   );
-  const field = section?.fields.find(
-    (candidate) => candidate.id === "appointment-city",
-  );
-  if (!applicant || !section || !field)
-    throw new Error("Missing appointment city field.");
+  const field = section?.fields.find((candidate) => candidate.id === "appointment-city");
+  if (!applicant || !section || !field) throw new Error("Missing appointment city field.");
 
   return { applicant, field, section };
 }
 
 describe("questionnaire submission-context prefill", () => {
-  test("prefills appointment city from the new submission context", () => {
+  test("keeps appointment city blank until the user selects it", () => {
     const draft = createDraftSubmission({
       city: "Казань",
       familyCount: 1,
@@ -30,7 +24,7 @@ describe("questionnaire submission-context prefill", () => {
     });
 
     const normalized = normalizeSubmissionQuestionnaire(draft);
-    expect(appointmentCityValue(normalized).field.value).toBe("Казань");
+    expect(appointmentCityValue(normalized).field.value).toBe("");
   });
 
   test("never overwrites an explicitly selected appointment city", () => {
@@ -48,9 +42,8 @@ describe("questionnaire submission-context prefill", () => {
       value: "Казань",
     });
 
-    expect(
-      appointmentCityValue(normalizeSubmissionQuestionnaire(withExplicitChoice)).field
-        .value,
-    ).toBe("Казань");
+    expect(appointmentCityValue(normalizeSubmissionQuestionnaire(withExplicitChoice)).field.value).toBe(
+      "Казань",
+    );
   });
 });
