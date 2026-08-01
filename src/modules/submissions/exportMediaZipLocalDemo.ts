@@ -33,6 +33,8 @@ export async function localDemoReviewMediaUrl(
   _file?: SubmissionFile,
   _submissionId?: string,
 ): Promise<string | null> {
+  void _file;
+  void _submissionId;
   const documentType = type === "selfie" ? "selfie_1" : type;
   return localDemoJpegUrls[documentType] ?? null;
 }

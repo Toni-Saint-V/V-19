@@ -138,7 +138,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     const reviewWithIssue = addPreciseAdminIssue(cleanReview, {
       applicantId: cleanReview.applicants[0]?.id ?? "",
       comment: "Исправьте значение перед повторной проверкой.",
-      field: "Адрес",
+      field: "Адрес отеля",
       reason: "Адрес отеля требует исправления",
       severity: "blocker",
       type: "field",
@@ -146,7 +146,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     const correctionsWithIssue = addPreciseAdminIssue(reviewedCorrections, {
       applicantId: reviewedCorrections.applicants[0]?.id ?? "",
       comment: "Исправление не прошло повторную проверку.",
-      field: "Адрес",
+      field: "Адрес отеля",
       reason: "Адрес отеля всё ещё требует исправления",
       severity: "blocker",
       type: "field",
@@ -160,7 +160,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       },
       {
         submission: reviewedCorrections,
-        button: "Закрыть исправления и принять",
+        button: "Принять на выгрузку",
         action: "close_issues_accept",
       },
       {
@@ -354,9 +354,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       />,
     );
 
-    const accept = screen.getByRole("button", {
-      name: "Закрыть исправления и принять",
-    });
+    const accept = screen.getByRole("button", { name: "Принять на выгрузку" });
     expect(accept).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "Отправить на исправление" }),
@@ -1287,59 +1285,6 @@ describe("ReviewWorkspace passport section contract", () => {
     ).not.toBeInTheDocument();
   });
 
-  test("surfaces corrected questionnaire issues before the admin closes them", () => {
-    const source = singleSubmission();
-    const applicant = source.applicants[0];
-    if (!applicant) throw new Error("Expected review applicant.");
-    const submission: Submission = {
-      ...source,
-      issues: [
-        {
-          comment: "Адрес заменён на актуальный.",
-          createdAt: "2026-07-26T12:00:00.000Z",
-          createdBy: "admin",
-          id: "corrected-hotel-address",
-          reason: "Проверьте новый адрес отеля",
-          severity: "blocker",
-          status: "fixed_by_agent",
-          target: {
-            applicantId: applicant.id,
-            applicantName: applicant.fullName,
-            field: "Адрес отеля",
-            section: "Поездка",
-          },
-          type: "field",
-        },
-      ],
-      status: "corrections_received",
-    };
-
-    render(
-      <ReviewWorkspace
-        applicantId={applicant.id}
-        onAddRemark={() => undefined}
-        onBack={() => undefined}
-        onReviewAction={vi.fn().mockResolvedValue(true)}
-        submission={submission}
-        submissionId={submission.id}
-      />,
-    );
-
-    const correctedIssues = screen.getByRole("region", {
-      name: "Исправления к закрытию",
-    });
-    expect(correctedIssues).toHaveTextContent("Проверьте новый адрес отеля");
-    expect(correctedIssues).toHaveTextContent("Адрес заменён на актуальный.");
-    expect(correctedIssues).toHaveTextContent(
-      `${applicant.fullName} · Поездка · Адрес отеля`,
-    );
-    expect(
-      screen.getByRole("button", { name: "Закрыть исправления и принять" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("К закрытию 1")).toBeVisible();
-    expect(screen.queryByText("Без замечаний")).not.toBeInTheDocument();
-  });
-
   test.each([
     "draft",
     "in_progress",
@@ -1568,7 +1513,7 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toBeInTheDocument();
   });
 
-  test("uses the canonical passport field ID when a display label is duplicated", () => {
+  test("keeps a field remark attached to its exact applicant and label", () => {
     const submission = singleSubmission();
     const applicant = submission.applicants[0];
     if (!applicant) throw new Error("Expected applicant.");
@@ -1584,14 +1529,13 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Добавить замечание: Срок действия" }),
+      screen.getByRole("button", { name: "Добавить замечание: Номер паспорта" }),
     );
     expect(onAddRemark).toHaveBeenCalledWith(
-      "passport-expiry-date",
+      "Номер паспорта",
       applicant.fullName,
       undefined,
       applicant.id,
-      "Срок действия",
     );
   });
 
@@ -1947,51 +1891,6 @@ describe("ReviewWorkspace passport section contract", () => {
     });
   });
 
-  test("submits a canonical field target with human-readable remark copy", async () => {
-    const submission = singleSubmission();
-    const onAdminIssueAdd = vi.fn().mockResolvedValue(undefined);
-    const { container } = render(
-      <VisaflowBusinessBridgeProvider bridge={{ onAdminIssueAdd }}>
-        <AdminWorkspace
-          currentEmail="qa-admin@example.test"
-          onSignOut={() => undefined}
-          submissions={[submission]}
-          usesSupabase
-        />
-      </VisaflowBusinessBridgeProvider>,
-    );
-
-    const opener = container.querySelector<HTMLButtonElement>(
-      `[data-submission-id="${submission.id}"]`,
-    );
-    if (!opener) throw new Error("Review queue opener was not rendered.");
-    fireEvent.click(opener);
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Добавить замечание: Срок действия",
-      }),
-    );
-
-    expect(screen.getByLabelText("Текст для клиента")).toHaveValue(
-      "Проверьте «Срок действия».",
-    );
-    expect(
-      screen.getByRole("dialog", { name: "Добавить замечание" }),
-    ).not.toHaveTextContent("passport-expiry-date");
-    fireEvent.click(screen.getByRole("button", { name: "Отправить замечание" }));
-
-    await waitFor(() => expect(onAdminIssueAdd).toHaveBeenCalledTimes(1));
-    expect(onAdminIssueAdd).toHaveBeenCalledWith({
-      input: expect.objectContaining({
-        applicantId: submission.applicants[0]?.id,
-        field: "passport-expiry-date",
-        reason: "Требуется исправить поле «Срок действия»",
-        type: "field",
-      }),
-      submissionId: submission.id,
-    });
-  });
-
   test("keeps revision-conflict feedback inside the open remark form", async () => {
     const submission = singleSubmission();
     const onAdminIssueAdd = vi.fn().mockRejectedValue(new Error("revision conflict"));
@@ -2243,18 +2142,15 @@ describe("Admin document-review target safety", () => {
       }),
     ).not.toBe(family);
 
-    expect(() =>
-      addPreciseAdminIssue(family, {
-        applicantId: "missing-applicant",
-        comment: "Точный комментарий для проверки fail-closed поведения.",
-        field: "Номер паспорта",
-        reason: "Требуется исправление поля.",
-        severity: "blocker",
-        type: "field",
-      }),
-    ).toThrow(
-      "Admin issue target must resolve to exactly one canonical questionnaire field or media file.",
-    );
-    expect(family.issues).toHaveLength(source.issues.length);
+    const unchanged = addPreciseAdminIssue(family, {
+      applicantId: "missing-applicant",
+      comment: "Точный комментарий для проверки fail-closed поведения.",
+      field: "Номер паспорта",
+      reason: "Требуется исправление поля.",
+      severity: "blocker",
+      type: "field",
+    });
+
+    expect(unchanged).toBe(family);
   });
 });

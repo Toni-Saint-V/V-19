@@ -495,6 +495,33 @@ async function assertGroupedApplicantActions(page: Page) {
   await expect(detail).toHaveCount(0);
 }
 
+async function assertGroupedApplicantFileRouting(page: Page) {
+  const surface = page.getByRole("region", { name: "Мои действия" });
+  const card = surface
+    .locator(".v19-actions-timeline-event")
+    .filter({ hasText: "Артём Соколов" });
+  const disclosure = card.locator(".v19-actions-timeline-hit");
+
+  await disclosure.click();
+  const detailId = await disclosure.getAttribute("aria-controls");
+  if (!detailId) throw new Error("Grouped applicant card has no detail id.");
+
+  await surface.locator(`#${detailId}`).getByRole("button", {
+    name: "Добавить файл",
+  }).click();
+
+  const submissionCard = page
+    .locator('[data-submission-id="ПД-1051"]')
+    .filter({ hasText: "Артём Соколов" })
+    .first();
+  await expect(submissionCard).toBeVisible();
+  await expect(
+    submissionCard.getByRole("button", {
+      name: "Селфи 1: не добавлено, Артём Соколов",
+    }),
+  ).toBeVisible();
+}
+
 async function assertPrimaryActionRouting(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
   if ((await surface.getByTestId("agent-action-mobile-detail").count()) === 0) {
@@ -526,6 +553,10 @@ test.describe("V-19 My Actions submission command cockpit", () => {
 
       if (viewport.width < 768) {
         await assertMobileCockpit(page);
+        if (viewport.width === 390) {
+          await openFreshAgentActions(page);
+          await assertGroupedApplicantFileRouting(page);
+        }
       } else {
         await assertDesktopCockpit(page);
         if (viewport.width === 1440) {

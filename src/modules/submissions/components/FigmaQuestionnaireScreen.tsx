@@ -5548,7 +5548,11 @@ export function FigmaQuestionnaireScreen({
                             ? familyCopyStatusId
                             : undefined
                         }
-                        className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
+                        className={`linear-product-action ${
+                          familyCopyPreview
+                            ? "linear-product-action--primary"
+                            : "linear-product-action--secondary"
+                        } v19-questionnaire-draft-button v19-questionnaire-copy-button`}
                         disabled={
                           !isEditable ||
                           Boolean(familyCopyPreview) ||

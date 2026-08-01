@@ -145,9 +145,14 @@ export const test = base.extend({
     page.on("requestfailed", (request) => {
       const coordinates = networkCoordinates(request.url());
       if (coordinates.origin !== state.allowedHttpOrigin) return;
+      const errorText = request.failure()?.errorText ?? "request failed";
+      // A new page.goto() intentionally cancels assets that are still in flight
+      // from the previous proof viewport. Chromium reports those cancellations as
+      // request failures even though the destination page loads successfully.
+      if (errorText === "net::ERR_ABORTED") return;
       recordProblem(
         state,
-        `network: ${request.failure()?.errorText ?? "request failed"} ${request.method()} ${coordinates.origin}${coordinates.path}`,
+        `network: ${errorText} ${request.method()} ${coordinates.origin}${coordinates.path}`,
       );
     });
     page.on("response", (response) => {
