@@ -2440,10 +2440,10 @@
     .v19-admin-queue-toolbar.v19-two-row-toolbar {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) max-content !important;
-    grid-template-rows: var(--v19b-size-40) !important;
+    grid-template-rows: var(--v19b-size-44) !important;
     align-items: center !important;
     gap: var(--v19b-size-8) !important;
-    min-height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-44) !important;
     padding: var(--v19b-size-12) !important;
   }
 
@@ -2477,8 +2477,8 @@
     .v19-admin-queue-toolbar
     .v19-admin-queue-toolbar-search
     input {
-    height: var(--v19b-size-40) !important;
-    min-height: var(--v19b-size-40) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
   }
 
   #root
@@ -2504,11 +2504,11 @@
       .v19-admin-toolbar-controls > .v19-admin-toolbar-select,
       .v19-admin-city-filter
     ) {
-    width: var(--v19b-size-40) !important;
-    min-width: var(--v19b-size-40) !important;
-    height: var(--v19b-size-40) !important;
-    min-height: var(--v19b-size-40) !important;
-    flex: 0 0 var(--v19b-size-40) !important;
+    width: calc(var(--v19b-size-44) + var(--v19b-size-2)) !important;
+    min-width: calc(var(--v19b-size-44) + var(--v19b-size-2)) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
+    flex: 0 0 calc(var(--v19b-size-44) + var(--v19b-size-2)) !important;
     grid-column: auto !important;
     grid-row: auto !important;
   }
@@ -2518,9 +2518,9 @@
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-admin-queue-toolbar
     .v19-admin-toolbar-select-trigger {
-    width: var(--v19b-size-40) !important;
-    height: var(--v19b-size-40) !important;
-    min-height: var(--v19b-size-40) !important;
+    width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
     justify-content: center !important;
     padding: 0 !important;
   }

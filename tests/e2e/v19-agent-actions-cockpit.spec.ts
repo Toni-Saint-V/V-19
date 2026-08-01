@@ -272,13 +272,23 @@ async function assertDesktopCockpit(page: Page) {
   await firstDisclosure.click();
   await expect(firstDisclosure).toHaveAttribute("aria-expanded", "true");
   await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(1);
-  const [selectedCardBox, secondCardAfterOpenBox, rightFollowerAfterOpenBox] =
-    await Promise.all([
-      firstCard.boundingBox(),
-      secondCard.boundingBox(),
-      rightFollower.boundingBox(),
-    ]);
-  if (!selectedCardBox || !secondCardAfterOpenBox || !rightFollowerAfterOpenBox) {
+  const [
+    selectedCardBox,
+    secondCardAfterOpenBox,
+    leftFollowerAfterOpenBox,
+    rightFollowerAfterOpenBox,
+  ] = await Promise.all([
+    firstCard.boundingBox(),
+    secondCard.boundingBox(),
+    leftFollower.boundingBox(),
+    rightFollower.boundingBox(),
+  ]);
+  if (
+    !selectedCardBox ||
+    !secondCardAfterOpenBox ||
+    !leftFollowerAfterOpenBox ||
+    !rightFollowerAfterOpenBox
+  ) {
     throw new Error("Expanded desktop person cards have no measurable geometry.");
   }
   expect(
@@ -362,7 +372,7 @@ async function assertDesktopCockpit(page: Page) {
     "switching disclosure keeps the first column stable",
   ).toBeLessThanOrEqual(1);
   expect(
-    Math.abs(leftFollowerAfterSwitchBox.y - leftFollowerBox.y),
+    Math.abs(leftFollowerAfterSwitchBox.y - leftFollowerAfterOpenBox.y),
     "opening the right column does not move later cards in the left column",
   ).toBeLessThanOrEqual(1);
   await firstDisclosure.click();
