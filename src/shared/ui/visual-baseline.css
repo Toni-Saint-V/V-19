@@ -5089,16 +5089,8 @@
 
 /* Admin export: fail-closed queue with a compact mobile control sheet. */
 .v19-admin-export-screen-v2 {
-  --v19b-admin-red-border: color-mix(
-    in srgb,
-    var(--v19b-admin-red) 58%,
-    transparent
-  );
-  --v19b-admin-red-soft: color-mix(
-    in srgb,
-    var(--v19b-admin-red) 16%,
-    transparent
-  );
+  --v19b-admin-red-border: color-mix(in srgb, var(--v19b-admin-red) 58%, transparent);
+  --v19b-admin-red-soft: color-mix(in srgb, var(--v19b-admin-red) 16%, transparent);
   --v19b-admin-error-surface: color-mix(
     in srgb,
     var(--v19b-admin-red) 15%,
@@ -42468,9 +42460,7 @@ section[data-testid="agent-actions-screen"]
   box-shadow: inset var(--v19b-size-3) 0 0 var(--v19b-admin-red);
 }
 
-.v19-admin-export-screen-v2
-  .v19-admin-export-active-blockers-v2
-  > div {
+.v19-admin-export-screen-v2 .v19-admin-export-active-blockers-v2 > div {
   border-color: var(--v19b-admin-red-border);
   border-inline-start-width: var(--v19b-size-3);
   background: var(--v19b-admin-error-surface);

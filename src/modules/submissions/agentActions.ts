@@ -10,10 +10,7 @@ import {
 import { formatAgentActionRowText } from "./listFormatters";
 import { applicantCountLabel, submissionSearchText } from "./selectors";
 import type { DrawerTab, Submission, SubmissionFile } from "./types";
-import {
-  targetForIssue,
-  type WorkspaceTarget,
-} from "./workspaceModel";
+import { targetForIssue, type WorkspaceTarget } from "./workspaceModel";
 
 export type AgentActionDue = "overdue" | "today" | "week" | "completed";
 export type AgentActionSeverity = "blocker" | "warning" | "ready" | "info";
@@ -222,9 +219,9 @@ export function agentActionQueue(submissions: Submission[]) {
   const open = sortAgentActions(submissions.flatMap(agentOpenActions)).map(
     withSearchText,
   );
-  const completed = sortAgentActions(
-    submissions.flatMap(agentCompletedActions),
-  ).map(withSearchText);
+  const completed = sortAgentActions(submissions.flatMap(agentCompletedActions)).map(
+    withSearchText,
+  );
 
   return {
     completed,
@@ -237,9 +234,9 @@ export function adminActionQueue(submissions: Submission[]) {
   const open = sortAgentActions(submissions.flatMap(adminOpenActions)).map(
     withSearchText,
   );
-  const completed = sortAgentActions(
-    submissions.flatMap(adminCompletedActions),
-  ).map(withSearchText);
+  const completed = sortAgentActions(submissions.flatMap(adminCompletedActions)).map(
+    withSearchText,
+  );
 
   return {
     completed,
@@ -514,8 +511,7 @@ function actionNextAction(action: AgentActionItem): AgentActionTask["nextAction"
   if (action.id.startsWith("completed-")) {
     if (action.submission.status === "ready_for_export") {
       return {
-        detail:
-          "Проверить статус выгрузки. Агент не выгружает пакет напрямую.",
+        detail: "Проверить статус выгрузки. Агент не выгружает пакет напрямую.",
         label: "Открыть статус выгрузки",
         primaryLabel: "Проверить статус",
         tab: "history",
@@ -554,7 +550,8 @@ function actionStatusLine(
     return `${statusLabel}: ${lowercaseFirst(problem)}`;
   }
   if (status === "ready") {
-    if (problem === "Подача готова к выгрузке") return `${statusLabel}: можно выгружать`;
+    if (problem === "Подача готова к выгрузке")
+      return `${statusLabel}: можно выгружать`;
     return `${statusLabel}: можно передавать дальше`;
   }
   if (status === "blocked") return `${statusLabel}: ждём внешнее событие`;
@@ -653,17 +650,15 @@ function actionProblemDetail(action: AgentActionItem) {
   return actionReason(action);
 }
 
-function actionImportanceText(
-  action: AgentActionItem,
-  status: AgentActionTaskStatus,
-) {
+function actionImportanceText(action: AgentActionItem, status: AgentActionTaskStatus) {
   if (status === "error") return "Без этого подачу нельзя продолжить.";
   if (status === "blocked") return "Агент не может продолжить без внешнего события.";
   if (status === "action_required") {
     return "Это действие нужно выполнить, чтобы подача не застряла в очереди.";
   }
   if (status === "ready") return "Подачу можно передавать дальше по процессу.";
-  if (action.id.startsWith("completed-")) return "Решение ожидается на следующем этапе.";
+  if (action.id.startsWith("completed-"))
+    return "Решение ожидается на следующем этапе.";
   return "Статус нужно отслеживать до следующего решения.";
 }
 
@@ -717,12 +712,9 @@ function actionProgressSummary(
       readiness.files.state === "ready"
         ? "Файлы готовы"
         : readiness.files.label.replace("Файлы: ", "Файлы "),
-    form:
-      readiness.form.state === "ready" ? "Анкета готова" : "Анкета с ошибками",
+    form: readiness.form.state === "ready" ? "Анкета готова" : "Анкета с ошибками",
     review:
-      readiness.review.state === "passed"
-        ? "Проверка пройдена"
-        : "Проверка ожидает",
+      readiness.review.state === "passed" ? "Проверка пройдена" : "Проверка ожидает",
   };
 }
 
@@ -1100,9 +1092,7 @@ function isMissingAgentFile(file: SubmissionFile) {
 
 function isActiveAgentFile(file: SubmissionFile) {
   return (
-    file.type === "selfie" ||
-    file.type === "selfie_2" ||
-    file.type === "passport_scan"
+    file.type === "selfie" || file.type === "selfie_2" || file.type === "passport_scan"
   );
 }
 

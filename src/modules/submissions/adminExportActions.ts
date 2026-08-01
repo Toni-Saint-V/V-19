@@ -63,7 +63,8 @@ export function describeAdminExportActionFeedback({
   if (selectedCount === 0) {
     return {
       canRun: false,
-      message: "Выберите хотя бы один пакет слева — после выбора кнопки выполнят действие сразу.",
+      message:
+        "Выберите хотя бы один пакет слева — после выбора кнопки выполнят действие сразу.",
       nextAction: "Выбрать пакет",
       tone: "warning",
     };
@@ -82,7 +83,8 @@ export function describeAdminExportActionFeedback({
   if (action === "download_zip" && !prepared) {
     return {
       canRun: true,
-      message: "Excel будет сформирован автоматически, затем соберётся ZIP с документами.",
+      message:
+        "Excel будет сформирован автоматически, затем соберётся ZIP с документами.",
       nextAction: "Excel → ZIP",
       tone: "success",
     };

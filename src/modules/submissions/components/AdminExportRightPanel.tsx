@@ -154,9 +154,7 @@ export function AdminExportRightPanel({
                 />
               ))
             ) : (
-              <div className="v19-admin-export-empty-inline">
-                Выберите пакеты слева
-              </div>
+              <div className="v19-admin-export-empty-inline">Выберите пакеты слева</div>
             )}
           </div>
         </section>
@@ -238,9 +236,7 @@ export function AdminExportStatusPill({
   children: ReactNode;
   tone?: AdminExportPanelTone;
 }) {
-  return (
-    <span className={`v19-admin-export-status tone-${tone}`}>{children}</span>
-  );
+  return <span className={`v19-admin-export-status tone-${tone}`}>{children}</span>;
 }
 
 export function AdminExportCheckRow({

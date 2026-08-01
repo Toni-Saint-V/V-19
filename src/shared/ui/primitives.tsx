@@ -491,10 +491,7 @@ export function SegmentedControl<T extends string>({
 
 export function StateTabs<T extends string>(props: StateTabsProps<T>) {
   return (
-    <SegmentedControl
-      {...props}
-      className={cn("v19-state-tabs", props.className)}
-    />
+    <SegmentedControl {...props} className={cn("v19-state-tabs", props.className)} />
   );
 }
 
@@ -682,12 +679,7 @@ export type StatusPillProps = Omit<BadgeProps, "children"> & {
   label?: ReactNode;
 };
 
-export function StatusPill({
-  children,
-  className,
-  label,
-  ...props
-}: StatusPillProps) {
+export function StatusPill({ children, className, label, ...props }: StatusPillProps) {
   return (
     <Badge {...props} className={cn("mp-status-pill", className)}>
       {label ?? children}

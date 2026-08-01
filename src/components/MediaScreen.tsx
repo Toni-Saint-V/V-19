@@ -1,20 +1,27 @@
-import { useMemo, useState } from 'react';
-import type { Submission } from '../modules/submissions/types';
-import { mediaRowsFromSubmissions } from './v19BusinessScreenAdapter';
-import { motion, AnimatePresence } from 'motion/react';
-import { useExperienceReducedMotion } from '../shared/ui/experiencePreferences';
-import { 
-  Search, Filter, Download, MoreVertical, FileText, 
-  Image as ImageIcon, CheckCircle2, AlertCircle, Clock 
-} from 'lucide-react';
+import { useMemo, useState } from "react";
+import type { Submission } from "../modules/submissions/types";
+import { mediaRowsFromSubmissions } from "./v19BusinessScreenAdapter";
+import { motion, AnimatePresence } from "motion/react";
+import { useExperienceReducedMotion } from "../shared/ui/experiencePreferences";
+import {
+  Search,
+  Filter,
+  Download,
+  MoreVertical,
+  FileText,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+} from "lucide-react";
 
-type FileCategory = 'all' | 'passports' | 'selfies' | 'financial' | 'other';
-type FileStatus = 'verified' | 'processing' | 'error';
+type FileCategory = "all" | "passports" | "selfies" | "financial" | "other";
+type FileStatus = "verified" | "processing" | "error";
 
 interface MediaFile {
   id: string;
   name: string;
-  type: 'pdf' | 'image';
+  type: "pdf" | "image";
   category: FileCategory;
   size: string;
   status: FileStatus;
@@ -24,58 +31,125 @@ interface MediaFile {
 }
 
 const mockFiles: MediaFile[] = [
-  { id: '1', name: 'Passport_Petrov_I.pdf', type: 'pdf', category: 'passports', size: '2.4 MB', status: 'verified', applicant: 'Иван Петров', submissionId: 'SUB-1042', date: 'Сегодня, 10:45' },
-  { id: '2', name: 'Selfie_Front.jpg', type: 'image', category: 'selfies', size: '850 KB', status: 'verified', applicant: 'Иван Петров', submissionId: 'SUB-1042', date: 'Сегодня, 10:45' },
-  { id: '3', name: 'Bank_Statement_Tinkoff.pdf', type: 'pdf', category: 'financial', size: '1.1 MB', status: 'processing', applicant: 'Анна Петрова', submissionId: 'SUB-1042', date: 'Сегодня, 11:20' },
-  { id: '4', name: 'Marriage_Certificate.pdf', type: 'pdf', category: 'other', size: '3.2 MB', status: 'error', applicant: 'Семья Петровых', submissionId: 'SUB-1042', date: 'Сегодня, 11:25' },
-  { id: '5', name: 'Passport_Smirnova.pdf', type: 'pdf', category: 'passports', size: '4.5 MB', status: 'verified', applicant: 'Алина Смирнова', submissionId: 'SUB-1057', date: 'Вчера, 16:30' },
-  { id: '6', name: 'Booking_Hotel_Madrid.pdf', type: 'pdf', category: 'other', size: '500 KB', status: 'verified', applicant: 'Алина Смирнова', submissionId: 'SUB-1057', date: 'Вчера, 16:32' },
+  {
+    id: "1",
+    name: "Passport_Petrov_I.pdf",
+    type: "pdf",
+    category: "passports",
+    size: "2.4 MB",
+    status: "verified",
+    applicant: "Иван Петров",
+    submissionId: "SUB-1042",
+    date: "Сегодня, 10:45",
+  },
+  {
+    id: "2",
+    name: "Selfie_Front.jpg",
+    type: "image",
+    category: "selfies",
+    size: "850 KB",
+    status: "verified",
+    applicant: "Иван Петров",
+    submissionId: "SUB-1042",
+    date: "Сегодня, 10:45",
+  },
+  {
+    id: "3",
+    name: "Bank_Statement_Tinkoff.pdf",
+    type: "pdf",
+    category: "financial",
+    size: "1.1 MB",
+    status: "processing",
+    applicant: "Анна Петрова",
+    submissionId: "SUB-1042",
+    date: "Сегодня, 11:20",
+  },
+  {
+    id: "4",
+    name: "Marriage_Certificate.pdf",
+    type: "pdf",
+    category: "other",
+    size: "3.2 MB",
+    status: "error",
+    applicant: "Семья Петровых",
+    submissionId: "SUB-1042",
+    date: "Сегодня, 11:25",
+  },
+  {
+    id: "5",
+    name: "Passport_Smirnova.pdf",
+    type: "pdf",
+    category: "passports",
+    size: "4.5 MB",
+    status: "verified",
+    applicant: "Алина Смирнова",
+    submissionId: "SUB-1057",
+    date: "Вчера, 16:30",
+  },
+  {
+    id: "6",
+    name: "Booking_Hotel_Madrid.pdf",
+    type: "pdf",
+    category: "other",
+    size: "500 KB",
+    status: "verified",
+    applicant: "Алина Смирнова",
+    submissionId: "SUB-1057",
+    date: "Вчера, 16:32",
+  },
 ];
 
 export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
   const prefersReducedMotion = useExperienceReducedMotion();
-  const [activeTab, setActiveTab] = useState<FileCategory>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<FileCategory>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const sourceFiles = useMemo(() => {
     const rows = mediaRowsFromSubmissions(submissions);
     return rows.length ? rows : mockFiles;
   }, [submissions]);
 
-  const filteredFiles = sourceFiles.filter(f => 
-    (activeTab === 'all' || f.category === activeTab) &&
-    (f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.applicant.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredFiles = sourceFiles.filter(
+    (f) =>
+      (activeTab === "all" || f.category === activeTab) &&
+      (f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        f.applicant.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   const getStatusIcon = (status: FileStatus) => {
     switch (status) {
-      case 'verified': return <CheckCircle2 className="w-3.5 h-3.5 text-[#b8baff]" />;
-      case 'processing': return <Clock className="w-3.5 h-3.5 text-[#b8baff]" />;
-      case 'error': return <AlertCircle className="w-3.5 h-3.5 text-[#d59aa3]" />;
+      case "verified":
+        return <CheckCircle2 className="w-3.5 h-3.5 text-[#b8baff]" />;
+      case "processing":
+        return <Clock className="w-3.5 h-3.5 text-[#b8baff]" />;
+      case "error":
+        return <AlertCircle className="w-3.5 h-3.5 text-[#d59aa3]" />;
     }
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: prefersReducedMotion ? 0.01 : 0.3 }}
-      data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
+      data-reduced-motion={prefersReducedMotion ? "true" : "false"}
       className="space-y-6 lg:space-y-8 h-full flex flex-col"
     >
       {/* Top Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between shrink-0">
         <div className="flex bg-[#161617] p-1 border border-[#242529] rounded-[11px] overflow-x-auto scrollbar-hide">
           {[
-            { id: 'all', label: 'Все файлы' },
-            { id: 'passports', label: 'Паспорта' },
-            { id: 'selfies', label: 'Селфи' },
-            { id: 'financial', label: 'Финансы' }
-          ].map(tab => (
-            <button 
+            { id: "all", label: "Все файлы" },
+            { id: "passports", label: "Паспорта" },
+            { id: "selfies", label: "Селфи" },
+            { id: "financial", label: "Финансы" },
+          ].map((tab) => (
+            <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as FileCategory)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${
-                activeTab === tab.id ? 'bg-[#27272b] text-white shadow-sm border border-[#2e2f34]' : 'text-white/50 hover:text-white/80 border border-transparent'
+                activeTab === tab.id
+                  ? "bg-[#27272b] text-white shadow-sm border border-[#2e2f34]"
+                  : "text-white/50 hover:text-white/80 border border-transparent"
               }`}
             >
               {tab.label}
@@ -86,9 +160,9 @@ export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
         <div className="flex items-center gap-2">
           <div className="relative w-full sm:w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-            <input 
-              type="text" 
-              placeholder="Поиск по файлам..." 
+            <input
+              type="text"
+              placeholder="Поиск по файлам..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-10 bg-[#161617] border border-[#242529] rounded-[10px] pl-9 pr-3 text-sm text-white placeholder-white/40 focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none"
@@ -124,15 +198,17 @@ export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
               >
                 {/* Preview Area */}
                 <div className="aspect-[4/3] bg-[#101011] relative border-b border-[#242529] flex flex-col items-center justify-center overflow-hidden">
-                  {file.status === 'error' && <div className="absolute inset-0 bg-[#a35f69]/5 mix-blend-overlay" />}
-                  
-                  {file.type === 'pdf' ? (
+                  {file.status === "error" && (
+                    <div className="absolute inset-0 bg-[#a35f69]/5 mix-blend-overlay" />
+                  )}
+
+                  {file.type === "pdf" ? (
                     <div className="w-14 h-16 bg-white/5 border border-white/10 rounded-lg flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform duration-300">
                       <FileText className="w-6 h-6 text-white/40" />
                     </div>
                   ) : (
                     <div className="w-full h-full bg-[#1a1a1d] flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                       <ImageIcon className="w-8 h-8 text-white/20" />
+                      <ImageIcon className="w-8 h-8 text-white/20" />
                     </div>
                   )}
 
@@ -153,37 +229,55 @@ export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
                   </div>
 
                   {/* Status Badge inside preview */}
-                  <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-md backdrop-blur-md border border-white/10 text-[10px] font-medium flex items-center gap-1.5 shadow-sm
-                    ${file.status === 'verified' ? 'bg-white/[0.045] text-[#b8baff]' : 
-                      file.status === 'processing' ? 'bg-white/[0.045] text-[#b8baff]' : 'bg-[#24191b]/60 text-[#d59aa3]'}`}>
+                  <div
+                    className={`absolute bottom-2 left-2 px-2 py-1 rounded-md backdrop-blur-md border border-white/10 text-[10px] font-medium flex items-center gap-1.5 shadow-sm
+                    ${
+                      file.status === "verified"
+                        ? "bg-white/[0.045] text-[#b8baff]"
+                        : file.status === "processing"
+                          ? "bg-white/[0.045] text-[#b8baff]"
+                          : "bg-[#24191b]/60 text-[#d59aa3]"
+                    }`}
+                  >
                     {getStatusIcon(file.status)}
-                    {file.status === 'verified' ? 'Распознано' : file.status === 'processing' ? 'В обработке' : 'Ошибка OCR'}
+                    {file.status === "verified"
+                      ? "Распознано"
+                      : file.status === "processing"
+                        ? "В обработке"
+                        : "Ошибка OCR"}
                   </div>
                 </div>
 
                 {/* Metadata */}
                 <div className="p-3 bg-gradient-to-b from-[#1a1a1d] to-[#161617] flex-1 flex flex-col">
-                  <div className="text-[13px] font-medium text-white truncate group-hover:text-[#b8baff] transition-colors" title={file.name}>
+                  <div
+                    className="text-[13px] font-medium text-white truncate group-hover:text-[#b8baff] transition-colors"
+                    title={file.name}
+                  >
                     {file.name}
                   </div>
                   <div className="text-[11px] text-white/40 mt-1 flex items-center justify-between">
                     <span className="truncate pr-2">{file.applicant}</span>
                     <span className="shrink-0">{file.size}</span>
                   </div>
-                  <div className="text-[10px] text-white/30 mt-auto pt-2">{file.date}</div>
+                  <div className="text-[10px] text-white/30 mt-auto pt-2">
+                    {file.date}
+                  </div>
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
-        
+
         {filteredFiles.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4">
               <Search className="w-5 h-5 text-white/30" />
             </div>
             <h3 className="text-sm font-medium text-white">Файлы не найдены</h3>
-            <p className="text-xs text-white/40 mt-1">Попробуйте изменить параметры поиска или фильтры.</p>
+            <p className="text-xs text-white/40 mt-1">
+              Попробуйте изменить параметры поиска или фильтры.
+            </p>
           </div>
         )}
       </div>

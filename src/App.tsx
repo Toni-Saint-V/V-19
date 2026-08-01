@@ -1,4 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LoaderCircle, RefreshCw, ShieldAlert, TriangleAlert } from "lucide-react";
 import { AccessGate } from "./components/AccessGate";
 import {
@@ -433,25 +441,12 @@ export default function App({
 
   const runCanonicalSubmissionsRefresh = useCallback(
     async (throwOnFailure = false) => {
-    if (!supabaseEnabled || !activeApprovedSession || !activeProfile) return;
+      if (!supabaseEnabled || !activeApprovedSession || !activeProfile) return;
 
-    const sessionToken: WorkspaceSessionToken = {
-      generation: workspaceSessionGenerationRef.current,
-      userId: activeApprovedSession.userId,
-    };
-    if (
-      !isCurrentWorkspaceSession(
-        sessionToken,
-        workspaceSessionGenerationRef.current,
-        workspaceSessionUserIdRef.current,
-      )
-    ) {
-      return;
-    }
-
-    if (workspaceSessionNeedsQueueDrainRef.current) {
-      const pendingMutations = workspaceSubmissionMutationQueueRef.current;
-      const queueDrain = await waitForWorkspaceMutationQueueDrain(pendingMutations);
+      const sessionToken: WorkspaceSessionToken = {
+        generation: workspaceSessionGenerationRef.current,
+        userId: activeApprovedSession.userId,
+      };
       if (
         !isCurrentWorkspaceSession(
           sessionToken,
@@ -461,95 +456,108 @@ export default function App({
       ) {
         return;
       }
-      workspaceSessionNeedsQueueDrainRef.current = false;
-      if (queueDrain === "timed_out") {
-        // A never-settling mutation from the previous session must not remain
-        // the parent promise for every mutation in the newly loaded session.
-        // Its own fence still prevents a late continuation from committing.
-        workspaceSubmissionMutationQueueRef.current = Promise.resolve();
-        void pendingMutations.then(
-          () => {
-            if (
-              isCurrentWorkspaceSession(
-                sessionToken,
-                workspaceSessionGenerationRef.current,
-                workspaceSessionUserIdRef.current,
-              )
-            ) {
-              void refreshCanonicalSubmissionsRef.current();
-            }
-          },
-          () => {
-            if (
-              isCurrentWorkspaceSession(
-                sessionToken,
-                workspaceSessionGenerationRef.current,
-                workspaceSessionUserIdRef.current,
-              )
-            ) {
-              void refreshCanonicalSubmissionsRef.current();
-            }
-          },
-        );
+
+      if (workspaceSessionNeedsQueueDrainRef.current) {
+        const pendingMutations = workspaceSubmissionMutationQueueRef.current;
+        const queueDrain = await waitForWorkspaceMutationQueueDrain(pendingMutations);
+        if (
+          !isCurrentWorkspaceSession(
+            sessionToken,
+            workspaceSessionGenerationRef.current,
+            workspaceSessionUserIdRef.current,
+          )
+        ) {
+          return;
+        }
+        workspaceSessionNeedsQueueDrainRef.current = false;
+        if (queueDrain === "timed_out") {
+          // A never-settling mutation from the previous session must not remain
+          // the parent promise for every mutation in the newly loaded session.
+          // Its own fence still prevents a late continuation from committing.
+          workspaceSubmissionMutationQueueRef.current = Promise.resolve();
+          void pendingMutations.then(
+            () => {
+              if (
+                isCurrentWorkspaceSession(
+                  sessionToken,
+                  workspaceSessionGenerationRef.current,
+                  workspaceSessionUserIdRef.current,
+                )
+              ) {
+                void refreshCanonicalSubmissionsRef.current();
+              }
+            },
+            () => {
+              if (
+                isCurrentWorkspaceSession(
+                  sessionToken,
+                  workspaceSessionGenerationRef.current,
+                  workspaceSessionUserIdRef.current,
+                )
+              ) {
+                void refreshCanonicalSubmissionsRef.current();
+              }
+            },
+          );
+        }
       }
-    }
 
-    const requestId = workspaceRefreshRequestRef.current + 1;
-    workspaceRefreshRequestRef.current = requestId;
-    setWorkspaceDataState((current) => ({
-      ...current,
-      error: undefined,
-      sessionUserId: sessionToken.userId,
-      status:
-        current.sessionUserId !== sessionToken.userId ||
-        current.status === "idle" ||
-        current.status === "error"
-          ? "loading"
-          : current.status,
-    }));
-
-    const isCurrentResponse = () =>
-      isLatestWorkspaceResponse(requestId, workspaceRefreshRequestRef.current) &&
-      isCurrentWorkspaceSession(
-        sessionToken,
-        workspaceSessionGenerationRef.current,
-        workspaceSessionUserIdRef.current,
-      );
-
-    try {
-      const [loaded, nextAccessRequests] = await Promise.all([
-        loadCockpitSubmissionsForProfile(activeProfile),
-        loadAccessRequests(activeApprovedSession),
-      ]);
-      if (!isCurrentResponse()) return;
-
-      submissionsRef.current = loaded.submissions;
-      caseRevisionsBySubmissionIdRef.current =
-        loaded.caseRevisionsBySubmissionId ?? new Map();
-      quarantinedSubmissionIdsRef.current =
-        loaded.quarantinedSubmissionIds ?? new Set();
-      ownerIdsBySubmissionIdRef.current = loaded.ownerIdsBySubmissionId;
-      setSupabaseProfile(activeProfile);
-      setOwnerIdsBySubmissionId(loaded.ownerIdsBySubmissionId);
-      setSubmissions(loaded.submissions);
-      setAccessRequests(nextAccessRequests);
-      setWorkspaceDataState({
-        refreshedAt: new Date().toISOString(),
+      const requestId = workspaceRefreshRequestRef.current + 1;
+      workspaceRefreshRequestRef.current = requestId;
+      setWorkspaceDataState((current) => ({
+        ...current,
+        error: undefined,
         sessionUserId: sessionToken.userId,
-        status: workspaceDataStatusForCount(loaded.submissions.length),
-      });
-    } catch (error) {
-      if (!isCurrentResponse()) return;
-      setWorkspaceDataState({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Не удалось загрузить данные Supabase.",
-        sessionUserId: sessionToken.userId,
-        status: "error",
-      });
-      if (throwOnFailure) throw error;
-    }
+        status:
+          current.sessionUserId !== sessionToken.userId ||
+          current.status === "idle" ||
+          current.status === "error"
+            ? "loading"
+            : current.status,
+      }));
+
+      const isCurrentResponse = () =>
+        isLatestWorkspaceResponse(requestId, workspaceRefreshRequestRef.current) &&
+        isCurrentWorkspaceSession(
+          sessionToken,
+          workspaceSessionGenerationRef.current,
+          workspaceSessionUserIdRef.current,
+        );
+
+      try {
+        const [loaded, nextAccessRequests] = await Promise.all([
+          loadCockpitSubmissionsForProfile(activeProfile),
+          loadAccessRequests(activeApprovedSession),
+        ]);
+        if (!isCurrentResponse()) return;
+
+        submissionsRef.current = loaded.submissions;
+        caseRevisionsBySubmissionIdRef.current =
+          loaded.caseRevisionsBySubmissionId ?? new Map();
+        quarantinedSubmissionIdsRef.current =
+          loaded.quarantinedSubmissionIds ?? new Set();
+        ownerIdsBySubmissionIdRef.current = loaded.ownerIdsBySubmissionId;
+        setSupabaseProfile(activeProfile);
+        setOwnerIdsBySubmissionId(loaded.ownerIdsBySubmissionId);
+        setSubmissions(loaded.submissions);
+        setAccessRequests(nextAccessRequests);
+        setWorkspaceDataState({
+          refreshedAt: new Date().toISOString(),
+          sessionUserId: sessionToken.userId,
+          status: workspaceDataStatusForCount(loaded.submissions.length),
+        });
+      } catch (error) {
+        if (!isCurrentResponse()) return;
+        setWorkspaceDataState({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Не удалось загрузить данные Supabase.",
+          sessionUserId: sessionToken.userId,
+          status: "error",
+        });
+        if (throwOnFailure) throw error;
+      }
     },
     [activeApprovedSession, activeProfile, loadAccessRequests, supabaseEnabled],
   );
@@ -916,12 +924,15 @@ export default function App({
         const additions = nextVisibleSubmissions.filter(
           (submission) => !existingIds.has(submission.id),
         );
-        await persistSubmissions([
-          ...additions,
-          ...currentSubmissions.map(
-            (submission) => nextById.get(submission.id) ?? submission,
-          ),
-        ], fence);
+        await persistSubmissions(
+          [
+            ...additions,
+            ...currentSubmissions.map(
+              (submission) => nextById.get(submission.id) ?? submission,
+            ),
+          ],
+          fence,
+        );
       });
     },
     [activeApprovedSession, enqueueWorkspaceSubmissionMutation, persistSubmissions],
@@ -953,17 +964,12 @@ export default function App({
         );
         await persistSubmissions(nextSubmissions, fence);
         return (
-          submissionsRef.current.find(
-            (submission) => submission.id === submissionId,
-          ) ?? nextSubmission
+          submissionsRef.current.find((submission) => submission.id === submissionId) ??
+          nextSubmission
         );
       });
     },
-    [
-      activeApprovedSession,
-      enqueueWorkspaceSubmissionMutation,
-      persistSubmissions,
-    ],
+    [activeApprovedSession, enqueueWorkspaceSubmissionMutation, persistSubmissions],
   );
 
   const assignVisibleAgentSubmissionPublicNumber = useCallback(
@@ -1520,8 +1526,7 @@ export default function App({
             type: "admin.passport-section.approve",
           },
           fence,
-          () =>
-            bridge.onAdminPassportSectionApprove?.({ submissionId, applicantId }),
+          () => bridge.onAdminPassportSectionApprove?.({ submissionId, applicantId }),
         );
       },
       onAdminAiReviewRun: async (submissionId) => {
@@ -1573,7 +1578,9 @@ export default function App({
       onAdminAiSuggestionDismiss: async ({ submissionId, suggestionId }) => {
         const session = activeApprovedSession;
         if (!session || session.role !== "admin") {
-          throw new Error("Только активный администратор может отклонить AI-подсказку.");
+          throw new Error(
+            "Только активный администратор может отклонить AI-подсказку.",
+          );
         }
         const fence = createWorkspaceMutationFence(session.userId);
         const eventId = crypto.randomUUID();
@@ -1616,178 +1623,178 @@ export default function App({
         const eventId = crypto.randomUUID();
         try {
           await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
-          const currentSubmissions = submissionsRef.current;
-          const requestedSubmissionIds = new Set(submissionIds);
-          const selectedCurrent = currentSubmissions.filter((submission) =>
-            requestedSubmissionIds.has(submission.id),
-          );
-          const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
-          const currentArchiveInputSignature =
-            buildExportArchiveInputSignature(selectedCurrent);
-          const artifactStillMatchesCurrentSelection =
-            requestedSubmissionIds.size === submissionIds.length &&
-            selectedCurrent.length === submissionIds.length &&
-            archiveInputSignature === currentArchiveInputSignature &&
-            exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
-            exportPackageDocumentCommitMatchesIdentity(
-              documentExport,
-              packageIdentity,
+            const currentSubmissions = submissionsRef.current;
+            const requestedSubmissionIds = new Set(submissionIds);
+            const selectedCurrent = currentSubmissions.filter((submission) =>
+              requestedSubmissionIds.has(submission.id),
             );
-          if (!artifactStillMatchesCurrentSelection) {
-            throw new Error(
-              "Export artifact is stale; regenerate Excel and ZIP before retrying.",
-            );
-          }
-
-          const selectionAlreadyDownloaded = selectedCurrent.every(
-            (submission) =>
-              submission.exportState === "file_downloaded" &&
-              submission.exportPackage &&
-              exportPackageIdentityMatches(
-                submission.exportPackage,
-                currentPackageIdentity,
-              ),
-          );
-          let downloadedSubmissions = currentSubmissions;
-          let rollbackExpectedCaseRevisions = new Map(
-            caseRevisionsBySubmissionIdRef.current,
-          );
-          if (!selectionAlreadyDownloaded) {
-            const generatedSubmissions = applyExportStateToSelection(
-              currentSubmissions,
-              submissionIds,
-              "file_generated",
-            );
-            downloadedSubmissions = applyExportStateToSelection(
-              generatedSubmissions,
-              submissionIds,
-              "file_downloaded",
-            );
-            if (downloadedSubmissions === generatedSubmissions) {
-              throw new Error("Export download state was blocked by domain guards.");
+            const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
+            const currentArchiveInputSignature =
+              buildExportArchiveInputSignature(selectedCurrent);
+            const artifactStillMatchesCurrentSelection =
+              requestedSubmissionIds.size === submissionIds.length &&
+              selectedCurrent.length === submissionIds.length &&
+              archiveInputSignature === currentArchiveInputSignature &&
+              exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
+              exportPackageDocumentCommitMatchesIdentity(
+                documentExport,
+                packageIdentity,
+              );
+            if (!artifactStillMatchesCurrentSelection) {
+              throw new Error(
+                "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+              );
             }
-          }
 
-          const selectedDownloaded = downloadedSubmissions.filter((submission) =>
-            requestedSubmissionIds.has(submission.id),
-          );
-          const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
-          const downloadedArchiveInputSignature =
-            buildExportArchiveInputSignature(selectedDownloaded);
-          const downloadedSelectionMatchesArtifact =
-            selectedDownloaded.length === submissionIds.length &&
-            archiveInputSignature === downloadedArchiveInputSignature &&
-            exportPackageIdentityMatches(packageIdentity, downloadedIdentity) &&
-            selectedDownloaded.every(
+            const selectionAlreadyDownloaded = selectedCurrent.every(
               (submission) =>
+                submission.exportState === "file_downloaded" &&
                 submission.exportPackage &&
                 exportPackageIdentityMatches(
-                  packageIdentity,
                   submission.exportPackage,
+                  currentPackageIdentity,
                 ),
             );
-          if (!downloadedSelectionMatchesArtifact) {
-            throw new Error(
-              "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+            let downloadedSubmissions = currentSubmissions;
+            let rollbackExpectedCaseRevisions = new Map(
+              caseRevisionsBySubmissionIdRef.current,
             );
-          }
-
-          if (!selectionAlreadyDownloaded) {
-            const checkpointRevisions = await persistSubmissions(
-              downloadedSubmissions,
-              fence,
-            );
-            if (checkpointRevisions) {
-              rollbackExpectedCaseRevisions = new Map(checkpointRevisions);
+            if (!selectionAlreadyDownloaded) {
+              const generatedSubmissions = applyExportStateToSelection(
+                currentSubmissions,
+                submissionIds,
+                "file_generated",
+              );
+              downloadedSubmissions = applyExportStateToSelection(
+                generatedSubmissions,
+                submissionIds,
+                "file_downloaded",
+              );
+              if (downloadedSubmissions === generatedSubmissions) {
+                throw new Error("Export download state was blocked by domain guards.");
+              }
             }
-          }
-          const failWithRetryableExportState = async (
-            failure: unknown,
-          ): Promise<never> => {
-            fence.assertCurrent();
-            const rollbackBaseSubmissions = submissionsRef.current;
-            const retryableSubmissions = applyExportStateToSelection(
-              rollbackBaseSubmissions,
-              submissionIds,
-              "ready",
+
+            const selectedDownloaded = downloadedSubmissions.filter((submission) =>
+              requestedSubmissionIds.has(submission.id),
             );
-            const failureMessage =
-              failure instanceof Error
-                ? failure.message
-                : typeof failure === "string"
-                  ? failure
-                  : "Export package completion failed.";
-            if (retryableSubmissions === rollbackBaseSubmissions) {
+            const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
+            const downloadedArchiveInputSignature =
+              buildExportArchiveInputSignature(selectedDownloaded);
+            const downloadedSelectionMatchesArtifact =
+              selectedDownloaded.length === submissionIds.length &&
+              archiveInputSignature === downloadedArchiveInputSignature &&
+              exportPackageIdentityMatches(packageIdentity, downloadedIdentity) &&
+              selectedDownloaded.every(
+                (submission) =>
+                  submission.exportPackage &&
+                  exportPackageIdentityMatches(
+                    packageIdentity,
+                    submission.exportPackage,
+                  ),
+              );
+            if (!downloadedSelectionMatchesArtifact) {
               throw new Error(
-                `${failureMessage} Export state could not be restored for retry.`,
+                "Export artifact is stale; regenerate Excel and ZIP before retrying.",
               );
             }
-            try {
-              await persistSubmissions(
-                retryableSubmissions,
+
+            if (!selectionAlreadyDownloaded) {
+              const checkpointRevisions = await persistSubmissions(
+                downloadedSubmissions,
                 fence,
-                rollbackExpectedCaseRevisions,
               );
-            } catch (rollbackError) {
-              if (isWorkspaceSessionChangedError(rollbackError)) throw rollbackError;
-              throw new Error(
-                `${failureMessage} Export state rollback could not be persisted.`,
-              );
+              if (checkpointRevisions) {
+                rollbackExpectedCaseRevisions = new Map(checkpointRevisions);
+              }
             }
-            throw new Error(failureMessage);
-          };
+            const failWithRetryableExportState = async (
+              failure: unknown,
+            ): Promise<never> => {
+              fence.assertCurrent();
+              const rollbackBaseSubmissions = submissionsRef.current;
+              const retryableSubmissions = applyExportStateToSelection(
+                rollbackBaseSubmissions,
+                submissionIds,
+                "ready",
+              );
+              const failureMessage =
+                failure instanceof Error
+                  ? failure.message
+                  : typeof failure === "string"
+                    ? failure
+                    : "Export package completion failed.";
+              if (retryableSubmissions === rollbackBaseSubmissions) {
+                throw new Error(
+                  `${failureMessage} Export state could not be restored for retry.`,
+                );
+              }
+              try {
+                await persistSubmissions(
+                  retryableSubmissions,
+                  fence,
+                  rollbackExpectedCaseRevisions,
+                );
+              } catch (rollbackError) {
+                if (isWorkspaceSessionChangedError(rollbackError)) throw rollbackError;
+                throw new Error(
+                  `${failureMessage} Export state rollback could not be persisted.`,
+                );
+              }
+              throw new Error(failureMessage);
+            };
 
-          const completionOptions = {
-            batchId: crypto.randomUUID(),
-            createdAt: new Date().toISOString(),
-            createdBy: session.userId,
-            documentExport,
-            format: "xlsx" as const,
-          };
-          let completed: Awaited<ReturnType<typeof completeExportPackage>>;
-          try {
-            fence.assertCurrent();
-            completed = await completeExportPackage(
-              selectedDownloaded,
-              completionOptions,
-            );
-            fence.assertCurrent();
-          } catch (error) {
-            if (isWorkspaceSessionChangedError(error)) throw error;
-            fence.assertCurrent();
-            const reconciliation = await reconcileExportPackageCompletion(
-              selectedDownloaded,
-              completionOptions,
-              error,
-              fence,
-            );
-            fence.assertCurrent();
-            if (reconciliation.status === "committed") {
-              // A lost response can still represent a committed transaction.
-              // Follow-up reads and observers never roll that commit back.
+            const completionOptions = {
+              batchId: crypto.randomUUID(),
+              createdAt: new Date().toISOString(),
+              createdBy: session.userId,
+              documentExport,
+              format: "xlsx" as const,
+            };
+            let completed: Awaited<ReturnType<typeof completeExportPackage>>;
+            try {
+              fence.assertCurrent();
+              completed = await completeExportPackage(
+                selectedDownloaded,
+                completionOptions,
+              );
+              fence.assertCurrent();
+            } catch (error) {
+              if (isWorkspaceSessionChangedError(error)) throw error;
+              fence.assertCurrent();
+              const reconciliation = await reconcileExportPackageCompletion(
+                selectedDownloaded,
+                completionOptions,
+                error,
+                fence,
+              );
+              fence.assertCurrent();
+              if (reconciliation.status === "committed") {
+                // A lost response can still represent a committed transaction.
+                // Follow-up reads and observers never roll that commit back.
+                void refreshCanonicalSubmissions();
+                return;
+              }
+              if (reconciliation.status === "not_committed") {
+                return failWithRetryableExportState(error);
+              }
+
               void refreshCanonicalSubmissions();
-              return;
+              const failureMessage =
+                error instanceof Error
+                  ? error.message
+                  : "Export package completion failed.";
+              throw new ExportPackageCompletionUncertainError(
+                `${failureMessage} Canonical export commit could not be confirmed; automatic rollback was skipped.`,
+                { cause: error },
+              );
             }
-            if (reconciliation.status === "not_committed") {
-              return failWithRetryableExportState(error);
+            if (completed.status === "blocked") {
+              return failWithRetryableExportState(completed.blockers.join("; "));
             }
 
-            void refreshCanonicalSubmissions();
-            const failureMessage =
-              error instanceof Error
-                ? error.message
-                : "Export package completion failed.";
-            throw new ExportPackageCompletionUncertainError(
-              `${failureMessage} Canonical export commit could not be confirmed; automatic rollback was skipped.`,
-              { cause: error },
-            );
-          }
-          if (completed.status === "blocked") {
-            return failWithRetryableExportState(completed.blockers.join("; "));
-          }
-
-          // `complete_export_package` is the durable, atomic terminal transition.
-          // Follow-up reads are best-effort and remain outside that transaction.
+            // `complete_export_package` is the durable, atomic terminal transition.
+            // Follow-up reads are best-effort and remain outside that transaction.
             void refreshCanonicalSubmissions();
           });
         } catch (error) {
@@ -1816,7 +1823,7 @@ export default function App({
               documentExport,
               packageIdentity,
               submissionIds,
-          },
+            },
             submissionIds,
             type: "export.complete",
           },

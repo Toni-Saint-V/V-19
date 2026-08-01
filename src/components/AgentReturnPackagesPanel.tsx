@@ -129,8 +129,12 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
           <Inbox className="h-4 w-4" />
         </span>
         <div>
-          <h2 className="m-0 text-[16px] font-semibold text-white">Полученные документы</h2>
-          <p className="m-0 mt-0.5 text-[12px] text-white/48">Списки и готовые анкеты, переданные администратором.</p>
+          <h2 className="m-0 text-[16px] font-semibold text-white">
+            Полученные документы
+          </h2>
+          <p className="m-0 mt-0.5 text-[12px] text-white/48">
+            Списки и готовые анкеты, переданные администратором.
+          </p>
         </div>
       </header>
 
@@ -146,7 +150,10 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
       ) : null}
 
       {loadState === "empty" ? (
-        <div className="px-5 py-5 text-[12px] text-white/55" data-testid="agent-return-packages-empty">
+        <div
+          className="px-5 py-5 text-[12px] text-white/55"
+          data-testid="agent-return-packages-empty"
+        >
           Пока нет документов, переданных администратором.
         </div>
       ) : null}
@@ -174,14 +181,24 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
           {packages.map((item) => (
             <article className="px-5 py-4" key={item.id}>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <strong className="text-[14px] font-semibold text-white">{item.city}</strong>
+                <strong className="text-[14px] font-semibold text-white">
+                  {item.city}
+                </strong>
                 <span className="rounded-full border border-[#244238] bg-[#14251f] px-2 py-0.5 text-[11px] font-medium text-[#8fe7c1]">
-                  {item.artifacts.filter((artifact) => artifact.artifactKind === "visa_application_pdf").length} анкет
+                  {
+                    item.artifacts.filter(
+                      (artifact) => artifact.artifactKind === "visa_application_pdf",
+                    ).length
+                  }{" "}
+                  анкет
                 </span>
               </div>
               <div className="grid gap-2">
                 {item.artifacts.map((artifact) => (
-                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[#242529] bg-[#1e1e21] px-3 py-2.5" key={artifact.id}>
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#242529] bg-[#1e1e21] px-3 py-2.5"
+                    key={artifact.id}
+                  >
                     <span className="min-w-0 truncate text-[12px] text-white/70">
                       <FileText className="mr-2 inline h-3.5 w-3.5 text-[#b8baff]" />
                       {artifactLabel(artifact)}
@@ -194,7 +211,11 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
                       type="button"
                       onClick={() => void download(artifact)}
                     >
-                      {busyArtifactId === artifact.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                      {busyArtifactId === artifact.id ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
                       Скачать
                     </button>
                   </div>

@@ -1625,7 +1625,6 @@
   --v19-polish-readable-muted: rgb(242 243 245 / 0.68);
 }
 
-
 /* Passport review semantic tokens keep the workspace themeable without component literals. */
 :root {
   --v19b-review-ai-surface: var(--v19b-admin-card-bg);

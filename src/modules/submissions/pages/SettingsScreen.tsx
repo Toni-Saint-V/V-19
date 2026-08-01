@@ -17,11 +17,7 @@ type SettingsSectionId =
   | "export-defaults"
   | "interface";
 
-const agentSections: SettingsSectionId[] = [
-  "profile",
-  "notifications",
-  "interface",
-];
+const agentSections: SettingsSectionId[] = ["profile", "notifications", "interface"];
 
 const adminSections: SettingsSectionId[] = [
   "profile",
@@ -151,7 +147,11 @@ export default function SettingsScreen({
           />
 
           {dirty ? (
-            <div className="settings-save-bar is-dirty" role="status" aria-live="polite">
+            <div
+              className="settings-save-bar is-dirty"
+              role="status"
+              aria-live="polite"
+            >
               <span>Есть несохранённые изменения</span>
               <div className="settings-save-actions">
                 <Button variant="secondary" onClick={onReset}>
@@ -169,10 +169,7 @@ export default function SettingsScreen({
       </div>
 
       {confirmLeave ? (
-        <SettingsLeaveDialog
-          onCancel={onCancelLeave}
-          onConfirm={onConfirmLeave}
-        />
+        <SettingsLeaveDialog onCancel={onCancelLeave} onConfirm={onConfirmLeave} />
       ) : null}
     </section>
   );
@@ -335,14 +332,19 @@ function SettingsSectionContent({
           id="settings-action-digest"
           value={settings.digest}
           onChange={(event) =>
-            onSettings({ digest: event.currentTarget.value as WorkspaceSettings["digest"] })
+            onSettings({
+              digest: event.currentTarget.value as WorkspaceSettings["digest"],
+            })
           }
         >
           <option value="instant">Сразу</option>
           <option value="daily">Ежедневно</option>
         </select>
       </SettingsRow>
-      <SettingsRow label="Новые замечания" help="Открывать drawer на вкладке «Замечания».">
+      <SettingsRow
+        label="Новые замечания"
+        help="Открывать drawer на вкладке «Замечания»."
+      >
         <SwitchButton
           ariaLabel="Новые замечания"
           checked={settings.drawerHints}
@@ -441,7 +443,8 @@ function AccessRequestsSection({
                   {request.companyName} · {request.city} · {request.phone}
                 </span>
                 <small>
-                  {request.email} · агент · на рассмотрении · {formatAccessRequestDate(request.createdAt)}
+                  {request.email} · агент · на рассмотрении ·{" "}
+                  {formatAccessRequestDate(request.createdAt)}
                 </small>
               </div>
               <div className="settings-access-actions">

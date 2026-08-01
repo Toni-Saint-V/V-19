@@ -97,10 +97,7 @@ describe("shared UI primitives", () => {
       "aria-describedby",
       "city-helper city-error",
     );
-    expect(screen.getByText("City is required.")).toHaveAttribute(
-      "id",
-      "city-error",
-    );
+    expect(screen.getByText("City is required.")).toHaveAttribute("id", "city-error");
   });
 
   test("keeps text input helper and error descriptions associated", () => {
@@ -122,9 +119,6 @@ describe("shared UI primitives", () => {
       "aria-describedby",
       "route-helper route-error",
     );
-    expect(screen.getByText("Route is required.")).toHaveAttribute(
-      "id",
-      "route-error",
-    );
+    expect(screen.getByText("Route is required.")).toHaveAttribute("id", "route-error");
   });
 });

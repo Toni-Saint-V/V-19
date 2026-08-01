@@ -154,10 +154,7 @@ function fileDomId(fileId: string) {
   return `admin-review-file-${fileId}`;
 }
 
-function focusReviewTarget(
-  target: HTMLElement | null,
-  prefersReducedMotion: boolean,
-) {
+function focusReviewTarget(target: HTMLElement | null, prefersReducedMotion: boolean) {
   if (!target) {
     return;
   }
@@ -180,9 +177,7 @@ function issueTargetsFile(issue: Issue) {
 function fieldStatus(field: QuestionnaireField, issues: Issue[]): FieldReviewStatus {
   if (
     field.error ||
-    issues.some(
-      (issue) => issue.status === "open" && fieldMatchesIssue(field, issue),
-    )
+    issues.some((issue) => issue.status === "open" && fieldMatchesIssue(field, issue))
   )
     return "error";
   if (field.adminReviewApprovedAtIso && field.adminReviewApprovedBy) {
@@ -811,12 +806,7 @@ function QuestionnaireTab({
     });
 
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [
-    prefersReducedMotion,
-    reviewTarget,
-    selectedApplicantId,
-    submission,
-  ]);
+  }, [prefersReducedMotion, reviewTarget, selectedApplicantId, submission]);
 
   if (!submission) {
     return (
@@ -1559,9 +1549,11 @@ export function AdminReviewDrawer({
         id: "questionnaire" as const,
         label: "Анкета",
         icon: ClipboardPenLine,
-        count: submission?.applicants.flatMap((applicant) =>
-          applicant.sections.flatMap((section) => section.fields),
-        ).filter((field) => hasReviewValue(field.value)).length,
+        count: submission?.applicants
+          .flatMap((applicant) =>
+            applicant.sections.flatMap((section) => section.fields),
+          )
+          .filter((field) => hasReviewValue(field.value)).length,
       },
     ],
     [submission],

@@ -1737,8 +1737,7 @@
     padding-inline: var(--v19b-size-6);
   }
 
-  .vf-figma-questionnaire-screen.codex-polish-v1
-    .v19-questionnaire-mobile-footer-save {
+  .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-mobile-footer-save {
     gap: var(--v19b-size-3);
     padding-inline: var(--v19b-size-4);
   }

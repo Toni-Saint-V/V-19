@@ -570,9 +570,7 @@ function normalizeDateInput(value: string, intent: QuestionnaireDateIntent) {
     const currentYear = new Date().getFullYear();
     const currentTwoDigitYear = currentYear % 100;
     return String(
-      numericYear <= currentTwoDigitYear
-        ? 2000 + numericYear
-        : 1900 + numericYear,
+      numericYear <= currentTwoDigitYear ? 2000 + numericYear : 1900 + numericYear,
     );
   };
   let day = "";
@@ -960,9 +958,7 @@ function FormField({
           deleteIndex >= 0
             ? `${value.slice(0, deleteIndex)}${value.slice(deleteIndex + 1)}`
             : value.slice(caret);
-        onChange?.(
-          formatDateInput(nextValue, "deleteContentBackward", dateIntent),
-        );
+        onChange?.(formatDateInput(nextValue, "deleteContentBackward", dateIntent));
         window.requestAnimationFrame(() => {
           const nextCaret = Math.max(0, caret - 2);
           input.setSelectionRange(nextCaret, nextCaret);
@@ -973,9 +969,7 @@ function FormField({
         event.preventDefault();
         const input = event.currentTarget;
         const nextValue = `${value.slice(0, caret + 1)}${value.slice(caret + 2)}`;
-        onChange?.(
-          formatDateInput(nextValue, "deleteContentForward", dateIntent),
-        );
+        onChange?.(formatDateInput(nextValue, "deleteContentForward", dateIntent));
         window.requestAnimationFrame(() =>
           input.setSelectionRange(caret + 1, caret + 1),
         );
@@ -1617,9 +1611,7 @@ function questionnaireUpdateKey(
   return `${update.applicantId}:${update.sectionId}:${update.fieldId}`;
 }
 
-function questionnaireCommitMutationFingerprint(
-  payload: QuestionnaireCommitPayload,
-) {
+function questionnaireCommitMutationFingerprint(payload: QuestionnaireCommitPayload) {
   const fieldUpdates = [...payload.fieldUpdates].sort((left, right) =>
     questionnaireUpdateKey(left).localeCompare(questionnaireUpdateKey(right)),
   );
@@ -2351,7 +2343,7 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
 // eslint-disable-next-line react-refresh/only-export-components
 export const questionnaireUiNonRenderedFieldDispositions = {
   "birth-citizenship": "derived from country of birth",
-  "category": "service-managed appointment value",
+  category: "service-managed appointment value",
   "cost-covered-by": "service-managed payment value",
   "final-entry-permit": "reserved optional visa field",
   "final-entry-permit-issued-by": "reserved optional visa field",
@@ -2359,7 +2351,7 @@ export const questionnaireUiNonRenderedFieldDispositions = {
   "final-entry-permit-valid-to": "reserved optional visa field",
   "home-address": "derived from structured address fields",
   "means-of-support": "service-managed payment value",
-  "nationality": "derived from passport issue country",
+  nationality: "derived from passport issue country",
   "visa-type": "service-managed appointment value",
 } as const;
 
@@ -2368,18 +2360,33 @@ export const questionnaireUiNonRenderedFieldDispositions = {
 // eslint-disable-next-line react-refresh/only-export-components
 export const questionnaireUiLegacyBindingDispositions = {
   "appointment-note": { reason: "legacy appointment note", sectionId: "appointment" },
-  "desired-date-3": { reason: "legacy third appointment date", sectionId: "appointment" },
-  "occupation-specify": { reason: "legacy free-form occupation", sectionId: "employment" },
+  "desired-date-3": {
+    reason: "legacy third appointment date",
+    sectionId: "appointment",
+  },
+  "occupation-specify": {
+    reason: "legacy free-form occupation",
+    sectionId: "employment",
+  },
   "eu-relationship": { reason: "legacy EU-relative relation", sectionId: "euRelative" },
-  "eu-relative-details": { reason: "legacy EU-relative details", sectionId: "euRelative" },
+  "eu-relative-details": {
+    reason: "legacy EU-relative details",
+    sectionId: "euRelative",
+  },
   "form-filler-contact": { reason: "legacy form-filler contact", sectionId: "filler" },
   "form-filler-name": { reason: "legacy form-filler name", sectionId: "filler" },
   "form-filler-phone": { reason: "legacy form-filler phone", sectionId: "filler" },
   "other-sponsor": { reason: "legacy sponsor identity", sectionId: "payment" },
-  "sponsor-in-host-fields": { reason: "legacy sponsor host data", sectionId: "payment" },
+  "sponsor-in-host-fields": {
+    reason: "legacy sponsor host data",
+    sectionId: "payment",
+  },
   "sponsor-means": { reason: "legacy sponsor means", sectionId: "payment" },
   "national-id": { reason: "legacy national identifier", sectionId: "personal" },
-  "other-citizenship": { reason: "legacy additional citizenship", sectionId: "personal" },
+  "other-citizenship": {
+    reason: "legacy additional citizenship",
+    sectionId: "personal",
+  },
 } as const;
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -2723,9 +2730,7 @@ export function FigmaQuestionnaireScreen({
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const completionInFlightRef = useRef(false);
   const issueResolutionPendingRef = useRef(false);
-  const issueResolutionPromiseRef = useRef<Promise<boolean> | undefined>(
-    undefined,
-  );
+  const issueResolutionPromiseRef = useRef<Promise<boolean> | undefined>(undefined);
   const navigationPendingRef = useRef(false);
   const saveAndExitDraftReadyRef = useRef(false);
   const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
@@ -3073,8 +3078,7 @@ export function FigmaQuestionnaireScreen({
     ).length;
     const openIssueRisks = draftSubmission.issues.filter(
       (issue) =>
-        issue.status === "open" &&
-        isQuestionnaireFieldIssue(draftSubmission, issue),
+        issue.status === "open" && isQuestionnaireFieldIssue(draftSubmission, issue),
     ).length;
     const total = requiredFields.length;
     const completed = completedFields.length;
@@ -4168,9 +4172,7 @@ export function FigmaQuestionnaireScreen({
     setRevealRequiredErrors(true);
     setSaveStatus("idle");
     setSaveMessage(
-      target.label
-        ? `Сначала: ${target.label}`
-        : "Сначала: устраните блокер",
+      target.label ? `Сначала: ${target.label}` : "Сначала: устраните блокер",
     );
     focusQuestionnaireTarget(target);
   }
@@ -5026,26 +5028,25 @@ export function FigmaQuestionnaireScreen({
   const mobileBlockerReason = mobileBlockerTarget?.reason?.trim();
   const currentIssueCoversMobileBlocker = Boolean(
     currentSectionIssue &&
-      mobileBlockerTarget &&
-      currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
-      (!currentSectionIssue.target.section?.trim() ||
-        sameFieldLabel(
-          currentSectionIssue.target.section,
-          activeSectionContext?.title,
-        )) &&
-      questionnaireFieldBindings.some((binding) => {
-        const fieldLabel =
-          questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
-          mobileBlockerLabel;
-        return (
-          issueFieldMatches(
-            binding.fieldId,
-            fieldLabel,
-            currentSectionIssue.target.field,
-          ) &&
-          issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
-        );
-      }),
+    mobileBlockerTarget &&
+    currentSectionIssue.target.applicantId === mobileBlockerTarget.applicantId &&
+    (!currentSectionIssue.target.section?.trim() ||
+      sameFieldLabel(
+        currentSectionIssue.target.section,
+        activeSectionContext?.title,
+      )) &&
+    questionnaireFieldBindings.some((binding) => {
+      const fieldLabel =
+        questionnaireField(activeApplicantModel, binding.fieldId)?.label ??
+        mobileBlockerLabel;
+      return (
+        issueFieldMatches(
+          binding.fieldId,
+          fieldLabel,
+          currentSectionIssue.target.field,
+        ) && issueFieldMatches(binding.fieldId, fieldLabel, mobileBlockerLabel)
+      );
+    }),
   );
   const showWorkToolbar =
     showFamilyCopyControl ||
@@ -5178,8 +5179,8 @@ export function FigmaQuestionnaireScreen({
                 {discardExitArmed ? (
                   <>
                     <span className="v19-questionnaire-save-error-warning">
-                      Последние несохранённые изменения будут потеряны. Уже
-                      сохранённые данные останутся.
+                      Последние несохранённые изменения будут потеряны. Уже сохранённые
+                      данные останутся.
                     </span>
                     <button
                       {...agentInteractionProps("questionnaire.back")}

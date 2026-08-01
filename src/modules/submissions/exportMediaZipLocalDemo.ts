@@ -20,10 +20,8 @@ export function buildLocalDemoExportMediaZipOptions(
 type LocalDemoJpegType = DocumentType;
 
 const localDemoJpegUrls: Partial<Record<LocalDemoJpegType, string>> = {
-  passport_scan: new URL(
-    "../../assets/export-demo/passport_scan.jpeg",
-    import.meta.url,
-  ).href,
+  passport_scan: new URL("../../assets/export-demo/passport_scan.jpeg", import.meta.url)
+    .href,
   selfie_1: new URL("../../assets/export-demo/selfie_1.jpg", import.meta.url).href,
   selfie_2: new URL("../../assets/export-demo/selfie_2.jpg", import.meta.url).href,
 };
@@ -133,10 +131,7 @@ function localDemoDocumentAssetsFromSubmissionFiles(
   );
 }
 
-function localDemoDocumentFileName(
-  file: SubmissionFile,
-  type: DocumentType,
-): string {
+function localDemoDocumentFileName(file: SubmissionFile, type: DocumentType): string {
   const extension = localDemoExtension(file.mimeType);
   const raw =
     file.generatedFileName ??

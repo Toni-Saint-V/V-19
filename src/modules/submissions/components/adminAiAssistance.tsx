@@ -4575,7 +4575,9 @@ const figmaSubmissionDrawerStyles = `
 
 function getDrawerFocusableElements(container: HTMLElement | null) {
   if (!container) return [];
-  return Array.from(container.querySelectorAll<HTMLElement>(drawerFocusableSelector)).filter(
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(drawerFocusableSelector),
+  ).filter(
     (element) =>
       !element.hasAttribute("disabled") &&
       element.getAttribute("aria-hidden") !== "true" &&
@@ -4663,16 +4665,16 @@ function drawerUpdatedLabel(value: string) {
   }).format(date);
 }
 
-function applicantQuestionnairePercent(
-  applicant: Submission["applicants"][number],
-) {
+function applicantQuestionnairePercent(applicant: Submission["applicants"][number]) {
   if (applicant.questionnaireStatus === "complete") return 100;
   if (applicant.questionnaireStatus === "empty") return 0;
 
   const sections = applicant.sections;
   if (!sections.length) return applicant.questionnaireStatus === "needs_fix" ? 65 : 40;
 
-  const completeCount = sections.filter((section) => section.status === "complete").length;
+  const completeCount = sections.filter(
+    (section) => section.status === "complete",
+  ).length;
   return Math.round((completeCount / sections.length) * 100);
 }
 
@@ -4692,19 +4694,16 @@ function buildDetail(submission: Submission): FigmaSubmissionDetail {
     city: submission.city,
     completeness: submission.completeness.total,
     id: submission.id,
-    issuesCount: submission.issues.filter(
-      (issue) => issue.status !== "closed_by_admin",
-    ).length,
+    issuesCount: submission.issues.filter((issue) => issue.status !== "closed_by_admin")
+      .length,
     owner: "Татьяна Н.",
     status: operationalDrawerSourceStatus(submission),
     title:
       submission.type === "family"
-        ? familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ?? submission.title
+        ? (familyDisplayTitleFromMainApplicantName(mainApplicant?.fullName) ??
+          submission.title)
         : submission.title,
-    tripDates: drawerTripDatesLabel(
-      submission.tripDateFrom,
-      submission.tripDateTo,
-    ),
+    tripDates: drawerTripDatesLabel(submission.tripDateFrom, submission.tripDateTo),
     type: submission.type,
     updated: drawerUpdatedLabel(submission.updatedAt),
   };
@@ -4757,10 +4756,14 @@ type FileApplicantSection = {
 
 function fileApplicantSections(submission: Submission): FileApplicantSection[] {
   const applicantNameById = new Map<string, string>(
-    submission.applicants.map((applicant) => [applicant.id, applicant.fullName] as [string, string]),
+    submission.applicants.map(
+      (applicant) => [applicant.id, applicant.fullName] as [string, string],
+    ),
   );
   const applicantOrder = new Map<string, number>(
-    submission.applicants.map((applicant, index) => [applicant.id, index] as [string, number]),
+    submission.applicants.map(
+      (applicant, index) => [applicant.id, index] as [string, number],
+    ),
   );
   const filesByApplicantId = new Map<string, SubmissionFile[]>();
 
@@ -4817,11 +4820,7 @@ function documentPackageItems(submission: Submission) {
         ? `${fileTypeLabel(item.type)} (${item.ready}/${item.total})`
         : fileTypeLabel(item.type),
     status:
-      item.ready === item.total
-        ? "done"
-        : item.ready > 0
-          ? "in_progress"
-          : "pending",
+      item.ready === item.total ? "done" : item.ready > 0 ? "in_progress" : "pending",
   }));
 }
 
@@ -4857,7 +4856,8 @@ const OverviewTab = ({
     ? {
         action: onOpenIssues,
         actionLabel: "Открыть замечания",
-        description: "Исправьте отмеченные поля и файлы, затем отправьте пакет повторно.",
+        description:
+          "Исправьте отмеченные поля и файлы, затем отправьте пакет повторно.",
         label: "Требует действий",
         title: "Исправьте замечания",
       }
@@ -4865,7 +4865,8 @@ const OverviewTab = ({
       ? {
           action: undefined,
           actionLabel: "",
-          description: "Исправления отправлены. Администратор повторно проверяет пакет.",
+          description:
+            "Исправления отправлены. Администратор повторно проверяет пакет.",
           label: "Статус пакета",
           title: "Исправления на проверке",
         }
@@ -4938,7 +4939,9 @@ const OverviewTab = ({
 
           <div className="v20-card v20-info-card">
             <div className="v20-package-head">
-              <h4 className="v20-info-title v20-info-title--compact">Пакет документов</h4>
+              <h4 className="v20-info-title v20-info-title--compact">
+                Пакет документов
+              </h4>
               <span className="v20-package-count">
                 {readyFilesCount}/{submission.files.length}
               </span>
@@ -5061,13 +5064,19 @@ const QuestionnaireTab = ({
     {
       title: "Визовая история",
       Icon: History,
-      fieldIds: ["previous-biometrics", "previous-biometrics-date", "previous-visa-number"],
+      fieldIds: [
+        "previous-biometrics",
+        "previous-biometrics-date",
+        "previous-visa-number",
+      ],
       sectionIds: ["trip"],
     },
   ];
   const sections = sectionBlueprint.map((section) => {
     const relevantSections = submission.applicants.flatMap((applicant) =>
-      applicant.sections.filter((candidate) => section.sectionIds.includes(candidate.id)),
+      applicant.sections.filter((candidate) =>
+        section.sectionIds.includes(candidate.id),
+      ),
     );
     const allApplicantsComplete = submission.applicants.every(
       (applicant) => applicant.questionnaireStatus === "complete",
@@ -5081,7 +5090,9 @@ const QuestionnaireTab = ({
               if (candidate.status === "empty") return sum;
 
               const fields = section.fieldIds
-                ? candidate.fields.filter((field) => section.fieldIds?.includes(field.id))
+                ? candidate.fields.filter((field) =>
+                    section.fieldIds?.includes(field.id),
+                  )
                 : candidate.fields;
               const requiredFields = fields.filter((field) => field.required);
               if (requiredFields.length === 0) {
@@ -5094,7 +5105,12 @@ const QuestionnaireTab = ({
               const calculated = Math.round(
                 (filledFields.length / requiredFields.length) * 100,
               );
-              return sum + (candidate.status === "needs_fix" ? Math.min(calculated, 90) : calculated);
+              return (
+                sum +
+                (candidate.status === "needs_fix"
+                  ? Math.min(calculated, 90)
+                  : calculated)
+              );
             }, 0) / relevantSections.length,
           )
         : Math.round(
@@ -5112,7 +5128,8 @@ const QuestionnaireTab = ({
           return (
             sum +
             fields.filter(
-              (field) => field.required && (!field.value.trim() || Boolean(field.error)),
+              (field) =>
+                field.required && (!field.value.trim() || Boolean(field.error)),
             ).length
           );
         }, 0);
@@ -5129,7 +5146,9 @@ const QuestionnaireTab = ({
             : ("pending" as const),
     };
   });
-  const remainingBlockCount = sections.filter((section) => section.progress < 100).length;
+  const remainingBlockCount = sections.filter(
+    (section) => section.progress < 100,
+  ).length;
   const remainingBlockLabel =
     remainingBlockCount === 0
       ? "Все блоки данных заполнены"
@@ -5147,7 +5166,9 @@ const QuestionnaireTab = ({
     <div className="v20-questionnaire-tab space-y-6">
       <div className="v19-drawer-questionnaire-summary-head">
         <div className="v19-drawer-questionnaire-summary-copy">
-          <h3 className="v19-drawer-questionnaire-summary-title">Прогресс заполнения</h3>
+          <h3 className="v19-drawer-questionnaire-summary-title">
+            Прогресс заполнения
+          </h3>
           <p className="v19-questionnaire-progress-helper v19-drawer-questionnaire-summary-helper">
             {remainingBlockLabel}
           </p>
@@ -5176,9 +5197,7 @@ const QuestionnaireTab = ({
               onOpenQuestionnaire();
             }}
           >
-            <span
-              className={`v20-questionnaire-section-icon is-${section.status}`}
-            >
+            <span className={`v20-questionnaire-section-icon is-${section.status}`}>
               <section.Icon aria-hidden="true" />
             </span>
             <span className="v20-questionnaire-section-copy flex-1 min-w-0">
@@ -5287,10 +5306,7 @@ const FilesTab = ({
     }
   }
 
-  function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>,
-    fileId: string,
-  ) {
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>, fileId: string) {
     const selectedFile = event.currentTarget.files?.[0];
     if (!selectedFile) return;
 
@@ -5334,9 +5350,14 @@ const FilesTab = ({
         <div className="v20-card v20-question-card">
           <div className="v20-question-row">
             <span className="v20-question-text">
-              Общие адреса семьи заполняются один раз и копируются только после подтверждения.
+              Общие адреса семьи заполняются один раз и копируются только после
+              подтверждения.
             </span>
-            <button className="linear-product-action linear-product-action--secondary v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
+            <button
+              className="linear-product-action linear-product-action--secondary v20-questionnaire-open"
+              type="button"
+              onClick={onOpenQuestionnaire}
+            >
               Открыть анкету
             </button>
           </div>
@@ -5350,7 +5371,11 @@ const FilesTab = ({
           onDrop={handleDrop}
         >
           <input
-            accept={firstActionFile ? fileAccept(firstActionFile) : "image/jpeg,image/png,application/pdf"}
+            accept={
+              firstActionFile
+                ? fileAccept(firstActionFile)
+                : "image/jpeg,image/png,application/pdf"
+            }
             className="v20-hidden-file-input"
             disabled={!canDropUpload}
             ref={dropInputRef}
@@ -5363,7 +5388,8 @@ const FilesTab = ({
             </span>
             <h3 className="v20-dropzone-title">Перетащи документы сюда</h3>
             <p className="v20-dropzone-helper">
-              PDF, JPG, PNG. Статус загрузки и требуемое действие появятся в списке ниже.
+              PDF, JPG, PNG. Статус загрузки и требуемое действие появятся в списке
+              ниже.
             </p>
             <button
               className="linear-product-action linear-product-action--secondary v20-upload-button"
@@ -5376,9 +5402,16 @@ const FilesTab = ({
           </div>
         </div>
       ) : (
-        <section className="v20-empty-state v20-files-empty-state" aria-label="Файлы ещё не сформированы">
+        <section
+          className="v20-empty-state v20-files-empty-state"
+          aria-label="Файлы ещё не сформированы"
+        >
           <p>Для этой подачи ещё не сформированы слоты документов.</p>
-          <button className="linear-product-action linear-product-action--secondary v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
+          <button
+            className="linear-product-action linear-product-action--secondary v20-questionnaire-open"
+            type="button"
+            onClick={onOpenQuestionnaire}
+          >
             Открыть анкету
           </button>
         </section>
@@ -5390,7 +5423,8 @@ const FilesTab = ({
           {applicantSections.map((section) => {
             const isExpanded = expandedApplicantIds.includes(section.id);
             const uploadedCount = section.files.filter(
-              (file) => file.status !== "missing" && file.status !== "needs_replacement",
+              (file) =>
+                file.status !== "missing" && file.status !== "needs_replacement",
             ).length;
             const actionCount = section.files.length - uploadedCount;
 
@@ -5418,7 +5452,8 @@ const FilesTab = ({
                   <div className="v20-file-list">
                     {section.files.map((file) => {
                       const canUpload =
-                        file.status === "missing" || file.status === "needs_replacement";
+                        file.status === "missing" ||
+                        file.status === "needs_replacement";
                       const actionLabel = `${fileActionLabel(file)} ${fileTypeLabel(file.type)} — ${section.name}`;
 
                       return (
@@ -5435,7 +5470,9 @@ const FilesTab = ({
                             <UploadCloud aria-hidden="true" />
                           </span>
                           <span>
-                            <span className="v20-file-title">{fileTypeLabel(file.type)}</span>
+                            <span className="v20-file-title">
+                              {fileTypeLabel(file.type)}
+                            </span>
                             <span className="v20-file-meta">{fileSummary(file)}</span>
                           </span>
                           {canUpload ? (
@@ -5457,7 +5494,9 @@ const FilesTab = ({
                                 className="linear-product-action linear-product-action--outline linear-product-action--compact v20-file-action"
                                 disabled={!onUploadFile}
                                 type="button"
-                                onClick={() => fileInputsRef.current.get(file.id)?.click()}
+                                onClick={() =>
+                                  fileInputsRef.current.get(file.id)?.click()
+                                }
                               >
                                 {fileActionLabel(file)}
                               </button>
@@ -5577,9 +5616,7 @@ const IssuesTab = ({
                     <button
                       className="linear-product-action linear-product-action--outline linear-product-action--compact v20-issue-button"
                       type="button"
-                      onClick={() =>
-                        onOpenWorkspaceTarget(targetForIssue(issue))
-                      }
+                      onClick={() => onOpenWorkspaceTarget(targetForIssue(issue))}
                     >
                       Исправить в анкете
                     </button>
@@ -5640,8 +5677,10 @@ const IssuesTab = ({
 function issueEmptyPresentation(status: SourceStatus) {
   if (status === "submitted_for_review" || status === "corrections_received") {
     return {
-      description: "Пакет находится у администратора. Новые задачи появятся здесь, если потребуются исправления.",
-      stage: status === "corrections_received" ? "Повторная проверка" : "Проверка пакета",
+      description:
+        "Пакет находится у администратора. Новые задачи появятся здесь, если потребуются исправления.",
+      stage:
+        status === "corrections_received" ? "Повторная проверка" : "Проверка пакета",
       title: "Сейчас от вас ничего не требуется",
       tone: "review" as const,
     };
@@ -5649,7 +5688,8 @@ function issueEmptyPresentation(status: SourceStatus) {
 
   if (status === "ready_for_export" || status === "exported") {
     return {
-      description: "Все замечания закрыты. Подача прошла проверку и готова к следующему этапу.",
+      description:
+        "Все замечания закрыты. Подача прошла проверку и готова к следующему этапу.",
       stage: status === "exported" ? "Пакет выгружен" : "Проверка завершена",
       title: "Замечаний нет",
       tone: "complete" as const,
@@ -5657,7 +5697,8 @@ function issueEmptyPresentation(status: SourceStatus) {
   }
 
   return {
-    description: "Продолжайте заполнять анкету и собирать документы. Здесь появятся только конкретные задачи по проверке.",
+    description:
+      "Продолжайте заполнять анкету и собирать документы. Здесь появятся только конкретные задачи по проверке.",
     stage: status === "draft" ? "Черновик" : "Подготовка пакета",
     title: "Открытых замечаний нет",
     tone: "awaiting" as const,
@@ -5682,13 +5723,15 @@ function historyActorLabel(source: Submission["history"][number]["source"]) {
 
 function historyVisualTone(event: Submission["history"][number]) {
   if (event.toStatus === "returned" || event.source === "admin") return "warning";
-  if (event.toStatus === "submitted_for_review" || event.source === "agent") return "info";
+  if (event.toStatus === "submitted_for_review" || event.source === "agent")
+    return "info";
   return "neutral";
 }
 
 function historyVisualIcon(event: Submission["history"][number]): IconComponent {
   if (event.toStatus === "returned" || event.source === "admin") return AlertCircle;
-  if (event.toStatus === "submitted_for_review" || event.source === "agent") return UploadCloud;
+  if (event.toStatus === "submitted_for_review" || event.source === "agent")
+    return UploadCloud;
   if (/файл|паспорт|скан/i.test(event.text)) return ImageIcon;
   return FileText;
 }
@@ -5703,7 +5746,11 @@ const HistoryTab = ({ submission }: { submission: Submission }) => {
   const events = submission.history;
 
   if (!events.length) {
-    return <div className="v20-empty-state">История появится после первого действия по подаче.</div>;
+    return (
+      <div className="v20-empty-state">
+        История появится после первого действия по подаче.
+      </div>
+    );
   }
 
   return (
@@ -5748,7 +5795,9 @@ function tabIdForWorkspaceTarget(target: WorkspaceTarget): TabId {
   return initialTab(tabForTarget(target));
 }
 
-function questionnaireFocusFromTarget(target: WorkspaceTarget): QuestionnaireFocusTarget | undefined {
+function questionnaireFocusFromTarget(
+  target: WorkspaceTarget,
+): QuestionnaireFocusTarget | undefined {
   if (target.tab !== "questionnaire") return undefined;
   return {
     applicantId: target.applicantId,
@@ -5758,10 +5807,7 @@ function questionnaireFocusFromTarget(target: WorkspaceTarget): QuestionnaireFoc
 }
 
 function screenMeta(data: FigmaSubmissionDetail) {
-  return [
-    data.id,
-    data.type === "family" ? "семейная" : "индивидуальная",
-  ].join(" · ");
+  return [data.id, data.type === "family" ? "семейная" : "индивидуальная"].join(" · ");
 }
 
 export function FigmaSubmissionDrawer({
@@ -5801,17 +5847,21 @@ export function FigmaSubmissionDrawer({
   const tabContentInitial = getDrawerTabInitial(shouldReduceMotion);
   const tabContentExit = getDrawerTabExit(shouldReduceMotion);
 
-  const openWorkspaceTarget = useCallback((target: WorkspaceTarget) => {
-    pendingTargetRef.current = target;
+  const openWorkspaceTarget = useCallback(
+    (target: WorkspaceTarget) => {
+      pendingTargetRef.current = target;
 
-    if (target.tab === "questionnaire") {
-      setTab("questionnaire");
-      if (role === "agent") onOpenQuestionnaireWorkspace(questionnaireFocusFromTarget(target));
-      return;
-    }
+      if (target.tab === "questionnaire") {
+        setTab("questionnaire");
+        if (role === "agent")
+          onOpenQuestionnaireWorkspace(questionnaireFocusFromTarget(target));
+        return;
+      }
 
-    setTab(tabIdForWorkspaceTarget(target));
-  }, [onOpenQuestionnaireWorkspace, role]);
+      setTab(tabIdForWorkspaceTarget(target));
+    },
+    [onOpenQuestionnaireWorkspace, role],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -5846,7 +5896,14 @@ export function FigmaSubmissionDrawer({
       return;
     }
     openWorkspaceTarget(focusTarget);
-  }, [activeTab, focusTarget, isOpen, onClearFocusTarget, openWorkspaceTarget, submission.id]);
+  }, [
+    activeTab,
+    focusTarget,
+    isOpen,
+    onClearFocusTarget,
+    openWorkspaceTarget,
+    submission.id,
+  ]);
 
   useEffect(() => {
     if (!isOpen || status !== "success") return;
@@ -5976,13 +6033,17 @@ export function FigmaSubmissionDrawer({
     });
   }
 
-  function handleDrawerTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, currentTab: TabId) {
+  function handleDrawerTabKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentTab: TabId,
+  ) {
     const currentIndex = tabs.findIndex((item) => item.id === currentTab);
     if (currentIndex < 0) return;
 
     let nextIndex = currentIndex;
     if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
-    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    else if (event.key === "ArrowLeft")
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
     else if (event.key === "Home") nextIndex = 0;
     else if (event.key === "End") nextIndex = tabs.length - 1;
     else return;
@@ -6008,7 +6069,9 @@ export function FigmaSubmissionDrawer({
       ? "Исправьте замечания перед повторной отправкой."
       : statusLabels[submission.status]);
   const primaryFooterLabel =
-    data.status === "returned" ? "Отправить исправления" : (primaryAction.label || "Далее");
+    data.status === "returned"
+      ? "Отправить исправления"
+      : primaryAction.label || "Далее";
   async function handlePrimaryAction() {
     if (primaryAction.disabled || actionPendingRef.current) return;
 
@@ -6038,229 +6101,255 @@ export function FigmaSubmissionDrawer({
         {isOpen ? (
           <>
             <motion.div
-          animate={{ opacity: 1 }}
-          className="v20-drawer-overlay"
-          exit={{ opacity: 0 }}
-          initial={{ opacity: 0 }}
-          key="figma-drawer-overlay"
-          onClick={onClose}
-          transition={shouldReduceMotion ? drawerMotion.reduced : drawerMotion.overlay}
-        />
+              animate={{ opacity: 1 }}
+              className="v20-drawer-overlay"
+              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }}
+              key="figma-drawer-overlay"
+              onClick={onClose}
+              transition={
+                shouldReduceMotion ? drawerMotion.reduced : drawerMotion.overlay
+              }
+            />
 
             <motion.div
-          animate={{ opacity: 1, x: 0, y: 0 }}
-          className="v20-submission-drawer"
-          exit={drawerPanelExit}
-          initial={drawerPanelInitial}
-          key="figma-drawer-panel"
-          ref={drawerRef}
-          role="dialog"
-          aria-labelledby={drawerHeadingId}
-          aria-modal="true"
-          tabIndex={-1}
-          transition={drawerPanelTransition}
-          onKeyDown={handleDrawerKeyDown}
-        >
-          <header className="v20-drawer-topbar">
-            <div className="v20-title-wrap">
-              <div className="v20-subtitle">
-                <span>{screenMeta(data)}</span>
-              </div>
-              <div className="v20-drawer-title-line">
-                <h2 className="v20-title" id={drawerHeadingId}>{data.title}</h2>
-              </div>
-              <div className="v20-status-row">
-                <span className={`v20-status-pill ${data.status === "returned" ? "is-warning" : ""}`}>
-                  {data.status === "returned" ? <AlertCircle aria-hidden="true" /> : null}
-                  {data.status === "returned"
-                    ? "Возвращено (ошибки)"
-                    : operationalDrawerCompactStatusLabel(data.status)}
-                </span>
-                <span className="v20-updated-at">
-                  <Clock aria-hidden="true" />
-                  Обновлено {data.updated}
-                </span>
-              </div>
-            </div>
-            <button className="linear-product-action linear-product-action--icon linear-product-action--ghost v20-icon-button is-close" aria-label="Закрыть" type="button" onClick={onClose}>
-              <X aria-hidden="true" />
-            </button>
-          </header>
-
-          <div className="v20-tabbar-wrap">
-            <nav className="v20-tabbar" ref={drawerTabsRef} aria-label="Разделы подачи" role="tablist">
-              {tabs.map((item) => {
-                const count = item.getCount ? item.getCount(data) : undefined;
-                const isActive = tab === item.id;
-                const Icon = item.icon;
-
-                return (
-                  <button
-                    aria-controls={drawerPanelId(item.id)}
-                    aria-selected={isActive}
-                    className={`v20-tab-button ${mobileSecondaryTabs.some((secondary) => secondary.id === item.id) ? "is-mobile-secondary" : ""} ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""}`}
-                    data-drawer-tab={item.id}
-                    id={drawerTabId(item.id)}
-                    key={item.id}
-                    role="tab"
-                    tabIndex={isActive ? 0 : -1}
-                    type="button"
-                    onClick={() => selectDrawerTab(item.id)}
-                    onKeyDown={(event) => handleDrawerTabKeyDown(event, item.id)}
-                  >
-                    <Icon className="v20-tab-icon" aria-hidden="true" />
-                    {item.label}
-                    {typeof count === "number" && count > 0 ? (
-                      <span className="v20-tab-count">{count}</span>
-                    ) : null}
-                    {isActive ? (
-                      <motion.span
-                        aria-hidden="true"
-                        className="v20-tab-indicator"
-                        initial={false}
-                        layoutId="figmaSubmissionDrawerActiveTab"
-                        transition={drawerMotion.tabIndicator}
-                      />
-                    ) : null}
-                  </button>
-                );
-              })}
-            </nav>
-            <div className="v20-tabbar-more">
-              <button
-                aria-expanded={mobileMoreOpen}
-                aria-haspopup="menu"
-                className={`v20-tabbar-more-trigger ${mobileSecondaryTabs.some((item) => item.id === tab) ? "is-active" : ""}`}
-                onClick={() => setMobileMoreOpen((open) => !open)}
-                type="button"
-              >
-                Ещё
-              </button>
-              {mobileMoreOpen ? (
-                <div
-                  aria-label="Дополнительные разделы подачи"
-                  className="v20-tabbar-more-menu"
-                  role="menu"
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              className="v20-submission-drawer"
+              exit={drawerPanelExit}
+              initial={drawerPanelInitial}
+              key="figma-drawer-panel"
+              ref={drawerRef}
+              role="dialog"
+              aria-labelledby={drawerHeadingId}
+              aria-modal="true"
+              tabIndex={-1}
+              transition={drawerPanelTransition}
+              onKeyDown={handleDrawerKeyDown}
+            >
+              <header className="v20-drawer-topbar">
+                <div className="v20-title-wrap">
+                  <div className="v20-subtitle">
+                    <span>{screenMeta(data)}</span>
+                  </div>
+                  <div className="v20-drawer-title-line">
+                    <h2 className="v20-title" id={drawerHeadingId}>
+                      {data.title}
+                    </h2>
+                  </div>
+                  <div className="v20-status-row">
+                    <span
+                      className={`v20-status-pill ${data.status === "returned" ? "is-warning" : ""}`}
+                    >
+                      {data.status === "returned" ? (
+                        <AlertCircle aria-hidden="true" />
+                      ) : null}
+                      {data.status === "returned"
+                        ? "Возвращено (ошибки)"
+                        : operationalDrawerCompactStatusLabel(data.status)}
+                    </span>
+                    <span className="v20-updated-at">
+                      <Clock aria-hidden="true" />
+                      Обновлено {data.updated}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  className="linear-product-action linear-product-action--icon linear-product-action--ghost v20-icon-button is-close"
+                  aria-label="Закрыть"
+                  type="button"
+                  onClick={onClose}
                 >
-                  {mobileSecondaryTabs.map((item) => {
+                  <X aria-hidden="true" />
+                </button>
+              </header>
+
+              <div className="v20-tabbar-wrap">
+                <nav
+                  className="v20-tabbar"
+                  ref={drawerTabsRef}
+                  aria-label="Разделы подачи"
+                  role="tablist"
+                >
+                  {tabs.map((item) => {
                     const count = item.getCount ? item.getCount(data) : undefined;
+                    const isActive = tab === item.id;
                     const Icon = item.icon;
+
                     return (
                       <button
-                        aria-current={tab === item.id ? "page" : undefined}
+                        aria-controls={drawerPanelId(item.id)}
+                        aria-selected={isActive}
+                        className={`v20-tab-button ${mobileSecondaryTabs.some((secondary) => secondary.id === item.id) ? "is-mobile-secondary" : ""} ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""}`}
+                        data-drawer-tab={item.id}
+                        id={drawerTabId(item.id)}
                         key={item.id}
-                        onClick={() => selectDrawerTab(item.id)}
-                        role="menuitem"
+                        role="tab"
+                        tabIndex={isActive ? 0 : -1}
                         type="button"
+                        onClick={() => selectDrawerTab(item.id)}
+                        onKeyDown={(event) => handleDrawerTabKeyDown(event, item.id)}
                       >
-                        <Icon aria-hidden="true" className="v20-tab-icon" />
+                        <Icon className="v20-tab-icon" aria-hidden="true" />
                         {item.label}
                         {typeof count === "number" && count > 0 ? (
                           <span className="v20-tab-count">{count}</span>
                         ) : null}
+                        {isActive ? (
+                          <motion.span
+                            aria-hidden="true"
+                            className="v20-tab-indicator"
+                            initial={false}
+                            layoutId="figmaSubmissionDrawerActiveTab"
+                            transition={drawerMotion.tabIndicator}
+                          />
+                        ) : null}
                       </button>
                     );
                   })}
+                </nav>
+                <div className="v20-tabbar-more">
+                  <button
+                    aria-expanded={mobileMoreOpen}
+                    aria-haspopup="menu"
+                    className={`v20-tabbar-more-trigger ${mobileSecondaryTabs.some((item) => item.id === tab) ? "is-active" : ""}`}
+                    onClick={() => setMobileMoreOpen((open) => !open)}
+                    type="button"
+                  >
+                    Ещё
+                  </button>
+                  {mobileMoreOpen ? (
+                    <div
+                      aria-label="Дополнительные разделы подачи"
+                      className="v20-tabbar-more-menu"
+                      role="menu"
+                    >
+                      {mobileSecondaryTabs.map((item) => {
+                        const count = item.getCount ? item.getCount(data) : undefined;
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            aria-current={tab === item.id ? "page" : undefined}
+                            key={item.id}
+                            onClick={() => selectDrawerTab(item.id)}
+                            role="menuitem"
+                            type="button"
+                          >
+                            <Icon aria-hidden="true" className="v20-tab-icon" />
+                            {item.label}
+                            {typeof count === "number" && count > 0 ? (
+                              <span className="v20-tab-count">{count}</span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-          </div>
-
-          {status === "loading" ? (
-            <div className="v20-skeleton-screen" aria-hidden="true">
-              <Skeleton variant="title" />
-              <div className="v20-stat-grid">
-                <Skeleton variant="stat" />
-                <Skeleton variant="stat" />
-                <Skeleton variant="stat" />
-                <Skeleton variant="stat" />
               </div>
-              <Skeleton variant="panel" />
-            </div>
-          ) : (
-            <>
-              <main className="v20-drawer-body">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    aria-labelledby={tabs.some((item) => item.id === tab) ? drawerTabId(tab) : drawerHeadingId}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={tabContentExit}
-                    id={drawerPanelId(tab)}
-                    initial={tabContentInitial}
-                    key={tab}
-                    role="tabpanel"
-                    tabIndex={0}
-                    transition={shouldReduceMotion ? drawerMotion.reduced : drawerMotion.tab}
-                  >
-                    {tab === "overview" ? (
-                      <OverviewTab
-                        data={data}
-                        onOpenFiles={() => setTab("files")}
-                        onOpenIssues={() => setTab("issues")}
-                        onOpenQuestionnaire={() => onOpenQuestionnaireWorkspace()}
-                        submission={submission}
-                      />
-                    ) : null}
-                    {tab === "applicants" ? <ApplicantsTab data={data} /> : null}
-                    {tab === "questionnaire" ? (
-                      <QuestionnaireTab
-                        onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
-                        submission={submission}
-                      />
-                    ) : null}
-                    {tab === "files" ? (
-                      <FilesTab
-                        focusTarget={pendingTargetRef.current ?? undefined}
-                        onOpenQuestionnaire={() => onOpenQuestionnaireWorkspace()}
-                        onUploadFile={onUploadFile}
-                        submission={submission}
-                      />
-                    ) : null}
-                    {tab === "issues" ? (
-                      <IssuesTab
-                        data={data}
-                        onMarkIssueFixed={onMarkIssueFixed}
-                        onOpenWorkspaceTarget={openWorkspaceTarget}
-                        role={role}
-                        submission={submission}
-                      />
-                    ) : null}
-                    {tab === "history" ? <HistoryTab submission={submission} /> : null}
-                  </motion.div>
-                </AnimatePresence>
-              </main>
 
-              <footer className="v20-footer">
-                <div
-                  className={`v20-footer-note ${visibleActionError ? "is-error" : ""}`}
-                  role={visibleActionError ? "alert" : undefined}
-                >
-                  {footerStatusText}
+              {status === "loading" ? (
+                <div className="v20-skeleton-screen" aria-hidden="true">
+                  <Skeleton variant="title" />
+                  <div className="v20-stat-grid">
+                    <Skeleton variant="stat" />
+                    <Skeleton variant="stat" />
+                    <Skeleton variant="stat" />
+                    <Skeleton variant="stat" />
+                  </div>
+                  <Skeleton variant="panel" />
                 </div>
-                <div className="v20-footer-actions">
-                  <button
-                    className="linear-product-action linear-product-action--secondary v20-action-button is-ghost"
-                    type="button"
-                    onClick={onClose}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    aria-busy={actionPending}
-                    className={`linear-product-action ${data.status === "returned" ? "linear-product-action--warning is-warning" : "linear-product-action--primary is-primary"} v20-action-button`}
-                    disabled={primaryAction.disabled || actionPending}
-                    type="button"
-                    onClick={() => void handlePrimaryAction()}
-                  >
-                    {data.status === "returned" && !actionPending ? (
-                      <UploadCloud aria-hidden="true" />
-                    ) : null}
-                    {actionPending ? "Сохраняем…" : primaryFooterLabel}
-                  </button>
-                </div>
-              </footer>
-            </>
-          )}
+              ) : (
+                <>
+                  <main className="v20-drawer-body">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        aria-labelledby={
+                          tabs.some((item) => item.id === tab)
+                            ? drawerTabId(tab)
+                            : drawerHeadingId
+                        }
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={tabContentExit}
+                        id={drawerPanelId(tab)}
+                        initial={tabContentInitial}
+                        key={tab}
+                        role="tabpanel"
+                        tabIndex={0}
+                        transition={
+                          shouldReduceMotion ? drawerMotion.reduced : drawerMotion.tab
+                        }
+                      >
+                        {tab === "overview" ? (
+                          <OverviewTab
+                            data={data}
+                            onOpenFiles={() => setTab("files")}
+                            onOpenIssues={() => setTab("issues")}
+                            onOpenQuestionnaire={() => onOpenQuestionnaireWorkspace()}
+                            submission={submission}
+                          />
+                        ) : null}
+                        {tab === "applicants" ? <ApplicantsTab data={data} /> : null}
+                        {tab === "questionnaire" ? (
+                          <QuestionnaireTab
+                            onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
+                            submission={submission}
+                          />
+                        ) : null}
+                        {tab === "files" ? (
+                          <FilesTab
+                            focusTarget={pendingTargetRef.current ?? undefined}
+                            onOpenQuestionnaire={() => onOpenQuestionnaireWorkspace()}
+                            onUploadFile={onUploadFile}
+                            submission={submission}
+                          />
+                        ) : null}
+                        {tab === "issues" ? (
+                          <IssuesTab
+                            data={data}
+                            onMarkIssueFixed={onMarkIssueFixed}
+                            onOpenWorkspaceTarget={openWorkspaceTarget}
+                            role={role}
+                            submission={submission}
+                          />
+                        ) : null}
+                        {tab === "history" ? (
+                          <HistoryTab submission={submission} />
+                        ) : null}
+                      </motion.div>
+                    </AnimatePresence>
+                  </main>
+
+                  <footer className="v20-footer">
+                    <div
+                      className={`v20-footer-note ${visibleActionError ? "is-error" : ""}`}
+                      role={visibleActionError ? "alert" : undefined}
+                    >
+                      {footerStatusText}
+                    </div>
+                    <div className="v20-footer-actions">
+                      <button
+                        className="linear-product-action linear-product-action--secondary v20-action-button is-ghost"
+                        type="button"
+                        onClick={onClose}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        aria-busy={actionPending}
+                        className={`linear-product-action ${data.status === "returned" ? "linear-product-action--warning is-warning" : "linear-product-action--primary is-primary"} v20-action-button`}
+                        disabled={primaryAction.disabled || actionPending}
+                        type="button"
+                        onClick={() => void handlePrimaryAction()}
+                      >
+                        {data.status === "returned" && !actionPending ? (
+                          <UploadCloud aria-hidden="true" />
+                        ) : null}
+                        {actionPending ? "Сохраняем…" : primaryFooterLabel}
+                      </button>
+                    </div>
+                  </footer>
+                </>
+              )}
             </motion.div>
           </>
         ) : null}
