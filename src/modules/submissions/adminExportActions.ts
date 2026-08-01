@@ -9,6 +9,14 @@ export type AdminExportActionFeedback = {
   tone: AdminActionTone;
 };
 
+export const adminDocumentPackageExportEnabled = false;
+
+export function assertAdminDocumentPackageExportEnabled() {
+  if (!adminDocumentPackageExportEnabled) {
+    throw new Error("Действие недоступно в текущем статусе");
+  }
+}
+
 const actionLabel: Record<AdminExportActionKind, string> = {
   prepare_excel: "сформировать Excel",
   download_excel: "скачать Excel",
@@ -40,6 +48,15 @@ export function describeAdminExportActionFeedback({
       message: "Идёт формирование пакета. Дождитесь завершения текущего действия.",
       nextAction: "Дождаться завершения",
       tone: "info",
+    };
+  }
+
+  if (action === "download_zip" && !adminDocumentPackageExportEnabled) {
+    return {
+      canRun: false,
+      message: "Действие недоступно в текущем статусе",
+      nextAction: "Сформировать Excel",
+      tone: "warning",
     };
   }
 

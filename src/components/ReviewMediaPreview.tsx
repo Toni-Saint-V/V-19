@@ -13,6 +13,7 @@ export type ReviewMediaPreviewState = {
 type ReviewMediaPreviewProps = {
   alt: string;
   file?: SubmissionFile;
+  focus?: "identity";
   label: string;
   preview: ReviewMediaPreviewState;
   testId: string;
@@ -78,6 +79,7 @@ function LoadingPreviewState() {
 export function ReviewMediaPreview({
   alt,
   file,
+  focus,
   label,
   preview,
   testId,
@@ -98,6 +100,7 @@ export function ReviewMediaPreview({
     preview.status === "loading" ||
     (embeddedMedia && !mediaReady);
   const unavailable = unavailableCopy(file, preview);
+  const mediaTransform = transform;
 
   useEffect(() => {
     const object = pdfObjectRef.current;
@@ -124,7 +127,9 @@ export function ReviewMediaPreview({
   };
 
   return (
-    <figure className={`v19-review-preview is-${variant}`}>
+    <figure
+      className={`v19-review-preview is-${variant}${focus ? ` is-focus-${focus}` : ""}`}
+    >
       {variant === "single" ? null : (
         <figcaption>
           <strong>{label}</strong>
@@ -172,7 +177,7 @@ export function ReviewMediaPreview({
                 onError={onError}
                 onLoad={(event) => void handleImageLoad(event)}
                 src={previewUrl}
-                style={transform ? { transform } : undefined}
+                style={mediaTransform ? { transform: mediaTransform } : undefined}
               />
               {mediaReady ? null : <LoadingPreviewState />}
             </>
