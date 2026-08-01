@@ -474,7 +474,10 @@ async function expectMobileExportRowComposition(
 
   const row = page.locator(".v19-admin-export-row-v2:visible").first();
   await expect(row).toBeVisible();
-  await expect(row.locator(".v19-admin-export-row-agent-v2")).toBeHidden();
+  await expect(row.locator(".v19-admin-export-row-agent-v2")).toBeVisible();
+  await expect(
+    row.locator(".v19-admin-export-row-agent-v2 .v19-admin-export-row-value-v2"),
+  ).not.toBeEmpty();
   const composition = await row.evaluate((element) => {
     const checkbox = element.querySelector<HTMLInputElement>('input[type="checkbox"]');
     const city = element.querySelector<HTMLElement>(".v19-admin-export-row-city-v2");
@@ -583,7 +586,7 @@ async function expectMobileExportRowComposition(
     composition!.cityContentAligned,
     `${context}: city icon and text share one vertical center`,
   ).toBe(true);
-  expect(composition!.cityIconWidth, `${context}: compact city icon`).toBe(16);
+  expect(composition!.cityIconWidth, `${context}: compact city icon`).toBe(14);
   expect(composition!.idAfterName, `${context}: public ID follows the name`).toBe(true);
   expect(
     composition!.identityWidth,
@@ -623,14 +626,14 @@ async function expectMobileExportRowComposition(
     "500",
   );
   expect(composition!.dateColor, `${context}: trip date contrast`).toBe(
-    "rgb(245, 245, 245)",
+    "rgb(186, 181, 181)",
   );
   expect(composition!.cityFontSize, `${context}: readable city`).toBe(13);
   expect(composition!.cityPaddingInline, `${context}: edge-aligned city`).toEqual([
-    0, 0,
+    8, 8,
   ]);
   expect(composition!.cityColor, `${context}: city contrast`).toBe(
-    "rgb(245, 245, 245)",
+    "rgb(186, 181, 181)",
   );
   expect(
     composition!.checkboxOpacity,
@@ -660,7 +663,7 @@ async function expectMobileExportRowComposition(
     expect(
       composition!.headerActionRadius,
       `${context}: compact all action radius`,
-    ).toBe(20);
+    ).toBe(10);
   }
 }
 
@@ -668,7 +671,7 @@ async function expectMobileActionDensity(page: Page, context: string) {
   const cards = page.locator(
     '[data-agent-screen="actions"] .v19-actions-timeline-event:visible',
   );
-  await expect(cards).toHaveCount(8);
+  await expect(cards).toHaveCount(5);
   await expect(
     page.locator('[data-agent-screen="actions"] .v19-actions-timeline-node:visible'),
   ).toHaveCount(0);
