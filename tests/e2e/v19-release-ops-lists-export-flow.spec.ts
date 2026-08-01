@@ -21,9 +21,7 @@ test.describe("V-19 release ops lists export flow", () => {
 
     await clickWorkspaceButton(page, /Проверка|Работа/);
     await expect(submissionCardById(page, "ПД-1053")).toBeVisible();
-    await expect(submissionCardById(page, "ПД-1053")).toContainText(
-      "Агент VisaFlow",
-    );
+    await expect(submissionCardById(page, "ПД-1053")).toContainText("Агент VisaFlow");
     await submissionCardById(page, "ПД-1053").click();
     const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
     await expect(reviewWorkspace).toBeVisible();
@@ -31,14 +29,8 @@ test.describe("V-19 release ops lists export flow", () => {
     await expect(
       reviewWorkspace.getByRole("tab", { name: "Паспорт", exact: true }),
     ).toHaveAttribute("aria-selected", "true");
-    await expect(
-      reviewWorkspace
-        .getByText(/Нина Волкова/)
-        .first(),
-    ).toBeVisible();
-    await reviewWorkspace
-      .getByRole("button", { name: "Вернуться к очереди" })
-      .click();
+    await expect(reviewWorkspace.getByText(/Нина Волкова/).first()).toBeVisible();
+    await reviewWorkspace.getByRole("button", { name: "Вернуться к очереди" }).click();
 
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
@@ -49,9 +41,7 @@ test.describe("V-19 release ops lists export flow", () => {
     await cityFilter.click();
     await page.getByRole("option", { name: "Москва" }).click();
     await expect(cityFilter).toHaveAccessibleName("Фильтр городов: Москва");
-    await expect(
-      page.getByTestId("admin-export-row-ПД-1054"),
-    ).toBeVisible();
+    await expect(page.getByTestId("admin-export-row-ПД-1054")).toBeVisible();
 
     await cityFilter.click();
     await page.getByRole("option", { name: "Города", exact: true }).click();
@@ -69,9 +59,7 @@ test.describe("V-19 release ops lists export flow", () => {
     await agentFilter.click();
     await page.getByRole("option", { name: "Все агенты" }).click();
     await page.getByLabel("ID, семья или агент").fill("SUB-1102");
-    await expect(
-      page.getByTestId("admin-export-row-SUB-1102"),
-    ).toBeVisible();
+    await expect(page.getByTestId("admin-export-row-SUB-1102")).toBeVisible();
     await expect(page.locator(".export-row")).toHaveCount(1);
     await page.getByLabel("ID, семья или агент").fill("");
 
@@ -83,19 +71,19 @@ test.describe("V-19 release ops lists export flow", () => {
     await clearExportSelection(page);
     await familyRow.getByRole("checkbox").check();
     await singleRow.getByRole("checkbox").check();
-    await expect(page.getByRole("complementary", { name: "Контроль пакета" })).toContainText(
-      /2 пакета/,
-    );
     await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toBeEnabled();
-    await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    await expect(page.getByRole("link", { name: "Скачать Excel" })).toBeVisible();
+      page.getByRole("complementary", { name: "Контроль пакета" }),
+    ).toContainText(/2 пакета/);
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
+    const excelDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Скачать Excel" }).click();
+    await excelDownload;
+    await expect(page.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
 
     await clearExportSelection(page);
     await page.getByRole("button", { name: "Стоп" }).click();
     await expect(page.getByText("Пакетов с ограничениями нет")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Сформировать Excel" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
 
     await openFreshWorkspace(page, {
       heading: "Мои действия",

@@ -622,33 +622,13 @@
       var(--v19b-color-primary) 20%,
       var(--v19b-color-border)
     );
-    box-shadow: inset var(--v19b-size-3) 0 0
+    border-left: var(--v19b-size-3) solid
       color-mix(in srgb, var(--v19b-color-primary) 72%, transparent);
-  }
-
-  #root
-    .v19-admin-workspace-root
-    .v19-review-watchlist
-    .v19-review-watch-item:nth-child(3n + 1) {
-    border-left-color: var(--v19b-color-primary);
-  }
-
-  #root
-    .v19-admin-workspace-root
-    .v19-review-watchlist
-    .v19-review-watch-item:nth-child(3n + 2) {
-    border-left-color: var(--v19b-dot-warning);
-  }
-
-  #root
-    .v19-admin-workspace-root
-    .v19-review-watchlist
-    .v19-review-watch-item:nth-child(3n) {
-    border-left-color: var(--v19b-dot-success);
+    box-shadow: none;
   }
 
   #root .v19-admin-workspace-root .v19-review-watchlist .v19-review-watch-item {
-    border-left-width: var(--v19b-size-3);
+    border-left: var(--v19b-size-1) solid var(--v19b-color-border);
   }
 
   #root .v19-admin-workspace-root .v19-admin-export-rail-v2.is-mobile-open {
@@ -706,26 +686,34 @@
   #root
     .v19-admin-workspace-root
     .v19-admin-export-row-v2:not(.is-selected):not(.is-blocked) {
-    border-color: color-mix(in srgb, var(--v19b-color-border) 84%, transparent);
-    background: color-mix(in srgb, var(--v19b-color-panel) 82%, var(--v19b-color-app));
+    border-color: #3e3a4a;
+    background: #242324;
   }
 
-  #root .v19-admin-workspace-root .v19-admin-export-row-v2 > input {
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-screen-v2
+    .v19-admin-export-row-v2
+    > input {
     position: static;
-    width: var(--v19b-size-18) !important;
-    min-width: var(--v19b-size-18);
-    height: var(--v19b-size-18) !important;
-    min-height: var(--v19b-size-18);
+    width: var(--v19b-size-16) !important;
+    min-width: var(--v19b-size-16);
+    height: var(--v19b-size-16) !important;
+    min-height: var(--v19b-size-16);
     grid-column: 2;
     grid-row: 1;
     align-self: start;
     justify-self: end;
-    margin: 0;
+    margin: 0 var(--v19b-size-16) 0 0;
+    /* Native checkboxes ignore padding; translate provides the requested 4px visual inset. */
+    transform: translateX(calc(var(--v19b-size-4) * -1));
     accent-color: color-mix(
       in srgb,
       var(--v19b-color-primary) 62%,
       var(--v19b-color-text-muted)
     );
+    font-size: var(--v19b-size-12);
+    font-weight: 500;
     opacity: 0.72;
   }
 
@@ -759,6 +747,7 @@
     grid-template-columns: minmax(0, max-content) max-content !important;
     align-items: baseline;
     gap: var(--v19b-size-6);
+    margin-left: var(--v19b-size-6);
   }
 
   #root
@@ -789,8 +778,10 @@
     border: var(--v19b-size-1) solid var(--v19b-color-border);
     border-radius: var(--v19b-radius-pill);
     background: var(--v19b-color-app);
-    color: var(--v19b-color-text-muted);
-    font-size: var(--v19b-size-10);
+    color: #f5f5f5;
+    background-color: #040e15;
+    font-size: var(--v19b-size-8);
+    font-weight: 500;
     line-height: calc(var(--v19b-size-20) - var(--v19b-size-2));
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -829,7 +820,7 @@
     grid-column: 2;
     grid-row: 2;
     align-self: stretch;
-    padding: 0 var(--v19b-size-10);
+    padding: 0;
     overflow: hidden;
     border: var(--v19b-size-1) solid var(--v19b-color-border);
     border-radius: 0 var(--v19b-radius-control) var(--v19b-radius-control) 0;
@@ -848,10 +839,22 @@
   #root
     .v19-admin-workspace-root
     .v19-admin-export-row-v2
+    > .v19-admin-export-row-dates-v2
+    .v19-admin-export-row-value-v2 {
+    color: #f5f5f5;
+    font-size: var(--v19b-size-13);
+    font-weight: 500;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-row-v2
     > .v19-admin-export-row-city-v2
     .v19-admin-export-row-value-v2 {
     min-width: 0;
     overflow: hidden;
+    color: #f5f5f5;
+    font-size: var(--v19b-size-13);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -973,7 +976,7 @@
     .v19-admin-workspace-root
     .ops-shell.surface-admin-review
     .v19-admin-toolbar-controls
-    > .v19-admin-toolbar-select:nth-child(2),
+    > .v19-admin-toolbar-select:not(:first-child),
   #root
     .v19-admin-workspace-root
     .ops-shell.surface-admin-review
@@ -986,9 +989,7 @@
     .ops-shell.surface-admin-review
     .v19-admin-review-board
     .v19-admin-queue-toolbar.v19-two-row-toolbar {
-    grid-template-columns:
-      minmax(0, 1fr) var(--v19b-size-128)
-      var(--v19b-size-44) !important;
+    grid-template-columns: minmax(0, 1fr) var(--v19b-size-44) !important;
     grid-template-rows: var(--v19b-size-44) !important;
   }
 
@@ -996,11 +997,7 @@
     .v19-admin-workspace-root
     .ops-shell.surface-admin-review
     .v19-two-row-toolbar-filters {
-    grid-column: 2;
-    grid-row: 1;
-    width: var(--v19b-size-128) !important;
-    min-width: var(--v19b-size-128) !important;
-    height: var(--v19b-size-44) !important;
+    display: none !important;
   }
 
   #root
@@ -1088,7 +1085,7 @@
     .v19-review-mobile-filters {
     position: relative;
     display: block;
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1;
     width: var(--v19b-size-44);
     min-width: var(--v19b-size-44);
@@ -1181,12 +1178,13 @@
     right: 0;
     display: grid;
     width: min(calc(100vw - var(--v19b-size-48)), var(--v19b-size-320));
-    gap: var(--v19b-size-8);
+    gap: var(--v19b-size-1);
     padding: var(--v19b-size-10);
     border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
     border-radius: var(--v19b-radius-card);
     background: var(--v19b-color-panel-strong);
     box-shadow: 0 var(--v19b-size-16) var(--v19b-size-32) rgb(0 0 0 / 0.32);
+    overflow: visible;
   }
 
   #root
@@ -1196,6 +1194,28 @@
     > div
     .v19-admin-toolbar-select {
     width: 100%;
+    min-height: var(--v19b-size-64);
+    border: var(--v19b-size-1) solid var(--v19b-color-border);
+    border-radius: 0;
+    background: var(--v19b-color-control);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-review-mobile-filters
+    > div
+    .v19-admin-toolbar-select:first-child {
+    border-radius: var(--v19b-radius-control) var(--v19b-radius-control) 0 0;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-review-mobile-filters
+    > div
+    .v19-admin-toolbar-select:last-child {
+    border-radius: 0 0 var(--v19b-radius-control) var(--v19b-radius-control);
   }
 
   #root
@@ -1205,7 +1225,35 @@
     > div
     .v19-admin-toolbar-select-trigger {
     width: 100%;
-    min-height: var(--v19b-size-40);
+    min-height: var(--v19b-size-64);
+    grid-template-columns: var(--v19b-size-18) !important;
+    place-content: center;
+    padding: 0 !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-review-mobile-filters
+    > div
+    .v19-admin-toolbar-select-trigger
+    :is(
+      .v19-admin-toolbar-select-label,
+      .v19-admin-toolbar-select-value,
+      .v19-admin-toolbar-select-chevron
+    ) {
+    display: none !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-review-mobile-filters
+    > div
+    .v19-admin-toolbar-select-icon {
+    width: var(--v19b-size-18);
+    height: var(--v19b-size-18);
+    margin: 0;
   }
 
   #root
@@ -1500,6 +1548,741 @@
   }
 }
 
+/* Keep the annotated review cell composition stable at every viewport.
+   Breakpoints may tune density, but must not turn the card back into a table row. */
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-entry {
+  container-type: inline-size;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row {
+  display: grid;
+  grid-template-areas:
+    "identity"
+    "priority"
+    "readiness"
+    "signals"
+    "open";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(5, auto);
+  gap: 0;
+  min-height: 0;
+  padding: clamp(var(--v19b-size-12), 1.6cqw, var(--v19b-size-16));
+  border-radius: clamp(var(--v19b-size-12), 1.2cqw, var(--v19b-size-16));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-rank {
+  position: absolute;
+  z-index: 2;
+  top: clamp(var(--v19b-size-12), 1.6cqw, var(--v19b-size-16));
+  right: clamp(var(--v19b-size-12), 1.6cqw, var(--v19b-size-16));
+  width: clamp(var(--v19b-size-32), 4cqw, var(--v19b-size-44));
+  height: clamp(var(--v19b-size-32), 4cqw, var(--v19b-size-44));
+  border-radius: clamp(var(--v19b-size-9), 1.2cqw, var(--v19b-size-12));
+  font-size: clamp(var(--v19b-size-9), 1.2cqw, var(--v19b-size-12));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-identity {
+  gap: clamp(var(--v19b-size-4), 0.6cqw, var(--v19b-size-6));
+  padding-right: clamp(var(--v19b-size-48), 6cqw, var(--v19b-size-60));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-overline {
+  font-size: clamp(var(--v19b-size-10), 1.2cqw, var(--v19b-size-12));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-identity
+  > strong {
+  font-size: clamp(var(--v19b-size-16), 1.9cqw, var(--v19b-size-18));
+  line-height: 1.18;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-identity
+  > small {
+  font-size: clamp(var(--v19b-size-10), 1.2cqw, var(--v19b-size-12));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  :is(
+    .v19-review-row-identity > em,
+    .v19-review-row-time-separator,
+    .v19-review-row-time,
+    .v19-review-row-priority > small
+  ) {
+  display: none;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-priority {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(var(--v19b-size-8), 1.2cqw, var(--v19b-size-12));
+  margin-top: clamp(var(--v19b-size-12), 1.6cqw, var(--v19b-size-16));
+  padding: clamp(var(--v19b-size-10), 1.4cqw, var(--v19b-size-14));
+  border: var(--v19b-size-1) solid
+    color-mix(in srgb, var(--v19-review-row-accent) 18%, var(--v19b-color-border));
+  border-radius: clamp(var(--v19b-size-10), 1.4cqw, var(--v19b-size-14));
+  background: color-mix(
+    in srgb,
+    var(--v19-review-row-accent) 4%,
+    var(--v19b-color-app)
+  );
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-priority
+  > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #c7ccd6;
+  font-size: clamp(var(--v19b-size-12), 1.5cqw, var(--v19b-size-16));
+  font-weight: 650;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-priority-badge {
+  min-height: clamp(var(--v19b-size-24), 3cqw, var(--v19b-size-32));
+  padding-inline: clamp(var(--v19b-size-8), 1.2cqw, var(--v19b-size-12));
+  font-size: clamp(var(--v19b-size-9), 1.1cqw, var(--v19b-size-12));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-priority-badge
+  strong {
+  font-size: inherit;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-readiness {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(var(--v19b-size-12), 2cqw, var(--v19b-size-20));
+  margin-top: clamp(var(--v19b-size-12), 1.6cqw, var(--v19b-size-16));
+  padding-inline: clamp(var(--v19b-size-2), 0.7cqw, var(--v19b-size-6));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-progress
+  > div,
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-progress
+  > div
+  strong {
+  font-size: clamp(var(--v19b-size-9), 1.1cqw, var(--v19b-size-11));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-progress-track {
+  height: clamp(var(--v19b-size-3), 0.45cqw, var(--v19b-size-4));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-signals {
+  display: grid;
+  min-height: clamp(var(--v19b-size-40), 5cqw, var(--v19b-size-52));
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--v19b-size-10);
+  margin-top: clamp(var(--v19b-size-12), 1.6cqw, var(--v19b-size-16));
+  padding: clamp(var(--v19b-size-10), 1.4cqw, var(--v19b-size-14))
+    clamp(var(--v19b-size-2), 0.7cqw, var(--v19b-size-6)) 0;
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+  border-left: 0;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-trip-label {
+  font-size: clamp(var(--v19b-size-10), 1.3cqw, var(--v19b-size-13));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-signal-chips
+  > span {
+  min-height: clamp(var(--v19b-size-20), 2.8cqw, var(--v19b-size-28));
+  padding-inline: clamp(var(--v19b-size-6), 1cqw, var(--v19b-size-10));
+  font-size: clamp(var(--v19b-size-8), 1.1cqw, var(--v19b-size-11));
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-row-open {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: clamp(var(--v19b-size-44), 5cqw, var(--v19b-size-52));
+  align-self: stretch;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v19b-size-12);
+  margin-top: clamp(var(--v19b-size-12), 1.6cqw, var(--v19b-size-16));
+  padding: 0 clamp(var(--v19b-size-12), 1.8cqw, var(--v19b-size-18));
+  border: var(--v19b-size-1) solid
+    color-mix(in srgb, var(--v19-review-row-accent) 24%, var(--v19b-color-border));
+  border-radius: clamp(var(--v19b-size-10), 1.4cqw, var(--v19b-size-14));
+  background: color-mix(in srgb, var(--v19-review-row-accent) 7%, transparent);
+  color: var(--v19b-color-text-muted);
+  font-size: clamp(var(--v19b-size-10), 1.3cqw, var(--v19b-size-13));
+}
+
+@media (max-width: 360px) {
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-row-priority {
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--v19b-size-6);
+    padding-inline: var(--v19b-size-8);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-row-priority
+    > strong {
+    font-size: var(--v19b-size-11);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-board
+    .v19-two-row-toolbar-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-board
+    .v19-admin-toolbar-controls {
+    display: contents;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-board
+    :is(.v19-admin-toolbar-select, .v19-admin-city-filter) {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Export toolbar controls use one deliberate interaction language without
+   changing the shared Review/Agent toolbar geometry. */
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  :is(.v19-admin-toolbar-select, .v19-admin-city-filter) {
+  min-height: var(--v19b-size-44);
+  border-color: color-mix(in srgb, var(--v19b-color-border-strong) 88%, transparent);
+  border-radius: var(--v19b-radius-control);
+  background: color-mix(in srgb, var(--v19b-color-control) 88%, black);
+  box-shadow:
+    inset 0 var(--v19b-size-1) 0 rgb(255 255 255 / 0.035),
+    0 var(--v19b-size-1) var(--v19b-size-2) rgb(0 0 0 / 0.16);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  .v19-admin-toolbar-select-trigger {
+  min-height: var(--v19b-size-44);
+  gap: var(--v19b-size-10);
+  padding-inline: var(--v19b-size-12);
+  border-radius: inherit;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  .v19-admin-toolbar-select-icon {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  color: color-mix(in srgb, var(--v19b-color-primary-text) 78%, white);
+  stroke-width: 1.8;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  :is(.v19-admin-toolbar-select, .v19-admin-city-filter):hover {
+  border-color: color-mix(
+    in srgb,
+    var(--v19b-color-primary) 28%,
+    var(--v19b-color-border-selected)
+  );
+  color: var(--v19b-color-text-strong);
+  background: color-mix(
+    in srgb,
+    var(--v19b-color-primary) 7%,
+    var(--v19b-color-control)
+  );
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  :is(.v19-admin-toolbar-select, .v19-admin-city-filter):is(.is-open, .is-active) {
+  border-color: color-mix(
+    in srgb,
+    var(--v19b-color-primary) 54%,
+    var(--v19b-color-border-selected)
+  );
+  color: var(--v19b-color-text-strong);
+  background: color-mix(
+    in srgb,
+    var(--v19b-color-primary) 12%,
+    var(--v19b-color-control)
+  );
+  box-shadow:
+    inset 0 var(--v19b-size-1) 0 rgb(255 255 255 / 0.05),
+    0 0 0 var(--v19b-size-2)
+      color-mix(in srgb, var(--v19b-color-primary) 15%, transparent);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  :is(.v19-admin-toolbar-select, .v19-admin-city-filter):is(.is-open, .is-active)
+  .v19-admin-toolbar-select-icon {
+  color: color-mix(in srgb, var(--v19b-color-primary-text) 58%, white);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  .v19-admin-toolbar-select-trigger:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  .v19-admin-toolbar-select-menu {
+  gap: var(--v19b-size-4);
+  padding: var(--v19b-size-8);
+  border-color: var(--v19b-color-border-selected);
+  border-radius: var(--v19b-radius-card);
+  background: var(--v19b-color-panel-strong);
+  box-shadow: 0 var(--v19b-size-16) var(--v19b-size-32) rgb(0 0 0 / 0.34);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-workspace-v2
+  .v19-admin-queue-toolbar
+  .v19-admin-toolbar-select-menu
+  > button {
+  min-height: var(--v19b-size-42);
+  border-radius: var(--v19b-radius-control);
+}
+
+@media (max-width: 767px) {
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    grid-template-rows: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar
+    .v19-two-row-toolbar-filters {
+    gap: var(--v19b-size-6) !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar
+    :is(
+      .v19-admin-toolbar-controls > .v19-admin-toolbar-select,
+      .v19-admin-city-filter
+    ) {
+    width: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    flex-basis: var(--v19b-size-44) !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-trigger {
+    width: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    padding: 0 !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-icon {
+    width: var(--v19b-size-18);
+    height: var(--v19b-size-18);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar
+    :is(
+      .v19-admin-toolbar-controls > .v19-admin-toolbar-select,
+      .v19-admin-city-filter
+    ) {
+    width: var(--v19b-size-44);
+    min-width: var(--v19b-size-44);
+  }
+}
+
+/* Review and export use one compact trigger with the same stacked filter popover. */
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-admin-queue-toolbar:has(.v19-unified-filter-popover) {
+  grid-template-rows: var(--v19b-size-44) !important;
+  min-height: var(--v19b-size-44);
+  overflow: visible;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-admin-queue-toolbar:has(.v19-unified-filter-popover)
+  > .v19-two-row-toolbar-filters {
+  display: none !important;
+}
+
+#root .v19-admin-workspace-root .v19-unified-filter-popover {
+  position: relative;
+  z-index: 12;
+  display: block;
+  width: var(--v19b-size-44);
+  min-width: var(--v19b-size-44);
+  height: var(--v19b-size-44);
+  grid-column: 2;
+  grid-row: 1;
+}
+
+#root .v19-admin-workspace-root .v19-unified-filter-popover > summary {
+  position: relative;
+  display: grid;
+  width: var(--v19b-size-44);
+  min-width: var(--v19b-size-44);
+  height: var(--v19b-size-44);
+  min-height: var(--v19b-size-44);
+  grid-template-columns: var(--v19b-size-18);
+  place-content: center;
+  padding: 0;
+  border: var(--v19b-size-1) solid var(--v19b-color-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+  color: var(--v19b-color-primary-text);
+  list-style: none;
+  cursor: pointer;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-unified-filter-popover
+  > summary::-webkit-details-marker {
+  display: none;
+}
+
+#root .v19-admin-workspace-root .v19-unified-filter-popover > summary svg {
+  width: var(--v19b-size-18);
+  height: var(--v19b-size-18);
+}
+
+#root .v19-admin-workspace-root .v19-unified-filter-popover > summary strong {
+  position: absolute;
+  top: var(--v19b-size-3);
+  right: var(--v19b-size-3);
+  display: grid;
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  place-items: center;
+  border-radius: var(--v19b-radius-pill);
+  background: var(--v19b-color-tag);
+  color: var(--v19b-color-text);
+  font-size: var(--v19b-size-9);
+  font-variant-numeric: tabular-nums;
+}
+
+#root .v19-admin-workspace-root .v19-unified-filter-popover[open] > summary {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-primary-soft-10);
+  box-shadow: 0 0 0 var(--v19b-size-1)
+    color-mix(in srgb, var(--v19b-color-primary) 20%, transparent);
+}
+
+#root .v19-admin-workspace-root .v19-unified-filter-popover > div {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + var(--v19b-size-6));
+  right: 0;
+  display: grid;
+  width: min(calc(100vw - var(--v19b-size-48)), var(--v19b-size-320));
+  gap: var(--v19b-size-1);
+  padding: var(--v19b-size-10);
+  overflow: visible;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-card);
+  background: var(--v19b-color-panel-strong);
+  box-shadow: 0 var(--v19b-size-16) var(--v19b-size-32) rgb(0 0 0 / 0.34);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-unified-filter-popover
+  > div
+  .v19-admin-toolbar-select {
+  width: 100% !important;
+  min-width: 100% !important;
+  min-height: var(--v19b-size-64);
+  border: var(--v19b-size-1) solid var(--v19b-color-border);
+  border-radius: 0;
+  background: var(--v19b-color-control);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-unified-filter-popover
+  > div
+  .v19-admin-toolbar-select:first-child {
+  border-radius: var(--v19b-radius-control) var(--v19b-radius-control) 0 0;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-unified-filter-popover
+  > div
+  .v19-admin-toolbar-select:last-child {
+  border-radius: 0 0 var(--v19b-radius-control) var(--v19b-radius-control);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-unified-filter-popover
+  > div
+  .v19-admin-toolbar-select-trigger {
+  width: 100% !important;
+  min-width: 100% !important;
+  min-height: var(--v19b-size-64);
+  grid-template-columns: var(--v19b-size-18) !important;
+  place-content: center;
+  padding: 0 !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-unified-filter-popover
+  > div
+  .v19-admin-toolbar-select-trigger
+  :is(
+    .v19-admin-toolbar-select-label,
+    .v19-admin-toolbar-select-value,
+    .v19-admin-toolbar-select-chevron
+  ) {
+  display: none !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-unified-filter-popover
+  > div
+  .v19-admin-toolbar-select-icon {
+  width: var(--v19b-size-18);
+  height: var(--v19b-size-18);
+  margin: 0;
+}
+
+/* Blocking diagnostics stay neutral; amber is reserved for recovery guidance. */
+#root .v19-admin-workspace-root [data-testid="export-blocker-diagnostics"] {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-panel) !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  [data-testid="export-blocker-diagnostics"]
+  > div:first-of-type
+  > div:first-child {
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-muted) !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  [data-testid="export-blocker-diagnostics"]
+  > div:first-of-type
+  .text-\[var\(--v19b-admin-red\)\] {
+  color: var(--v19b-color-text-muted) !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  [data-testid="export-blocker-diagnostics"]
+  > .space-y-2
+  > div {
+  border-color: var(--v19b-color-border) !important;
+  background: var(--v19b-color-control) !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  [data-testid="export-blocker-diagnostics"]
+  > .space-y-2
+  > div
+  > div:last-child {
+  margin-inline: calc(var(--v19b-size-3) * -1);
+  padding: var(--v19b-size-10) var(--v19b-size-12);
+  border: var(--v19b-size-1) solid
+    color-mix(in srgb, var(--v19b-dot-warning) 34%, var(--v19b-color-border));
+  border-radius: var(--v19b-radius-control);
+  background: color-mix(in srgb, var(--v19b-dot-warning) 10%, var(--v19b-color-app));
+}
+
+#root
+  .v19-admin-workspace-root
+  [data-testid="export-blocker-diagnostics"]
+  > .space-y-2
+  > div
+  > div:last-child
+  > div {
+  color: color-mix(in srgb, var(--v19b-dot-warning) 74%, white) !important;
+}
+
+/* The export rail is intentionally content-first: blockers, summary, stats, action. */
+#root .v19-admin-workspace-root .v19-admin-export-rail-v2 {
+  position: sticky;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-rail-v2
+  .v19-admin-export-download-action-v2 {
+  z-index: 2;
+  margin-inline: calc(var(--v19b-size-4) * -1);
+  padding-inline: var(--v19b-size-4);
+  padding-bottom: var(--v19b-size-4);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--v19b-color-panel) 96%, transparent) var(--v19b-size-12)
+  );
+}
+
+@media (max-width: 1279px) {
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-rail-v2.is-mobile-open
+    .v19-admin-export-rail-close-floating-v2 {
+    position: absolute;
+    top: var(--v19b-size-12);
+    right: var(--v19b-size-12);
+    z-index: 4;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-rail-v2.is-mobile-open
+    .v19-admin-export-rail-content-v2 {
+    padding-top: var(--v19b-size-64) !important;
+  }
+}
+
 @media (max-width: 479px) {
   #root
     .v19-admin-workspace-root
@@ -1568,4 +2351,562 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+}
+
+/* Final queue controls: Review and Export expose three explicit filters beside
+   search. Each control owns its menu, so no extra summary row can drift or
+   cover the first card. */
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-admin-queue-toolbar:has(.v19-inline-filter-buttons) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  grid-template-rows: var(--v19b-size-44) !important;
+  align-items: center !important;
+  gap: var(--v19b-size-8) !important;
+  min-height: var(--v19b-size-44) !important;
+  padding: var(--v19b-size-12) !important;
+  overflow: visible !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-admin-queue-toolbar:has(.v19-inline-filter-buttons)
+  > .v19-two-row-toolbar-filters {
+  display: none !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-admin-queue-toolbar:has(.v19-inline-filter-buttons)
+  > .v19-two-row-toolbar-search-row {
+  display: contents !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-admin-queue-toolbar:has(.v19-inline-filter-buttons)
+  .v19-admin-queue-toolbar-search {
+  min-width: 0 !important;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+#root .v19-admin-workspace-root .v19-inline-filter-buttons {
+  display: flex;
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  gap: var(--v19b-size-8);
+}
+
+#root .v19-admin-workspace-root .v19-inline-filter-buttons > .v19-admin-toolbar-select {
+  width: var(--v19b-size-44) !important;
+  min-width: var(--v19b-size-44) !important;
+  height: var(--v19b-size-44) !important;
+  min-height: var(--v19b-size-44) !important;
+  flex: 0 0 var(--v19b-size-44) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-control);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-inline-filter-buttons
+  > .v19-admin-toolbar-select:is(.is-active, .is-open) {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-primary-soft-10);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-inline-filter-buttons
+  .v19-admin-toolbar-select-trigger {
+  width: 100% !important;
+  min-width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  grid-template-columns: var(--v19b-size-18) !important;
+  place-content: center;
+  padding: 0 !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-inline-filter-buttons
+  .v19-admin-toolbar-select-trigger
+  :is(
+    .v19-admin-toolbar-select-label,
+    .v19-admin-toolbar-select-value,
+    .v19-admin-toolbar-select-chevron
+  ) {
+  display: none !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-inline-filter-buttons
+  .v19-admin-toolbar-select-icon {
+  width: var(--v19b-size-18);
+  height: var(--v19b-size-18);
+  margin: 0;
+  color: var(--v19b-color-primary-text);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-inline-filter-buttons
+  > .v19-admin-toolbar-select:nth-child(n + 2)
+  .v19-admin-toolbar-select-menu {
+  right: 0;
+  left: auto;
+}
+
+/* Export uses the compact two-line card contract at every viewport size. */
+#root .v19-admin-workspace-root .v19-admin-export-table-head-v2 {
+  display: none !important;
+}
+
+#root .v19-admin-workspace-root .v19-admin-export-screen-v2 .v19-admin-export-row-v2 {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(var(--v19b-size-144), 0.44fr) !important;
+  grid-template-rows: auto var(--v19b-size-48);
+  align-items: center;
+  gap: var(--v19b-size-10) 0;
+  min-height: 0;
+  padding: clamp(var(--v19b-size-12), 2vw, var(--v19b-size-16));
+  border-color: #3e3a4a;
+  border-radius: var(--v19b-radius-card);
+  background: #242324;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-screen-v2
+  .v19-admin-export-row-v2.is-selected {
+  border-color: var(--v19b-color-border-selected);
+  background: var(--v19b-color-primary-soft-10);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-screen-v2
+  .v19-admin-export-row-v2.is-blocked {
+  border-color: var(--v19b-admin-red-border);
+  background: color-mix(in srgb, var(--v19b-admin-red-soft) 28%, #242324);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-screen-v2
+  .v19-admin-export-row-v2
+  > input {
+  position: static;
+  width: var(--v19b-size-16) !important;
+  min-width: var(--v19b-size-16);
+  height: var(--v19b-size-16) !important;
+  min-height: var(--v19b-size-16);
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  justify-self: end;
+  margin: 0 var(--v19b-size-16) 0 0;
+  padding: 0;
+  overflow: visible;
+  clip: auto;
+  transform: none;
+  accent-color: color-mix(
+    in srgb,
+    var(--v19b-color-primary) 62%,
+    var(--v19b-color-text-muted)
+  );
+  opacity: 0.72;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-screen-v2
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-identity-v2 {
+  display: block;
+  min-width: 0;
+  grid-column: 1;
+  grid-row: 1;
+  padding-right: 0;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-identity-v2
+  > .v19-admin-export-row-icon-v2,
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-agent-v2 {
+  display: none !important;
+}
+
+#root .v19-admin-workspace-root .v19-admin-export-row-v2 .v19-admin-export-row-copy-v2 {
+  display: flex !important;
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--v19b-size-8);
+  margin-left: var(--v19b-size-6);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  .v19-admin-export-row-title-v2 {
+  order: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--v19b-color-text-strong);
+  font-size: var(--v19b-size-15);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  .v19-admin-export-row-public-id-v2 {
+  order: 2;
+  width: max-content;
+  min-height: var(--v19b-size-20);
+  flex: none;
+  padding: 0 var(--v19b-size-8);
+  overflow: hidden;
+  border: var(--v19b-size-1) solid var(--v19b-color-border);
+  border-radius: var(--v19b-radius-pill);
+  color: #f5f5f5;
+  background: #040e15;
+  font-size: var(--v19b-size-8);
+  font-weight: 500;
+  line-height: calc(var(--v19b-size-20) - var(--v19b-size-2));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > :is(.v19-admin-export-row-dates-v2, .v19-admin-export-row-city-v2) {
+  position: static;
+  display: flex;
+  width: 100%;
+  max-width: none;
+  height: var(--v19b-size-48);
+  min-height: var(--v19b-size-48);
+  align-self: stretch;
+  padding: 0 var(--v19b-size-12);
+  overflow: hidden;
+  border: var(--v19b-size-1) solid var(--v19b-color-border);
+  background: var(--v19b-color-app);
+  column-gap: var(--v19b-size-6);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-dates-v2 {
+  grid-column: 1;
+  grid-row: 2;
+  border-right: 0;
+  border-radius: var(--v19b-radius-control) 0 0 var(--v19b-radius-control);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-city-v2 {
+  grid-column: 2;
+  grid-row: 2;
+  align-items: center;
+  padding-inline: 0;
+  border-radius: 0 var(--v19b-radius-control) var(--v19b-radius-control) 0;
+  gap: var(--v19b-size-2);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-city-v2
+  .v19-admin-export-row-icon-v2,
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-city-v2
+  .v19-admin-export-row-icon-v2
+  > svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  flex: none;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-city-v2
+  .v19-admin-export-row-icon-v2 {
+  display: inline-grid;
+  place-items: center;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-city-v2
+  .v19-admin-export-row-icon-v2
+  > svg {
+  display: block;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  :is(.v19-admin-export-row-dates-v2, .v19-admin-export-row-city-v2)
+  .v19-admin-export-row-label-v2 {
+  display: none;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  :is(.v19-admin-export-row-dates-v2, .v19-admin-export-row-city-v2)
+  .v19-admin-export-row-value-v2 {
+  min-width: 0;
+  overflow: hidden;
+  color: #f5f5f5;
+  font-size: var(--v19b-size-13);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > .v19-admin-export-row-city-v2
+  .v19-admin-export-row-value-v2 {
+  line-height: 1;
+}
+
+/* Review card rhythm from the final annotations. */
+#root
+  .v19-admin-workspace-root
+  .v19-admin-review-screen
+  .v19-review-row-identity
+  > strong {
+  margin-block: var(--v19b-size-2);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-review-screen
+  .v19-review-priority-badge.is-attention {
+  margin-left: var(--v19b-size-4);
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-review-screen
+  .v19-review-row-priority
+  > strong {
+  color: #c7ccd6;
+}
+
+@media (max-width: 767px) {
+  #root
+    .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    > .workspace {
+    padding-bottom: 0 !important;
+  }
+
+  #root .v19-admin-workspace-root .v19-inline-filter-buttons {
+    gap: var(--v19b-size-4);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-inline-filter-buttons
+    > .v19-admin-toolbar-select {
+    width: var(--v19b-size-40) !important;
+    min-width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    flex-basis: var(--v19b-size-40) !important;
+  }
+
+  #root .v19-admin-workspace-root .v19-admin-export-workspace-v2 > .min-h-0.flex-1 {
+    min-height: 0 !important;
+    flex: none !important;
+    overflow-y: visible !important;
+  }
+}
+
+/* Review keeps all three icon-only queue filters inside the mobile toolbar. */
+@media (max-width: 767px) {
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-board
+    .v19-admin-queue-toolbar:has(.v19-inline-filter-buttons) {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+  }
+}
+
+/* Keep the three icon-only Admin filters visually identical to the standalone
+   controls used by Agent submissions. */
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-inline-filter-buttons
+  > .v19-admin-toolbar-select {
+  overflow: visible;
+  border-color: var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  color: var(--v19b-color-text-muted) !important;
+  background: var(--v19b-color-app) !important;
+  box-shadow: none !important;
+  transition:
+    border-color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    color var(--v19b-motion-fast),
+    box-shadow var(--v19b-motion-fast);
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-inline-filter-buttons
+  > .v19-admin-toolbar-select:hover {
+  border-color: var(--v19b-color-border-selected) !important;
+  color: var(--v19b-color-text) !important;
+  background: var(--v19b-color-control) !important;
+  box-shadow: none !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-inline-filter-buttons
+  > .v19-admin-toolbar-select:is(.is-active, .is-open) {
+  border-color: transparent !important;
+  color: var(--v19b-color-primary-text) !important;
+  background: var(--vf-accent-soft) !important;
+  box-shadow: 0 0 0 var(--v19b-size-2) var(--vf-accent-soft) !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-inline-filter-buttons
+  .v19-admin-toolbar-select-trigger {
+  border-radius: inherit;
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-inline-filter-buttons
+  .v19-admin-toolbar-select-trigger:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
+#root
+  .v19-admin-workspace-root
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+  .v19-inline-filter-buttons
+  .v19-admin-toolbar-select-icon {
+  stroke-width: 1.9;
+}
+
+/* Keep the shared Linear-style list action rectangular on admin mobile too;
+   the historical export override above otherwise restores a pill radius. */
+#root .v19-admin-workspace-root .v19-admin-list-header > button {
+  border-radius: var(--v19b-radius-control) !important;
+}
+
+/* Admin Review and Export reuse the same separated compact filter controls as
+   Agent submissions on phone-width workspaces. */
+@media (max-width: 767px) {
+  #root
+    .v19-admin-workspace-root
+    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-inline-filter-buttons {
+    column-gap: var(--v19b-size-6) !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-inline-filter-buttons
+    > .v19-admin-toolbar-select {
+    box-sizing: border-box;
+    width: var(--v19b-size-40) !important;
+    min-width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    flex: 0 0 var(--v19b-size-40) !important;
+    overflow: visible;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-control) !important;
+    color: var(--v19b-color-text-muted) !important;
+    background: var(--v19b-color-app) !important;
+    box-shadow: none !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select-trigger {
+    width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    border-radius: inherit;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select
+    :is(
+      .v19-admin-toolbar-select-label,
+      .v19-admin-toolbar-select-value,
+      .v19-admin-toolbar-select-chevron
+    ) {
+    display: none !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select-icon {
+    width: var(--v19b-size-16);
+    height: var(--v19b-size-16);
+    margin: 0;
+  }
 }

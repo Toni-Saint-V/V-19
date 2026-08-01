@@ -2,7 +2,6 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
-  ArrowUpDown,
   ArrowUpRight,
   Bot,
   CheckCircle2,
@@ -11,10 +10,8 @@ import {
   MessageSquareWarning,
   MapPin,
   Plane,
-  RotateCcw,
   ShieldCheck,
   Shapes,
-  SlidersHorizontal,
   User,
   Users,
   X,
@@ -501,37 +498,36 @@ export function ReviewScreen({
     setTypeFilter("all");
   }, []);
 
-  const focusTabs: Array<{
+  const laneFilterOptions: Array<{
     count: number;
     id: Lane | "all";
     label: string;
-    mobileLabel: string;
   }> = [
     {
       count: filteredReviews.length,
       id: "all",
       label: "Вся очередь",
-      mobileLabel: "Все",
     },
     {
       count: laneCounts.urgent,
       id: "urgent",
-      label: "Критично",
-      mobileLabel: "Срочно",
+      label: "Срочно",
     },
     {
       count: laneCounts.review,
       id: "review",
       label: "Первичная проверка",
-      mobileLabel: "Первич.",
     },
     {
       count: laneCounts.returned,
       id: "returned",
-      label: "Исправления",
-      mobileLabel: "Правки",
+      label: "Правки",
     },
   ];
+  const laneOptions = laneFilterOptions.map((option) => ({
+    label: `${option.label} · ${option.count}`,
+    value: option.id,
+  }));
 
   return (
     <motion.div {...surfaceMotion} className="v19-admin-screen v19-admin-review-screen">
@@ -590,50 +586,27 @@ export function ReviewScreen({
             title="Очередь проверки"
           />
 
-          <div
-            aria-label="Фокус очереди"
-            className="v19-review-focus-tabs"
-            role="tablist"
-          >
-            {focusTabs.map((tab) => (
-              <button
-                aria-label={`${tab.label} ${tab.count}`}
-                aria-selected={activeLane === tab.id}
-                className={activeLane === tab.id ? "is-active" : ""}
-                key={tab.id}
-                role="tab"
-                type="button"
-                onClick={() => setActiveLane(tab.id)}
-              >
-                <span className="v19-review-focus-label">{tab.label}</span>
-                <span className="v19-review-focus-label-mobile" aria-hidden="true">
-                  {tab.mobileLabel}
-                </span>
-                <strong>{tab.count}</strong>
-              </button>
-            ))}
-          </div>
-
           <AdminQueueToolbar
-            actionDisabled={!hasActiveFilters}
-            actionIcon={RotateCcw}
             cityFilter={cityFilter}
             cityOptions={cityOptions}
-            filterLabel="Сбросить фильтры"
-            controls={
-              <>
-                <AdminToolbarSelect<AdminReviewSort>
-                  icon={ArrowUpDown}
-                  label="Сортировка"
-                  value={sortBy}
-                  onChange={setSortBy}
-                  options={[
-                    { value: "priority", label: "По приоритету" },
-                    { value: "tripDate", label: "По дате вылета" },
-                    { value: "createdAt", label: "По дате создания" },
-                  ]}
+            onCityFilterChange={setCityFilter}
+            onSearchChange={setSearchQuery}
+            searchAction={
+              <div
+                aria-label="Фильтры очереди"
+                className="v19-inline-filter-buttons"
+                role="group"
+              >
+                <AdminToolbarSelect<Lane | "all">
+                  className={`v19-review-lane-filter ${activeLane !== "all" ? "is-active" : ""}`}
+                  icon={ListChecks}
+                  label="Этап"
+                  value={activeLane}
+                  onChange={setActiveLane}
+                  options={laneOptions}
                 />
                 <AdminToolbarSelect<AdminReviewTypeFilter>
+                  className={typeFilter !== "all" ? "is-active" : ""}
                   icon={Shapes}
                   label="Тип"
                   value={typeFilter}
@@ -644,50 +617,22 @@ export function ReviewScreen({
                     { value: "single", label: "Заявители" },
                   ]}
                 />
-              </>
-            }
-            onCityFilterChange={setCityFilter}
-            onFilterClick={resetQueueView}
-            onSearchChange={setSearchQuery}
-            searchAction={
-              <details className="v19-review-mobile-filters">
-                <summary aria-label="Дополнительные фильтры">
-                  <SlidersHorizontal aria-hidden="true" />
-                  <span className="sr-only">Фильтры</span>
-                  {typeFilter !== "all" || cityFilter !== "Все города" ? (
-                    <strong>
-                      {Number(typeFilter !== "all") +
-                        Number(cityFilter !== "Все города")}
-                    </strong>
-                  ) : null}
-                </summary>
-                <div>
-                  <AdminToolbarSelect<AdminReviewTypeFilter>
-                    icon={Shapes}
-                    label="Тип"
-                    value={typeFilter}
-                    onChange={setTypeFilter}
-                    options={[
-                      { value: "all", label: "Все типы" },
-                      { value: "family", label: "Семьи" },
-                      { value: "single", label: "Заявители" },
-                    ]}
-                  />
-                  <AdminToolbarSelect<string>
-                    icon={MapPin}
-                    label="Город"
-                    value={cityFilter}
-                    onChange={setCityFilter}
-                    options={cityOptions.map((city) => ({
-                      value: city,
-                      label: city,
-                    }))}
-                  />
-                </div>
-              </details>
+                <AdminToolbarSelect<string>
+                  className={cityFilter !== "Все города" ? "is-active" : ""}
+                  icon={MapPin}
+                  label="Город"
+                  value={cityFilter}
+                  onChange={setCityFilter}
+                  options={cityOptions.map((city) => ({
+                    value: city,
+                    label: city,
+                  }))}
+                />
+              </div>
             }
             searchPlaceholder="ID, семья или агент"
             searchValue={searchQuery}
+            showCityFilter={false}
           />
 
           <div

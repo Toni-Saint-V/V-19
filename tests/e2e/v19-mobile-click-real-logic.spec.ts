@@ -59,36 +59,40 @@ async function expectCenterHitTarget(target: Locator, context: string) {
   await target.scrollIntoViewIfNeeded();
   await expect(target, context).toBeVisible();
 
-  const readHit = () => target.evaluate((element) => {
-    const browser = globalThis as unknown as BrowserGlobal;
-    const targetElement = element as unknown as BrowserElement;
-    const rect = targetElement.getBoundingClientRect();
-    const x = Math.min(Math.max(rect.left + rect.width / 2, 0), browser.innerWidth - 1);
-    const y = Math.min(
-      Math.max(rect.top + rect.height / 2, 0),
-      browser.innerHeight - 1,
-    );
-    const top = browser.document.elementFromPoint(x, y);
-    const footer = targetElement.closest?.("footer");
-    const dialogElement = targetElement.closest?.('[role="dialog"]');
-    const cover = top?.closest?.(
-      ".ops-mobile-tabbar, .mobile-create-dock, .v19-context-panel, .v19-context-backdrop, .ops-mobile-menu-backdrop",
-    );
+  const readHit = () =>
+    target.evaluate((element) => {
+      const browser = globalThis as unknown as BrowserGlobal;
+      const targetElement = element as unknown as BrowserElement;
+      const rect = targetElement.getBoundingClientRect();
+      const x = Math.min(
+        Math.max(rect.left + rect.width / 2, 0),
+        browser.innerWidth - 1,
+      );
+      const y = Math.min(
+        Math.max(rect.top + rect.height / 2, 0),
+        browser.innerHeight - 1,
+      );
+      const top = browser.document.elementFromPoint(x, y);
+      const footer = targetElement.closest?.("footer");
+      const dialogElement = targetElement.closest?.('[role="dialog"]');
+      const cover = top?.closest?.(
+        ".ops-mobile-tabbar, .mobile-create-dock, .v19-context-panel, .v19-context-backdrop, .ops-mobile-menu-backdrop",
+      );
 
-    return {
-      coverClass: cover?.getAttribute("class") ?? null,
-      ok: top === targetElement || targetElement.contains(top),
-      dialogRect: dialogElement?.getBoundingClientRect() ?? null,
-      footerRect: footer?.getBoundingClientRect() ?? null,
-      targetRect: rect,
-      targetPointerEvents: browser.getComputedStyle(targetElement).pointerEvents,
-      targetText:
-        targetElement.textContent?.trim().replace(/\s+/g, " ").slice(0, 120) ?? "",
-      topClass: top?.getAttribute("class") ?? null,
-      topText: top?.textContent?.trim().replace(/\s+/g, " ").slice(0, 120) ?? "",
-      viewport: { height: browser.innerHeight, width: browser.innerWidth },
-    };
-  });
+      return {
+        coverClass: cover?.getAttribute("class") ?? null,
+        ok: top === targetElement || targetElement.contains(top),
+        dialogRect: dialogElement?.getBoundingClientRect() ?? null,
+        footerRect: footer?.getBoundingClientRect() ?? null,
+        targetRect: rect,
+        targetPointerEvents: browser.getComputedStyle(targetElement).pointerEvents,
+        targetText:
+          targetElement.textContent?.trim().replace(/\s+/g, " ").slice(0, 120) ?? "",
+        topClass: top?.getAttribute("class") ?? null,
+        topText: top?.textContent?.trim().replace(/\s+/g, " ").slice(0, 120) ?? "",
+        viewport: { height: browser.innerHeight, width: browser.innerWidth },
+      };
+    });
 
   let hit = await readHit();
   if (!hit.ok) {
@@ -98,7 +102,10 @@ async function expectCenterHitTarget(target: Locator, context: string) {
           hit = await readHit();
           return hit.ok;
         },
-        { message: `${context}: wait for the animated surface to settle`, timeout: 3_000 },
+        {
+          message: `${context}: wait for the animated surface to settle`,
+          timeout: 3_000,
+        },
       )
       .toBe(true);
   }
@@ -231,32 +238,53 @@ test.describe("V-19 mobile click real logic", () => {
     await expectNoFixedLayerOverControls(page, "390 agent actions");
 
     const lastEventAction = page
-      .getByRole("button", { name: /^Открыть (действие|подачу):/ })
+      .getByRole("button", { name: /^Выбрать действие:/ })
       .last();
     await expectCenterHitTarget(lastEventAction, "390 actions last row action");
     await lastEventAction.click();
-    const questionnaireWorkspace = page.getByRole("heading", {
+    const mobileActionDetail = page.getByTestId("agent-action-mobile-detail");
+    await expect(mobileActionDetail).toBeVisible();
+    const primaryAction = mobileActionDetail.locator(
+      '[data-v19-interaction-id="actions.open-primary"]',
+    );
+    await expectCenterHitTarget(primaryAction, "390 actions inline primary action");
+    await expect(primaryAction).toBeEnabled();
+    await primaryAction.click();
+    const questionnaireWorkspace = page.locator(".v19-questionnaire-screen-shell");
+    const submissionsWorkspace = page.getByRole("heading", {
       level: 1,
-      name: /^Анкета:/,
+      name: "Мои подачи",
     });
     await expect
       .poll(async () => {
-        if (await drawer(page).isVisible().catch(() => false)) return "drawer";
+        if (
+          await drawer(page)
+            .isVisible()
+            .catch(() => false)
+        )
+          return "drawer";
         if (await questionnaireWorkspace.isVisible().catch(() => false)) {
           return "questionnaire";
         }
+        if (await submissionsWorkspace.isVisible().catch(() => false)) {
+          return "submissions";
+        }
         return "none";
       })
-      .toMatch(/drawer|questionnaire/);
+      .toMatch(/drawer|questionnaire|submissions/);
 
-    if (await drawer(page).isVisible().catch(() => false)) {
+    if (
+      await drawer(page)
+        .isVisible()
+        .catch(() => false)
+    ) {
       await expectCenterHitTarget(
         drawerCloseButton(page),
         "390 drawer close from action row",
       );
       await drawerCloseButton(page).click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
-    } else {
+    } else if (await questionnaireWorkspace.isVisible().catch(() => false)) {
       const backToActions = page.getByRole("button", { name: "Назад" });
       await expectCenterHitTarget(backToActions, "390 questionnaire back to actions");
       await backToActions.click();
@@ -297,10 +325,7 @@ test.describe("V-19 mobile click real logic", () => {
     await expect(drawer(page)).toBeVisible();
     await expect(page.locator(".ops-mobile-tabbar")).toBeHidden();
     await expect(page.locator(".mobile-create-dock")).toBeHidden();
-    await expectCenterHitTarget(
-      drawerCloseButton(page),
-      "390 submission drawer close",
-    );
+    await expectCenterHitTarget(drawerCloseButton(page), "390 submission drawer close");
     await expectNoHorizontalOverflow(page, "390 submission drawer");
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
@@ -380,15 +405,10 @@ test.describe("V-19 mobile click real logic", () => {
     });
     await expect(controlPanel).toBeVisible();
     const continueExport = controlPanel.getByRole("button", {
-      name: "Сформировать ZIP с Excel",
+      name: "Скачать Excel",
     });
-    await expectCenterHitTarget(
-      continueExport,
-      "390 export generate CTA",
-    );
-    await controlPanel
-      .getByRole("button", { name: "Закрыть контроль пакета" })
-      .click();
+    await expectCenterHitTarget(continueExport, "390 Excel export generate CTA");
+    await controlPanel.getByRole("button", { name: "Закрыть контроль пакета" }).click();
     await expect(controlPanel).toBeHidden();
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

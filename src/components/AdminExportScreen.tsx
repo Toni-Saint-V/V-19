@@ -1,29 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
-  AlertTriangle,
   ArrowUpDown,
   ArrowRight,
   CalendarDays,
   CheckCircle2,
   CheckSquare,
-  ChevronRight,
-  Clock3,
   Download,
-  FileArchive,
-  FileSpreadsheet,
   FolderCheck,
-  History,
   IdCard,
-  Lock,
   MapPin,
   PackageCheck,
-  RotateCcw,
   ShieldCheck,
   Shapes,
   UploadCloud,
-  User,
-  Users,
   X,
   XCircle,
 } from "lucide-react";
@@ -59,10 +49,11 @@ import {
   V19QueueCard,
 } from "../shared/ui/v19-design-system";
 import { OperationalTableHeader } from "../shared/ui/OperationalTableHeader";
-import { agentDisplayName } from "../modules/submissions/agentDirectory";
 import { cityFilterValuesForSubmissions } from "../modules/submissions/selectors";
-import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
-import { assertAdminDocumentPackageExportEnabled } from "../modules/submissions/adminExportActions";
+import {
+  adminDocumentPackageExportEnabled,
+  assertAdminDocumentPackageExportEnabled,
+} from "../modules/submissions/adminExportActions";
 import { AdminExportDiagnosticsPanel } from "../modules/submissions/components/AdminExportDiagnosticsPanel";
 
 interface ExportItem {
@@ -111,13 +102,6 @@ type ExportFailureKind =
   | "archive_stale"
   | "archive_link"
   | "commit";
-
-const opaqueAgentIdPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-function isOpaqueAgentId(agentId: string) {
-  return opaqueAgentIdPattern.test(agentId.trim());
-}
 
 function exportActionFailureNextStep(kind: ExportFailureKind) {
   if (kind === "authority") {
@@ -174,34 +158,6 @@ function StatusPill({
     >
       {children}
     </span>
-  );
-}
-
-function ManifestRow({
-  icon: Icon,
-  label,
-  value,
-  state = "ok",
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  state?: "ok" | "warn" | "neutral";
-}) {
-  const stateClass =
-    state === "ok"
-      ? "text-[var(--v19b-dot-success)]"
-      : state === "warn"
-        ? "text-white/62"
-        : "text-white/45";
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2.5">
-      <div className="flex items-center gap-2 min-w-0">
-        <Icon className={`h-4 w-4 shrink-0 ${stateClass}`} />
-        <span className="text-[12px] text-white/55">{label}</span>
-      </div>
-      <span className="shrink-0 text-[12px] font-medium text-white/85">{value}</span>
-    </div>
   );
 }
 
@@ -275,30 +231,6 @@ function rowCountLabel(count: number) {
   return countLabel(count, ["строка", "строки", "строк"]);
 }
 
-function fileCountLabel(count: number) {
-  return countLabel(count, ["файл", "файла", "файлов"]);
-}
-
-function exportAgentName(agentId: string) {
-  const normalizedAgentId = agentId.trim();
-  if (isOpaqueAgentId(normalizedAgentId)) {
-    return normalizedAgentId.slice(0, 4).toUpperCase();
-  }
-
-  const displayName = agentDisplayName(agentId);
-  if (displayName === "Агент не указан") return "Не указан";
-
-  return displayName.replace(/^Агент\s+/u, "").replace(/^Local Agent\s+/u, "");
-}
-
-function exportAgentFilterLabel(agentId: string) {
-  if (agentId === "Все агенты") {
-    return agentId;
-  }
-
-  return `Агент ${exportAgentName(agentId)}`;
-}
-
 export function AdminExportScreen({
   submissions = [],
 }: {
@@ -314,7 +246,6 @@ export function AdminExportScreen({
   const [selectedRealIds, setSelectedRealIds] = useState<string[]>([]);
   const [activeQueueTab, setActiveQueueTab] = useState<ExportQueueTab>("ready");
   const [activeId, setActiveId] = useState("");
-  const [agentFilter, setAgentFilter] = useState("Все агенты");
   const [cityFilter, setCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<ExportSort>("tripDate");
@@ -330,8 +261,6 @@ export function AdminExportScreen({
   const [preparedArchive, setPreparedArchive] = useState<PreparedExportArchive | null>(
     null,
   );
-  const [workbookDownloadUrl, setWorkbookDownloadUrl] = useState("");
-  const [archiveDownloadUrl, setArchiveDownloadUrl] = useState("");
   const [archiveDownloadStarted, setArchiveDownloadStarted] = useState(false);
   const [mobileControlOpen, setMobileControlOpen] = useState(false);
   const mobileControlSheetRef = useRef<HTMLElement>(null);
@@ -368,42 +297,6 @@ export function AdminExportScreen({
   };
 
   useEffect(() => {
-    if (!preparedExport) {
-      setWorkbookDownloadUrl("");
-      return;
-    }
-    try {
-      const url = URL.createObjectURL(preparedExport.workbookArtifact.blob);
-      setWorkbookDownloadUrl(url);
-      return () => {
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      };
-    } catch {
-      setWorkbookDownloadUrl("");
-      setExportFailureKind("workbook");
-      setExportError("Не удалось подготовить ссылку Excel. Сформируйте файл заново.");
-    }
-  }, [preparedExport]);
-
-  useEffect(() => {
-    if (!preparedArchive) {
-      setArchiveDownloadUrl("");
-      return;
-    }
-    try {
-      const url = URL.createObjectURL(preparedArchive.artifact.blob);
-      setArchiveDownloadUrl(url);
-      return () => {
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      };
-    } catch {
-      setArchiveDownloadUrl("");
-      setExportFailureKind("archive_link");
-      setExportError("Не удалось подготовить ссылку ZIP. Сформируйте пакет заново.");
-    }
-  }, [preparedArchive]);
-
-  useEffect(() => {
     setSelectedRealIds((current) => {
       const selectableItems = realItems.filter((item) => item.blockers === 0);
       const available = new Set(selectableItems.map((item) => item.id));
@@ -429,18 +322,10 @@ export function AdminExportScreen({
     () => cityFilterValuesForSubmissions(submissions),
     [submissions],
   );
-  const agentOptions = useMemo(
-    () => [
-      "Все агенты",
-      ...Array.from(new Set(enrichedItems.map((item) => item.agent))),
-    ],
-    [enrichedItems],
-  );
   const baseFilteredItems = useMemo(() => {
     const searchNeedle = searchQuery.trim().toLowerCase();
     return enrichedItems
       .filter((item) => {
-        const agentMatches = agentFilter === "Все агенты" || item.agent === agentFilter;
         const cityMatches = cityFilter === "Все города" || item.city === cityFilter;
         const typeMatches = typeFilter === "all" || item.type === typeFilter;
         const searchMatches =
@@ -449,7 +334,7 @@ export function AdminExportScreen({
             .join(" ")
             .toLowerCase()
             .includes(searchNeedle);
-        return agentMatches && cityMatches && typeMatches && searchMatches;
+        return cityMatches && typeMatches && searchMatches;
       })
       .sort((left, right) => {
         if (sortBy === "createdAt") {
@@ -457,7 +342,7 @@ export function AdminExportScreen({
         }
         return dateValue(left.appointmentDate) - dateValue(right.appointmentDate);
       });
-  }, [agentFilter, cityFilter, enrichedItems, searchQuery, sortBy, typeFilter]);
+  }, [cityFilter, enrichedItems, searchQuery, sortBy, typeFilter]);
   const displayItems = useMemo(() => {
     if (activeQueueTab === "selected")
       return baseFilteredItems.filter((item) => item.selected);
@@ -494,8 +379,6 @@ export function AdminExportScreen({
       (terminalNoticeSelectionRef.current === selectedSignature ||
         selectedSignature === "");
     setPreparedExport(null);
-    setPreparedArchive(null);
-    setArchiveDownloadStarted(false);
     setExportError("");
     if (!preserveTerminalNotice) {
       terminalNoticeSelectionRef.current = null;
@@ -518,6 +401,10 @@ export function AdminExportScreen({
   const selectedWarnings = selectedCount ? selectedPlan.warnings.length : 0;
   const selectedBlockers = selectedCount ? selectedPlan.blockers.length : 0;
   const hasExportBlockers = selectedCount > 0 && selectedBlockers > 0;
+  const excelDownloadCompleted =
+    !adminDocumentPackageExportEnabled &&
+    Boolean(preparedExport) &&
+    exportNotice.startsWith("Excel скачан:");
   const activeBlockerReasons = activeItem?.blockerReasons ?? [];
   const selectedDiagnosticReasons = hasExportBlockers
     ? selectedPlan.blockers.map((blocker) => blocker.reason)
@@ -534,24 +421,52 @@ export function AdminExportScreen({
     : selectedCount > 1
       ? `${selectedCount} ${packageCountLabel(selectedCount)} нельзя выгрузить`
       : "Выбранный пакет нельзя выгрузить";
-  const selectedExportStateLabel = !selectedCount
-    ? "Не выбран"
-    : preparedExport
-      ? "Excel готов"
-      : selectedPlan.exportState === "not_ready"
-        ? "Не готов"
-        : selectedPlan.exportState === "ready"
-          ? "Готов"
-          : selectedPlan.exportState === "file_generated"
-            ? "Excel готов"
-            : "Скачан";
-  const hasActiveFilters =
-    activeQueueTab !== "ready" ||
-    agentFilter !== "Все агенты" ||
-    cityFilter !== "Все города" ||
-    searchQuery.length > 0 ||
-    sortBy !== "tripDate" ||
-    typeFilter !== "all";
+  const railSummaryTargetsSelection = selectedCount > 0;
+  const railSummaryTitle = railSummaryTargetsSelection
+    ? `${selectedCount} ${packageCountLabel(selectedCount)}`
+    : (activeItem?.title ?? "Пакет не выбран");
+  const railSummaryDiagnosticReasons = railSummaryTargetsSelection
+    ? selectedDiagnosticReasons
+    : activeBlockerReasons;
+  const railSummaryStatusTone: "danger" | "green" | "neutral" =
+    railSummaryDiagnosticReasons.length
+      ? "danger"
+      : railSummaryTargetsSelection || activeItem
+        ? "green"
+        : "neutral";
+  const railSummaryStatusLabel = railSummaryDiagnosticReasons.length
+    ? "есть блокеры"
+    : railSummaryTargetsSelection
+      ? "готово"
+      : activeItem
+        ? "готов к выбору"
+        : "нет пакета";
+  const railSummaryMetrics: Array<{
+    label: string;
+    value: number | string;
+    wide?: boolean;
+  }> = railSummaryTargetsSelection
+    ? [
+        { label: "Пакеты", value: selectedCount },
+        { label: "Заявители", value: selectedApplicants },
+        { label: "Файлы", value: selectedFiles },
+        { label: "Строки Excel", value: selectedPlan.rowCount },
+        {
+          label: "Город",
+          value: [...new Set(selectedItems.map((item) => item.city))].join(", "),
+          wide: true,
+        },
+      ]
+    : activeItem
+      ? [
+          { label: "Готовность", value: `${activeItem.readiness}%` },
+          { label: "Заявители", value: activeItem.applicantsCount },
+          { label: "Файлы", value: activeItem.files },
+          { label: "Ограничения", value: activeItem.blockers },
+          { label: "Даты поездки", value: activeItem.appointmentDate, wide: true },
+          { label: "Город", value: activeItem.city, wide: true },
+        ]
+      : [];
   const selectableDisplayItems = displayItems.filter((item) => item.blockers === 0);
   const allDisplaySelected =
     selectableDisplayItems.length > 0 &&
@@ -576,17 +491,8 @@ export function AdminExportScreen({
               title: "Очередь выгрузки пуста",
               description: "Новые пакеты появятся после принятия проверки.",
             };
-  const selectedHistory = selectedSubmissions
-    .flatMap((submission) =>
-      submission.history.map((item) => ({
-        ...item,
-        submissionId: submission.id,
-      })),
-    )
-    .slice(0, 3);
   const revealBlockedPackage = () => {
     setActiveQueueTab("blocked");
-    setAgentFilter("Все агенты");
     setCityFilter("Все города");
     setSearchQuery("");
     setSortBy("tripDate");
@@ -710,123 +616,74 @@ export function AdminExportScreen({
       };
     };
 
-  const handlePrepareExcel = async () => {
-    if (!beginExportOperation()) return;
-    setExportError("");
-    setExportNotice("");
-    try {
-      const prepared = await prepareWorkbookForCurrentSelection();
-      if (!prepared) return;
-      if (selectedArchiveInputSignatureRef.current !== prepared.archiveInputSignature) {
-        clearPreparedExport();
-        setExportFailureKind("workbook");
-        setExportError("Данные изменились. Сформируйте Excel заново.");
-        return;
-      }
-      setPreparedArchive(null);
-      setArchiveDownloadStarted(false);
-      setPreparedExport(prepared);
-      setExportNotice(`Excel сформирован: ${prepared.identity.fileName}`);
-    } catch {
-      setExportFailureKind("workbook");
-      setExportError(
-        "Не удалось сформировать Excel. Проверьте выбранные подачи и повторите действие.",
-      );
-    } finally {
-      finishExportOperation();
-    }
-  };
-
-  const handleWorkbookDownloadClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
-    if (
-      !preparedExport ||
-      !currentIdentity ||
-      preparedExport.archiveInputSignature !== selectedArchiveInputSignature ||
-      !exportPackageIdentityMatches(preparedExport.identity, currentIdentity)
-    ) {
-      event.preventDefault();
+  const prepareArchiveForCurrentSelection =
+    async (): Promise<PreparedExportArchive | null> => {
+      if (selectedCount === 0 || hasExportBlockers) return null;
+      setExportError("");
       setExportNotice("");
-      setExportFailureKind("workbook");
-      setExportError("Выбор изменился. Сформируйте Excel заново.");
-      return;
-    }
-    setExportError("");
-    setExportNotice(
-      `Скачивание Excel начато: ${preparedExport.workbookArtifact.fileName}`,
-    );
-  };
-
-  const handlePrepareArchive = async () => {
-    if (selectedCount === 0 || hasExportBlockers) return;
-    if (!beginExportOperation()) return;
-    setExportError("");
-    setExportNotice("");
-    try {
-      assertAdminDocumentPackageExportEnabled();
-      const prepared =
-        preparedExport?.archiveInputSignature === selectedArchiveInputSignature
-          ? preparedExport
-          : await prepareWorkbookForCurrentSelection();
-      if (!prepared) return;
-      const { prepareExportMediaZip } =
-        await import("../modules/submissions/exportMediaZip");
-      const supabaseClient = getSupabaseClient();
-      let zipOptions = {};
-      if (!supabaseClient) {
-        if (!__V19_LOCAL_DEMO_BUILD__) {
-          setExportFailureKind("archive_documents");
-          setExportError(
-            "Обязательные документы сейчас недоступны для выгрузки. Обновите страницу; если ошибка повторится, обратитесь к администратору.",
-          );
-          return;
+      try {
+        assertAdminDocumentPackageExportEnabled();
+        const prepared =
+          preparedExport?.archiveInputSignature === selectedArchiveInputSignature
+            ? preparedExport
+            : await prepareWorkbookForCurrentSelection();
+        if (!prepared) return null;
+        const { prepareExportMediaZip } =
+          await import("../modules/submissions/exportMediaZip");
+        const supabaseClient = getSupabaseClient();
+        let zipOptions = {};
+        if (!supabaseClient) {
+          if (!__V19_LOCAL_DEMO_BUILD__) {
+            setExportFailureKind("archive_documents");
+            setExportError(
+              "Обязательные документы сейчас недоступны для выгрузки. Обновите страницу; если ошибка повторится, обратитесь к администратору.",
+            );
+            return null;
+          }
+          const { buildLocalDemoExportMediaZipOptions } =
+            await import("../modules/submissions/exportMediaZipLocalDemo");
+          zipOptions = buildLocalDemoExportMediaZipOptions(prepared.submissions);
         }
-        const { buildLocalDemoExportMediaZipOptions } =
-          await import("../modules/submissions/exportMediaZipLocalDemo");
-        zipOptions = buildLocalDemoExportMediaZipOptions(prepared.submissions);
-      }
-      const zipArtifactResult = await prepareExportMediaZip(
-        prepared.submissions,
-        prepared.identity,
-        zipOptions,
-      );
-      if (!zipArtifactResult.ok) {
+        const zipArtifactResult = await prepareExportMediaZip(
+          prepared.submissions,
+          prepared.identity,
+          zipOptions,
+        );
+        if (!zipArtifactResult.ok) {
+          setExportFailureKind("archive_documents");
+          setExportError(safeArchiveFailureMessage(zipArtifactResult.safeMessage));
+          return null;
+        }
+        if (
+          selectedArchiveInputSignatureRef.current !== prepared.archiveInputSignature
+        ) {
+          clearPreparedExport();
+          setExportFailureKind("archive_stale");
+          setExportError("Данные изменились. Сформируйте ZIP заново.");
+          return null;
+        }
+        setPreparedExport(prepared);
+        const archive = {
+          artifact: zipArtifactResult.artifact,
+          prepared,
+        };
+        return archive;
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "Действие недоступно в текущем статусе"
+        ) {
+          setExportFailureKind("authority");
+          setExportError(error.message);
+          return null;
+        }
         setExportFailureKind("archive_documents");
-        setExportError(safeArchiveFailureMessage(zipArtifactResult.safeMessage));
-        return;
+        setExportError(
+          "Не удалось сформировать ZIP. Проверьте обязательные документы и повторите действие.",
+        );
+        return null;
       }
-      if (selectedArchiveInputSignatureRef.current !== prepared.archiveInputSignature) {
-        clearPreparedExport();
-        setExportFailureKind("archive_stale");
-        setExportError("Данные изменились. Сформируйте ZIP заново.");
-        return;
-      }
-      setPreparedExport(prepared);
-      setArchiveDownloadStarted(false);
-      setPreparedArchive({
-        artifact: zipArtifactResult.artifact,
-        prepared,
-      });
-      setExportNotice(
-        `ZIP проверен: ${zipArtifactResult.artifact.fileName}. Нажмите «Скачать ZIP».`,
-      );
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message === "Действие недоступно в текущем статусе"
-      ) {
-        setExportFailureKind("authority");
-        setExportError(error.message);
-        return;
-      }
-      setExportFailureKind("archive_documents");
-      setExportError(
-        "Не удалось сформировать ZIP. Проверьте обязательные документы и повторите действие.",
-      );
-    } finally {
-      finishExportOperation();
-    }
-  };
+    };
 
   const commitPreparedArchive = async (archive: PreparedExportArchive) => {
     if (!beginExportOperation()) return;
@@ -863,54 +720,91 @@ export function AdminExportScreen({
     }
   };
 
-  const handleArchiveDownloadClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (exportOperationLockedRef.current) {
-      event.preventDefault();
+  const handleDownloadBundle = async () => {
+    if (preparedArchive && archiveDownloadStarted) {
+      const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
+      if (
+        !currentIdentity ||
+        preparedArchive.prepared.archiveInputSignature !==
+          selectedArchiveInputSignature ||
+        !exportPackageIdentityMatches(
+          preparedArchive.artifact.packageIdentity,
+          currentIdentity,
+        )
+      ) {
+        clearPreparedExport();
+        setExportFailureKind("archive_stale");
+        setExportError("Выбор изменился. Подготовьте выгрузку заново.");
+        return;
+      }
+      await commitPreparedArchive(preparedArchive);
       return;
     }
-    const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
-    if (
-      !preparedArchive ||
-      !currentIdentity ||
-      preparedArchive.prepared.archiveInputSignature !==
-        selectedArchiveInputSignature ||
-      !exportPackageIdentityMatches(
-        preparedArchive.artifact.packageIdentity,
-        currentIdentity,
-      )
-    ) {
-      event.preventDefault();
-      setExportNotice("");
-      setExportFailureKind("archive_stale");
-      setExportError("Выбор изменился. Сформируйте ZIP заново.");
-      return;
-    }
-    setExportError("");
-    setExportNotice(
-      `ZIP передан браузеру: ${preparedArchive.artifact.fileName}. После сохранения подтвердите скачивание.`,
-    );
-    setArchiveDownloadStarted(true);
-  };
 
-  const handleConfirmArchiveDownload = () => {
-    if (exportOperationLockedRef.current || !archiveDownloadStarted) return;
-    const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
-    if (
-      !preparedArchive ||
-      !currentIdentity ||
-      preparedArchive.prepared.archiveInputSignature !==
-        selectedArchiveInputSignature ||
-      !exportPackageIdentityMatches(
-        preparedArchive.artifact.packageIdentity,
-        currentIdentity,
-      )
-    ) {
-      setExportNotice("");
-      setExportFailureKind("archive_stale");
-      setExportError("Выбор изменился. Сформируйте ZIP заново.");
-      return;
+    if (selectedCount === 0 || hasExportBlockers || !beginExportOperation()) return;
+    let downloadUrl = "";
+    try {
+      if (!adminDocumentPackageExportEnabled) {
+        const prepared = await prepareWorkbookForCurrentSelection();
+        if (!prepared) return;
+        const { downloadPreparedExportWorkbookArtifact } =
+          await import("../modules/submissions/exportWorkbook");
+        const result = downloadPreparedExportWorkbookArtifact(
+          prepared.workbookArtifact,
+        );
+        if (!result.ok) {
+          setExportFailureKind("workbook");
+          setExportError(result.safeMessage);
+          return;
+        }
+        setPreparedExport(prepared);
+        setExportError("");
+        setExportNotice(`Excel скачан: ${result.fileName}`);
+        return;
+      }
+
+      const archive = await prepareArchiveForCurrentSelection();
+      if (!archive) return;
+      const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
+      if (
+        !currentIdentity ||
+        archive.prepared.archiveInputSignature !== selectedArchiveInputSignature ||
+        !exportPackageIdentityMatches(archive.artifact.packageIdentity, currentIdentity)
+      ) {
+        setExportFailureKind("archive_stale");
+        setExportError("Выбор изменился. Подготовьте выгрузку заново.");
+        return;
+      }
+
+      downloadUrl = URL.createObjectURL(archive.artifact.blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = archive.artifact.fileName;
+      link.hidden = true;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setPreparedArchive(archive);
+      setArchiveDownloadStarted(true);
+      setExportError("");
+      setExportNotice(
+        "ZIP с Excel передан браузеру. Подтвердите скачивание отдельным нажатием.",
+      );
+    } catch {
+      setExportFailureKind(
+        adminDocumentPackageExportEnabled ? "archive_link" : "workbook",
+      );
+      setExportError(
+        adminDocumentPackageExportEnabled
+          ? "Не удалось подготовить скачивание. Повторите действие."
+          : "Не удалось подготовить Excel. Проверьте пакет и повторите действие.",
+      );
+    } finally {
+      if (exportOperationLockedRef.current) finishExportOperation();
+      if (downloadUrl) {
+        window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 60_000);
+      }
     }
-    void commitPreparedArchive(preparedArchive);
   };
 
   return (
@@ -994,14 +888,18 @@ export function AdminExportScreen({
           />
 
           <AdminQueueToolbar
-            actionDisabled={!hasActiveFilters}
-            actionIcon={RotateCcw}
             cityFilter={cityFilter}
             cityOptions={cityOptions}
-            filterLabel="Сбросить фильтры выгрузки"
-            controls={
-              <>
+            onCityFilterChange={setCityFilter}
+            onSearchChange={setSearchQuery}
+            searchAction={
+              <div
+                aria-label="Фильтры выгрузки"
+                className="v19-inline-filter-buttons"
+                role="group"
+              >
                 <AdminToolbarSelect<ExportSort>
+                  className={`v19-admin-export-toolbar-control v19-admin-export-toolbar-control--sort ${sortBy !== "tripDate" ? "is-active" : ""}`}
                   icon={ArrowUpDown}
                   label="Сортировка"
                   value={sortBy}
@@ -1012,6 +910,7 @@ export function AdminExportScreen({
                   ]}
                 />
                 <AdminToolbarSelect<ExportTypeFilter>
+                  className={`v19-admin-export-toolbar-control ${typeFilter !== "all" ? "is-active" : ""}`}
                   icon={Shapes}
                   label="Тип"
                   value={typeFilter}
@@ -1023,29 +922,21 @@ export function AdminExportScreen({
                   ]}
                 />
                 <AdminToolbarSelect<string>
-                  icon={User}
-                  label="Агент"
-                  value={agentFilter}
-                  onChange={setAgentFilter}
-                  options={agentOptions.map((agent) => ({
-                    value: agent,
-                    label: exportAgentFilterLabel(agent),
+                  className={`v19-admin-export-toolbar-control ${cityFilter !== "Все города" ? "is-active" : ""}`}
+                  icon={MapPin}
+                  label="Город"
+                  value={cityFilter}
+                  onChange={setCityFilter}
+                  options={cityOptions.map((city) => ({
+                    value: city,
+                    label: city === "Все города" ? "Города" : city,
                   }))}
                 />
-              </>
+              </div>
             }
-            onCityFilterChange={setCityFilter}
-            onFilterClick={() => {
-              setActiveQueueTab("ready");
-              setAgentFilter("Все агенты");
-              setCityFilter("Все города");
-              setSearchQuery("");
-              setSortBy("tripDate");
-              setTypeFilter("all");
-            }}
-            onSearchChange={setSearchQuery}
             searchPlaceholder="ID, семья или агент"
             searchValue={searchQuery}
+            showCityFilter={false}
           />
 
           <OperationalTableHeader
@@ -1054,7 +945,6 @@ export function AdminExportScreen({
               { key: "applicant", label: "ID / имя и фамилия" },
               { key: "dates", label: "Даты поездки" },
               { key: "city", label: "Город" },
-              { key: "agent", label: "Агент" },
             ]}
             leadingControl={
               <button
@@ -1155,22 +1045,6 @@ export function AdminExportScreen({
                       <small className="v19-admin-export-row-label-v2">Город</small>
                       <span className="v19-admin-export-row-value-v2">{item.city}</span>
                     </div>
-
-                    <div
-                      className={
-                        isOpaqueAgentId(item.agent)
-                          ? "v19-admin-export-row-agent-v2 is-opaque-agent"
-                          : "v19-admin-export-row-agent-v2"
-                      }
-                    >
-                      <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
-                        <User />
-                      </span>
-                      <small className="v19-admin-export-row-label-v2">Агент</small>
-                      <span className="v19-admin-export-row-value-v2">
-                        {exportAgentName(item.agent)}
-                      </span>
-                    </div>
                   </V19QueueCard>
                 ))}
               </div>
@@ -1187,36 +1061,18 @@ export function AdminExportScreen({
         role={mobileControlModalOpen ? "dialog" : undefined}
         tabIndex={-1}
       >
-        <div className="v19-admin-export-rail-head-v2">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--v19b-color-primary-text)]">
-                Выгрузка
-              </div>
-              <h3 className="mt-1 text-[20px] font-semibold tracking-tight text-white">
-                Контроль пакета
-              </h3>
-              <p className="mt-2 text-[12px] leading-relaxed text-white/45">
-                Состав, проверки, Excel и обязательные документы перед скачиванием.
-              </p>
-            </div>
-            <div className="v19-admin-export-rail-icon-v2">
-              <FolderCheck className="h-5 w-5" />
-            </div>
-            <button
-              aria-label="Закрыть контроль пакета"
-              className="v19-admin-export-rail-close-v2"
-              type="button"
-              onClick={closeMobileControl}
-            >
-              <X aria-hidden="true" />
-            </button>
-          </div>
-        </div>
+        <button
+          aria-label="Закрыть контроль пакета"
+          className="v19-admin-export-rail-close-v2 v19-admin-export-rail-close-floating-v2"
+          type="button"
+          onClick={closeMobileControl}
+        >
+          <X aria-hidden="true" />
+        </button>
 
         <div
           aria-label="Панель контроля выгрузки"
-          className="min-h-0 flex-1 overflow-y-auto p-5 space-y-5"
+          className="v19-admin-export-rail-content-v2 min-h-0 flex-1 overflow-y-auto p-5 space-y-5"
           role="region"
           tabIndex={0}
         >
@@ -1226,345 +1082,126 @@ export function AdminExportScreen({
             title={diagnosticTitle}
           />
 
-          <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[12px] text-white/45">Активный пакет</div>
-                <div className="mt-1 text-[15px] font-semibold text-white">
-                  {activeItem?.title ?? "Не выбран"}
-                </div>
-              </div>
-              {activeItem && (
-                <StatusPill
-                  tone={
-                    activeItem.blockers > 0
-                      ? "danger"
-                      : activeItem.warnings > 0
-                        ? "blue"
-                        : "green"
-                  }
-                >
-                  {activeItem.blockers > 0
-                    ? "заблокирован"
-                    : diagnosticTargetsSelection
-                      ? "сам пакет готов"
-                      : activeItem.warnings > 0
-                        ? "есть предупреждения"
-                        : "готов"}
-                </StatusPill>
-              )}
-            </div>
-            {activeItem && (
-              <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
-                <div className="rounded-xl bg-white/[0.03] p-3">
-                  <div className="text-white/35">Заявители</div>
-                  <div className="mt-1 font-semibold text-white">
-                    {activeItem.applicantsCount}
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white/[0.03] p-3">
-                  <div className="text-white/35">Город</div>
-                  <div className="mt-1 font-semibold text-white">{activeItem.city}</div>
-                </div>
-                <div className="rounded-xl bg-white/[0.03] p-3">
-                  <div className="text-white/35">Файлы</div>
-                  <div className="mt-1 font-semibold text-white">
-                    {activeItem.files}
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white/[0.03] p-3">
-                  <div className="text-white/35">Размер</div>
-                  <div className="mt-1 font-semibold text-white">
-                    {activeItem.packageSize}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {selectedCount > 0 && diagnosticReasons.length === 0 ? (
-            <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-[14px] font-semibold text-white">
-                  Проверка готовности
-                </h4>
-                <StatusPill
-                  tone={
-                    selectedCount === 0
-                      ? "neutral"
-                      : hasExportBlockers
-                        ? "danger"
-                        : "green"
-                  }
-                >
-                  {selectedCount === 0
-                    ? "нет выбора"
-                    : hasExportBlockers
-                      ? "нужна правка"
-                      : "можно выгружать"}
-                </StatusPill>
-              </div>
-              <div className="export-preview mb-3 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2 text-[12px] font-medium text-white/70">
-                {selectedCount ? "Пакет выбран" : "Пакет не выбран"}
-              </div>
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <button
-                  className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-white/45"
-                  disabled={selectedCount === 0 || hasExportBlockers || isExporting}
-                  type="button"
-                  onClick={handlePrepareExcel}
-                >
-                  {preparedExport ? "Excel готов" : "Сформировать Excel"}
-                </button>
-                {preparedExport && workbookDownloadUrl ? (
-                  <a
-                    className="flex h-9 items-center justify-center rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
-                    download={preparedExport.workbookArtifact.fileName}
-                    href={workbookDownloadUrl}
-                    onClick={handleWorkbookDownloadClick}
-                  >
-                    Скачать Excel
-                  </a>
-                ) : (
-                  <button
-                    className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white/45 disabled:cursor-not-allowed"
-                    disabled
-                    type="button"
-                    title="Сначала сформируйте Excel"
-                  >
-                    Скачать Excel
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2">
-                <ManifestRow
-                  icon={ShieldCheck}
-                  label="Открытые ограничения"
-                  value={`${selectedBlockers}`}
-                  state={selectedBlockers ? "warn" : "ok"}
-                />
-                <ManifestRow
-                  icon={FileSpreadsheet}
-                  label="Предпросмотр Excel"
-                  value={selectedCount ? "готов" : "нет выбора"}
-                  state={selectedCount ? "ok" : "neutral"}
-                />
-                <ManifestRow
-                  icon={FileSpreadsheet}
-                  label="Строки Excel"
-                  value={`${selectedPlan.rowCount} ${rowCountLabel(selectedPlan.rowCount)}`}
-                  state={selectedCount ? "ok" : "neutral"}
-                />
-                <ManifestRow
-                  icon={FileArchive}
-                  label="ZIP медиа"
-                  value={`${selectedFiles} ${fileCountLabel(selectedFiles)}`}
-                  state={selectedCount ? "ok" : "neutral"}
-                />
-                <ManifestRow
-                  icon={Lock}
-                  label="Состояние экспорта"
-                  value={selectedExportStateLabel}
-                  state={selectedCount ? "ok" : "neutral"}
-                />
-                <ManifestRow
-                  icon={AlertTriangle}
-                  label="Предупреждения"
-                  value={`${selectedWarnings}`}
-                  state={selectedWarnings ? "warn" : "ok"}
-                />
-              </div>
-              {selectedCount > 0 &&
-                (selectedPlan.blockers.length > 0 ||
-                  selectedPlan.warnings.length > 0) && (
-                  <div className="mt-3 space-y-1.5">
-                    {[...selectedPlan.blockers, ...selectedPlan.warnings].map(
-                      (item) => (
-                        <div
-                          key={item.reason}
-                          className="rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2 text-[11px] leading-snug text-white/55"
-                        >
-                          {item.reason}
-                        </div>
-                      ),
-                    )}
-                  </div>
-                )}
-              {selectedCount > 0 && !hasExportBlockers ? (
-                <div className="mt-3">
-                  <ExportWorkbookPreview preview={selectedPlan.preview} />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {selectedCount > 0 && diagnosticReasons.length === 0 ? (
-            <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-[14px] font-semibold text-white">
-                  Состав выгрузки
-                </h4>
-                <span className="text-[12px] text-white/40">
-                  {selectedCount} {packageCountLabel(selectedCount)}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {selectedItems.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-[12px] text-white/35">
-                    Выберите пакеты слева
-                  </div>
-                ) : (
-                  selectedItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.025] p-3"
-                    >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--v19b-color-primary-soft-20)] text-[var(--v19b-color-primary-text)]">
-                        {item.type === "family" ? (
-                          <Users className="h-4 w-4" />
-                        ) : (
-                          <User className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[12px] font-medium text-white/85">
-                          {item.title}
-                        </div>
-                        <div className="mt-0.5 text-[11px] text-white/35">
-                          {item.publicId} · {item.applicantsCount}{" "}
-                          {applicantCountLabel(item.applicantsCount)}
-                        </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-white/25" />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : null}
-
-          {selectedHistory.length > 0 && diagnosticReasons.length === 0 ? (
-            <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <History className="h-4 w-4 text-white/40" />
-                <h4 className="text-[14px] font-semibold text-white">
-                  История сегодня
-                </h4>
-              </div>
-              <div className="space-y-3 border-l border-white/10 pl-4">
-                {selectedHistory.length === 0 ? (
-                  <div>
-                    <div className="text-[12px] font-medium text-white/75">
-                      История появится после действия
-                    </div>
-                    <div className="text-[11px] text-white/35">
-                      Только реальные события выбранных подач
-                    </div>
-                  </div>
-                ) : (
-                  selectedHistory.map((item) => (
-                    <div key={`${item.submissionId}-${item.id}`}>
-                      <div className="text-[12px] font-medium text-white/75">
-                        {item.text}
-                      </div>
-                      <div className="text-[11px] text-white/35">
-                        {item.at} · {item.source ?? "system"}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="shrink-0 border-t border-[#242529] bg-[#1a1a1d] p-4">
-          {preparedArchive && archiveDownloadUrl && archiveDownloadStarted ? (
-            <div className="space-y-2">
-              <button
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-wait disabled:opacity-60"
-                data-testid="confirm-export-download"
-                disabled={isExporting}
-                onClick={handleConfirmArchiveDownload}
-                type="button"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                {isExporting ? "Фиксируем выгрузку…" : "Подтвердить скачивание"}
-              </button>
-              <a
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#242529] bg-[#1e1e21] text-[12px] font-semibold text-white/75 transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
-                data-testid="repeat-export-download"
-                download={preparedArchive.artifact.fileName}
-                href={archiveDownloadUrl}
-                onClick={handleArchiveDownloadClick}
-              >
-                <Download className="h-4 w-4" />
-                Скачать ZIP повторно
-              </a>
-            </div>
-          ) : preparedArchive && archiveDownloadUrl ? (
-            <a
-              aria-disabled={isExporting}
-              className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)] ${isExporting ? "cursor-wait opacity-60" : ""}`}
-              data-testid="export-download"
-              download={preparedArchive.artifact.fileName}
-              href={archiveDownloadUrl}
-              onClick={handleArchiveDownloadClick}
-            >
-              <Download className="h-4 w-4" />
-              Скачать ZIP
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          ) : (
-            <button
-              onClick={handlePrepareArchive}
-              disabled={selectedCount === 0 || isExporting || hasExportBlockers}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
-            >
-              {isExporting ? (
-                <UploadCloud className="h-4 w-4 animate-pulse" />
-              ) : (
-                <FileArchive className="h-4 w-4" />
-              )}
-              {isExporting ? "Формируем пакет…" : "Сформировать ZIP с Excel"}
-              {!isExporting && <ArrowRight className="h-4 w-4" />}
-            </button>
-          )}
-          <div
-            className={`mt-2 text-[11px] ${exportError ? "text-[var(--vf-red-soft-text)]" : exportNotice ? "flex items-center justify-center gap-2 text-[var(--v19b-color-primary-text)]" : "flex items-center justify-center gap-2 text-white/35"}`}
-            id="export-action-hint"
-            role={exportError ? "alert" : "status"}
+          <section
+            aria-label="Текущая выгрузка"
+            className="v19-admin-export-summary-v2 rounded-2xl border border-[#242529] bg-[#141416] p-4"
           >
-            {exportError ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[12px] text-white/45">
+                  {railSummaryTargetsSelection ? "Текущая выгрузка" : "Пакет в фокусе"}
+                </div>
+                <div className="mt-1 flex min-w-0 items-center gap-2">
+                  <div className="truncate text-[15px] font-semibold text-white">
+                    {railSummaryTitle}
+                  </div>
+                  {!railSummaryTargetsSelection && activeItem ? (
+                    <span className="shrink-0 rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[10px] font-medium text-white/60">
+                      {activeItem.publicId}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <StatusPill tone={railSummaryStatusTone}>
+                {railSummaryStatusLabel}
+              </StatusPill>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
+              {railSummaryMetrics.map((metric) => (
+                <div
+                  className={`${metric.wide ? "col-span-2" : ""} rounded-xl bg-white/[0.03] p-3`}
+                  key={metric.label}
+                >
+                  <div className="text-white/35">{metric.label}</div>
+                  <div className="mt-1 truncate font-semibold text-white">
+                    {metric.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-white/45">
+              {railSummaryTargetsSelection
+                ? "Excel и обязательные документы будут подготовлены автоматически при скачивании."
+                : railSummaryDiagnosticReasons.length > 0
+                  ? "Исправьте ограничения выше, затем добавьте пакет в выгрузку."
+                  : "Отметьте пакет в списке, чтобы добавить его в текущую выгрузку."}
+            </p>
+            {selectedWarnings > 0 ? (
+              <div className="mt-3 text-[11px] text-[var(--vf-amber-text)]">
+                Предупреждения: {selectedWarnings}
+              </div>
+            ) : null}
+          </section>
+
+          {exportError ? (
+            <section
+              className="v19-admin-export-action-error-v2 rounded-2xl border border-[#3a2c1c] bg-[#18140f] p-4"
+              role="alert"
+            >
               <div className="flex items-start gap-2.5">
-                <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--vf-amber-text)]" />
                 <div>
                   <div className="text-[12px] font-semibold text-white">
                     Выгрузка не выполнена
                   </div>
-                  <p className="mt-1 text-[11px] leading-relaxed">{exportError}</p>
-                  <p className="mt-1.5 text-[10.5px] leading-relaxed text-white/55">
+                  <p className="mt-1 text-[11px] leading-relaxed text-white/70">
+                    {exportError}
+                  </p>
+                  <p className="mt-1.5 text-[10.5px] leading-relaxed text-white/50">
                     {exportActionFailureNextStep(exportFailureKind)}
                   </p>
                 </div>
               </div>
-            ) : (
-              <>
-                <Clock3 className="h-3.5 w-3.5" />{" "}
-                {exportNotice ||
-                  (selectedCount
-                    ? hasExportBlockers
-                      ? "Устраните блокирующие ошибки выше"
-                      : preparedArchive
-                        ? "ZIP проверен, можно скачивать"
-                        : preparedExport
-                          ? "Excel готов и будет добавлен в ZIP"
-                          : "ZIP включает Excel и обязательные документы"
-                    : showBlockedPackageFocus
-                      ? "Исправьте пакет перед выгрузкой"
-                      : "Выберите хотя бы одну подачу")}
-              </>
-            )}
+            </section>
+          ) : null}
+
+          <div className="v19-admin-export-download-action-v2 sticky bottom-0 pt-2">
+            <button
+              aria-describedby="export-action-hint"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
+              data-testid="export-download"
+              disabled={
+                selectedCount === 0 ||
+                isExporting ||
+                hasExportBlockers ||
+                excelDownloadCompleted
+              }
+              type="button"
+              onClick={() => void handleDownloadBundle()}
+            >
+              {isExporting ? (
+                <UploadCloud className="h-4 w-4 animate-pulse" />
+              ) : excelDownloadCompleted ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {isExporting
+                ? "Готовим выгрузку…"
+                : excelDownloadCompleted
+                  ? "Excel скачан"
+                  : archiveDownloadStarted
+                    ? "Подтвердить скачивание"
+                    : adminDocumentPackageExportEnabled
+                      ? "Скачать ZIP + Excel"
+                      : "Скачать Excel"}
+              {!isExporting && !excelDownloadCompleted && (
+                <ArrowRight className="h-4 w-4" />
+              )}
+            </button>
+            <p
+              className="sr-only"
+              data-testid="export-action-feedback"
+              id="export-action-hint"
+              role="status"
+            >
+              {exportNotice ||
+                (selectedCount
+                  ? hasExportBlockers
+                    ? "Устраните блокирующие ошибки выше"
+                    : "Excel и обязательные документы будут подготовлены автоматически"
+                  : "Выберите хотя бы одну подачу")}
+            </p>
           </div>
         </div>
       </aside>

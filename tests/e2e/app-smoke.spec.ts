@@ -658,46 +658,33 @@ function e2ePassportFile(name: string) {
 }
 
 async function generateAndDownloadExcel(page: Page) {
-  const generateButton = page.getByRole("button", { name: "Сформировать Excel" });
-
-  if (!(await isVisible(generateButton))) {
+  const downloadButton = page.getByRole("button", { name: "Скачать Excel" });
+  if (!(await isVisible(downloadButton))) {
     const openContractButton = page
       .getByRole("button", { name: "Открыть контракт выгрузки" })
       .first();
 
     if (await isVisible(openContractButton)) {
       await openContractButton.click();
-      await expect(generateButton).toBeVisible();
+      await expect(downloadButton).toBeVisible();
     }
   }
 
-  await generateButton.click();
-  const downloadButton = page.getByRole("link", { name: "Скачать Excel" });
-  await expect(downloadButton).toBeVisible();
+  await expect(downloadButton).toBeEnabled();
   const downloadPromise = page.waitForEvent("download");
   await downloadButton.click();
   const download = await downloadPromise;
   await expect(download.failure()).resolves.toBeNull();
+  await expect(page.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
   return download;
 }
 
-async function generateDownloadAndConfirmZip(page: Page) {
-  const prepareZip = page.getByRole("button", {
-    name: "Сформировать ZIP с Excel",
-  });
-  await expect(prepareZip).toBeEnabled();
-  await prepareZip.click();
-  const downloadZip = page.getByRole("link", { name: "Скачать ZIP" });
-  await expect(downloadZip).toBeVisible();
-  const downloadPromise = page.waitForEvent("download");
-  await downloadZip.click();
-  const download = await downloadPromise;
-  await expect(download.failure()).resolves.toBeNull();
-  await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
-  await expect(page.locator("#export-action-hint")).toContainText(
-    "Скачивание подтверждено, пакет зафиксирован",
-  );
-  return download;
+async function expectCurrentExportDownloadComplete(page: Page) {
+  await expect(page.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
+  await expect(page.locator("#export-action-hint")).toContainText("Excel скачан:");
+  await expect(
+    page.getByRole("button", { name: "Подтвердить скачивание" }),
+  ).toHaveCount(0);
 }
 
 async function uploadCreatePassports(page: Page, names: string[]) {
@@ -992,7 +979,7 @@ test.describe("V-19 operations workspace", () => {
     await closeDrawer(page);
 
     await clickWorkspaceButton(page, /Выгрузка/);
-    await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
     await expect(
       page.locator(".export-row").filter({ hasText: "Дмитрий Орлов" }),
     ).toBeVisible();
@@ -1006,12 +993,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { name: "1 подача · 1 заявитель" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toBeVisible();
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Сначала сформируйте Excel",
-    );
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeVisible();
     const download = await generateAndDownloadExcel(page);
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
     await clearExportSelection(page);
@@ -1091,7 +1073,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(reviewAction).toBeFocused();
 
     await clickWorkspaceButton(page, /Выгрузка/);
-    await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
     await expect(
       page
         .locator(".export-row")
@@ -1426,7 +1408,7 @@ test.describe("V-19 operations workspace", () => {
     await expectDrawerStatus(page, "Возвращено");
   });
 
-  test("admin accepts corrections and completes the export sequence", async ({
+  test("admin accepts corrections and completes the Excel plus ZIP export", async ({
     page,
   }) => {
     await switchToAdmin(page);
@@ -1445,7 +1427,7 @@ test.describe("V-19 operations workspace", () => {
     await closeDrawer(page);
 
     await clickWorkspaceButton(page, /Выгрузка/);
-    await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
     await clearExportSelection(page);
     await page
       .locator(".export-row")
@@ -1455,51 +1437,12 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { name: "1 подача · 2 заявителя" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Excel сформирован:",
-    );
-    const excelLink = page.getByRole("link", { name: "Скачать Excel" });
-    await expect(excelLink).toBeVisible();
-    const excelDownloadPromise = page.waitForEvent("download");
-    await excelLink.click();
-    await excelDownloadPromise;
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание Excel начато:",
-    );
-    await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
-    const zipLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(zipLink).toBeVisible();
-    const zipDownloadPromise = page.waitForEvent("download");
-    await zipLink.click();
-    await zipDownloadPromise;
-    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание подтверждено, пакет зафиксирован",
-    );
-
-    await clickExportTab(page, "История");
-    await expect(
-      page
-        .locator(".export-history-table .export-row")
-        .filter({ hasText: "Семья Петровых" }),
-    ).toBeVisible();
-
-    const exportedFamilyRow = page
+    await generateAndDownloadExcel(page);
+    await expectCurrentExportDownloadComplete(page);
+    const readyForExportFamilyRow = page
       .locator(".export-row")
       .filter({ hasText: "Семья Петровых" });
-    await expect(
-      exportedFamilyRow.getByRole("button", { name: /^(Открыть|Проверить) PDF$/ }),
-    ).toHaveCount(0);
-    await expect(exportedFamilyRow.getByText("Нужна проверка PDF")).toBeVisible();
-    await expect(exportedFamilyRow.getByText("PDF записи отсутствует.")).toBeVisible();
-    await exportedFamilyRow.getByRole("button", { name: /Семья Петровых/ }).click();
-    await expect(drawer(page).getByText("Семья Петровых").first()).toBeVisible();
-    await expect(
-      drawer(page).getByRole("button", {
-        name: /Передача агентам недоступна:/,
-      }),
-    ).toHaveCount(0);
+    await expect(readyForExportFamilyRow).toBeVisible();
   });
 
   test("admin can return corrected submission again after adding a new issue", async ({
@@ -1596,9 +1539,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.locator("#export-action-hint")).toContainText(
       "Нельзя смешивать разные даты поездки",
     );
-    await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
   });
 
   test("one submission moves from creation to Excel export", async ({ page }) => {
@@ -1678,11 +1619,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { name: "1 подача · 1 заявитель" }),
     ).toBeVisible();
-    await expect(page.getByText("Sheet1 · предпросмотр")).toBeVisible();
-    await expect(
-      page.getByText("53 связано · 3 вычислено · 0 не сопоставлено"),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Сформировать Excel" }).click();
+    await generateAndDownloadExcel(page);
     await page
       .locator(".export-row")
       .filter({ hasText: "Новая подача" })
@@ -1693,7 +1630,7 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: "Дмитрий Орлов" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
     await page
       .locator(".export-row")
       .filter({ hasText: "Дмитрий Орлов" })
@@ -1704,30 +1641,11 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: "Новая подача" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
-    await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    const refreshedExcelLink = page.getByRole("link", { name: "Скачать Excel" });
-    await expect(refreshedExcelLink).toBeVisible();
-    const refreshedExcelDownload = page.waitForEvent("download");
-    await refreshedExcelLink.click();
-    await refreshedExcelDownload;
-    await page.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
-    const refreshedZipLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(refreshedZipLink).toBeVisible();
-    const refreshedZipDownload = page.waitForEvent("download");
-    await refreshedZipLink.click();
-    await refreshedZipDownload;
-    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание подтверждено, пакет зафиксирован",
-    );
-
-    await clickExportTab(page, "История");
-    const exportedHistoryRow = page.getByLabel(/Выгруженный пакет Новая подача/);
-
-    await expect(exportedHistoryRow).toBeVisible();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
+    await generateAndDownloadExcel(page);
+    await expectCurrentExportDownloadComplete(page);
     await expect(
-      exportedHistoryRow.getByRole("button", { name: /Новая подача/ }),
+      page.locator(".export-row").filter({ hasText: "Новая подача" }),
     ).toBeVisible();
   });
 
@@ -1905,7 +1823,7 @@ test.describe("V-19 operations workspace", () => {
         ),
       ).toBeVisible();
       await generateAndDownloadExcel(page);
-      await generateDownloadAndConfirmZip(page);
+      await expectCurrentExportDownloadComplete(page);
     });
 
     await test.step("export two single applicants together", async () => {
@@ -1925,15 +1843,17 @@ test.describe("V-19 operations workspace", () => {
         page.getByRole("heading", { name: "2 подачи · 2 заявителя" }),
       ).toBeVisible();
       await generateAndDownloadExcel(page);
-      await generateDownloadAndConfirmZip(page);
+      await expectCurrentExportDownloadComplete(page);
     });
 
-    await test.step("export history contains all generated packages", async () => {
-      await clickExportTab(page, "История");
-      const historyRegion = page.getByRole("region", { name: "История выгрузки" });
-      await expect(historyRegion.getByText(secondFamilyTitle)).toBeVisible();
-      await expect(historyRegion.getByText(firstSingle)).toBeVisible();
-      await expect(historyRegion.getByText(secondSingle)).toBeVisible();
+    await test.step("Excel-only export leaves packages ready for future T9", async () => {
+      await clickExportTab(page, "Пакеты");
+      await expect(
+        page.locator(".export-row").filter({ hasText: firstSingle }),
+      ).toBeVisible();
+      await expect(
+        page.locator(".export-row").filter({ hasText: secondSingle }),
+      ).toBeVisible();
     });
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

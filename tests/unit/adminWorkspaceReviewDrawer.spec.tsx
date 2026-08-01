@@ -435,8 +435,28 @@ describe("AdminReviewDrawer visual hierarchy", () => {
     expect(
       container.querySelectorAll(".v19-review-queue-list [data-submission-card]"),
     ).toHaveLength(2);
-    expect(screen.getByRole("tab", { name: /Первичная проверка/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Исправления/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tablist", { name: "Фокус очереди" }),
+    ).not.toBeInTheDocument();
+    const toolbarFilters = screen.getByRole("group", {
+      name: "Фильтры очереди",
+    });
+    expect(
+      container.querySelector(".v19-unified-filter-popover"),
+    ).not.toBeInTheDocument();
+    expect(toolbarFilters.querySelectorAll(".v19-admin-toolbar-select")).toHaveLength(
+      3,
+    );
+    const laneFilter = within(toolbarFilters).getByRole("button", {
+      name: /Этап: Вся очередь/,
+    });
+    fireEvent.click(laneFilter);
+    expect(
+      within(toolbarFilters).getByRole("option", { name: /Первичная проверка/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(toolbarFilters).getByRole("option", { name: /Правки/ }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Начать проверку/ }),
     ).not.toBeInTheDocument();
