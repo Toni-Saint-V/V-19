@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
+import { expect, test } from "./v19-localhost-test";
 import { clickWorkspaceButton, openFreshWorkspace } from "./v19-pilot-helpers";
 import { testRunArtifactPath } from "../support/artifacts";
 
