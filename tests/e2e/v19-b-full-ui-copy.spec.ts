@@ -62,10 +62,7 @@ function collectBrowserProblems(page: Page) {
   return problems;
 }
 
-async function openWorkspace(
-  page: Page,
-  options: { email: string; heading: string },
-) {
+async function openWorkspace(page: Page, options: { email: string; heading: string }) {
   await openFreshWorkspace(page, {
     heading: options.heading,
     workspaceEmail: options.email,
@@ -274,20 +271,15 @@ async function exerciseExport(page: Page) {
   const preview = page.getByRole("region", {
     name: "Панель контроля выгрузки",
   });
-  const panelToggle = page
-    .getByRole("button", { name: /Контроль пакета/ })
-    .first();
+  const panelToggle = page.getByRole("button", { name: /Контроль пакета/ }).first();
   const panelWasOpen = await isVisible(preview);
   if (!panelWasOpen) await panelToggle.click();
 
   await expect(preview).toBeVisible();
-  await expect(page.getByRole("button", { name: "Сформировать Excel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeVisible();
 
   if (!panelWasOpen) {
-    await page
-      .getByRole("button", { name: "Закрыть контроль пакета" })
-      .first()
-      .click();
+    await page.getByRole("button", { name: "Закрыть контроль пакета" }).first().click();
     await expect(preview).toBeHidden();
   }
 }

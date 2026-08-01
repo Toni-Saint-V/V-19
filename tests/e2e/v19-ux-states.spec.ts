@@ -165,9 +165,7 @@ test.describe("V-19 UX state proof", () => {
     await expect(page.locator("#export-action-hint")).toContainText(
       "Выберите хотя бы одну подачу",
     );
-    await expect(
-      page.getByRole("button", { name: "Сформировать ZIP с Excel" }),
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
     await saveScreenshot(page, "export-disabled-reason");
 
     expect(problems).toEqual([]);

@@ -15,6 +15,7 @@ import {
   EXPORT_WORKBOOK_COLUMN_COUNT,
 } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
+import { adminDocumentPackageExportEnabled } from "../../src/modules/submissions/adminExportActions";
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
 import { decodeVisaApplicationFormTemplate } from "../../src/modules/submissions/visaApplicationFormReferencePdf";
 import {
@@ -343,9 +344,8 @@ async function inspectZip(
         passport: extraction.text.includes(identity.passportNumber),
         referenceTemplate:
           entryBytes.byteLength > canonicalTemplate.byteLength &&
-          productionExportDigest(
-            entryBytes.slice(0, canonicalTemplate.byteLength),
-          ) === productionExportDigest(canonicalTemplate),
+          productionExportDigest(entryBytes.slice(0, canonicalTemplate.byteLength)) ===
+            productionExportDigest(canonicalTemplate),
         textLayer: extraction.source === "text_layer",
       };
       invariant(
@@ -445,10 +445,7 @@ async function openSession(
   }
 }
 
-async function closeSession(
-  session: ExportSession,
-  evidence: ExportEvidence,
-) {
+async function closeSession(session: ExportSession, evidence: ExportEvidence) {
   try {
     const browserProblems = session.browserProblems();
     evidence.sessions.push({
@@ -498,7 +495,10 @@ function exportRow(page: Page, submissionId: string) {
 }
 
 async function openExport(page: Page, submissionId: string) {
-  const heading = page.getByRole("heading", { level: 1, name: "Выгрузка" });
+  const heading = page.getByRole("heading", {
+    level: 1,
+    name: "Центр выгрузки",
+  });
   if (!(await isVisible(heading))) {
     await clickWorkspaceButton(page, /Выгрузка/);
   }
@@ -539,14 +539,12 @@ async function selectOnlyA1F6(
 }
 
 async function downloadAndInspectExcel(page: Page, cohortCase: ProductionCohortCase) {
-  const prepare = page.getByRole("button", { name: "Сформировать Excel" });
-  await expect(prepare).toBeEnabled();
-  await prepare.click();
-  await expect(page.getByRole("button", { name: "Excel готов" })).toBeVisible();
-  const downloadButton = page.getByRole("link", { name: "Скачать Excel" });
+  const downloadButton = page.getByRole("button", { name: "Скачать Excel" });
+  await expect(downloadButton).toBeEnabled();
   const downloadPromise = page.waitForEvent("download");
   await downloadButton.click();
   const download = await downloadPromise;
+  await expect(page.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
   invariant(
     /^visaflow-export-.+\.xlsx$/.test(download.suggestedFilename()),
     "Excel download filename is not canonical.",
@@ -566,31 +564,24 @@ async function downloadAndInspectZip(
   session.gate.beginExport();
   let proof: SanitizedZipProof;
   try {
-    const prepareButton = session.page.getByRole("button", {
-      name: "Сформировать ZIP с Excel",
+    const downloadButton = session.page.getByRole("button", {
+      name: "Скачать ZIP + Excel",
     });
-    await expect(prepareButton).toBeEnabled();
+    await expect(downloadButton).toBeEnabled();
     const exportStartedAt = Date.now();
-    await prepareButton.click();
-    const downloadLink = session.page.getByRole("link", {
-      name: "Скачать ZIP",
-    });
-    await expect(downloadLink).toBeVisible({ timeout: zipDownloadTimeoutMs });
     const downloadPromise = session.page.waitForEvent("download", {
       timeout: zipDownloadTimeoutMs,
     });
-    await downloadLink.click();
+    await downloadButton.click();
     const download = await downloadPromise.catch(async () => {
       const [buttonText, hint] = await Promise.all([
-        prepareButton.textContent().catch(() => ""),
+        downloadButton.textContent().catch(() => ""),
         session.page
           .locator("#export-action-hint")
           .textContent()
           .catch(() => ""),
       ]);
-      const phase = buttonText?.includes("Формируем пакет")
-        ? "preparing"
-        : "settled";
+      const phase = buttonText?.includes("Формируем пакет") ? "preparing" : "settled";
       const hintDigest = productionExportDigest(hint ?? "").slice(0, 16);
       throw new Error(
         `ZIP download did not arrive within ${zipDownloadTimeoutMs}ms (phase=${phase}, hintDigest=${hintDigest}).`,
@@ -704,6 +695,10 @@ test.describe("production A1-F6 export artifact gate", () => {
   test("downloads and verifies six tourist packages plus exact Excel through real UI", async ({
     browser,
   }, testInfo) => {
+    test.skip(
+      !adminDocumentPackageExportEnabled,
+      "T9 document-package export is blocked by the current release contract.",
+    );
     test.setTimeout(1_800_000);
     assertProductionExportWriteUnlock();
     const runMarker = requiredProductionRunMarker();

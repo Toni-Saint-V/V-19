@@ -1569,7 +1569,7 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
 
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+      page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
     ).toBeVisible();
     const exportRow = page
       .locator(".export-row, .v19-admin-export-row")
@@ -1586,41 +1586,22 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
       submissionId: singleSubmissionId,
       testInfo,
     });
-    await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    const downloadLink = page.getByRole("link", { name: "Скачать Excel" });
-    await expect(downloadLink).toBeVisible({ timeout: 120_000 });
-    const zipButton = page.getByRole("button", {
-      name: "Сформировать ZIP с Excel",
-    });
-    await expect(zipButton).toBeEnabled();
-    await zipButton.click();
-    const zipLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(zipLink).toBeVisible();
-    const zipDownloadPromise = page.waitForEvent("download");
-    await zipLink.click();
-    const zipDownload = await zipDownloadPromise;
-    await expect(zipDownload.failure()).resolves.toBeNull();
-    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание подтверждено, пакет зафиксирован",
-    );
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Скачать Excel" }).click();
+    const download = await downloadPromise;
+    await expect(download.failure()).resolves.toBeNull();
+    await expect(page.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
     await captureUiEvidence({
       description:
-        "Excel и ZIP сформированы через UI; browser download подтверждён и terminal package commit завершён.",
+        "Excel сформирован и скачан одним действием; ZIP остаётся закрыт release-контрактом.",
       page,
       role: "admin",
       step: "07-excel-ready-to-download",
       submissionId: singleSubmissionId,
       testInfo,
     });
-    const downloadPromise = page.waitForEvent("download");
-    await downloadLink.click();
-    const download = await downloadPromise;
-    await expect(download.failure()).resolves.toBeNull();
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Скачивание Excel начато:",
-    );
+    await expect(page.locator("#export-action-hint")).toContainText("Excel скачан:");
     await captureUiEvidence({
       description:
         "Excel download инициирован реальным кликом; статус подачи не переводится в exported.",

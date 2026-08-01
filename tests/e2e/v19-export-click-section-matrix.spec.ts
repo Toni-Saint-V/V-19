@@ -30,7 +30,7 @@ async function openMobileExportControl(page: Page) {
 }
 
 test.describe("V-19 export click and section matrix", () => {
-  test("admin export keeps the current Excel and ZIP contract actionable", async ({
+  test("admin export keeps the current one-click Excel contract actionable", async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "desktop export proof");
@@ -45,46 +45,29 @@ test.describe("V-19 export click and section matrix", () => {
 
     const rail = exportRail(page);
     await expect(rail).toBeVisible();
-    await expect(rail.getByRole("button", { name: "Сформировать Excel" })).toBeDisabled();
-    await expect(
-      rail.getByRole("button", { name: "Сформировать ZIP с Excel" }),
-    ).toBeDisabled();
+    await expect(rail.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
     await expect(rail).toContainText("Выберите хотя бы одну подачу");
 
     const activeRow = exportRowById(page, "ПД-1054");
     await expect(activeRow).toBeVisible();
     await activeRow.click();
-    await expect(rail).toContainText("Активный пакет");
-    await expect(rail).toContainText("Петровы");
+    await expect(rail).toContainText("Текущая выгрузка");
+    await expect(rail).toContainText("1 пакет");
 
     await clearExportSelection(page);
     await selectExportPackage(page, "ПД-1054");
-    await expect(rail).toContainText("Пакет выбран");
-    await expect(rail.getByRole("button", { name: "Сформировать Excel" })).toBeEnabled();
-
-    await rail.getByRole("button", { name: "Сформировать Excel" }).click();
-    await expect(rail).toContainText(/Excel сформирован:/);
-
+    await expect(rail).toContainText("1 пакет");
+    await expect(rail).toContainText("готово");
+    const excelButton = rail.getByRole("button", { name: "Скачать Excel" });
+    await expect(excelButton).toBeEnabled();
     const excelDownloadPromise = page.waitForEvent("download");
-    await rail.getByRole("link", { name: "Скачать Excel" }).click();
+    await excelButton.click();
     const excelDownload = await excelDownloadPromise;
     expect(excelDownload.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
     await expect(excelDownload.failure()).resolves.toBeNull();
-    await expect(rail).toContainText(/Скачивание Excel начато:/);
-
-    await rail.getByRole("button", { name: "Сформировать ZIP с Excel" }).click();
-    const zipLink = rail.getByRole("link", { name: "Скачать ZIP" });
-    await expect(zipLink).toBeVisible();
-    const zipDownloadPromise = page.waitForEvent("download");
-    await zipLink.click();
-    const zipDownload = await zipDownloadPromise;
-    expect(zipDownload.suggestedFilename()).toMatch(
-      /^visaflow-export-.+_documents\.zip$/,
-    );
-    await expect(zipDownload.failure()).resolves.toBeNull();
-    await rail.getByRole("button", { name: "Подтвердить скачивание" }).click();
-    await expect(rail).toContainText(/пакет зафиксирован:/);
-    await expectNoHorizontalOverflow(page, "desktop export after ZIP");
+    await expect(rail.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
+    await expect(rail.locator("#export-action-hint")).toContainText("Excel скачан:");
+    await expectNoHorizontalOverflow(page, "desktop export after Excel");
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
@@ -105,9 +88,7 @@ test.describe("V-19 export click and section matrix", () => {
     await page.getByRole("button", { name: "Стоп" }).click();
     await expect(page.getByText("Пакетов с ограничениями нет")).toBeVisible();
     await expect(
-      exportRail(page).getByRole("button", {
-        name: "Сформировать ZIP с Excel",
-      }),
+      exportRail(page).getByRole("button", { name: "Скачать Excel" }),
     ).toBeDisabled();
 
     await page.getByRole("button", { name: "Доступно" }).click();
@@ -120,14 +101,18 @@ test.describe("V-19 export click and section matrix", () => {
     await expect(exportRowById(page, "SUB-1102")).toBeVisible();
     await expect(page.locator(".export-row")).toHaveCount(1);
 
-    await page.getByRole("button", { name: "Сбросить фильтры выгрузки" }).click();
+    await page.getByLabel("ID, семья или агент").fill("");
+    await typeFilter.click();
+    await page.getByRole("option", { name: "Все типы" }).click();
     await expect(typeFilter).toHaveAccessibleName("Тип: Все типы");
     await expectNoHorizontalOverflow(page, "desktop export queue tabs and filters");
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
 
-  test("mobile export control sheet stays reachable and closable", async ({ page }, testInfo) => {
+  test("mobile export control sheet stays reachable and closable", async ({
+    page,
+  }, testInfo) => {
     test.skip(testInfo.project.name !== "mobile-chromium", "mobile export proof");
     const browserProblems = collectBrowserProblems(page);
 
@@ -147,11 +132,8 @@ test.describe("V-19 export click and section matrix", () => {
 
     await openMobileExportControl(page);
     const rail = exportRail(page);
-    await expect(rail).toContainText("Pre-flight checks");
-    await expect(rail.getByRole("button", { name: "Сформировать Excel" })).toBeEnabled();
-    await expect(
-      rail.getByRole("button", { name: "Сформировать ZIP с Excel" }),
-    ).toBeEnabled();
+    await expect(rail).toContainText("Текущая выгрузка");
+    await expect(rail.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
     await expectNoHorizontalOverflow(page, "mobile export control sheet");
 
     const screenshotPath = testInfo.outputPath("admin-export-mobile-control.png");

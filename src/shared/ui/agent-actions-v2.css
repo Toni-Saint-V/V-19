@@ -255,6 +255,7 @@
   gap: var(--v19b-size-10);
   padding: var(--v19b-size-12) var(--v19b-size-16) !important;
   border-bottom: var(--v19b-size-1) solid var(--v19b-color-border) !important;
+  background: #111113 !important;
 }
 
 #root
@@ -290,7 +291,7 @@
   border-color: var(--v19b-color-border-strong) !important;
   border-radius: var(--v19b-radius-control) !important;
   color: var(--v19b-color-text) !important;
-  background: var(--v19b-color-control) !important;
+  background: #0d0d0d !important;
   font-size: var(--v19b-size-13) !important;
 }
 
@@ -2192,5 +2193,330 @@
     .v19-actions-table-row.is-inline-context
     > * {
     min-width: 0;
+  }
+}
+
+/* Match the compact one-row submissions toolbar on phone-width Actions. */
+@media (max-width: 767px) {
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    grid-template-rows: var(--v19b-size-40) !important;
+    align-items: center !important;
+    gap: var(--v19b-size-8) !important;
+    min-height: var(--v19b-size-40) !important;
+    padding: var(--v19b-size-12) !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    > .v19-two-row-toolbar-search-row,
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-controls {
+    display: contents !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    .v19-admin-queue-toolbar-search {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    .v19-admin-queue-toolbar-search
+    input {
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    > .v19-two-row-toolbar-filters {
+    display: flex !important;
+    width: max-content !important;
+    min-width: 0 !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: var(--v19b-size-6) !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    :is(
+      .v19-admin-toolbar-controls > .v19-admin-toolbar-select,
+      .v19-admin-city-filter
+    ) {
+    width: var(--v19b-size-40) !important;
+    min-width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    flex: 0 0 var(--v19b-size-40) !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select-trigger {
+    width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    .v19-admin-toolbar-select
+    :is(
+      .v19-admin-toolbar-select-label,
+      .v19-admin-toolbar-select-value,
+      .v19-admin-toolbar-select-chevron
+    ) {
+    display: none !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-admin-queue-toolbar
+    > .v19-two-row-toolbar-search-row
+    > button {
+    display: none !important;
+  }
+}
+
+/* Use the existing mobile person cards everywhere: one per row on phones and
+   two different people per row on wider screens. */
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-timeline-event.is-selected::before,
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-timeline-event.is-selected::after {
+  display: none !important;
+  content: none !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-timeline-hit {
+  border: var(--v19b-size-2) solid var(--v19b-color-border-faint) !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-timeline-event.is-selected
+  .v19-actions-timeline-hit {
+  border-color: var(--v19b-color-border-selected) !important;
+  box-shadow: none !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-timeline::before,
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-timeline-node {
+  display: none !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-mobile-detail {
+  border-right-width: var(--v19b-size-2) !important;
+  border-bottom-width: var(--v19b-size-2) !important;
+  border-left-width: var(--v19b-size-2) !important;
+}
+
+@media (min-width: 768px) {
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-desktop-grid.is-inline-context {
+    display: none !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-stage {
+    display: block !important;
+    padding: var(--v19b-size-8) !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-stage
+    > .v19-actions-panel-header {
+    display: none !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline {
+    position: relative;
+    display: block !important;
+    width: 100%;
+    gap: var(--v19b-size-8) !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline-event {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: var(--v19b-radius-row);
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline-hit {
+    display: grid !important;
+    grid-template-areas:
+      "identity status"
+      "next next";
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+    width: 100%;
+    min-height: var(--v19b-size-92) !important;
+    align-items: start;
+    gap: var(--v19b-size-6) var(--v19b-size-10) !important;
+    padding: var(--v19b-size-12) var(--v19b-size-14) !important;
+    border-radius: var(--v19b-radius-row) !important;
+    text-align: left;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-timeline-event.is-selected
+    .v19-actions-timeline-hit {
+    border-bottom-right-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-identity {
+    grid-area: identity;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-next {
+    display: flex;
+    min-width: 0;
+    grid-area: next;
+    align-items: baseline;
+    gap: var(--v19b-size-8);
+    padding-top: var(--v19b-size-6);
+    border-top: var(--v19b-size-1) solid var(--v19b-color-border-faint);
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-next
+    > small {
+    flex: 0 0 auto;
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-10);
+    font-weight: var(--v19b-weight-control);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-next
+    > strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--v19b-color-text);
+    font-size: var(--v19b-size-13);
+    font-weight: var(--v19b-weight-control);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-status-row {
+    display: flex;
+    min-width: 0;
+    grid-area: status;
+    align-items: center;
+    justify-self: end;
+    gap: var(--v19b-size-8);
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-detail {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--v19b-size-14);
+    width: 100%;
+    padding: var(--v19b-size-16);
+    border-top: 0;
+    border-radius: 0 0 var(--v19b-radius-row) var(--v19b-radius-row);
+    background: var(--v19b-color-page);
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-actions-mobile-detail
+    > div
+    + div {
+    padding-top: var(--v19b-size-14);
+    padding-left: 0;
+    border-top: var(--v19b-size-1) solid var(--v19b-color-border-faint);
+    border-left: 0;
   }
 }

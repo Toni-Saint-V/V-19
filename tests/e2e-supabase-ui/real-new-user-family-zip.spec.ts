@@ -9,6 +9,7 @@ import JSZip from "jszip";
 import { testArtifactPath } from "../support/artifacts";
 import { EXPECTED_EXPORT_CONTRACT_HEADERS } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
+import { adminDocumentPackageExportEnabled } from "../../src/modules/submissions/adminExportActions";
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
 import {
   assertNoOverflow,
@@ -986,6 +987,10 @@ test.describe("real new-user Supabase family application ZIP", () => {
   test("creates users, submits one new family, accepts it, and verifies the generated ZIP", async ({
     browser,
   }) => {
+    test.skip(
+      !adminDocumentPackageExportEnabled,
+      "T9 document-package export is blocked by the current release contract.",
+    );
     test.setTimeout(900_000);
     const runId = `real-e2e-${Date.now()}-${randomBytes(3).toString("hex")}`;
     const outputDir = testArtifactPath("real-supabase-e2e", runId);
@@ -1153,7 +1158,10 @@ test.describe("real new-user Supabase family application ZIP", () => {
 
       await clickWorkspaceButton(admin.page, /Выгрузка/);
       await expect(
-        admin.page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+        admin.page.getByRole("heading", {
+          level: 1,
+          name: "Центр выгрузки",
+        }),
       ).toBeVisible();
       await clearExportSelection(admin.page);
       const exportRow = admin.page
@@ -1176,16 +1184,14 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await expect(preview).toContainText("910000001");
       await expect(preview).toContainText("910000002");
       await expect(preview).toContainText("HOTEL E2E MADRID");
-      await admin.page.getByRole("button", { name: "Сформировать Excel" }).click();
-      await expect(
-        admin.page.getByRole("button", { name: "Excel готов" }),
-      ).toBeVisible();
       await admin.page.screenshot({
         fullPage: true,
         path: resolve(outputDir, "desktop-1440-excel-preview.png"),
       });
 
-      const zipButton = admin.page.getByRole("button", { name: "Скачать ZIP с Excel" });
+      const zipButton = admin.page.getByRole("button", {
+        name: "Скачать ZIP + Excel",
+      });
       await expect(zipButton).toBeEnabled();
       const downloadPromise = admin.page.waitForEvent("download");
       await zipButton.click();
@@ -1196,11 +1202,14 @@ test.describe("real new-user Supabase family application ZIP", () => {
       );
       const zipPath = resolve(outputDir, download.suggestedFilename());
       await download.saveAs(zipPath);
+      const confirmDownload = admin.page.getByRole("button", {
+        name: "Подтвердить скачивание",
+      });
+      await expect(confirmDownload).toBeEnabled();
+      await confirmDownload.click();
       await expect(admin.page.locator("#export-action-hint")).toContainText(
-        /ZIP скачан|пакет/i,
-        {
-          timeout: 45_000,
-        },
+        "Скачивание подтверждено, пакет зафиксирован",
+        { timeout: 90_000 },
       );
 
       await signOut(owner.page);

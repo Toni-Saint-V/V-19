@@ -359,7 +359,7 @@ async function adminReviewPresence(page: Page, submissionId: string) {
 
 async function adminExportPresence(page: Page, submissionId: string) {
   await clickWorkspaceButton(page, /Выгрузка/);
-  await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Центр выгрузки" })).toBeVisible();
   await waitForWorkspaceData(page);
   await setSearch(page, submissionId);
   return isVisible(exportRow(page, submissionId));

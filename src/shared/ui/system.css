@@ -16692,6 +16692,44 @@ button.v19-summary-tile:not(:disabled):active {
   }
 }
 
+/* Final annotated operational-control ownership. These overrides live in the
+   legacy system layer because it still carries important background rules for
+   the active Agent runtime. Keep them surface-scoped. */
+#root
+  .v19-agent-workspace-content[data-agent-screen="submissions"]
+  .v19-agent-submissions-board
+  .v19-admin-queue-toolbar-search
+  input {
+  background: #111112 !important;
+}
+
+/* Shared Linear-style list action: all operational list headers retain the
+   same right-side control and a one-pixel line on its lower boundary. */
+#root .v19-admin-list-header > button {
+  position: relative;
+  border-color: var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: #111112 !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.025) !important;
+}
+
+#root .v19-admin-list-header > button::after {
+  position: absolute;
+  right: var(--v19b-size-10);
+  bottom: 0;
+  left: var(--v19b-size-10);
+  height: var(--v19b-size-1);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--v19b-color-primary-bright),
+    transparent
+  );
+  content: "";
+  opacity: 0.72;
+  pointer-events: none;
+}
+
 /* Screen-scoped premium color pilot.
    Raw values live in ./tokens/index.css; this layer only maps them to the
    active My Actions shell and deliberately excludes Drawer descendants. */

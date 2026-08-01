@@ -1,3 +1,4 @@
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { Badge, Button } from "../../../shared/ui/primitives";
@@ -76,6 +77,11 @@ export function AgentActionsCommandCockpit({
   onSelectTask,
   onSummaryFilterChange,
 }: AgentActionsCommandCockpitProps) {
+  const { getCardRef, timelineRef } = useIndependentTimelineLayout(
+    tasks,
+    selectedTask?.id,
+  );
+
   if (errorMessage) {
     return (
       <div className="v19-actions-cockpit-empty" data-testid="agent-actions-cockpit">
@@ -149,7 +155,6 @@ export function AgentActionsCommandCockpit({
       intelligenceTasks.map((task) => [task.submission.id, task.submission] as const),
     ).values(),
   );
-
   return (
     <div
       className="v19-actions-cockpit"
@@ -262,9 +267,10 @@ export function AgentActionsCommandCockpit({
         data-testid="agent-action-timeline"
       >
         <PanelHeader label="Лента" title={actionGroupLabel} />
-        <div className="v19-actions-timeline">
+        <div className="v19-actions-timeline" ref={timelineRef}>
           {tasks.map((task) => (
             <TimelineEvent
+              elementRef={getCardRef(task.id)}
               key={task.id}
               selected={selectedTask?.id === task.id}
               task={task}
@@ -278,6 +284,106 @@ export function AgentActionsCommandCockpit({
       </section>
     </div>
   );
+}
+
+function useIndependentTimelineLayout(
+  tasks: AgentActionTask[],
+  selectedTaskId?: string,
+) {
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const cardElements = useRef(new Map<string, HTMLElement>());
+  const cardRefCallbacks = useRef(
+    new Map<string, (element: HTMLElement | null) => void>(),
+  );
+
+  const getCardRef = useCallback((taskId: string) => {
+    const existing = cardRefCallbacks.current.get(taskId);
+    if (existing) return existing;
+
+    const callback = (element: HTMLElement | null) => {
+      if (element) cardElements.current.set(taskId, element);
+      else cardElements.current.delete(taskId);
+    };
+    cardRefCallbacks.current.set(taskId, callback);
+    return callback;
+  }, []);
+
+  useLayoutEffect(() => {
+    const timeline = timelineRef.current;
+    if (
+      !timeline ||
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      typeof ResizeObserver === "undefined"
+    ) {
+      return undefined;
+    }
+
+    const desktopQuery = window.matchMedia("(min-width: 768px)");
+    let animationFrame = 0;
+
+    const clearDesktopLayout = () => {
+      timeline.style.removeProperty("height");
+      for (const element of cardElements.current.values()) {
+        element.style.removeProperty("position");
+        element.style.removeProperty("top");
+        element.style.removeProperty("left");
+        element.style.removeProperty("width");
+      }
+    };
+
+    const layoutColumns = () => {
+      animationFrame = 0;
+      if (!desktopQuery.matches) {
+        clearDesktopLayout();
+        return;
+      }
+
+      const timelineWidth = timeline.clientWidth;
+      if (!timelineWidth) return;
+
+      const computedStyle = window.getComputedStyle(timeline);
+      const parsedGap = Number.parseFloat(computedStyle.columnGap);
+      const gap = Number.isFinite(parsedGap) ? parsedGap : 8;
+      const columnWidth = (timelineWidth - gap) / 2;
+      const columnOffsets = [0, 0];
+
+      tasks.forEach((task, index) => {
+        const element = cardElements.current.get(task.id);
+        if (!element) return;
+
+        const column = index % 2;
+        element.style.position = "absolute";
+        element.style.top = `${columnOffsets[column]}px`;
+        element.style.left = `${column * (columnWidth + gap)}px`;
+        element.style.width = `${columnWidth}px`;
+        columnOffsets[column] += element.getBoundingClientRect().height + gap;
+      });
+
+      timeline.style.height = `${Math.max(...columnOffsets, gap) - gap}px`;
+    };
+
+    const scheduleLayout = () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(layoutColumns);
+    };
+
+    const resizeObserver = new ResizeObserver(scheduleLayout);
+    resizeObserver.observe(timeline);
+    for (const element of cardElements.current.values())
+      resizeObserver.observe(element);
+    desktopQuery.addEventListener("change", scheduleLayout);
+    layoutColumns();
+
+    return () => {
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      desktopQuery.removeEventListener("change", scheduleLayout);
+      resizeObserver.disconnect();
+      clearDesktopLayout();
+    };
+  }, [selectedTaskId, tasks]);
+
+  return { getCardRef, timelineRef };
 }
 
 function CockpitSummary({
@@ -850,6 +956,7 @@ function ReadinessLine({
 }
 
 function TimelineEvent({
+  elementRef,
   selected,
   task,
   onOpenPrimary,
@@ -857,6 +964,7 @@ function TimelineEvent({
   onOpenTab,
   onSelect,
 }: {
+  elementRef?: (element: HTMLElement | null) => void;
   selected: boolean;
   task: AgentActionTask;
   onOpenPrimary: () => void;
@@ -870,6 +978,7 @@ function TimelineEvent({
 
   return (
     <article
+      ref={elementRef}
       className={cn(
         "v19-actions-timeline-event",
         `status-${task.status}`,

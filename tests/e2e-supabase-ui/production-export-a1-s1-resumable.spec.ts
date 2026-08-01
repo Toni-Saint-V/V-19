@@ -18,6 +18,7 @@ import {
   EXPORT_WORKBOOK_COLUMN_COUNT,
 } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
+import { adminDocumentPackageExportEnabled } from "../../src/modules/submissions/adminExportActions";
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
 import { decodeVisaApplicationFormTemplate } from "../../src/modules/submissions/visaApplicationFormReferencePdf";
 import {
@@ -146,8 +147,8 @@ const exportDocumentTypes = [
   "visa_form",
 ] as const;
 const exportLocationByCity: Record<ProductionCohortCase["city"], string> = {
-  "Казань": "KZN",
-  "Москва": "MOW",
+  Казань: "KZN",
+  Москва: "MOW",
   "Санкт-Петербург": "SPB",
 };
 const zipDownloadTimeoutMs = 180_000;
@@ -217,9 +218,7 @@ async function inspectWorkbook(
       ),
     "Workbook marker, city, or individual appointment mapping is incorrect.",
   );
-  const passportNumbers = new Set([
-    workbookValue(headers, row, "Passport No"),
-  ]);
+  const passportNumbers = new Set([workbookValue(headers, row, "Passport No")]);
   invariant(
     passportNumbers.size === 1 &&
       [...passportNumbers].every((passport) => /^\d{9}$/.test(passport)),
@@ -606,7 +605,9 @@ function reviewCard(page: Page, submissionId: string) {
 
 async function openExport(page: Page, submissionId: string) {
   await clickWorkspaceButton(page, /Выгрузка/);
-  await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
+  ).toBeVisible();
   await waitForWorkspaceData(page);
   await setSearch(page, submissionId);
   return exportRow(page, submissionId);
@@ -639,14 +640,12 @@ async function selectOnlySelectedCase(
 }
 
 async function downloadAndInspectExcel(page: Page, cohortCase: ProductionCohortCase) {
-  const prepare = page.getByRole("button", { name: "Сформировать Excel" });
-  await expect(prepare).toBeEnabled();
-  await prepare.click();
-  await expect(page.getByRole("button", { name: "Excel готов" })).toBeVisible();
-  const downloadButton = page.getByRole("link", { name: "Скачать Excel" });
+  const downloadButton = page.getByRole("button", { name: "Скачать Excel" });
+  await expect(downloadButton).toBeEnabled();
   const downloadPromise = page.waitForEvent("download");
   await downloadButton.click();
   const download = await downloadPromise;
+  await expect(page.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
   invariant(
     /^visaflow-export-.+\.xlsx$/.test(download.suggestedFilename()),
     "Excel download filename is not canonical.",
@@ -667,16 +666,11 @@ async function downloadAndInspectZip(
   session.gate.beginExport();
   let proof: SanitizedA1S1ZipProof;
   try {
-    const prepareButton = session.page.getByRole("button", {
-      name: "Сформировать ZIP с Excel",
+    const downloadButton = session.page.getByRole("button", {
+      name: "Скачать ZIP + Excel",
     });
-    await expect(prepareButton).toBeEnabled();
+    await expect(downloadButton).toBeEnabled();
     const exportStartedAt = Date.now();
-    await prepareButton.click();
-    const downloadLink = session.page.getByRole("link", {
-      name: "Скачать ZIP",
-    });
-    await expect(downloadLink).toBeVisible({ timeout: zipDownloadTimeoutMs });
     const downloadOutcome = session.page
       .waitForEvent("download", { timeout: zipDownloadTimeoutMs })
       .then(
@@ -706,7 +700,7 @@ async function downloadAndInspectZip(
         () => ({ kind: "ui-error" as const }),
         () => ({ kind: "no-ui-error" as const }),
       );
-    await downloadLink.click();
+    await downloadButton.click();
     const outcome = await Promise.race([downloadOutcome, uiErrorOutcome]);
     let download: Download | undefined;
     if (outcome.kind === "download") {
@@ -722,15 +716,13 @@ async function downloadAndInspectZip(
       );
     } else {
       const [buttonText, hint] = await Promise.all([
-        prepareButton.textContent().catch(() => ""),
+        downloadButton.textContent().catch(() => ""),
         session.page
           .locator("#export-action-hint")
           .textContent()
           .catch(() => ""),
       ]);
-      const phase = buttonText?.includes("Формируем пакет")
-        ? "preparing"
-        : "settled";
+      const phase = buttonText?.includes("Формируем пакет") ? "preparing" : "settled";
       const hintDigest = productionA1S1ExportDigest(hint ?? "").slice(0, 16);
       throw new Error(
         `${PRODUCTION_EXPORT_CASE_KEY} ZIP download did not arrive within ${zipDownloadTimeoutMs}ms (phase=${phase}, hintDigest=${hintDigest}).`,
@@ -924,6 +916,10 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} export artifact gate`, (
   test("downloads and verifies one real technical tourist package plus exact Excel through real UI", async ({
     browser,
   }, testInfo) => {
+    test.skip(
+      !adminDocumentPackageExportEnabled,
+      "T9 document-package export is blocked by the current release contract.",
+    );
     test.setTimeout(1_800_000);
     assertProductionA1S1ExportWriteUnlock();
     const runMarker = requiredProductionRunMarker();
@@ -1156,6 +1152,10 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} abort-only draft gate`, 
   test("accepts the artifact-bound real draft and aborts it before production send", async ({
     browser,
   }, testInfo) => {
+    test.skip(
+      !adminDocumentPackageExportEnabled,
+      "T9 document-package export is blocked by the current release contract.",
+    );
     test.setTimeout(1_800_000);
     const runMarker = requiredProductionRunMarker();
     const evidence: {
@@ -1238,12 +1238,13 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} abort-only draft gate`, 
       );
       invariant(owner, "A2-S1 owner account is unavailable for read-only preflight.");
       const submissionId = cohortCheckpoint.submissionId;
-      const { networkContract, preflight } =
-        await resolveA1S1ProductionExportPreflight({
+      const { networkContract, preflight } = await resolveA1S1ProductionExportPreflight(
+        {
           admin: accounts.admin,
           ownerId: owner.authUserId,
           submissionId,
-        });
+        },
+      );
       evidence.caseMarkerDigest = productionA1S1ExportDigest(cohortCase.caseMarker);
       evidence.preflight = preflight;
       evidence.submissionDigest = productionA1S1ExportDigest(submissionId);
@@ -1280,37 +1281,25 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} abort-only draft gate`, 
         admin.gate.beginExport();
         let exportPhaseFinished = false;
         try {
-          const prepareButton = admin.page.getByRole("button", {
-            name: "Сформировать ZIP с Excel",
+          const downloadButton = admin.page.getByRole("button", {
+            name: "Скачать ZIP + Excel",
           });
-          await expect(prepareButton).toBeEnabled();
-          await prepareButton.click();
-          const downloadLink = admin.page.getByRole("link", {
-            name: "Скачать ZIP",
-          });
-          await expect(downloadLink).toBeVisible({
-            timeout: zipDownloadTimeoutMs,
-          });
+          await expect(downloadButton).toBeEnabled();
           const downloadPromise = admin.page.waitForEvent("download", {
             timeout: zipDownloadTimeoutMs,
           });
-          await downloadLink.click();
+          await downloadButton.click();
           const download = await downloadPromise;
           invariant(
-            /^visaflow-export-.+_documents\.zip$/.test(
-              download.suggestedFilename(),
-            ),
+            /^visaflow-export-.+_documents\.zip$/.test(download.suggestedFilename()),
             "Abort-only ZIP filename is not canonical.",
           );
-          const inspected = await inspectZip(
-            await downloadA1S1ExportBytes(download),
-            {
-              cohortCase,
-              expectedWorkbook: workbook.proof,
-              submissionId,
-              zipFileName: download.suggestedFilename(),
-            },
-          );
+          const inspected = await inspectZip(await downloadA1S1ExportBytes(download), {
+            cohortCase,
+            expectedWorkbook: workbook.proof,
+            submissionId,
+            zipFileName: download.suggestedFilename(),
+          });
           evidence.zip = inspected.proof;
           admin.gate.bindVerifiedArtifact(inspected.artifactContract);
           const acceptedDraftPromise = admin.gate.waitForAcceptedExportDraft(30_000);

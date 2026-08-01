@@ -400,32 +400,16 @@ async function expectMobileHeaderRhythm(page: Page, context: string) {
 }
 
 async function expectMobileAdminReviewDensity(page: Page, context: string) {
-  const focusTabs = page.locator(".v19-review-focus-tabs > button:visible");
-  await expect(focusTabs).toHaveCount(4);
-  const tabTops = await focusTabs.evaluateAll((elements) =>
-    elements.map((element) => Math.round(element.getBoundingClientRect().top)),
-  );
-  expect(new Set(tabTops).size, `${context}: focus tabs stay on one row`).toBe(1);
+  await expect(page.locator(".v19-review-focus-tabs")).toHaveCount(0);
 
-  await expect(
-    page.locator(".v19-admin-review-board .v19-admin-toolbar-select:visible"),
-  ).toHaveCount(1);
-  const sortTrigger = page.locator(
-    ".v19-admin-review-board .v19-admin-toolbar-select:visible .v19-admin-toolbar-select-trigger",
+  const filterButtons = page.locator(
+    ".v19-admin-review-board .v19-inline-filter-buttons .v19-admin-toolbar-select:visible",
   );
-  await expect(sortTrigger).toContainText(/По приоритету|По дате/);
-  expect(
-    await sortTrigger.evaluate((element) => element.getBoundingClientRect().width),
-    `${context}: sort control is a labeled button`,
-  ).toBeGreaterThanOrEqual(120);
-
-  const mobileFilters = page.locator(".v19-review-mobile-filters");
-  const mobileFiltersTrigger = mobileFilters.locator("summary");
-  await expect(mobileFiltersTrigger).toBeVisible();
+  await expect(filterButtons).toHaveCount(3);
   const queueToolbarControls = page.locator(
-    ".v19-admin-review-board .v19-admin-queue-toolbar-search:visible, .v19-admin-review-board .v19-admin-toolbar-select:visible, .v19-admin-review-board .v19-review-mobile-filters > summary:visible",
+    ".v19-admin-review-board .v19-admin-queue-toolbar-search:visible, .v19-admin-review-board .v19-inline-filter-buttons .v19-admin-toolbar-select:visible",
   );
-  await expect(queueToolbarControls).toHaveCount(3);
+  await expect(queueToolbarControls).toHaveCount(4);
   const toolbarControlCenters = await queueToolbarControls.evaluateAll((elements) =>
     elements.map((element) => {
       const bounds = element.getBoundingClientRect();
@@ -434,23 +418,60 @@ async function expectMobileAdminReviewDensity(page: Page, context: string) {
   );
   expect(
     new Set(toolbarControlCenters).size,
-    `${context}: search, sorting and filters stay on one row`,
+    `${context}: search and all three filter buttons stay on one row`,
   ).toBe(1);
-
-  await mobileFiltersTrigger.click();
-  await expect(mobileFilters.locator(".v19-admin-toolbar-select:visible")).toHaveCount(
-    2,
-  );
-  await mobileFiltersTrigger.click();
+  await expect(page.locator(".v19-review-mobile-filters")).toHaveCount(0);
 
   const firstCard = page.locator(".v19-admin-review-card:visible").first();
   await expect(firstCard).toBeVisible();
   await expect(firstCard.locator(".v19-review-row-time")).toBeHidden();
   await expect(firstCard.locator(".v19-review-row-identity > em")).toBeHidden();
   await expect(firstCard.locator(".v19-review-row-priority > small")).toBeHidden();
+
+  const density = await firstCard.evaluate((card) => {
+    const title = card.querySelector<HTMLElement>(".v19-review-row-identity > strong");
+    const rank = card.querySelector<HTMLElement>(".v19-review-row-rank");
+    const open = card.querySelector<HTMLElement>(".v19-review-row-open");
+    const cardStyle = getComputedStyle(card);
+
+    return {
+      openHeight: open?.getBoundingClientRect().height ?? 0,
+      paddingTop: Number.parseFloat(cardStyle.paddingTop),
+      rankWidth: rank?.getBoundingClientRect().width ?? 0,
+      titleFontSize: title ? Number.parseFloat(getComputedStyle(title).fontSize) : 0,
+    };
+  });
+  expect(density.titleFontSize, `${context}: compact title`).toBeLessThanOrEqual(18.1);
+  expect(density.rankWidth, `${context}: compact rank`).toBeLessThanOrEqual(44.1);
+  expect(density.openHeight, `${context}: compact action`).toBeLessThanOrEqual(52.1);
+  expect(density.paddingTop, `${context}: compact card padding`).toBeLessThanOrEqual(
+    16.1,
+  );
 }
 
-async function expectMobileExportRowComposition(page: Page, context: string) {
+async function expectMobileExportRowComposition(
+  page: Page,
+  context: string,
+  expectCompactHeader = false,
+) {
+  const toolbarControls = page.locator(
+    ".v19-admin-export-workspace-v2 .v19-inline-filter-buttons .v19-admin-toolbar-select:visible",
+  );
+  await expect(toolbarControls).toHaveCount(3);
+  await expect(page.locator(".v19-export-mobile-filters")).toHaveCount(0);
+
+  if (expectCompactHeader) {
+    const workspacePaddingBottom = await page
+      .locator(".workspace")
+      .evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).paddingBottom),
+      );
+    expect(
+      workspacePaddingBottom,
+      `${context}: export workspace has no obsolete bottom-nav reserve`,
+    ).toBe(0);
+  }
+
   const row = page.locator(".v19-admin-export-row-v2:visible").first();
   await expect(row).toBeVisible();
   await expect(row.locator(".v19-admin-export-row-agent-v2")).toBeHidden();
@@ -469,9 +490,26 @@ async function expectMobileExportRowComposition(page: Page, context: string) {
     const idRect = publicId.getBoundingClientRect();
     const titleRect = title.getBoundingClientRect();
     const cityRect = city.getBoundingClientRect();
+    const identityRect = title
+      .closest<HTMLElement>(".v19-admin-export-row-identity-v2")
+      ?.getBoundingClientRect();
     const titleStyle = getComputedStyle(title);
+    const idStyle = getComputedStyle(publicId);
     const checkboxStyle = getComputedStyle(checkbox);
+    const copyStyle = getComputedStyle(title.parentElement!);
+    const dateValue = dates.querySelector<HTMLElement>(
+      ".v19-admin-export-row-value-v2",
+    );
+    const cityValue = city.querySelector<HTMLElement>(".v19-admin-export-row-value-v2");
+    const dateValueStyle = dateValue ? getComputedStyle(dateValue) : null;
+    const cityValueStyle = cityValue ? getComputedStyle(cityValue) : null;
+    const cityIconRect = cityIcon.getBoundingClientRect();
+    const cityValueRect = cityValue?.getBoundingClientRect();
     const rowStyle = getComputedStyle(element);
+    const unselectedRow = document.querySelector<HTMLElement>(
+      ".v19-admin-export-row-v2:not(.is-selected):not(.is-blocked)",
+    );
+    const unselectedRowStyle = unselectedRow ? getComputedStyle(unselectedRow) : null;
     const headerAction = document.querySelector<HTMLElement>(
       ".v19-admin-export-list-head-v2 > button",
     );
@@ -487,12 +525,38 @@ async function expectMobileExportRowComposition(page: Page, context: string) {
         Math.abs(cityRect.top - datesRect.top) <= 1 &&
         Math.abs(cityRect.height - datesRect.height) <= 1,
       cityColumnGap: Number.parseFloat(getComputedStyle(city).columnGap),
+      cityContentAligned:
+        cityValueRect !== undefined &&
+        Math.abs(
+          cityIconRect.top +
+            cityIconRect.height / 2 -
+            (cityValueRect.top + cityValueRect.height / 2),
+        ) <= 1,
+      cityPaddingInline: [
+        Number.parseFloat(getComputedStyle(city).paddingLeft),
+        Number.parseFloat(getComputedStyle(city).paddingRight),
+      ],
       cityIconWidth: cityIcon.getBoundingClientRect().width,
       idAfterName: idRect.left >= titleRect.right,
+      identityWidth: identityRect?.width ?? 0,
       idWidth: idRect.width,
+      idColor: idStyle.color,
+      idBackground: idStyle.backgroundColor,
+      idFontSize: Number.parseFloat(idStyle.fontSize),
+      idFontWeight: idStyle.fontWeight,
       checkboxWidth: checkboxRect.width,
       checkboxOpacity: Number.parseFloat(checkboxStyle.opacity),
+      checkboxMarginRight: Number.parseFloat(checkboxStyle.marginRight),
+      checkboxVisualInset: element.getBoundingClientRect().right - checkboxRect.right,
+      copyMarginLeft: Number.parseFloat(copyStyle.marginLeft),
+      dateFontSize: Number.parseFloat(dateValueStyle?.fontSize ?? "0"),
+      dateFontWeight: dateValueStyle?.fontWeight ?? "0",
+      dateColor: dateValueStyle?.color ?? "",
+      cityFontSize: Number.parseFloat(cityValueStyle?.fontSize ?? "0"),
+      cityColor: cityValueStyle?.color ?? "",
       rowBackground: rowStyle.backgroundColor,
+      unselectedRowBackground: unselectedRowStyle?.backgroundColor ?? "",
+      unselectedRowBorder: unselectedRowStyle?.borderColor ?? "",
       headerActionHeight: headerActionRect?.height ?? 0,
       headerActionRadius: headerAction
         ? Number.parseFloat(getComputedStyle(headerAction).borderRadius)
@@ -500,6 +564,9 @@ async function expectMobileExportRowComposition(page: Page, context: string) {
       headerActionWidth: headerActionRect?.width ?? 0,
       titleFontSize: Number.parseFloat(titleStyle.fontSize),
       titleFontWeight: titleStyle.fontWeight,
+      titleWidth: titleRect.width,
+      datesWidth: datesRect.width,
+      cityWidth: cityRect.width,
     };
   });
   expect(composition, `${context}: export row composition`).not.toBeNull();
@@ -513,14 +580,58 @@ async function expectMobileExportRowComposition(page: Page, context: string) {
   ).toBe(true);
   expect(composition!.cityColumnGap, `${context}: compact city icon gap`).toBe(2);
   expect(
-    composition!.cityIconWidth,
-    `${context}: compact city icon`,
-  ).toBeLessThanOrEqual(18);
+    composition!.cityContentAligned,
+    `${context}: city icon and text share one vertical center`,
+  ).toBe(true);
+  expect(composition!.cityIconWidth, `${context}: compact city icon`).toBe(16);
   expect(composition!.idAfterName, `${context}: public ID follows the name`).toBe(true);
+  expect(
+    composition!.identityWidth,
+    `${context}: applicant identity is not collapsed by the desktop table grid`,
+  ).toBeGreaterThan(100);
+  expect(
+    composition!.titleWidth,
+    `${context}: applicant name stays visible`,
+  ).toBeGreaterThan(expectCompactHeader ? 40 : 100);
+  expect(
+    composition!.datesWidth,
+    `${context}: trip dates stay visible`,
+  ).toBeGreaterThan(80);
+  expect(composition!.cityWidth, `${context}: city stays visible`).toBeGreaterThan(80);
   expect(composition!.idWidth, `${context}: compact public ID tag`).toBeLessThanOrEqual(
     88,
   );
-  expect(composition!.checkboxWidth, `${context}: calm checkbox size`).toBe(18);
+  expect(composition!.idColor, `${context}: public ID contrast`).toBe(
+    "rgb(245, 245, 245)",
+  );
+  expect(composition!.idBackground, `${context}: public ID surface`).toBe(
+    "rgb(4, 14, 21)",
+  );
+  expect(composition!.idFontSize, `${context}: compact public ID type`).toBe(8);
+  expect(composition!.idFontWeight, `${context}: stable public ID weight`).toBe("500");
+  expect(composition!.checkboxWidth, `${context}: calm checkbox size`).toBe(16);
+  expect(composition!.checkboxMarginRight, `${context}: checkbox right rhythm`).toBe(
+    16,
+  );
+  expect(
+    composition!.checkboxVisualInset,
+    `${context}: checkbox includes card padding, margin and visual inset`,
+  ).toBeGreaterThanOrEqual(29);
+  expect(composition!.copyMarginLeft, `${context}: identity leading rhythm`).toBe(6);
+  expect(composition!.dateFontSize, `${context}: readable trip date`).toBe(13);
+  expect(composition!.dateFontWeight, `${context}: stable trip date weight`).toBe(
+    "500",
+  );
+  expect(composition!.dateColor, `${context}: trip date contrast`).toBe(
+    "rgb(245, 245, 245)",
+  );
+  expect(composition!.cityFontSize, `${context}: readable city`).toBe(13);
+  expect(composition!.cityPaddingInline, `${context}: edge-aligned city`).toEqual([
+    0, 0,
+  ]);
+  expect(composition!.cityColor, `${context}: city contrast`).toBe(
+    "rgb(245, 245, 245)",
+  );
   expect(
     composition!.checkboxOpacity,
     `${context}: calm checkbox emphasis`,
@@ -529,17 +640,28 @@ async function expectMobileExportRowComposition(page: Page, context: string) {
     composition!.rowBackground,
     `${context}: unselected rows keep a dark-grey surface`,
   ).not.toBe("rgba(0, 0, 0, 0)");
+  expect(
+    composition!.unselectedRowBackground,
+    `${context}: unselected export surface`,
+  ).toBe("rgb(36, 35, 36)");
+  expect(composition!.unselectedRowBorder, `${context}: unselected export border`).toBe(
+    "rgb(62, 58, 74)",
+  );
   expect(composition!.titleFontSize, `${context}: compact applicant name`).toBe(15);
   expect(composition!.titleFontWeight, `${context}: calm applicant weight`).toBe("500");
-  expect(composition!.headerActionWidth, `${context}: compact all action width`).toBe(
-    60,
-  );
-  expect(composition!.headerActionHeight, `${context}: compact all action height`).toBe(
-    36,
-  );
-  expect(composition!.headerActionRadius, `${context}: compact all action radius`).toBe(
-    20,
-  );
+  if (expectCompactHeader) {
+    expect(composition!.headerActionWidth, `${context}: compact all action width`).toBe(
+      60,
+    );
+    expect(
+      composition!.headerActionHeight,
+      `${context}: compact all action height`,
+    ).toBe(36);
+    expect(
+      composition!.headerActionRadius,
+      `${context}: compact all action radius`,
+    ).toBe(10);
+  }
 }
 
 async function expectMobileActionDensity(page: Page, context: string) {
@@ -595,16 +717,18 @@ async function expectMobileActionDensity(page: Page, context: string) {
       event.classList.add("is-selected");
       const hit = event.querySelector<HTMLElement>(".v19-actions-timeline-hit");
       const result = {
+        borderWidth: hit ? getComputedStyle(hit).borderLeftWidth : "0px",
         inset: hit ? getComputedStyle(hit).boxShadow : "none",
+        beforeContent: getComputedStyle(event, "::before").content,
         pseudoContent: getComputedStyle(event, "::after").content,
       };
       if (!wasSelected) event.classList.remove("is-selected");
       return result;
     });
   expect(selectedAccent.pseudoContent, `${context}: one selected accent`).toBe("none");
-  expect(selectedAccent.inset, `${context}: selected accent remains visible`).not.toBe(
-    "none",
-  );
+  expect(selectedAccent.beforeContent, `${context}: no left accent strip`).toBe("none");
+  expect(selectedAccent.inset, `${context}: no inset accent strip`).toBe("none");
+  expect(selectedAccent.borderWidth, `${context}: card border`).toBe("2px");
 
   const viewport = page.viewportSize();
   expect(viewport, `${context}: viewport`).not.toBeNull();
@@ -647,85 +771,34 @@ async function expectMobileActionDensity(page: Page, context: string) {
 
 async function expectDesktopActionTableContract(
   page: Page,
-  viewportWidth: number,
+  _viewportWidth: number,
   context: string,
 ) {
-  const header = page.locator(".v19-actions-table-head").first();
-  const row = page.locator(".v19-actions-table-row.is-inline-context").first();
-  await expect(header, `${context}: table header`).toBeVisible();
-  await expect(row, `${context}: first table row`).toBeVisible();
-
-  if (viewportWidth < 900) {
-    await expect(
-      header.locator(":scope > span").nth(2),
-      `${context}: dates header`,
-    ).toBeHidden();
-    await expect(
-      header.locator(":scope > span").nth(3),
-      `${context}: city header`,
-    ).toBeVisible();
-    await expect(row.locator(".v19-actions-cell-dates")).toBeHidden();
-    await expect(row.locator(".v19-actions-cell-city")).toBeVisible();
-
-    const tracks = await Promise.all([
-      header.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
-      row.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
-    ]);
-    expect(tracks[1], `${context}: compact row tracks match header tracks`).toBe(
-      tracks[0],
-    );
-
-    const [headerLefts, rowLefts] = await Promise.all([
-      header
-        .locator(":scope > span:visible")
-        .evaluateAll((elements) =>
-          elements.map((element) => element.getBoundingClientRect().left),
-        ),
-      row
-        .locator(
-          ":scope > .v19-actions-cell-id:visible, :scope > .v19-actions-cell-applicant:visible, :scope > .v19-actions-cell-city:visible, :scope > .v19-actions-cell-action:visible",
-        )
-        .evaluateAll((elements) =>
-          elements.map((element) => element.getBoundingClientRect().left),
-        ),
-    ]);
-    expect(rowLefts).toHaveLength(4);
-    headerLefts.forEach((left, index) => {
-      expect(
-        Math.abs(rowLefts[index] - left),
-        `${context}: compact column ${index + 1} left alignment`,
-      ).toBeLessThanOrEqual(1);
-    });
-    return;
-  }
-
-  const tracks = await Promise.all([
-    header.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
-    row.evaluate((element) => getComputedStyle(element).gridTemplateColumns),
+  await expect(
+    page.getByTestId("agent-action-queue"),
+    `${context}: legacy desktop table is hidden`,
+  ).toBeHidden();
+  const timeline = page.getByTestId("agent-action-timeline");
+  await expect(timeline, `${context}: person card list`).toBeVisible();
+  const entries = timeline.locator(".v19-actions-timeline-event");
+  expect(
+    await entries.count(),
+    `${context}: at least two person cards`,
+  ).toBeGreaterThanOrEqual(2);
+  const [firstBox, secondBox] = await Promise.all([
+    entries.first().boundingBox(),
+    entries.nth(1).boundingBox(),
   ]);
-  expect(tracks[1], `${context}: row tracks match header tracks`).toBe(tracks[0]);
-
-  const [headerLefts, rowLefts] = await Promise.all([
-    header
-      .locator(":scope > span")
-      .evaluateAll((elements) =>
-        elements.map((element) => element.getBoundingClientRect().left),
-      ),
-    row
-      .locator(
-        ":scope > .v19-actions-cell-id, :scope > .v19-actions-cell-applicant, :scope > .v19-actions-cell-dates, :scope > .v19-actions-cell-city, :scope > .v19-actions-cell-action",
-      )
-      .evaluateAll((elements) =>
-        elements.map((element) => element.getBoundingClientRect().left),
-      ),
-  ]);
-  expect(rowLefts).toHaveLength(5);
-  headerLefts.slice(0, 5).forEach((left, index) => {
-    expect(
-      Math.abs(rowLefts[index] - left),
-      `${context}: column ${index + 1} left alignment`,
-    ).toBeLessThanOrEqual(1);
-  });
+  expect(firstBox, `${context}: first card geometry`).not.toBeNull();
+  expect(secondBox, `${context}: second card geometry`).not.toBeNull();
+  expect(
+    Math.abs(firstBox!.y - secondBox!.y),
+    `${context}: first two people share one grid row`,
+  ).toBeLessThanOrEqual(1);
+  expect(
+    secondBox!.x,
+    `${context}: second person occupies the second grid column`,
+  ).toBeGreaterThan(firstBox!.x + firstBox!.width - 1);
 }
 
 async function expectSettingsPanelsDoNotOverlap(page: Page, context: string) {
@@ -819,10 +892,9 @@ async function selectReadyExportPackage(page: Page) {
   }
 
   await expect(controlRail).toBeVisible();
-  return controlRail
-    .locator("button")
-    .filter({ hasText: /^Сформировать\s+Excel$/ })
-    .first();
+  return controlRail.getByRole("button", {
+    name: /Скачать (?:Excel|ZIP \+ Excel)/,
+  });
 }
 
 async function expectMobileSheetKeyboardContract(
@@ -1313,9 +1385,11 @@ test.describe("V-19 responsive proof", () => {
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
-      if (viewport.width < 768) {
-        await expectMobileExportRowComposition(page, `${viewport.label}: export`);
-      }
+      await expectMobileExportRowComposition(
+        page,
+        `${viewport.label}: export`,
+        viewport.width < 768,
+      );
       await expectMobileSheetKeyboardContract(page, {
         closeName: "Закрыть контроль пакета",
         dialogName: "Контроль пакета",
@@ -1329,6 +1403,15 @@ test.describe("V-19 responsive proof", () => {
           toggleName: /^Контроль пакета/,
         });
       }
+      if (viewport.width >= 1280) {
+        const exportSummary = page.getByRole("region", {
+          name: "Текущая выгрузка",
+        });
+        await expect(exportSummary).toContainText("Пакет в фокусе");
+        await expect(exportSummary).toContainText("Готовность");
+        await expect(exportSummary).toContainText("Даты поездки");
+        await screenshot(page, viewport, "export-idle");
+      }
       const generateButton = await selectReadyExportPackage(page);
       await generateButton.scrollIntoViewIfNeeded();
       await expect(generateButton).toBeEnabled();
@@ -1338,6 +1421,31 @@ test.describe("V-19 responsive proof", () => {
       );
       await screenshot(page, viewport, "export");
     }
+
+    expect(problems).toEqual([]);
+  });
+
+  test("admin review cards stay compact at a 4:3 viewport", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    test.skip(testInfo.project.name !== "chromium", "single-project viewport proof");
+
+    const problems = collectBrowserProblems(page);
+    const viewport: ViewportProof = {
+      height: 540,
+      label: "720-4x3",
+      width: 720,
+    };
+
+    await page.setViewportSize(viewport);
+    await openFreshWorkspace(page, {
+      heading: /^(Очередь на проверку|Проверка)$/,
+      workspaceEmail: "admin@visaflow.local",
+    });
+    await expectNoHorizontalDocumentOverflow(page, "720-4x3: admin review");
+    await expectMobileAdminReviewDensity(page, "720-4x3: admin review");
+    await screenshot(page, viewport, "admin-review-compact");
 
     expect(problems).toEqual([]);
   });

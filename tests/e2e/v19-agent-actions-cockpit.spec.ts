@@ -115,11 +115,20 @@ async function assertMobileCockpit(page: Page) {
   await expect(surface.getByTestId("agent-action-queue")).not.toBeVisible();
   await expect(page.locator(".ops-mobile-tabbar")).not.toBeVisible();
 
-  const event = surface
+  const mobileCards = surface
     .getByTestId("agent-action-timeline")
-    .locator(".v19-actions-timeline-event")
-    .first();
+    .locator(".v19-actions-timeline-event");
+  const event = mobileCards.first();
   await expect(event).toBeVisible();
+  const [firstMobileBox, secondMobileBox] = await Promise.all([
+    mobileCards.first().boundingBox(),
+    mobileCards.nth(1).boundingBox(),
+  ]);
+  if (!firstMobileBox || !secondMobileBox) {
+    throw new Error("The first two mobile person cards have no geometry.");
+  }
+  expect(Math.abs(firstMobileBox.x - secondMobileBox.x)).toBeLessThanOrEqual(1);
+  expect(secondMobileBox.y).toBeGreaterThan(firstMobileBox.y + firstMobileBox.height);
   await expect(event.locator(".v19-actions-mobile-priority")).toHaveCount(0);
   await expect(event.locator(".v19-actions-mobile-cell-route")).toHaveCount(0);
   await expect(event.locator(".v19-actions-mobile-cell-reason")).toHaveCount(0);
@@ -133,6 +142,38 @@ async function assertMobileCockpit(page: Page) {
   const mobileDetail = page.getByTestId("agent-action-mobile-detail");
   await expect(mobileDetail).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  const selectedCardStyle = await event.evaluate((card) => {
+    const hit = card.querySelector<HTMLElement>(".v19-actions-timeline-hit");
+    const hitStyle = hit ? getComputedStyle(hit) : null;
+    return {
+      after: getComputedStyle(card, "::after").content,
+      before: getComputedStyle(card, "::before").content,
+      borderStyles: hitStyle
+        ? [
+            hitStyle.borderTopStyle,
+            hitStyle.borderRightStyle,
+            hitStyle.borderBottomStyle,
+            hitStyle.borderLeftStyle,
+          ]
+        : [],
+      borderWidths: hitStyle
+        ? [
+            hitStyle.borderTopWidth,
+            hitStyle.borderRightWidth,
+            hitStyle.borderBottomWidth,
+            hitStyle.borderLeftWidth,
+          ]
+        : [],
+      boxShadow: hitStyle?.boxShadow,
+    };
+  });
+  expect(selectedCardStyle).toEqual({
+    after: "none",
+    before: "none",
+    borderStyles: ["solid", "solid", "solid", "solid"],
+    borderWidths: ["2px", "2px", "2px", "2px"],
+    boxShadow: "none",
+  });
 
   await disclosure.click();
   await expect(disclosure).toHaveAttribute("aria-expanded", "false");
@@ -169,116 +210,172 @@ async function assertMobileCockpit(page: Page) {
 
 async function assertDesktopCockpit(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
-  await expect(surface.getByTestId("agent-action-queue")).toBeVisible();
-  await expect(surface.getByTestId("agent-action-timeline")).not.toBeVisible();
+  await expect(surface.getByTestId("agent-action-queue")).not.toBeVisible();
+  const timeline = surface.getByTestId("agent-action-timeline");
+  await expect(timeline).toBeVisible();
   await expect(surface.locator(".v19-action-row, .vf-figma-action-row")).toHaveCount(0);
 
-  const rows = surface.getByTestId("agent-action-queue-item");
-  await expect(rows.first()).toBeVisible();
-  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
-  await expect(surface.getByTestId("agent-action-inline-detail")).toHaveCount(0);
+  const cards = timeline.locator(".v19-actions-timeline-event");
+  const firstCard = cards.nth(0);
+  const secondCard = cards.nth(1);
+  const leftFollower = cards.nth(2);
+  const rightFollower = cards.nth(3);
+  const firstDisclosure = firstCard.locator(".v19-actions-timeline-hit");
+  const secondDisclosure = secondCard.locator(".v19-actions-timeline-hit");
+  expect(
+    await cards.count(),
+    "desktop exposes at least two person cards",
+  ).toBeGreaterThanOrEqual(2);
+  await expect(firstDisclosure).toBeVisible();
+  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
   await expect(surface.getByTestId("agent-action-active-panel")).toHaveCount(0);
-  await expect(surface.locator(".v19-actions-table-rank")).toHaveCount(0);
-  await expect(surface.locator(".v19-actions-table-priority")).toHaveCount(0);
-
-  const headerCells = surface.locator(".v19-actions-table-head > span");
-  await expect(headerCells).toHaveCount(5);
-  await expect(headerCells).toHaveText([
-    "ID",
-    "Имя, фамилия",
-    "Даты поездки",
-    "Город",
-    "Действие",
-  ]);
-
-  const firstRowCells = [
-    rows.first().locator(".v19-actions-cell-id"),
-    rows.first().locator(".v19-actions-cell-applicant"),
-    rows.first().locator(".v19-actions-cell-dates"),
-    rows.first().locator(".v19-actions-cell-city"),
-    rows.first().locator(".v19-actions-cell-action"),
-  ];
-  const headerBoxes = [];
-  const rowCellBoxes = [];
-
-  for (let index = 0; index < firstRowCells.length; index += 1) {
-    const header = headerCells.nth(index);
-    const rowCell = firstRowCells[index];
-    await expect(header).toBeVisible();
-    await expect(rowCell).toBeVisible();
-
-    const [headerBox, rowCellBox] = await Promise.all([
-      header.boundingBox(),
-      rowCell.boundingBox(),
+  const [firstCardBox, secondCardBox, leftFollowerBox, rightFollowerBox] =
+    await Promise.all([
+      firstCard.boundingBox(),
+      secondCard.boundingBox(),
+      leftFollower.boundingBox(),
+      rightFollower.boundingBox(),
     ]);
-
-    if (!headerBox || !rowCellBox) {
-      throw new Error(`Column ${index + 1} does not expose measurable geometry.`);
-    }
-
-    headerBoxes.push(headerBox);
-    rowCellBoxes.push(rowCellBox);
-    expect(
-      Math.abs(headerBox.x - rowCellBox.x),
-      `Column ${index + 1} header starts on the same horizontal axis as its value`,
-    ).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs(headerBox.width - rowCellBox.width),
-      `Column ${index + 1} header and value use the same width`,
-    ).toBeLessThanOrEqual(1);
+  if (!firstCardBox || !secondCardBox || !leftFollowerBox || !rightFollowerBox) {
+    throw new Error("The two independent person columns have incomplete geometry.");
   }
-
   expect(
-    Math.max(...headerBoxes.map((box) => box.width)) -
-      Math.min(...headerBoxes.map((box) => box.width)),
-    "the five header columns are equal in width",
+    Math.abs(firstCardBox.y - secondCardBox.y),
+    "the first two people share one grid row",
   ).toBeLessThanOrEqual(1);
   expect(
-    Math.max(...rowCellBoxes.map((box) => box.height)) -
-      Math.min(...rowCellBoxes.map((box) => box.height)),
-    "all row values share one vertical alignment box",
-  ).toBeLessThanOrEqual(1);
-
-  const actionTagLabels = await rows
-    .locator(".v19-actions-action-tag")
-    .allTextContents();
-  expect(actionTagLabels.length).toBeGreaterThan(0);
-  expect(
-    actionTagLabels.every((label) => label.trim().split(/\s+/).length <= 2),
-    "rightmost action tags stay within two words",
-  ).toBe(true);
-
-  const queue = surface.locator(".v19-actions-queue-list");
-  const initialOrder = await rows.evaluateAll((items) =>
-    items.map((item) => item.getAttribute("data-agent-action-id")),
+    secondCardBox.x,
+    "the second person occupies the second grid column",
+  ).toBeGreaterThan(firstCardBox.x + firstCardBox.width - 1);
+  const firstVisibleCardBox = await firstDisclosure.boundingBox();
+  if (!firstVisibleCardBox) {
+    throw new Error("The first visible desktop person card has no geometry.");
+  }
+  expect(Math.abs(firstVisibleCardBox.x - firstCardBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(firstVisibleCardBox.width - firstCardBox.width)).toBeLessThanOrEqual(
+    1,
   );
-  const initialScrollTop = await queue.evaluate((element) => element.scrollTop);
+  const firstTwoNames = await Promise.all([
+    firstCard.locator(".v19-actions-mobile-identity > strong").textContent(),
+    secondCard.locator(".v19-actions-mobile-identity > strong").textContent(),
+  ]);
+  expect(firstTwoNames).toHaveLength(2);
+  expect(firstTwoNames[0], "first person name").toBeTruthy();
+  expect(firstTwoNames[1], "second person name").toBeTruthy();
 
-  await rows.first().click();
-  await expect(rows.first()).toHaveAttribute("aria-expanded", "true");
-  await expect(surface.getByTestId("agent-action-inline-detail")).toHaveCount(1);
+  const initialOrder = await cards.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-submission-id")),
+  );
+  const initialScrollTop = await timeline.evaluate((element) => element.scrollTop);
 
-  await rows.first().click();
-  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
-  await expect(surface.getByTestId("agent-action-inline-detail")).toHaveCount(0);
-  expect(await queue.evaluate((element) => element.scrollTop)).toBe(initialScrollTop);
+  await firstDisclosure.click();
+  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "true");
+  await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(1);
+  const [selectedCardBox, secondCardAfterOpenBox, rightFollowerAfterOpenBox] =
+    await Promise.all([
+      firstCard.boundingBox(),
+      secondCard.boundingBox(),
+      rightFollower.boundingBox(),
+    ]);
+  if (!selectedCardBox || !secondCardAfterOpenBox || !rightFollowerAfterOpenBox) {
+    throw new Error("Expanded desktop person cards have no measurable geometry.");
+  }
   expect(
-    await rows.evaluateAll((items) =>
-      items.map((item) => item.getAttribute("data-agent-action-id")),
+    Math.abs(selectedCardBox.x - firstCardBox.x),
+    "the expanded person remains in the first grid column",
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(selectedCardBox.width - firstCardBox.width),
+    "the expanded person keeps the width of one grid column",
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(secondCardAfterOpenBox.x - secondCardBox.x),
+    "expanding the first person does not move the second column",
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(secondCardAfterOpenBox.y - secondCardBox.y),
+    "expanding the first person keeps the neighboring card top-aligned",
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(rightFollowerAfterOpenBox.y - rightFollowerBox.y),
+    "expanding the left column does not move later cards in the right column",
+  ).toBeLessThanOrEqual(1);
+  const selectedDesktopStyle = await firstCard.evaluate((card) => {
+    const hit = card.querySelector<HTMLElement>(".v19-actions-timeline-hit");
+    const style = hit ? getComputedStyle(hit) : null;
+    return {
+      after: getComputedStyle(card, "::after").content,
+      before: getComputedStyle(card, "::before").content,
+      borderWidths: style
+        ? [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ]
+        : [],
+      boxShadow: style?.boxShadow,
+    };
+  });
+  expect(selectedDesktopStyle).toEqual({
+    after: "none",
+    before: "none",
+    borderWidths: ["2px", "2px", "2px", "2px"],
+    boxShadow: "none",
+  });
+
+  await firstDisclosure.click();
+  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
+  expect(await timeline.evaluate((element) => element.scrollTop)).toBe(
+    initialScrollTop,
+  );
+  expect(
+    await cards.evaluateAll((items) =>
+      items.map((item) => item.getAttribute("data-submission-id")),
     ),
   ).toEqual(initialOrder);
 
-  const secondRow = rows.nth(1);
-  await secondRow.click();
-  await expect(rows.first()).toHaveAttribute("aria-expanded", "false");
-  await expect(secondRow).toHaveAttribute("aria-expanded", "true");
-  const detailId = await secondRow.getAttribute("aria-controls");
+  await secondDisclosure.click();
+  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(secondDisclosure).toHaveAttribute("aria-expanded", "true");
+  const detailId = await secondDisclosure.getAttribute("aria-controls");
   if (!detailId) {
-    throw new Error("Selected action row does not expose its inline detail id.");
+    throw new Error("Selected person card does not expose its inline detail id.");
   }
 
-  const activeDetail = surface.getByTestId("agent-action-inline-detail");
+  const activeDetail = surface.getByTestId("agent-action-mobile-detail");
   await expect(activeDetail).toHaveAttribute("id", detailId);
+  const [secondSelectedCardBox, firstCardAfterSwitchBox, leftFollowerAfterSwitchBox] =
+    await Promise.all([
+      secondCard.boundingBox(),
+      firstCard.boundingBox(),
+      leftFollower.boundingBox(),
+    ]);
+  if (
+    !secondSelectedCardBox ||
+    !firstCardAfterSwitchBox ||
+    !leftFollowerAfterSwitchBox
+  ) {
+    throw new Error("Switched desktop person cards have no measurable geometry.");
+  }
+  expect(
+    Math.abs(secondSelectedCardBox.x - secondCardBox.x),
+    "the expanded second person remains in the second grid column",
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(secondSelectedCardBox.width - secondCardBox.width),
+    "the expanded second person keeps the width of one grid column",
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(firstCardAfterSwitchBox.x - firstCardBox.x),
+    "switching disclosure keeps the first column stable",
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(leftFollowerAfterSwitchBox.y - leftFollowerBox.y),
+    "expanding the right column does not move later cards in the left column",
+  ).toBeLessThanOrEqual(1);
   await expect(activeDetail).toContainText("Почему сейчас");
   await expect(activeDetail).toContainText("Готовность подачи");
   await expect(activeDetail).toContainText("Следующее действие");
@@ -291,9 +388,21 @@ async function assertDesktopCockpit(page: Page) {
     surface.locator(".v19-agent-action-metrics .v19-metric-card"),
   ).toHaveCount(5);
 
+  await expect(surface.getByTestId("agent-action-next-panel")).toHaveCount(0);
+  await activeDetail
+    .locator('[data-v19-interaction-id="actions.open-secondary"]')
+    .click();
+  await expect(page.getByRole("dialog").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await secondDisclosure.click();
+  await expect(secondDisclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
+
   const viewport = page.viewportSize();
   if (viewport && viewport.width >= 1280) {
-    const visibleCards = await surface.locator(".v19-actions-queue-entry").evaluateAll(
+    const visibleCards = await cards.evaluateAll(
       (cards) =>
         cards.filter((card) => {
           const element = card as unknown as {
@@ -308,14 +417,6 @@ async function assertDesktopCockpit(page: Page) {
     expect(visibleCards).toBeGreaterThanOrEqual(3);
   }
 
-  await expect(surface.getByTestId("agent-action-next-panel")).toHaveCount(0);
-  await activeDetail
-    .locator('[data-v19-interaction-id="actions.open-secondary"]')
-    .click();
-  await expect(page.getByRole("dialog").first()).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-
   await expect(
     page.getByRole("heading", { level: 1, name: "Мои действия" }),
   ).toBeVisible();
@@ -323,6 +424,7 @@ async function assertDesktopCockpit(page: Page) {
 
 async function assertActionFilters(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
+  const visibleCards = surface.locator(".v19-actions-timeline-event");
   const chooseFilter = async (
     filter: "blockers" | "completed" | "open" | "today" | "week",
   ) => {
@@ -332,23 +434,21 @@ async function assertActionFilters(page: Page) {
   };
 
   await chooseFilter("blockers");
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+  await expect(visibleCards.first()).toBeVisible();
 
   await chooseFilter("today");
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+  await expect(visibleCards.first()).toBeVisible();
 
   await chooseFilter("week");
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+  await expect(visibleCards.first()).toBeVisible();
 
   await chooseFilter("completed");
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toBeVisible();
+  await expect(visibleCards.first()).toBeVisible();
 
   await chooseFilter("open");
   const search = surface.getByPlaceholder("ID, семья или город");
   await search.fill("Мария");
-  await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
-    "Мария",
-  );
+  await expect(visibleCards.first()).toContainText("Мария");
   const reset = surface.locator('[data-v19-interaction-id="actions.reset-filters"]');
   await expect(reset.first()).toBeEnabled();
   await reset.first().click();
@@ -357,10 +457,10 @@ async function assertActionFilters(page: Page) {
 
 async function assertPrimaryActionRouting(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
-  if ((await surface.getByTestId("agent-action-inline-detail").count()) === 0) {
-    await surface.getByTestId("agent-action-queue-item").first().click();
+  if ((await surface.getByTestId("agent-action-mobile-detail").count()) === 0) {
+    await surface.locator(".v19-actions-timeline-hit").first().click();
   }
-  const detail = surface.getByTestId("agent-action-inline-detail");
+  const detail = surface.getByTestId("agent-action-mobile-detail");
   const primaryAction = detail.locator(
     '[data-v19-interaction-id="actions.open-primary"]',
   );

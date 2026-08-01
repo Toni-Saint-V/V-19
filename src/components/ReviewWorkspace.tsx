@@ -1152,14 +1152,24 @@ export function ReviewWorkspace({
         <section aria-label="Оригиналы документов" className="v19-review-media-pane">
           <div className="v19-review-media-toolbar">
             <div className="v19-review-filebar">
-              {activeMediaTarget.type === "passport_scan" ? (
-                <FileText aria-hidden="true" />
-              ) : (
-                <UserRound aria-hidden="true" />
-              )}
-              <span title={reviewFileName(activeMediaTarget, activeMediaFile)}>
-                {activeMediaTarget.shortLabel}
-              </span>
+              <div className="v19-review-file-leading">
+                <button
+                  aria-label="Вернуться к очереди"
+                  className="v19-review-back v19-review-toolbar-back"
+                  onClick={onBack}
+                  type="button"
+                >
+                  <ArrowLeft aria-hidden="true" />
+                </button>
+                {activeMediaTarget.type === "passport_scan" ? (
+                  <FileText aria-hidden="true" />
+                ) : (
+                  <UserRound aria-hidden="true" />
+                )}
+                <span title={reviewFileName(activeMediaTarget, activeMediaFile)}>
+                  {activeMediaTarget.shortLabel}
+                </span>
+              </div>
               {selectedApplicant || submission ? (
                 <div
                   aria-label="Контекст проверки подачи"
@@ -1173,14 +1183,6 @@ export function ReviewWorkspace({
                 </div>
               ) : null}
               <div className="v19-review-media-controls">
-                <button
-                  aria-label="Вернуться к очереди"
-                  className="v19-review-back v19-review-toolbar-back"
-                  onClick={onBack}
-                  type="button"
-                >
-                  <ArrowLeft aria-hidden="true" />
-                </button>
                 <button
                   aria-label="Уменьшить изображение"
                   disabled={!activeMediaSupportsTransform || zoom <= 60}

@@ -91,7 +91,16 @@ test.describe("V-19 P0 admin document review", () => {
         workspaceEmail: "admin@visaflow.local",
       });
 
-      await expect(page.locator(".v19-review-focus-tabs")).toBeVisible();
+      await expect(page.locator(".v19-review-focus-tabs")).toHaveCount(0);
+      if (viewport.width < 768) {
+        await expect(
+          page.locator(".v19-review-mobile-filters > summary"),
+        ).toBeVisible();
+      } else {
+        await expect(
+          page.locator(".v19-admin-review-board .v19-review-lane-filter:visible"),
+        ).toBeVisible();
+      }
       const submission = page.locator('[data-submission-id="ПД-1055"]').first();
       await expect(submission).toBeVisible();
       await submission.click();

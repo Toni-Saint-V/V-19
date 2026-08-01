@@ -728,8 +728,10 @@
 
   #root .ops-shell.surface-agent-submissions .v19-applicant-family-meta {
     display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-columns: max-content max-content minmax(0, max-content) max-content;
     align-items: center;
+    justify-content: start;
+    column-gap: var(--v19b-size-4);
   }
 
   #root
@@ -737,8 +739,9 @@
     .v19-applicant-family-meta
     .v19-applicant-public-id {
     width: max-content;
-    grid-column: 1 / -1;
-    margin-top: var(--v19b-size-4);
+    grid-column: 4;
+    grid-row: 1;
+    margin-top: 0;
   }
 
   #root
@@ -1041,5 +1044,32 @@
     * {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Keep the compact Agent submissions header and toolbar optically aligned on
+   phone-width workspaces. Desktop retains the established full controls. */
+@media (max-width: 767px) {
+  #root .v19-agent-submissions-board > .v19-admin-list-header > button {
+    box-sizing: border-box;
+    width: var(--v19b-size-60) !important;
+    min-width: var(--v19b-size-60) !important;
+    height: var(--v19b-size-36) !important;
+    min-height: var(--v19b-size-36) !important;
+  }
+
+  #root .v19-agent-submissions-board .v19-admin-queue-toolbar-search input,
+  #root .v19-agent-submissions-board .v19-admin-toolbar-select-trigger {
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+  }
+
+  #root
+    .v19-agent-submissions-board
+    .v19-two-row-toolbar-filters
+    :is(.v19-admin-toolbar-select, .v19-admin-city-filter) {
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    align-self: center;
   }
 }

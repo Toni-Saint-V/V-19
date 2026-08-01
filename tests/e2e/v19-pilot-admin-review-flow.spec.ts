@@ -716,18 +716,20 @@ test.describe("V-19 pilot admin review click flow", () => {
       expect(readinessScroll.scrollWidth).toBeGreaterThan(readinessScroll.clientWidth);
     }
 
-    await expectBodyMatches(page, [/Пакет выбран|Excel preview|Excel rows/i]);
+    await expectBodyMatches(page, [/Текущая выгрузка|Строки Excel/i]);
 
     const prepareButton = page
-      .getByRole("button", { name: /Сформировать Excel|Excel готов/i })
+      .getByRole("button", { name: /Скачать Excel|Excel скачан/i })
       .first();
 
     await expect(prepareButton).toBeVisible();
     if (await prepareButton.isEnabled()) {
+      const downloadPromise = page.waitForEvent("download");
       await prepareButton.click();
+      await downloadPromise;
     }
 
-    await expectBodyMatches(page, [/Excel готов|Excel сформирован/i]);
+    await expectBodyMatches(page, [/Excel скачан/i]);
 
     expect(
       blockingBrowserProblems(browserProblems),

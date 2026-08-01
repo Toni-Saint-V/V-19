@@ -64,9 +64,10 @@ async function closeReadOnlySession(session: ReadOnlySession) {
   try {
     session.gate.assertReadOnly();
     session.ledger.assertNoOriginViolations();
-    expect(session.browserProblems().count, `${session.accountKey} browser errors`).toBe(
-      0,
-    );
+    expect(
+      session.browserProblems().count,
+      `${session.accountKey} browser errors`,
+    ).toBe(0);
   } finally {
     await session.context.close();
   }
@@ -84,10 +85,7 @@ async function waitForWorkspaceData(page: Page) {
 }
 
 async function setSearch(page: Page, submissionId: string) {
-  const search = page
-    .getByRole("searchbox")
-    .or(page.getByRole("textbox"))
-    .first();
+  const search = page.getByRole("searchbox").or(page.getByRole("textbox")).first();
   if (!(await isVisible(search))) return;
   await search.fill(submissionId);
   await page.waitForTimeout(300);
@@ -134,7 +132,10 @@ test.describe("production A1-F6 exported final state", () => {
     try {
       await clickWorkspaceButton(admin.page, /Выгрузка/);
       await expect(
-        admin.page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+        admin.page.getByRole("heading", {
+          level: 1,
+          name: "Центр выгрузки",
+        }),
       ).toBeVisible();
       await waitForWorkspaceData(admin.page);
       await setSearch(admin.page, checkpoint.submissionId);
