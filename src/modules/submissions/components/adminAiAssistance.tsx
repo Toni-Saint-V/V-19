@@ -5153,7 +5153,7 @@ const QuestionnaireTab = ({
           </p>
         </div>
         <button
-          className="v19-drawer-questionnaire-open-button"
+          className="linear-product-action linear-product-action--secondary v19-drawer-questionnaire-open-button"
           onClick={() => onOpenQuestionnaire()}
           type="button"
         >
@@ -5336,7 +5336,7 @@ const FilesTab = ({
             <span className="v20-question-text">
               Общие адреса семьи заполняются один раз и копируются только после подтверждения.
             </span>
-            <button className="v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
+            <button className="linear-product-action linear-product-action--secondary v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
               Открыть анкету
             </button>
           </div>
@@ -5366,7 +5366,7 @@ const FilesTab = ({
               PDF, JPG, PNG. Статус загрузки и требуемое действие появятся в списке ниже.
             </p>
             <button
-              className="v20-upload-button"
+              className="linear-product-action linear-product-action--secondary v20-upload-button"
               disabled={!canDropUpload}
               type="button"
               onClick={() => dropInputRef.current?.click()}
@@ -5378,7 +5378,7 @@ const FilesTab = ({
       ) : (
         <section className="v20-empty-state v20-files-empty-state" aria-label="Файлы ещё не сформированы">
           <p>Для этой подачи ещё не сформированы слоты документов.</p>
-          <button className="v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
+          <button className="linear-product-action linear-product-action--secondary v20-questionnaire-open" type="button" onClick={onOpenQuestionnaire}>
             Открыть анкету
           </button>
         </section>
@@ -5454,7 +5454,7 @@ const FilesTab = ({
                               />
                               <button
                                 aria-label={actionLabel}
-                                className="v20-file-action"
+                                className="linear-product-action linear-product-action--outline linear-product-action--compact v20-file-action"
                                 disabled={!onUploadFile}
                                 type="button"
                                 onClick={() => fileInputsRef.current.get(file.id)?.click()}
@@ -5575,7 +5575,7 @@ const IssuesTab = ({
                 <span className="v20-issue-actions">
                   {issue.type === "field" && issue.status === "open" ? (
                     <button
-                      className="v20-issue-button"
+                      className="linear-product-action linear-product-action--outline linear-product-action--compact v20-issue-button"
                       type="button"
                       onClick={() =>
                         onOpenWorkspaceTarget(targetForIssue(issue))
@@ -5586,7 +5586,7 @@ const IssuesTab = ({
                   ) : null}
                   {issue.target.fileType && issue.status === "open" ? (
                     <button
-                      className="v20-issue-button"
+                      className="linear-product-action linear-product-action--outline linear-product-action--compact v20-issue-button"
                       type="button"
                       onClick={() => onOpenWorkspaceTarget(targetForIssue(issue))}
                     >
@@ -5596,7 +5596,7 @@ const IssuesTab = ({
                   {canMarkFixed && !issue.target.fileType && issue.type !== "field" ? (
                     <button
                       aria-busy={pendingIssueId === issue.id}
-                      className="v20-issue-button is-ghost"
+                      className="linear-product-action linear-product-action--ghost linear-product-action--compact v20-issue-button is-ghost"
                       disabled={pendingIssueId !== null}
                       type="button"
                       onClick={() => void markIssueFixed(issue.id)}
@@ -6082,7 +6082,7 @@ export function FigmaSubmissionDrawer({
                 </span>
               </div>
             </div>
-            <button className="v20-icon-button is-close" aria-label="Закрыть" type="button" onClick={onClose}>
+            <button className="linear-product-action linear-product-action--icon linear-product-action--ghost v20-icon-button is-close" aria-label="Закрыть" type="button" onClick={onClose}>
               <X aria-hidden="true" />
             </button>
           </header>
@@ -6239,7 +6239,7 @@ export function FigmaSubmissionDrawer({
                 </div>
                 <div className="v20-footer-actions">
                   <button
-                    className="v20-action-button is-ghost"
+                    className="linear-product-action linear-product-action--secondary v20-action-button is-ghost"
                     type="button"
                     onClick={onClose}
                   >
@@ -6247,7 +6247,7 @@ export function FigmaSubmissionDrawer({
                   </button>
                   <button
                     aria-busy={actionPending}
-                    className={`v20-action-button ${data.status === "returned" ? "is-warning" : "is-primary"}`}
+                    className={`linear-product-action ${data.status === "returned" ? "linear-product-action--warning is-warning" : "linear-product-action--primary is-primary"} v20-action-button`}
                     disabled={primaryAction.disabled || actionPending}
                     type="button"
                     onClick={() => void handlePrimaryAction()}

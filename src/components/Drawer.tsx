@@ -706,7 +706,7 @@ const QuestionnaireTab = ({
         <button
           {...agentInteractionProps("drawer.open-questionnaire")}
           onClick={() => onOpenQuestionnaire()}
-          className="v19-agent-drawer-section-primary"
+          className="linear-product-action linear-product-action--secondary v19-agent-drawer-section-primary"
           type="button"
         >
           {questionnairePresentation.canEdit ? (
@@ -1706,7 +1706,7 @@ export function Drawer({
                 <button
                   {...agentInteractionProps("drawer.close")}
                   aria-label="Закрыть подачу"
-                  className="v19-agent-drawer-close"
+                  className="linear-product-action linear-product-action--icon linear-product-action--ghost v19-agent-drawer-close"
                   type="button"
                   onClick={onClose}
                 >
@@ -1730,7 +1730,7 @@ export function Drawer({
                   <button
                     {...agentInteractionProps("drawer.toggle-context")}
                     aria-expanded={contextExpanded}
-                    className="v19-agent-drawer-context-toggle"
+                    className="linear-product-action linear-product-action--secondary v19-agent-drawer-context-toggle"
                     type="button"
                     onClick={() => setContextExpanded((expanded) => !expanded)}
                   >
@@ -1830,6 +1830,7 @@ export function Drawer({
                   <button
                     {...agentInteractionProps("drawer.dismiss-notice")}
                     aria-label="Скрыть сообщение"
+                    className="linear-product-action linear-product-action--icon linear-product-action--ghost"
                     type="button"
                     onClick={() => setMissingTargetMessage("")}
                   >
@@ -1899,7 +1900,7 @@ export function Drawer({
                 {submission.status === "ready_for_export" ? (
                   <button
                     {...agentInteractionProps("drawer.open-return-review")}
-                    className="v19-agent-drawer-return-review"
+                    className="linear-product-action linear-product-action--secondary v19-agent-drawer-return-review"
                     disabled={actionPending}
                     type="button"
                     onClick={openReviewConfirmation}
@@ -1913,7 +1914,11 @@ export function Drawer({
                   aria-describedby={
                     footerActionNotice ? footerInstructionId : undefined
                   }
-                  className={`v19-agent-drawer-primary ${primaryButtonClassName}`}
+                  className={`linear-product-action ${
+                    primaryButtonClassName === "is-warning"
+                      ? "linear-product-action--warning"
+                      : "linear-product-action--primary"
+                  } v19-agent-drawer-primary ${primaryButtonClassName}`}
                   data-testid="drawer-primary-action"
                   disabled={primaryIntentDisabled}
                   type="button"

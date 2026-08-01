@@ -1343,7 +1343,7 @@ export function ReviewWorkspace({
               {isEditableReviewStatus ? (
                 <button
                   aria-label={`Добавить замечание: ${activeMediaTarget.label}`}
-                  className="v19-review-file-remark"
+                  className="linear-product-action linear-product-action--warning v19-review-file-remark"
                   onClick={() =>
                     onAddRemark(
                       `${activeMediaTarget.label}: требуется проверка`,

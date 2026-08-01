@@ -422,7 +422,7 @@ export function AdminReturnPackagesScreen() {
             <div className="flex flex-wrap items-center gap-2">
               {!startedPackage ? (
                 <button
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#2e2f34] bg-[#1e1e21] px-4 text-[13px] font-semibold text-white/80 transition-colors hover:bg-[#27272b] disabled:cursor-not-allowed disabled:text-white/32"
+                  className="linear-product-action linear-product-action--secondary inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#2e2f34] bg-[#1e1e21] px-4 text-[13px] font-semibold text-white/80 transition-colors hover:bg-[#27272b] disabled:cursor-not-allowed disabled:text-white/32"
                   disabled={Boolean(busySlot)}
                   type="button"
                   onClick={() => void openDraft()}
@@ -432,7 +432,7 @@ export function AdminReturnPackagesScreen() {
                 </button>
               ) : null}
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#4450c5] bg-[#3a45b4] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#4855d4] disabled:cursor-not-allowed disabled:border-[#2e2f34] disabled:bg-[#1e1e21] disabled:text-white/32"
+                className="linear-product-action linear-product-action--primary inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#4450c5] bg-[#3a45b4] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#4855d4] disabled:cursor-not-allowed disabled:border-[#2e2f34] disabled:bg-[#1e1e21] disabled:text-white/32"
                 disabled={!canPublish || Boolean(busySlot) || startedPackage?.status === "published"}
                 type="button"
                 onClick={() => void publish()}

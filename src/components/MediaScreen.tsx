@@ -94,7 +94,10 @@ export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
               className="w-full h-10 bg-[#161617] border border-[#242529] rounded-[10px] pl-9 pr-3 text-sm text-white placeholder-white/40 focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none"
             />
           </div>
-          <button className="w-10 h-10 shrink-0 bg-[#161617] hover:bg-[#1a1a1d] border border-[#242529] rounded-[10px] flex items-center justify-center text-white/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]">
+          <button
+            aria-label="Фильтровать файлы"
+            className="linear-product-action linear-product-action--icon linear-product-action--ghost w-10 h-10 shrink-0 bg-[#161617] hover:bg-[#1a1a1d] border border-[#242529] rounded-[10px] flex items-center justify-center text-white/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          >
             <Filter className="w-4 h-4" />
           </button>
         </div>
@@ -135,10 +138,16 @@ export function MediaScreen({ submissions }: { submissions?: Submission[] }) {
 
                   {/* Overlay Actions */}
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                    <button
+                      aria-label={`Скачать ${file.name}`}
+                      className="linear-product-action linear-product-action--icon linear-product-action--ghost linear-product-action--compact w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                    >
                       <Download className="w-3.5 h-3.5" />
                     </button>
-                    <button className="w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                    <button
+                      aria-label={`Другие действия: ${file.name}`}
+                      className="linear-product-action linear-product-action--icon linear-product-action--ghost linear-product-action--compact w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                    >
                       <MoreVertical className="w-3.5 h-3.5" />
                     </button>
                   </div>

@@ -60,7 +60,11 @@ export class AppCrashBoundary extends Component<
           <p className="v19-app-runtime-copy">
             Обновите приложение и повторите последнее действие.
           </p>
-          <button type="button" onClick={this.reloadApplication}>
+          <button
+            className="linear-product-action linear-product-action--primary"
+            type="button"
+            onClick={this.reloadApplication}
+          >
             <RefreshCw aria-hidden="true" />
             Перезагрузить приложение
           </button>

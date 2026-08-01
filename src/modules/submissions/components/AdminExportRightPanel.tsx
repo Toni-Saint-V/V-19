@@ -190,7 +190,7 @@ export function AdminExportRightPanel({
 
       <div className="v19-admin-export-footer">
         <button
-          className="v19-admin-export-primary-action"
+          className="linear-product-action linear-product-action--primary v19-admin-export-primary-action"
           type="button"
           disabled={generateDisabled}
           aria-describedby={actionHintId}
@@ -207,10 +207,20 @@ export function AdminExportRightPanel({
           ) : null}
         </button>
         <div className="v19-admin-export-secondary-actions">
-          <button type="button" disabled={downloadDisabled} onClick={onDownload}>
+          <button
+            className="linear-product-action linear-product-action--outline linear-product-action--compact"
+            type="button"
+            disabled={downloadDisabled}
+            onClick={onDownload}
+          >
             Скачать
           </button>
-          <button type="button" disabled={markExportedDisabled} onClick={onMarkExported}>
+          <button
+            className="linear-product-action linear-product-action--outline linear-product-action--compact"
+            type="button"
+            disabled={markExportedDisabled}
+            onClick={onMarkExported}
+          >
             Отметить
           </button>
         </div>

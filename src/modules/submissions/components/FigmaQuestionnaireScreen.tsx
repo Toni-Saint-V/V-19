@@ -1318,6 +1318,7 @@ function FormField({
             <button
               {...agentInteractionProps("questionnaire.update-field")}
               aria-label={`Подтвердить поле: ${label}`}
+              className="linear-product-action linear-product-action--outline linear-product-action--compact"
               type="button"
               onClick={() => fieldContract?.confirmReview(modelFieldId)}
             >
@@ -1336,6 +1337,7 @@ function FormField({
           <button
             {...agentInteractionProps("questionnaire.update-field")}
             aria-label={`Подставить адрес: ${label}`}
+            className="linear-product-action linear-product-action--outline linear-product-action--compact"
             type="button"
             onClick={() => (onAddressSuggestionAccept ?? onChange)(addressSuggestion)}
           >
@@ -5321,6 +5323,7 @@ export function FigmaQuestionnaireScreen({
                     </span>
                     <button
                       {...agentInteractionProps("questionnaire.back")}
+                      className="linear-product-action linear-product-action--danger"
                       type="button"
                       onClick={exitWithoutSaving}
                     >
@@ -5328,6 +5331,7 @@ export function FigmaQuestionnaireScreen({
                     </button>
                     <button
                       {...agentInteractionProps("questionnaire.navigate")}
+                      className="linear-product-action linear-product-action--secondary"
                       type="button"
                       onClick={() => setDiscardExitArmed(false)}
                     >
@@ -5339,6 +5343,7 @@ export function FigmaQuestionnaireScreen({
                     <button
                       {...agentInteractionProps("questionnaire.save-exit")}
                       aria-busy={navigationPending}
+                      className="linear-product-action linear-product-action--primary"
                       disabled={navigationPending}
                       type="button"
                       onClick={() => void retryFailedSave().catch(() => undefined)}
@@ -5347,6 +5352,7 @@ export function FigmaQuestionnaireScreen({
                     </button>
                     <button
                       {...agentInteractionProps("questionnaire.navigate")}
+                      className="linear-product-action linear-product-action--secondary"
                       type="button"
                       onClick={continueAfterSaveFailure}
                     >
@@ -5356,6 +5362,7 @@ export function FigmaQuestionnaireScreen({
                     saveFailureAction === "save-exit" ? (
                       <button
                         {...agentInteractionProps("questionnaire.back")}
+                        className="linear-product-action linear-product-action--danger"
                         type="button"
                         onClick={() => setDiscardExitArmed(true)}
                       >
@@ -5692,7 +5699,11 @@ export function FigmaQuestionnaireScreen({
                         }
                         aria-invalid={familyCopyUnavailable || undefined}
                         aria-pressed={Boolean(familyCopyPreview)}
-                        className={`v19-questionnaire-draft-button v19-questionnaire-copy-button${
+                        className={`linear-product-action ${
+                          familyCopyPreview
+                            ? "linear-product-action--primary"
+                            : "linear-product-action--secondary"
+                        } v19-questionnaire-draft-button v19-questionnaire-copy-button${
                           familyCopyPreview ? " is-copy-armed" : ""
                         }${familyCopyUnavailable ? " is-copy-unavailable" : ""}`}
                         disabled={!isEditable || questionnaireInteractionPending}

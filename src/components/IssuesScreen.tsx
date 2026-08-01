@@ -119,7 +119,7 @@ export function IssuesScreen({ onOpenDrawer, submissions }: IssuesScreenProps) {
             </div>
 
             <div className="flex items-center sm:justify-end mt-2 sm:mt-0 shrink-0">
-              <button className="w-full sm:w-auto px-5 h-10 rounded-xl text-[13px] font-medium transition-colors flex items-center justify-center gap-2 bg-[#1a1a1d] border border-[#242529] text-white group-hover:border-[#6f64ff]/50 group-hover:bg-[#6f64ff]/10 group-hover:text-[#b8baff]">
+              <button className="linear-product-action linear-product-action--secondary w-full sm:w-auto px-5 h-10 rounded-xl text-[13px] font-medium transition-colors flex items-center justify-center gap-2 bg-[#1a1a1d] border border-[#242529] text-white group-hover:border-[#6f64ff]/50 group-hover:bg-[#6f64ff]/10 group-hover:text-[#b8baff]">
                 <span>Решить проблему</span>
                 <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
               </button>

@@ -158,7 +158,7 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
           </p>
           <button
             {...agentInteractionProps("returned-documents.retry-load")}
-            className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#654047] bg-[#342126] px-3 text-[11px] font-semibold text-white"
+            className="linear-product-action linear-product-action--secondary linear-product-action--compact mt-3 inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#654047] bg-[#342126] px-3 text-[11px] font-semibold text-white"
             data-testid="agent-return-packages-retry"
             onClick={() => setLoadAttempt((current) => current + 1)}
             type="button"
@@ -189,7 +189,7 @@ export function AgentReturnPackagesPanel({ enabled }: { enabled: boolean }) {
                     <button
                       {...agentInteractionProps("returned-documents.download")}
                       aria-label={`Скачать ${artifactLabel(artifact)}`}
-                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[8px] border border-[#2e2f34] bg-[#27272b] px-2.5 text-[11px] font-semibold text-white/80 transition-colors hover:bg-[#303035]"
+                      className="linear-product-action linear-product-action--outline linear-product-action--compact inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[8px] border border-[#2e2f34] bg-[#27272b] px-2.5 text-[11px] font-semibold text-white/80 transition-colors hover:bg-[#303035]"
                       disabled={Boolean(busyArtifactId)}
                       type="button"
                       onClick={() => void download(artifact)}
