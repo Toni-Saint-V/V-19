@@ -5146,15 +5146,7 @@ export function FigmaQuestionnaireScreen({
               ? { duration: 0 }
               : { delay: 0.1, duration: 1.2, ease: "easeOut" }
           }
-        >
-          {!prefersReducedMotion ? (
-            <motion.div
-              animate={{ x: ["-100%", "200%"] }}
-              className="v19-questionnaire-progress-shimmer absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-              transition={{ duration: 2.5, ease: "linear", repeat: Infinity }}
-            />
-          ) : null}
-        </motion.div>
+        />
       </div>
 
       <p aria-atomic="true" aria-live="polite" className="sr-only" role="status">
