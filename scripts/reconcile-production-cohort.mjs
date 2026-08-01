@@ -7,9 +7,10 @@ import {
   productionCohortFinalGate,
 } from "./lib/production-cohort-final-gate.mjs";
 import { productionCohortExportDataGate } from "./lib/production-cohort-export-data-gate.mjs";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
-const productionProjectRef = "tsymifccglpepvbmrcgh";
-const productionUrl = `https://${productionProjectRef}.supabase.co`;
+const productionProjectRef = SUPABASE_PRODUCTION_TARGET.projectId;
+const productionUrl = SUPABASE_PRODUCTION_TARGET.projectUrl;
 const expectedBucket = "submission-media";
 const expectedCases = [
   { applicantCount: 6, caseKey: "A1-F6", city: "Москва", type: "family" },

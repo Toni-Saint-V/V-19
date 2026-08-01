@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
 const repoRoot = process.cwd();
 const sandboxProjectRef = "oevvaowoklqttqkraxho";
@@ -116,9 +117,9 @@ const readiness = readJson(readinessPath);
 const projectRef =
   value("projectRef", "SUPABASE_PROJECT_REF") ||
   value("projectId", "VITE_SUPABASE_PROJECT_ID") ||
-  clean(readiness.productionTarget?.projectId);
+  SUPABASE_PRODUCTION_TARGET.projectId;
 const projectUrl =
-  value("projectUrl", "VITE_SUPABASE_URL") || clean(readiness.productionTarget?.projectUrl);
+  value("projectUrl", "VITE_SUPABASE_URL") || SUPABASE_PRODUCTION_TARGET.projectUrl;
 const organization =
   value("organization", "SUPABASE_ORGANIZATION") ||
   value("organizationSlug") ||
@@ -141,6 +142,9 @@ const targetLooksProduction =
   !targetLooksSandbox &&
   clean(confirmNotSandbox).toLowerCase() !== "sandbox";
 const projectUrlMatchesRef = Boolean(projectRef && projectUrl === expectedProjectUrl);
+const targetMatchesDescriptor =
+  projectRef === SUPABASE_PRODUCTION_TARGET.projectId &&
+  projectUrl === SUPABASE_PRODUCTION_TARGET.projectUrl;
 
 function addCheck(ok, label, detail = "") {
   report.push({ ok, label, detail });
@@ -148,6 +152,7 @@ function addCheck(ok, label, detail = "") {
 
 addCheck(Boolean(projectRef), "production project ref provided");
 addCheck(Boolean(projectUrl), "production project URL provided");
+addCheck(targetMatchesDescriptor, "production target matches canonical descriptor");
 addCheck(Boolean(organization), "Supabase organization provided");
 addCheck(
   projectUrlMatchesRef,
@@ -167,6 +172,11 @@ addCheck(
   targetLooksProduction || args.allowSandbox,
   "production target evidence is complete enough for local preflight",
 );
+
+if ((args.writeLocal || args.syncReadinessJson) && !targetMatchesDescriptor) {
+  console.error("Refusing to write production files for a non-canonical target.");
+  process.exit(1);
+}
 
 const productionEnv = [
   "# Local only. Do not commit.",
@@ -215,6 +225,7 @@ const authSecurity = {
   recordedAt: now,
   projectRef,
   projectUrl,
+  cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
   organization,
   projectName,
   productionNotSandboxConfirmed: targetLooksProduction,
@@ -238,6 +249,7 @@ const backupRestore = {
   recordedAt: now,
   projectRef,
   projectUrl,
+  cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
   organization,
   backupOwner: "",
   backupMechanism: "",
@@ -258,6 +270,7 @@ const pilotCohort = {
   recordedAt: now,
   projectRef,
   projectUrl,
+  cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
   organization,
   productionNotSandboxConfirmed: targetLooksProduction,
   cohorts: {
@@ -292,6 +305,7 @@ if (args.syncReadinessJson) {
       ...readiness.productionTarget,
       projectId: projectRef,
       projectUrl,
+      cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
       supabaseOrganization: organization,
       activationTarget: "production",
     },

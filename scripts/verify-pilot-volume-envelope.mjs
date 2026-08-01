@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { testArtifactPath } from "./lib/artifact-paths.mjs";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
 const repoRoot = process.cwd();
 const evidencePath = testArtifactPath("supabase-pilot-volume-envelope-20260706.md");
@@ -35,11 +36,11 @@ const publicEnv = readEnvIfExists(publicEnvPath);
 const projectRef =
   clean(adminEnv.SUPABASE_PROJECT_REF) ||
   clean(publicEnv.VITE_SUPABASE_PROJECT_ID) ||
-  clean(readiness.productionTarget?.projectId);
+  SUPABASE_PRODUCTION_TARGET.projectId;
 const projectUrl =
   clean(adminEnv.SUPABASE_PROJECT_URL) ||
   clean(publicEnv.VITE_SUPABASE_URL) ||
-  clean(readiness.productionTarget?.projectUrl);
+  SUPABASE_PRODUCTION_TARGET.projectUrl;
 const adminCredential = clean(
   adminEnv[["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_")],
 );
@@ -129,6 +130,11 @@ async function verifyProductionSubmissionCaps() {
   assert(projectRef, "production project ref is available for read-only cap check");
   assert(projectRef !== sandboxProjectRef, "read-only cap check target is not sandbox");
   assert(projectUrl, "production project URL is available for read-only cap check");
+  assert(
+    projectRef === SUPABASE_PRODUCTION_TARGET.projectId &&
+      projectUrl === SUPABASE_PRODUCTION_TARGET.projectUrl,
+    "read-only cap check target matches canonical descriptor",
+  );
   assert(
     projectUrl.includes(projectRef),
     "production project URL matches production project ref",

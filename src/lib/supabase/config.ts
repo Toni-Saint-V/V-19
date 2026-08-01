@@ -5,6 +5,7 @@ import {
   type SupabaseActivationTarget,
   type SupabaseBackendTarget,
 } from "./activation";
+import { SUPABASE_PRODUCTION_TARGET } from "../../../config/supabase-production-target.mjs";
 
 export interface SupabaseRuntimeConfig {
   projectId: string;
@@ -55,8 +56,48 @@ function enabled(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes(clean(value).toLowerCase());
 }
 
-function backendTarget(value: string | undefined): SupabaseBackendTarget {
-  return clean(value) === "local-demo" ? "local-demo" : "supabase";
+export function resolveSupabaseBackendTarget(
+  value: string | undefined,
+): SupabaseBackendTarget {
+  const target = clean(value);
+  if (target === "supabase") return "supabase";
+  return "local-demo";
+}
+
+export function productionTargetConfigIssues(input: {
+  activationTarget: SupabaseActivationTarget;
+  projectId: string;
+  url: string;
+}): string[] {
+  if (input.activationTarget !== "production") return [];
+
+  const issues: string[] = [];
+  if (input.projectId !== SUPABASE_PRODUCTION_TARGET.projectId) {
+    issues.push("Supabase production project id does not match the canonical target.");
+  }
+  if (input.url !== SUPABASE_PRODUCTION_TARGET.projectUrl) {
+    issues.push("Supabase production URL does not match the canonical target.");
+  }
+  return issues;
+}
+
+export function bindActivationToCanonicalProductionTarget(
+  activation: SupabaseActivationReadiness,
+  issues: string[],
+): SupabaseActivationReadiness {
+  if (!issues.length) return activation;
+
+  return {
+    ...activation,
+    allowClientActivation: false,
+    allowSandboxProbe: false,
+    blockedReasons: [...activation.blockedReasons, ...issues],
+    ready: false,
+    state: "contract-only",
+    warnings: [...activation.warnings, ...issues],
+    boundary:
+      "Supabase production activation is fail-closed because the runtime target does not match the canonical descriptor.",
+  };
 }
 
 function activationTarget(value: string | undefined): SupabaseActivationTarget {
@@ -76,7 +117,7 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
     env.VITE_SUPABASE_PUBLISHABLE_KEY ?? env.VITE_SUPABASE_ANON_KEY,
   );
   const edgeFunctionsUrl = clean(env.VITE_SUPABASE_EDGE_FUNCTIONS_URL);
-  const target = backendTarget(env.VITE_SUPABASE_BACKEND_TARGET);
+  const target = resolveSupabaseBackendTarget(env.VITE_SUPABASE_BACKEND_TARGET);
   const sandboxProbeEnabled = enabled(env.VITE_SUPABASE_SANDBOX_PROBE_ENABLED);
   const activationTargetRaw = env.VITE_SUPABASE_ACTIVATION_TARGET;
   const releaseEnabled = enabled(env.VITE_SUPABASE_RELEASE_ENABLED);
@@ -95,7 +136,7 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
     browserKeyAudited: enabled(env.VITE_SUPABASE_BROWSER_KEY_AUDITED),
     productionApproved: enabled(env.VITE_SUPABASE_PRODUCTION_APPROVED),
   };
-  const activation = evaluateSupabaseActivationReadiness({
+  const evaluatedActivation = evaluateSupabaseActivationReadiness({
     target,
     releaseEnabled,
     sandboxProbeEnabled,
@@ -107,6 +148,15 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
     },
     evidence,
   });
+  const productionTargetIssues = productionTargetConfigIssues({
+    activationTarget: evidence.target,
+    projectId,
+    url,
+  });
+  const activation = bindActivationToCanonicalProductionTarget(
+    evaluatedActivation,
+    productionTargetIssues,
+  );
   const missing = [
     projectId ? "" : "VITE_SUPABASE_PROJECT_ID",
     url ? "" : "VITE_SUPABASE_URL",

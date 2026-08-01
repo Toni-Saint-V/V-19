@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { testArtifactPath } from "./lib/artifact-paths.mjs";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
 const repoRoot = process.cwd();
 const publicEnvPath = resolve(repoRoot, ".env.supabase-production.local");
@@ -12,7 +13,8 @@ const readinessPath = resolve(
   "docs/release/supabase-production-readiness.json",
 );
 const evidencePath = testArtifactPath("supabase-production-workflow-smoke-20260701.md");
-const productionProjectId = "tsymifccglpepvbmrcgh";
+const productionProjectId = SUPABASE_PRODUCTION_TARGET.projectId;
+const productionProjectUrl = SUPABASE_PRODUCTION_TARGET.projectUrl;
 const sandboxProjectId = "oevvaowoklqttqkraxho";
 const bucket = "submission-media";
 const stamp = new Date()
@@ -63,7 +65,7 @@ async function main() {
     "sandbox project selected",
   );
   assert(
-    projectUrl === `https://${productionProjectId}.supabase.co`,
+    projectUrl === productionProjectUrl,
     "production URL is exact",
     "URL mismatch",
   );

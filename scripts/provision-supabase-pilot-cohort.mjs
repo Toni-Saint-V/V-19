@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
 const repoRoot = process.cwd();
 const sandboxProjectRef = "oevvaowoklqttqkraxho";
@@ -34,15 +35,18 @@ const cohort = readJsonIfExists(cohortPath);
 const projectRef =
   clean(adminEnv.SUPABASE_PROJECT_REF) ||
   clean(publicEnv.VITE_SUPABASE_PROJECT_ID) ||
-  clean(readiness.productionTarget?.projectId);
+  SUPABASE_PRODUCTION_TARGET.projectId;
 const projectUrl =
   clean(adminEnv.SUPABASE_PROJECT_URL) ||
   clean(publicEnv.VITE_SUPABASE_URL) ||
-  clean(readiness.productionTarget?.projectUrl);
+  SUPABASE_PRODUCTION_TARGET.projectUrl;
 const publishableKey = clean(publicEnv.VITE_SUPABASE_PUBLISHABLE_KEY);
 const adminKey = clean(adminEnv[["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_")]);
 
 if (writeTemplate) {
+  if (!productionTargetMatchesDescriptor()) {
+    fail("Refusing to write a pilot template for a non-canonical production target.");
+  }
   writePilotTemplate();
   process.exit(0);
 }
@@ -82,6 +86,13 @@ function clean(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function productionTargetMatchesDescriptor() {
+  return (
+    projectRef === SUPABASE_PRODUCTION_TARGET.projectId &&
+    projectUrl === SUPABASE_PRODUCTION_TARGET.projectUrl
+  );
+}
+
 function readJsonIfExists(path) {
   if (!existsSync(path)) return {};
   return JSON.parse(readFileSync(path, "utf8"));
@@ -106,6 +117,7 @@ function writePilotTemplate() {
     recordedAt: new Date().toISOString(),
     projectRef,
     projectUrl,
+    cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
     organization:
       clean(adminEnv.SUPABASE_ORGANIZATION) ||
       clean(readiness.productionTarget?.supabaseOrganization),
@@ -174,6 +186,10 @@ function validatePreflight({ desiredUsers, needAdminKey, needPublishableKey }) {
   add(Boolean(projectRef), "production project ref is recorded");
   add(projectRef !== sandboxProjectRef, "target is not sandbox");
   add(Boolean(projectUrl), "production project URL is recorded");
+  add(
+    productionTargetMatchesDescriptor(),
+    "production target matches canonical descriptor",
+  );
   add(
     !needPublishableKey || Boolean(publishableKey),
     needPublishableKey
@@ -251,6 +267,7 @@ async function provisionPilotUsers(desiredUsers) {
     recordedAt: new Date().toISOString(),
     projectRef,
     projectUrl,
+    cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
     productionNotSandboxConfirmed: projectRef !== sandboxProjectRef,
     pilotUsers: mergePilotResults(cohort.pilotUsers ?? [], results),
     orphanAuthUsersWithoutProfileCount: cohort.orphanAuthUsersWithoutProfileCount ?? null,

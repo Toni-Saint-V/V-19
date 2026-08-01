@@ -3,11 +3,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { lstat, mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { expect, type BrowserContext, type Locator, type Page } from "@playwright/test";
+import { SUPABASE_PRODUCTION_TARGET } from "../../config/supabase-production-target.mjs";
 import { testArtifactPath } from "../support/artifacts";
 import { clickWorkspaceButton } from "./ui-helpers";
 
-export const PRODUCTION_PROJECT_REF = "tsymifccglpepvbmrcgh";
-export const PRODUCTION_SUPABASE_ORIGIN = `https://${PRODUCTION_PROJECT_REF}.supabase.co`;
+export const PRODUCTION_PROJECT_REF = SUPABASE_PRODUCTION_TARGET.projectId;
+export const PRODUCTION_SUPABASE_ORIGIN = SUPABASE_PRODUCTION_TARGET.projectUrl;
 export const PRODUCTION_COHORT_APP_ORIGIN = "http://127.0.0.1:4202";
 export const REQUIRED_COHORT_WRITE_UNLOCK = "I_UNDERSTAND_12_SUBMISSIONS_27_APPLICANTS";
 

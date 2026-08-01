@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
 const root = process.cwd();
 const configPath = path.join(
@@ -15,8 +16,8 @@ const required = [
   'VITE_SUPABASE_ACTIVATION_TARGET: "production"',
   'VITE_SUPABASE_RELEASE_ENABLED: "true"',
   'VITE_SUPABASE_SANDBOX_PROBE_ENABLED: "false"',
-  'expectedProductionProjectId = "tsymifccglpepvbmrcgh"',
-  "expectedProductionUrl = `https://${expectedProductionProjectId}.supabase.co`",
+  "expectedProductionProjectId = SUPABASE_PRODUCTION_TARGET.projectId",
+  "expectedProductionUrl = SUPABASE_PRODUCTION_TARGET.projectUrl",
   "refuses an unapproved Supabase project ref",
   "refuses an unapproved Supabase URL",
   "testMatch: /production-readonly\\.spec\\.ts/",
@@ -41,6 +42,14 @@ const missing = required.filter((entry) => !contract.includes(entry));
 if (missing.length) {
   console.error("Production UI E2E contract failed:");
   for (const entry of missing) console.error(`- missing ${entry}`);
+  process.exit(1);
+}
+
+if (
+  SUPABASE_PRODUCTION_TARGET.projectUrl !==
+  `https://${SUPABASE_PRODUCTION_TARGET.projectId}.supabase.co`
+) {
+  console.error("Production UI E2E contract failed: canonical target URL mismatch.");
   process.exit(1);
 }
 

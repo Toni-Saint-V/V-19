@@ -3,13 +3,14 @@ import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { SUPABASE_PRODUCTION_TARGET } from "../../config/supabase-production-target.mjs";
 import { createQuestionnaireSections } from "../../src/modules/submissions/questionnaire";
 import { testArtifactPath } from "../support/artifacts";
 
 const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
 const allowedSmokeProjectId = "oevvaowoklqttqkraxho";
-const allowedProductionProjectId = "tsymifccglpepvbmrcgh";
+const allowedProductionProjectId = SUPABASE_PRODUCTION_TARGET.projectId;
 const browserAuditTarget =
   process.env.SUPABASE_BROWSER_AUDIT_ENV === "production" ? "production" : "sandbox";
 const browserAuditEnvPath =

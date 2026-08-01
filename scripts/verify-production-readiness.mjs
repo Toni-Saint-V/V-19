@@ -9,6 +9,8 @@ import {
   undeclaredMigrationFiles,
 } from "./supabase-migration-contract.mjs";
 import { testArtifactPath } from "./lib/artifact-paths.mjs";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
+import { forbiddenProductionReadinessMarkers } from "./lib/supabase-readiness-contract.mjs";
 
 const repoRoot = process.cwd();
 const readinessRelativePath = "docs/release/supabase-production-readiness.json";
@@ -519,20 +521,13 @@ function printBlocker(blocker) {
 }
 
 function verifyNoCommittedSecrets(content) {
-  const forbidden = [
-    /SUPABASE_SMOKE_[A-Z_]*PASSWORD/i,
-    /SUPABASE_SERVICE_ROLE/i,
-    /SUPABASE_FUNCTION_ADMIN_KEY/i,
-    /OPENAI_API_KEY/i,
-    /ANTHROPIC_API_KEY/i,
-    /MODEL_PROVIDER_API_KEY/i,
-    /sb_secret_/i,
-    /sk-[A-Za-z0-9_-]{12,}/,
-  ];
-
-  const hit = forbidden.find((pattern) => pattern.test(content));
-  if (hit) block("Production readiness packet contains forbidden secret marker", hit);
-  else pass("Production readiness packet contains no forbidden secret markers");
+  const hits = forbiddenProductionReadinessMarkers(content);
+  if (hits.length) {
+    block(
+      "Production readiness packet contains forbidden secret marker",
+      hits.join(", "),
+    );
+  } else pass("Production readiness packet contains no forbidden secret markers");
 }
 
 function verifyMigrationOrder(packet) {
@@ -606,7 +601,10 @@ function verifyPackageScript() {
 }
 
 function verifyAgentInteractionProductionEvidence() {
-  const verifierPath = resolve(repoRoot, "scripts/verify-agent-interaction-evidence.mjs");
+  const verifierPath = resolve(
+    repoRoot,
+    "scripts/verify-agent-interaction-evidence.mjs",
+  );
   let rawResult = "";
   try {
     rawResult = execFileSync(process.execPath, [verifierPath], {
@@ -629,7 +627,11 @@ function verifyAgentInteractionProductionEvidence() {
     return;
   }
 
-  if (result.status === "PASS" && Array.isArray(result.blockers) && !result.blockers.length) {
+  if (
+    result.status === "PASS" &&
+    Array.isArray(result.blockers) &&
+    !result.blockers.length
+  ) {
     pass("Exact deployed agent interaction evidence passes");
     return;
   }
@@ -1622,8 +1624,7 @@ function verifyControlledPilotEnvelope(packet) {
   }
 }
 
-function verifyPacket(packet, rawContent) {
-  verifyNoCommittedSecrets(rawContent);
+function verifyPacket(packet) {
   const gitHead = currentGitHead();
   const verifierSha256 = sha256Text(
     readText(
@@ -1687,6 +1688,16 @@ function verifyPacket(packet, rawContent) {
   const target = packet.productionTarget ?? {};
   requireActivationPresent(target.projectId, "Production project id is recorded");
   requireActivationPresent(target.projectUrl, "Production project URL is recorded");
+  requireActivationEqual(
+    target.projectId,
+    SUPABASE_PRODUCTION_TARGET.projectId,
+    "Production project id matches the canonical target",
+  );
+  requireActivationEqual(
+    target.projectUrl,
+    SUPABASE_PRODUCTION_TARGET.projectUrl,
+    "Production project URL matches the canonical target",
+  );
   requireActivationPresent(
     target.supabaseOrganization,
     "Supabase organization is recorded",
@@ -2059,6 +2070,85 @@ function verifyPacket(packet, rawContent) {
   }
 }
 
+function trueBooleanPaths(value, path = []) {
+  if (value === true) return [path.join(".")];
+  if (!value || typeof value !== "object") return [];
+
+  return Object.entries(value).flatMap(([key, child]) =>
+    trueBooleanPaths(child, [...path, key]),
+  );
+}
+
+function verifyCutoverPacket(packet) {
+  requireEqual(packet.schemaVersion, 2, "Cutover readiness packet schema is v2");
+  requireEqual(
+    packet.scope,
+    "supabase-production-cutover",
+    "Cutover readiness packet scope is locked",
+  );
+  requireEqual(packet.status, "NO_GO", "Cutover readiness status is fail-closed");
+  requireEqual(
+    packet.phase,
+    "awaiting-fresh-evidence",
+    "Cutover readiness waits for fresh evidence",
+  );
+  requireEqual(
+    packet.productionTarget?.descriptorPath,
+    "config/supabase-production-target.mjs",
+    "Cutover target descriptor path is canonical",
+  );
+  requireEqual(
+    packet.productionTarget?.projectId,
+    SUPABASE_PRODUCTION_TARGET.projectId,
+    "Cutover project id matches the canonical target",
+  );
+  requireEqual(
+    packet.productionTarget?.projectUrl,
+    SUPABASE_PRODUCTION_TARGET.projectUrl,
+    "Cutover project URL matches the canonical target",
+  );
+  requireEqual(
+    packet.productionTarget?.cutoverGeneration,
+    SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
+    "Cutover generation matches the canonical target",
+  );
+  requireEqual(
+    packet.deploymentGate?.deployApproved,
+    false,
+    "Cutover deploy approval is reset",
+  );
+  requireEqual(
+    packet.deploymentGate?.cutoverApproved,
+    false,
+    "Cutover approval is reset",
+  );
+  requireEqual(
+    packet.deploymentGate?.productionMutationApproved,
+    false,
+    "Cutover production mutation approval is reset",
+  );
+  requireEqual(
+    packet.goNoGo?.decision,
+    "NO_GO",
+    "Cutover Go / No-Go decision is reset",
+  );
+
+  const unexpectedTruePaths = trueBooleanPaths(packet);
+  if (unexpectedTruePaths.length === 0) {
+    pass("Cutover readiness contains no inherited true evidence");
+  } else {
+    block(
+      "Cutover readiness contains no inherited true evidence",
+      unexpectedTruePaths.join(", "),
+    );
+  }
+
+  activationBlock(
+    "Fresh Supabase cutover evidence is required",
+    `${SUPABASE_PRODUCTION_TARGET.projectId} is not approved for activation`,
+  );
+}
+
 const rawReadiness = readText(readinessPath, "Production readiness packet exists");
 let readiness = {};
 if (rawReadiness) {
@@ -2070,9 +2160,14 @@ if (rawReadiness) {
 }
 
 verifyPackageScript();
-verifyMigrationOrder(readiness);
-verifyPacket(readiness, rawReadiness);
-verifyAgentInteractionProductionEvidence();
+verifyNoCommittedSecrets(rawReadiness);
+if (readiness.scope === "supabase-production-cutover") {
+  verifyCutoverPacket(readiness);
+} else {
+  verifyMigrationOrder(readiness);
+  verifyPacket(readiness);
+  verifyAgentInteractionProductionEvidence();
+}
 
 for (const label of passes) console.log(`PASS ${label}`);
 

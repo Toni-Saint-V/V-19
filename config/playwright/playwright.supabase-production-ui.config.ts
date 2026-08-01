@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
+import { SUPABASE_PRODUCTION_TARGET } from "../supabase-production-target.mjs";
 import { testArtifactPath } from "../../tests/support/artifacts";
 
 if (process.env.SUPABASE_PRODUCTION_E2E_UNLOCK !== "1") {
@@ -13,8 +14,8 @@ if (process.env.SUPABASE_PRODUCTION_E2E_UNLOCK !== "1") {
 process.env.SUPABASE_UI_E2E_ENV_FILE ??= ".env.supabase-production.local";
 
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
-const expectedProductionProjectId = "tsymifccglpepvbmrcgh";
-const expectedProductionUrl = `https://${expectedProductionProjectId}.supabase.co`;
+const expectedProductionProjectId = SUPABASE_PRODUCTION_TARGET.projectId;
+const expectedProductionUrl = SUPABASE_PRODUCTION_TARGET.projectUrl;
 const browserSafeEnvNames = [
   "VITE_SUPABASE_BACKEND_TARGET",
   "VITE_SUPABASE_BROWSER_KEY_AUDITED",

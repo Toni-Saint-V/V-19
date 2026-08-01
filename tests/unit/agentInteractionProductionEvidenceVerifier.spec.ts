@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
+import { SUPABASE_PRODUCTION_TARGET } from "../../config/supabase-production-target.mjs";
 
 import {
   V19_AGENT_INTERACTION_CONTRACTS,
@@ -85,8 +86,8 @@ function productionFixture() {
   const artifacts: AgentInteractionEvidenceArtifact[] = [];
   const runId = "CODEX-E2E-verifier-fixture";
   const markerSha256 = sha256(runId);
-  const backendProjectRef = "tsymifccglpepvbmrcgh";
-  const backendOrigin = `https://${backendProjectRef}.supabase.co`;
+  const backendProjectRef: string = SUPABASE_PRODUCTION_TARGET.projectId;
+  const backendOrigin: string = SUPABASE_PRODUCTION_TARGET.projectUrl;
   const capturedAt = new Date().toISOString();
   const actorIds = {
     admin: "00000000-0000-4000-8000-0000000000ad",

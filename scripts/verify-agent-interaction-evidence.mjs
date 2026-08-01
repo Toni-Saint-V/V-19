@@ -11,12 +11,13 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import ts from "typescript";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
 const fallbackSchemaVersion = "v19-agent-interaction-evidence-v2";
 const repoRoot = realpathSync(process.cwd());
 const productionAlias = "https://document-intake-system.vercel.app";
-const productionBackendProjectRef = "tsymifccglpepvbmrcgh";
-const productionBackendOrigin = `https://${productionBackendProjectRef}.supabase.co`;
+const productionBackendProjectRef = SUPABASE_PRODUCTION_TARGET.projectId;
+const productionBackendOrigin = SUPABASE_PRODUCTION_TARGET.projectUrl;
 const trustedRepository = "Toni-Saint-V/V-19";
 const trustedSignerWorkflow =
   "Toni-Saint-V/V-19/.github/workflows/production-agent-evidence-attestation.yml";
