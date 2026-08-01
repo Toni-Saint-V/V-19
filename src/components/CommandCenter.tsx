@@ -66,6 +66,7 @@ import {
   type AgentActionTask,
 } from "../modules/submissions/agentActions";
 import { AgentActionsCommandCockpit } from "../modules/submissions/components/AgentActionsCommandCockpit";
+import { retainExpandedActionTaskIds } from "../modules/submissions/components/agentActionsCommandCockpitState";
 import {
   AgentActionStatusStrip,
   type AgentActionFilter,
@@ -211,7 +212,9 @@ export function CommandCenter({
   const [actionCityFilter, setActionCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
-  const [selectedActionTaskId, setSelectedActionTaskId] = useState<string | null>(null);
+  const [expandedActionTaskIds, setExpandedActionTaskIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
   const questionnaireOriginSurfaceRef = useRef<"drawer" | "workspace">("workspace");
   const questionnaireSubmissionSnapshotRef = useRef<Submission | undefined>(undefined);
@@ -314,13 +317,14 @@ export function CommandCenter({
     () => buildAgentActionTasks(visibleActions),
     [visibleActions],
   );
+  useEffect(() => {
+    setExpandedActionTaskIds((current) =>
+      retainExpandedActionTaskIds(current, actionTasks),
+    );
+  }, [actionTasks]);
   const actionTaskSummary = useMemo(
     () => summarizeAgentActionTasks(actionTasks),
     [actionTasks],
-  );
-  const selectedActionTask = useMemo(
-    () => actionTasks.find((task) => task.id === selectedActionTaskId),
-    [actionTasks, selectedActionTaskId],
   );
   const actionFiltersActive =
     actionSummaryFilter !== "open" ||
@@ -329,22 +333,22 @@ export function CommandCenter({
   const actionControlsAreDefault = !actionFiltersActive && actionSort === "tripDate";
   const handleActionFilterChange = (filter: AgentActionFilter) => {
     setActionSummaryFilter(filter);
-    setSelectedActionTaskId(null);
+    setExpandedActionTaskIds(new Set());
   };
   const handleActionCityFilterChange = (city: string) => {
     setActionCityFilter(city);
-    setSelectedActionTaskId(null);
+    setExpandedActionTaskIds(new Set());
   };
   const handleActionSearchChange = (query: string) => {
     setSearchQuery(query);
-    setSelectedActionTaskId(null);
+    setExpandedActionTaskIds(new Set());
   };
   const resetActionFilters = () => {
     setActionSummaryFilter("open");
     setActionCityFilter("Все города");
     setSearchQuery("");
     setActionSort("tripDate");
-    setSelectedActionTaskId(null);
+    setExpandedActionTaskIds(new Set());
   };
   const agentName = agentDisplayName(agentId);
   const agentAgency = agentAgencyLabel(agentId);
@@ -1031,7 +1035,7 @@ export function CommandCenter({
                 ? "Ничего не найдено"
                 : "Очередь действий пуста",
             }}
-            selectedTask={selectedActionTask}
+            expandedTaskIds={expandedActionTaskIds}
             showSummary={false}
             summary={actionTaskSummary}
             tasks={actionTasks}
@@ -1043,9 +1047,12 @@ export function CommandCenter({
             onOpenSecondary={(task) => handleActionTaskTab(task, "overview")}
             onOpenTab={handleActionTaskTab}
             onSelectTask={(task) =>
-              setSelectedActionTaskId((current) =>
-                current === task.id ? null : task.id,
-              )
+              setExpandedActionTaskIds((current) => {
+                const next = new Set(current);
+                if (next.has(task.id)) next.delete(task.id);
+                else next.add(task.id);
+                return next;
+              })
             }
           />
         </div>

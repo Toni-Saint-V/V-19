@@ -435,11 +435,17 @@
 
 .v19-review-queue-list {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: 8px;
   padding: 11px;
   background:
     linear-gradient(rgb(255 255 255 / 0.008), rgb(255 255 255 / 0.008)),
     var(--v19b-color-app);
+}
+
+.v19-review-queue-empty {
+  grid-column: 1 / -1;
 }
 
 .v19-review-queue-row {
@@ -1164,6 +1170,7 @@
   }
 
   .v19-review-queue-list {
+    grid-template-columns: minmax(0, 1fr);
     padding: 8px;
   }
 

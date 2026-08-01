@@ -42,6 +42,7 @@ type AgentActionsCommandCockpitProps = {
   desktopContextMode?: DesktopContextMode;
   emptyState: EmptyState;
   errorMessage?: string;
+  expandedTaskIds?: ReadonlySet<string>;
   loading?: boolean;
   selectedTask?: AgentActionTask;
   showSummary?: boolean;
@@ -63,6 +64,7 @@ export function AgentActionsCommandCockpit({
   desktopContextMode = "rail",
   emptyState,
   errorMessage = "",
+  expandedTaskIds,
   loading = false,
   selectedTask,
   showSummary = true,
@@ -77,10 +79,7 @@ export function AgentActionsCommandCockpit({
   onSelectTask,
   onSummaryFilterChange,
 }: AgentActionsCommandCockpitProps) {
-  const { getCardRef, timelineRef } = useIndependentTimelineLayout(
-    tasks,
-    selectedTask?.id,
-  );
+  const { getCardRef, timelineRef } = useIndependentTimelineLayout(tasks);
 
   if (errorMessage) {
     return (
@@ -149,6 +148,8 @@ export function AgentActionsCommandCockpit({
 
   const railTask = selectedTask ?? tasks[0];
   const usesInlineContext = desktopContextMode === "inline";
+  const isTaskExpanded = (taskId: string) =>
+    expandedTaskIds?.has(taskId) ?? selectedTask?.id === taskId;
   const intelligenceTasks = summaryTasks ?? tasks;
   const intelligenceSubmissions = Array.from(
     new Map(
@@ -214,7 +215,7 @@ export function AgentActionsCommandCockpit({
           />
           <div className="v19-actions-queue-list">
             {tasks.map((task) => {
-              const selected = selectedTask?.id === task.id;
+              const selected = isTaskExpanded(task.id);
               const rowId = `agent-action-row-${stableDomId(task.id)}`;
               const detailId = `agent-action-detail-${stableDomId(task.id)}`;
 
@@ -270,7 +271,7 @@ export function AgentActionsCommandCockpit({
             <TimelineEvent
               elementRef={getCardRef(task.id)}
               key={task.id}
-              selected={selectedTask?.id === task.id}
+              selected={isTaskExpanded(task.id)}
               task={task}
               onOpenPrimary={() => onOpenPrimary(task)}
               onOpenSecondary={() => onOpenSecondary(task)}
@@ -284,10 +285,7 @@ export function AgentActionsCommandCockpit({
   );
 }
 
-function useIndependentTimelineLayout(
-  tasks: AgentActionTask[],
-  selectedTaskId?: string,
-) {
+function useIndependentTimelineLayout(tasks: AgentActionTask[]) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const cardElements = useRef(new Map<string, HTMLElement>());
   const cardRefCallbacks = useRef(
@@ -379,7 +377,7 @@ function useIndependentTimelineLayout(
       resizeObserver.disconnect();
       clearDesktopLayout();
     };
-  }, [selectedTaskId, tasks]);
+  }, [tasks]);
 
   return { getCardRef, timelineRef };
 }

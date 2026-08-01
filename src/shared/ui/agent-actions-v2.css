@@ -2134,8 +2134,8 @@
   }
 }
 
-/* Controlled single-open accordion: keep the collapsed row identity-first and
-   leave operational detail behind explicit disclosure. */
+/* Independent disclosures: keep five equal data columns and leave
+   operational detail behind explicit disclosure. */
 #root
   .v19-legacy-actions-screen.surface-agent-actions
   .v19-actions-desktop-grid.is-inline-context

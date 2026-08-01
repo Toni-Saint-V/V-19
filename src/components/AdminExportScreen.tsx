@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Shapes,
   UploadCloud,
+  User,
   X,
   XCircle,
 } from "lucide-react";
@@ -49,6 +50,7 @@ import {
   V19QueueCard,
 } from "../shared/ui/v19-design-system";
 import { OperationalTableHeader } from "../shared/ui/OperationalTableHeader";
+import { agentDisplayName } from "../modules/submissions/agentDirectory";
 import { cityFilterValuesForSubmissions } from "../modules/submissions/selectors";
 import {
   adminDocumentPackageExportEnabled,
@@ -229,6 +231,21 @@ function applicantCountLabel(count: number) {
 
 function rowCountLabel(count: number) {
   return countLabel(count, ["строка", "строки", "строк"]);
+}
+
+const opaqueAgentIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function exportAgentName(agentId: string) {
+  if (opaqueAgentIdPattern.test(agentId.trim())) return "—";
+
+  const displayName = agentDisplayName(agentId);
+  if (displayName === "Агент не указан") return "—";
+
+  return displayName
+    .replace(/^Агент\s+/u, "")
+    .replace(/^Local Agent\s+/u, "")
+    .replace(/^Agent\s+/u, "");
 }
 
 export function AdminExportScreen({
@@ -1026,7 +1043,11 @@ export function AdminExportScreen({
                       </div>
                     </div>
 
-                    <div className="v19-admin-export-row-dates-v2">
+                    <div
+                      aria-label={`Даты поездки: ${item.appointmentDate}`}
+                      className="v19-admin-export-row-dates-v2"
+                      role="group"
+                    >
                       <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
                         <CalendarDays />
                       </span>
@@ -1038,12 +1059,30 @@ export function AdminExportScreen({
                       </span>
                     </div>
 
-                    <div className="v19-admin-export-row-city-v2">
+                    <div
+                      aria-label={`Город: ${item.city}`}
+                      className="v19-admin-export-row-city-v2"
+                      role="group"
+                    >
                       <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
                         <MapPin />
                       </span>
                       <small className="v19-admin-export-row-label-v2">Город</small>
                       <span className="v19-admin-export-row-value-v2">{item.city}</span>
+                    </div>
+
+                    <div
+                      aria-label={`Агент: ${exportAgentName(item.agent)}`}
+                      className="v19-admin-export-row-agent-v2"
+                      role="group"
+                    >
+                      <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
+                        <User />
+                      </span>
+                      <small className="v19-admin-export-row-label-v2">Агент</small>
+                      <span className="v19-admin-export-row-value-v2">
+                        {exportAgentName(item.agent)}
+                      </span>
                     </div>
                   </V19QueueCard>
                 ))}

@@ -325,27 +325,16 @@ async function assertDesktopCockpit(page: Page) {
     boxShadow: "none",
   });
 
-  await firstDisclosure.click();
-  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "false");
-  await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(0);
-  expect(await timeline.evaluate((element) => element.scrollTop)).toBe(
-    initialScrollTop,
-  );
-  expect(
-    await cards.evaluateAll((items) =>
-      items.map((item) => item.getAttribute("data-submission-id")),
-    ),
-  ).toEqual(initialOrder);
-
   await secondDisclosure.click();
-  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "true");
   await expect(secondDisclosure).toHaveAttribute("aria-expanded", "true");
+  await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(2);
   const detailId = await secondDisclosure.getAttribute("aria-controls");
   if (!detailId) {
     throw new Error("Selected person card does not expose its inline detail id.");
   }
 
-  const activeDetail = surface.getByTestId("agent-action-mobile-detail");
+  const activeDetail = surface.locator(`#${detailId}`);
   await expect(activeDetail).toHaveAttribute("id", detailId);
   const [secondSelectedCardBox, firstCardAfterSwitchBox, leftFollowerAfterSwitchBox] =
     await Promise.all([
@@ -374,8 +363,20 @@ async function assertDesktopCockpit(page: Page) {
   ).toBeLessThanOrEqual(1);
   expect(
     Math.abs(leftFollowerAfterSwitchBox.y - leftFollowerBox.y),
-    "expanding the right column does not move later cards in the left column",
+    "opening the right column does not move later cards in the left column",
   ).toBeLessThanOrEqual(1);
+  await firstDisclosure.click();
+  await expect(firstDisclosure).toHaveAttribute("aria-expanded", "false");
+  await expect(secondDisclosure).toHaveAttribute("aria-expanded", "true");
+  await expect(surface.getByTestId("agent-action-mobile-detail")).toHaveCount(1);
+  expect(await timeline.evaluate((element) => element.scrollTop)).toBe(
+    initialScrollTop,
+  );
+  expect(
+    await cards.evaluateAll((items) =>
+      items.map((item) => item.getAttribute("data-submission-id")),
+    ),
+  ).toEqual(initialOrder);
   await expect(activeDetail).toContainText("Почему сейчас");
   await expect(activeDetail).toContainText("Готовность подачи");
   await expect(activeDetail).toContainText("Следующее действие");
@@ -472,7 +473,7 @@ async function assertPrimaryActionRouting(page: Page) {
 }
 
 test.describe("V-19 My Actions submission command cockpit", () => {
-  test("viewport matrix and controlled single-open disclosure", async ({ page }) => {
+  test("viewport matrix and independent stable disclosures", async ({ page }) => {
     test.setTimeout(180_000);
     mkdirSync(proofDir, { recursive: true });
     const browserProblems = collectBrowserProblems(page);

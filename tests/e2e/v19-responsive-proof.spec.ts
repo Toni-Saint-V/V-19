@@ -660,7 +660,7 @@ async function expectMobileExportRowComposition(
     expect(
       composition!.headerActionRadius,
       `${context}: compact all action radius`,
-    ).toBe(10);
+    ).toBe(20);
   }
 }
 

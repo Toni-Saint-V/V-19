@@ -54,10 +54,39 @@ describe("active admin export screen", () => {
     expect(row.querySelector(".v19-admin-export-row-identity-v2")).toBeInTheDocument();
     expect(row.querySelector(".v19-admin-export-row-dates-v2")).toBeInTheDocument();
     expect(row.querySelector(".v19-admin-export-row-city-v2")).toBeInTheDocument();
-    expect(row.querySelector(".v19-admin-export-row-agent-v2")).not.toBeInTheDocument();
+    expect(row.querySelector(".v19-admin-export-row-agent-v2")).toBeInTheDocument();
+    expect(
+      within(row).getByRole("group", {
+        name: `Даты поездки: ${submission.tripDateFrom} – ${submission.tripDateTo}`,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(row).getByRole("group", { name: `Город: ${submission.city}` }),
+    ).toBeInTheDocument();
+    expect(within(row).getByRole("group", { name: "Агент: Тони" })).toBeInTheDocument();
+    expect(Array.from(row.children).map((child) => child.classList[0])).toEqual([
+      "h-5",
+      "v19-admin-export-row-identity-v2",
+      "v19-admin-export-row-dates-v2",
+      "v19-admin-export-row-city-v2",
+      "v19-admin-export-row-agent-v2",
+    ]);
     expect(row.querySelector(".v19-admin-export-row-title-v2")).toHaveTextContent(
       submission.applicants[0]?.fullName ?? "",
     );
+  });
+
+  test("does not expose opaque agent identifiers in the metadata row", () => {
+    const submission = {
+      ...readySubmission(),
+      agentId: "8d17d610-50bc-4015-88c5-2deda1d48631",
+    };
+    render(<AdminExportScreen submissions={[submission]} />);
+
+    const row = screen.getByTestId(`admin-export-row-${submission.id}`);
+    expect(within(row).getByRole("group", { name: "Агент: —" })).toBeInTheDocument();
+    expect(row).not.toHaveTextContent("8d17d610");
+    expect(row).not.toHaveTextContent("2deda1d48631");
   });
 
   test("keeps preparation under the hood and exposes one final action", () => {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AgentActionsCommandCockpit } from "../../src/modules/submissions/components/AgentActionsCommandCockpit";
+import { retainExpandedActionTaskIds } from "../../src/modules/submissions/components/agentActionsCommandCockpitState";
 import {
   agentActionQueue,
   buildAgentActionTasks,
@@ -10,7 +11,31 @@ import {
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 
 describe("AgentActionsCommandCockpit", () => {
-  it("opens, closes, and transfers the single desktop disclosure", () => {
+  it("forgets expanded tasks that disappear from the current queue", () => {
+    const queue = agentActionQueue(initialSubmissions);
+    const tasks = buildAgentActionTasks([...queue.open, ...queue.completed]).slice(
+      0,
+      2,
+    );
+    const firstTask = tasks[0];
+    const secondTask = tasks[1];
+
+    if (!firstTask || !secondTask) {
+      throw new Error("Expected at least two action tasks in the local-demo seed.");
+    }
+
+    const afterRemoval = retainExpandedActionTaskIds(
+      new Set([firstTask.id, secondTask.id]),
+      [secondTask],
+    );
+    const afterReappearance = retainExpandedActionTaskIds(afterRemoval, tasks);
+
+    expect([...afterRemoval]).toEqual([secondTask.id]);
+    expect(afterReappearance.has(firstTask.id)).toBe(false);
+    expect(afterReappearance.has(secondTask.id)).toBe(true);
+  });
+
+  it("opens and closes desktop disclosures independently", () => {
     const queue = agentActionQueue(initialSubmissions);
     const tasks = buildAgentActionTasks([...queue.open, ...queue.completed]).slice(
       0,
@@ -49,7 +74,12 @@ describe("AgentActionsCommandCockpit", () => {
 
     fireEvent.click(rows[0]);
     expect(onSelectTask).toHaveBeenLastCalledWith(firstTask);
-    rerender(<AgentActionsCommandCockpit {...props} selectedTask={firstTask} />);
+    rerender(
+      <AgentActionsCommandCockpit
+        {...props}
+        expandedTaskIds={new Set([firstTask.id])}
+      />,
+    );
 
     const firstOpenRows = screen.getAllByTestId("agent-action-queue-item");
     const firstDetail = screen.getByTestId("agent-action-inline-detail");
@@ -59,7 +89,7 @@ describe("AgentActionsCommandCockpit", () => {
 
     fireEvent.click(firstOpenRows[0]);
     expect(onSelectTask).toHaveBeenLastCalledWith(firstTask);
-    rerender(<AgentActionsCommandCockpit {...props} />);
+    rerender(<AgentActionsCommandCockpit {...props} expandedTaskIds={new Set()} />);
     expect(screen.getAllByTestId("agent-action-queue-item")[0]).toHaveAttribute(
       "aria-expanded",
       "false",
@@ -72,12 +102,20 @@ describe("AgentActionsCommandCockpit", () => {
     expect(onOpenPrimary).not.toHaveBeenCalled();
     expect(onOpenSecondary).not.toHaveBeenCalled();
 
-    rerender(<AgentActionsCommandCockpit {...props} selectedTask={secondTask} />);
+    rerender(
+      <AgentActionsCommandCockpit
+        {...props}
+        expandedTaskIds={new Set([firstTask.id, secondTask.id])}
+      />,
+    );
 
     const updatedRows = screen.getAllByTestId("agent-action-queue-item");
-    const secondDetail = screen.getByTestId("agent-action-inline-detail");
-    expect(updatedRows[0]).toHaveAttribute("aria-expanded", "false");
+    const details = screen.getAllByTestId("agent-action-inline-detail");
+    const secondDetail = details[1];
+    if (!secondDetail) throw new Error("Expected the second independent detail.");
+    expect(updatedRows[0]).toHaveAttribute("aria-expanded", "true");
     expect(updatedRows[1]).toHaveAttribute("aria-expanded", "true");
+    expect(details).toHaveLength(2);
     expect(secondDetail).toHaveAttribute("data-agent-action-id", secondTask.id);
     expect(updatedRows[1]?.nextElementSibling).toBe(secondDetail);
 
@@ -85,6 +123,23 @@ describe("AgentActionsCommandCockpit", () => {
       within(secondDetail).getByRole("button", { name: /Открыть подачу/ }),
     );
     expect(onOpenSecondary).toHaveBeenCalledWith(secondTask);
+
+    fireEvent.click(updatedRows[0]);
+    rerender(
+      <AgentActionsCommandCockpit
+        {...props}
+        expandedTaskIds={new Set([secondTask.id])}
+      />,
+    );
+    expect(screen.getAllByTestId("agent-action-queue-item")[0]).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.getAllByTestId("agent-action-queue-item")[1]).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getAllByTestId("agent-action-inline-detail")).toHaveLength(1);
   });
 
   it("explains a disabled primary action inside the inline detail", () => {
@@ -165,7 +220,7 @@ describe("AgentActionsCommandCockpit", () => {
       <AgentActionsCommandCockpit
         actionGroupLabel="Открытые действия"
         emptyState={{ action: "Новая подача", body: "Нет действий", title: "Пусто" }}
-        selectedTask={task}
+        expandedTaskIds={new Set([task.id])}
         summary={summarizeAgentActionTasks([task])}
         tasks={[task]}
         onEmptyAction={vi.fn()}

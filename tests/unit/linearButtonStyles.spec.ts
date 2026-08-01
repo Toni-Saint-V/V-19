@@ -33,8 +33,10 @@ describe("Linear Indigo product button contract", () => {
     expect(productActions).toContain(
       "linear-product-action linear-product-action--primary v19-admin-export-primary-action",
     );
+    expect(productActions).toContain("familyCopyPreview");
+    expect(productActions).toContain('? "linear-product-action--primary"');
     expect(productActions).toContain(
-      "linear-product-action linear-product-action--primary v19-questionnaire-complete-button",
+      "} v19-questionnaire-draft-button v19-questionnaire-copy-button",
     );
     expect(productActions).toContain('primaryButtonClassName === "is-warning"');
     expect(productActions).toContain('? "linear-product-action--warning"');

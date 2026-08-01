@@ -1558,6 +1558,33 @@
   container-type: inline-size;
 }
 
+/* Standard-priority cards already explain their state in the reason text.
+   Keep only exception badges so the routine score does not compete with it. */
+#root
+  .v19-admin-workspace-root
+  .v19-admin-review-screen
+  .v19-review-queue-row[data-priority-band="standard"]
+  .v19-review-priority-badge.is-standard {
+  display: none;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-review-screen
+  .v19-review-queue-row[data-priority-band="standard"]
+  .v19-review-row-priority {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-review-screen
+  .v19-review-queue-row[data-priority-band="standard"]
+  .v19-review-row-priority
+  > strong {
+  grid-column: 1 / -1;
+}
+
 #root
   .v19-admin-workspace-root
   .ops-shell.surface-admin-review
@@ -2476,7 +2503,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 #root .v19-admin-workspace-root .v19-admin-export-screen-v2 .v19-admin-export-row-v2 {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(var(--v19b-size-144), 0.44fr) !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   grid-template-rows: auto var(--v19b-size-48);
   align-items: center;
   gap: var(--v19b-size-10) 0;
@@ -2513,7 +2540,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
   min-width: var(--v19b-size-16);
   height: var(--v19b-size-16) !important;
   min-height: var(--v19b-size-16);
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   align-self: start;
   justify-self: end;
@@ -2537,7 +2564,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
   > .v19-admin-export-row-identity-v2 {
   display: block;
   min-width: 0;
-  grid-column: 1;
+  grid-column: 1 / 3;
   grid-row: 1;
   padding-right: 0;
 }
@@ -2546,11 +2573,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
   > .v19-admin-export-row-identity-v2
-  > .v19-admin-export-row-icon-v2,
-#root
-  .v19-admin-workspace-root
-  .v19-admin-export-row-v2
-  > .v19-admin-export-row-agent-v2 {
+  > .v19-admin-export-row-icon-v2 {
   display: none !important;
 }
 
@@ -2601,19 +2624,26 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  > :is(.v19-admin-export-row-dates-v2, .v19-admin-export-row-city-v2) {
+  > :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  ) {
   position: static;
-  display: flex;
+  display: flex !important;
   width: 100%;
   max-width: none;
   height: var(--v19b-size-48);
   min-height: var(--v19b-size-48);
+  box-sizing: border-box;
+  align-items: center;
   align-self: stretch;
-  padding: 0 var(--v19b-size-12);
+  justify-content: center;
+  padding: 0 var(--v19b-size-8);
   overflow: hidden;
   border: var(--v19b-size-1) solid var(--v19b-color-border);
   background: var(--v19b-color-app);
-  column-gap: var(--v19b-size-6);
+  column-gap: var(--v19b-size-2);
 }
 
 #root
@@ -2632,41 +2662,66 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
   > .v19-admin-export-row-city-v2 {
   grid-column: 2;
   grid-row: 2;
-  align-items: center;
-  padding-inline: 0;
-  border-radius: 0 var(--v19b-radius-control) var(--v19b-radius-control) 0;
-  gap: var(--v19b-size-2);
+  border-right: 0;
+  border-radius: 0;
 }
 
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  > .v19-admin-export-row-city-v2
+  > .v19-admin-export-row-agent-v2 {
+  grid-column: 3;
+  grid-row: 2;
+  border-radius: 0 var(--v19b-radius-control) var(--v19b-radius-control) 0;
+}
+
+#root
+  .v19-admin-workspace-root
+  .v19-admin-export-row-v2
+  > :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  )
   .v19-admin-export-row-icon-v2,
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  > .v19-admin-export-row-city-v2
+  > :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  )
   .v19-admin-export-row-icon-v2
   > svg {
-  width: var(--v19b-size-16);
-  height: var(--v19b-size-16);
+  width: var(--v19b-size-14);
+  height: var(--v19b-size-14);
   flex: none;
+  color: #bab5b5;
 }
 
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  > .v19-admin-export-row-city-v2
+  > :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  )
   .v19-admin-export-row-icon-v2 {
   display: inline-grid;
   place-items: center;
+  color: #bab5b5;
 }
 
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  > .v19-admin-export-row-city-v2
+  > :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  )
   .v19-admin-export-row-icon-v2
   > svg {
   display: block;
@@ -2675,7 +2730,11 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  :is(.v19-admin-export-row-dates-v2, .v19-admin-export-row-city-v2)
+  :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  )
   .v19-admin-export-row-label-v2 {
   display: none;
 }
@@ -2683,11 +2742,15 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  :is(.v19-admin-export-row-dates-v2, .v19-admin-export-row-city-v2)
+  :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  )
   .v19-admin-export-row-value-v2 {
   min-width: 0;
   overflow: hidden;
-  color: #f5f5f5;
+  color: #bab5b5;
   font-size: var(--v19b-size-13);
   font-weight: 500;
   text-overflow: ellipsis;
@@ -2697,7 +2760,11 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 #root
   .v19-admin-workspace-root
   .v19-admin-export-row-v2
-  > .v19-admin-export-row-city-v2
+  > :is(
+    .v19-admin-export-row-dates-v2,
+    .v19-admin-export-row-city-v2,
+    .v19-admin-export-row-agent-v2
+  )
   .v19-admin-export-row-value-v2 {
   line-height: 1;
 }
