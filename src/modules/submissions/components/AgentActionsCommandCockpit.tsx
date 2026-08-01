@@ -239,6 +239,7 @@ export function AgentActionsCommandCockpit({
                       rowId={rowId}
                       task={task}
                       onOpenPrimary={() => onOpenPrimary(task)}
+                      onOpenRelatedPrimary={onOpenPrimary}
                       onOpenSecondary={() => onOpenSecondary(task)}
                       onOpenTab={(tab) => onOpenTab(task, tab)}
                     />
@@ -274,6 +275,7 @@ export function AgentActionsCommandCockpit({
               selected={isTaskExpanded(task.id)}
               task={task}
               onOpenPrimary={() => onOpenPrimary(task)}
+              onOpenRelatedPrimary={onOpenPrimary}
               onOpenSecondary={() => onOpenSecondary(task)}
               onOpenTab={(tab) => onOpenTab(task, tab)}
               onSelect={() => onSelectTask(task)}
@@ -590,6 +592,7 @@ function AgentActionInlineDetail({
   surface = "desktop",
   task,
   onOpenPrimary,
+  onOpenRelatedPrimary,
   onOpenSecondary,
   onOpenTab,
 }: {
@@ -598,11 +601,13 @@ function AgentActionInlineDetail({
   surface?: "desktop" | "mobile";
   task: AgentActionTask;
   onOpenPrimary: () => void;
+  onOpenRelatedPrimary: (task: AgentActionTask) => void;
   onOpenSecondary: () => void;
   onOpenTab: (tab: DrawerTab) => void;
 }) {
   const disabledReason = primaryActionDisabledReason(task);
   const disabledReasonId = `${stableDomId(task.id)}-${surface}-inline-primary-disabled-reason`;
+  const actionTasks = [task, ...(task.relatedTasks ?? [])];
 
   return (
     <section
@@ -637,7 +642,7 @@ function AgentActionInlineDetail({
       </div>
 
       <div className="v19-actions-inline-next">
-        <p>Следующее действие</p>
+        <p>{actionTasks.length > 1 ? "Следующие действия" : "Следующее действие"}</p>
         <strong>{task.nextAction.label}</strong>
         <span>{task.nextAction.detail}</span>
         {disabledReason ? (
@@ -646,16 +651,26 @@ function AgentActionInlineDetail({
           </small>
         ) : null}
         <div className="v19-actions-inline-actions">
-          <Button
-            {...agentInteractionProps("actions.open-primary")}
-            aria-describedby={disabledReason ? disabledReasonId : undefined}
-            disabled={Boolean(disabledReason)}
-            title={disabledReason || undefined}
-            variant="primary"
-            onClick={onOpenPrimary}
-          >
-            {task.nextAction.primaryLabel}
-          </Button>
+          {actionTasks.map((actionTask, index) => {
+            const actionDisabledReason = primaryActionDisabledReason(actionTask);
+            return (
+              <Button
+                {...agentInteractionProps("actions.open-primary")}
+                aria-describedby={
+                  index === 0 && actionDisabledReason ? disabledReasonId : undefined
+                }
+                disabled={Boolean(actionDisabledReason)}
+                key={actionTask.id}
+                title={actionDisabledReason || undefined}
+                variant={index === 0 ? "primary" : "secondary"}
+                onClick={
+                  index === 0 ? onOpenPrimary : () => onOpenRelatedPrimary(actionTask)
+                }
+              >
+                {actionTask.nextAction.primaryLabel}
+              </Button>
+            );
+          })}
           <Button
             {...agentInteractionProps("actions.open-secondary")}
             variant="secondary"
@@ -927,6 +942,7 @@ function TimelineEvent({
   selected,
   task,
   onOpenPrimary,
+  onOpenRelatedPrimary,
   onOpenSecondary,
   onOpenTab,
   onSelect,
@@ -935,6 +951,7 @@ function TimelineEvent({
   selected: boolean;
   task: AgentActionTask;
   onOpenPrimary: () => void;
+  onOpenRelatedPrimary: (task: AgentActionTask) => void;
   onOpenSecondary: () => void;
   onOpenTab: (tab: DrawerTab) => void;
   onSelect: () => void;
@@ -990,6 +1007,7 @@ function TimelineEvent({
           surface="mobile"
           task={task}
           onOpenPrimary={onOpenPrimary}
+          onOpenRelatedPrimary={onOpenRelatedPrimary}
           onOpenSecondary={onOpenSecondary}
           onOpenTab={onOpenTab}
         />

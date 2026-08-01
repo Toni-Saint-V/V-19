@@ -51,6 +51,12 @@ async function openFreshAgentActions(page: Page) {
     workspaceEmail: "agent@visaflow.local",
   });
   await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Мои действия" })
+      .locator(".v19-actions-timeline-event")
+      .filter({ hasText: "Артём Соколов" }),
+  ).toHaveCount(1);
 }
 
 async function documentMetrics(page: Page) {
@@ -389,7 +395,7 @@ async function assertDesktopCockpit(page: Page) {
   ).toEqual(initialOrder);
   await expect(activeDetail).toContainText("Почему сейчас");
   await expect(activeDetail).toContainText("Готовность подачи");
-  await expect(activeDetail).toContainText("Следующее действие");
+  await expect(activeDetail).toContainText(/Следующ(?:ее|ие) действ/);
   await expect(surface.locator(".v19-actions-summary-metric")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-cockpit-summary")).toHaveCount(0);
   await expect(surface.locator('[data-v19-metric-id="open"]')).toBeVisible();
@@ -466,15 +472,36 @@ async function assertActionFilters(page: Page) {
   await expect(search).toHaveValue("");
 }
 
+async function assertGroupedApplicantActions(page: Page) {
+  const surface = page.getByRole("region", { name: "Мои действия" });
+  const card = surface
+    .locator(".v19-actions-timeline-event")
+    .filter({ hasText: "Артём Соколов" });
+  const disclosure = card.locator(".v19-actions-timeline-hit");
+
+  await disclosure.click();
+  const detailId = await disclosure.getAttribute("aria-controls");
+  if (!detailId) throw new Error("Grouped applicant card has no detail id.");
+
+  const detail = surface.locator(`#${detailId}`);
+  await expect(detail).toContainText("Следующие действия");
+  await expect(
+    detail.locator('[data-v19-interaction-id="actions.open-primary"]'),
+  ).toHaveCount(2);
+  await expect(detail.getByRole("button", { name: "Открыть анкету" })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "Добавить файл" })).toBeVisible();
+
+  await disclosure.click();
+  await expect(detail).toHaveCount(0);
+}
+
 async function assertPrimaryActionRouting(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
   if ((await surface.getByTestId("agent-action-mobile-detail").count()) === 0) {
     await surface.locator(".v19-actions-timeline-hit").first().click();
   }
   const detail = surface.getByTestId("agent-action-mobile-detail");
-  const primaryAction = detail.locator(
-    '[data-v19-interaction-id="actions.open-primary"]',
-  );
+  const primaryAction = detail.getByRole("button", { name: "Открыть анкету" });
 
   await expect(primaryAction).toBeEnabled();
   await primaryAction.click();
@@ -502,6 +529,7 @@ test.describe("V-19 My Actions submission command cockpit", () => {
       } else {
         await assertDesktopCockpit(page);
         if (viewport.width === 1440) {
+          await assertGroupedApplicantActions(page);
           await assertActionFilters(page);
           await assertPrimaryActionRouting(page);
         }

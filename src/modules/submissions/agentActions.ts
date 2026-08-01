@@ -114,6 +114,7 @@ export type AgentActionTask = {
   readiness: AgentActionTaskReadiness;
   importanceText: string;
   reason: string;
+  relatedTasks?: AgentActionTask[];
   secondaryAction: {
     label: "Открыть подачу";
     tab: DrawerTab;
@@ -322,6 +323,38 @@ export function buildAgentActionTasks(actions: AgentActionItem[]): AgentActionTa
     seenIds.set(action.id, duplicateIndex + 1);
     return toAgentActionTask(action, duplicateIndex);
   });
+}
+
+export function groupAgentActionTasksByApplicant(
+  tasks: AgentActionTask[],
+): AgentActionTask[] {
+  const groupedTasks: AgentActionTask[] = [];
+  const taskByApplicant = new Map<string, AgentActionTask>();
+
+  for (const task of tasks) {
+    const workspaceTarget = agentActionWorkspaceTarget(task.action);
+    const applicantId =
+      workspaceTarget && "applicantId" in workspaceTarget
+        ? workspaceTarget.applicantId
+        : undefined;
+    if (!applicantId) {
+      groupedTasks.push(task);
+      continue;
+    }
+
+    const groupKey = `${task.submission.id}:${applicantId}`;
+    const existingTask = taskByApplicant.get(groupKey);
+    if (existingTask) {
+      existingTask.relatedTasks = [...(existingTask.relatedTasks ?? []), task];
+      continue;
+    }
+
+    const groupedTask = { ...task, relatedTasks: [] };
+    taskByApplicant.set(groupKey, groupedTask);
+    groupedTasks.push(groupedTask);
+  }
+
+  return groupedTasks;
 }
 
 export function summarizeAgentActionTasks(

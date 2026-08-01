@@ -6,11 +6,50 @@ import { retainExpandedActionTaskIds } from "../../src/modules/submissions/compo
 import {
   agentActionQueue,
   buildAgentActionTasks,
+  groupAgentActionTasksByApplicant,
   summarizeAgentActionTasks,
 } from "../../src/modules/submissions/agentActions";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 
 describe("AgentActionsCommandCockpit", () => {
+  it("shows one applicant card with every action available inside", () => {
+    const queue = agentActionQueue(
+      initialSubmissions.filter((submission) => submission.id === "ПД-1051"),
+    );
+    const tasks = groupAgentActionTasksByApplicant(buildAgentActionTasks(queue.open));
+    const task = tasks[0];
+
+    expect(tasks).toHaveLength(1);
+    expect(task?.applicantName).toBe("Артём Соколов");
+    expect(
+      [task, ...(task?.relatedTasks ?? [])].map((item) => item?.action.tab),
+    ).toEqual(["questionnaire", "files"]);
+
+    if (!task) throw new Error("Expected a grouped applicant task.");
+    const onOpenPrimary = vi.fn();
+    render(
+      <AgentActionsCommandCockpit
+        actionGroupLabel="Открытые действия"
+        desktopContextMode="inline"
+        emptyState={{ action: "Новая подача", body: "Нет действий", title: "Пусто" }}
+        expandedTaskIds={new Set([task.id])}
+        summary={summarizeAgentActionTasks(tasks)}
+        tasks={tasks}
+        onEmptyAction={vi.fn()}
+        onOpenIssue={vi.fn()}
+        onOpenPrimary={onOpenPrimary}
+        onOpenSecondary={vi.fn()}
+        onOpenTab={vi.fn()}
+        onSelectTask={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByTestId("agent-action-queue-item")).toHaveLength(1);
+    const detail = screen.getByTestId("agent-action-inline-detail");
+    fireEvent.click(within(detail).getByRole("button", { name: "Добавить файл" }));
+    expect(onOpenPrimary).toHaveBeenCalledWith(task.relatedTasks?.[0]);
+  });
+
   it("forgets expanded tasks that disappear from the current queue", () => {
     const queue = agentActionQueue(initialSubmissions);
     const tasks = buildAgentActionTasks([...queue.open, ...queue.completed]).slice(

@@ -59,6 +59,7 @@ import {
   agentActionQueue,
   agentActionWorkspaceTarget,
   buildAgentActionTasks,
+  groupAgentActionTasksByApplicant,
   searchAgentActions,
   summarizeAgentActionTasks,
   type AgentActionDue,
@@ -314,7 +315,7 @@ export function CommandCenter({
     searchQuery,
   ]);
   const actionTasks = useMemo(
-    () => buildAgentActionTasks(visibleActions),
+    () => groupAgentActionTasksByApplicant(buildAgentActionTasks(visibleActions)),
     [visibleActions],
   );
   useEffect(() => {
