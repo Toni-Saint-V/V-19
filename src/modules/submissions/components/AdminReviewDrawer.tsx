@@ -715,7 +715,7 @@ export function AdminReviewDrawer({
             </div>
             <button
               aria-label="Закрыть проверку"
-              className="admin-review-close"
+              className="linear-product-action linear-product-action--icon linear-product-action--ghost admin-review-close"
               type="button"
               onClick={onClose}
             >
@@ -925,15 +925,22 @@ export function AdminReviewDrawer({
             <span className="admin-review-footer-dot" aria-hidden="true" />
             {adminNextAction}
           </div>
-          <button className="admin-review-secondary" type="button" onClick={onClose}>
+          <button
+            className="linear-product-action linear-product-action--secondary admin-review-secondary"
+            type="button"
+            onClick={onClose}
+          >
             Отложить
           </button>
           <button
-            className={`admin-review-primary ${
+            className={`linear-product-action ${
               primaryAction.action === "return_with_issues" ||
               primaryAction.action === "return_again"
-                ? "is-return"
-                : ""
+                ? "linear-product-action--warning"
+                : "linear-product-action--primary"
+            } admin-review-primary ${
+              primaryAction.action === "return_with_issues" ||
+              primaryAction.action === "return_again" ? "is-return" : ""
             }`}
             disabled={primaryAction.disabled}
             type="button"
@@ -1419,7 +1426,7 @@ function AdminFilesTab({
                       </div>
                       <div className="admin-review-file-actions">
                         <button
-                          className="v19-drawer-file-action admin-review-file-open"
+                          className="linear-product-action linear-product-action--outline linear-product-action--compact v19-drawer-file-action admin-review-file-open"
                           type="button"
                           onClick={() => onOpenReview(file)}
                         >
@@ -1428,7 +1435,7 @@ function AdminFilesTab({
                         {canCreateRemark ? (
                           <button
                             aria-label={`Создать замечание: ${fileLabel(file.type)}`}
-                            className="admin-review-row-remark admin-review-file-remark"
+                            className="linear-product-action linear-product-action--outline linear-product-action--compact admin-review-row-remark admin-review-file-remark"
                             type="button"
                             onClick={() =>
                               onFileRemark(
@@ -1571,7 +1578,11 @@ function PassportReviewTab({
             <h3>Паспорт + ключевые поля</h3>
           </div>
           <div className="admin-review-check-actions">
-            <button type="button" onClick={onOpenWorkspace}>
+            <button
+              className="linear-product-action linear-product-action--secondary"
+              type="button"
+              onClick={onOpenWorkspace}
+            >
               <ScanText aria-hidden="true" size={15} />
               Сверить
             </button>
@@ -1588,7 +1599,11 @@ function PassportReviewTab({
                 <strong>{item.label}</strong>
                 <span>{item.helper}</span>
               </div>
-              <button type="button" onClick={() => onChecklistRemark(item)}>
+              <button
+                className="linear-product-action linear-product-action--outline linear-product-action--compact"
+                type="button"
+                onClick={() => onChecklistRemark(item)}
+              >
                 <MessageSquarePlus aria-hidden="true" size={14} />
                 Замечание
               </button>
@@ -1609,11 +1624,19 @@ function PassportReviewTab({
         </div>
 
         <footer className="admin-review-inline-footer">
-          <button type="button" onClick={onRemark}>
+          <button
+            className="linear-product-action linear-product-action--warning"
+            type="button"
+            onClick={onRemark}
+          >
             <MessageSquarePlus aria-hidden="true" size={15} />
             Замечание
           </button>
-          <button type="button" onClick={onNext}>
+          <button
+            className="linear-product-action linear-product-action--secondary"
+            type="button"
+            onClick={onNext}
+          >
             К анкете
             <ArrowRight aria-hidden="true" size={15} />
           </button>
@@ -1862,6 +1885,7 @@ function SelfieReviewTab({
             <strong>Селфи не загружено</strong>
             <span>Создайте точное замечание, чтобы агент провалился прямо в этот файл.</span>
             <button
+              className="linear-product-action linear-product-action--warning"
               type="button"
               onClick={() => onFileRemark(reviewTarget, `${fileLabel(reviewTarget)} отсутствует`)}
             >
@@ -1872,6 +1896,7 @@ function SelfieReviewTab({
 
         <footer className="admin-review-inline-footer">
           <button
+            className="linear-product-action linear-product-action--warning"
             type="button"
             onClick={() =>
               onFileRemark(reviewTarget, `${fileLabel(reviewTarget)} не проходит визуальную проверку`)
@@ -2147,6 +2172,7 @@ function MediaReviewPane({
       {showActions ? (
         <div className="admin-review-media-actions">
           <button
+            className="linear-product-action linear-product-action--warning"
             disabled={Boolean(issueGuardReason)}
             type="button"
             onClick={() =>
@@ -2322,7 +2348,7 @@ function FieldReviewRow({
         {onVerifyPassport ? (
           <button
             aria-label={`Сверить с паспортом: ${row.label}`}
-            className="admin-review-row-verify"
+            className="linear-product-action linear-product-action--outline linear-product-action--compact admin-review-row-verify"
             type="button"
             onClick={onVerifyPassport}
           >
@@ -2332,7 +2358,7 @@ function FieldReviewRow({
         ) : null}
         <button
           aria-label={`Создать замечание: ${row.label}`}
-          className="admin-review-row-remark"
+          className="linear-product-action linear-product-action--outline linear-product-action--compact admin-review-row-remark"
           title="Добавить замечание"
           type="button"
           onClick={onRemark}
@@ -2579,7 +2605,12 @@ function AdminRemarkForm({
               </p>
             </div>
           </div>
-          <button aria-label="Закрыть форму замечания" type="button" onClick={onClose}>
+          <button
+            aria-label="Закрыть форму замечания"
+            className="linear-product-action linear-product-action--icon linear-product-action--ghost"
+            type="button"
+            onClick={onClose}
+          >
             <X aria-hidden="true" size={16} />
           </button>
         </header>
@@ -2704,6 +2735,7 @@ function AdminRemarkForm({
             <span>Что нужно исправить?</span>
             <button
               aria-label="Сформулировать с AI"
+              className="linear-product-action linear-product-action--secondary linear-product-action--compact"
               disabled={draftState.status === "loading"}
               type="button"
               onClick={draftRemark}
@@ -2762,10 +2794,19 @@ function AdminRemarkForm({
             <span aria-hidden="true" />
             {issueGuardReason || "Статус: Открыто"}
           </div>
-          <button type="button" onClick={onClose}>
+          <button
+            className="linear-product-action linear-product-action--secondary"
+            type="button"
+            onClick={onClose}
+          >
             Отмена
           </button>
-          <button disabled={!canSubmit} type="button" onClick={submit}>
+          <button
+            className="linear-product-action linear-product-action--primary"
+            disabled={!canSubmit}
+            type="button"
+            onClick={submit}
+          >
             <Send aria-hidden="true" size={16} />
             Отправить замечание
           </button>
@@ -2860,7 +2901,7 @@ function IssuesTab({
       {issuesSummary}
 
       <button
-        className="admin-review-add-remark"
+        className="linear-product-action linear-product-action--warning admin-review-add-remark"
         disabled={addRemarkDisabled}
         type="button"
         onClick={onAddRemark}

@@ -244,7 +244,7 @@ export function RemarkForm({
               </div>
               <button
                 aria-label="Закрыть форму замечания"
-                className="v19-remark-form-close w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors disabled:opacity-40"
+                className="linear-product-action linear-product-action--icon linear-product-action--ghost v19-remark-form-close w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors disabled:opacity-40"
                 disabled={isSubmitting}
                 onClick={handleRequestClose}
                 type="button"
@@ -371,18 +371,23 @@ export function RemarkForm({
                 >
                   <p>Текст не сохранён. Закрыть форму и потерять изменения?</p>
                   <button
+                    className="linear-product-action linear-product-action--secondary"
                     onClick={() => setDiscardConfirmationOpen(false)}
                     type="button"
                   >
                     Продолжить редактирование
                   </button>
-                  <button onClick={onClose} type="button">
+                  <button
+                    className="linear-product-action linear-product-action--danger"
+                    onClick={onClose}
+                    type="button"
+                  >
                     Закрыть без сохранения
                   </button>
                 </div>
               ) : null}
               <button
-                className="h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[13px] font-medium text-white/70 hover:text-white transition-colors disabled:opacity-40"
+                className="linear-product-action linear-product-action--secondary h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[13px] font-medium text-white/70 hover:text-white transition-colors disabled:opacity-40"
                 disabled={isSubmitting}
                 onClick={handleRequestClose}
                 type="button"
@@ -391,7 +396,7 @@ export function RemarkForm({
               </button>
               <button
                 aria-label="Отправить замечание"
-                className="h-11 px-5 rounded-xl bg-[#24242a] hover:bg-[#2a2b32] text-[13px] font-semibold text-white flex items-center gap-2 shadow-[0_0_28px_rgba(111,100,255,0.14)] transition-colors disabled:opacity-55"
+                className="linear-product-action linear-product-action--primary h-11 px-5 rounded-xl bg-[#24242a] hover:bg-[#2a2b32] text-[13px] font-semibold text-white flex items-center gap-2 shadow-[0_0_28px_rgba(111,100,255,0.14)] transition-colors disabled:opacity-55"
                 data-testid="remark-form-submit"
                 disabled={isSubmitting}
                 onClick={() => void handleSubmit()}

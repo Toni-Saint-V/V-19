@@ -300,7 +300,7 @@ const FieldRow = ({
           data-testid="admin-review-add-remark"
           type="button"
           onClick={onRemark}
-          className="admin-review-row-remark admin-review-remark-action"
+          className="linear-product-action linear-product-action--outline linear-product-action--compact admin-review-row-remark admin-review-remark-action"
           title="Добавить замечание"
         >
           <MessageSquarePlus className="h-4 w-4" />
@@ -1192,7 +1192,7 @@ function MediaTab({
               {file.type === "passport_scan" && file.status !== "missing" && (
                 <button
                   aria-label={`Сверить паспорт: ${applicant?.fullName ?? "заявитель"}`}
-                  className="admin-review-file-verify"
+                  className="linear-product-action linear-product-action--outline linear-product-action--compact admin-review-file-verify"
                   data-testid="admin-review-verify-passport"
                   title="Открыть сверку паспорта"
                   type="button"
@@ -1204,7 +1204,7 @@ function MediaTab({
               )}
               <button
                 aria-label={`Добавить замечание: ${fileTypeLabels[file.type]} — ${applicant?.fullName ?? "заявитель"}`}
-                className="admin-review-file-remark flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-transparent bg-white/[0.045] px-3 text-[12px] font-medium text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+                className="linear-product-action linear-product-action--outline linear-product-action--compact admin-review-file-remark flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-transparent bg-white/[0.045] px-3 text-[12px] font-medium text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
                 data-testid="admin-review-add-file-remark"
                 title="Добавить замечание к файлу"
                 type="button"
@@ -1271,7 +1271,7 @@ function IssuesTab({
         <article key={issue.id} className="admin-review-issue-card">
           <button
             aria-label={`Открыть замечание: ${issue.reason}`}
-            className="admin-review-issue-open"
+            className="linear-product-action linear-product-action--ghost admin-review-issue-open"
             onClick={() => onOpenIssue(issue)}
             type="button"
           >
@@ -1581,7 +1581,7 @@ export function AdminReviewDrawer({
 
   const reviewActionControl = canPublishReturnedPdfHandoff ? (
     <button
-      className="admin-review-secondary"
+      className="linear-product-action linear-product-action--secondary admin-review-secondary"
       onClick={handlePublishReturnedPdfHandoff}
       title={returnedPdfHandoffReason}
       type="button"
@@ -1591,7 +1591,11 @@ export function AdminReviewDrawer({
   ) : footerReviewAction ? (
     <button
       aria-describedby={primaryReason ? primaryActionReasonId : undefined}
-      className={`admin-review-primary${isReturnReviewAction ? " is-return" : ""}`}
+      className={`linear-product-action ${
+        isReturnReviewAction
+          ? "linear-product-action--warning"
+          : "linear-product-action--primary"
+      } admin-review-primary${isReturnReviewAction ? " is-return" : ""}`}
       disabled={footerReviewAction.disabled}
       onClick={() => handleAdminAction(footerReviewAction)}
       title={footerReviewAction.reason}
@@ -1607,7 +1611,7 @@ export function AdminReviewDrawer({
   ) : (
     <button
       aria-describedby={primaryReason ? primaryActionReasonId : undefined}
-      className="admin-review-primary"
+      className="linear-product-action linear-product-action--primary admin-review-primary"
       disabled={primaryDisabled}
       onClick={handlePrimaryAction}
       title={primaryReason}
@@ -1737,7 +1741,7 @@ export function AdminReviewDrawer({
                 <div className="admin-review-header-actions">
                   <button
                     aria-label="Закрыть проверку"
-                    className="admin-review-close"
+                    className="linear-product-action linear-product-action--icon linear-product-action--ghost admin-review-close"
                     data-admin-review-initial-focus
                     onClick={onClose}
                     type="button"

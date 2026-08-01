@@ -1268,7 +1268,7 @@ export function AdminExportScreen({
               </div>
               <div className="mb-3 grid grid-cols-2 gap-2">
                 <button
-                  className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-white/45"
+                  className="linear-product-action linear-product-action--secondary linear-product-action--compact h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-white/45"
                   disabled={selectedCount === 0 || hasExportBlockers || isExporting}
                   type="button"
                   onClick={handlePrepareExcel}
@@ -1286,7 +1286,7 @@ export function AdminExportScreen({
                   </a>
                 ) : (
                   <button
-                    className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white/45 disabled:cursor-not-allowed"
+                    className="linear-product-action linear-product-action--secondary linear-product-action--compact h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white/45 disabled:cursor-not-allowed"
                     disabled
                     type="button"
                     title="Сначала сформируйте Excel"

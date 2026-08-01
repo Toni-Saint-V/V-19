@@ -75,7 +75,7 @@ export function WorkspaceSurface({
                 {workspaceDataState.error ?? "Не удалось синхронизировать Supabase."}
               </span>
               <button
-                className="h-10 shrink-0 rounded-[10px] border border-[#7f3d45] px-3 text-[12px] font-semibold text-white"
+                className="linear-product-action linear-product-action--warning h-10 shrink-0 rounded-[10px] border border-[#7f3d45] px-3 text-[12px] font-semibold text-white"
                 type="button"
                 onClick={() => void onRetryWorkspace()}
               >

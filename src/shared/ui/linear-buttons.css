@@ -50,7 +50,8 @@
     font-family: var(--v19-font-family);
     line-height: var(--v19b-line-height-control);
     text-decoration: none;
-    white-space: nowrap;
+    text-align: center;
+    white-space: normal;
     cursor: pointer;
     box-shadow: none !important;
     transition:
@@ -511,6 +512,169 @@
 
     .mp-button.is-loading::after {
       animation: none;
+    }
+  }
+}
+
+/* Legacy action bridge. New code should use the shared Button primitive. */
+@layer v19-linear-buttons {
+  .linear-product-action {
+    position: relative;
+    display: inline-flex;
+    min-height: var(--v19-linear-button-height-default) !important;
+    align-items: center;
+    justify-content: center;
+    gap: var(--v19-linear-button-gap) !important;
+    padding-inline: var(--v19-linear-button-padding-inline) !important;
+    border: var(--vf-ref-size-1px) solid var(--v19-linear-button-secondary-border) !important;
+    border-radius: var(--v19-linear-button-radius) !important;
+    background: var(--v19-linear-button-secondary-background) !important;
+    color: var(--v19-depth-text) !important;
+    font-family: var(--v19-font-family);
+    line-height: var(--v19b-line-height-control);
+    text-decoration: none;
+    text-align: center;
+    white-space: normal;
+    cursor: pointer;
+    box-shadow: none !important;
+    transition:
+      background-color var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      border-color var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      box-shadow var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      color var(--v19b-motion-soft-duration) var(--v19b-ease-standard),
+      transform var(--v19b-motion-soft-duration) var(--v19b-ease-standard) !important;
+  }
+
+  .linear-product-action--primary {
+    border-color: transparent !important;
+    background:
+      var(--v19-linear-button-primary-background) padding-box,
+      var(--v19-linear-button-primary-edge) border-box !important;
+    color: var(--v19-depth-text-strong) !important;
+  }
+
+  .linear-product-action--outline {
+    background: transparent !important;
+  }
+
+  :is(.linear-product-action--ghost, .linear-product-action--danger) {
+    border-color: transparent !important;
+    background: transparent !important;
+  }
+
+  .linear-product-action--ghost {
+    color: var(--v19-depth-text-muted) !important;
+  }
+
+  .linear-product-action--warning {
+    border-color: var(--v19b-admin-orange-border) !important;
+    background: var(--v19-linear-button-secondary-background) !important;
+    color: var(--v19b-admin-orange) !important;
+  }
+
+  .linear-product-action--danger {
+    color: var(--vf-red-soft-text) !important;
+  }
+
+  .linear-product-action--compact {
+    min-height: var(--v19-linear-button-height-compact) !important;
+    height: var(--v19-linear-button-height-compact) !important;
+  }
+
+  .linear-product-action--large {
+    min-height: var(--v19-linear-button-height-large) !important;
+    height: var(--v19-linear-button-height-large) !important;
+  }
+
+  .linear-product-action--icon {
+    height: var(--v19-linear-button-height-default) !important;
+    min-height: var(--v19-linear-button-height-default) !important;
+    width: var(--v19-linear-button-height-default) !important;
+    min-width: var(--v19-linear-button-height-default) !important;
+    padding-inline: 0 !important;
+  }
+
+  .linear-product-action--icon.linear-product-action--compact {
+    height: var(--v19-linear-button-height-compact) !important;
+    min-height: var(--v19-linear-button-height-compact) !important;
+    width: var(--v19-linear-button-height-compact) !important;
+    min-width: var(--v19-linear-button-height-compact) !important;
+  }
+
+  .linear-product-action:not(:disabled, [aria-disabled="true"]):hover {
+    background: var(--v19-linear-button-secondary-hover) !important;
+    color: var(--v19-depth-text-strong) !important;
+    box-shadow: var(--v19-linear-button-halo) !important;
+    transform: translateY(var(--vf-ref-size-neg-1px)) !important;
+  }
+
+  .linear-product-action--primary:not(:disabled, [aria-disabled="true"]):hover {
+    border-color: transparent !important;
+    background:
+      var(--v19-linear-button-primary-background) padding-box,
+      var(--v19-linear-button-primary-edge) border-box !important;
+  }
+
+  .linear-product-action--danger:not(:disabled, [aria-disabled="true"]):hover {
+    background: transparent !important;
+    color: var(--vf-red) !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .linear-product-action--warning:not(:disabled, [aria-disabled="true"]):hover {
+    border-color: var(--v19b-admin-orange-border) !important;
+    background: var(--v19-linear-button-secondary-hover) !important;
+    color: var(--v19b-admin-orange) !important;
+  }
+
+  .linear-product-action:focus-visible {
+    outline: var(--vf-ref-size-2px) solid var(--v19-depth-focus) !important;
+    outline-offset: var(--vf-ref-size-2px) !important;
+    box-shadow: var(--v19-linear-button-focus-halo) !important;
+  }
+
+  .linear-product-action:not(:disabled, [aria-disabled="true"]):active {
+    box-shadow: none !important;
+    transform: translateY(var(--v19-linear-button-press-offset)) !important;
+  }
+
+  .linear-product-action:is(:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed !important;
+    opacity: var(--v19-linear-button-disabled-opacity) !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .linear-product-action--primary:is(:disabled, [aria-disabled="true"]) {
+    border-color: var(--v19-linear-button-secondary-border) !important;
+    background: var(--v19-linear-button-secondary-background) !important;
+    color: var(--v19-depth-text-faint) !important;
+  }
+
+  @media (max-width: 767px) {
+    .linear-product-action {
+      min-height: var(--v19b-size-44) !important;
+    }
+
+    .linear-product-action--icon {
+      height: var(--v19b-size-44) !important;
+      min-height: var(--v19b-size-44) !important;
+      width: var(--v19b-size-44) !important;
+      min-width: var(--v19b-size-44) !important;
+    }
+
+    .linear-product-action--icon.linear-product-action--compact {
+      height: var(--v19b-size-44) !important;
+      min-height: var(--v19b-size-44) !important;
+      width: var(--v19b-size-44) !important;
+      min-width: var(--v19b-size-44) !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .linear-product-action {
+      transition: none !important;
     }
   }
 }

@@ -175,7 +175,11 @@ function AppRuntimeState({
           </div>
         ) : null}
         {actionLabel && onAction ? (
-          <button type="button" onClick={onAction}>
+          <button
+            className="linear-product-action linear-product-action--primary"
+            type="button"
+            onClick={onAction}
+          >
             <RefreshCw aria-hidden="true" />
             <span>{actionLabel}</span>
           </button>

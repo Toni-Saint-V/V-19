@@ -115,7 +115,7 @@ export function PwaInstallAssistant({ environment }: PwaInstallAssistantProps) {
         </div>
         {showAndroidInstall ? (
           <button
-            className="vf-pwa-install-action"
+            className="linear-product-action linear-product-action--primary vf-pwa-install-action"
             type="button"
             onClick={() => void handleInstall()}
           >
@@ -124,7 +124,7 @@ export function PwaInstallAssistant({ environment }: PwaInstallAssistantProps) {
         ) : null}
         <button
           aria-label="Скрыть подсказку об установке"
-          className="vf-pwa-install-dismiss"
+          className="linear-product-action linear-product-action--icon linear-product-action--ghost vf-pwa-install-dismiss"
           type="button"
           onClick={() => setDismissed(true)}
         >

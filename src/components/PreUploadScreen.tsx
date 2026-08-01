@@ -979,7 +979,7 @@ export function PreUploadScreen({
                           activeItem.status === "selected") ? (
                           <button
                             {...agentInteractionProps("new-submission.manage-file")}
-                            className="v19-preupload-inline-action"
+                            className="linear-product-action linear-product-action--outline linear-product-action--compact v19-preupload-inline-action"
                             onClick={() => skipOcr(activeItem)}
                             type="button"
                           >
@@ -994,6 +994,7 @@ export function PreUploadScreen({
                         <span>{activeItem.summary}</span>
                         <button
                           {...agentInteractionProps("new-submission.manage-file")}
+                          className="linear-product-action linear-product-action--outline linear-product-action--compact"
                           onClick={() => retryOcr(activeItem)}
                           type="button"
                         >
@@ -1307,6 +1308,7 @@ export function PreUploadScreen({
                   <footer>
                     <button
                       {...agentInteractionProps("new-submission.manage-file")}
+                      className="linear-product-action linear-product-action--secondary"
                       onClick={() => setPendingAssignments([])}
                       type="button"
                     >
@@ -1314,6 +1316,7 @@ export function PreUploadScreen({
                     </button>
                     <button
                       {...agentInteractionProps("new-submission.manage-file")}
+                      className="linear-product-action linear-product-action--primary"
                       disabled={!assignmentsComplete}
                       onClick={confirmAssignments}
                       type="button"
@@ -1361,6 +1364,7 @@ export function PreUploadScreen({
                   <footer>
                     <button
                       {...agentInteractionProps("new-submission.configure")}
+                      className="linear-product-action linear-product-action--secondary"
                       onClick={() => setConfirmation(null)}
                       type="button"
                     >
@@ -1368,7 +1372,7 @@ export function PreUploadScreen({
                     </button>
                     <button
                       {...agentInteractionProps("new-submission.configure")}
-                      className="is-danger"
+                      className="linear-product-action linear-product-action--danger is-danger"
                       onClick={confirmAction}
                       type="button"
                     >

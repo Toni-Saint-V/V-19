@@ -3956,7 +3956,7 @@ function AdminExportReferenceCockpit({
 
         <div className="v19-admin-export-footer">
           <button
-            className="v19-admin-export-primary-action"
+            className="linear-product-action linear-product-action--primary v19-admin-export-primary-action"
             type="button"
             disabled={exportActionBusy || !exportPlan.canGenerate}
             aria-describedby="export-action-hint"
@@ -3974,6 +3974,7 @@ function AdminExportReferenceCockpit({
           </button>
           <div className="v19-admin-export-secondary-actions">
             <button
+              className="linear-product-action linear-product-action--outline linear-product-action--compact"
               type="button"
               disabled={exportActionBusy || !exportPlan.canDownload}
               onClick={onDownload}
@@ -3981,6 +3982,7 @@ function AdminExportReferenceCockpit({
               Скачать Excel
             </button>
             <button
+              className="linear-product-action linear-product-action--outline linear-product-action--compact"
               type="button"
               disabled={exportActionBusy || !canDownloadMediaZip || !onDownloadMediaZip}
               onClick={onDownloadMediaZip}
@@ -3988,6 +3990,7 @@ function AdminExportReferenceCockpit({
               Скачать ZIP файлов
             </button>
             <button
+              className="linear-product-action linear-product-action--outline linear-product-action--compact"
               type="button"
               disabled={exportActionBusy || !exportPlan.canMarkExported}
               onClick={onMarkExported}
@@ -4003,10 +4006,15 @@ function AdminExportReferenceCockpit({
       </aside>
 
       <div className="v19-admin-export-mobile-dock" aria-label="Действия выгрузки">
-        <button type="button" onClick={() => setMobileSummaryOpen(true)}>
+        <button
+          className="linear-product-action linear-product-action--secondary"
+          type="button"
+          onClick={() => setMobileSummaryOpen(true)}
+        >
           Сводка
         </button>
         <button
+          className="linear-product-action linear-product-action--primary"
           type="button"
           disabled={exportActionBusy || !exportPlan.canGenerate}
           onClick={onGenerate}
@@ -4015,6 +4023,7 @@ function AdminExportReferenceCockpit({
         </button>
         <button
           aria-label="Скачать ZIP файлов"
+          className="linear-product-action linear-product-action--outline linear-product-action--compact"
           type="button"
           disabled={exportActionBusy || !canDownloadMediaZip || !onDownloadMediaZip}
           onClick={onDownloadMediaZip}

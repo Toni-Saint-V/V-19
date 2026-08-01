@@ -124,7 +124,7 @@ export default function SettingsScreen({
           ))}
           {activeSectionSafe !== "profile" ? (
             <button
-              className="settings-nav-signout"
+              className="linear-product-action linear-product-action--danger settings-nav-signout"
               type="button"
               onClick={() => void onSignOut()}
             >
