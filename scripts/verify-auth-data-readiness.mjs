@@ -139,6 +139,11 @@ function verifyNoFrontendSecrets() {
     "VITE_SUPABASE_PRODUCTION_APPROVED",
     "Frontend Supabase production activation requires explicit approval flag",
   );
+  expectContains(
+    config,
+    "VITE_SUPABASE_CUTOVER_GENERATION",
+    "Frontend Supabase production activation binds approval to a cutover generation",
+  );
 }
 
 function verifyAuthProfileBoundary() {

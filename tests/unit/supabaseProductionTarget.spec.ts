@@ -28,21 +28,26 @@ describe("Supabase production target", () => {
   test("binds the current cutover generation to one non-secret descriptor", () => {
     expect(SUPABASE_PRODUCTION_TARGET).toEqual({
       schemaVersion: 1,
-      projectId: "mqhjiaymoarpzzjfefno",
-      projectUrl: "https://mqhjiaymoarpzzjfefno.supabase.co",
-      cutoverGeneration: "v19-supabase-cutover-20260801-g2",
-      baselineGitSha: "ff424e8e82d5fd61b94d68db6e3a908010035233",
-      evidenceNotBefore: "2026-08-01T00:00:00.000Z",
+      projectId: "tsymifccglpepvbmrcgh",
+      projectUrl: "https://tsymifccglpepvbmrcgh.supabase.co",
+      cutoverGeneration: "v19-supabase-reactivation-20260802-g4",
+      baselineGitSha: "1c05cb316c42178a9ffe0be84c394b1b0e6a5729",
+      evidenceNotBefore: "2026-08-02T00:00:00.000Z",
     });
   });
 
-  test("removes the legacy project ref from executable target consumers", () => {
-    const legacyProjectRef = ["tsymifcc", "glpepvbmrcgh"].join("");
+  test("removes abandoned alternate project refs from executable target consumers", () => {
+    const abandonedProjectRefs = [
+      ["mqhjiaym", "oarpzzjfefno"].join(""),
+      ["pwaasuql", "jxeypeqhvzqs"].join(""),
+    ];
 
     for (const path of productionTargetConsumers) {
       const content = read(path);
       expect(content, path).toContain("SUPABASE_PRODUCTION_TARGET");
-      expect(content, path).not.toContain(legacyProjectRef);
+      for (const projectRef of abandonedProjectRefs) {
+        expect(content, path).not.toContain(projectRef);
+      }
     }
   });
 
@@ -54,7 +59,7 @@ describe("Supabase production target", () => {
       phase?: string;
       productionTarget?: { projectId?: string; cutoverGeneration?: string };
       deploymentGate?: Record<string, boolean | string[]>;
-      goNoGo?: { decision?: string };
+      goNoGo?: { decision?: string; scope?: string };
     };
 
     expect(readiness).toMatchObject({
@@ -69,11 +74,14 @@ describe("Supabase production target", () => {
         cutoverApproved: false,
         productionMutationApproved: false,
       },
-      goNoGo: { decision: "NO_GO" },
+      goNoGo: {
+        decision: "NO_GO",
+        scope: "supabase-production-reactivation",
+      },
     });
 
     expect(read("docs/release/supabase-production-readiness.json")).not.toContain(
-      ["tsymifcc", "glpepvbmrcgh"].join(""),
+      ["pwaasuql", "jxeypeqhvzqs"].join(""),
     );
   });
 

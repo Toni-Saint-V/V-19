@@ -33,6 +33,7 @@ interface VisaFlowEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_SUPABASE_EDGE_FUNCTIONS_URL?: string;
   readonly VITE_SUPABASE_ACTIVATION_TARGET?: string;
+  readonly VITE_SUPABASE_CUTOVER_GENERATION?: string;
   readonly VITE_SUPABASE_TRANSACTIONAL_PERSISTENCE_TESTED?: string;
   readonly VITE_SUPABASE_MIGRATION_APPROVED?: string;
   readonly VITE_SUPABASE_MIGRATIONS_APPLIED?: string;
@@ -68,15 +69,50 @@ export function productionTargetConfigIssues(input: {
   activationTarget: SupabaseActivationTarget;
   projectId: string;
   url: string;
+  edgeFunctionsUrl: string;
+  cutoverGeneration: string;
 }): string[] {
-  if (input.activationTarget !== "production") return [];
+  const canonicalProductionHost = new URL(
+    SUPABASE_PRODUCTION_TARGET.projectUrl,
+  ).hostname.toLowerCase();
+  const hostnameOf = (value: string): string => {
+    try {
+      return new URL(value).hostname.toLowerCase().replace(/\.$/, "");
+    } catch {
+      return "";
+    }
+  };
+  const usesCanonicalProductionIdentity =
+    input.projectId === SUPABASE_PRODUCTION_TARGET.projectId ||
+    hostnameOf(input.url) === canonicalProductionHost ||
+    hostnameOf(input.edgeFunctionsUrl) === canonicalProductionHost;
+  if (input.activationTarget !== "production" && !usesCanonicalProductionIdentity) {
+    return [];
+  }
 
   const issues: string[] = [];
+  if (input.activationTarget !== "production") {
+    issues.push(
+      "The canonical Supabase production target must declare production activation.",
+    );
+  }
   if (input.projectId !== SUPABASE_PRODUCTION_TARGET.projectId) {
     issues.push("Supabase production project id does not match the canonical target.");
   }
   if (input.url !== SUPABASE_PRODUCTION_TARGET.projectUrl) {
     issues.push("Supabase production URL does not match the canonical target.");
+  }
+  if (
+    input.edgeFunctionsUrl !== `${SUPABASE_PRODUCTION_TARGET.projectUrl}/functions/v1`
+  ) {
+    issues.push(
+      "Supabase production Edge Functions URL does not match the canonical target.",
+    );
+  }
+  if (input.cutoverGeneration !== SUPABASE_PRODUCTION_TARGET.cutoverGeneration) {
+    issues.push(
+      "Supabase production cutover generation does not match the canonical target.",
+    );
   }
   return issues;
 }
@@ -120,6 +156,7 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
   const target = resolveSupabaseBackendTarget(env.VITE_SUPABASE_BACKEND_TARGET);
   const sandboxProbeEnabled = enabled(env.VITE_SUPABASE_SANDBOX_PROBE_ENABLED);
   const activationTargetRaw = env.VITE_SUPABASE_ACTIVATION_TARGET;
+  const cutoverGeneration = clean(env.VITE_SUPABASE_CUTOVER_GENERATION);
   const releaseEnabled = enabled(env.VITE_SUPABASE_RELEASE_ENABLED);
   const evidence: SupabaseActivationEvidence = {
     target: activationTarget(activationTargetRaw),
@@ -152,6 +189,8 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
     activationTarget: evidence.target,
     projectId,
     url,
+    edgeFunctionsUrl,
+    cutoverGeneration,
   });
   const activation = bindActivationToCanonicalProductionTarget(
     evaluatedActivation,

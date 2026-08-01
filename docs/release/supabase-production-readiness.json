@@ -3,13 +3,13 @@
   "scope": "supabase-production-cutover",
   "status": "NO_GO",
   "phase": "awaiting-fresh-evidence",
-  "recordedAt": "2026-08-01",
-  "runId": "v19-supabase-cutover-20260801-g2",
+  "recordedAt": "2026-08-02",
+  "runId": "v19-supabase-reactivation-20260802-g4",
   "productionTarget": {
     "descriptorPath": "config/supabase-production-target.mjs",
-    "projectId": "mqhjiaymoarpzzjfefno",
-    "projectUrl": "https://mqhjiaymoarpzzjfefno.supabase.co",
-    "cutoverGeneration": "v19-supabase-cutover-20260801-g2",
+    "projectId": "tsymifccglpepvbmrcgh",
+    "projectUrl": "https://tsymifccglpepvbmrcgh.supabase.co",
+    "cutoverGeneration": "v19-supabase-reactivation-20260802-g4",
     "activationTarget": "production",
     "supabaseOrganization": ""
   },
@@ -64,8 +64,8 @@
   },
   "goNoGo": {
     "decision": "NO_GO",
-    "scope": "new-project-supabase-cutover",
-    "reason": "BLOCKED until the connected Supabase account can access mqhjiaymoarpzzjfefno and fresh authentication, migration, RLS, Storage, canonical readback, reload, and role-isolation evidence is recorded for v19-supabase-cutover-20260801-g2.",
+    "scope": "supabase-production-reactivation",
+    "reason": "BLOCKED until fresh authentication, migration, RLS, Storage, canonical readback, reload, and role-isolation evidence is recorded for v19-supabase-reactivation-20260802-g4.",
     "verificationCommand": "npm run verify:production-readiness"
   }
 }

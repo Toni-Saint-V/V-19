@@ -32,6 +32,7 @@ process.env.SUPABASE_UI_E2E_ENV_FILE = ".env.supabase-production.local";
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
 const browserSafeEnvNames = [
   "VITE_SUPABASE_BACKEND_TARGET",
+  "VITE_SUPABASE_CUTOVER_GENERATION",
   "VITE_SUPABASE_BROWSER_KEY_AUDITED",
   "VITE_SUPABASE_BROWSER_QA_PASSED",
   "VITE_SUPABASE_EDGE_FUNCTIONS_URL",

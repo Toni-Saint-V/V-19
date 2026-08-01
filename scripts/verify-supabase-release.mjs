@@ -1090,6 +1090,7 @@ function verifyDocsAndScripts() {
     "Auth leaked password protection",
     "Auth/Profile Repair Gate",
     "Do not auto-create production profiles",
+    "VITE_SUPABASE_CUTOVER_GENERATION=<current descriptor generation>",
     "VITE_SUPABASE_PRODUCTION_APPROVED=true",
   ]) {
     expectContains(runbook, expected, `Production runbook documents ${expected}`);

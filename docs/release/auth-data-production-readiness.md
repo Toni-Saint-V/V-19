@@ -108,3 +108,4 @@ Required before production activation:
 - Edge Function dry-runs attached.
 - Browser key audit attached.
 - `VITE_SUPABASE_PRODUCTION_APPROVED=true` set only after owner approval.
+- `VITE_SUPABASE_CUTOVER_GENERATION` exactly matches the current canonical descriptor.

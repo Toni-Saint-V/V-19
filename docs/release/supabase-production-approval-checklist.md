@@ -91,6 +91,7 @@ Backup owner:
 Production activation requires owner approval and:
 
 ```bash
+VITE_SUPABASE_CUTOVER_GENERATION=<current descriptor generation>
 VITE_SUPABASE_PRODUCTION_APPROVED=true
 ```
 

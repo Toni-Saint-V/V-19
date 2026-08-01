@@ -15,6 +15,7 @@ declare global {
     readonly VITE_SUPABASE_ANON_KEY?: string;
     readonly VITE_SUPABASE_EDGE_FUNCTIONS_URL?: string;
     readonly VITE_SUPABASE_ACTIVATION_TARGET?: string;
+    readonly VITE_SUPABASE_CUTOVER_GENERATION?: string;
     readonly VITE_SUPABASE_TRANSACTIONAL_PERSISTENCE_TESTED?: string;
     readonly VITE_SUPABASE_MIGRATION_APPROVED?: string;
     readonly VITE_SUPABASE_MIGRATIONS_APPLIED?: string;

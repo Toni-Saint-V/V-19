@@ -139,5 +139,6 @@ forward migration or this remediation template.
 Production client activation requires:
 
 ```bash
+VITE_SUPABASE_CUTOVER_GENERATION=<current descriptor generation>
 VITE_SUPABASE_PRODUCTION_APPROVED=true
 ```

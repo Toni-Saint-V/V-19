@@ -3,9 +3,9 @@ export const SUPABASE_PRODUCTION_TARGET_DESCRIPTOR_PATH =
 
 export const SUPABASE_PRODUCTION_TARGET = Object.freeze({
   schemaVersion: 1,
-  projectId: "mqhjiaymoarpzzjfefno",
-  projectUrl: "https://mqhjiaymoarpzzjfefno.supabase.co",
-  cutoverGeneration: "v19-supabase-cutover-20260801-g2",
-  baselineGitSha: "ff424e8e82d5fd61b94d68db6e3a908010035233",
-  evidenceNotBefore: "2026-08-01T00:00:00.000Z",
+  projectId: "tsymifccglpepvbmrcgh",
+  projectUrl: "https://tsymifccglpepvbmrcgh.supabase.co",
+  cutoverGeneration: "v19-supabase-reactivation-20260802-g4",
+  baselineGitSha: "1c05cb316c42178a9ffe0be84c394b1b0e6a5729",
+  evidenceNotBefore: "2026-08-02T00:00:00.000Z",
 });
