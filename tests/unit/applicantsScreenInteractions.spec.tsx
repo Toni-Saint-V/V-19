@@ -632,9 +632,9 @@ describe("ApplicantsScreen interactions", () => {
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
-    expect(
-      canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok,
-    ).toBe(true);
+    expect(canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok).toBe(
+      true,
+    );
 
     render(
       <ApplicantsScreen

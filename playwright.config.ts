@@ -19,6 +19,7 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: e2eUrl,
+    serviceWorkers: "block",
     screenshot: "off",
     trace: "off",
     video: "off",

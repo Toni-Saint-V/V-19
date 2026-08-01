@@ -506,9 +506,12 @@ async function assertGroupedApplicantFileRouting(page: Page) {
   const detailId = await disclosure.getAttribute("aria-controls");
   if (!detailId) throw new Error("Grouped applicant card has no detail id.");
 
-  await surface.locator(`#${detailId}`).getByRole("button", {
-    name: "Добавить файл",
-  }).click();
+  await surface
+    .locator(`#${detailId}`)
+    .getByRole("button", {
+      name: "Добавить файл",
+    })
+    .click();
 
   const submissionCard = page
     .locator('[data-submission-id="ПД-1051"]')

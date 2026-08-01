@@ -5,12 +5,13 @@ import { expect, test as base, type BrowserContext, type Page } from "@playwrigh
 import { testRunArtifactPath } from "../support/artifacts";
 
 type BrowserNetworkEvent = {
+  errorText?: string;
   method?: string;
   origin: string;
   path: string;
   resourceType?: string;
   status?: number;
-  type: "blocked" | "request" | "response" | "websocket";
+  type: "blocked" | "failed" | "request" | "response" | "websocket";
 };
 
 type LocalhostGuardState = {
@@ -146,6 +147,13 @@ export const test = base.extend({
       const coordinates = networkCoordinates(request.url());
       if (coordinates.origin !== state.allowedHttpOrigin) return;
       const errorText = request.failure()?.errorText ?? "request failed";
+      state.events.push({
+        ...coordinates,
+        errorText,
+        method: request.method(),
+        resourceType: request.resourceType(),
+        type: "failed",
+      });
       // A new page.goto() intentionally cancels assets that are still in flight
       // from the previous proof viewport. Chromium reports those cancellations as
       // request failures even though the destination page loads successfully.

@@ -1024,14 +1024,8 @@ test.describe("V-19 responsive proof", () => {
         page.getByRole("button", { name: "Новая подача" }).first(),
       ).toBeVisible();
       await expect(page.locator(".v19-applicant-delete-card-action")).toHaveCount(0);
-      if (viewport.width >= 768) {
-        await expect(
-          page.locator(".v19-applicant-delete-footer-action").first(),
-        ).toBeVisible();
-      } else {
-        await expect(
-          page.locator(".v19-applicant-delete-footer-action").first(),
-        ).toBeHidden();
+      await expect(page.locator(".v19-applicant-delete-footer-action")).toHaveCount(0);
+      if (viewport.width < 768) {
         await expectMobileSubmissionHeaderAlignment(
           page,
           `${viewport.label}: agent submissions`,
