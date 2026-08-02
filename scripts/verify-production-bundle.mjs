@@ -23,6 +23,17 @@ const forbidden = [
 
 const files = await collectFiles(distDir);
 const findings = [];
+const releaseIdentityPath = path.join(distDir, "release-identity.json");
+const releaseIdentity = JSON.parse(await readFile(releaseIdentityPath, "utf8"));
+if (
+  releaseIdentity.schemaVersion !== 1 ||
+  releaseIdentity.mode !== "supabase-production" ||
+  !/^[0-9a-f]{40}$/.test(releaseIdentity.gitSha) ||
+  !/^[0-9a-f]{64}$/.test(releaseIdentity.sourceSha256) ||
+  typeof releaseIdentity.dirty !== "boolean"
+) {
+  findings.push("dist/release-identity.json: invalid production release identity");
+}
 
 for (const file of files) {
   if (!/\.(?:html|js|css|json|map)$/i.test(file)) continue;

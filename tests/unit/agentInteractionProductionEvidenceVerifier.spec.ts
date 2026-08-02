@@ -136,9 +136,8 @@ function productionFixture() {
   } as const;
   const writePathByTarget = {
     "edge:access-request": "/functions/v1/access-request",
-    "rpc:save_submission_draft": "/rest/v1/rpc/save_submission_draft",
-    "rpc:submit_corrections_handoff":
-      "/rest/v1/rpc/submit_corrections_handoff",
+    "rpc:save_agent_submission_if_current":
+      "/rest/v1/rpc/save_agent_submission_if_current",
     "storage:submission-media":
       "/storage/v1/object/submission-media/CODEX-E2E-verifier-fixture/file.pdf",
   } as const;
@@ -179,443 +178,438 @@ function productionFixture() {
 
   const records: AgentInteractionEvidenceRecord[] = Object.values(
     V19_AGENT_INTERACTION_CONTRACTS,
-  ).flatMap(
-    (contract) => {
-      const statuses =
-        "statusFixtures" in contract && contract.statusFixtures?.length
-          ? contract.statusFixtures
-          : (["draft"] as const);
-      return statuses.map((status) => {
-        const recordId = `evidence:${contract.id}:${status}`;
-        const actorId = actorIds[contract.role];
-        const operationId = `operation:${contract.id}:${status}`;
-        const entityTargets: readonly (
+  ).flatMap((contract) => {
+    const statuses =
+      "statusFixtures" in contract && contract.statusFixtures?.length
+        ? contract.statusFixtures
+        : (["draft"] as const);
+    return statuses.map((status) => {
+      const recordId = `evidence:${contract.id}:${status}`;
+      const actorId = actorIds[contract.role];
+      const operationId = `operation:${contract.id}:${status}`;
+      const entityTargets: readonly (
+        | AgentInteractionMutationTarget
+        | "return-package"
+        | "session"
+        | "ui-state"
+      )[] =
+        contract.kind === "mutation"
+          ? contract.writeScope.requiredCheckedTargets
+          : contract.kind === "download"
+            ? ["return-package"]
+            : contract.kind === "session"
+              ? ["session"]
+              : ["ui-state"];
+      const entities = entityTargets.map((target) => ({
+        id: `entity:${contract.id}:${status}:${target}`,
+        ownerActorId: actorId,
+        target,
+      }));
+      const primaryTarget =
+        contract.kind === "mutation"
+          ? contract.canonicalEffect.primaryTarget
+          : entityTargets[0]!;
+      const primaryEntity = entities.find((entity) => entity.target === primaryTarget);
+      if (!primaryEntity) throw new Error("expected primary evidence entity");
+      const synthetic = {
+        actor: { id: actorId, role: contract.role },
+        entities,
+        markerSha256,
+        operationId,
+        primaryEntityId: primaryEntity.id,
+      };
+      const entityIdForTarget = (
+        target:
           | AgentInteractionMutationTarget
           | "return-package"
           | "session"
-          | "ui-state"
-        )[] =
-          contract.kind === "mutation"
-            ? contract.writeScope.requiredCheckedTargets
-            : contract.kind === "download"
-              ? ["return-package"]
-              : contract.kind === "session"
-                ? ["session"]
-                : ["ui-state"];
-        const entities = entityTargets.map((target) => ({
-          id: `entity:${contract.id}:${status}:${target}`,
-          ownerActorId: actorId,
-          target,
-        }));
-        const primaryTarget =
-          contract.kind === "mutation"
-            ? contract.canonicalEffect.primaryTarget
-            : entityTargets[0]!;
-        const primaryEntity = entities.find(
-          (entity) => entity.target === primaryTarget,
-        );
-        if (!primaryEntity) throw new Error("expected primary evidence entity");
-        const synthetic = {
-          actor: { id: actorId, role: contract.role },
-          entities,
-          markerSha256,
-          operationId,
-          primaryEntityId: primaryEntity.id,
-        };
-        const entityIdForTarget = (
-          target:
-            | AgentInteractionMutationTarget
-            | "return-package"
-            | "session"
-            | "ui-state",
-        ) =>
-          entities.find((entity) => entity.target === target)?.id ??
-          synthetic.primaryEntityId;
-        const downloadBytes = Buffer.from(
-          "%PDF-1.4\n% CODEX-E2E-verifier-fixture\n%%EOF\n",
-        );
-        const returnPackageArtifact =
-          contract.id === "returned-documents.download"
-            ? {
-                artifactId: "00000000-0000-4000-8000-000000000701",
-                fileName: "CODEX-E2E-returned.pdf",
-                owner: "current-agent" as const,
-                packageId: "00000000-0000-4000-8000-000000000700",
-                packageStatus: "published" as const,
-                sha256: sha256(downloadBytes),
-                sizeBytes: downloadBytes.byteLength,
-                storageBucket: "agent-return-packages" as const,
-                storagePath:
-                  "return-packages/CODEX-E2E-verifier-fixture/applicants/applicant-1/visa_application.pdf",
-              }
-            : undefined;
-        const signedReturnPackagePath = returnPackageArtifact
-          ? `/storage/v1/object/sign/agent-return-packages/${returnPackageArtifact.storagePath}`
+          | "ui-state",
+      ) =>
+        entities.find((entity) => entity.target === target)?.id ??
+        synthetic.primaryEntityId;
+      const downloadBytes = Buffer.from(
+        "%PDF-1.4\n% CODEX-E2E-verifier-fixture\n%%EOF\n",
+      );
+      const returnPackageArtifact =
+        contract.id === "returned-documents.download"
+          ? {
+              artifactId: "00000000-0000-4000-8000-000000000701",
+              fileName: "CODEX-E2E-returned.pdf",
+              owner: "current-agent" as const,
+              packageId: "00000000-0000-4000-8000-000000000700",
+              packageStatus: "published" as const,
+              sha256: sha256(downloadBytes),
+              sizeBytes: downloadBytes.byteLength,
+              storageBucket: "agent-return-packages" as const,
+              storagePath:
+                "return-packages/CODEX-E2E-verifier-fixture/applicants/applicant-1/visa_application.pdf",
+            }
           : undefined;
-        const correlation = (
-          target:
-            | AgentInteractionMutationTarget
-            | "return-package"
-            | "session"
-            | "ui-state",
-        ) => ({
-          actorId,
-          actorRole: contract.role,
-          entityIds: [entityIdForTarget(target)],
-          operationClass: null,
-          operationId,
-          query: null,
-          resultSha256: null,
-          target,
-        });
-        const providerResultSha256 = sha256(`${recordId}:provider-result`);
-        const mutationResponses =
-          contract.kind === "mutation"
-            ? contract.writeScope.requiredNetworkTargets.map((networkTarget) => {
-                const target =
-                  networkTarget === "storage:submission-media"
-                    ? "submission-media"
-                    : contract.canonicalEffect.primaryTarget;
-                return {
-                  ...correlation(target),
-                  method: "POST" as const,
-                  path: writePathByTarget[networkTarget],
+      const signedReturnPackagePath = returnPackageArtifact
+        ? `/storage/v1/object/sign/agent-return-packages/${returnPackageArtifact.storagePath}`
+        : undefined;
+      const correlation = (
+        target:
+          | AgentInteractionMutationTarget
+          | "return-package"
+          | "session"
+          | "ui-state",
+      ) => ({
+        actorId,
+        actorRole: contract.role,
+        entityIds: [entityIdForTarget(target)],
+        operationClass: null,
+        operationId,
+        query: null,
+        resultSha256: null,
+        target,
+      });
+      const providerResultSha256 = sha256(`${recordId}:provider-result`);
+      const mutationResponses =
+        contract.kind === "mutation"
+          ? contract.writeScope.requiredNetworkTargets.map((networkTarget) => {
+              const target =
+                networkTarget === "storage:submission-media"
+                  ? "submission-media"
+                  : contract.canonicalEffect.primaryTarget;
+              return {
+                ...correlation(target),
+                method: "POST" as const,
+                path: writePathByTarget[networkTarget],
+                status: 200,
+                write: true,
+              };
+            })
+          : [];
+      const networkResponses = (
+        contract.proof as readonly AgentInteractionProof[]
+      ).includes("network-readback")
+        ? contract.kind === "mutation"
+          ? mutationResponses
+          : contract.kind === "session"
+            ? [
+                {
+                  ...correlation("session"),
+                  ...sessionNetwork[contract.id],
+                  resultSha256: providerResultSha256,
                   status: 200,
                   write: true,
-                };
-              })
-            : [];
-        const networkResponses = (
-          contract.proof as readonly AgentInteractionProof[]
-        ).includes("network-readback")
-          ? contract.kind === "mutation"
-            ? mutationResponses
-            : contract.kind === "session"
+                },
+              ]
+            : contract.kind === "download"
               ? [
                   {
-                    ...correlation("session"),
-                    ...sessionNetwork[contract.id],
-                    resultSha256: providerResultSha256,
+                    ...correlation("return-package"),
+                    method: "POST" as const,
+                    path: signedReturnPackagePath!,
                     status: 200,
-                    write: true,
+                    write: false,
+                  },
+                  {
+                    ...correlation("return-package"),
+                    method: "GET" as const,
+                    path: signedReturnPackagePath!,
+                    status: 200,
+                    write: false,
                   },
                 ]
-              : contract.kind === "download"
-                ? [
-                    {
-                      ...correlation("return-package"),
-                      method: "POST" as const,
-                      path: signedReturnPackagePath!,
-                      status: 200,
-                      write: false,
-                    },
-                    {
-                      ...correlation("return-package"),
-                      method: "GET" as const,
-                      path: signedReturnPackagePath!,
-                      status: 200,
-                      write: false,
-                    },
-                  ]
-                : [
-                    {
-                      ...correlation("ui-state"),
-                      method: "GET" as const,
-                      path: "/fixture-read",
-                      status: 200,
-                      write: false,
-                    },
-                  ]
-          : (contract.proof as readonly AgentInteractionProof[]).includes(
-                "no-network-write",
-              )
-            ? []
-            : undefined;
-        const resolveCanonicalValue = (value: string | number | boolean | null) =>
-          value === "$fixture-status"
-            ? status
-            : value === "$marker-sha256"
-              ? markerSha256
-              : value;
-        const canonicalFields =
-          contract.kind === "mutation"
-            ? Object.keys(contract.canonicalEffect.expectedAfter)
-            : ["fixture.state"];
-        const canonicalBefore =
-          contract.kind === "mutation"
-            ? Object.fromEntries(
-                Object.entries(contract.canonicalEffect.before).map(([field, value]) => [
-                  field,
-                  resolveCanonicalValue(value),
-                ]),
-              )
-            : { "fixture.state": "before" };
-        const canonicalAfter =
-          contract.kind === "mutation"
-            ? Object.fromEntries(
-                Object.entries(contract.canonicalEffect.expectedAfter).map(
-                  ([field, value]) => [field, resolveCanonicalValue(value)],
-                ),
-              )
-            : { "fixture.state": "after" };
-        const targetSnapshots =
-          contract.kind === "mutation"
-            ? contract.writeScope.requiredCheckedTargets.map((target) => {
-                const beforeSha256 = sha256(`${recordId}:${target}:before`);
-                return {
-                  afterSha256: contract.writeScope.requiredChangedTargets.includes(target)
-                    ? sha256(`${recordId}:${target}:after`)
-                    : beforeSha256,
-                  beforeSha256,
-                  entityIds: [entityIdForTarget(target)],
-                  target,
-                };
-              })
-            : undefined;
-        const mutation =
-          contract.kind === "mutation"
-            ? {
-                canonicalReloadReadback: {
-                  before: canonicalBefore,
-                  expectedAfter: canonicalAfter,
-                  fields: canonicalFields,
-                  reloadedAt: capturedAt,
-                },
-                networkResponse: {
-                  method: mutationResponses[0]!.method,
-                  path: mutationResponses[0]!.path,
-                  status: mutationResponses[0]!.status,
-                },
-                unintendedWrites: {
-                  changedTargets: contract.writeScope.requiredChangedTargets,
-                  checkedTargets: contract.writeScope.requiredCheckedTargets,
-                  targetSnapshots: targetSnapshots!,
-                },
-              }
-            : undefined;
-        const recordBase = { id: recordId, interactionId: contract.id };
-        const artifactIds: string[] = [];
-
-        for (const proof of contract.proof) {
-          const kind = proofArtifactKind[proof];
-          if (kind === "download") {
-            if (!returnPackageArtifact) {
-              throw new Error("expected canonical return-package artifact fixture");
+              : [
+                  {
+                    ...correlation("ui-state"),
+                    method: "GET" as const,
+                    path: "/fixture-read",
+                    status: 200,
+                    write: false,
+                  },
+                ]
+        : (contract.proof as readonly AgentInteractionProof[]).includes(
+              "no-network-write",
+            )
+          ? []
+          : undefined;
+      const resolveCanonicalValue = (value: string | number | boolean | null) =>
+        value === "$fixture-status"
+          ? status
+          : value === "$marker-sha256"
+            ? markerSha256
+            : value;
+      const canonicalFields =
+        contract.kind === "mutation"
+          ? Object.keys(contract.canonicalEffect.expectedAfter)
+          : ["fixture.state"];
+      const canonicalBefore =
+        contract.kind === "mutation"
+          ? Object.fromEntries(
+              Object.entries(contract.canonicalEffect.before).map(([field, value]) => [
+                field,
+                resolveCanonicalValue(value),
+              ]),
+            )
+          : { "fixture.state": "before" };
+      const canonicalAfter =
+        contract.kind === "mutation"
+          ? Object.fromEntries(
+              Object.entries(contract.canonicalEffect.expectedAfter).map(
+                ([field, value]) => [field, resolveCanonicalValue(value)],
+              ),
+            )
+          : { "fixture.state": "after" };
+      const targetSnapshots =
+        contract.kind === "mutation"
+          ? contract.writeScope.requiredCheckedTargets.map((target) => {
+              const beforeSha256 = sha256(`${recordId}:${target}:before`);
+              return {
+                afterSha256: contract.writeScope.requiredChangedTargets.includes(target)
+                  ? sha256(`${recordId}:${target}:after`)
+                  : beforeSha256,
+                beforeSha256,
+                entityIds: [entityIdForTarget(target)],
+                target,
+              };
+            })
+          : undefined;
+      const mutation =
+        contract.kind === "mutation"
+          ? {
+              canonicalReloadReadback: {
+                before: canonicalBefore,
+                expectedAfter: canonicalAfter,
+                fields: canonicalFields,
+                reloadedAt: capturedAt,
+              },
+              networkResponse: {
+                method: mutationResponses[0]!.method,
+                path: mutationResponses[0]!.path,
+                status: mutationResponses[0]!.status,
+              },
+              unintendedWrites: {
+                changedTargets: contract.writeScope.requiredChangedTargets,
+                checkedTargets: contract.writeScope.requiredCheckedTargets,
+                targetSnapshots: targetSnapshots!,
+              },
             }
-            const file = addArtifact("download", downloadBytes);
-            artifactIds.push(file.id);
-            artifactIds.push(
-              addArtifact("download-metadata", {
-                ...commonArtifact("download-metadata", recordBase),
-                byteLength: downloadBytes.byteLength,
-                canonicalArtifactId: returnPackageArtifact.artifactId,
-                canonicalPackageId: returnPackageArtifact.packageId,
-                fileArtifactId: file.id,
-                fileName: returnPackageArtifact.fileName,
-                fileSha256: file.sha256,
-                owner: returnPackageArtifact.owner,
-                packageStatus: returnPackageArtifact.packageStatus,
-                storageBucket: returnPackageArtifact.storageBucket,
-                storagePath: returnPackageArtifact.storagePath,
-                syntheticMarker: runId,
-              }).id,
-            );
-            const fields = [
-              "agent_return_package_artifacts.file_name",
-              "agent_return_package_artifacts.id",
-              "agent_return_package_artifacts.sha256",
-              "agent_return_package_artifacts.size_bytes",
-              "agent_return_package_artifacts.storage_bucket",
-              "agent_return_package_artifacts.storage_path",
-              "agent_return_packages.agent_id",
-              "agent_return_packages.status",
-            ];
-            const after = {
-              "agent_return_package_artifacts.file_name": returnPackageArtifact.fileName,
-              "agent_return_package_artifacts.id": returnPackageArtifact.artifactId,
-              "agent_return_package_artifacts.sha256": returnPackageArtifact.sha256,
-              "agent_return_package_artifacts.size_bytes": returnPackageArtifact.sizeBytes,
-              "agent_return_package_artifacts.storage_bucket":
-                returnPackageArtifact.storageBucket,
-              "agent_return_package_artifacts.storage_path":
-                returnPackageArtifact.storagePath,
-              "agent_return_packages.agent_id": actorId,
-              "agent_return_packages.status": returnPackageArtifact.packageStatus,
-            };
-            artifactIds.push(
-              addArtifact("canonical-readback", {
-                ...commonArtifact("canonical-readback", recordBase),
+          : undefined;
+      const recordBase = { id: recordId, interactionId: contract.id };
+      const artifactIds: string[] = [];
+
+      for (const proof of contract.proof) {
+        const kind = proofArtifactKind[proof];
+        if (kind === "download") {
+          if (!returnPackageArtifact) {
+            throw new Error("expected canonical return-package artifact fixture");
+          }
+          const file = addArtifact("download", downloadBytes);
+          artifactIds.push(file.id);
+          artifactIds.push(
+            addArtifact("download-metadata", {
+              ...commonArtifact("download-metadata", recordBase),
+              byteLength: downloadBytes.byteLength,
+              canonicalArtifactId: returnPackageArtifact.artifactId,
+              canonicalPackageId: returnPackageArtifact.packageId,
+              fileArtifactId: file.id,
+              fileName: returnPackageArtifact.fileName,
+              fileSha256: file.sha256,
+              owner: returnPackageArtifact.owner,
+              packageStatus: returnPackageArtifact.packageStatus,
+              storageBucket: returnPackageArtifact.storageBucket,
+              storagePath: returnPackageArtifact.storagePath,
+              syntheticMarker: runId,
+            }).id,
+          );
+          const fields = [
+            "agent_return_package_artifacts.file_name",
+            "agent_return_package_artifacts.id",
+            "agent_return_package_artifacts.sha256",
+            "agent_return_package_artifacts.size_bytes",
+            "agent_return_package_artifacts.storage_bucket",
+            "agent_return_package_artifacts.storage_path",
+            "agent_return_packages.agent_id",
+            "agent_return_packages.status",
+          ];
+          const after = {
+            "agent_return_package_artifacts.file_name": returnPackageArtifact.fileName,
+            "agent_return_package_artifacts.id": returnPackageArtifact.artifactId,
+            "agent_return_package_artifacts.sha256": returnPackageArtifact.sha256,
+            "agent_return_package_artifacts.size_bytes":
+              returnPackageArtifact.sizeBytes,
+            "agent_return_package_artifacts.storage_bucket":
+              returnPackageArtifact.storageBucket,
+            "agent_return_package_artifacts.storage_path":
+              returnPackageArtifact.storagePath,
+            "agent_return_packages.agent_id": actorId,
+            "agent_return_packages.status": returnPackageArtifact.packageStatus,
+          };
+          artifactIds.push(
+            addArtifact("canonical-readback", {
+              ...commonArtifact("canonical-readback", recordBase),
+              actorId,
+              actorRole: contract.role,
+              after,
+              before: {
+                ...after,
+                "agent_return_packages.status": "pre-publish",
+              },
+              entityId: synthetic.primaryEntityId,
+              expectedAfter: after,
+              fields,
+              markerSha256,
+              operationId,
+              reloadedAt: capturedAt,
+            }).id,
+          );
+          continue;
+        }
+
+        const common = commonArtifact(kind, recordBase);
+        const content = (() => {
+          switch (kind) {
+            case "dom-snapshot":
+              return {
+                ...common,
+                enabled: true,
+                expectedEffectConfirmed: true,
+                role: contract.role,
+                statusFixture: status,
+                surface: contract.surface,
+                viewport: "1440x900",
+              };
+            case "network-ledger":
+              return { ...common, requests: networkResponses };
+            case "no-network-write":
+              return {
+                ...common,
+                observedRequests: networkResponses ?? [],
+                unexpectedWrites: [],
+              };
+            case "canonical-readback": {
+              const signsOut = ["access.pending-sign-out", "shell.sign-out"].includes(
+                contract.id,
+              );
+              const fields = mutation ? canonicalFields : ["fixture.state"];
+              const before = mutation
+                ? canonicalBefore
+                : { "fixture.state": signsOut ? "authenticated" : "before" };
+              const after = mutation
+                ? canonicalAfter
+                : {
+                    "fixture.state":
+                      contract.kind === "session"
+                        ? signsOut
+                          ? "anonymous"
+                          : "authenticated"
+                        : "after",
+                  };
+              return {
+                ...common,
                 actorId,
                 actorRole: contract.role,
                 after,
-                before: {
-                  ...after,
-                  "agent_return_packages.status": "pre-publish",
-                },
+                before,
                 entityId: synthetic.primaryEntityId,
                 expectedAfter: after,
                 fields,
                 markerSha256,
                 operationId,
                 reloadedAt: capturedAt,
-              }).id,
-            );
-            continue;
-          }
-
-          const common = commonArtifact(kind, recordBase);
-          const content = (() => {
-            switch (kind) {
-              case "dom-snapshot":
-                return {
-                  ...common,
-                  enabled: true,
-                  expectedEffectConfirmed: true,
-                  role: contract.role,
-                  statusFixture: status,
-                  surface: contract.surface,
-                  viewport: "1440x900",
-                };
-              case "network-ledger":
-                return { ...common, requests: networkResponses };
-              case "no-network-write":
-                return {
-                  ...common,
-                  observedRequests: networkResponses ?? [],
-                  unexpectedWrites: [],
-                };
-              case "canonical-readback": {
-                const signsOut = ["access.pending-sign-out", "shell.sign-out"].includes(
-                  contract.id,
-                );
-                const fields = mutation ? canonicalFields : ["fixture.state"];
-                const before = mutation
-                  ? canonicalBefore
-                  : { "fixture.state": signsOut ? "authenticated" : "before" };
-                const after = mutation
-                  ? canonicalAfter
-                  : {
-                      "fixture.state":
-                        contract.kind === "session"
-                          ? signsOut
-                            ? "anonymous"
-                            : "authenticated"
-                          : "after",
-                    };
-                return {
-                  ...common,
-                  actorId,
-                  actorRole: contract.role,
-                  after,
-                  before,
-                  entityId: synthetic.primaryEntityId,
-                  expectedAfter: after,
-                  fields,
-                  markerSha256,
-                  operationId,
-                  reloadedAt: capturedAt,
-                };
-              }
-              case "storage-readback":
-                return {
-                  ...common,
-                  actorId,
-                  entityId: synthetic.primaryEntityId,
-                  markerSha256,
-                  operationId,
-                  slots: ["passport_scan"],
-                };
-              case "cross-role-readback":
-                return {
-                  ...common,
-                  entityId: synthetic.primaryEntityId,
-                  fields: canonicalFields,
-                  markerSha256,
-                  observedAt: capturedAt,
-                  observedValues: canonicalAfter,
-                  operationId,
-                  sourceActorId: actorId,
-                  witnessActorId: adminWitnessActorId,
-                  witnessRole: "admin",
-                };
-              case "clipboard-proof":
-                return { ...common, characterCount: 32, passed: true };
-              case "session-transition": {
-                const signsOut = ["access.pending-sign-out", "shell.sign-out"].includes(
-                  contract.id,
-                );
-                return {
-                  ...common,
-                  actorId,
-                  actorRole: contract.role,
-                  entityId: synthetic.primaryEntityId,
-                  from: signsOut ? "authenticated" : "anonymous",
-                  fromSessionSha256: signsOut
-                    ? sha256(`${recordId}:session:before`)
-                    : null,
-                  markerSha256,
-                  operationClass:
-                    sessionNetwork[contract.id as keyof typeof sessionNetwork]
-                      .operationClass,
-                  operationId,
-                  providerResultSha256,
-                  reloadedAt: capturedAt,
-                  reloginVerifiedAt: capturedAt,
-                  to: signsOut ? "anonymous" : "authenticated",
-                  toSessionSha256: signsOut
-                    ? null
-                    : sha256(`${recordId}:session:after`),
-                };
-              }
-              default:
-                throw new Error(`unsupported fixture artifact kind: ${kind}`);
+              };
             }
-          })();
-          artifactIds.push(addArtifact(kind, content).id);
-        }
+            case "storage-readback":
+              return {
+                ...common,
+                actorId,
+                entityId: synthetic.primaryEntityId,
+                markerSha256,
+                operationId,
+                slots: ["passport_scan"],
+              };
+            case "cross-role-readback":
+              return {
+                ...common,
+                entityId: synthetic.primaryEntityId,
+                fields: canonicalFields,
+                markerSha256,
+                observedAt: capturedAt,
+                observedValues: canonicalAfter,
+                operationId,
+                sourceActorId: actorId,
+                witnessActorId: adminWitnessActorId,
+                witnessRole: "admin",
+              };
+            case "clipboard-proof":
+              return { ...common, characterCount: 32, passed: true };
+            case "session-transition": {
+              const signsOut = ["access.pending-sign-out", "shell.sign-out"].includes(
+                contract.id,
+              );
+              return {
+                ...common,
+                actorId,
+                actorRole: contract.role,
+                entityId: synthetic.primaryEntityId,
+                from: signsOut ? "authenticated" : "anonymous",
+                fromSessionSha256: signsOut
+                  ? sha256(`${recordId}:session:before`)
+                  : null,
+                markerSha256,
+                operationClass:
+                  sessionNetwork[contract.id as keyof typeof sessionNetwork]
+                    .operationClass,
+                operationId,
+                providerResultSha256,
+                reloadedAt: capturedAt,
+                reloginVerifiedAt: capturedAt,
+                to: signsOut ? "anonymous" : "authenticated",
+                toSessionSha256: signsOut ? null : sha256(`${recordId}:session:after`),
+              };
+            }
+            default:
+              throw new Error(`unsupported fixture artifact kind: ${kind}`);
+          }
+        })();
+        artifactIds.push(addArtifact(kind, content).id);
+      }
 
-        if (mutation) {
-          artifactIds.push(
-            addArtifact("unintended-writes", {
-              ...commonArtifact("unintended-writes", recordBase),
-              changedTargets: mutation.unintendedWrites.changedTargets,
-              checkedTargets: mutation.unintendedWrites.checkedTargets,
-              targetSnapshots: mutation.unintendedWrites.targetSnapshots,
-              unexpectedWrites: [],
-            }).id,
-          );
-        }
+      if (mutation) {
+        artifactIds.push(
+          addArtifact("unintended-writes", {
+            ...commonArtifact("unintended-writes", recordBase),
+            changedTargets: mutation.unintendedWrites.changedTargets,
+            checkedTargets: mutation.unintendedWrites.checkedTargets,
+            targetSnapshots: mutation.unintendedWrites.targetSnapshots,
+            unexpectedWrites: [],
+          }).id,
+        );
+      }
 
-        return {
-          assertions: Object.fromEntries(
-            contract.proof.map((proof) => [
-              proof,
-              { detail: `fixture asserted ${proof}`, passed: true },
-            ]),
-          ),
-          execution: { artifactIds, capturedAt, runId },
-          expectedEffect: {
-            description: contract.expectedEffect,
-            detail: "fixture confirmed the declared effect",
-            passed: true,
-          },
-          fixture: {
-            id: `fixture:${contract.id}:${status}`,
-            returnPackageArtifact,
-            submissionStatuses: [status],
-            synthetic,
-          },
-          id: recordId,
-          interactionId: contract.id,
-          mutation,
-          network: networkResponses ? { responses: networkResponses } : undefined,
-          role: contract.role,
-          surface: contract.surface,
-          testCase: `fixture:${contract.id}:${status}`,
-        } satisfies AgentInteractionEvidenceRecord;
-      });
-    },
-  );
+      return {
+        assertions: Object.fromEntries(
+          contract.proof.map((proof) => [
+            proof,
+            { detail: `fixture asserted ${proof}`, passed: true },
+          ]),
+        ),
+        execution: { artifactIds, capturedAt, runId },
+        expectedEffect: {
+          description: contract.expectedEffect,
+          detail: "fixture confirmed the declared effect",
+          passed: true,
+        },
+        fixture: {
+          id: `fixture:${contract.id}:${status}`,
+          returnPackageArtifact,
+          submissionStatuses: [status],
+          synthetic,
+        },
+        id: recordId,
+        interactionId: contract.id,
+        mutation,
+        network: networkResponses ? { responses: networkResponses } : undefined,
+        role: contract.role,
+        surface: contract.surface,
+        testCase: `fixture:${contract.id}:${status}`,
+      } satisfies AgentInteractionEvidenceRecord;
+    });
+  });
 
   const globalCommon = (kind: AgentInteractionArtifactKind) => ({
     capturedAt,
@@ -659,10 +653,7 @@ function productionFixture() {
       })),
     ),
   );
-  const inventoryControls = [
-    ...enabledInventoryControls,
-    ...disabledInventoryControls,
-  ];
+  const inventoryControls = [...enabledInventoryControls, ...disabledInventoryControls];
   addArtifact("deployed-dom-inventory", {
     ...globalCommon("deployed-dom-inventory"),
     baseUrl: "https://document-intake-system.vercel.app",
@@ -672,14 +663,12 @@ function productionFixture() {
     roles: ["admin", "agent", "anonymous"],
     statusFixtures: [
       ...new Set(
-        Object.values(V19_AGENT_INTERACTION_CONTRACTS).flatMap(
-          (contract) => [
-            ...("statusFixtures" in contract ? contract.statusFixtures : []),
-            ...("disabledStatusFixtures" in contract
-              ? contract.disabledStatusFixtures
-              : []),
-          ],
-        ),
+        Object.values(V19_AGENT_INTERACTION_CONTRACTS).flatMap((contract) => [
+          ...("statusFixtures" in contract ? contract.statusFixtures : []),
+          ...("disabledStatusFixtures" in contract
+            ? contract.disabledStatusFixtures
+            : []),
+        ]),
       ),
     ],
     surfaces: [
@@ -714,7 +703,9 @@ function productionFixture() {
     (record) =>
       record.role === "agent" &&
       record.mutation &&
-      record.fixture.synthetic.entities.some((entity) => entity.target === "submissions"),
+      record.fixture.synthetic.entities.some(
+        (entity) => entity.target === "submissions",
+      ),
   );
   if (!isolationRecord) throw new Error("expected agent-owned mutation fixture");
   const isolationEntity = isolationRecord.fixture.synthetic.entities.find(
@@ -937,8 +928,7 @@ describe("agent interaction production evidence verifier", () => {
     if (!target?.mutation?.networkResponse) {
       throw new Error("expected mutation record");
     }
-    (target.mutation.networkResponse as { path: string }).path =
-      "/different-write";
+    (target.mutation.networkResponse as { path: string }).path = "/different-write";
     fixture.writeManifest();
 
     const result = verifierResult(fixture.manifestPath);
@@ -1019,9 +1009,9 @@ describe("agent interaction production evidence verifier", () => {
       throw new Error("expected lifecycle mutation evidence");
     }
     const field = target.mutation.canonicalReloadReadback.fields[0]!;
-    (
-      target.mutation.canonicalReloadReadback.expectedAfter as Record<string, unknown>
-    )[field] = "ready_for_export";
+    (target.mutation.canonicalReloadReadback.expectedAfter as Record<string, unknown>)[
+      field
+    ] = "ready_for_export";
     rewriteJsonArtifact(canonicalArtifact, (content) => {
       (content.after as Record<string, unknown>)[field] = "ready_for_export";
       (content.expectedAfter as Record<string, unknown>)[field] = "ready_for_export";
@@ -1456,10 +1446,7 @@ describe("agent interaction production evidence verifier", () => {
     const fixture = productionFixture();
     const artifact = fixture.artifacts[0];
     if (!artifact) throw new Error("expected artifact fixture");
-    const symlinkPath = join(
-      resolve(artifact.path, ".."),
-      "symlinked-artifact.json",
-    );
+    const symlinkPath = join(resolve(artifact.path, ".."), "symlinked-artifact.json");
     symlinkSync(artifact.path, symlinkPath);
     artifact.path = symlinkPath;
     fixture.writeManifest();

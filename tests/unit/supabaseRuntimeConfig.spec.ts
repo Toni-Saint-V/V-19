@@ -30,10 +30,10 @@ describe("Supabase runtime target selection", () => {
     expect(
       productionTargetConfigIssues({
         activationTarget: "production",
-        projectId: "tsymifccglpepvbmrcgh",
-        url: "https://tsymifccglpepvbmrcgh.supabase.co",
-        edgeFunctionsUrl: "https://tsymifccglpepvbmrcgh.supabase.co/functions/v1",
-        cutoverGeneration: "v19-supabase-reactivation-20260802-g4",
+        projectId: "pwaasuqljxeypeqhvzqs",
+        url: "https://pwaasuqljxeypeqhvzqs.supabase.co",
+        edgeFunctionsUrl: "https://pwaasuqljxeypeqhvzqs.supabase.co/functions/v1",
+        cutoverGeneration: "v19-supabase-clean-cutover-20260802-g5",
       }),
     ).toEqual([]);
   });
@@ -42,9 +42,9 @@ describe("Supabase runtime target selection", () => {
     expect(
       productionTargetConfigIssues({
         activationTarget: "production",
-        projectId: "tsymifccglpepvbmrcgh",
-        url: "https://tsymifccglpepvbmrcgh.supabase.co",
-        edgeFunctionsUrl: "https://tsymifccglpepvbmrcgh.supabase.co/functions/v1",
+        projectId: "pwaasuqljxeypeqhvzqs",
+        url: "https://pwaasuqljxeypeqhvzqs.supabase.co",
+        edgeFunctionsUrl: "https://pwaasuqljxeypeqhvzqs.supabase.co/functions/v1",
         cutoverGeneration: "v19-supabase-cutover-20260801-g2",
       }),
     ).toEqual([
@@ -67,9 +67,9 @@ describe("Supabase runtime target selection", () => {
   test("blocks the canonical production project when relabeled as sandbox", () => {
     const issues = productionTargetConfigIssues({
       activationTarget: "sandbox",
-      projectId: "tsymifccglpepvbmrcgh",
-      url: "https://tsymifccglpepvbmrcgh.supabase.co",
-      edgeFunctionsUrl: "https://tsymifccglpepvbmrcgh.supabase.co/functions/v1",
+      projectId: "pwaasuqljxeypeqhvzqs",
+      url: "https://pwaasuqljxeypeqhvzqs.supabase.co",
+      edgeFunctionsUrl: "https://pwaasuqljxeypeqhvzqs.supabase.co/functions/v1",
       cutoverGeneration: "",
     });
 
@@ -113,8 +113,8 @@ describe("Supabase runtime target selection", () => {
     const issues = productionTargetConfigIssues({
       activationTarget: "sandbox",
       projectId: "sandbox-label",
-      url: "https://tsymifccglpepvbmrcgh.supabase.co/",
-      edgeFunctionsUrl: "https://tsymifccglpepvbmrcgh.supabase.co/functions/v1/",
+      url: "https://pwaasuqljxeypeqhvzqs.supabase.co/",
+      edgeFunctionsUrl: "https://pwaasuqljxeypeqhvzqs.supabase.co/functions/v1/",
       cutoverGeneration: "stale-generation",
     });
 
@@ -131,7 +131,7 @@ describe("Supabase runtime target selection", () => {
       productionTargetConfigIssues({
         activationTarget: "sandbox",
         projectId: "sandbox-label",
-        url: "https://tsymifccglpepvbmrcgh.supabase.co./",
+        url: "https://pwaasuqljxeypeqhvzqs.supabase.co./",
         edgeFunctionsUrl: "https://sandbox-project.supabase.co/functions/v1",
         cutoverGeneration: "",
       }),
@@ -144,7 +144,7 @@ describe("Supabase runtime target selection", () => {
         activationTarget: "sandbox",
         projectId: "sandbox-project",
         url: "https://sandbox-project.supabase.co",
-        edgeFunctionsUrl: "https://tsymifccglpepvbmrcgh.supabase.co/functions/v1",
+        edgeFunctionsUrl: "https://pwaasuqljxeypeqhvzqs.supabase.co/functions/v1",
         cutoverGeneration: "",
       }),
     ).not.toEqual([]);

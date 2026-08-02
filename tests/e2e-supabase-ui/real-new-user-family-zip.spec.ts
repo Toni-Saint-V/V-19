@@ -6,6 +6,7 @@ import { basename, resolve } from "node:path";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import JSZip from "jszip";
 
+import { SUPABASE_SANDBOX_TARGET } from "../../config/supabase-sandbox-target.mjs";
 import { testArtifactPath } from "../support/artifacts";
 import { EXPECTED_EXPORT_CONTRACT_HEADERS } from "../../src/lib/export/exportContractCore";
 import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore";
@@ -701,7 +702,7 @@ async function createFamilyDraft(page: Page, passportPaths: [string, string]) {
   await clickAndWaitForSupabaseWrite(
     page,
     () => submit.click(),
-    /\/rest\/v1\/rpc\/save_submission_draft$/,
+    /\/rest\/v1\/rpc\/save_agent_submission_if_current$/,
   );
   const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
   await expect(questionnaire).toBeVisible({ timeout: 45_000 });
@@ -996,7 +997,8 @@ test.describe("real new-user Supabase family application ZIP", () => {
 
     const env = readSmokeEnv();
     const projectRef = env.VITE_SUPABASE_PROJECT_ID;
-    expect(projectRef).toBe("oevvaowoklqttqkraxho");
+    expect(projectRef).toBe(SUPABASE_SANDBOX_TARGET.projectId);
+    expect(env.VITE_SUPABASE_URL).toBe(SUPABASE_SANDBOX_TARGET.projectUrl);
     expect(env.VITE_SUPABASE_RELEASE_ENABLED ?? "false").not.toBe("true");
     const functionUrl = `${(env.VITE_SUPABASE_EDGE_FUNCTIONS_URL || env.VITE_SUPABASE_URL).replace(/\/$/, "")}/access-request`;
     const publishableKey = env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -1076,7 +1078,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await clickAndWaitForSupabaseWrite(
         owner.page,
         () => saveDraft.click(),
-        /\/rest\/v1\/rpc\/save_submission_draft$/,
+        /\/rest\/v1\/rpc\/save_agent_submission_if_current$/,
       );
       await questionnaire.getByRole("button", { name: "Назад" }).click();
       await expect(questionnaire).toHaveCount(0);
@@ -1101,7 +1103,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await clickAndWaitForSupabaseWrite(
         owner.page,
         () => complete.click(),
-        /\/rest\/v1\/rpc\/save_submission_draft$/,
+        /\/rest\/v1\/rpc\/save_agent_submission_if_current$/,
       );
       await reopenedQuestionnaire.getByRole("button", { name: "Назад" }).click();
       await expect(reopenedQuestionnaire).toHaveCount(0);

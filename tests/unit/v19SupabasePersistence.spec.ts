@@ -35,9 +35,7 @@ vi.mock("../../src/lib/supabase/client", () => {
     let range: [number, number] | null = null;
     const result = {
       eq(column: string, value: unknown) {
-        filteredRows = filteredRows.filter(
-          (row) => fieldValue(row, column) === value,
-        );
+        filteredRows = filteredRows.filter((row) => fieldValue(row, column) === value);
         return result;
       },
       in(column: string, values: unknown[]) {
@@ -58,8 +56,7 @@ vi.mock("../../src/lib/supabase/client", () => {
         filteredRows = filteredRows.filter((row) => {
           const rowValue = fieldValue(row, column);
           return (
-            Array.isArray(rowValue) &&
-            rowValue.some((value) => values.includes(value))
+            Array.isArray(rowValue) && rowValue.some((value) => values.includes(value))
           );
         });
         return result;
@@ -102,21 +99,46 @@ vi.mock("../../src/lib/supabase/client", () => {
                   ? mockState.applicantRows
                   : table === "questionnaire_answers"
                     ? mockState.questionnaireRows
-                  : table === "media_assets"
+                    : table === "media_assets"
                       ? mockState.mediaAssetRows
                       : table === "corrections"
                         ? mockState.correctionRows
-                      : table === "status_history"
-                      ? mockState.statusHistoryRows
-                      : table === "profiles"
-                        ? mockState.profileRows
-                      : mockState.exportBatchRows,
+                        : table === "status_history"
+                          ? mockState.statusHistoryRows
+                          : table === "profiles"
+                            ? mockState.profileRows
+                            : mockState.exportBatchRows,
             ),
         };
       },
       rpc: (name: string, args: Record<string, unknown>) => {
         mockState.rpcCalls.push({ args, name });
-        return Promise.resolve(mockState.rpcResults.shift() ?? { error: null });
+        const queued = mockState.rpcResults.shift();
+        if (
+          queued &&
+          !(
+            name === "save_agent_submission_if_current" &&
+            queued.error === null &&
+            queued.data === undefined
+          )
+        ) {
+          return Promise.resolve(queued);
+        }
+        if (name === "save_agent_submission_if_current") {
+          const payload = args.payload as { submission?: { id?: string } };
+          const expectedRevision = args.expected_revision;
+          return Promise.resolve({
+            data: {
+              caseRevision:
+                typeof expectedRevision === "number" ? expectedRevision + 1 : 0,
+              operationId: args.operation_id,
+              result: {},
+              submissionId: payload.submission?.id,
+            },
+            error: null,
+          });
+        }
+        return Promise.resolve({ error: null });
       },
     }),
   };
@@ -135,6 +157,7 @@ import {
   cockpitSubmissionFingerprintMap,
   ensureSubmissionPublicNumber,
   isAdminSubmissionConcurrencyConflict,
+  isSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
   readCockpitSnapshot,
   reviewHandoffPersistenceIssues,
@@ -291,12 +314,10 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(loaded.submissions).toHaveLength(101);
     expect(loaded.caseRevisionsBySubmissionId.size).toBe(101);
-    expect(
-      mockState.fromCalls.filter((table) => table === "submissions"),
-    ).toHaveLength(2);
-    expect(mockState.gtCalls).toEqual([
-      { column: "id", value: "VF-PAGE-099" },
-    ]);
+    expect(mockState.fromCalls.filter((table) => table === "submissions")).toHaveLength(
+      2,
+    );
+    expect(mockState.gtCalls).toEqual([{ column: "id", value: "VF-PAGE-099" }]);
   });
 
   it("quarantines a corrupt snapshot without blocking healthy submissions", async () => {
@@ -437,18 +458,54 @@ describe("V-19 Supabase cockpit persistence", () => {
       title: "Изменённая подача",
     };
 
-    await saveCockpitSubmissionsForProfile(
+    const saved = await saveCockpitSubmissionsForProfile(
       agentProfile,
       [changedSubmission],
       new Map(),
     );
 
-    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(rpcNames()).toEqual(["save_agent_submission_if_current"]);
     expect(payloadSubmission()).toMatchObject({
       agent_id: agentProfile.id,
       id: changedSubmission.id,
       title: changedSubmission.title,
     });
+    expect(mockState.rpcCalls[0]?.args).toMatchObject({
+      expected_revision: null,
+      mutation_kind: "draft",
+    });
+    expect(saved.caseRevisionsBySubmissionId.get(changedSubmission.id)).toBe(0);
+  });
+
+  it("saves an existing agent submission with its exact server revision", async () => {
+    const operationId = "00000000-0000-4000-8000-000000000811";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(operationId);
+    const submission = initialSubmissions[0] as Submission;
+    mockState.rpcResults = [
+      {
+        data: {
+          caseRevision: 8,
+          operationId,
+          result: {},
+          submissionId: submission.id,
+        },
+        error: null,
+      },
+    ];
+
+    const saved = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [submission],
+      new Map([[submission.id, agentProfile.id]]),
+      new Map([[submission.id, 7]]),
+    );
+
+    expect(mockState.rpcCalls[0]?.args).toMatchObject({
+      expected_revision: 7,
+      mutation_kind: "draft",
+      operation_id: operationId,
+    });
+    expect(saved.caseRevisionsBySubmissionId.get(submission.id)).toBe(8);
   });
 
   it("retries a transient idempotent draft save once", async () => {
@@ -473,9 +530,12 @@ describe("V-19 Supabase cockpit persistence", () => {
     );
 
     expect(rpcNames()).toEqual([
-      "save_submission_draft",
-      "save_submission_draft",
+      "save_agent_submission_if_current",
+      "save_agent_submission_if_current",
     ]);
+    expect(mockState.rpcCalls[0]?.args.operation_id).toBe(
+      mockState.rpcCalls[1]?.args.operation_id,
+    );
   });
 
   it("writes separate trip date range columns while keeping legacy travel_date", () => {
@@ -566,7 +626,10 @@ describe("V-19 Supabase cockpit persistence", () => {
       new Map(),
     );
 
-    expect(rpcNames()).toEqual(["save_submission_draft", "save_submission_draft"]);
+    expect(rpcNames()).toEqual([
+      "save_agent_submission_if_current",
+      "save_agent_submission_if_current",
+    ]);
     expect(payloadSubmission(0)).toMatchObject({
       agent_id: agentProfile.id,
       id: firstAgentSubmission.id,
@@ -621,14 +684,16 @@ describe("V-19 Supabase cockpit persistence", () => {
       new Map(),
     );
 
-    expect(rpcNames()).toEqual(["submit_corrections_handoff"]);
+    expect(rpcNames()).toEqual(["save_agent_submission_if_current"]);
+    expect(mockState.rpcCalls[0]?.args.mutation_kind).toBe("correction_handoff");
     expect(
       (
-        mockState.rpcCalls.find((call) => call.name === "submit_corrections_handoff")
-          ?.args.payload as {
+        mockState.rpcCalls.find(
+          (call) => call.name === "save_agent_submission_if_current",
+        )?.args.payload as {
           submission: { status: string };
         }
-    ).submission.status,
+      ).submission.status,
     ).toBe("waiting_review");
   });
 
@@ -725,14 +790,10 @@ describe("V-19 Supabase cockpit persistence", () => {
       "corrections_received fixed issues must resolve their targets",
     );
     await expect(
-      saveCockpitSubmissionsForProfile(
-        agentProfile,
-        [invalidCorrections],
-        new Map(),
-      ),
+      saveCockpitSubmissionsForProfile(agentProfile, [invalidCorrections], new Map()),
     ).rejects.toMatchObject({
       diagnostics: {
-        safeCode: "rpc.submit_corrections_handoff:save:HANDOFF_CONSISTENCY",
+        safeCode: "rpc.save_agent_submission_if_current:save:HANDOFF_CONSISTENCY",
       },
     });
     expect(rpcNames()).toEqual([]);
@@ -863,7 +924,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       ),
     ).rejects.toMatchObject({
       diagnostics: {
-        safeCode: "rpc.save_submission_draft:save:HANDOFF_CONSISTENCY",
+        safeCode: "rpc.save_admin_submission_batch_if_current:save:HANDOFF_CONSISTENCY",
       },
     });
     expect(rpcNames()).toEqual([]);
@@ -963,7 +1024,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       ),
     ).rejects.toMatchObject({
       diagnostics: {
-        safeCode: "rpc.save_submission_draft:save:HANDOFF_CONSISTENCY",
+        safeCode: "rpc.save_admin_submission_batch_if_current:save:HANDOFF_CONSISTENCY",
       },
     });
     expect(rpcNames()).toEqual([]);
@@ -1259,10 +1320,10 @@ describe("V-19 Supabase cockpit persistence", () => {
                       fields: section.fields.map((field) =>
                         field.id === sourceField.id
                           ? {
-                            ...field,
-                            adminReviewApprovedAtIso: "2026-07-15T06:30:00.000Z",
-                            adminReviewApprovedBy: "admin-reviewer",
-                            reviewOriginSource: "passport_ocr",
+                              ...field,
+                              adminReviewApprovedAtIso: "2026-07-15T06:30:00.000Z",
+                              adminReviewApprovedBy: "admin-reviewer",
+                              reviewOriginSource: "passport_ocr",
                               reviewSource: "passport_ocr",
                               reviewState: "needs_review",
                             }
@@ -1806,7 +1867,8 @@ describe("V-19 Supabase cockpit persistence", () => {
         original_file_name: "other-passport.jpg",
         generated_file_name: "other_passport_scan.jpg",
         storage_bucket: "submission-media",
-        storage_path: "OTHER-AGENT-SUBMISSION/other-agent-applicant/passport_scan/other_passport_scan.jpg",
+        storage_path:
+          "OTHER-AGENT-SUBMISSION/other-agent-applicant/passport_scan/other_passport_scan.jpg",
         mime_type: "image/jpeg",
         size_bytes: 2048,
         upload_status: "uploaded",
@@ -1870,9 +1932,7 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
 
-    expect(loaded.ownerIdsBySubmissionId.get(submission.id)).toBe(
-      otherAgentProfile.id,
-    );
+    expect(loaded.ownerIdsBySubmissionId.get(submission.id)).toBe(otherAgentProfile.id);
     expect(
       loaded.submissions[0]?.files.find((file) => file.type === "passport_scan"),
     ).toMatchObject({
@@ -2376,6 +2436,29 @@ describe("V-19 Supabase cockpit persistence", () => {
     ).catch((error: unknown) => error);
 
     expect(isAdminSubmissionConcurrencyConflict(conflict)).toBe(true);
+    expect(mockState.rpcCalls).toHaveLength(1);
+  });
+
+  it("reports an agent CAS conflict without overwriting canonical state", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    mockState.rpcResults = [
+      {
+        data: null,
+        error: {
+          code: "40001",
+          message: "V19_AGENT_SUBMISSION_CONFLICT",
+        },
+      },
+    ];
+
+    const conflict = await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [submission],
+      new Map([[submission.id, agentProfile.id]]),
+      new Map([[submission.id, 7]]),
+    ).catch((error: unknown) => error);
+
+    expect(isSubmissionConcurrencyConflict(conflict)).toBe(true);
     expect(mockState.rpcCalls).toHaveLength(1);
   });
 

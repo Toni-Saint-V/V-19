@@ -1,6 +1,40 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { execFileSync } from "node:child_process";
 import { visaflowPwaServiceWorker } from "./config/pwa/visaflowPwaServiceWorker";
+import { releaseSourceSha256FromFileSystem } from "./scripts/lib/release-source-identity.mjs";
+
+function releaseIdentity(mode: string): Plugin {
+  const vercelGitSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
+  const gitSha =
+    vercelGitSha ||
+    execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const dirty = vercelGitSha
+    ? false
+    : Boolean(
+        execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
+          encoding: "utf8",
+        }).trim(),
+      );
+  const sourceSha256 = releaseSourceSha256FromFileSystem(process.cwd());
+  return {
+    name: "visaflow-release-identity",
+    generateBundle() {
+      this.emitFile({
+        fileName: "release-identity.json",
+        source: `${JSON.stringify({
+          schemaVersion: 1,
+          gitSha,
+          dirty,
+          mode,
+          sourceSha256,
+          builtAt: new Date().toISOString(),
+        })}\n`,
+        type: "asset",
+      });
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const localDemoBuildEnabled =
@@ -15,7 +49,7 @@ export default defineConfig(({ mode }) => {
     // Keep Vite's CSS assets intact. Replacing an emitted CSS file during
     // generateBundle leaves lazy-import preload maps pointing at a file that
     // no longer exists and can break the authenticated workspace at runtime.
-    plugins: [react(), visaflowPwaServiceWorker()],
+    plugins: [react(), visaflowPwaServiceWorker(), releaseIdentity(mode)],
     build: {
       manifest: true,
       rollupOptions: {

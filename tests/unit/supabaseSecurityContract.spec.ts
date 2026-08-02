@@ -1632,9 +1632,7 @@ describe("Supabase security contract", () => {
       "create unique index submissions_public_number_uidx on public.submissions (public_number)",
     );
     expect(migration).toContain("Submission public number is immutable");
-    expect(migration).toContain(
-      "nextval('public.submission_public_number_seq')",
-    );
+    expect(migration).toContain("nextval('public.submission_public_number_seq')");
     expectSqlStatement(
       migration,
       "revoke all on function app_private.assign_submission_public_number() from public",
@@ -1727,5 +1725,40 @@ describe("Supabase security contract", () => {
 
     expect(previousMigrationIndex).toBeGreaterThan(-1);
     expect(migrationIndex).toBeGreaterThan(previousMigrationIndex);
+  });
+
+  test("requires replay-safe CAS for every authenticated agent snapshot", () => {
+    const migrationFileName = "20260803000100_agent_submission_concurrency.sql";
+    const migration = readProjectFile(`supabase/migrations/${migrationFileName}`);
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+
+    expect(migration).toContain(
+      "create table if not exists app_private.agent_submission_mutation_receipts",
+    );
+    expect(migration).toContain(
+      "create or replace function public.save_agent_submission_if_current(",
+    );
+    expect(migration).toContain("expected_revision bigint");
+    expect(migration).toContain("operation_id uuid");
+    expect(migration).toContain("request_fingerprint := encode(");
+    expect(migration).toContain("pg_catalog.pg_advisory_xact_lock");
+    expect(migration).toContain("using errcode = '40001'");
+    expect(migration).toContain("receipt_result is not null");
+    expect(migration).toContain("mutation_kind = 'correction_handoff'");
+    expectSqlStatement(
+      migration,
+      "revoke execute on function public.save_submission_draft(jsonb) from authenticated",
+    );
+    expectSqlStatement(
+      migration,
+      "revoke execute on function public.submit_corrections_handoff(jsonb) from authenticated",
+    );
+    expectSqlStatement(
+      migration,
+      "grant execute on function public.save_agent_submission_if_current( jsonb, bigint, uuid, text ) to authenticated",
+    );
+    expect(migrationContract).toContain(migrationFileName);
   });
 });

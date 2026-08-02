@@ -5,6 +5,11 @@ import {
   requiredMigrationsInActualOrder,
   undeclaredMigrationFiles,
 } from "./supabase-migration-contract.mjs";
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
+import {
+  isCanonicalSupabaseSandboxTarget,
+  SUPABASE_SANDBOX_TARGET,
+} from "../config/supabase-sandbox-target.mjs";
 
 const repoRoot = process.cwd();
 const migrationsDir = resolve(repoRoot, "supabase/migrations");
@@ -35,9 +40,24 @@ const pilotVolumeEnvelopePath = resolve(
   repoRoot,
   "scripts/verify-pilot-volume-envelope.mjs",
 );
+const productionFunctionsManagerPath = resolve(
+  repoRoot,
+  "scripts/manage-supabase-production-functions.mjs",
+);
+const cleanCutoverStateVerifierPath = resolve(
+  repoRoot,
+  "scripts/verify-supabase-clean-cutover-state.mjs",
+);
+const productionMigrationsManagerPath = resolve(
+  repoRoot,
+  "scripts/manage-supabase-production-migrations.mjs",
+);
+const deploymentIdentityVerifierPath = resolve(
+  repoRoot,
+  "scripts/verify-vercel-release-identity.mjs",
+);
 const packagePath = resolve(repoRoot, "package.json");
 const smokeEnvPath = resolve(repoRoot, ".env.supabase-smoke.local");
-const allowedSandboxProjectId = "oevvaowoklqttqkraxho";
 
 const checks = [];
 
@@ -235,6 +255,32 @@ function verifyMigrationOrder() {
   } else {
     pass("No undeclared Supabase migrations exist outside promotion order");
   }
+
+  const declaredPublicTables = new Set();
+  for (const fileName of migrationFiles) {
+    const migrationSql = readFileSync(resolve(migrationsDir, fileName), "utf8");
+    for (const match of migrationSql.matchAll(
+      /create\s+table\s+(?:if\s+not\s+exists\s+)?public\.([a-z_][a-z0-9_]*)/gi,
+    )) {
+      declaredPublicTables.add(match[1].toLowerCase());
+    }
+  }
+  const expectedEmptyTables = [...declaredPublicTables]
+    .filter((table) => table !== "profiles")
+    .sort();
+  const recordedEmptyTables = [
+    ...SUPABASE_PRODUCTION_TARGET.requiredEmptyPublicTables,
+  ].sort();
+  if (expectedEmptyTables.join("\n") === recordedEmptyTables.join("\n")) {
+    pass(
+      "Clean-cutover empty-data contract covers every declared public product table",
+    );
+  } else {
+    fail(
+      "Clean-cutover empty-data contract covers every declared public product table",
+      `Expected ${expectedEmptyTables.join(", ")}; recorded ${recordedEmptyTables.join(", ")}`,
+    );
+  }
 }
 
 function verifyPrivateSchemaIsNotExposed() {
@@ -353,10 +399,7 @@ function verifyWorkspaceMediaSlotContract() {
 
 function verifyAdminPassportReviewMediaPolicy() {
   const migration = readProjectFile(
-    resolve(
-      migrationsDir,
-      "20260717050000_admin_passport_review_media_policy.sql",
-    ),
+    resolve(migrationsDir, "20260717050000_admin_passport_review_media_policy.sql"),
     "Admin passport review media-policy migration exists",
   );
 
@@ -629,8 +672,8 @@ function verifySmokeGuard() {
 
   expectContains(
     liveSmoke,
-    'const allowedSmokeProjectId = "oevvaowoklqttqkraxho"',
-    "Live smoke is allow-listed to the V-19 sandbox project",
+    "isCanonicalSupabaseSandboxTarget(projectId, url)",
+    "Live smoke requires the canonical sandbox descriptor",
   );
   expectContains(
     liveSmoke,
@@ -754,11 +797,7 @@ function verifySmokeGuard() {
     "passport_scan",
     "Live smoke uses canonical passport_scan media",
   );
-  expectContains(
-    liveSmoke,
-    "selfie_2",
-    "Live smoke uses canonical selfie_2 media",
-  );
+  expectContains(liveSmoke, "selfie_2", "Live smoke uses canonical selfie_2 media");
   expectContains(
     productionWorkflowSmoke,
     "waiting_review",
@@ -869,21 +908,24 @@ function verifySmokeGuard() {
     );
   }
 
-  if (projectId === allowedSandboxProjectId) {
-    pass("Dedicated smoke env project is allow-listed");
+  if (isCanonicalSupabaseSandboxTarget(projectId, url)) {
+    pass("Dedicated smoke env matches the approved sandbox descriptor");
   } else {
     fail(
-      "Dedicated smoke env project is allow-listed",
-      "VITE_SUPABASE_PROJECT_ID is not the V-19 sandbox",
+      "Dedicated smoke env matches the approved sandbox descriptor",
+      `expected ${SUPABASE_SANDBOX_TARGET.projectId || "an assigned sandbox project"}`,
     );
   }
 
-  if (url?.startsWith(`https://${allowedSandboxProjectId}.supabase.co`)) {
-    pass("Dedicated smoke env URL matches the sandbox project");
+  if (
+    SUPABASE_SANDBOX_TARGET.projectUrl &&
+    url === SUPABASE_SANDBOX_TARGET.projectUrl
+  ) {
+    pass("Dedicated smoke env URL matches the approved sandbox URL");
   } else {
     fail(
-      "Dedicated smoke env URL matches the sandbox project",
-      "VITE_SUPABASE_URL does not match the allow-list",
+      "Dedicated smoke env URL matches the approved sandbox URL",
+      "VITE_SUPABASE_URL does not match the sandbox descriptor",
     );
   }
 }
@@ -916,11 +958,147 @@ function verifyDocsAndScripts() {
     productionApprovalChecklistPath,
     "Supabase production approval checklist exists",
   );
+  const productionFunctionsManager = readProjectFile(
+    productionFunctionsManagerPath,
+    "Supabase production Edge Function manager exists",
+  );
+  const cleanCutoverStateVerifier = readProjectFile(
+    cleanCutoverStateVerifierPath,
+    "Supabase clean-cutover state verifier exists",
+  );
+  const productionMigrationsManager = readProjectFile(
+    productionMigrationsManagerPath,
+    "Supabase production migration manager exists",
+  );
+  const deploymentIdentityVerifier = readProjectFile(
+    deploymentIdentityVerifierPath,
+    "Vercel deployment identity verifier exists",
+  );
 
   if (packageJson.scripts?.["verify:supabase-release"]) {
     pass("Package exposes verify:supabase-release");
   } else {
     fail("Package exposes verify:supabase-release", "Missing npm script");
+  }
+
+  for (const scriptName of [
+    "supabase:functions:check",
+    "supabase:functions:verify-remote",
+    "supabase:functions:deploy",
+    "supabase:migrations:dry-run",
+    "supabase:migrations:apply",
+    "verify:supabase-clean-cutover-state",
+    "verify:deployment-identity",
+  ]) {
+    if (packageJson.scripts?.[scriptName]) {
+      pass(`Package exposes ${scriptName}`);
+    } else {
+      fail(`Package exposes ${scriptName}`, "Missing npm script");
+    }
+  }
+
+  expectContains(
+    productionMigrationsManager,
+    '"link", "--project-ref", SUPABASE_PRODUCTION_TARGET.projectId',
+    "Production migration manager links the exact canonical project immediately before db push",
+  );
+  expectContains(
+    productionMigrationsManager,
+    "SUPABASE_PRODUCTION_MIGRATION_CONFIRMATION",
+    "Production migration apply requires exact target confirmation",
+  );
+  expectContains(
+    cleanCutoverStateVerifier,
+    "v19_clean_cutover_schema_inventory",
+    "Clean-cutover verifier reads the exact public schema inventory",
+  );
+  expectContains(
+    deploymentIdentityVerifier,
+    "release-identity.json",
+    "Deployment verifier reads the canonical production release identity",
+  );
+  expectContains(
+    deploymentIdentityVerifier,
+    "expectedGitSha: gitHead",
+    "Deployment verifier binds production to the exact local Git SHA",
+  );
+  expectContains(
+    productionFunctionsManager,
+    "SUPABASE_PRODUCTION_TARGET.requiredEdgeFunctions",
+    "Production function manager uses the canonical required function list",
+  );
+  expectContains(
+    productionFunctionsManager,
+    "SUPABASE_PRODUCTION_FUNCTION_DEPLOY_CONFIRMATION",
+    "Production function deploy requires exact target confirmation",
+  );
+  expectContains(
+    productionFunctionsManager,
+    '"--project-ref"',
+    "Production function manager pins the Supabase project ref",
+  );
+  expectContains(
+    productionFunctionsManager,
+    "requiredEdgeFunctionSecretNames",
+    "Production function manager checks the complete Edge secret contract",
+  );
+  expectContains(
+    productionFunctionsManager,
+    "/health",
+    "Production function manager invokes target-bound runtime health endpoints",
+  );
+  expectContains(
+    productionFunctionsManager,
+    "runtimeChecks",
+    "Production function evidence records per-function runtime checks",
+  );
+  expectContains(
+    cleanCutoverStateVerifier,
+    "requiredEmptyPublicTables",
+    "Clean-cutover verifier counts every required empty public table",
+  );
+  expectContains(
+    cleanCutoverStateVerifier,
+    "requiredStorageBuckets",
+    "Clean-cutover verifier counts every required Storage bucket",
+  );
+  for (const functionName of SUPABASE_PRODUCTION_TARGET.requiredEdgeFunctions) {
+    const functionEntry = readProjectFile(
+      resolve(repoRoot, "supabase", "functions", functionName, "index.ts"),
+      `Required Edge Function ${functionName} exists`,
+    );
+    expectContains(
+      functionEntry,
+      'endsWith("/health")',
+      `Required Edge Function ${functionName} exposes a read-only health contract`,
+    );
+  }
+  const aiHelperFunction = readProjectFile(
+    resolve(repoRoot, "supabase/functions/ai-helper/index.ts"),
+    "AI helper Edge Function exists",
+  );
+  const passportFunction = readProjectFile(
+    resolve(repoRoot, "supabase/functions/passport-extract/index.ts"),
+    "Passport Edge Function exists",
+  );
+  expectContains(
+    aiHelperFunction,
+    "env.AI_HELPER_AUDIT_TABLE === undefined",
+    "AI helper health rejects an explicitly empty or non-canonical audit table",
+  );
+  expectContains(
+    passportFunction,
+    "env.PASSPORT_EXTRACTION_AUDIT_TABLE !== undefined",
+    "Passport health rejects an explicitly empty or non-canonical audit table",
+  );
+  for (const [key, expected] of Object.entries(
+    SUPABASE_PRODUCTION_TARGET.requiredCleanDataState,
+  )) {
+    expectContains(
+      cleanCutoverStateVerifier,
+      `observed[key] !== expected`,
+      `Clean-cutover verifier enforces ${key}=${expected}`,
+    );
   }
 
   if (packageJson.scripts?.["verify:local-readiness"]) {

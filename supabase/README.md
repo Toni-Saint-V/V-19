@@ -9,7 +9,7 @@ Use only public browser variables:
 ```bash
 VITE_SUPABASE_BACKEND_TARGET=supabase
 VITE_SUPABASE_SANDBOX_PROBE_ENABLED=true
-VITE_SUPABASE_PROJECT_ID=oevvaowoklqttqkraxho
+VITE_SUPABASE_PROJECT_ID=your-isolated-sandbox-project-ref
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_SUPABASE_ANON_KEY=
@@ -24,6 +24,12 @@ Do not define both keys with different values.
 ## Live smoke env
 
 `npm run test:supabase-live` uses browser-safe Supabase clients and real user JWTs. It must not use a service-role key. Put local smoke credentials only in ignored `.env.supabase-smoke.local`; the smoke runner does not read `.env` or `.env.local`, and it requires `VITE_SUPABASE_ACTIVATION_TARGET=sandbox` plus the allow-listed V-19 sandbox project.
+
+The canonical sandbox descriptor is `config/supabase-sandbox-target.mjs`. It is
+intentionally unassigned after the clean production cutover, so destructive
+smoke and UI E2E fail closed until a dedicated disposable sandbox is reviewed
+and recorded there. A project id supplied only through the smoke env is not an
+allow-list.
 
 Required test accounts must already exist in Supabase Auth and have matching `public.profiles` rows:
 
@@ -52,9 +58,70 @@ npm run test:supabase-live
 npm run verify:local-readiness
 npm run verify:auth-data-readiness
 npm run verify:full
+npm run supabase:functions:check
 ```
 
 `npm run verify:supabase-release` checks local migration order, RLS/Storage guard migrations, the sandbox-only smoke target guard, rollback documentation, and the production env evidence gate. `npm run test:supabase-live` remains sandbox-only; do not point it at production. `npm run verify:local-readiness` proves the local layer with local verification, security audit, and full Playwright E2E. `npm run verify:auth-data-readiness` proves the bounded Auth/Data contract and browser secret boundary. `npm run verify:full` runs local readiness, Auth/Data, and release checks before the fail-closed production packet, so a production `NO_GO` does not hide local proof. Production activation also requires `VITE_SUPABASE_ACTIVATION_TARGET=production` and `VITE_SUPABASE_PRODUCTION_APPROVED=true` after owner approval.
+
+Apply the 57 tracked migrations only through the target-bound Supabase CLI wrapper:
+
+```bash
+npm run supabase:migrations:dry-run
+npm run supabase:migrations:apply
+```
+
+Do not concatenate migrations into a SQL Editor bundle and do not reconstruct
+`supabase_migrations.schema_migrations` manually. After the schema is applied,
+the clean-cutover final state is read back with:
+
+```bash
+npm run verify:supabase-clean-cutover-state
+npm run supabase:functions:verify-remote
+```
+
+The final data-state gate requires exactly one confirmed Auth user, one admin
+profile, zero agent profiles, zero Auth/profile orphans, the exact canonical
+public-table inventory, zero rows in every non-profile public product table,
+and zero objects in every required private Storage bucket. Unexpected public
+tables or Storage buckets also block activation. Pilot
+provisioning is disabled while the readiness scope is
+`supabase-production-cutover`.
+
+Every migration receipt is bound to the ordered version/name/SQL SHA-256
+contract. A failed CLI operation records a remote-history readback receipt and
+sets `retryAllowed=false`; do not retry until the observed history is reconciled
+as an exact immutable prefix. Existing migration versions must never be silently
+reused with different SQL on an already-initialized target.
+
+Edge Function deployment is target-bound and remains locked until the exact
+project/generation confirmation requested by `npm run supabase:functions:deploy`
+is supplied. The required functions are `access-request`, `ai-helper`, and
+`passport-extract`. Remote verification requires the complete canonical Edge
+secret-name contract and performs a read-only `/health` invocation against each
+deployed function. Names and `/health` responses are diagnostic only: they can
+never set readiness to PASS without exact deployed-source identity and real
+handler semantic evidence. `ai-helper` reports healthy in production only when its
+quota RPC, audit-table OpenAPI contract, and configured LiteLLM model are
+reachable by read-only probes. `passport-extract` reports the explicitly safe
+manual-review fallback; automated OCR is not claimed by this activation gate.
+
+After deployment, `npm run verify:deployment-identity` verifies that the
+canonical Vercel alias serves a clean `supabase-production` bundle built from
+the exact pre-activation Git SHA.
+
+Cutover readiness currently progresses only through
+`awaiting-fresh-evidence -> evidence-complete`; both phases are `NO_GO`.
+The former self-declared `approved/GO` transition is intentionally disabled
+until an authenticated detached owner-approval mechanism is configured.
+Predictable `projectId:generation` confirmation strings do not authorize a
+production write. Evidence files must be fresh and bound to the exact project,
+cutover generation, Git SHA, source digest, timestamp, and SHA-256.
+
+Production acceptance also requires temporary Agent and second-owner fixtures
+to prove create/write/readback/reload, Admin readback, cross-owner database and
+private Storage denial, and role-escalation denial. Those fixtures must be
+removed before the final clean-state receipt, which requires zero agents and
+exactly one confirmed admin.
 
 ## Local/demo behavior
 

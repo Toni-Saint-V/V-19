@@ -31,7 +31,6 @@ const legacyArchiveOnlyTests = [
   "tests/unit/smartCorrectionReturn.spec.ts",
   "tests/unit/storageService.spec.ts",
   "tests/unit/submissionService.spec.ts",
-  "tests/unit/supabasePersistenceFailurePaths.spec.ts",
   "tests/unit/textIntakeReviewer.spec.ts",
   "tests/unit/workflow.spec.ts",
 ] as const;

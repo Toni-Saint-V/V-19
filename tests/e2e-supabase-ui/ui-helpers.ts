@@ -525,7 +525,9 @@ export async function fillQuestionnaire(
   ) {
     if (applicantCount > 0) await applicants.nth(applicantIndex).click();
     await questionnaire
-      .locator(".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab")
+      .locator(
+        ".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab",
+      )
       .filter({ hasText: "Личные данные" })
       .click();
     surnameReadbacks.push({
@@ -542,7 +544,7 @@ export async function fillQuestionnaire(
     const url = new URL(request.url());
     return (
       url.origin === supabaseOrigin() &&
-      url.pathname.endsWith("/rest/v1/rpc/save_submission_draft") &&
+      url.pathname.endsWith("/rest/v1/rpc/save_agent_submission_if_current") &&
       request.method() === "POST"
     );
   };
@@ -562,7 +564,7 @@ export async function fillQuestionnaire(
         questionnaire
           .getByRole("button", { name: "Сохранить и выйти", exact: true })
           .click(),
-      /\/rest\/v1\/rpc\/save_submission_draft$/,
+      /\/rest\/v1\/rpc\/save_agent_submission_if_current$/,
     );
     await expect(questionnaire).toHaveCount(0);
     // Keep observing through the 900 ms questionnaire autosave debounce so a
@@ -639,7 +641,7 @@ export async function uploadVisibleRequiredFiles(page: Page, assets: string[]) {
         await uploadButton.click();
         await (await fileChooser).setFiles(asset);
       },
-      /\/rest\/v1\/rpc\/save_submission_draft$/,
+      /\/rest\/v1\/rpc\/save_agent_submission_if_current$/,
     );
     await expect
       .poll(() => visibleLocatorCount(section.locator), { timeout: 30_000 })

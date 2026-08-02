@@ -80,6 +80,8 @@ Apply migrations only in the repository order declared by
 - `20260722001000_admin_submission_batch_concurrency.sql`
 - `20260722002000_access_request_review_claim.sql`
 - `20260722003000_atomic_return_package_artifact_upload.sql`
+- `20260802000100_clean_cutover_schema_inventory.sql`
+- `20260803000100_agent_submission_concurrency.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 
@@ -107,6 +109,13 @@ Confirm production auth/profile consistency before activation.
 
 Do not auto-create production profiles from Codex. Any profile repair requires
 owner approval, an actor list, a rollback note, and a dry-run report.
+
+Production migration apply and Edge Function deploy are mechanically disabled
+while the readiness phase is `NO_GO`. A target/generation confirmation string is
+not approval. Re-enable a writer only after a clean exact Git SHA/source digest,
+the immutable migration SQL-hash contract, a successful bound dry-run receipt,
+full Agent/Admin cross-owner isolation evidence, and an authenticated detached
+owner-approval receipt are all verified.
 
 ## Rollback Boundary
 

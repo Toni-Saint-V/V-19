@@ -4,12 +4,12 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SUPABASE_PRODUCTION_TARGET } from "../../config/supabase-production-target.mjs";
+import { SUPABASE_SANDBOX_TARGET } from "../../config/supabase-sandbox-target.mjs";
 import { createQuestionnaireSections } from "../../src/modules/submissions/questionnaire";
 import { testArtifactPath } from "../support/artifacts";
 
 const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
-const allowedSmokeProjectId = "oevvaowoklqttqkraxho";
 const allowedProductionProjectId = SUPABASE_PRODUCTION_TARGET.projectId;
 const browserAuditTarget =
   process.env.SUPABASE_BROWSER_AUDIT_ENV === "production" ? "production" : "sandbox";
@@ -324,10 +324,10 @@ async function resetUploadSmokeSubmission() {
     .delete()
     .eq("submission_id", uploadSmokeSubmissionId);
   if (mediaDeleteError) throw new Error(mediaDeleteError.message);
-  const { error } = await client.rpc("save_submission_draft", {
-    payload: uploadSmokeDraftPayload(userId, new Date().toISOString()),
-  });
-  if (error) throw new Error(error.message);
+  await saveAgentSnapshotIfCurrent(
+    client,
+    uploadSmokeDraftPayload(userId, new Date().toISOString()),
+  );
   return { client, userId };
 }
 
@@ -568,10 +568,10 @@ async function resetSyncSmokeSubmission() {
 
   if (correctionsError) throw new Error(correctionsError.message);
 
-  const { error } = await adminClient.rpc("save_submission_draft", {
-    payload: syncSmokeSubmittedPayload(agentId, nowIso),
-  });
-  if (error) throw new Error(error.message);
+  await saveAdminSnapshotIfCurrent(
+    adminClient,
+    syncSmokeSubmittedPayload(agentId, nowIso),
+  );
 
   return agentId;
 }
@@ -802,8 +802,12 @@ async function waitForSyncSmokeStatus(
 async function expectCorrectionHandoffRejectedForClient(
   client: SupabaseClient,
   ownerAgentId: string,
+  expectedRevision: number,
 ) {
-  const { error } = await client.rpc("submit_corrections_handoff", {
+  const { error } = await client.rpc("save_agent_submission_if_current", {
+    expected_revision: expectedRevision,
+    mutation_kind: "correction_handoff",
+    operation_id: crypto.randomUUID(),
     payload: syncSmokeSubmittedPayload(ownerAgentId, new Date().toISOString()),
   });
 
@@ -865,14 +869,70 @@ async function persistUploadSmokeMedia(client: SupabaseClient, agentId: string) 
   const nowIso = new Date().toISOString();
   const mediaRows = uploadSmokeUploadedMediaRows(nowIso);
 
-  const { error } = await withTimeout(
-    client.rpc("save_submission_draft", {
-      payload: uploadSmokeDraftPayload(agentId, nowIso, mediaRows),
-    }),
+  await withTimeout(
+    saveAgentSnapshotIfCurrent(
+      client,
+      uploadSmokeDraftPayload(agentId, nowIso, mediaRows),
+    ),
     30_000,
-    "Upload smoke media save_submission_draft timed out.",
+    "Upload smoke media CAS save timed out.",
   );
+}
+
+async function readCaseRevision(
+  client: SupabaseClient,
+  submissionId: string,
+): Promise<number | null> {
+  const { data, error } = await client
+    .from("submissions")
+    .select("case_revision")
+    .eq("id", submissionId)
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) return null;
+  if (!Number.isSafeInteger(data.case_revision)) {
+    throw new Error(`Invalid case revision for ${submissionId}.`);
+  }
+  return data.case_revision;
+}
+
+async function saveAgentSnapshotIfCurrent(
+  client: SupabaseClient,
+  payload: ReturnType<typeof uploadSmokeDraftPayload>,
+) {
+  const submissionId = payload.submission.id;
+  const expectedRevision = await readCaseRevision(client, submissionId);
+  const operationId = crypto.randomUUID();
+  const { data, error } = await client.rpc("save_agent_submission_if_current", {
+    expected_revision: expectedRevision,
+    mutation_kind: "draft",
+    operation_id: operationId,
+    payload,
+  });
+  if (error) throw new Error(error.message);
+  if (data?.operationId !== operationId) throw new Error("Agent CAS receipt mismatch.");
+  return data;
+}
+
+async function saveAdminSnapshotIfCurrent(
+  client: SupabaseClient,
+  payload: ReturnType<typeof syncSmokeSubmittedPayload>,
+) {
+  const submissionId = payload.submission.id;
+  const expectedRevision = await readCaseRevision(client, submissionId);
+  if (expectedRevision === null) {
+    throw new Error(`Admin reset requires existing submission ${submissionId}.`);
+  }
+  const operationId = crypto.randomUUID();
+  const { data, error } = await client.rpc("save_admin_submission_batch_if_current", {
+    actor_id: (await client.auth.getUser()).data.user?.id ?? "",
+    expected_revisions: { [submissionId]: expectedRevision },
+    operation_id: operationId,
+    payloads: [payload],
+  });
+  if (error) throw new Error(error.message);
+  if (data?.operationId !== operationId) throw new Error("Admin CAS receipt mismatch.");
+  return data;
 }
 
 async function expectUploadSmokeMediaPersisted(client: SupabaseClient) {
@@ -896,9 +956,13 @@ test("exposes only browser-safe Supabase values", async ({ page }) => {
   const expectedProjectId =
     browserAuditTarget === "production"
       ? allowedProductionProjectId
-      : allowedSmokeProjectId;
+      : SUPABASE_SANDBOX_TARGET.projectId;
 
   expect(projectId).toBe(expectedProjectId);
+  if (browserAuditTarget === "sandbox") {
+    expect(projectId).toBe(SUPABASE_SANDBOX_TARGET.projectId);
+    expect(supabaseUrl).toBe(SUPABASE_SANDBOX_TARGET.projectUrl);
+  }
   expect(supabaseUrl).toBe(`https://${expectedProjectId}.supabase.co`);
   expect(publishableKey).toMatch(/^sb_publishable_/);
 
@@ -1049,7 +1113,9 @@ test.describe("Supabase sandbox auth smoke", () => {
       const returnSave = page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
-          response.url().includes("/rest/v1/rpc/save_submission_draft"),
+          response
+            .url()
+            .includes("/rest/v1/rpc/save_admin_submission_batch_if_current"),
         { timeout: 20_000 },
       );
       await page
@@ -1059,11 +1125,22 @@ test.describe("Supabase sandbox auth smoke", () => {
       expect(returnSaveResponse.ok(), "Admin return save must succeed.").toBe(true);
       await expect(page.getByRole("dialog", { name: "Проверка пакета" })).toBeHidden();
       await waitForSyncSmokeStatus(adminClient, "returned", "returned");
-      await expectCorrectionHandoffRejectedForClient(adminClient, syncOwnerAgentId);
+      const correctionRevision = await readCaseRevision(
+        adminClient,
+        syncSmokeSubmissionId,
+      );
+      if (correctionRevision === null)
+        throw new Error("Correction revision is missing.");
+      await expectCorrectionHandoffRejectedForClient(
+        adminClient,
+        syncOwnerAgentId,
+        correctionRevision,
+      );
       const { client: otherAgentClient } = await signedSmokeOtherAgentClient();
       await expectCorrectionHandoffRejectedForClient(
         otherAgentClient,
         syncOwnerAgentId,
+        correctionRevision,
       );
 
       await signOut(page);
@@ -1085,7 +1162,7 @@ test.describe("Supabase sandbox auth smoke", () => {
       const agentDraftSave = page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
-          response.url().includes("/rest/v1/rpc/save_submission_draft"),
+          response.url().includes("/rest/v1/rpc/save_agent_submission_if_current"),
         { timeout: 20_000 },
       );
       await chooseQuestionnaireOption(page, "Страна первого въезда", "France");
@@ -1110,7 +1187,7 @@ test.describe("Supabase sandbox auth smoke", () => {
       const correctionSave = page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
-          response.url().includes("/rest/v1/rpc/submit_corrections_handoff"),
+          response.url().includes("/rest/v1/rpc/save_agent_submission_if_current"),
         { timeout: 20_000 },
       );
       await page.getByRole("button", { name: "Отправить исправления" }).click();
@@ -1118,7 +1195,7 @@ test.describe("Supabase sandbox auth smoke", () => {
       const correctionSaveBody = await correctionSaveResponse.text();
       expect(
         correctionSaveResponse.ok(),
-        `submit_corrections_handoff failed with ${correctionSaveResponse.status()}: ${correctionSaveBody}`,
+        `Agent correction CAS failed with ${correctionSaveResponse.status()}: ${correctionSaveBody}`,
       ).toBe(true);
       await expect(
         page.getByText("· Исправления отправлены", { exact: true }),

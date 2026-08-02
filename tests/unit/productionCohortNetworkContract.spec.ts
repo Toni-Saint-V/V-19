@@ -138,7 +138,8 @@ function draftFixture(input: {
   const applicantId = "applicant-a2-s1";
   const timestamp = "2026-07-14T12:00:00.000Z";
   const includeTargetCorrection = input.includeTargetCorrection ?? true;
-  const correctionReason = "Требуется исправить поле «Примечание» — RUN A2-S1: correct the note";
+  const correctionReason =
+    "Требуется исправить поле «Примечание» — RUN A2-S1: correct the note";
   const applicant = {
     address: "Санкт-Петербург",
     birth_date: "1990-01-01",
@@ -194,8 +195,7 @@ function draftFixture(input: {
     created_at: timestamp,
     created_by: input.ownerId,
     field_key: "Примечание",
-    fixed_at:
-      input.correctionStatus === "open" ? null : timestamp,
+    fixed_at: input.correctionStatus === "open" ? null : timestamp,
     id: productionDraftStableUuid(
       `correction:${input.submissionId}:зм-${input.submissionId}-новое-1`,
     ),
@@ -325,8 +325,9 @@ function draftFixture(input: {
     statusHistory: [],
   });
   const snapshotIssues = productionDraftSnapshotIssueIdentities(familyIntelligence);
-  const submissionStaticContentDigest =
-    productionDraftSubmissionStaticContentDigest(payload.submission);
+  const submissionStaticContentDigest = productionDraftSubmissionStaticContentDigest(
+    payload.submission,
+  );
   if (
     !applicantContentDigest ||
     !mediaContentDigest ||
@@ -413,8 +414,7 @@ describe("production cohort runtime asset allowlist", () => {
     for (const cohortCase of cases) {
       const contacts = Array.from(
         { length: cohortCase.applicantCount },
-        (_, applicantIndex) =>
-          productionCohortContactEmail(cohortCase, applicantIndex),
+        (_, applicantIndex) => productionCohortContactEmail(cohortCase, applicantIndex),
       );
       primaryContacts.add(contacts[0] ?? "");
       expect(contacts.every((contact) => contact.endsWith("@example.invalid"))).toBe(
@@ -517,7 +517,7 @@ describe("production lifecycle mutation audit", () => {
         JSON.stringify({
           ...payload,
           payload: {
-          ...payload.payload,
+            ...payload.payload,
             submission: {
               ...payload.payload.submission,
               id: "other-submission",
@@ -676,18 +676,17 @@ describe("production lifecycle mutation audit", () => {
     expect(matches(rootLifecycleTimestampDrift)).toBe(false);
 
     const snapshotApplicantDrift = structuredClone(request);
-    snapshotApplicantDrift.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .applicants[0]!.fullName = "Changed snapshot applicant";
+    snapshotApplicantDrift.payload.submission.family_intelligence.v19CockpitSnapshot.submission.applicants[0]!.fullName =
+      "Changed snapshot applicant";
     expect(matches(snapshotApplicantDrift)).toBe(false);
 
     const snapshotFieldDrift = structuredClone(request);
-    snapshotFieldDrift.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .applicants[0]!.sections[0]!.fields[0]!.value = "changed snapshot field";
+    snapshotFieldDrift.payload.submission.family_intelligence.v19CockpitSnapshot.submission.applicants[0]!.sections[0]!.fields[0]!.value =
+      "changed snapshot field";
     expect(matches(snapshotFieldDrift)).toBe(false);
 
     const snapshotFileDrift = structuredClone(request);
-    snapshotFileDrift.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .files[0]!.sizeBytes = 8192;
+    snapshotFileDrift.payload.submission.family_intelligence.v19CockpitSnapshot.submission.files[0]!.sizeBytes = 8192;
     expect(matches(snapshotFileDrift)).toBe(false);
 
     const unknownEnvelopeKey = structuredClone(request);
@@ -732,8 +731,8 @@ describe("production lifecycle mutation audit", () => {
     };
     const request = { payload: structuredClone(fixture.payload) };
     request.payload.questionnaire_answers[0]!.value = replacement;
-    request.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .applicants[0]!.sections[0]!.fields[0]!.value = replacement;
+    request.payload.submission.family_intelligence.v19CockpitSnapshot.submission.applicants[0]!.sections[0]!.fields[0]!.value =
+      replacement;
 
     expect(
       productionLifecycleMutationPayloadMatches(JSON.stringify(request), contract),
@@ -741,8 +740,8 @@ describe("production lifecycle mutation audit", () => {
 
     const wrongValue = structuredClone(request);
     wrongValue.payload.questionnaire_answers[0]!.value = "Different note";
-    wrongValue.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .applicants[0]!.sections[0]!.fields[0]!.value = "Different note";
+    wrongValue.payload.submission.family_intelligence.v19CockpitSnapshot.submission.applicants[0]!.sections[0]!.fields[0]!.value =
+      "Different note";
     expect(
       productionLifecycleMutationPayloadMatches(JSON.stringify(wrongValue), contract),
     ).toBe(false);
@@ -795,8 +794,8 @@ describe("production lifecycle mutation audit", () => {
     const request = { payload: structuredClone(fixture.payload) };
     request.payload.applicants[0] = projectedApplicant;
     request.payload.questionnaire_answers[0]!.value = replacement;
-    request.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .applicants[0]!.sections[0]!.fields[0]!.value = replacement;
+    request.payload.submission.family_intelligence.v19CockpitSnapshot.submission.applicants[0]!.sections[0]!.fields[0]!.value =
+      replacement;
 
     expect(
       productionLifecycleMutationPayloadMatches(JSON.stringify(request), contract),
@@ -863,10 +862,7 @@ describe("production lifecycle mutation audit", () => {
     const extraChange = structuredClone(request);
     extraChange.payload.applicants[0]!.phone = "+7 999 999-99-99";
     expect(
-      productionLifecycleMutationPayloadMatches(
-        JSON.stringify(extraChange),
-        contract,
-      ),
+      productionLifecycleMutationPayloadMatches(JSON.stringify(extraChange), contract),
     ).toBe(false);
   });
 
@@ -977,8 +973,8 @@ describe("production lifecycle mutation audit", () => {
     expect(matches(request)).toBe(true);
 
     const changedError = structuredClone(request);
-    changedError.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .applicants[0]!.sections[0]!.fields[0]!.error = "other error";
+    changedError.payload.submission.family_intelligence.v19CockpitSnapshot.submission.applicants[0]!.sections[0]!.fields[0]!.error =
+      "other error";
     expect(matches(changedError)).toBe(false);
 
     const changedHistory = structuredClone(request);
@@ -987,8 +983,8 @@ describe("production lifecycle mutation audit", () => {
     expect(matches(changedHistory)).toBe(false);
 
     const changedIssueSnapshot = structuredClone(request);
-    changedIssueSnapshot.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .issues[0]!.snapshot = "tampered-snapshot";
+    changedIssueSnapshot.payload.submission.family_intelligence.v19CockpitSnapshot.submission.issues[0]!.snapshot =
+      "tampered-snapshot";
     expect(matches(changedIssueSnapshot)).toBe(false);
 
     const staleRootTimestamp = structuredClone(request);
@@ -1073,8 +1069,8 @@ describe("production lifecycle mutation audit", () => {
     expect(matches(request)).toBe(true);
 
     const retainedError = structuredClone(request);
-    retainedError.payload.submission.family_intelligence.v19CockpitSnapshot.submission
-      .applicants[0]!.sections[0]!.fields[0]!.error = issueReason;
+    retainedError.payload.submission.family_intelligence.v19CockpitSnapshot.submission.applicants[0]!.sections[0]!.fields[0]!.error =
+      issueReason;
     expect(matches(retainedError)).toBe(false);
 
     const staleFixedAt = structuredClone(request);
@@ -1120,13 +1116,17 @@ describe("production lifecycle mutation audit", () => {
       severity: "blocker",
       type: "field",
     });
-    const addedDigest = productionDraftSnapshotFullContentDigest(persistedEnvelope(added));
+    const addedDigest = productionDraftSnapshotFullContentDigest(
+      persistedEnvelope(added),
+    );
     expect(addedDigest).toBe(addMutation.expectedContentDigest);
     const addedIssue = added.issues[0];
     if (!addedIssue) throw new Error("Expected added lifecycle issue.");
     const addedTarget = added.applicants
       .find((item) => item.id === addedIssue.target.applicantId)
-      ?.sections.flatMap((section) => section.fields.map((field) => ({ field, section })))
+      ?.sections.flatMap((section) =>
+        section.fields.map((field) => ({ field, section })),
+      )
       .find(({ field }) => field.label === addedIssue.target.field);
     if (!addedTarget) throw new Error("Expected exact added issue target.");
     expect(addedTarget.field.error).toBe(issueReason);
@@ -1138,9 +1138,7 @@ describe("production lifecycle mutation audit", () => {
     tamperedAdded.issues[0]!.snapshot = "tampered-snapshot";
     expect(
       productionDraftSnapshotFullContentDigest(persistedEnvelope(tamperedAdded)),
-    ).not.toBe(
-      addMutation.expectedContentDigest,
-    );
+    ).not.toBe(addMutation.expectedContentDigest);
 
     const corrected = updateQuestionnaireField(added, {
       applicantId: addedIssue.target.applicantId,
@@ -1156,9 +1154,9 @@ describe("production lifecycle mutation audit", () => {
     if (!markMutation) throw new Error("Expected source-derived mark-fixed mutation.");
     const fixed = markSubmissionIssueFixedResult(returned, addedIssue.id, "agent");
     if (!fixed.ok) throw new Error(fixed.error.message);
-    expect(productionDraftSnapshotFullContentDigest(persistedEnvelope(fixed.data))).toBe(
-      markMutation.expectedContentDigest,
-    );
+    expect(
+      productionDraftSnapshotFullContentDigest(persistedEnvelope(fixed.data)),
+    ).toBe(markMutation.expectedContentDigest);
     const fixedTarget = fixed.data.applicants
       .find((item) => item.id === addedIssue.target.applicantId)
       ?.sections.flatMap((section) => section.fields)
@@ -1169,9 +1167,7 @@ describe("production lifecycle mutation audit", () => {
     tamperedFixed.issues[0]!.target.applicantName = "tampered-applicant";
     expect(
       productionDraftSnapshotFullContentDigest(persistedEnvelope(tamperedFixed)),
-    ).not.toBe(
-      markMutation.expectedContentDigest,
-    );
+    ).not.toBe(markMutation.expectedContentDigest);
   });
 
   test("derives the active field-remark shape without an implicit section", () => {
@@ -1205,15 +1201,21 @@ describe("production lifecycle mutation audit", () => {
       type: "field",
     });
     const persisted = JSON.parse(
-      JSON.stringify({ status: "unreviewed", v19CockpitSnapshot: { submission: actual, version: 1 } }),
+      JSON.stringify({
+        status: "unreviewed",
+        v19CockpitSnapshot: { submission: actual, version: 1 },
+      }),
     );
     expect(productionDraftSnapshotFullContentDigest(persisted)).toBe(
       mutation.expectedContentDigest,
     );
     expect(Object.hasOwn(actual.issues[0]!.target, "section")).toBe(true);
-    expect(Object.hasOwn(persisted.v19CockpitSnapshot.submission.issues[0].target, "section")).toBe(
-      false,
-    );
+    expect(
+      Object.hasOwn(
+        persisted.v19CockpitSnapshot.submission.issues[0].target,
+        "section",
+      ),
+    ).toBe(false);
   });
 
   test("rejects stale durable and snapshot transition timestamps", () => {
@@ -1469,8 +1471,7 @@ describe("production lifecycle mutation audit", () => {
         ...fixture.draft,
         effectiveHistoryCount: effectiveHistory.effectiveHistoryCount,
         snapshotHistory: effectiveHistory.snapshotHistory,
-        snapshotUntypedHistoryDigests:
-          effectiveHistory.snapshotUntypedHistoryDigests,
+        snapshotUntypedHistoryDigests: effectiveHistory.snapshotUntypedHistoryDigests,
         statusHistory: durableRows.map((row) => ({
           changedAt: row.changed_at,
           commentDigest: requiredDigest(row.comment),
@@ -1511,7 +1512,9 @@ describe("production lifecycle mutation audit", () => {
     ).toBe(false);
 
     const missingDuplicate = structuredClone(request);
-    missingDuplicate.payload.status_history = [missingDuplicate.payload.status_history[0]!];
+    missingDuplicate.payload.status_history = [
+      missingDuplicate.payload.status_history[0]!,
+    ];
     expect(
       productionLifecycleMutationPayloadMatches(
         JSON.stringify(missingDuplicate),
@@ -1527,17 +1530,18 @@ describe("production lifecycle mutation audit", () => {
       snapshotStatus: "returned",
       submissionId: "submission-a2-s1",
     });
-    fixture.payload.submission.family_intelligence.v19CockpitSnapshot.submission.history = [
-      { at: "2026-07-14T11:00:00.000Z", id: "snapshot-only", text: "UI note" },
-      {
-        fromStatus: "submitted_for_review",
-        id: "covered-snapshot-row",
-        note: "same note",
-        source: "agent",
-        text: "Same semantic transition",
-        toStatus: "returned",
-      },
-    ];
+    fixture.payload.submission.family_intelligence.v19CockpitSnapshot.submission.history =
+      [
+        { at: "2026-07-14T11:00:00.000Z", id: "snapshot-only", text: "UI note" },
+        {
+          fromStatus: "submitted_for_review",
+          id: "covered-snapshot-row",
+          note: "same note",
+          source: "agent",
+          text: "Same semantic transition",
+          toStatus: "returned",
+        },
+      ];
     const durableRows = [1, 2].map((index) => ({
       changed_at: `2026-07-14T12:0${index}:00.000Z`,
       changed_by: "owner-a2-s1",
@@ -1652,9 +1656,9 @@ describe("production lifecycle mutation audit", () => {
 
     expect(error.message).toContain("status=400");
     expect(error.message).toContain(evidenceDigest(`Database response ${sentinel}`));
-    expect(JSON.stringify({ message: error.message, stack: error.stack })).not.toContain(
-      sentinel,
-    );
+    expect(
+      JSON.stringify({ message: error.message, stack: error.stack }),
+    ).not.toContain(sentinel);
   });
 
   test("accepts a bounded auth transport retry that recovers", () => {
@@ -1849,7 +1853,7 @@ describe("production A2-S1 export artifact contract", () => {
     expect(
       exportPayloadMatches(
         JSON.stringify(draftPayload),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -1883,9 +1887,7 @@ describe("production A2-S1 export artifact contract", () => {
     ).toBe(false);
 
     const unexpectedBatchKey = structuredClone(terminalPayload);
-    (
-      unexpectedBatchKey.payload.batch as Record<string, unknown>
-    ).unexpected = true;
+    (unexpectedBatchKey.payload.batch as Record<string, unknown>).unexpected = true;
     expect(
       exportPayloadMatches(
         JSON.stringify(unexpectedBatchKey),
@@ -1930,7 +1932,7 @@ describe("production A2-S1 export artifact contract", () => {
     expect(
       exportPayloadMatches(
         JSON.stringify(unexpectedDraftPayloadKey),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -1944,7 +1946,7 @@ describe("production A2-S1 export artifact contract", () => {
             questionnaire_answers: [],
           },
         }),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -1963,7 +1965,7 @@ describe("production A2-S1 export artifact contract", () => {
             ],
           },
         }),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -1988,7 +1990,7 @@ describe("production A2-S1 export artifact contract", () => {
             },
           },
         }),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -2000,7 +2002,7 @@ describe("production A2-S1 export artifact contract", () => {
     expect(
       exportPayloadMatches(
         JSON.stringify(wrongExportState),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -2013,7 +2015,7 @@ describe("production A2-S1 export artifact contract", () => {
     expect(
       exportPayloadMatches(
         JSON.stringify(unexpectedHistory),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -2027,7 +2029,7 @@ describe("production A2-S1 export artifact contract", () => {
     expect(
       exportPayloadMatches(
         JSON.stringify(unknownSnapshotKey),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -2039,33 +2041,30 @@ describe("production A2-S1 export artifact contract", () => {
     expect(
       exportPayloadMatches(
         JSON.stringify(invalidUpdatedAt),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
     ).toBe(false);
 
     const detachedAcceptedAt = structuredClone(draftPayload);
-    detachedAcceptedAt.payload.submission.accepted_at =
-      "2026-07-14T13:00:00.000Z";
+    detachedAcceptedAt.payload.submission.accepted_at = "2026-07-14T13:00:00.000Z";
     expect(
       exportPayloadMatches(
         JSON.stringify(detachedAcceptedAt),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
     ).toBe(false);
 
     const staleExportTimestamp = structuredClone(draftPayload);
-    staleExportTimestamp.payload.submission.updated_at =
-      "2026-07-14T11:58:59.000Z";
-    staleExportTimestamp.payload.submission.accepted_at =
-      "2026-07-14T11:58:59.000Z";
+    staleExportTimestamp.payload.submission.updated_at = "2026-07-14T11:58:59.000Z";
+    staleExportTimestamp.payload.submission.accepted_at = "2026-07-14T11:58:59.000Z";
     expect(
       exportPayloadMatches(
         JSON.stringify(staleExportTimestamp),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
       ),
@@ -2074,14 +2073,12 @@ describe("production A2-S1 export artifact contract", () => {
 
   test("anchors a slow ZIP export timestamp window to the persistence request", () => {
     const slowZipPersistence = structuredClone(draftPayload);
-    slowZipPersistence.payload.submission.updated_at =
-      "2026-07-14T12:03:00.000Z";
-    slowZipPersistence.payload.submission.accepted_at =
-      "2026-07-14T12:03:00.000Z";
+    slowZipPersistence.payload.submission.updated_at = "2026-07-14T12:03:00.000Z";
+    slowZipPersistence.payload.submission.accepted_at = "2026-07-14T12:03:00.000Z";
     expect(
       productionA1S1ExportPayloadMatches(
         JSON.stringify(slowZipPersistence),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
         {
@@ -2093,7 +2090,7 @@ describe("production A2-S1 export artifact contract", () => {
     expect(
       productionA1S1ExportPayloadMatches(
         JSON.stringify(slowZipPersistence),
-        "POST /rest/v1/rpc/save_submission_draft",
+        "POST /rest/v1/rpc/save_agent_submission_if_current",
         networkContract,
         artifactContract,
         {
@@ -2113,14 +2110,10 @@ describe("production A2-S1 export artifact contract", () => {
   });
 
   test("routes ambiguous terminal checkpoints away from primary mutation evidence", () => {
-    expect(productionA2S1StartsInTerminalReadbackLane("artifact_verified")).toBe(
-      true,
-    );
+    expect(productionA2S1StartsInTerminalReadbackLane("artifact_verified")).toBe(true);
     expect(productionA2S1StartsInTerminalReadbackLane("verified")).toBe(true);
     expect(productionA2S1StartsInTerminalReadbackLane("pending")).toBe(false);
-    expect(productionA2S1StartsInTerminalReadbackLane("excel_verified")).toBe(
-      false,
-    );
+    expect(productionA2S1StartsInTerminalReadbackLane("excel_verified")).toBe(false);
     expect(productionA2S1StartsInTerminalReadbackLane("exporting")).toBe(false);
   });
 
@@ -2167,9 +2160,9 @@ describe("production A2-S1 export artifact contract", () => {
       },
     };
 
-    expect(
-      prepareProductionA2S1ExportRetryCheckpoint(state, { ...preflight }),
-    ).toBe(state);
+    expect(prepareProductionA2S1ExportRetryCheckpoint(state, { ...preflight })).toBe(
+      state,
+    );
     expect(state).toMatchObject({
       excelProof: { byteDigest: "e".repeat(64) },
       preflight,
@@ -2231,7 +2224,11 @@ describe("production cohort network health", () => {
       assertProductionNetworkRecordsHealthy(
         [
           { method: "POST", path: "/auth/v1/token", status: 200 },
-          { method: "POST", path: "/rest/v1/rpc/save_submission_draft", status: 0 },
+          {
+            method: "POST",
+            path: "/rest/v1/rpc/save_agent_submission_if_current",
+            status: 0,
+          },
         ],
         "save",
       ),

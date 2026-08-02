@@ -1,3 +1,10 @@
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
+
 export const requiredMigrationOrder = [
   "20260611000000_visaflow_mvp_foundation.sql",
   "20260612000000_visaflow_rls_performance_hardening.sql",
@@ -55,9 +62,11 @@ export const requiredMigrationOrder = [
   "20260722001000_admin_submission_batch_concurrency.sql",
   "20260722002000_access_request_review_claim.sql",
   "20260722003000_atomic_return_package_artifact_upload.sql",
+  "20260802000100_clean_cutover_schema_inventory.sql",
+  "20260803000100_agent_submission_concurrency.sql",
 ];
 
-export const requiredRemoteMigrationOrder = [
+export const legacyRemoteMigrationOrder = [
   "20260611000000_visaflow_mvp_foundation",
   "20260612000000_visaflow_rls_performance_hardening",
   "20260612001000_visaflow_rpc_corrections_persistence",
@@ -123,6 +132,82 @@ export const requiredRemoteMigrationOrder = [
   "20260715000000_document_assets_source_media_id_update_cascade",
   "20260717050000_admin_passport_review_media_policy",
 ];
+
+export const cleanCutoverRemoteMigrationOrder = Object.freeze(
+  requiredMigrationOrder.map((fileName) => fileName.replace(/\.sql$/, "")),
+);
+
+const remoteMigrationOrderByCutoverGeneration = new Map([
+  [SUPABASE_PRODUCTION_TARGET.cutoverGeneration, cleanCutoverRemoteMigrationOrder],
+]);
+
+export function requiredRemoteMigrationOrderForGeneration(cutoverGeneration) {
+  return remoteMigrationOrderByCutoverGeneration.get(cutoverGeneration) ?? [];
+}
+
+export function migrationContractEntriesFromFileSystem(root) {
+  assertExactMigrationInventory(
+    readdirSync(resolve(root, "supabase/migrations"))
+      .filter((fileName) => fileName.endsWith(".sql"))
+      .sort(),
+  );
+  return requiredMigrationOrder.map((fileName) =>
+    migrationContractEntry(
+      fileName,
+      readFileSync(resolve(root, "supabase/migrations", fileName)),
+    ),
+  );
+}
+
+export function migrationContractEntriesFromGitHead(root) {
+  const gitMigrationFiles = execFileSync(
+    "git",
+    ["ls-tree", "-r", "--name-only", "HEAD", "--", "supabase/migrations"],
+    { cwd: root, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter((path) => path.endsWith(".sql"))
+    .map((path) => path.slice("supabase/migrations/".length))
+    .sort();
+  assertExactMigrationInventory(gitMigrationFiles);
+  return requiredMigrationOrder.map((fileName) =>
+    migrationContractEntry(
+      fileName,
+      execFileSync("git", ["show", `HEAD:supabase/migrations/${fileName}`], {
+        cwd: root,
+        encoding: "buffer",
+      }),
+    ),
+  );
+}
+
+function assertExactMigrationInventory(migrationFiles) {
+  const expected = [...requiredMigrationOrder].sort();
+  if (migrationFiles.join("\n") !== expected.join("\n")) {
+    const missing = expected.filter((fileName) => !migrationFiles.includes(fileName));
+    const unexpected = migrationFiles.filter(
+      (fileName) => !requiredMigrationOrder.includes(fileName),
+    );
+    throw new Error(
+      `Supabase migration inventory mismatch; missing=${missing.join(",") || "none"}; unexpected=${unexpected.join(",") || "none"}`,
+    );
+  }
+}
+
+export function migrationContractSha256(entries) {
+  return createHash("sha256")
+    .update(`${JSON.stringify(entries)}\n`)
+    .digest("hex");
+}
+
+function migrationContractEntry(fileName, content) {
+  return Object.freeze({
+    fileName,
+    version: fileName.slice(0, 14),
+    name: fileName.slice(15, -4),
+    sha256: createHash("sha256").update(content).digest("hex"),
+  });
+}
 
 export function requiredMigrationsInActualOrder(migrationFiles) {
   return migrationFiles.filter((fileName) => requiredMigrationOrder.includes(fileName));

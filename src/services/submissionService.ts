@@ -4,7 +4,6 @@ import type {
   CorrectionNote,
   ExportBatch,
   MediaSlot,
-  Role,
   StatusHistoryItem,
   Submission,
 } from "../types/domain";
@@ -731,31 +730,4 @@ function isMissingPublicNumberColumn(error: unknown): boolean {
     record.code === "42703" ||
     (typeof record.message === "string" && record.message.includes("public_number"))
   );
-}
-
-export async function saveSubmissionDraft(
-  submission: Submission,
-  options: {
-    actorId: string;
-    role: Role;
-    persistedStatusHistoryIds?: ReadonlySet<string>;
-  },
-): Promise<void> {
-  const client = getSupabaseClient();
-  if (!client) return;
-
-  const normalized = normalizeSubmission(submission);
-  const payload = toSubmissionDraftPersistencePayload(
-    normalized,
-    options.actorId,
-    options.persistedStatusHistoryIds,
-  );
-  const { error } = await client.rpc("save_submission_draft", { payload });
-
-  if (error) {
-    throw mapSupabasePersistenceError(error, {
-      operation: "rpc.save_submission_draft",
-      fallbackKind: "save",
-    });
-  }
 }

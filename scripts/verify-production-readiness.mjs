@@ -3,21 +3,37 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import {
+  migrationContractEntriesFromFileSystem,
+  migrationContractEntriesFromGitHead,
+  migrationContractSha256,
   requiredMigrationOrder,
   requiredMigrationsInActualOrder,
-  requiredRemoteMigrationOrder,
+  requiredRemoteMigrationOrderForGeneration,
   undeclaredMigrationFiles,
 } from "./supabase-migration-contract.mjs";
 import { testArtifactPath } from "./lib/artifact-paths.mjs";
 import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 import { forbiddenProductionReadinessMarkers } from "./lib/supabase-readiness-contract.mjs";
+import {
+  cutoverEvidenceRootSha256,
+  cutoverPhaseContract,
+  sha256Evidence,
+  validateExternalApprovalPacketBinding,
+  validateBoundEvidence,
+} from "./lib/supabase-cutover-evidence.mjs";
+import { releaseSourceSha256FromGitHead } from "./lib/release-source-identity.mjs";
+import { edgeFunctionSourceSha256FromGitHead } from "./lib/edge-function-source-identity.mjs";
+import {
+  productionApprovalPacketPath,
+  verifyDetachedOwnerApproval,
+} from "./lib/supabase-production-mutation-gate.mjs";
+import { validateExternalEvidenceImportReceipt } from "./lib/supabase-external-evidence.mjs";
 
 const repoRoot = process.cwd();
 const readinessRelativePath = "docs/release/supabase-production-readiness.json";
 const readinessPath = resolve(repoRoot, readinessRelativePath);
 const packagePath = resolve(repoRoot, "package.json");
 const migrationsDir = resolve(repoRoot, "supabase/migrations");
-const sandboxProjectId = "oevvaowoklqttqkraxho";
 const expectBlocked = process.argv.includes("--expect-blocked");
 const readinessContractVersion = "2026-06-16-production-readiness-v2";
 
@@ -25,52 +41,10 @@ const integrityBlockers = [];
 const activationBlockers = [];
 const passes = [];
 const controlledPilotRiskEvidenceCache = new Map();
-const remoteMigrationNameOverrides = {
-  "20260615000000_ai_helper_security_advisor_hardening.sql":
-    "20260616001949_ai_helper_security_advisor_hardening",
-  "20260704050806_day10_required_media_canonical_write_paths.sql":
-    "20260705235913_day10_required_media_canonical_write_paths",
-  "20260706000100_ai_helper_admin_intent_quota_contract.sql":
-    "20260710034506_ai_helper_admin_intent_quota_contract",
-  "20260706023000_typed_submission_files.sql": "20260710034513_typed_submission_files",
-  "20260707000100_typed_status_history_source.sql":
-    "20260709221437_typed_status_history_source",
-  "20260707001000_document_assets_production_pipeline.sql":
-    "20260709222911_document_assets_production_pipeline",
-  "20260709234515_agent_return_packages.sql": "20260710041440_agent_return_packages",
-  "20260710000100_allow_submission_handoff_child_writes.sql":
-    "20260709232214_allow_submission_handoff_child_writes",
-  "20260710000200_allow_handoff_children_in_draft_rpc.sql":
-    "20260709233239_allow_handoff_children_in_draft_rpc_v2",
-  "20260710000300_persist_handoff_applicant_projection.sql":
-    "20260709233641_persist_handoff_applicant_projection_v3",
-  "20260710003127_agent_return_packages_duplicate_result.sql":
-    "20260710041454_20260710003127_agent_return_packages_duplicate_result",
-  "20260710003254_document_asset_function_search_path_hardening.sql":
-    "20260710041457_20260710003254_document_asset_function_search_path_hardening",
-  "20260710004000_harden_document_assets_projection.sql":
-    "20260710041458_20260710004000_harden_document_assets_projection",
-  "20260710021043_harden_media_asset_review_boundary.sql":
-    "20260710041500_20260710021043_harden_media_asset_review_boundary",
-  "20260710022231_add_media_assets_applicant_submission_index.sql":
-    "20260710041502_20260710022231_add_media_assets_applicant_submission_index",
-  "20260712201203_allow_admin_waiting_review_issue_checkpoint.sql":
-    "20260714064305_20260712201203_allow_admin_waiting_review_issue_checkpoint",
-  "20260712225209_save_returned_submission_update_first.sql":
-    "20260714064308_20260712225209_save_returned_submission_update_first",
-  "20260713095403_atomic_export_document_completion.sql":
-    "20260714065154_20260713095403_atomic_export_document_completion",
-  "20260714020334_atomic_export_guard_null_safe.sql":
-    "20260714065303_20260714020334_atomic_export_guard_null_safe",
-  "20260714110000_repair_incomplete_export_document_completion.sql":
-    "20260714065657_20260714110000_repair_incomplete_export_document_completion",
-  "20260714190000_fix_complete_export_package_zip_suffix_guard.sql":
-    "20260714182809_20260714190000_fix_complete_export_package_zip_suffix_guard",
-  "20260714200000_harden_null_safe_admin_rpc_guards.sql":
-    "20260714191730_20260714200000_harden_null_safe_admin_rpc_guards",
-  "20260717050000_admin_passport_review_media_policy.sql":
-    "20260717050000_admin_passport_review_media_policy",
-};
+let currentFullGitHeadCache;
+let currentReleaseSourceSha256Cache;
+let currentMigrationContractEntriesCache;
+let currentFunctionSourceSha256Cache;
 
 const scopedDiffPaths = [
   "package.json",
@@ -190,6 +164,70 @@ function currentGitHead() {
   }
 }
 
+function currentFullGitHead() {
+  if (currentFullGitHeadCache !== undefined) return currentFullGitHeadCache;
+  try {
+    currentFullGitHeadCache = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    return currentFullGitHeadCache;
+  } catch (error) {
+    block("Current full git HEAD is readable", error.message);
+    currentFullGitHeadCache = "";
+    return currentFullGitHeadCache;
+  }
+}
+
+function currentReleaseSourceSha256() {
+  if (currentReleaseSourceSha256Cache !== undefined) {
+    return currentReleaseSourceSha256Cache;
+  }
+  try {
+    currentReleaseSourceSha256Cache = releaseSourceSha256FromGitHead(repoRoot);
+    return currentReleaseSourceSha256Cache;
+  } catch (error) {
+    block("Current release source SHA-256 is readable", error.message);
+    currentReleaseSourceSha256Cache = "";
+    return currentReleaseSourceSha256Cache;
+  }
+}
+
+function currentMigrationContractEntries() {
+  if (currentMigrationContractEntriesCache !== undefined) {
+    return currentMigrationContractEntriesCache;
+  }
+  try {
+    currentMigrationContractEntriesCache =
+      migrationContractEntriesFromGitHead(repoRoot);
+  } catch (error) {
+    activationBlock("Exact migration contract is committed at Git HEAD", error.message);
+    currentMigrationContractEntriesCache =
+      migrationContractEntriesFromFileSystem(repoRoot);
+  }
+  return currentMigrationContractEntriesCache;
+}
+
+function currentFunctionSourceSha256() {
+  if (currentFunctionSourceSha256Cache !== undefined) {
+    return currentFunctionSourceSha256Cache;
+  }
+  try {
+    currentFunctionSourceSha256Cache = Object.fromEntries(
+      SUPABASE_PRODUCTION_TARGET.requiredEdgeFunctions.map((name) => [
+        name,
+        edgeFunctionSourceSha256FromGitHead(repoRoot, name),
+      ]),
+    );
+    return currentFunctionSourceSha256Cache;
+  } catch (error) {
+    activationBlock("Required Edge Function source is committed", error.message);
+    currentFunctionSourceSha256Cache = {};
+    return currentFunctionSourceSha256Cache;
+  }
+}
+
 function gitOutput(args, label) {
   try {
     return execFileSync("git", args, {
@@ -263,13 +301,6 @@ function scopedPackageJsonHashContent(content) {
     block("Scoped package.json hash content is readable JSON", error.message);
     return "__INVALID_PACKAGE_JSON__";
   }
-}
-
-function expectedRemoteMigrationName(localMigrationFile) {
-  return (
-    remoteMigrationNameOverrides[localMigrationFile] ??
-    localMigrationFile.replace(/\.sql$/, "")
-  );
 }
 
 function canonicalReadinessForScopedHash() {
@@ -408,27 +439,6 @@ function requireExistingProjectFile(value, label) {
   return false;
 }
 
-function verifyBrowserKeyAuditEvidence(sandbox) {
-  const evidenceArtifact = present(sandbox.browserKeyAuditEvidenceArtifact)
-    ? sandbox.browserKeyAuditEvidenceArtifact
-    : sandbox.browserKeyAuditScreenshot;
-
-  requireExistingProjectFile(
-    evidenceArtifact,
-    "Sandbox browser key audit evidence artifact exists",
-  );
-  if (present(sandbox.browserKeyAuditScreenshot)) {
-    requireActivationExistingProjectFile(
-      sandbox.browserKeyAuditScreenshot,
-      "Sandbox browser key audit screenshot exists",
-    );
-  } else {
-    pass(
-      "Sandbox browser key audit screenshot is optional when evidence artifact exists",
-    );
-  }
-}
-
 function requireSnippet(content, snippet, label) {
   if (content.includes(snippet)) pass(label);
   else block(label, "missing");
@@ -470,17 +480,38 @@ const blockerActions = [
     artifact: `${testArtifactPath("supabase-production-env-evidence-20260701.md")} and ${testArtifactPath("supabase-production-owner-approval-20260701.md")}`,
   },
   {
+    match:
+      /Cutover target migration|migration contract|migration history|post-apply migration|migration dry-run|migrationsApplied|remoteMigrationHistoryReadbackPassed/i,
+    owner: "Supabase production operator",
+    command: "npm run supabase:migrations:dry-run",
+    artifact: testArtifactPath("supabase-production-migration-dry-run.json"),
+  },
+  {
+    match:
+      /Clean cutover final|final data-state|public table inventory|Storage bucket|unexpected Storage/i,
+    owner: "Supabase production operator",
+    command: "npm run verify:supabase-clean-cutover-state",
+    artifact: testArtifactPath("supabase-clean-cutover-final-state.json"),
+  },
+  {
+    match:
+      /Agent sign-in|Agent reload|cross-agent|cross-role|cross-owner|role escalation|agentSignInWorks|agentCreateWriteReadbackPassed|agentReloadReadbackPassed|secondAgentSignInWorks|secondAgentBrowserIsolationPassed|adminReadsAgentRecordPassed|crossAgentDatabaseReadDenied|crossAgentStorageReadDenied|agentStorageWriteReadbackPassed|agentStorageReloadReadbackPassed|authenticatedRoleEscalationDenied|anonymousDatabaseWriteDenied|privateMediaAnonymousIsolationPassed|storageWriteReadbackPassed/i,
+    owner: "Supabase production browser verifier",
+    command: "npm run verify:production-readiness",
+    artifact: testArtifactPath("supabase-production-role-isolation-runtime.json"),
+  },
+  {
     match: /Edge Function/i,
     owner: "Supabase production operator",
-    command: "npm run verify:production-readiness",
-    artifact: testArtifactPath("supabase-production-edge-functions-20260701.md"),
+    command: "npm run supabase:functions:verify-remote",
+    artifact: testArtifactPath("supabase-production-edge-functions.json"),
   },
   {
     match:
       /migration|Transactional persistence|RLS policy|Storage policy|workflow|Post-activation|waiting_review|Admin can accept|media|handoff/i,
     owner: "Supabase production operator",
-    command: "npm run supabase:production-workflow-smoke",
-    artifact: `${testArtifactPath("supabase-production-migration-evidence-20260701.md")} and ${testArtifactPath("supabase-production-workflow-smoke-20260701.md")}`,
+    command: "npm run verify:production-readiness",
+    artifact: testArtifactPath("supabase-production-blockers-20260704.md"),
   },
   {
     match: /security advisor|leaked password|Auth security|plan eligibility|advisor/i,
@@ -541,6 +572,9 @@ function verifyMigrationOrder(packet) {
     .sort();
   const actualRequiredOrder = requiredMigrationsInActualOrder(migrationFiles);
   const undeclaredMigrations = undeclaredMigrationFiles(migrationFiles);
+  const cutoverGeneration = packet.productionTarget?.cutoverGeneration ?? "";
+  const requiredRemoteMigrationOrder =
+    requiredRemoteMigrationOrderForGeneration(cutoverGeneration);
 
   if (actualRequiredOrder.join("\n") === requiredMigrationOrder.join("\n")) {
     pass("Local required migration order is intact");
@@ -567,6 +601,14 @@ function verifyMigrationOrder(packet) {
   }
 
   const remoteOrder = packet.migrationContract?.appliedRemoteOrder ?? [];
+  if (requiredRemoteMigrationOrder.length === 0) {
+    block(
+      "Remote migration contract is registered for the cutover generation",
+      cutoverGeneration || "missing cutover generation",
+    );
+  } else {
+    pass("Remote migration contract is registered for the cutover generation");
+  }
   if (remoteOrder.join("\n") === requiredRemoteMigrationOrder.join("\n")) {
     pass("Production packet records the exact applied remote migration order");
   } else {
@@ -577,7 +619,7 @@ function verifyMigrationOrder(packet) {
   }
 
   const missingRemoteCoverage = requiredMigrationOrder
-    .map(expectedRemoteMigrationName)
+    .map((migration) => migration.replace(/\.sql$/, ""))
     .filter(
       (remoteMigration) => !requiredRemoteMigrationOrder.includes(remoteMigration),
     );
@@ -662,6 +704,9 @@ function verifyProductionMigrationEvidence(packet) {
   if (!evidence) return;
 
   const targetProjectId = packet.productionTarget?.projectId;
+  const requiredRemoteMigrationOrder = requiredRemoteMigrationOrderForGeneration(
+    packet.productionTarget?.cutoverGeneration ?? "",
+  );
   if (present(targetProjectId) && evidence.includes(targetProjectId)) {
     pass("Production migration evidence records target project id");
   } else {
@@ -1669,21 +1714,11 @@ function verifyPacket(packet) {
   }
 
   const sandbox = packet.sandboxReference ?? {};
-  if (sandbox.projectId === sandboxProjectId) {
-    pass("Sandbox reference project id is allow-listed");
+  if (Object.keys(sandbox).length === 0) {
+    pass("Retired sandbox reference is absent");
   } else {
-    block("Sandbox reference project id is allow-listed", "mismatch");
+    block("Retired sandbox reference is absent", "remove sandboxReference");
   }
-  if (sandbox.activationTarget === "sandbox") {
-    pass("Sandbox reference activation target is sandbox");
-  } else {
-    block("Sandbox reference activation target is sandbox", "mismatch");
-  }
-  requireExistingProjectFile(
-    sandbox.evidenceArtifact,
-    "Sandbox evidence artifact exists",
-  );
-  verifyBrowserKeyAuditEvidence(sandbox);
 
   const target = packet.productionTarget ?? {};
   requireActivationPresent(target.projectId, "Production project id is recorded");
@@ -1702,13 +1737,6 @@ function verifyPacket(packet) {
     target.supabaseOrganization,
     "Supabase organization is recorded",
   );
-  if (!present(target.projectId)) {
-    activationBlock("Production project is not the sandbox project", "missing");
-  } else if (target.projectId !== sandboxProjectId) {
-    pass("Production project is not the sandbox project");
-  } else {
-    block("Production project is not the sandbox project", "sandbox id");
-  }
   if (!present(target.activationTarget)) {
     activationBlock("Production activation target is explicit", "missing");
   } else if (target.activationTarget === "production") {
@@ -2079,18 +2107,746 @@ function trueBooleanPaths(value, path = []) {
   );
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, canonicalJson(value[key])]),
+  );
+}
+
+function jsonEqual(left, right) {
+  return JSON.stringify(canonicalJson(left)) === JSON.stringify(canonicalJson(right));
+}
+
+function readBoundCutoverEvidence({
+  artifact,
+  checkedAt,
+  evidenceSha256,
+  label,
+  scope,
+}) {
+  requireActivationPresent(checkedAt, `${label} timestamp is recorded`);
+  requireActivationPresent(evidenceSha256, `${label} SHA-256 is recorded`);
+  if (!requireActivationExistingProjectFile(artifact, `${label} exists`)) return null;
+
+  const content = readFileSync(resolve(repoRoot, artifact), "utf8");
+  const validation = validateBoundEvidence({
+    content,
+    expectedCheckedAt: checkedAt,
+    expectedGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
+    expectedProjectRef: SUPABASE_PRODUCTION_TARGET.projectId,
+    expectedScope: scope,
+    expectedSha256: evidenceSha256,
+    expectedGitHead: currentFullGitHead(),
+    expectedSourceSha256: currentReleaseSourceSha256(),
+    evidenceNotBefore: SUPABASE_PRODUCTION_TARGET.evidenceNotBefore,
+    maxAgeMs: SUPABASE_PRODUCTION_TARGET.maxEvidenceAgeMs,
+  });
+  if (validation.issues.length > 0) {
+    block(
+      `${label} is target-bound, fresh, and hash-verified`,
+      validation.issues.join(", "),
+    );
+    return null;
+  }
+  pass(`${label} is target-bound, fresh, and hash-verified`);
+  return validation.document;
+}
+
+function verifyCutoverMigrationContract(packet) {
+  const generation = packet.productionTarget?.cutoverGeneration ?? "";
+  const expectedOrder = requiredRemoteMigrationOrderForGeneration(generation);
+  const recordedOrder = packet.migrationContract?.expectedPostApplyOrder ?? [];
+  const expectedEntries = currentMigrationContractEntries();
+  const expectedContractSha256 = migrationContractSha256(expectedEntries);
+
+  if (expectedOrder.length === 0) {
+    block(
+      "Cutover generation has a registered remote migration contract",
+      generation || "missing cutover generation",
+    );
+  } else {
+    pass("Cutover generation has a registered remote migration contract");
+  }
+
+  if (recordedOrder.join("\n") === expectedOrder.join("\n")) {
+    pass("Cutover packet records the exact clean post-apply migration order");
+  } else {
+    block(
+      "Cutover packet records the exact clean post-apply migration order",
+      "mismatch",
+    );
+  }
+  requireActivationEqual(
+    packet.migrationContract?.expectedContractSha256,
+    expectedContractSha256,
+    "Cutover packet records the exact Git migration contract SHA-256",
+  );
+  const dryRunEvidence = readBoundCutoverEvidence({
+    artifact: packet.migrationContract?.dryRunEvidenceArtifact,
+    checkedAt: packet.migrationContract?.dryRunCheckedAt,
+    evidenceSha256: packet.migrationContract?.dryRunEvidenceSha256,
+    label: "Migration dry-run evidence",
+    scope: "supabase-production-migration-dry-run",
+  });
+  if (dryRunEvidence) {
+    requireEqual(
+      dryRunEvidence.checks?.migrationDryRunPassed,
+      true,
+      "Migration dry-run evidence proves the CLI dry-run passed",
+    );
+    requireEqual(
+      dryRunEvidence.contractSha256,
+      expectedContractSha256,
+      "Migration dry-run evidence binds the exact Git migration contract",
+    );
+    if (jsonEqual(dryRunEvidence.expectedContract, expectedEntries)) {
+      pass("Migration dry-run evidence records the exact Git migration inventory");
+    } else {
+      block(
+        "Migration dry-run evidence records the exact Git migration inventory",
+        "mismatch",
+      );
+    }
+  }
+
+  for (const [key, label] of [
+    ["targetHistoryChecked", "Cutover target migration history was checked"],
+    ["targetHistoryCompatible", "Cutover target migration history is compatible"],
+    [
+      "ownerApprovedExactMigrationContract",
+      "Owner approved the exact cutover migration contract",
+    ],
+    [
+      "expectedPostApplyMigrationListRecorded",
+      "Expected post-apply migration list was recorded",
+    ],
+  ]) {
+    requireActivationTrue(packet.migrationContract?.[key], label);
+  }
+}
+
+function verifyCutoverPreActivation(packet) {
+  const verification = packet.preActivationVerification ?? {};
+  requireActivationPresent(
+    verification.checkedAt,
+    "Cutover pre-activation verification timestamp is recorded",
+  );
+  requireActivationPresent(
+    verification.gitHead,
+    "Cutover pre-activation verification Git SHA is recorded",
+  );
+  requireActivationPresent(
+    verification.sourceSha256,
+    "Cutover pre-activation source SHA-256 is recorded",
+  );
+  requireActivationEqual(
+    verification.gitHead,
+    currentFullGitHead(),
+    "Cutover pre-activation verification Git SHA matches this checkout",
+  );
+  requireActivationEqual(
+    verification.sourceSha256,
+    currentReleaseSourceSha256(),
+    "Cutover pre-activation source SHA-256 matches current Git HEAD",
+  );
+  requireActivationEqual(
+    gitOutput(["status", "--porcelain"], "Current Git status is readable").trim(),
+    "",
+    "Cutover pre-activation checkout is clean",
+  );
+  requireActivationPresent(
+    verification.verificationScope,
+    "Cutover pre-activation verification scope is recorded",
+  );
+  for (const [key, label] of [
+    ["typecheckPassed", "Typecheck passed"],
+    ["lintPassed", "Lint passed"],
+    ["fullTestSuitePassed", "Full test suite passed"],
+    ["buildPassed", "Production build passed"],
+    ["verifyAuthDataReadinessPassed", "Auth/data readiness verification passed"],
+    ["verifySupabaseReleasePassed", "Supabase release verification passed"],
+    ["finalDiffReviewed", "Final cutover diff was reviewed"],
+  ]) {
+    requireActivationTrue(verification[key], label);
+  }
+}
+
+function verifyCutoverOwnerApproval(packet) {
+  const issues = [];
+  verifyDetachedOwnerApproval({
+    action: "",
+    approval: packet.ownerApproval ?? {},
+    evidenceRootSha256: cutoverEvidenceRootSha256(packet),
+    gitHead: currentFullGitHead(),
+    issues,
+    repoRoot,
+    sourceSha256: currentReleaseSourceSha256(),
+  });
+  if (issues.length > 0) {
+    activationBlock(
+      "Authenticated owner approval is cryptographically verified",
+      issues.join(", "),
+    );
+  } else {
+    pass("Authenticated owner approval is cryptographically verified");
+  }
+}
+
+function verifyExternalEvidenceImport(packet) {
+  const issues = validateExternalEvidenceImportReceipt({ packet, repoRoot });
+  if (issues.length > 0) {
+    activationBlock(
+      "External role-isolation and Edge evidence import is verified",
+      issues.join(", "),
+    );
+  } else {
+    pass("External role-isolation and Edge evidence import is verified");
+  }
+}
+
+function verifyCutoverFinalDataState(packet) {
+  const finalState = packet.finalDataState ?? {};
+  requireActivationTrue(
+    finalState.checked,
+    "Clean cutover final data state was checked",
+  );
+  requireActivationPresent(
+    finalState.checkedAt,
+    "Clean cutover final data state timestamp is recorded",
+  );
+
+  for (const [key, expected] of Object.entries(
+    SUPABASE_PRODUCTION_TARGET.requiredCleanDataState,
+  )) {
+    requireActivationEqual(
+      finalState[key],
+      expected,
+      `Clean cutover final ${key} equals ${expected}`,
+    );
+  }
+
+  const evidence = readBoundCutoverEvidence({
+    artifact: finalState.evidenceArtifact,
+    checkedAt: finalState.checkedAt,
+    evidenceSha256: finalState.evidenceSha256,
+    label: "Clean cutover final data-state evidence",
+    scope: "supabase-clean-cutover-final-data-state",
+  });
+  if (!evidence) return;
+
+  const expected = {
+    ...SUPABASE_PRODUCTION_TARGET.requiredCleanDataState,
+    emptyPublicTables: SUPABASE_PRODUCTION_TARGET.requiredEmptyPublicTables,
+    publicTables: [
+      "profiles",
+      ...SUPABASE_PRODUCTION_TARGET.requiredEmptyPublicTables,
+    ].sort(),
+    emptyStorageBuckets: SUPABASE_PRODUCTION_TARGET.requiredStorageBuckets,
+    unexpectedStorageBucketCount: 0,
+  };
+  if (jsonEqual(evidence.expected, expected)) {
+    pass("Clean cutover evidence records the exact empty-data contract");
+  } else {
+    block("Clean cutover evidence records the exact empty-data contract", "mismatch");
+  }
+  for (const [key, expectedValue] of Object.entries(
+    SUPABASE_PRODUCTION_TARGET.requiredCleanDataState,
+  )) {
+    requireEqual(
+      evidence.observed?.[key],
+      expectedValue,
+      `Clean cutover evidence observed ${key} equals ${expectedValue}`,
+    );
+    requireEqual(
+      finalState[key],
+      evidence.observed?.[key],
+      `Clean cutover packet ${key} matches bound evidence`,
+    );
+  }
+  for (const table of SUPABASE_PRODUCTION_TARGET.requiredEmptyPublicTables) {
+    requireEqual(
+      evidence.observed?.emptyPublicTableRowCounts?.[table],
+      0,
+      `Clean cutover public.${table} is empty`,
+    );
+  }
+  if (jsonEqual(evidence.observed?.publicTables, expected.publicTables)) {
+    pass("Clean cutover has the exact canonical public table inventory");
+  } else {
+    block("Clean cutover has the exact canonical public table inventory", "mismatch");
+  }
+  for (const bucket of SUPABASE_PRODUCTION_TARGET.requiredStorageBuckets) {
+    requireEqual(
+      evidence.observed?.storageBucketObjectCounts?.[bucket],
+      0,
+      `Clean cutover Storage bucket ${bucket} is empty`,
+    );
+  }
+  requireEqual(
+    evidence.observed?.unexpectedStorageBucketCount,
+    0,
+    "Clean cutover has no unexpected Storage buckets",
+  );
+}
+
+function verifyCutoverEdgeFunctions(packet) {
+  const functions = packet.edgeFunctions ?? {};
+  const expected = [...SUPABASE_PRODUCTION_TARGET.requiredEdgeFunctions];
+  const recorded = Array.isArray(functions.expected) ? functions.expected : [];
+
+  if (recorded.join("\n") === expected.join("\n")) {
+    pass("Cutover packet records the exact required Edge Functions");
+  } else {
+    block("Cutover packet records the exact required Edge Functions", "mismatch");
+  }
+
+  requireActivationTrue(
+    functions.localContractChecked,
+    "Required Edge Function local contract was checked",
+  );
+  requireActivationTrue(
+    functions.remoteListChecked,
+    "Required Edge Function remote list was checked",
+  );
+  requireActivationTrue(functions.deployed, "Required Edge Functions are deployed");
+  requireActivationTrue(
+    functions.dryRunsPassed,
+    "Required Edge Function dry-runs passed",
+  );
+  requireActivationTrue(
+    functions.semanticChecksPassed,
+    "Required Edge Function semantic handler checks passed",
+  );
+  requireActivationTrue(
+    functions.sourceIdentityBound,
+    "Required Edge Function deployed source identity is bound",
+  );
+  const evidence = readBoundCutoverEvidence({
+    artifact: functions.evidenceArtifact,
+    checkedAt: functions.checkedAt,
+    evidenceSha256: functions.evidenceSha256,
+    label: "Required Edge Function evidence",
+    scope: "supabase-production-edge-functions",
+  });
+  if (!evidence) return;
+
+  for (const key of [
+    "localContractChecked",
+    "remoteListChecked",
+    "deployed",
+    "dryRunsPassed",
+    "semanticChecksPassed",
+    "sourceIdentityBound",
+  ]) {
+    requireEqual(evidence[key], true, `Edge Function evidence ${key} is true`);
+    requireEqual(
+      functions[key],
+      evidence[key],
+      `Edge Function packet ${key} matches evidence`,
+    );
+  }
+  if (jsonEqual(evidence.expectedFunctions, [...expected].sort())) {
+    pass("Edge Function evidence records the exact required function list");
+  } else {
+    block(
+      "Edge Function evidence records the exact required function list",
+      "mismatch",
+    );
+  }
+  if (jsonEqual(evidence.observedFunctions, [...expected].sort())) {
+    pass("Edge Function evidence observed the exact required function list");
+  } else {
+    block(
+      "Edge Function evidence observed the exact required function list",
+      "mismatch",
+    );
+  }
+  if (jsonEqual(evidence.missingSecretNames, [])) {
+    pass("Edge Function evidence observed no missing required secrets");
+  } else {
+    block("Edge Function evidence observed no missing required secrets", "mismatch");
+  }
+  if (jsonEqual(evidence.localFunctionSourceSha256, currentFunctionSourceSha256())) {
+    pass("Edge Function evidence binds every local function source digest");
+  } else {
+    block(
+      "Edge Function evidence binds every local function source digest",
+      "mismatch",
+    );
+  }
+  if (jsonEqual(evidence.observedFunctionSourceSha256, currentFunctionSourceSha256())) {
+    pass("Edge Function evidence binds every observed deployed source digest");
+  } else {
+    block(
+      "Edge Function evidence binds every observed deployed source digest",
+      "mismatch",
+    );
+  }
+  const deploymentIdentities = Array.isArray(evidence.deploymentIdentities)
+    ? evidence.deploymentIdentities
+    : [];
+  const semanticReceipts = Array.isArray(evidence.semanticReceipts)
+    ? evidence.semanticReceipts
+    : [];
+  for (const functionName of expected) {
+    const expectedSourceSha256 = currentFunctionSourceSha256()[functionName];
+    const deployment = deploymentIdentities.find(
+      (entry) => entry?.function === functionName,
+    );
+    if (
+      present(deployment?.deploymentId) &&
+      present(deployment?.version) &&
+      deployment?.observedSourceSha256 === expectedSourceSha256
+    ) {
+      pass(`Edge Function ${functionName} deployment identity binds source/version`);
+    } else {
+      block(
+        `Edge Function ${functionName} deployment identity binds source/version`,
+        "missing or mismatch",
+      );
+    }
+    const semanticReceipt = semanticReceipts.find(
+      (entry) => entry?.function === functionName,
+    );
+    const expectedAction =
+      SUPABASE_PRODUCTION_TARGET.requiredEdgeFunctionSemanticActions[functionName];
+    if (
+      semanticReceipt?.passed === true &&
+      semanticReceipt?.action === expectedAction &&
+      /^[A-Za-z0-9_-]{16,}$/.test(semanticReceipt?.requestNonce ?? "") &&
+      semanticReceipt?.responseNonce === semanticReceipt?.requestNonce &&
+      /^[a-f0-9]{64}$/.test(semanticReceipt?.canonicalReadbackSha256 ?? "")
+    ) {
+      pass(`Edge Function ${functionName} has nonce-bound semantic readback proof`);
+    } else {
+      block(
+        `Edge Function ${functionName} has nonce-bound semantic readback proof`,
+        "missing or invalid",
+      );
+    }
+  }
+  if (
+    jsonEqual(evidence.requiredSecretNames, [
+      ...SUPABASE_PRODUCTION_TARGET.requiredEdgeFunctionSecretNames,
+    ])
+  ) {
+    pass("Edge Function evidence records the complete required secret contract");
+  } else {
+    block(
+      "Edge Function evidence records the complete required secret contract",
+      "mismatch",
+    );
+  }
+  const runtimeChecks = Array.isArray(evidence.runtimeChecks)
+    ? evidence.runtimeChecks
+    : [];
+  if (
+    jsonEqual(
+      runtimeChecks.map((entry) => entry?.function).sort(),
+      [...expected].sort(),
+    )
+  ) {
+    pass("Edge Function evidence contains one runtime check per required function");
+  } else {
+    block(
+      "Edge Function evidence contains one runtime check per required function",
+      "mismatch",
+    );
+  }
+  for (const functionName of expected) {
+    const runtimeCheck = runtimeChecks.find(
+      (entry) => entry?.function === functionName,
+    );
+    const expectedCapability =
+      SUPABASE_PRODUCTION_TARGET.requiredEdgeFunctionCapabilities[functionName];
+    if (
+      runtimeCheck?.passed === true &&
+      runtimeCheck.statusCode === 200 &&
+      runtimeCheck.capability === expectedCapability
+    ) {
+      pass(
+        `Edge Function ${functionName} passed a target-bound runtime health invocation`,
+      );
+    } else {
+      block(
+        `Edge Function ${functionName} passed a target-bound runtime health invocation`,
+        "missing, failed, or capability mismatch",
+      );
+    }
+  }
+}
+
+function verifyCutoverProductionEvidence(packet) {
+  const production = packet.productionEvidence ?? {};
+  const validatedArtifacts = new Map();
+  for (const key of SUPABASE_PRODUCTION_TARGET.requiredAdminOnlyProductionEvidence) {
+    requireActivationTrue(
+      production[key],
+      `Production role-isolation evidence ${key} is true`,
+    );
+  }
+
+  const evidence = readBoundCutoverEvidence({
+    artifact: production.evidenceManifest,
+    checkedAt: production.checkedAt,
+    evidenceSha256: production.evidenceManifestSha256,
+    label: "Production role-isolation evidence manifest",
+    scope: "supabase-production-role-isolation-runtime",
+  });
+  if (!evidence) return;
+
+  requireEqual(
+    evidence.deployedGitSha,
+    production.deployedGitSha,
+    "Production evidence deployed Git SHA matches the packet",
+  );
+  requirePresent(
+    evidence.deployedGitSha,
+    "Production evidence records deployed Git SHA",
+  );
+  requireEqual(
+    production.deployedGitSha,
+    packet.preActivationVerification?.gitHead,
+    "Deployed Git SHA matches the pre-activation verified Git SHA",
+  );
+  for (const key of SUPABASE_PRODUCTION_TARGET.requiredAdminOnlyProductionEvidence) {
+    requireEqual(
+      evidence.checks?.[key],
+      true,
+      `Production evidence manifest ${key} is true`,
+    );
+    requireEqual(
+      production[key],
+      evidence.checks?.[key],
+      `Production packet ${key} matches bound evidence`,
+    );
+  }
+  for (const [label, contract] of Object.entries(
+    SUPABASE_PRODUCTION_TARGET.requiredAdminOnlyEvidenceArtifacts,
+  )) {
+    const artifact = evidence.artifacts?.[label];
+    if (
+      !present(artifact?.path) ||
+      !present(artifact?.sha256) ||
+      !present(artifact?.checkedAt)
+    ) {
+      block(`Production evidence artifact ${label} is recorded`, "missing");
+      continue;
+    }
+    const artifactPath = resolve(repoRoot, artifact.path);
+    if (!existsSync(artifactPath)) {
+      block(
+        `Production evidence artifact ${label} exists`,
+        `${artifact.path} is missing`,
+      );
+      continue;
+    }
+    const artifactContent = readFileSync(artifactPath, "utf8");
+    const validation = validateBoundEvidence({
+      content: artifactContent,
+      expectedCheckedAt: artifact.checkedAt,
+      expectedGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
+      expectedProjectRef: SUPABASE_PRODUCTION_TARGET.projectId,
+      expectedScope: contract.scope,
+      expectedSha256: artifact.sha256,
+      expectedGitHead: packet.preActivationVerification?.gitHead ?? "",
+      expectedSourceSha256: currentReleaseSourceSha256(),
+      evidenceNotBefore: SUPABASE_PRODUCTION_TARGET.evidenceNotBefore,
+      maxAgeMs: SUPABASE_PRODUCTION_TARGET.maxEvidenceAgeMs,
+    });
+    if (validation.issues.length > 0) {
+      block(
+        `Production evidence artifact ${label} is target-bound and hash-verified`,
+        validation.issues.join(", "),
+      );
+      continue;
+    }
+    pass(`Production evidence artifact ${label} is target-bound and hash-verified`);
+    validatedArtifacts.set(label, validation.document);
+    for (const check of contract.checks) {
+      requireEqual(
+        validation.document?.checks?.[check],
+        true,
+        `Production evidence artifact ${label} proves ${check}`,
+      );
+      const packetValue =
+        check in production
+          ? production[check]
+          : packet.preActivationVerification?.[check];
+      requireEqual(
+        packetValue,
+        validation.document?.checks?.[check],
+        `Production packet ${check} matches component evidence`,
+      );
+    }
+    if (label === "remoteMigrationHistory") {
+      const expectedOrder = requiredRemoteMigrationOrderForGeneration(
+        SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
+      );
+      const expectedEntries = currentMigrationContractEntries();
+      const expectedContractSha256 = migrationContractSha256(expectedEntries);
+      if (
+        jsonEqual(validation.document?.expectedOrder, expectedOrder) &&
+        jsonEqual(validation.document?.observedOrder, expectedOrder) &&
+        jsonEqual(validation.document?.expectedContract, expectedEntries) &&
+        jsonEqual(validation.document?.observedContract, expectedEntries) &&
+        validation.document?.contractSha256 === expectedContractSha256
+      ) {
+        pass(
+          "Remote migration evidence records the exact expected order and SQL hashes",
+        );
+      } else {
+        block(
+          "Remote migration evidence records the exact expected order and SQL hashes",
+          "mismatch",
+        );
+      }
+    }
+    if (label === "deploymentIdentity") {
+      requireEqual(
+        validation.document?.canonicalHost,
+        "document-intake-system.vercel.app",
+        "Deployment identity proves the canonical production host",
+      );
+      if (/^dpl_[A-Za-z0-9]+$/.test(validation.document?.deploymentId ?? "")) {
+        pass("Deployment identity records a concrete Vercel deployment ID");
+      } else {
+        block("Deployment identity records a concrete Vercel deployment ID", "invalid");
+      }
+      requireEqual(
+        validation.document?.expectedGitSha,
+        packet.preActivationVerification?.gitHead,
+        "Deployment identity expected Git SHA matches pre-activation Git SHA",
+      );
+      requireEqual(
+        validation.document?.observedGitSha,
+        packet.preActivationVerification?.gitHead,
+        "Deployment identity observed Git SHA matches pre-activation Git SHA",
+      );
+      requireEqual(
+        validation.document?.observedDirty,
+        false,
+        "Deployment identity proves a clean production build",
+      );
+      requireEqual(
+        validation.document?.observedSourceSha256,
+        validation.document?.expectedSourceSha256,
+        "Deployment identity source digest matches the committed checkout",
+      );
+      requireEqual(
+        validation.document?.expectedSourceSha256,
+        currentReleaseSourceSha256(),
+        "Deployment identity expected source digest matches current Git HEAD",
+      );
+      requireEqual(
+        validation.document?.observedSourceSha256,
+        currentReleaseSourceSha256(),
+        "Deployment identity observed source digest matches current Git HEAD",
+      );
+    }
+  }
+
+  const finalStateCheckedAt = Date.parse(packet.finalDataState?.checkedAt ?? "");
+  for (const label of validatedArtifacts.keys()) {
+    const receiptCheckedAt = Date.parse(validatedArtifacts.get(label)?.checkedAt ?? "");
+    if (
+      Number.isFinite(finalStateCheckedAt) &&
+      Number.isFinite(receiptCheckedAt) &&
+      finalStateCheckedAt >= receiptCheckedAt
+    ) {
+      pass(`Final clean data-state readback follows ${label}`);
+    } else {
+      block(`Final clean data-state readback follows ${label}`, "timestamp order");
+    }
+  }
+  for (const [label, checkedAt] of [
+    ["production evidence manifest", production.checkedAt],
+    ["Edge semantic/source evidence", packet.edgeFunctions?.checkedAt],
+  ]) {
+    const receiptCheckedAt = Date.parse(checkedAt ?? "");
+    if (
+      Number.isFinite(finalStateCheckedAt) &&
+      Number.isFinite(receiptCheckedAt) &&
+      finalStateCheckedAt >= receiptCheckedAt
+    ) {
+      pass(`Final clean data-state readback follows ${label}`);
+    } else {
+      block(`Final clean data-state readback follows ${label}`, "timestamp order");
+    }
+  }
+
+  const deploymentReceipt = validatedArtifacts.get("deploymentIdentity");
+  for (const [label, role] of [
+    ["adminBrowserFlow", "Admin"],
+    ["agentBrowserFlow", "Agent"],
+  ]) {
+    const browserReceipt = validatedArtifacts.get(label);
+    for (const [field, expected] of [
+      ["canonicalHost", deploymentReceipt?.canonicalHost],
+      ["deploymentId", deploymentReceipt?.deploymentId],
+      ["observedGitSha", packet.preActivationVerification?.gitHead],
+    ]) {
+      requireEqual(
+        browserReceipt?.[field],
+        expected,
+        `${role} browser proof ${field} matches the verified deployment`,
+      );
+    }
+  }
+}
+
 function verifyCutoverPacket(packet) {
-  requireEqual(packet.schemaVersion, 2, "Cutover readiness packet schema is v2");
+  const allowedTopLevelKeys = new Set([
+    "schemaVersion",
+    "scope",
+    "status",
+    "phase",
+    "recordedAt",
+    "runId",
+    "productionTarget",
+    "migrationContract",
+    "preActivationVerification",
+    "ownerApproval",
+    "productionEvidence",
+    "finalDataState",
+    "edgeFunctions",
+    "externalEvidenceImport",
+    "deploymentGate",
+    "goNoGo",
+    "trackedReadinessSha256",
+  ]);
+  const unexpectedTopLevelKeys = Object.keys(packet).filter(
+    (key) => !allowedTopLevelKeys.has(key),
+  );
+  if (unexpectedTopLevelKeys.length > 0) {
+    block(
+      "Cutover readiness contains no legacy or unknown top-level evidence",
+      unexpectedTopLevelKeys.join(", "),
+    );
+  } else {
+    pass("Cutover readiness contains no legacy or unknown top-level evidence");
+  }
+  requireEqual(packet.schemaVersion, 3, "Cutover readiness packet schema is v3");
   requireEqual(
     packet.scope,
     "supabase-production-cutover",
     "Cutover readiness packet scope is locked",
   );
-  requireEqual(packet.status, "NO_GO", "Cutover readiness status is fail-closed");
+  const phaseContract = cutoverPhaseContract(packet.phase);
+  if (!phaseContract) {
+    block("Cutover readiness phase is recognized", packet.phase ?? "missing");
+    return;
+  }
+  pass("Cutover readiness phase is recognized");
+  requireEqual(packet.status, phaseContract.status, "Cutover status matches its phase");
   requireEqual(
-    packet.phase,
-    "awaiting-fresh-evidence",
-    "Cutover readiness waits for fresh evidence",
+    packet.goNoGo?.decision,
+    phaseContract.decision,
+    "Cutover decision matches its phase",
   );
   requireEqual(
     packet.productionTarget?.descriptorPath,
@@ -2112,51 +2868,96 @@ function verifyCutoverPacket(packet) {
     SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
     "Cutover generation matches the canonical target",
   );
-  requireEqual(
-    packet.deploymentGate?.deployApproved,
-    false,
-    "Cutover deploy approval is reset",
-  );
-  requireEqual(
-    packet.deploymentGate?.cutoverApproved,
-    false,
-    "Cutover approval is reset",
-  );
-  requireEqual(
-    packet.deploymentGate?.productionMutationApproved,
-    false,
-    "Cutover production mutation approval is reset",
-  );
-  requireEqual(
-    packet.goNoGo?.decision,
-    "NO_GO",
-    "Cutover Go / No-Go decision is reset",
-  );
+  verifyCutoverMigrationContract(packet);
+  verifyCutoverPreActivation(packet);
+  if (packet.phase === "approved") {
+    verifyExternalEvidenceImport(packet);
+    verifyCutoverOwnerApproval(packet);
+  }
+  verifyCutoverFinalDataState(packet);
+  verifyCutoverEdgeFunctions(packet);
+  verifyCutoverProductionEvidence(packet);
 
-  const unexpectedTruePaths = trueBooleanPaths(packet);
-  if (unexpectedTruePaths.length === 0) {
-    pass("Cutover readiness contains no inherited true evidence");
-  } else {
-    block(
-      "Cutover readiness contains no inherited true evidence",
-      unexpectedTruePaths.join(", "),
+  for (const [key, label] of [
+    ["deployApproved", "Cutover deploy approval"],
+    ["cutoverApproved", "Cutover approval"],
+    ["productionMutationApproved", "Cutover production mutation approval"],
+  ]) {
+    requireEqual(
+      packet.deploymentGate?.[key],
+      phaseContract.approvalsRequired,
+      `${label} matches the cutover phase`,
     );
   }
 
-  activationBlock(
-    "Fresh Supabase cutover evidence is required",
-    `${SUPABASE_PRODUCTION_TARGET.projectId} is not approved for activation`,
-  );
+  if (!phaseContract.evidenceComplete) {
+    const evidenceSections = {
+      edgeFunctions: packet.edgeFunctions,
+      finalDataState: packet.finalDataState,
+      preActivationVerification: packet.preActivationVerification,
+      productionEvidence: packet.productionEvidence,
+    };
+    const unexpectedTruePaths = trueBooleanPaths(evidenceSections);
+    if (unexpectedTruePaths.length === 0) {
+      pass("Awaiting cutover phase contains no inherited true evidence");
+    } else {
+      block(
+        "Awaiting cutover phase contains no inherited true evidence",
+        unexpectedTruePaths.join(", "),
+      );
+    }
+  }
+
+  if (packet.phase === "awaiting-fresh-evidence") {
+    activationBlock(
+      "Fresh Supabase cutover evidence is required",
+      `${SUPABASE_PRODUCTION_TARGET.projectId} has not completed live verification`,
+    );
+  } else if (packet.phase === "evidence-complete") {
+    activationBlock("Explicit owner activation approval is required", "not approved");
+  }
 }
 
 const rawReadiness = readText(readinessPath, "Production readiness packet exists");
-let readiness = {};
+let trackedReadiness = {};
 if (rawReadiness) {
   try {
-    readiness = JSON.parse(rawReadiness);
+    trackedReadiness = JSON.parse(rawReadiness);
   } catch (error) {
     block("Production readiness packet is valid JSON", error.message);
   }
+}
+
+let readiness = trackedReadiness;
+if (process.env.SUPABASE_PRODUCTION_APPROVAL_PACKET_PATH?.trim()) {
+  try {
+    const approvalPath = productionApprovalPacketPath(repoRoot);
+    const rawApproval = readFileSync(approvalPath, "utf8");
+    const approvalPacket = JSON.parse(rawApproval);
+    const bindingIssues = validateExternalApprovalPacketBinding({
+      approvalPacket,
+      trackedContent: rawReadiness,
+      trackedPacket: trackedReadiness,
+    });
+    if (bindingIssues.length > 0) {
+      block("External approval packet binds the tracked evidence root", bindingIssues.join(", "));
+    } else {
+      pass("External approval packet binds the tracked evidence root");
+    }
+    requireEqual(
+      approvalPacket.trackedReadinessSha256,
+      sha256Evidence(rawReadiness),
+      "External approval packet records the tracked readiness SHA-256",
+    );
+    readiness = approvalPacket;
+  } catch (error) {
+    block("External production approval packet is readable", error.message);
+  }
+} else if (trackedReadiness.phase === "approved") {
+  block(
+    "Approved cutover uses an external immutable approval packet",
+    "SUPABASE_PRODUCTION_APPROVAL_PACKET_PATH is missing",
+  );
 }
 
 verifyPackageScript();

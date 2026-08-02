@@ -99,11 +99,13 @@ export interface CockpitLoadResult {
   submissions: Submission[];
 }
 
-export interface AdminCockpitSaveResult {
+export interface CockpitSaveResult {
   caseRevisionsBySubmissionId: Map<string, number>;
   operationId: string;
   ownerIdsBySubmissionId: Map<string, string>;
 }
+
+export type AdminCockpitSaveResult = CockpitSaveResult;
 
 export type PublicNumberAssignment = {
   assignedNow: boolean;
@@ -252,10 +254,7 @@ type PagedRowsResult<Row> = {
 };
 
 async function collectPagedRows<Row>(
-  fetchPage: (
-    from: number,
-    to: number,
-  ) => Promise<PagedRowsResult<Row>>,
+  fetchPage: (from: number, to: number) => Promise<PagedRowsResult<Row>>,
   pageSize: number,
 ): Promise<PagedRowsResult<Row>> {
   const data: Row[] = [];
@@ -268,10 +267,7 @@ async function collectPagedRows<Row>(
 }
 
 async function collectIdKeysetPagedRows<Row extends { id: string }>(
-  fetchPage: (
-    afterId: string | null,
-    limit: number,
-  ) => Promise<PagedRowsResult<Row>>,
+  fetchPage: (afterId: string | null, limit: number) => Promise<PagedRowsResult<Row>>,
   pageSize: number,
 ): Promise<PagedRowsResult<Row>> {
   const data: Row[] = [];
@@ -311,9 +307,7 @@ function chunkedSubmissionIds(submissionIds: readonly string[]) {
     index < submissionIds.length;
     index += relatedSubmissionIdChunkSize
   ) {
-    chunks.push(
-      submissionIds.slice(index, index + relatedSubmissionIdChunkSize),
-    );
+    chunks.push(submissionIds.slice(index, index + relatedSubmissionIdChunkSize));
   }
   return chunks;
 }
@@ -637,7 +631,9 @@ function latestSubmissionStatusFromHistoryRows(
     .sort((left, right) => right.changed_at.localeCompare(left.changed_at))
     .find((row) => submissionStatusFromHistoryValue(row.to_status));
 
-  return latest ? (submissionStatusFromHistoryValue(latest.to_status) ?? undefined) : undefined;
+  return latest
+    ? (submissionStatusFromHistoryValue(latest.to_status) ?? undefined)
+    : undefined;
 }
 
 function exportPackageFromBatchRow(
@@ -727,7 +723,12 @@ function attachExportPackageRow(
 function reconcileCockpitSnapshotWithSubmissionRow(
   row: Pick<
     SubmissionRow,
-    "agent_id" | "created_at" | "exported_at" | "public_number" | "status" | "updated_at"
+    | "agent_id"
+    | "created_at"
+    | "exported_at"
+    | "public_number"
+    | "status"
+    | "updated_at"
   >,
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
@@ -833,9 +834,7 @@ function stableUuid(seed: string): string {
  * remains idempotent instead of generating a second audit event.
  */
 function isDurableUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function timestampOrNow(value: string | undefined): string {
@@ -1103,8 +1102,10 @@ export function toCockpitDraftPersistencePayload(
   submission: Submission,
   actorId: string,
   ownerId: string,
-  actorHistorySource: Extract<SubmissionHistorySource, "agent" | "admin"> =
-    actorId === ownerId ? "agent" : "admin",
+  actorHistorySource: Extract<SubmissionHistorySource, "agent" | "admin"> = actorId ===
+  ownerId
+    ? "agent"
+    : "admin",
 ): SubmissionDraftPersistencePayload {
   const ownedSubmission = assignSubmissionOwner(
     ensureSubmissionOwner(submission, ownerId),
@@ -1133,19 +1134,14 @@ export function toCockpitDraftPersistencePayload(
       family_intelligence: cockpitSnapshotFamilyIntelligence(ownedSubmission),
       appointment_status: appointmentStatusForSubmission(ownedSubmission),
       submitted_at:
-        ownedSubmission.status === "submitted_for_review"
-          ? persistenceTimestamp
-          : null,
+        ownedSubmission.status === "submitted_for_review" ? persistenceTimestamp : null,
       review_started_at: null,
       accepted_at:
         ownedSubmission.status === "ready_for_export" ||
         ownedSubmission.status === "exported"
           ? persistenceTimestamp
           : null,
-      exported_at:
-        ownedSubmission.status === "exported"
-          ? persistenceTimestamp
-          : null,
+      exported_at: ownedSubmission.status === "exported" ? persistenceTimestamp : null,
       updated_at: persistenceTimestamp,
     },
     applicants: ownedSubmission.applicants.map((applicant) =>
@@ -1258,9 +1254,10 @@ function assertReviewHandoffPersistenceConsistency(
 
   const issues = reviewHandoffPersistenceIssues(submission, role);
   if (issues.length === 0) return;
-  const operation = requiresCorrectionHandoff(submission, role)
-    ? "rpc.submit_corrections_handoff"
-    : "rpc.save_submission_draft";
+  const operation =
+    role === "agent"
+      ? "rpc.save_agent_submission_if_current"
+      : "rpc.save_admin_submission_batch_if_current";
 
   throw new PersistenceObservableError(
     `${operation} failed safely (${operation}:save:HANDOFF_CONSISTENCY).`,
@@ -1341,11 +1338,14 @@ function isCurrentLocalHandoffWrite(submission: Submission, role: Role): boolean
     return role === "agent";
   }
   if (submission.status === "returned") {
-    return role === "admin" && submission.issues.some(
-      (issue) =>
-        issue.status === "open" &&
-        issue.createdAt === "сейчас" &&
-        issue.createdBy === "admin",
+    return (
+      role === "admin" &&
+      submission.issues.some(
+        (issue) =>
+          issue.status === "open" &&
+          issue.createdAt === "сейчас" &&
+          issue.createdBy === "admin",
+      )
     );
   }
   if (submission.status === "corrections_received") {
@@ -1408,9 +1408,7 @@ function issueFromCorrectionRow(
     applicants.find((candidate) => candidate.role === "main") ??
     applicants[0];
   if (!applicant) {
-    throw new Error(
-      `Коррекция ${row.id} не может быть восстановлена без заявителя.`,
-    );
+    throw new Error(`Коррекция ${row.id} не может быть восстановлена без заявителя.`);
   }
   const fileType =
     row.media_type && isCanonicalFrontendMediaType(row.media_type)
@@ -1446,14 +1444,10 @@ export function attachDurableCorrectionRows(
 ): Submission {
   if (!correctionRows.length) return submission;
 
-  const correctionByPersistedId = new Map(
-    correctionRows.map((row) => [row.id, row]),
-  );
+  const correctionByPersistedId = new Map(correctionRows.map((row) => [row.id, row]));
   const consumedCorrectionIds = new Set<string>();
   const snapshotIssues = submission.issues.map((issue): Issue => {
-    const persistedId = stableUuid(
-      `correction:${submission.id}:${issue.id}`,
-    );
+    const persistedId = stableUuid(`correction:${submission.id}:${issue.id}`);
     const durable = correctionByPersistedId.get(persistedId);
     if (!durable) return issue;
     consumedCorrectionIds.add(durable.id);
@@ -1879,12 +1873,10 @@ export async function loadCockpitSubmissionsForProfile(
   ]);
 
   const { data: applicantRows, error: applicantError } = applicantResult;
-  const { data: questionnaireRows, error: questionnaireError } =
-    questionnaireResult;
+  const { data: questionnaireRows, error: questionnaireError } = questionnaireResult;
   const { data: mediaRows, error: mediaError } = mediaResult;
   const { data: correctionRows, error: correctionError } = correctionResult;
-  const { data: statusHistoryRows, error: statusHistoryError } =
-    statusHistoryResult;
+  const { data: statusHistoryRows, error: statusHistoryError } = statusHistoryResult;
 
   if (applicantError) {
     throw mapSupabasePersistenceError(applicantError, {
@@ -1984,9 +1976,7 @@ export async function loadCockpitSubmissionsForProfile(
                     row,
                     submissionApplicants,
                     submissionQuestionnaireAnswers,
-                    latestSubmissionStatusFromHistoryRows(
-                      submissionStatusHistoryRows,
-                    ),
+                    latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
                   ),
                   row,
                 )
@@ -1994,9 +1984,7 @@ export async function loadCockpitSubmissionsForProfile(
                   row,
                   submissionApplicants,
                   submissionQuestionnaireAnswers,
-                  latestSubmissionStatusFromHistoryRows(
-                    submissionStatusHistoryRows,
-                  ),
+                  latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
                 ),
             fromSupabaseSubmissionRowStatus(row),
             submissionExportBatches,
@@ -2111,19 +2099,42 @@ function adminCaseRevisionsFromRpc(
 }
 
 export function isAdminSubmissionConcurrencyConflict(error: unknown): boolean {
+  return isSubmissionConcurrencyConflict(error);
+}
+
+export function isSubmissionConcurrencyConflict(error: unknown): boolean {
   return (
     error instanceof PersistenceObservableError &&
-    error.diagnostics.operation ===
-      "rpc.save_admin_submission_batch_if_current" &&
+    (error.diagnostics.operation === "rpc.save_admin_submission_batch_if_current" ||
+      error.diagnostics.operation === "rpc.save_agent_submission_if_current") &&
     error.diagnostics.supabaseCode === "40001"
   );
+}
+
+function agentCaseRevisionFromRpc(
+  value: unknown,
+  submissionId: string,
+  operationId: string,
+): number {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Supabase вернул некорректный результат agent concurrency RPC.");
+  }
+  const record = value as Record<string, unknown>;
+  if (record.operationId !== operationId || record.submissionId !== submissionId) {
+    throw new Error("Supabase вернул результат другой agent mutation operation.");
+  }
+  const revision = record.caseRevision;
+  if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0) {
+    throw new Error("Supabase не вернул новую revision для agent mutation.");
+  }
+  return revision;
 }
 
 export async function saveAdminCockpitSubmissionsIfCurrent(
   profile: AppProfile,
   submissions: Submission[],
   ownerIdsBySubmissionId: ReadonlyMap<string, string>,
-  caseRevisionsBySubmissionId: ReadonlyMap<string, number>,
+  caseRevisionsBySubmissionId: ReadonlyMap<string, number> = new Map(),
 ): Promise<AdminCockpitSaveResult> {
   if (profile.role !== "admin") {
     throw new Error("Only administrators can use the admin concurrency writer.");
@@ -2147,8 +2158,7 @@ export async function saveAdminCockpitSubmissionsIfCurrent(
   const expectedRevisions: Record<string, number> = {};
   const payloads = submissions.map((submission) => {
     assertReviewHandoffPersistenceConsistency(submission, profile.role);
-    const ownerId =
-      nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id;
+    const ownerId = nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id;
     const expectedRevision = caseRevisionsBySubmissionId.get(submission.id);
     if (expectedRevision === undefined) {
       throw new Error(
@@ -2224,16 +2234,21 @@ export async function saveCockpitSubmissionsForProfile(
   profile: AppProfile,
   submissions: Submission[],
   ownerIdsBySubmissionId: ReadonlyMap<string, string>,
-): Promise<Map<string, string>> {
+  caseRevisionsBySubmissionId: ReadonlyMap<string, number> = new Map(),
+): Promise<CockpitSaveResult> {
   if (profile.role === "admin") {
     throw new Error(
       "Administrators must use the revision-checked admin concurrency writer.",
     );
   }
   const client = getSupabaseClient();
-  if (!client) return new Map(ownerIdsBySubmissionId);
+  if (!client) {
+    throw new Error("Supabase agent concurrency writer is unavailable.");
+  }
 
   const nextOwnerIds = new Map(ownerIdsBySubmissionId);
+  const nextCaseRevisions = new Map(caseRevisionsBySubmissionId);
+  let lastOperationId = "";
 
   for (const submission of submissions) {
     assertReviewHandoffPersistenceConsistency(submission, profile.role);
@@ -2246,17 +2261,35 @@ export async function saveCockpitSubmissionsForProfile(
       profile.role,
     );
     const correctionHandoff = requiresCorrectionHandoff(submission, profile.role);
-    const operation = correctionHandoff
-      ? "rpc.submit_corrections_handoff"
-      : "rpc.save_submission_draft";
-    const invokeSave = async (): Promise<{ error: unknown | null }> => {
+    const operation = "rpc.save_agent_submission_if_current";
+    const knownOwnerId = ownerIdsBySubmissionId.get(submission.id);
+    const expectedRevision = caseRevisionsBySubmissionId.get(submission.id);
+    if (knownOwnerId !== undefined && expectedRevision === undefined) {
+      throw new Error(
+        `Подача ${submission.id} не имеет server revision. Обновите данные после применения migration.`,
+      );
+    }
+    if (knownOwnerId === undefined && expectedRevision !== undefined) {
+      throw new Error(
+        `Подача ${submission.id} имеет revision без подтверждённого server owner. Обновите данные.`,
+      );
+    }
+    const operationId = crypto.randomUUID();
+    lastOperationId = operationId;
+    const invokeSave = async (): Promise<{
+      data: unknown;
+      error: unknown | null;
+    }> => {
       try {
-        const { error } = correctionHandoff
-          ? await client.rpc("submit_corrections_handoff", { payload })
-          : await client.rpc("save_submission_draft", { payload });
-        return { error };
+        const { data, error } = await client.rpc("save_agent_submission_if_current", {
+          expected_revision: expectedRevision ?? null,
+          mutation_kind: correctionHandoff ? "correction_handoff" : "draft",
+          operation_id: operationId,
+          payload,
+        });
+        return { data, error };
       } catch (error) {
-        return { error };
+        return { data: null, error };
       }
     };
 
@@ -2266,7 +2299,7 @@ export async function saveCockpitSubmissionsForProfile(
         operation,
         fallbackKind: "save",
       });
-      if (!correctionHandoff && failure.diagnostics.retryable) {
+      if (failure.diagnostics.retryable) {
         result = await invokeSave();
         if (result.error) {
           failure = mapSupabasePersistenceError(result.error, {
@@ -2278,8 +2311,19 @@ export async function saveCockpitSubmissionsForProfile(
       if (result.error) throw failure;
     }
 
+    const returnedRevision = agentCaseRevisionFromRpc(
+      result.data,
+      submission.id,
+      operationId,
+    );
+
     nextOwnerIds.set(submission.id, ownerId);
+    nextCaseRevisions.set(submission.id, returnedRevision);
   }
 
-  return nextOwnerIds;
+  return {
+    caseRevisionsBySubmissionId: nextCaseRevisions,
+    operationId: lastOperationId,
+    ownerIdsBySubmissionId: nextOwnerIds,
+  };
 }

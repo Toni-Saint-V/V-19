@@ -18,16 +18,16 @@ describe("Supabase persistence observability", () => {
         hint: "internal policy name",
       },
       {
-        operation: "rpc.save_submission_draft",
+        operation: "rpc.save_agent_submission_if_current",
         fallbackKind: "save",
       },
     );
 
     expect(error).toBeInstanceOf(PersistenceObservableError);
     expect(error.diagnostics).toEqual({
-      operation: "rpc.save_submission_draft",
+      operation: "rpc.save_agent_submission_if_current",
       kind: "rls",
-      safeCode: "rpc.save_submission_draft:rls:42501",
+      safeCode: "rpc.save_agent_submission_if_current:rls:42501",
       retryable: false,
       httpStatus: 403,
       supabaseCode: "42501",
@@ -36,7 +36,9 @@ describe("Supabase persistence observability", () => {
 
     const message = formatPersistenceFailureForUser(error, "fallback");
     expect(message).toContain("Access was denied by Supabase policy.");
-    expect(message).toContain("Reference: rpc.save_submission_draft:rls:42501.");
+    expect(message).toContain(
+      "Reference: rpc.save_agent_submission_if_current:rls:42501.",
+    );
     expect(message).not.toContain("private SQL predicate");
     expect(message).not.toContain("internal policy name");
   });

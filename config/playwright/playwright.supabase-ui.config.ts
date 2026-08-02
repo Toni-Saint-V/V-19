@@ -2,10 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
+import {
+  isCanonicalSupabaseSandboxTarget,
+  SUPABASE_SANDBOX_TARGET,
+} from "../supabase-sandbox-target.mjs";
 import { testArtifactPath } from "../../tests/support/artifacts";
 
-const sandboxProjectId = "oevvaowoklqttqkraxho";
-const sandboxOrigin = `https://${sandboxProjectId}.supabase.co`;
 const smokeEnvPath = resolve(
   process.cwd(),
   process.env.SUPABASE_UI_E2E_ENV_FILE ?? ".env.supabase-smoke.local",
@@ -39,16 +41,18 @@ function loadEnvFile(path: string): Record<string, string> {
 
 function loadSandboxBrowserEnv(): Record<string, string> {
   const smokeEnv = loadEnvFile(smokeEnvPath);
-  if (smokeEnv.VITE_SUPABASE_PROJECT_ID?.trim() !== sandboxProjectId) {
-    throw new Error("Supabase UI E2E refused: project id is not the approved sandbox.");
-  }
+  const sandboxProjectId = smokeEnv.VITE_SUPABASE_PROJECT_ID?.trim();
   const supabaseUrl = smokeEnv.VITE_SUPABASE_URL?.trim();
-  if (!supabaseUrl)
-    throw new Error("Supabase UI E2E refused: VITE_SUPABASE_URL is missing.");
+  if (!isCanonicalSupabaseSandboxTarget(sandboxProjectId, supabaseUrl)) {
+    throw new Error(
+      "Supabase UI E2E refused: project id and URL must match the approved sandbox descriptor.",
+    );
+  }
+  const sandboxOrigin = SUPABASE_SANDBOX_TARGET.projectUrl;
   try {
     if (new URL(supabaseUrl).origin !== sandboxOrigin) {
       throw new Error(
-        "Supabase UI E2E refused: VITE_SUPABASE_URL is not the approved sandbox.",
+        "Supabase UI E2E refused: VITE_SUPABASE_URL does not match the isolated sandbox.",
       );
     }
   } catch (error) {
@@ -70,11 +74,11 @@ function loadSandboxBrowserEnv(): Record<string, string> {
     const edgeUrl = new URL(edgeFunctionsUrl);
     const approvedEdgeHost =
       edgeUrl.protocol === "https:" &&
-      edgeUrl.hostname.includes(sandboxProjectId) &&
-      edgeUrl.hostname.endsWith(".supabase.co");
+      edgeUrl.origin === sandboxOrigin &&
+      edgeUrl.pathname.startsWith("/functions/v1");
     if (!approvedEdgeHost) {
       throw new Error(
-        "Supabase UI E2E refused: VITE_SUPABASE_EDGE_FUNCTIONS_URL is not the approved sandbox.",
+        "Supabase UI E2E refused: VITE_SUPABASE_EDGE_FUNCTIONS_URL does not match the isolated sandbox.",
       );
     }
   } catch (error) {

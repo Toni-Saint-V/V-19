@@ -85,8 +85,8 @@ type LifecycleEvidence = {
   startedAt: string;
 };
 
-const saveDraftRpcPath = "/rest/v1/rpc/save_submission_draft";
-const submitCorrectionsRpcPath = "/rest/v1/rpc/submit_corrections_handoff";
+const saveDraftRpcPath = "/rest/v1/rpc/save_agent_submission_if_current";
+const submitCorrectionsRpcPath = "/rest/v1/rpc/save_agent_submission_if_current";
 
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -194,11 +194,7 @@ class StrictProductionMutationGate {
     return this.#diagnosticCode;
   }
 
-  begin(
-    label: string,
-    path: string,
-    contract: ProductionLifecycleMutationContract,
-  ) {
+  begin(label: string, path: string, contract: ProductionLifecycleMutationContract) {
     invariant(!this.#window, "A production mutation window is already active.");
     this.#diagnosticCode = "not_observed";
     this.#window = { contract, label, observed: 0, path };
@@ -439,10 +435,7 @@ async function openAdminReviewDrawer(page: Page, submissionId: string) {
   return drawer(page);
 }
 
-async function assertAdminExportCaseReady(
-  page: Page,
-  submissionId: string,
-) {
+async function assertAdminExportCaseReady(page: Page, submissionId: string) {
   await assertAdminExportPresence(page, submissionId, true);
   const row = exportRow(page, submissionId);
   await expect(row).toContainText(submissionId);
@@ -461,15 +454,12 @@ async function assertDrawerCaseMarker(
   if ((await root.innerText()).includes(caseMarker)) return;
   const page = root.page();
   const isAdminDrawer =
-    (await root.getAttribute("data-admin-review-drawer-surface")) ===
-    "workspace";
+    (await root.getAttribute("data-admin-review-drawer-surface")) === "workspace";
   if (isAdminDrawer) {
     await expect(root).toContainText(caseMarker, { timeout: 45_000 });
     return;
   }
-  const inlineSurname = root
-    .locator('[data-field-label="Фамилия"] input')
-    .first();
+  const inlineSurname = root.locator('[data-field-label="Фамилия"] input').first();
   if ((await inlineSurname.count()) > 0) {
     await expect(inlineSurname).toHaveValue(new RegExp(caseMarker));
     return;
@@ -577,7 +567,9 @@ async function successfulProductionMutation(
         ? operationFailure.message
         : String(operationFailure);
     const gateMessage =
-      gateFailure instanceof Error ? gateFailure.message : String(gateFailure ?? "none");
+      gateFailure instanceof Error
+        ? gateFailure.message
+        : String(gateFailure ?? "none");
     const uiDiagnostic = await productionMutationUiDiagnostic(page);
     throw createProductionMutationDiagnosticError({
       ...uiDiagnostic,
@@ -611,20 +603,24 @@ type LifecycleMutationExpectation = {
   correctedQuestionnaireValue?: string;
   snapshotMutation?: "add_issue" | "mark_issue_fixed";
   snapshotStatus: ProductionLifecycleMutationContract["history"]["snapshotStatus"];
-  transition?: NonNullable<ProductionLifecycleMutationContract["history"]["transition"]>;
+  transition?: NonNullable<
+    ProductionLifecycleMutationContract["history"]["transition"]
+  >;
 };
 
 function lifecycleSnapshotMutationIntent(
   state: ProductionLifecycleState,
   requested: LifecycleMutationExpectation["snapshotMutation"],
-): {
-  applicantId?: string;
-  comment: string;
-  fieldId: string;
-  fieldLabel: string;
-  mode: "add_issue" | "mark_issue_fixed";
-  reason: string;
-} | undefined {
+):
+  | {
+      applicantId?: string;
+      comment: string;
+      fieldId: string;
+      fieldLabel: string;
+      mode: "add_issue" | "mark_issue_fixed";
+      reason: string;
+    }
+  | undefined {
   if (!requested) return undefined;
   return {
     comment: productionLifecycleIssueMarker(state),
@@ -650,15 +646,11 @@ async function lifecycleMutationContract(
   expectation: LifecycleMutationExpectation,
 ): Promise<ProductionLifecycleMutationContract> {
   const accounts = loadProductionCohortAccounts();
-  const owner = accounts.agents.find(
-    (account) => account.key === state.case.ownerKey,
-  );
+  const owner = accounts.agents.find((account) => account.key === state.case.ownerKey);
   invariant(owner, "Lifecycle mutation owner account is absent.");
   const expectedApplicantCount = state.case.caseKey === "A1-F6" ? 6 : 1;
   const actorId =
-    expectation.actorSource === "admin"
-      ? accounts.admin.authUserId
-      : owner.authUserId;
+    expectation.actorSource === "admin" ? accounts.admin.authUserId : owner.authUserId;
   const baseline = await resolveProductionCohortDraftPayloadIdentity({
     admin: accounts.admin,
     applicantSerializerProjection: {
@@ -694,28 +686,28 @@ async function lifecycleMutationContract(
           mode: "questionnaire_replace" as const,
           value: expectation.correctedQuestionnaireValue,
         }
-    : expectation.transition?.toStatus === "returned"
-      ? {
-          action: "return_with_issues" as const,
-          actorId,
-          mode: "submission_action" as const,
-          role: "admin" as const,
-        }
-      : expectation.transition?.toStatus === "corrections_received"
+      : expectation.transition?.toStatus === "returned"
         ? {
-            action: "submit_corrections" as const,
+            action: "return_with_issues" as const,
             actorId,
             mode: "submission_action" as const,
-            role: "agent" as const,
+            role: "admin" as const,
           }
-        : expectation.transition?.toStatus === "ready_for_export"
+        : expectation.transition?.toStatus === "corrections_received"
           ? {
-              action: "close_issues_accept" as const,
+              action: "submit_corrections" as const,
               actorId,
               mode: "submission_action" as const,
-              role: "admin" as const,
+              role: "agent" as const,
             }
-          : undefined;
+          : expectation.transition?.toStatus === "ready_for_export"
+            ? {
+                action: "close_issues_accept" as const,
+                actorId,
+                mode: "submission_action" as const,
+                role: "admin" as const,
+              }
+            : undefined;
   const resolved = submissionProjectionIntent
     ? await resolveProductionCohortDraftPayloadIdentity({
         admin: accounts.admin,
@@ -810,25 +802,27 @@ async function verifyInitialOwnerCaseBeforeFirstWrite(input: {
   const submissionId = state.case.submissionId;
 
   const ownerSession = await openSession(browser, testInfo, owner);
-  await runWithFailurePreservingCleanup(async () => {
-    await reloadCanonicalWorkspace(ownerSession);
-    expect(
-      await agentSubmissionPresence(ownerSession.page, submissionId),
-      `${state.case.caseKey} must belong to the checkpoint owner before the first lifecycle write.`,
-    ).toBe(true);
-    expect(
-      await agentActionPresence(ownerSession.page, submissionId, "Закрыто"),
-      `${state.case.caseKey} must be in the completed agent queue while submitted for review.`,
-    ).toBe(true);
-    expect(
-      await agentActionPresence(ownerSession.page, submissionId, "Открыто"),
-      `${state.case.caseKey} must not already carry an open agent action before the lifecycle starts.`,
-    ).toBe(false);
-    const root = await openAgentSubmissionDrawer(ownerSession.page, submissionId);
-    await assertDrawerCaseMarker(root, caseMarker, submissionId);
-    await expect(root.locator(".v20-status-pill")).toHaveText("проверка");
-  }, () => closeSession(ownerSession, evidence));
-
+  await runWithFailurePreservingCleanup(
+    async () => {
+      await reloadCanonicalWorkspace(ownerSession);
+      expect(
+        await agentSubmissionPresence(ownerSession.page, submissionId),
+        `${state.case.caseKey} must belong to the checkpoint owner before the first lifecycle write.`,
+      ).toBe(true);
+      expect(
+        await agentActionPresence(ownerSession.page, submissionId, "Закрыто"),
+        `${state.case.caseKey} must be in the completed agent queue while submitted for review.`,
+      ).toBe(true);
+      expect(
+        await agentActionPresence(ownerSession.page, submissionId, "Открыто"),
+        `${state.case.caseKey} must not already carry an open agent action before the lifecycle starts.`,
+      ).toBe(false);
+      const root = await openAgentSubmissionDrawer(ownerSession.page, submissionId);
+      await assertDrawerCaseMarker(root, caseMarker, submissionId);
+      await expect(root.locator(".v20-status-pill")).toHaveText("проверка");
+    },
+    () => closeSession(ownerSession, evidence),
+  );
 }
 
 async function addLifecycleIssue(
@@ -874,9 +868,7 @@ async function addLifecycleIssue(
   await expect(remark).toHaveCount(0);
   await openDrawerTab(root, /Анкета/);
   await expect(
-    root
-      .getByRole("button", { name: /\d+ замечани(?:е|я|й)/i })
-      .first(),
+    root.getByRole("button", { name: /\d+ замечани(?:е|я|й)/i }).first(),
   ).toBeVisible();
   state.stage = "issue_added";
   await persistLifecycleStage(state);
@@ -900,95 +892,97 @@ async function ensureAdminReturned(input: {
   }
 
   const session = await openSession(browser, testInfo, admin);
-  await runWithFailurePreservingCleanup(async () => {
-    const submissionId = state.case.submissionId;
-    if (state.stage === "pending_review") {
+  await runWithFailurePreservingCleanup(
+    async () => {
+      const submissionId = state.case.submissionId;
+      if (state.stage === "pending_review") {
+        await assertAdminExportPresence(session.page, submissionId, false);
+      }
+      const inReview = await adminReviewPresence(session.page, submissionId);
+      if (!inReview) {
+        const inExport = await adminExportPresence(session.page, submissionId);
+        invariant(
+          !inExport,
+          `${state.case.caseKey} reached Export before the mandatory return/fix/resubmit lifecycle completed.`,
+        );
+        invariant(
+          state.stage === "returning",
+          `${state.case.caseKey} disappeared from Review before the return action was checkpointed.`,
+        );
+        return;
+      }
+
       await assertAdminExportPresence(session.page, submissionId, false);
-    }
-    const inReview = await adminReviewPresence(session.page, submissionId);
-    if (!inReview) {
-      const inExport = await adminExportPresence(session.page, submissionId);
-      invariant(
-        !inExport,
-        `${state.case.caseKey} reached Export before the mandatory return/fix/resubmit lifecycle completed.`,
-      );
-      invariant(
-        state.stage === "returning",
-        `${state.case.caseKey} disappeared from Review before the return action was checkpointed.`,
-      );
-      return;
-    }
-
-    await assertAdminExportPresence(session.page, submissionId, false);
-    let root = await openAdminReviewDrawer(session.page, submissionId);
-    await assertDrawerCaseMarker(root, caseMarker, submissionId);
-    if (state.stage === "pending_review") {
-      await expect(root).toContainText("На проверке");
-      await expect(
-        root.getByRole("button", { exact: true, name: "Принять на выгрузку" }),
-      ).toBeEnabled();
-    }
-
-    let returnButton = root.getByRole("button", {
-      exact: true,
-      name: "Отправить на исправление",
-    });
-    if (!(await isVisible(returnButton))) {
-      const accept = root.getByRole("button", {
-        exact: true,
-        name: "Принять на выгрузку",
-      });
-      invariant(
-        ["pending_review", "adding_issue"].includes(state.stage) &&
-          (await isVisible(accept)),
-        "Return lifecycle card has an unexpected admin action state.",
-      );
-      await addLifecycleIssue(session, state);
-      await reloadCanonicalWorkspace(session);
-      root = await openAdminReviewDrawer(session.page, submissionId);
+      let root = await openAdminReviewDrawer(session.page, submissionId);
       await assertDrawerCaseMarker(root, caseMarker, submissionId);
-      returnButton = root.getByRole("button", {
+      if (state.stage === "pending_review") {
+        await expect(root).toContainText("На проверке");
+        await expect(
+          root.getByRole("button", { exact: true, name: "Принять на выгрузку" }),
+        ).toBeEnabled();
+      }
+
+      let returnButton = root.getByRole("button", {
         exact: true,
         name: "Отправить на исправление",
       });
-    }
+      if (!(await isVisible(returnButton))) {
+        const accept = root.getByRole("button", {
+          exact: true,
+          name: "Принять на выгрузку",
+        });
+        invariant(
+          ["pending_review", "adding_issue"].includes(state.stage) &&
+            (await isVisible(accept)),
+          "Return lifecycle card has an unexpected admin action state.",
+        );
+        await addLifecycleIssue(session, state);
+        await reloadCanonicalWorkspace(session);
+        root = await openAdminReviewDrawer(session.page, submissionId);
+        await assertDrawerCaseMarker(root, caseMarker, submissionId);
+        returnButton = root.getByRole("button", {
+          exact: true,
+          name: "Отправить на исправление",
+        });
+      }
 
-    await openDrawerTab(root, /Анкета/);
-    await expect(
-      root
-        .getByRole("button", { name: /\d+ замечани(?:е|я|й)/i })
-        .first(),
-    ).toBeVisible();
-    state.stage = "issue_added";
-    await persistLifecycleStage(state);
-    await expect(returnButton).toBeEnabled();
-    state.stage = "returning";
-    await persistLifecycleStage(state);
-    await successfulProductionMutation(
-      session.page,
-      session.ledger,
-      session.mutationGate,
-      saveDraftRpcPath,
-      "return with lifecycle issue",
-      await lifecycleMutationContract(state, "returned", "open", {
-        actorSource: "admin",
-        correctionMode: "existing",
-        snapshotStatus: "returned",
-        transition: {
-          comment: "Статус изменен: Возвращено: Администратор вернул подачу с замечаниями",
-          fromStatus: "submitted_for_review",
-          note: "Администратор вернул подачу с замечаниями",
-          toStatus: "returned",
-        },
-      }),
-      () => returnButton.click(),
-    );
-    state.stage = "returned";
-    await persistLifecycleStage(state);
-    await reloadCanonicalWorkspace(session);
-    await assertAdminReviewPresence(session.page, submissionId, false);
-    await assertAdminExportPresence(session.page, submissionId, false);
-  }, () => closeSession(session, evidence));
+      await openDrawerTab(root, /Анкета/);
+      await expect(
+        root.getByRole("button", { name: /\d+ замечани(?:е|я|й)/i }).first(),
+      ).toBeVisible();
+      state.stage = "issue_added";
+      await persistLifecycleStage(state);
+      await expect(returnButton).toBeEnabled();
+      state.stage = "returning";
+      await persistLifecycleStage(state);
+      await successfulProductionMutation(
+        session.page,
+        session.ledger,
+        session.mutationGate,
+        saveDraftRpcPath,
+        "return with lifecycle issue",
+        await lifecycleMutationContract(state, "returned", "open", {
+          actorSource: "admin",
+          correctionMode: "existing",
+          snapshotStatus: "returned",
+          transition: {
+            comment:
+              "Статус изменен: Возвращено: Администратор вернул подачу с замечаниями",
+            fromStatus: "submitted_for_review",
+            note: "Администратор вернул подачу с замечаниями",
+            toStatus: "returned",
+          },
+        }),
+        () => returnButton.click(),
+      );
+      state.stage = "returned";
+      await persistLifecycleStage(state);
+      await reloadCanonicalWorkspace(session);
+      await assertAdminReviewPresence(session.page, submissionId, false);
+      await assertAdminExportPresence(session.page, submissionId, false);
+    },
+    () => closeSession(session, evidence),
+  );
 }
 
 async function showLifecycleIssueInQuestionnaire(
@@ -1002,9 +996,7 @@ async function showLifecycleIssueInQuestionnaire(
   if (await isVisible(marker)) return "open" as const;
   if (await isVisible(fixed)) return "fixed" as const;
 
-  const sectionTabs = questionnaire.locator(
-    ".v19-questionnaire-section-tab:visible",
-  );
+  const sectionTabs = questionnaire.locator(".v19-questionnaire-section-tab:visible");
   for (let index = 0; index < (await sectionTabs.count()); index += 1) {
     await sectionTabs.nth(index).click();
     if (await isVisible(marker)) return "open" as const;
@@ -1076,20 +1068,34 @@ async function ensureAgentResubmitted(input: {
   if (["resubmitted", "accepting", "accepted"].includes(state.stage)) return;
 
   const session = await openSession(browser, testInfo, account);
-  await runWithFailurePreservingCleanup(async () => {
-    const submissionId = state.case.submissionId;
-    const inIssueActions = await agentActionPresence(
-      session.page,
-      submissionId,
-      "Открыто",
-    );
-    if (!inIssueActions) {
-      const alreadyResubmitted = await agentActionPresence(
+  await runWithFailurePreservingCleanup(
+    async () => {
+      const submissionId = state.case.submissionId;
+      const inIssueActions = await agentActionPresence(
         session.page,
         submissionId,
-        "Закрыто",
+        "Открыто",
       );
-      if (alreadyResubmitted) {
+      if (!inIssueActions) {
+        const alreadyResubmitted = await agentActionPresence(
+          session.page,
+          submissionId,
+          "Закрыто",
+        );
+        if (alreadyResubmitted) {
+          invariant(
+            [
+              "fixing_issue",
+              "marking_issue_fixed",
+              "agent_fixed",
+              "resubmitting",
+            ].includes(state.stage),
+            `${state.case.caseKey} reached the completed agent queue without a resubmission intent checkpoint.`,
+          );
+          state.stage = "resubmitted";
+          await persistLifecycleStage(state);
+          return;
+        }
         invariant(
           [
             "fixing_issue",
@@ -1097,196 +1103,192 @@ async function ensureAgentResubmitted(input: {
             "agent_fixed",
             "resubmitting",
           ].includes(state.stage),
-          `${state.case.caseKey} reached the completed agent queue without a resubmission intent checkpoint.`,
+          `${state.case.caseKey} is absent from the open agent queue before a saved issue-fix intent checkpoint.`,
         );
-        state.stage = "resubmitted";
-        await persistLifecycleStage(state);
-        return;
+        expect(
+          await agentActionPresence(session.page, submissionId, "Открыто"),
+          `${state.case.caseKey} must remain in agent actions while a saved fix is awaiting resubmission.`,
+        ).toBe(true);
+      } else {
+        invariant(
+          [
+            "returning",
+            "returned",
+            "fixing_issue",
+            "marking_issue_fixed",
+            "agent_fixed",
+            "resubmitting",
+          ].includes(state.stage),
+          `${state.case.caseKey} is in the open agent queue after an incompatible lifecycle checkpoint.`,
+        );
       }
-      invariant(
-        ["fixing_issue", "marking_issue_fixed", "agent_fixed", "resubmitting"].includes(
-          state.stage,
-        ),
-        `${state.case.caseKey} is absent from the open agent queue before a saved issue-fix intent checkpoint.`,
-      );
-      expect(
-        await agentActionPresence(session.page, submissionId, "Открыто"),
-        `${state.case.caseKey} must remain in agent actions while a saved fix is awaiting resubmission.`,
-      ).toBe(true);
-    } else {
-      invariant(
-        [
-          "returning",
-          "returned",
-          "fixing_issue",
-          "marking_issue_fixed",
-          "agent_fixed",
-          "resubmitting",
-        ].includes(state.stage),
-        `${state.case.caseKey} is in the open agent queue after an incompatible lifecycle checkpoint.`,
-      );
-    }
 
-    const { issueState, questionnaire } = await openExactLifecycleIssueQuestionnaire(
-      session,
-      state,
-    );
-
-    if (issueState === "open") {
-      invariant(
-        !["agent_fixed", "resubmitting"].includes(state.stage),
-        "Lifecycle checkpoint says fixed/resubmitting but the exact production issue remains open.",
+      const { issueState, questionnaire } = await openExactLifecycleIssueQuestionnaire(
+        session,
+        state,
       );
-      if (state.stage === "returning") {
-        state.stage = "returned";
+
+      if (issueState === "open") {
+        invariant(
+          !["agent_fixed", "resubmitting"].includes(state.stage),
+          "Lifecycle checkpoint says fixed/resubmitting but the exact production issue remains open.",
+        );
+        if (state.stage === "returning") {
+          state.stage = "returned";
+          await persistLifecycleStage(state);
+        }
+        state.stage = "fixing_issue";
         await persistLifecycleStage(state);
-      }
-      state.stage = "fixing_issue";
-      await persistLifecycleStage(state);
-      const noteField = questionnaire
-        .locator('[data-field-label="Примечание"]')
-        .first();
-      await expect(noteField).toBeVisible();
-      const noteControl = noteField
-        .locator("input:not([readonly]), textarea:not([readonly])")
-        .first();
-      await expect(noteControl).toBeVisible();
-      const correctedNote = productionLifecycleCorrectedNote(state);
-      if ((await noteControl.inputValue()) !== correctedNote) {
+        const noteField = questionnaire
+          .locator('[data-field-label="Примечание"]')
+          .first();
+        await expect(noteField).toBeVisible();
+        const noteControl = noteField
+          .locator("input:not([readonly]), textarea:not([readonly])")
+          .first();
+        await expect(noteControl).toBeVisible();
+        const correctedNote = productionLifecycleCorrectedNote(state);
+        if ((await noteControl.inputValue()) !== correctedNote) {
+          await successfulProductionMutation(
+            session.page,
+            session.ledger,
+            session.mutationGate,
+            saveDraftRpcPath,
+            "agent saves lifecycle audit-note correction",
+            await lifecycleMutationContract(state, "returned", "open", {
+              actorSource: "agent",
+              correctionMode: "existing",
+              correctedQuestionnaireValue: correctedNote,
+              snapshotStatus: "returned",
+            }),
+            async () => {
+              await noteControl.fill(correctedNote);
+              await noteControl.press("Tab");
+            },
+          );
+          await expect(
+            questionnaire.locator('.v19-questionnaire-screen-header [role="status"]'),
+          ).toContainText("Сохранено", { timeout: 45_000 });
+        }
+        await questionnaire.getByRole("button", { name: "Назад" }).click();
+        await expect(questionnaire).toHaveCount(0);
+
+        const issueContext = await openExactLifecycleIssueCard(session, state);
+        expect(
+          issueContext.issueIsFixed,
+          "The exact lifecycle issue must remain open until the agent confirms the saved correction.",
+        ).toBe(false);
+        const markFixed = issueContext.issueCard.getByRole("button", {
+          name: "Отметить исправленным",
+        });
+        await expect(markFixed).toBeEnabled();
+        state.stage = "marking_issue_fixed";
+        await persistLifecycleStage(state);
         await successfulProductionMutation(
           session.page,
           session.ledger,
           session.mutationGate,
           saveDraftRpcPath,
-          "agent saves lifecycle audit-note correction",
-          await lifecycleMutationContract(state, "returned", "open", {
+          "agent marks lifecycle issue fixed",
+          await lifecycleMutationContract(state, "returned", "fixed", {
             actorSource: "agent",
             correctionMode: "existing",
-            correctedQuestionnaireValue: correctedNote,
+            snapshotMutation: "mark_issue_fixed",
             snapshotStatus: "returned",
           }),
-          async () => {
-            await noteControl.fill(correctedNote);
-            await noteControl.press("Tab");
-          },
+          () => markFixed.click(),
+        );
+        await expect(issueContext.issueCard).toContainText(/Исправлено|Ждет проверки/);
+        state.stage = "agent_fixed";
+        await persistLifecycleStage(state);
+        await issueContext.root.getByLabel("Закрыть", { exact: true }).click();
+        await expect(drawer(session.page)).toHaveCount(0);
+      } else {
+        invariant(
+          [
+            "fixing_issue",
+            "marking_issue_fixed",
+            "agent_fixed",
+            "resubmitting",
+          ].includes(state.stage),
+          "The exact lifecycle issue is fixed without a saved fix intent checkpoint.",
         );
         await expect(
-          questionnaire.locator('.v19-questionnaire-screen-header [role="status"]'),
-        ).toContainText("Сохранено", { timeout: 45_000 });
+          questionnaire.getByText(
+            /Исправление.*отправлено, ожидает проверки администратора/,
+          ),
+        ).toBeVisible();
+        state.stage = "agent_fixed";
+        await persistLifecycleStage(state);
+        await questionnaire.getByRole("button", { name: "Назад" }).click();
+        await expect(questionnaire).toHaveCount(0);
       }
-      await questionnaire.getByRole("button", { name: "Назад" }).click();
-      await expect(questionnaire).toHaveCount(0);
 
-      const issueContext = await openExactLifecycleIssueCard(session, state);
       expect(
-        issueContext.issueIsFixed,
-        "The exact lifecycle issue must remain open until the agent confirms the saved correction.",
-      ).toBe(false);
-      const markFixed = issueContext.issueCard.getByRole("button", {
-        name: "Отметить исправленным",
+        await agentActionPresence(session.page, submissionId, "Открыто"),
+        "Fixed lifecycle record must remain in the open agent queue until resubmission.",
+      ).toBe(true);
+
+      const reopened = await openExactLifecycleIssueQuestionnaire(session, state);
+      await expect(reopened.questionnaire).toBeVisible();
+      expect(
+        reopened.issueState,
+        "The exact lifecycle issue must remain fixed before resubmission.",
+      ).toBe("fixed");
+      const resubmit = reopened.questionnaire.getByRole("button", {
+        name: /^(?:Отправить на проверку|Отправить исправления)$/,
       });
-      await expect(markFixed).toBeEnabled();
-      state.stage = "marking_issue_fixed";
+      await expect(resubmit).toBeEnabled();
+      state.stage = "resubmitting";
       await persistLifecycleStage(state);
       await successfulProductionMutation(
         session.page,
         session.ledger,
         session.mutationGate,
-        saveDraftRpcPath,
-        "agent marks lifecycle issue fixed",
-        await lifecycleMutationContract(state, "returned", "fixed", {
+        submitCorrectionsRpcPath,
+        "agent resubmits lifecycle corrections",
+        await lifecycleMutationContract(state, "waiting_review", "fixed", {
           actorSource: "agent",
           correctionMode: "existing",
-          snapshotMutation: "mark_issue_fixed",
-          snapshotStatus: "returned",
+          snapshotStatus: "corrections_received",
+          transition: {
+            comment: "Статус изменен: Исправления получены: Агент отправил исправления",
+            fromStatus: "returned",
+            note: "Агент отправил исправления",
+            toStatus: "corrections_received",
+          },
         }),
-        () => markFixed.click(),
+        () => resubmit.click(),
       );
-      await expect(issueContext.issueCard).toContainText(/Исправлено|Ждет проверки/);
-      state.stage = "agent_fixed";
+      state.stage = "resubmitted";
       await persistLifecycleStage(state);
-      await issueContext.root
-        .getByLabel("Закрыть", { exact: true })
-        .click();
-      await expect(drawer(session.page)).toHaveCount(0);
-    } else {
-      invariant(
-        ["fixing_issue", "marking_issue_fixed", "agent_fixed", "resubmitting"].includes(
-          state.stage,
-        ),
-        "The exact lifecycle issue is fixed without a saved fix intent checkpoint.",
-      );
       await expect(
-        questionnaire.getByText(
-          /Исправление.*отправлено, ожидает проверки администратора/,
-        ),
-      ).toBeVisible();
-      state.stage = "agent_fixed";
-      await persistLifecycleStage(state);
-      await questionnaire.getByRole("button", { name: "Назад" }).click();
-      await expect(questionnaire).toHaveCount(0);
-    }
+        reopened.questionnaire.getByTestId("questionnaire-read-only-status"),
+      ).toContainText(/Исправления на проверке|Отправлено на проверку/, {
+        timeout: 60_000,
+      });
 
-    expect(
-      await agentActionPresence(session.page, submissionId, "Открыто"),
-      "Fixed lifecycle record must remain in the open agent queue until resubmission.",
-    ).toBe(true);
-
-    const reopened = await openExactLifecycleIssueQuestionnaire(session, state);
-    await expect(reopened.questionnaire).toBeVisible();
-    expect(
-      reopened.issueState,
-      "The exact lifecycle issue must remain fixed before resubmission.",
-    ).toBe("fixed");
-    const resubmit = reopened.questionnaire.getByRole("button", {
-      name: /^(?:Отправить на проверку|Отправить исправления)$/,
-    });
-    await expect(resubmit).toBeEnabled();
-    state.stage = "resubmitting";
-    await persistLifecycleStage(state);
-    await successfulProductionMutation(
-      session.page,
-      session.ledger,
-      session.mutationGate,
-      submitCorrectionsRpcPath,
-      "agent resubmits lifecycle corrections",
-      await lifecycleMutationContract(state, "waiting_review", "fixed", {
-        actorSource: "agent",
-        correctionMode: "existing",
-        snapshotStatus: "corrections_received",
-        transition: {
-          comment: "Статус изменен: Исправления получены: Агент отправил исправления",
-          fromStatus: "returned",
-          note: "Агент отправил исправления",
-          toStatus: "corrections_received",
-        },
-      }),
-      () => resubmit.click(),
-    );
-    state.stage = "resubmitted";
-    await persistLifecycleStage(state);
-    await expect(
-      reopened.questionnaire.getByTestId("questionnaire-read-only-status"),
-    ).toContainText(/Исправления на проверке|Отправлено на проверку/, {
-      timeout: 60_000,
-    });
-
-    await reopened.questionnaire.getByRole("button", { name: "Назад" }).click();
-    await reloadCanonicalWorkspace(session);
-    expect(
-      await agentActionPresence(session.page, submissionId, "Открыто"),
-      "Resubmitted lifecycle record must leave the open agent queue.",
-    ).toBe(false);
-    expect(
-      await agentActionPresence(session.page, submissionId, "Закрыто"),
-      "Resubmitted lifecycle record must move to the completed agent queue.",
-    ).toBe(true);
-    const resubmittedRoot = await openAgentSubmissionDrawer(session.page, submissionId);
-    await assertDrawerCaseMarker(resubmittedRoot, caseMarker, submissionId);
-    await expect(resubmittedRoot.locator(".v20-status-pill")).toHaveText(
-      /проверка|исправлен/,
-    );
-  }, () => closeSession(session, evidence));
+      await reopened.questionnaire.getByRole("button", { name: "Назад" }).click();
+      await reloadCanonicalWorkspace(session);
+      expect(
+        await agentActionPresence(session.page, submissionId, "Открыто"),
+        "Resubmitted lifecycle record must leave the open agent queue.",
+      ).toBe(false);
+      expect(
+        await agentActionPresence(session.page, submissionId, "Закрыто"),
+        "Resubmitted lifecycle record must move to the completed agent queue.",
+      ).toBe(true);
+      const resubmittedRoot = await openAgentSubmissionDrawer(
+        session.page,
+        submissionId,
+      );
+      await assertDrawerCaseMarker(resubmittedRoot, caseMarker, submissionId);
+      await expect(resubmittedRoot.locator(".v20-status-pill")).toHaveText(
+        /проверка|исправлен/,
+      );
+    },
+    () => closeSession(session, evidence),
+  );
 }
 
 async function ensureReturnedAccepted(input: {
@@ -1301,76 +1303,77 @@ async function ensureReturnedAccepted(input: {
   if (state.stage === "accepted") return;
 
   const session = await openSession(browser, testInfo, admin);
-  await runWithFailurePreservingCleanup(async () => {
-    const submissionId = state.case.submissionId;
-    const inReview = await adminReviewPresence(session.page, submissionId);
-    if (!inReview) {
+  await runWithFailurePreservingCleanup(
+    async () => {
+      const submissionId = state.case.submissionId;
+      const inReview = await adminReviewPresence(session.page, submissionId);
+      if (!inReview) {
+        invariant(
+          await adminExportPresence(session.page, submissionId),
+          "Corrected lifecycle card is absent from both Review and Export.",
+        );
+        invariant(
+          state.stage === "accepting",
+          `${state.case.caseKey} reached Export without a saved acceptance intent checkpoint.`,
+        );
+        assertProductionLifecycleAcceptanceProof(state, caseMarker);
+        await assertAdminExportCaseReady(session.page, submissionId);
+        state.stage = "accepted";
+        await persistLifecycleStage(state);
+        return;
+      }
+
       invariant(
-        await adminExportPresence(session.page, submissionId),
-        "Corrected lifecycle card is absent from both Review and Export.",
+        ["resubmitted", "accepting"].includes(state.stage),
+        `${state.case.caseKey} returned to admin Review before a resubmission checkpoint.`,
       );
-      invariant(
-        state.stage === "accepting",
-        `${state.case.caseKey} reached Export without a saved acceptance intent checkpoint.`,
+      state.stage = "resubmitted";
+      await persistLifecycleStage(state);
+      await assertAdminExportPresence(session.page, submissionId, false);
+      const root = await openAdminReviewDrawer(session.page, submissionId);
+      await assertDrawerCaseMarker(root, caseMarker, submissionId);
+      await openDrawerTab(root, /Анкета/);
+      await expect(root).toContainText(productionLifecycleCorrectedNote(state));
+      await expect(
+        root.getByRole("button", { name: /\d+ замечани(?:е|я|й)/i }).first(),
+      ).toBeVisible();
+      const accept = root.getByRole("button", {
+        exact: true,
+        name: "Принять на выгрузку",
+      });
+      await expect(accept).toBeEnabled();
+      recordProductionLifecycleAcceptanceProof(state, caseMarker);
+      state.stage = "accepting";
+      await persistLifecycleStage(state);
+      await successfulProductionMutation(
+        session.page,
+        session.ledger,
+        session.mutationGate,
+        saveDraftRpcPath,
+        "accept corrected lifecycle record",
+        await lifecycleMutationContract(state, "ready_for_excel", "closed", {
+          actorSource: "admin",
+          correctionMode: "existing",
+          snapshotStatus: "ready_for_export",
+          transition: {
+            comment:
+              "Статус изменен: Готово к выгрузке: Администратор закрыл исправления и принял подачу",
+            fromStatus: "corrections_received",
+            note: "Администратор закрыл исправления и принял подачу",
+            toStatus: "ready_for_export",
+          },
+        }),
+        () => accept.click(),
       );
-      assertProductionLifecycleAcceptanceProof(state, caseMarker);
-      await assertAdminExportCaseReady(session.page, submissionId);
       state.stage = "accepted";
       await persistLifecycleStage(state);
-      return;
-    }
 
-    invariant(
-      ["resubmitted", "accepting"].includes(state.stage),
-      `${state.case.caseKey} returned to admin Review before a resubmission checkpoint.`,
-    );
-    state.stage = "resubmitted";
-    await persistLifecycleStage(state);
-    await assertAdminExportPresence(session.page, submissionId, false);
-    const root = await openAdminReviewDrawer(session.page, submissionId);
-    await assertDrawerCaseMarker(root, caseMarker, submissionId);
-    await openDrawerTab(root, /Анкета/);
-    await expect(root).toContainText(productionLifecycleCorrectedNote(state));
-    await expect(
-      root
-        .getByRole("button", { name: /\d+ замечани(?:е|я|й)/i })
-        .first(),
-    ).toBeVisible();
-    const accept = root.getByRole("button", {
-      exact: true,
-      name: "Принять на выгрузку",
-    });
-    await expect(accept).toBeEnabled();
-    recordProductionLifecycleAcceptanceProof(state, caseMarker);
-    state.stage = "accepting";
-    await persistLifecycleStage(state);
-    await successfulProductionMutation(
-      session.page,
-      session.ledger,
-      session.mutationGate,
-      saveDraftRpcPath,
-      "accept corrected lifecycle record",
-      await lifecycleMutationContract(state, "ready_for_excel", "closed", {
-        actorSource: "admin",
-        correctionMode: "existing",
-        snapshotStatus: "ready_for_export",
-        transition: {
-          comment:
-            "Статус изменен: Готово к выгрузке: Администратор закрыл исправления и принял подачу",
-          fromStatus: "corrections_received",
-          note: "Администратор закрыл исправления и принял подачу",
-          toStatus: "ready_for_export",
-        },
-      }),
-      () => accept.click(),
-    );
-    state.stage = "accepted";
-    await persistLifecycleStage(state);
-
-    await reloadCanonicalWorkspace(session);
-    await assertAdminReviewPresence(session.page, submissionId, false);
-    await assertAdminExportCaseReady(session.page, submissionId);
-  }, () => closeSession(session, evidence));
+      await reloadCanonicalWorkspace(session);
+      await assertAdminReviewPresence(session.page, submissionId, false);
+      await assertAdminExportCaseReady(session.page, submissionId);
+    },
+    () => closeSession(session, evidence),
+  );
 }
 
 async function verifyFinalStateAfterFreshRelogin(input: {
@@ -1384,63 +1387,78 @@ async function verifyFinalStateAfterFreshRelogin(input: {
 }) {
   const { admin, browser, caseMarker, evidence, owner, state, testInfo } = input;
   const adminSession = await openSession(browser, testInfo, admin);
-  await runWithFailurePreservingCleanup(async () => {
-    await reloadCanonicalWorkspace(adminSession);
-    await assertAdminReviewPresence(adminSession.page, state.case.submissionId, false);
-    assertProductionLifecycleAcceptanceProof(state, caseMarker);
-    await assertAdminExportCaseReady(
-      adminSession.page,
-      state.case.submissionId,
-    );
-  }, () => closeSession(adminSession, evidence));
+  await runWithFailurePreservingCleanup(
+    async () => {
+      await reloadCanonicalWorkspace(adminSession);
+      await assertAdminReviewPresence(
+        adminSession.page,
+        state.case.submissionId,
+        false,
+      );
+      assertProductionLifecycleAcceptanceProof(state, caseMarker);
+      await assertAdminExportCaseReady(adminSession.page, state.case.submissionId);
+    },
+    () => closeSession(adminSession, evidence),
+  );
 
   const ownerSession = await openSession(browser, testInfo, owner);
-  await runWithFailurePreservingCleanup(async () => {
-    await reloadCanonicalWorkspace(ownerSession);
-    expect(
-      await agentSubmissionPresence(ownerSession.page, state.case.submissionId),
-      `Accepted ${state.case.caseKey} must remain visible in owner My submissions.`,
-    ).toBe(true);
-    expect(
-      await agentActionPresence(ownerSession.page, state.case.submissionId, "Открыто"),
-      `Accepted ${state.case.caseKey} must be absent from the owner open queue.`,
-    ).toBe(false);
-    expect(
-      await agentActionPresence(ownerSession.page, state.case.submissionId, "Закрыто"),
-      `Accepted ${state.case.caseKey} must remain visible in the completed owner queue.`,
-    ).toBe(true);
-    const root = await openAgentSubmissionDrawer(
-      ownerSession.page,
-      state.case.submissionId,
-    );
-    await assertDrawerCaseMarker(root, caseMarker, state.case.submissionId);
-    await expect(root.locator(".v20-status-pill")).toHaveText("готово");
-    await openDrawerTab(root, /Замечания/);
-    await expect(root).not.toContainText(productionLifecycleIssueMarker(state));
-    await expect(root).toContainText("Нет открытых действий");
-    await openDrawerTab(root, /Анкета/);
-    await root.getByRole("button", { name: "Открыть анкету" }).first().click();
-    const questionnaire = ownerSession.page
-      .locator(".vf-figma-questionnaire-screen")
-      .first();
-    await expect(questionnaire).toBeVisible();
-    await questionnaire
-      .locator(".v19-questionnaire-section-tab:visible")
-      .filter({ hasText: "Запись" })
-      .first()
-      .click();
-    const noteControl = questionnaire
-      .locator('[data-field-label="Примечание"]')
-      .locator("input, textarea")
-      .first();
-    await expect(noteControl).toHaveValue(productionLifecycleCorrectedNote(state));
-    await expect(
-      questionnaire.getByText(
-        /Исправление.*отправлено, ожидает проверки администратора/,
-      ),
-    ).toHaveCount(0);
-    await questionnaire.getByRole("button", { name: "Назад" }).click();
-  }, () => closeSession(ownerSession, evidence));
+  await runWithFailurePreservingCleanup(
+    async () => {
+      await reloadCanonicalWorkspace(ownerSession);
+      expect(
+        await agentSubmissionPresence(ownerSession.page, state.case.submissionId),
+        `Accepted ${state.case.caseKey} must remain visible in owner My submissions.`,
+      ).toBe(true);
+      expect(
+        await agentActionPresence(
+          ownerSession.page,
+          state.case.submissionId,
+          "Открыто",
+        ),
+        `Accepted ${state.case.caseKey} must be absent from the owner open queue.`,
+      ).toBe(false);
+      expect(
+        await agentActionPresence(
+          ownerSession.page,
+          state.case.submissionId,
+          "Закрыто",
+        ),
+        `Accepted ${state.case.caseKey} must remain visible in the completed owner queue.`,
+      ).toBe(true);
+      const root = await openAgentSubmissionDrawer(
+        ownerSession.page,
+        state.case.submissionId,
+      );
+      await assertDrawerCaseMarker(root, caseMarker, state.case.submissionId);
+      await expect(root.locator(".v20-status-pill")).toHaveText("готово");
+      await openDrawerTab(root, /Замечания/);
+      await expect(root).not.toContainText(productionLifecycleIssueMarker(state));
+      await expect(root).toContainText("Нет открытых действий");
+      await openDrawerTab(root, /Анкета/);
+      await root.getByRole("button", { name: "Открыть анкету" }).first().click();
+      const questionnaire = ownerSession.page
+        .locator(".vf-figma-questionnaire-screen")
+        .first();
+      await expect(questionnaire).toBeVisible();
+      await questionnaire
+        .locator(".v19-questionnaire-section-tab:visible")
+        .filter({ hasText: "Запись" })
+        .first()
+        .click();
+      const noteControl = questionnaire
+        .locator('[data-field-label="Примечание"]')
+        .locator("input, textarea")
+        .first();
+      await expect(noteControl).toHaveValue(productionLifecycleCorrectedNote(state));
+      await expect(
+        questionnaire.getByText(
+          /Исправление.*отправлено, ожидает проверки администратора/,
+        ),
+      ).toHaveCount(0);
+      await questionnaire.getByRole("button", { name: "Назад" }).click();
+    },
+    () => closeSession(ownerSession, evidence),
+  );
 }
 
 test.describe("production lifecycle for existing audit cohort records", () => {

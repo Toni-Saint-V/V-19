@@ -61,8 +61,7 @@ export type AgentInteractionMutationTarget =
 
 export type AgentInteractionNetworkWriteTarget =
   | "edge:access-request"
-  | "rpc:save_submission_draft"
-  | "rpc:submit_corrections_handoff"
+  | "rpc:save_agent_submission_if_current"
   | "storage:submission-media";
 
 export type AgentInteractionCanonicalValue = string | number | boolean | null;
@@ -184,9 +183,15 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "status_history",
       "submission-media",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
+    allowedNetworkTargets: [
+      "rpc:save_agent_submission_if_current",
+      "storage:submission-media",
+    ],
     requiredChangedTargets: ["submissions", "applicants", "submission-media"],
-    requiredNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
+    requiredNetworkTargets: [
+      "rpc:save_agent_submission_if_current",
+      "storage:submission-media",
+    ],
   }),
   mark_issue_fixed: mutationWriteScope({
     allowedChangedTargets: [
@@ -197,9 +202,9 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "corrections",
       "status_history",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft"],
+    allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
     requiredChangedTargets: ["corrections"],
-    requiredNetworkTargets: ["rpc:save_submission_draft"],
+    requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
   }),
   prepare_and_submit_for_review: mutationWriteScope({
     allowedChangedTargets: [
@@ -210,9 +215,9 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "corrections",
       "status_history",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft"],
+    allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
     requiredChangedTargets: ["submissions", "status_history"],
-    requiredNetworkTargets: ["rpc:save_submission_draft"],
+    requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
   }),
   save_progress: mutationWriteScope({
     allowedChangedTargets: [
@@ -223,9 +228,9 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "corrections",
       "status_history",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft"],
+    allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
     requiredChangedTargets: ["submissions", "status_history"],
-    requiredNetworkTargets: ["rpc:save_submission_draft"],
+    requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
   }),
   submit_corrections: mutationWriteScope({
     allowedChangedTargets: [
@@ -236,9 +241,9 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "corrections",
       "status_history",
     ],
-    allowedNetworkTargets: ["rpc:submit_corrections_handoff"],
+    allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
     requiredChangedTargets: ["submissions", "corrections", "status_history"],
-    requiredNetworkTargets: ["rpc:submit_corrections_handoff"],
+    requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
   }),
   submit_for_review: mutationWriteScope({
     allowedChangedTargets: [
@@ -249,9 +254,9 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "corrections",
       "status_history",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft"],
+    allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
     requiredChangedTargets: ["submissions", "status_history"],
-    requiredNetworkTargets: ["rpc:save_submission_draft"],
+    requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
   }),
   update_questionnaire_field: mutationWriteScope({
     allowedChangedTargets: [
@@ -262,9 +267,9 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "corrections",
       "status_history",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft"],
+    allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
     requiredChangedTargets: ["questionnaire_answers"],
-    requiredNetworkTargets: ["rpc:save_submission_draft"],
+    requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
   }),
   upload_required_file: mutationWriteScope({
     allowedChangedTargets: [
@@ -276,9 +281,15 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
       "status_history",
       "submission-media",
     ],
-    allowedNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
+    allowedNetworkTargets: [
+      "rpc:save_agent_submission_if_current",
+      "storage:submission-media",
+    ],
     requiredChangedTargets: ["media_assets", "submission-media"],
-    requiredNetworkTargets: ["rpc:save_submission_draft", "storage:submission-media"],
+    requiredNetworkTargets: [
+      "rpc:save_agent_submission_if_current",
+      "storage:submission-media",
+    ],
   }),
 } as const satisfies Partial<Record<BusinessClickIntent, AgentInteractionWriteScope>>;
 

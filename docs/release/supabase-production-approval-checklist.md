@@ -2,6 +2,12 @@
 
 Status: production approval checklist, intentionally incomplete until owner review.
 
+Production mutation approval is a signed, short-lived external packet. Keep the
+packet, detached signature, and public key outside the repository and point
+`SUPABASE_PRODUCTION_APPROVAL_PACKET_PATH` to the packet. The tracked readiness
+JSON remains the fail-closed `NO_GO` template; do not commit live receipt paths,
+receipt hashes, or an `approved` phase into Git.
+
 Production project id:
 
 Rollout owner:
@@ -66,6 +72,8 @@ Backup owner:
 - `20260722001000_admin_submission_batch_concurrency.sql`
 - `20260722002000_access_request_review_claim.sql`
 - `20260722003000_atomic_return_package_artifact_upload.sql`
+- `20260802000100_clean_cutover_schema_inventory.sql`
+- `20260803000100_agent_submission_concurrency.sql`
 
 ## Required Evidence
 
@@ -94,5 +102,11 @@ Production activation requires owner approval and:
 VITE_SUPABASE_CUTOVER_GENERATION=<current descriptor generation>
 VITE_SUPABASE_PRODUCTION_APPROVED=true
 ```
+
+These environment values are configuration only and do not authorize a write.
+The production writers remain blocked until the repository verifies an
+authenticated detached owner-approval receipt bound to the exact project,
+generation, Git SHA, source digest, allowed action, and expiration. The current
+schema-v3 packet has no `approved/GO` transition and therefore remains `NO_GO`.
 
 Go / No-Go:

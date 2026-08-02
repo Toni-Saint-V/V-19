@@ -365,7 +365,7 @@ const businessMutationAllowlist = new Map<string, number>([
   // saveCockpitSubmissionsForProfile performs one explicit retry after a
   // retryable transport failure. Abort-only proof must contract-check and
   // abort both identical attempts instead of treating the retry as unknown.
-  ["POST /rest/v1/rpc/save_submission_draft", 2],
+  ["POST /rest/v1/rpc/save_agent_submission_if_current", 2],
   ["POST /rest/v1/rpc/complete_export_package", 1],
 ]);
 // signInSupabaseWithPassword retries twice and each request uses three
@@ -504,7 +504,7 @@ function baseExportPayloadMatches(
   const payload = exportPayloadRecord(body);
   if (!payload) return false;
 
-  if (key === "POST /rest/v1/rpc/save_submission_draft") {
+  if (key === "POST /rest/v1/rpc/save_agent_submission_if_current") {
     const submission = jsonRecord(payload.submission);
     const draftContract = exportDraftPayloadContract(networkContract, timestampWindow);
     return Boolean(
@@ -556,7 +556,7 @@ export function productionA1S1ExportPayloadMatches(
   const payload = exportPayloadRecord(body);
   if (!payload) return false;
 
-  if (key === "POST /rest/v1/rpc/save_submission_draft") {
+  if (key === "POST /rest/v1/rpc/save_agent_submission_if_current") {
     const submission = jsonRecord(payload.submission);
     const intelligence = jsonRecord(submission?.family_intelligence);
     const snapshot = jsonRecord(intelligence?.v19CockpitSnapshot);
@@ -928,16 +928,16 @@ function isStaticAppRequest(request: Request) {
 export class StrictProductionA1S1ExportNetworkGate {
   #acceptedExportDraft: {
     payloadDigest: string;
-    requestKey: "POST /rest/v1/rpc/save_submission_draft";
+    requestKey: "POST /rest/v1/rpc/save_agent_submission_if_current";
   } | null = null;
   #acceptedExportDraftPromise: Promise<{
     payloadDigest: string;
-    requestKey: "POST /rest/v1/rpc/save_submission_draft";
+    requestKey: "POST /rest/v1/rpc/save_agent_submission_if_current";
   }> | null = null;
   #acceptedExportDraftResolve:
     | ((proof: {
         payloadDigest: string;
-        requestKey: "POST /rest/v1/rpc/save_submission_draft";
+        requestKey: "POST /rest/v1/rpc/save_agent_submission_if_current";
       }) => void)
     | null = null;
   #businessPhase = false;
@@ -1021,7 +1021,7 @@ export class StrictProductionA1S1ExportNetworkGate {
     const networkContract = this.#networkContract;
     if (!networkContract) return false;
     const timestampWindow =
-      key === "POST /rest/v1/rpc/save_submission_draft"
+      key === "POST /rest/v1/rpc/save_agent_submission_if_current"
         ? (this.#exportMutationTimestampWindow ?? exportMutationTimestampWindow())
         : null;
     const matches = baseExportPayloadMatches(
@@ -1124,7 +1124,7 @@ export class StrictProductionA1S1ExportNetworkGate {
           return;
         }
         this.#requestCounts.set(key, count + 1);
-        if (key === "POST /rest/v1/rpc/save_submission_draft") {
+        if (key === "POST /rest/v1/rpc/save_agent_submission_if_current") {
           const acceptedExportDraft = {
             payloadDigest: productionA1S1ExportDigest(request.postData() ?? ""),
             requestKey: key,
@@ -1324,7 +1324,7 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
     invariant(
       this.#acceptedExportDraft?.requestKey ===
-        "POST /rest/v1/rpc/save_submission_draft" &&
+        "POST /rest/v1/rpc/save_agent_submission_if_current" &&
         /^[a-f0-9]{64}$/.test(this.#acceptedExportDraft.payloadDigest),
       "Abort-only export did not capture an accepted draft identity.",
     );
@@ -1334,7 +1334,8 @@ export class StrictProductionA1S1ExportNetworkGate {
     );
     invariant(this.#violations.length === 0, "Unapproved network request was blocked.");
     invariant(
-      (this.#requestCounts.get("POST /rest/v1/rpc/save_submission_draft") ?? 0) === 2,
+      (this.#requestCounts.get("POST /rest/v1/rpc/save_agent_submission_if_current") ??
+        0) === 2,
       "Abort-only export must capture the initial save and its one bounded retry.",
     );
     invariant(
@@ -1346,7 +1347,7 @@ export class StrictProductionA1S1ExportNetworkGate {
         this.#mutations.every(
           (mutation) =>
             mutation.method === "POST" &&
-            mutation.path === "/rest/v1/rpc/save_submission_draft" &&
+            mutation.path === "/rest/v1/rpc/save_agent_submission_if_current" &&
             mutation.status === 0,
         ),
       "Abort-only export must observe two client-aborted save attempts and no business response.",
@@ -1371,8 +1372,8 @@ export class StrictProductionA1S1ExportNetworkGate {
       (mutation) => `${mutation.method} ${mutation.path}`,
     );
     invariant(
-      keys.filter((key) => key === "POST /rest/v1/rpc/save_submission_draft").length ===
-        1,
+      keys.filter((key) => key === "POST /rest/v1/rpc/save_agent_submission_if_current")
+        .length === 1,
       "Successful export must persist only the pre-commit downloaded state.",
     );
     invariant(

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Blob as NodeBlob } from "node:buffer";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, test } from "vitest";
+import { isCanonicalSupabaseSandboxTarget } from "../../config/supabase-sandbox-target.mjs";
 import type { Database } from "../../src/lib/supabase/database.types";
 import { buildMediaSlot, normalizeSubmission } from "../../src/lib/workflow";
 import { toSubmissionDraftPersistencePayload } from "../../src/services/submissionService";
@@ -21,7 +22,6 @@ const describeLegacyArchiveLive =
     ? describe
     : describe.skip;
 const smokeEnv = loadSmokeEnv();
-const allowedSmokeProjectId = "oevvaowoklqttqkraxho";
 const requiredSmokeEnv = [
   "VITE_SUPABASE_PROJECT_ID",
   "VITE_SUPABASE_ACTIVATION_TARGET",
@@ -91,12 +91,10 @@ function supabaseUrl(): string {
     throw new Error("Supabase live smoke may only run against sandbox activation.");
   }
 
-  if (projectId !== allowedSmokeProjectId) {
-    throw new Error(`Supabase live smoke project is not allowed: ${projectId}.`);
-  }
-
-  if (!url.startsWith(`https://${projectId}.supabase.co`)) {
-    throw new Error("Supabase live smoke URL does not match the allowed project.");
+  if (!isCanonicalSupabaseSandboxTarget(projectId, url)) {
+    throw new Error(
+      "Supabase live smoke project id and URL must match the approved sandbox descriptor.",
+    );
   }
 
   return url;
@@ -285,20 +283,46 @@ function makeCanonicalSmokeSubmission(agent: AppProfile): {
 async function saveDraft(
   client: SupabaseClient<Database>,
   submission: Submission,
-  actorId: string,
+  actor: AppProfile,
 ): Promise<void> {
-  const payload = toSubmissionDraftPersistencePayload(submission, actorId);
-  const { error } = await client.rpc("save_submission_draft", { payload });
+  const { error } = await trySaveDraft(client, submission, actor);
   if (error) throw error;
 }
 
 async function trySaveDraft(
   client: SupabaseClient<Database>,
   submission: Submission,
-  actorId: string,
+  actor: AppProfile,
 ) {
-  const payload = toSubmissionDraftPersistencePayload(submission, actorId);
-  return client.rpc("save_submission_draft", { payload });
+  const payload = toSubmissionDraftPersistencePayload(submission, actor.id);
+  const { data: revisionRow, error: revisionError } = await client
+    .from("submissions")
+    .select("case_revision")
+    .eq("id", submission.id)
+    .maybeSingle();
+  if (revisionError) return { data: null, error: revisionError };
+  const expectedRevision = revisionRow?.case_revision ?? null;
+  const operationId = randomUUID();
+  if (actor.role === "admin") {
+    if (expectedRevision === null) {
+      return {
+        data: null,
+        error: new Error("Admin CAS reset requires an existing row."),
+      };
+    }
+    return client.rpc("save_admin_submission_batch_if_current", {
+      actor_id: actor.id,
+      expected_revisions: { [submission.id]: expectedRevision },
+      operation_id: operationId,
+      payloads: [payload],
+    });
+  }
+  return client.rpc("save_agent_submission_if_current", {
+    expected_revision: expectedRevision,
+    mutation_kind: "draft",
+    operation_id: operationId,
+    payload,
+  });
 }
 
 describeLive("V-19 canonical Supabase live smoke", () => {
@@ -339,11 +363,11 @@ describeLive("V-19 canonical Supabase live smoke", () => {
       uploadedTargets.find(({ slot }) => slot.type === "selfie")?.target ??
       uploadedTargets[0].target;
 
-    await saveDraft(admin.client, submission, admin.profile.id);
+    await saveDraft(owner.client, submission, owner.profile);
     await admin.client.storage
       .from(mediaStorageBucket)
       .remove(uploadedTargets.map(({ target }) => target.path));
-    await saveDraft(owner.client, submission, owner.profile.id);
+    await saveDraft(owner.client, submission, owner.profile);
 
     const { error: agentReviewEscalationError } = await owner.client
       .from("media_assets")
@@ -363,7 +387,7 @@ describeLive("V-19 canonical Supabase live smoke", () => {
         uploaded_at: new Date().toISOString(),
         reviewed_at: new Date().toISOString(),
         reviewed_by: owner.profile.id,
-    });
+      });
     expect(agentReviewEscalationError).toBeTruthy();
     expect(agentReviewEscalationError?.message).toContain(
       "Agents cannot set media review state",
@@ -401,9 +425,23 @@ describeLive("V-19 canonical Supabase live smoke", () => {
       submission,
       otherAgent.profile.id,
     );
+    const { data: currentRevisionRow } = await admin.client
+      .from("submissions")
+      .select("case_revision")
+      .eq("id", submission.id)
+      .single();
+    const currentRevision = currentRevisionRow?.case_revision;
+    if (typeof currentRevision !== "number" || !Number.isSafeInteger(currentRevision)) {
+      throw new Error("Canonical smoke case revision is missing.");
+    }
     const { error: crossAgentSaveDraftError } = await otherAgent.client.rpc(
-      "save_submission_draft",
-      { payload: crossAgentPayload },
+      "save_agent_submission_if_current",
+      {
+        expected_revision: currentRevision,
+        mutation_kind: "draft",
+        operation_id: randomUUID(),
+        payload: crossAgentPayload,
+      },
     );
     expect(crossAgentSaveDraftError).toBeTruthy();
 
@@ -555,7 +593,7 @@ describeLegacyArchiveLive(
           },
         ],
       });
-      await saveDraft(owner.client, blockedSubmission, owner.profile.id);
+      await saveDraft(owner.client, blockedSubmission, owner.profile);
       const { error: blockedReviewError } = await trySaveDraft(
         owner.client,
         normalizeSubmission({
@@ -563,15 +601,15 @@ describeLegacyArchiveLive(
           status: "waiting_review",
           submittedAt: new Date().toISOString(),
         }),
-        owner.profile.id,
+        owner.profile,
       );
       expect(blockedReviewError).toBeTruthy();
       expect(blockedReviewError?.message).toContain("required fields");
 
       // The smoke uses one deterministic submission id. Admin reset keeps repeated
       // runs stable without adding runtime delete permissions to the app role.
-      await saveDraft(admin.client, submission, admin.profile.id);
-      await saveDraft(owner.client, submission, owner.profile.id);
+      await saveDraft(admin.client, submission, admin.profile);
+      await saveDraft(owner.client, submission, owner.profile);
 
       const { data: ownerRows, error: ownerReadError } = await owner.client
         .from("submissions")
@@ -591,9 +629,26 @@ describeLegacyArchiveLive(
         submission,
         otherAgent.profile.id,
       );
+      const { data: currentRow } = await admin.client
+        .from("submissions")
+        .select("case_revision")
+        .eq("id", submission.id)
+        .single();
+      const currentRevision = currentRow?.case_revision;
+      if (
+        typeof currentRevision !== "number" ||
+        !Number.isSafeInteger(currentRevision)
+      ) {
+        throw new Error("Canonical smoke case revision is missing.");
+      }
       const { error: crossAgentWriteError } = await otherAgent.client.rpc(
-        "save_submission_draft",
-        { payload: crossAgentPayload },
+        "save_agent_submission_if_current",
+        {
+          expected_revision: currentRevision,
+          mutation_kind: "draft",
+          operation_id: randomUUID(),
+          payload: crossAgentPayload,
+        },
       );
       expect(crossAgentWriteError).toBeTruthy();
 
@@ -605,8 +660,13 @@ describeLegacyArchiveLive(
         owner.profile.id,
       );
       const { error: agentAcceptedError } = await owner.client.rpc(
-        "save_submission_draft",
-        { payload: agentAcceptedPayload },
+        "save_agent_submission_if_current",
+        {
+          expected_revision: currentRevision,
+          mutation_kind: "draft",
+          operation_id: randomUUID(),
+          payload: agentAcceptedPayload,
+        },
       );
       expect(agentAcceptedError).toBeTruthy();
 
@@ -663,7 +723,7 @@ describeLegacyArchiveLive(
           },
         ],
       });
-      await saveDraft(owner.client, readySubmission, owner.profile.id);
+      await saveDraft(owner.client, readySubmission, owner.profile);
 
       const waitingSubmission = normalizeSubmission({
         ...readySubmission,
@@ -671,7 +731,7 @@ describeLegacyArchiveLive(
         submittedAt: new Date().toISOString(),
         updated: new Date().toISOString(),
       });
-      await saveDraft(owner.client, waitingSubmission, owner.profile.id);
+      await saveDraft(owner.client, waitingSubmission, owner.profile);
 
       const adminAccepted = normalizeSubmission({
         ...waitingSubmission,
@@ -679,7 +739,7 @@ describeLegacyArchiveLive(
         acceptedAt: new Date().toISOString(),
         updated: new Date().toISOString(),
       });
-      await saveDraft(admin.client, adminAccepted, admin.profile.id);
+      await saveDraft(admin.client, adminAccepted, admin.profile);
 
       const { data: ownerApplicantUpdateRows, error: ownerApplicantUpdateError } =
         await owner.client

@@ -37,7 +37,7 @@ import {
 import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submissions/exportPackageDocumentCommit";
 import {
   ensureSubmissionPublicNumber,
-  isAdminSubmissionConcurrencyConflict,
+  isSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
   saveAdminCockpitSubmissionsIfCurrent,
   saveCockpitSubmissionsForProfile,
@@ -254,7 +254,7 @@ export default function App({
   inviteSetupPromise = noInviteSetupPromise,
   recoverySetupPromise = noInviteSetupPromise,
 }: AppProps = {}) {
-  const supabaseClient = getSupabaseClient();
+  const [supabaseClient] = useState(() => getSupabaseClient());
   const supabaseActivationBlocked = shouldBlockLocalDemoDataSource(
     supabaseRuntimeConfig,
     __V19_LOCAL_DEMO_BUILD__,
@@ -330,6 +330,26 @@ export default function App({
     [invalidateWorkspaceSession],
   );
 
+  const clearAuthenticatedWorkspace = useCallback(
+    (message = "Сессия завершена. Войдите снова.") => {
+      commitAuthSession(null);
+      setWorkspace("agent");
+      setAccessRequests([]);
+      setAccessRequestsBusy(false);
+      submissionsRef.current = [];
+      caseRevisionsBySubmissionIdRef.current = new Map();
+      quarantinedSubmissionIdsRef.current = new Set();
+      ownerIdsBySubmissionIdRef.current = new Map();
+      setSubmissions([]);
+      setOwnerIdsBySubmissionId(new Map());
+      setSupabaseProfile(null);
+      setWorkspaceDataState({ status: "idle" });
+      setAuthError(message);
+      setAuthChecked(true);
+    },
+    [commitAuthSession],
+  );
+
   useEffect(() => {
     submissionsRef.current = submissions;
   }, [submissions]);
@@ -365,6 +385,67 @@ export default function App({
     supabaseActivationBlocked,
     supabaseEnabled,
   ]);
+
+  useEffect(() => {
+    if (!supabaseEnabled || !supabaseClient) return;
+
+    let disposed = false;
+    let validationSequence = 0;
+    const clearAndDropLocalSession = async (message: string) => {
+      if (disposed) return;
+      clearAuthenticatedWorkspace(message);
+      try {
+        await supabaseClient.auth.signOut({ scope: "local" });
+      } catch {
+        // The workspace is already fail-closed even if local token cleanup fails.
+      }
+    };
+    const { data } = supabaseClient.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "INITIAL_SESSION") return;
+      if (event === "SIGNED_OUT" || !nextSession) {
+        validationSequence += 1;
+        clearAuthenticatedWorkspace();
+        return;
+      }
+      if (
+        event !== "SIGNED_IN" &&
+        event !== "TOKEN_REFRESHED" &&
+        event !== "USER_UPDATED"
+      ) {
+        return;
+      }
+
+      const expectedUserId = nextSession.user.id;
+      const sequence = validationSequence + 1;
+      validationSequence = sequence;
+      globalThis.setTimeout(() => {
+        void getCurrentAppSession()
+          .then((appSession) => {
+            if (disposed || sequence !== validationSequence) return;
+            if (!appSession || appSession.profile.id !== expectedUserId) {
+              void clearAndDropLocalSession("Доступ к профилю отозван. Войдите снова.");
+              return;
+            }
+            const restored = sessionFromSupabase(appSession);
+            commitAuthSession(restored);
+            setWorkspace(restored.role === "admin" ? "admin" : "agent");
+            setAuthError("");
+          })
+          .catch(() => {
+            if (disposed || sequence !== validationSequence) return;
+            void clearAndDropLocalSession(
+              "Не удалось подтвердить сессию. Войдите снова.",
+            );
+          });
+      }, 0);
+    });
+
+    return () => {
+      disposed = true;
+      validationSequence += 1;
+      data.subscription.unsubscribe();
+    };
+  }, [clearAuthenticatedWorkspace, commitAuthSession, supabaseClient, supabaseEnabled]);
   const visibleSubmissions = useMemo(() => {
     if (!activeApprovedSession) return [];
     if (activeApprovedSession.role === "admin") return submissions;
@@ -809,7 +890,7 @@ export default function App({
       workspaceRefreshCoordinatorRef.current.invalidate();
       let mutationSucceeded = false;
       try {
-        const adminSaveResult =
+        const saveResult =
           persistenceProfile.role === "admin"
             ? await saveAdminCockpitSubmissionsIfCurrent(
                 persistenceProfile,
@@ -818,22 +899,21 @@ export default function App({
                 currentCaseRevisions,
               )
             : null;
-        const nextOwnerIds = adminSaveResult
-          ? adminSaveResult.ownerIdsBySubmissionId
-          : await saveCockpitSubmissionsForProfile(
-              persistenceProfile,
-              changedSubmissions,
-              currentOwnerIds,
-            );
+        const persisted =
+          saveResult ??
+          (await saveCockpitSubmissionsForProfile(
+            persistenceProfile,
+            changedSubmissions,
+            currentOwnerIds,
+            currentCaseRevisions,
+          ));
+        const nextOwnerIds = persisted.ownerIdsBySubmissionId;
         fence.assertCurrent();
 
         workspaceRefreshRequestRef.current += 1;
         submissionsRef.current = nextSubmissions;
         setSubmissions(nextSubmissions);
-        if (adminSaveResult) {
-          caseRevisionsBySubmissionIdRef.current =
-            adminSaveResult.caseRevisionsBySubmissionId;
-        }
+        caseRevisionsBySubmissionIdRef.current = persisted.caseRevisionsBySubmissionId;
         ownerIdsBySubmissionIdRef.current = nextOwnerIds;
         setOwnerIdsBySubmissionId(nextOwnerIds);
         setWorkspaceDataState({
@@ -842,10 +922,10 @@ export default function App({
           status: workspaceDataStatusForCount(nextSubmissions.length),
         });
         mutationSucceeded = true;
-        return adminSaveResult?.caseRevisionsBySubmissionId;
+        return persisted.caseRevisionsBySubmissionId;
       } catch (error) {
         if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
-          const errorMessage = isAdminSubmissionConcurrencyConflict(error)
+          const errorMessage = isSubmissionConcurrencyConflict(error)
             ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
             : error instanceof Error
               ? error.message
@@ -1348,7 +1428,7 @@ export default function App({
       } catch (caught) {
         const error =
           caught instanceof Error ? caught : new Error("Не удалось изменить подачу.");
-        if (isAdminSubmissionConcurrencyConflict(error)) {
+        if (isSubmissionConcurrencyConflict(error)) {
           await refreshCanonicalSubmissions();
         }
         if (
@@ -1402,7 +1482,7 @@ export default function App({
       } catch (caught) {
         const error =
           caught instanceof Error ? caught : new Error("Не удалось изменить подачу.");
-        if (isAdminSubmissionConcurrencyConflict(error)) {
+        if (isSubmissionConcurrencyConflict(error)) {
           await refreshCanonicalSubmissions();
         }
         if (
@@ -1410,7 +1490,7 @@ export default function App({
           workspaceSessionUserIdRef.current === session.userId
         ) {
           setWorkspaceDataState({
-            error: isAdminSubmissionConcurrencyConflict(error)
+            error: isSubmissionConcurrencyConflict(error)
               ? "Подача изменилась в другой сессии. Загружена актуальная версия; повторите действие."
               : error.message,
             sessionUserId: session.userId,
@@ -1798,7 +1878,7 @@ export default function App({
             void refreshCanonicalSubmissions();
           });
         } catch (error) {
-          if (isAdminSubmissionConcurrencyConflict(error)) {
+          if (isSubmissionConcurrencyConflict(error)) {
             await refreshCanonicalSubmissions();
             if (postCommitFence.isCurrent()) {
               setWorkspaceDataState({

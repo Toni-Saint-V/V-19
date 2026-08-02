@@ -13,7 +13,6 @@ const readinessPath = resolve(
 const pilotCohortPath = resolve(repoRoot, ".supabase-pilot-cohort.local.json");
 const adminEnvPath = resolve(repoRoot, ".env.supabase-production-admin.local");
 const publicEnvPath = resolve(repoRoot, ".env.supabase-production.local");
-const sandboxProjectRef = "oevvaowoklqttqkraxho";
 
 const envelope = {
   registeredAgents: 10,
@@ -27,8 +26,7 @@ const primaryRequiredMediaSlots = ["passport_scan", "selfie", "selfie_2"];
 const secondaryRequiredMediaSlots = ["passport_scan"];
 const maxTotalSubmissions = envelope.registeredAgents * envelope.maxSubmissionsPerAgent;
 const maxTotalApplicants = maxTotalSubmissions * envelope.maxApplicantsPerSubmission;
-const maxRequiredMediaObjects =
-  maxTotalApplicants + maxTotalSubmissions * 2;
+const maxRequiredMediaObjects = maxTotalApplicants + maxTotalSubmissions * 2;
 const readiness = readJsonIfExists(readinessPath);
 const pilotWindowStartedAt = clean(readiness.controlledPilot?.pilotWindowStartedAt);
 const adminEnv = readEnvIfExists(adminEnvPath);
@@ -128,7 +126,6 @@ function isAuthUserBanned(user) {
 
 async function verifyProductionSubmissionCaps() {
   assert(projectRef, "production project ref is available for read-only cap check");
-  assert(projectRef !== sandboxProjectRef, "read-only cap check target is not sandbox");
   assert(projectUrl, "production project URL is available for read-only cap check");
   assert(
     projectRef === SUPABASE_PRODUCTION_TARGET.projectId &&
@@ -367,9 +364,7 @@ for (let agentIndex = 1; agentIndex <= envelope.registeredAgents; agentIndex += 
       });
 
       const requiredMediaSlots =
-        applicantIndex === 1
-          ? primaryRequiredMediaSlots
-          : secondaryRequiredMediaSlots;
+        applicantIndex === 1 ? primaryRequiredMediaSlots : secondaryRequiredMediaSlots;
       for (const slot of requiredMediaSlots) {
         const generatedFileName = `v19pilot_${applicantId}_${slot}.jpg`;
         const storagePath = storagePathFor(

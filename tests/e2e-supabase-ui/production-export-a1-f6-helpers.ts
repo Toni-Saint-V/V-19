@@ -88,7 +88,7 @@ const stages = new Set<ProductionExportStage>([
   "verified",
 ]);
 const businessMutationAllowlist = new Map<string, number>([
-  ["POST /rest/v1/rpc/save_submission_draft", 1],
+  ["POST /rest/v1/rpc/save_agent_submission_if_current", 1],
   ["POST /rest/v1/rpc/complete_export_package", 1],
 ]);
 
@@ -522,8 +522,8 @@ export class StrictProductionExportNetworkGate {
       (mutation) => `${mutation.method} ${mutation.path}`,
     );
     invariant(
-      keys.filter((key) => key === "POST /rest/v1/rpc/save_submission_draft").length ===
-        1,
+      keys.filter((key) => key === "POST /rest/v1/rpc/save_agent_submission_if_current")
+        .length === 1,
       "Successful export must persist only the pre-commit downloaded state; the terminal export is owned by complete_export_package.",
     );
     invariant(

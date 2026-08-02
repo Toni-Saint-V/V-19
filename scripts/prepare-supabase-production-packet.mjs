@@ -3,8 +3,10 @@ import { dirname, resolve } from "node:path";
 import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 
 const repoRoot = process.cwd();
-const sandboxProjectRef = "oevvaowoklqttqkraxho";
-const readinessPath = resolve(repoRoot, "docs/release/supabase-production-readiness.json");
+const readinessPath = resolve(
+  repoRoot,
+  "docs/release/supabase-production-readiness.json",
+);
 
 const localFilePaths = {
   productionEnv: resolve(repoRoot, ".env.supabase-production.local"),
@@ -129,22 +131,18 @@ const confirmNotSandbox =
   value("confirmNotSandbox", "SUPABASE_PRODUCTION_NOT_SANDBOX_CONFIRMATION") ||
   clean(args.values.productionConfirmation);
 const publishableKey = value("publishableKey", "VITE_SUPABASE_PUBLISHABLE_KEY");
-const adminKey = value(
-  "adminKey",
-  ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_"),
-);
+const adminKey = value("adminKey", ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_"));
 const accessToken = value("accessToken", "SUPABASE_ACCESS_TOKEN");
 
 const expectedProjectUrl = projectRef ? `https://${projectRef}.supabase.co` : "";
-const targetLooksSandbox = projectRef === sandboxProjectRef;
-const targetLooksProduction =
-  Boolean(projectRef && projectUrl && organization && confirmNotSandbox) &&
-  !targetLooksSandbox &&
-  clean(confirmNotSandbox).toLowerCase() !== "sandbox";
-const projectUrlMatchesRef = Boolean(projectRef && projectUrl === expectedProjectUrl);
 const targetMatchesDescriptor =
   projectRef === SUPABASE_PRODUCTION_TARGET.projectId &&
   projectUrl === SUPABASE_PRODUCTION_TARGET.projectUrl;
+const targetLooksProduction =
+  Boolean(projectRef && projectUrl && organization && confirmNotSandbox) &&
+  targetMatchesDescriptor &&
+  clean(confirmNotSandbox).toLowerCase() !== "sandbox";
+const projectUrlMatchesRef = Boolean(projectRef && projectUrl === expectedProjectUrl);
 
 function addCheck(ok, label, detail = "") {
   report.push({ ok, label, detail });
@@ -158,11 +156,6 @@ addCheck(
   projectUrlMatchesRef,
   "project URL matches project ref",
   projectRef && projectUrl ? `expected ${expectedProjectUrl}, got ${projectUrl}` : "",
-);
-addCheck(
-  !targetLooksSandbox || args.allowSandbox,
-  "target is not the known V-19 sandbox project",
-  targetLooksSandbox ? `known sandbox ref: ${sandboxProjectRef}` : "",
 );
 addCheck(
   Boolean(confirmNotSandbox),
@@ -294,7 +287,10 @@ if (args.writeLocal) {
     localFilePaths.backupRestore,
     `${JSON.stringify(backupRestore, null, 2)}\n`,
   );
-  writeFileIfAllowed(localFilePaths.pilotCohort, `${JSON.stringify(pilotCohort, null, 2)}\n`);
+  writeFileIfAllowed(
+    localFilePaths.pilotCohort,
+    `${JSON.stringify(pilotCohort, null, 2)}\n`,
+  );
 } else {
   addCheck(true, "local files not written", "pass --write-local to create templates");
 }
@@ -337,8 +333,12 @@ for (const item of report) {
 console.log("");
 console.log("Mutation guard:");
 console.log("- This script does not apply migrations.");
-console.log("- Keep VITE_SUPABASE_MIGRATION_APPROVED=false until owner approval is explicit.");
-console.log("- Apply production migrations only in a separate operator step after approval.");
+console.log(
+  "- Keep VITE_SUPABASE_MIGRATION_APPROVED=false until owner approval is explicit.",
+);
+console.log(
+  "- Apply production migrations only in a separate operator step after approval.",
+);
 
 if (blocking.length) {
   process.exitCode = 1;

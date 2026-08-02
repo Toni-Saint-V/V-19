@@ -52,9 +52,8 @@ import {
 } from "./production-lifecycle-helpers";
 import { clickWorkspaceButton, isVisible } from "./ui-helpers";
 
-const saveDraftRpcPath = "/rest/v1/rpc/save_submission_draft";
-const submitCorrectionsRpcPath =
-  "/rest/v1/rpc/submit_corrections_handoff";
+const saveDraftRpcPath = "/rest/v1/rpc/save_agent_submission_if_current";
+const submitCorrectionsRpcPath = "/rest/v1/rpc/save_agent_submission_if_current";
 const familyEmailFieldId = "email";
 const familyEmailFieldLabel = "Email";
 const familyEmailSectionLabel = "Адрес и контакты";
@@ -146,10 +145,7 @@ class StrictFamilyContactMutationGate {
         active.observed === 0;
       const payloadMatches =
         isCandidate &&
-        productionLifecycleMutationPayloadMatches(
-          request.postData(),
-          active.contract,
-        );
+        productionLifecycleMutationPayloadMatches(request.postData(), active.contract);
       if (isCandidate) {
         this.#diagnosticCode = payloadMatches
           ? "match"
@@ -190,11 +186,7 @@ class StrictFamilyContactMutationGate {
     return this.#diagnosticCode;
   }
 
-  begin(
-    label: string,
-    path: string,
-    contract: ProductionLifecycleMutationContract,
-  ) {
+  begin(label: string, path: string, contract: ProductionLifecycleMutationContract) {
     invariant(!this.#window, "A family-contact mutation window is already active.");
     this.#diagnosticCode = "not_observed";
     this.#window = { contract, label, observed: 0, path };
@@ -332,9 +324,7 @@ async function successfulProductionMutation(
       operationMessage:
         operationFailure instanceof Error ? operationFailure.message : "none",
       phase: "action",
-      remarkFormVisible: await isVisible(
-        page.getByTestId("remark-form-submit"),
-      ),
+      remarkFormVisible: await isVisible(page.getByTestId("remark-form-submit")),
     });
   }
   if (gateFailure) throw gateFailure;
@@ -467,14 +457,10 @@ async function familyMutationContract(
   expectation: FamilyMutationExpectation,
 ) {
   const accounts = loadProductionCohortAccounts();
-  const owner = accounts.agents.find(
-    (account) => account.key === state.case.ownerKey,
-  );
+  const owner = accounts.agents.find((account) => account.key === state.case.ownerKey);
   invariant(owner, "Family-contact owner account is absent.");
   const actorId =
-    expectation.actorSource === "admin"
-      ? accounts.admin.authUserId
-      : owner.authUserId;
+    expectation.actorSource === "admin" ? accounts.admin.authUserId : owner.authUserId;
   const baseline = await resolveProductionCohortDraftPayloadIdentity({
     admin: accounts.admin,
     applicantEmailReplacement: expectation.emailReplacement,
@@ -612,9 +598,7 @@ async function familyMutationContract(
 
 async function familyMarkerIssueExists(state: ProductionFamilyContactState) {
   const accounts = loadProductionCohortAccounts();
-  const owner = accounts.agents.find(
-    (account) => account.key === state.case.ownerKey,
-  );
+  const owner = accounts.agents.find((account) => account.key === state.case.ownerKey);
   invariant(owner, "Family-contact owner account is absent for marker readback.");
   const resolved = await resolveProductionCohortDraftPayloadIdentity({
     admin: accounts.admin,
@@ -634,17 +618,12 @@ async function addFamilyContactIssue(
   session: FamilySession,
   state: ProductionFamilyContactState,
 ) {
-  const mutation = await familyMutationContract(
-    state,
-    "waiting_review",
-    "open",
-    {
-      actorSource: "admin",
-      correctionMode: "append",
-      snapshotMutation: "add_issue",
-      snapshotStatus: "submitted_for_review",
-    },
-  );
+  const mutation = await familyMutationContract(state, "waiting_review", "open", {
+    actorSource: "admin",
+    correctionMode: "append",
+    snapshotMutation: "add_issue",
+    snapshotStatus: "submitted_for_review",
+  });
   const root = drawer(session.page);
   await openDrawerTab(root, /Анкета/);
   const applicantTrigger = root.getByRole("button", {
@@ -658,9 +637,7 @@ async function addFamilyContactIssue(
   await expect(applicantListbox.getByRole("option")).toHaveCount(
     mutation.applicantIdsInSnapshotOrder.length,
   );
-  await expect(
-    applicantListbox.getByRole("option", { selected: true }),
-  ).toHaveCount(1);
+  await expect(applicantListbox.getByRole("option", { selected: true })).toHaveCount(1);
   await applicantTrigger.click();
   const section = root
     .locator(".admin-review-field-section")
@@ -670,9 +647,7 @@ async function addFamilyContactIssue(
     await section.locator("summary").click();
   }
   const emailRow = section
-    .locator(
-      '.admin-review-field-row:has(.admin-review-row-label:text-is("Email"))',
-    )
+    .locator('.admin-review-field-row:has(.admin-review-row-label:text-is("Email"))')
     .first();
   const addRemark = emailRow.getByRole("button", {
     name: `Добавить замечание: ${familyEmailFieldLabel}`,
@@ -711,63 +686,48 @@ async function ensureAdminReturned(input: {
   testInfo: TestInfo;
 }) {
   const { admin, browser, evidence, state, testInfo } = input;
-  if (![
-    "pending_review",
-    "adding_issue",
-    "issue_added",
-    "returning",
-  ].includes(state.stage)) {
+  if (
+    !["pending_review", "adding_issue", "issue_added", "returning"].includes(
+      state.stage,
+    )
+  ) {
     return;
   }
   const session = await openSession(browser, testInfo, admin);
-  await runWithFailurePreservingCleanup(async () => {
-    const inReview = await adminReviewPresence(
-      session.page,
-      state.case.submissionId,
-    );
-    if (!inReview) {
-      invariant(
-        state.stage === "returning",
-        "Family-contact case left Review without a saved return intent.",
-      );
-      state.stage = "returned";
-      await saveProductionFamilyContactState(state);
-      return;
-    }
-    let root = await openAdminReviewDrawer(
-      session.page,
-      state.case.submissionId,
-    );
-    if (["pending_review", "adding_issue"].includes(state.stage)) {
-      const issueAlreadyExists = await familyMarkerIssueExists(state);
-      if (issueAlreadyExists) {
-        state.stage = "issue_added";
-        await saveProductionFamilyContactState(state);
-      } else {
-        await addFamilyContactIssue(session, state);
-        await reloadWorkspace(session);
-        root = await openAdminReviewDrawer(
-          session.page,
-          state.case.submissionId,
+  await runWithFailurePreservingCleanup(
+    async () => {
+      const inReview = await adminReviewPresence(session.page, state.case.submissionId);
+      if (!inReview) {
+        invariant(
+          state.stage === "returning",
+          "Family-contact case left Review without a saved return intent.",
         );
+        state.stage = "returned";
+        await saveProductionFamilyContactState(state);
+        return;
       }
-    }
-    await openDrawerTab(root, /Анкета/);
-    await expect(
-      root
-        .getByRole("button", { name: /\d+ замечани(?:е|я|й)/i })
-        .first(),
-    ).toBeVisible();
-    const returnButton = root.getByRole("button", {
-      exact: true,
-      name: "Отправить на исправление",
-    });
-    await expect(returnButton).toBeEnabled();
-    const mutation = await familyMutationContract(
-      state,
-      "returned",
-      "open",
-      {
+      let root = await openAdminReviewDrawer(session.page, state.case.submissionId);
+      if (["pending_review", "adding_issue"].includes(state.stage)) {
+        const issueAlreadyExists = await familyMarkerIssueExists(state);
+        if (issueAlreadyExists) {
+          state.stage = "issue_added";
+          await saveProductionFamilyContactState(state);
+        } else {
+          await addFamilyContactIssue(session, state);
+          await reloadWorkspace(session);
+          root = await openAdminReviewDrawer(session.page, state.case.submissionId);
+        }
+      }
+      await openDrawerTab(root, /Анкета/);
+      await expect(
+        root.getByRole("button", { name: /\d+ замечани(?:е|я|й)/i }).first(),
+      ).toBeVisible();
+      const returnButton = root.getByRole("button", {
+        exact: true,
+        name: "Отправить на исправление",
+      });
+      await expect(returnButton).toBeEnabled();
+      const mutation = await familyMutationContract(state, "returned", "open", {
         actorSource: "admin",
         correctionMode: "existing",
         snapshotStatus: "returned",
@@ -778,32 +738,30 @@ async function ensureAdminReturned(input: {
           note: "Администратор вернул подачу с замечаниями",
           toStatus: "returned",
         },
-      },
-    );
-    state.stage = "returning";
-    await saveProductionFamilyContactState(state);
-    await successfulProductionMutation(
-      session.page,
-      session.ledger,
-      session.mutationGate,
-      saveDraftRpcPath,
-      "return family contact for correction",
-      mutation.contract,
-      () => returnButton.click(),
-    );
-    state.stage = "returned";
-    await saveProductionFamilyContactState(state);
-  }, () => closeSession(session, evidence));
+      });
+      state.stage = "returning";
+      await saveProductionFamilyContactState(state);
+      await successfulProductionMutation(
+        session.page,
+        session.ledger,
+        session.mutationGate,
+        saveDraftRpcPath,
+        "return family contact for correction",
+        mutation.contract,
+        () => returnButton.click(),
+      );
+      state.stage = "returned";
+      await saveProductionFamilyContactState(state);
+    },
+    () => closeSession(session, evidence),
+  );
 }
 
 async function openFamilyIssueQuestionnaire(
   session: FamilySession,
   state: ProductionFamilyContactState,
 ) {
-  const root = await openAgentSubmissionDrawer(
-    session.page,
-    state.case.submissionId,
-  );
+  const root = await openAgentSubmissionDrawer(session.page, state.case.submissionId);
   await openDrawerTab(root, /Замечания/);
   const issueCard = root
     .locator(".v20-issue-card, .v19-drawer-issue-card, article")
@@ -828,17 +786,12 @@ async function openFamilyIssueQuestionnaire(
   }
   await expect(open).toBeVisible();
   await open.click();
-  const questionnaire = session.page
-    .locator(".vf-figma-questionnaire-screen")
-    .first();
+  const questionnaire = session.page.locator(".vf-figma-questionnaire-screen").first();
   await expect(questionnaire).toBeVisible();
   return { issueCard, questionnaire };
 }
 
-async function selectQuestionnaireSection(
-  questionnaire: Locator,
-  name: RegExp,
-) {
+async function selectQuestionnaireSection(questionnaire: Locator, name: RegExp) {
   const section = questionnaire
     .locator(".v19-questionnaire-section-tab:visible")
     .filter({ hasText: name })
@@ -847,9 +800,7 @@ async function selectQuestionnaireSection(
   await section.click();
 }
 
-async function resolveFamilyContactRecoveryState(
-  state: ProductionFamilyContactState,
-) {
+async function resolveFamilyContactRecoveryState(state: ProductionFamilyContactState) {
   const accounts = loadProductionCohortAccounts();
   const cohortCase = buildProductionCohortPlan(state.runMarker).find(
     (candidate) => candidate.caseKey === state.case.caseKey,
@@ -899,155 +850,138 @@ async function ensureAgentCorrectedAndResubmitted(input: {
     }
   }
   const session = await openSession(browser, testInfo, owner);
-  await runWithFailurePreservingCleanup(async () => {
-    const { questionnaire } = await openFamilyIssueQuestionnaire(session, state);
-    const cohortCase = buildProductionCohortPlan(state.runMarker).find(
-      (candidate) => candidate.caseKey === state.case.caseKey,
-    );
-    invariant(cohortCase, "Family-contact cohort case is absent from the plan.");
-    const canonicalEmail = productionCohortContactEmail(cohortCase, 0);
-    const applicantTabs = questionnaire.locator(
-      ".v19-questionnaire-applicant-tab",
-    );
-    await expect(applicantTabs).toHaveCount(6);
+  await runWithFailurePreservingCleanup(
+    async () => {
+      const { questionnaire } = await openFamilyIssueQuestionnaire(session, state);
+      const cohortCase = buildProductionCohortPlan(state.runMarker).find(
+        (candidate) => candidate.caseKey === state.case.caseKey,
+      );
+      invariant(cohortCase, "Family-contact cohort case is absent from the plan.");
+      const canonicalEmail = productionCohortContactEmail(cohortCase, 0);
+      const applicantTabs = questionnaire.locator(".v19-questionnaire-applicant-tab");
+      await expect(applicantTabs).toHaveCount(6);
 
-    while (state.nextApplicantIndex < 6) {
-      const index = state.nextApplicantIndex;
-      const applicantId = applicantIds[index];
-      invariant(applicantId, "Family-contact applicant order is incomplete.");
-      await applicantTabs.nth(index).click();
-      await selectQuestionnaireSection(questionnaire, /Адрес и контакты/);
-      const emailField = questionnaire
-        .locator(`[data-field-label="${familyEmailFieldLabel}"]`)
-        .first();
-      const emailControl = emailField
-        .locator("input:not([readonly]), textarea:not([readonly])")
-        .first();
-      await expect(emailControl).toBeVisible();
-      if ((await emailControl.inputValue()) !== canonicalEmail) {
-        const mutation = await familyMutationContract(
-          state,
-          "returned",
-          "open",
-          {
+      while (state.nextApplicantIndex < 6) {
+        const index = state.nextApplicantIndex;
+        const applicantId = applicantIds[index];
+        invariant(applicantId, "Family-contact applicant order is incomplete.");
+        await applicantTabs.nth(index).click();
+        await selectQuestionnaireSection(questionnaire, /Адрес и контакты/);
+        const emailField = questionnaire
+          .locator(`[data-field-label="${familyEmailFieldLabel}"]`)
+          .first();
+        const emailControl = emailField
+          .locator("input:not([readonly]), textarea:not([readonly])")
+          .first();
+        await expect(emailControl).toBeVisible();
+        if ((await emailControl.inputValue()) !== canonicalEmail) {
+          const mutation = await familyMutationContract(state, "returned", "open", {
             actorSource: "agent",
             correctionMode: "existing",
             emailReplacement: { applicantId, email: canonicalEmail },
             snapshotStatus: "returned",
-          },
-        );
-        state.stage = "correcting_emails";
+          });
+          state.stage = "correcting_emails";
+          await saveProductionFamilyContactState(state);
+          await successfulProductionMutation(
+            session.page,
+            session.ledger,
+            session.mutationGate,
+            saveDraftRpcPath,
+            `replace family contact email ${index + 1} of 6`,
+            mutation.contract,
+            async () => {
+              await emailControl.fill(canonicalEmail);
+              await emailControl.press("Tab");
+            },
+          );
+          await expect(
+            questionnaire.locator('.v19-questionnaire-screen-header [role="status"]'),
+          ).toContainText("Сохранено", { timeout: 45_000 });
+        }
+        state.nextApplicantIndex = index + 1;
+        await saveProductionFamilyContactState(state);
+      }
+
+      await questionnaire.getByRole("button", { name: "Назад" }).click();
+      const root = await openAgentSubmissionDrawer(
+        session.page,
+        state.case.submissionId,
+      );
+      await openDrawerTab(root, /Замечания/);
+      const issueCard = root
+        .locator(".v20-issue-card, .v19-drawer-issue-card, article")
+        .filter({ hasText: productionFamilyContactIssueMarker(state) })
+        .first();
+      const markFixed = issueCard.getByRole("button", {
+        name: /^(?:Отметить|Пометить) исправленным$/,
+      });
+      const alreadyFixed = await isVisible(
+        issueCard.getByText(/Исправлено|Ждет проверки/i).first(),
+      );
+      if (!alreadyFixed) {
+        await expect(markFixed).toBeVisible();
+        const mutation = await familyMutationContract(state, "returned", "fixed", {
+          actorSource: "agent",
+          correctionMode: "existing",
+          snapshotMutation: "mark_issue_fixed",
+          snapshotStatus: "returned",
+        });
+        state.stage = "marking_issue_fixed";
         await saveProductionFamilyContactState(state);
         await successfulProductionMutation(
           session.page,
           session.ledger,
           session.mutationGate,
           saveDraftRpcPath,
-          `replace family contact email ${index + 1} of 6`,
+          "mark family-contact issue fixed",
           mutation.contract,
-          async () => {
-            await emailControl.fill(canonicalEmail);
-            await emailControl.press("Tab");
-          },
+          () => markFixed.click(),
         );
-        await expect(
-          questionnaire.locator(
-            '.v19-questionnaire-screen-header [role="status"]',
-          ),
-        ).toContainText("Сохранено", { timeout: 45_000 });
       }
-      state.nextApplicantIndex = index + 1;
+      state.stage = "agent_fixed";
       await saveProductionFamilyContactState(state);
-    }
+      await root.getByLabel("Закрыть", { exact: true }).click();
 
-    await questionnaire.getByRole("button", { name: "Назад" }).click();
-    const root = await openAgentSubmissionDrawer(
-      session.page,
-      state.case.submissionId,
-    );
-    await openDrawerTab(root, /Замечания/);
-    const issueCard = root
-      .locator(".v20-issue-card, .v19-drawer-issue-card, article")
-      .filter({ hasText: productionFamilyContactIssueMarker(state) })
-      .first();
-    const markFixed = issueCard.getByRole("button", {
-      name: /^(?:Отметить|Пометить) исправленным$/,
-    });
-    const alreadyFixed = await isVisible(
-      issueCard.getByText(/Исправлено|Ждет проверки/i).first(),
-    );
-    if (!alreadyFixed) {
-      await expect(markFixed).toBeVisible();
-      const mutation = await familyMutationContract(
-        state,
-        "returned",
-        "fixed",
-        {
-          actorSource: "agent",
-          correctionMode: "existing",
-          snapshotMutation: "mark_issue_fixed",
-          snapshotStatus: "returned",
+      const reopened = await openFamilyIssueQuestionnaire(session, state);
+      const resubmit = reopened.questionnaire.getByRole("button", {
+        name: "Отправить исправления",
+      });
+      await expect(resubmit).toBeEnabled();
+      const mutation = await familyMutationContract(state, "waiting_review", "fixed", {
+        actorSource: "agent",
+        correctionMode: "existing",
+        snapshotStatus: "corrections_received",
+        transition: {
+          comment: "Статус изменен: Исправления получены: Агент отправил исправления",
+          fromStatus: "returned",
+          note: "Агент отправил исправления",
+          toStatus: "corrections_received",
         },
-      );
-      state.stage = "marking_issue_fixed";
+      });
+      state.stage = "resubmitting";
       await saveProductionFamilyContactState(state);
       await successfulProductionMutation(
         session.page,
         session.ledger,
         session.mutationGate,
-        saveDraftRpcPath,
-        "mark family-contact issue fixed",
+        submitCorrectionsRpcPath,
+        "resubmit corrected family contact",
         mutation.contract,
-        () => markFixed.click(),
+        () => resubmit.click(),
       );
-    }
-    state.stage = "agent_fixed";
-    await saveProductionFamilyContactState(state);
-    await root.getByLabel("Закрыть", { exact: true }).click();
-
-    const reopened = await openFamilyIssueQuestionnaire(session, state);
-    const resubmit = reopened.questionnaire.getByRole("button", {
-      name: "Отправить исправления",
-    });
-    await expect(resubmit).toBeEnabled();
-    const mutation = await familyMutationContract(
-      state,
-      "waiting_review",
-      "fixed",
-      {
-        actorSource: "agent",
-        correctionMode: "existing",
-        snapshotStatus: "corrections_received",
-        transition: {
-          comment:
-            "Статус изменен: Исправления получены: Агент отправил исправления",
-          fromStatus: "returned",
-          note: "Агент отправил исправления",
-          toStatus: "corrections_received",
-        },
-      },
-    );
-    state.stage = "resubmitting";
-    await saveProductionFamilyContactState(state);
-    await successfulProductionMutation(
-      session.page,
-      session.ledger,
-      session.mutationGate,
-      submitCorrectionsRpcPath,
-      "resubmit corrected family contact",
-      mutation.contract,
-      () => resubmit.click(),
-    );
-    invariant(
-      (await resolveFamilyContactRecoveryState(state)) === "resubmitted",
-      "Family-contact resubmission was not proven by exact durable readback.",
-    );
-    state.stage = "resubmitted";
-    await saveProductionFamilyContactState(state);
-    await expect(
-      reopened.questionnaire.getByTestId("questionnaire-read-only-status"),
-    ).toContainText("Исправления на проверке", { timeout: 60_000 });
-  }, () => closeSession(session, evidence));
+      invariant(
+        (await resolveFamilyContactRecoveryState(state)) === "resubmitted",
+        "Family-contact resubmission was not proven by exact durable readback.",
+      );
+      state.stage = "resubmitted";
+      await saveProductionFamilyContactState(state);
+      await expect(
+        reopened.questionnaire.getByTestId("questionnaire-read-only-status"),
+      ).toContainText("Исправления на проверке", { timeout: 60_000 });
+    },
+    () => closeSession(session, evidence),
+  );
 }
 
 async function verifyFamilyContactReadBack(input: {
@@ -1063,47 +997,46 @@ async function verifyFamilyContactReadBack(input: {
     "Family-contact verification requires exact durable readback.",
   );
   const session = await openSession(browser, testInfo, owner);
-  await runWithFailurePreservingCleanup(async () => {
-    const canonicalEmail = `v19qa.${state.case.caseKey.toLowerCase()}.family@example.invalid`;
-    const root = await openAgentSubmissionDrawer(
-      session.page,
-      state.case.submissionId,
-    );
-    await openDrawerTab(root, /Анкета/);
-    await root
-      .getByRole("button", {
-        name: /^(?:Открыть|Смотреть|Исправить) анкету$/,
-      })
-      .first()
-      .click();
-    const questionnaire = session.page
-      .locator(".vf-figma-questionnaire-screen")
-      .first();
-    const tabs = questionnaire.locator(".v19-questionnaire-applicant-tab");
-    await expect(tabs).toHaveCount(6);
-    for (let index = 0; index < 6; index += 1) {
-      await tabs.nth(index).click();
-      await selectQuestionnaireSection(questionnaire, /Адрес и контакты/);
-      await expect(
-        questionnaire
-          .locator(`[data-field-label="${familyEmailFieldLabel}"]`)
-          .first()
-          .locator("input, textarea")
-          .first(),
-      ).toHaveValue(canonicalEmail);
-    }
-    state.stage = "verified";
-    await saveProductionFamilyContactState(state);
-  }, () => closeSession(session, evidence));
+  await runWithFailurePreservingCleanup(
+    async () => {
+      const canonicalEmail = `v19qa.${state.case.caseKey.toLowerCase()}.family@example.invalid`;
+      const root = await openAgentSubmissionDrawer(
+        session.page,
+        state.case.submissionId,
+      );
+      await openDrawerTab(root, /Анкета/);
+      await root
+        .getByRole("button", {
+          name: /^(?:Открыть|Смотреть|Исправить) анкету$/,
+        })
+        .first()
+        .click();
+      const questionnaire = session.page
+        .locator(".vf-figma-questionnaire-screen")
+        .first();
+      const tabs = questionnaire.locator(".v19-questionnaire-applicant-tab");
+      await expect(tabs).toHaveCount(6);
+      for (let index = 0; index < 6; index += 1) {
+        await tabs.nth(index).click();
+        await selectQuestionnaireSection(questionnaire, /Адрес и контакты/);
+        await expect(
+          questionnaire
+            .locator(`[data-field-label="${familyEmailFieldLabel}"]`)
+            .first()
+            .locator("input, textarea")
+            .first(),
+        ).toHaveValue(canonicalEmail);
+      }
+      state.stage = "verified";
+      await saveProductionFamilyContactState(state);
+    },
+    () => closeSession(session, evidence),
+  );
 }
 
-async function assertFamilyContractPreflight(
-  state: ProductionFamilyContactState,
-) {
+async function assertFamilyContractPreflight(state: ProductionFamilyContactState) {
   const accounts = loadProductionCohortAccounts();
-  const owner = accounts.agents.find(
-    (account) => account.key === state.case.ownerKey,
-  );
+  const owner = accounts.agents.find((account) => account.key === state.case.ownerKey);
   invariant(owner, "Family-contact owner account is absent in preflight.");
   const resolved = await resolveProductionCohortDraftPayloadIdentity({
     admin: accounts.admin,
@@ -1140,50 +1073,52 @@ async function assertAdminFamilyContactTargetPreflight(input: {
 }) {
   const { admin, applicantIds, browser, evidence, state, testInfo } = input;
   const session = await openSession(browser, testInfo, admin);
-  await runWithFailurePreservingCleanup(async () => {
-    const root = await openAdminReviewDrawer(
-      session.page,
-      state.case.submissionId,
-    );
-    await openDrawerTab(root, /Анкета/);
-    const applicantTrigger = root.getByRole("button", {
-      name: /^Выбранный заявитель:/,
-    });
-    await expect(applicantTrigger).toBeVisible();
-    await applicantTrigger.click();
-    const applicantListbox = root.getByRole("listbox", {
-      name: "Выберите заявителя",
-    });
-    await expect(applicantListbox.getByRole("option")).toHaveCount(
-      applicantIds.length,
-    );
-    await expect(
-      applicantListbox.getByRole("option", { selected: true }),
-    ).toHaveCount(1);
-    await applicantTrigger.click();
-    const section = root
-      .locator(".admin-review-field-section")
-      .filter({ hasText: familyEmailSectionLabel })
-      .first();
-    if (!(await section.evaluate((element) => (element as HTMLDetailsElement).open))) {
-      await section.locator("summary").click();
-    }
-    const emailRow = section
-      .locator(
-        '.admin-review-field-row:has(.admin-review-row-label:text-is("Email"))',
-      )
-      .first();
-    await expect(emailRow).toBeVisible();
-    if (["pending_review", "adding_issue"].includes(state.stage)) {
+  await runWithFailurePreservingCleanup(
+    async () => {
+      const root = await openAdminReviewDrawer(session.page, state.case.submissionId);
+      await openDrawerTab(root, /Анкета/);
+      const applicantTrigger = root.getByRole("button", {
+        name: /^Выбранный заявитель:/,
+      });
+      await expect(applicantTrigger).toBeVisible();
+      await applicantTrigger.click();
+      const applicantListbox = root.getByRole("listbox", {
+        name: "Выберите заявителя",
+      });
+      await expect(applicantListbox.getByRole("option")).toHaveCount(
+        applicantIds.length,
+      );
       await expect(
-        emailRow.getByRole("button", {
-          name: `Добавить замечание: ${familyEmailFieldLabel}`,
-        }),
-      ).toBeVisible();
-    } else {
-      await expect(emailRow).toHaveAttribute("data-review-state", "error");
-    }
-  }, () => closeSession(session, evidence));
+        applicantListbox.getByRole("option", { selected: true }),
+      ).toHaveCount(1);
+      await applicantTrigger.click();
+      const section = root
+        .locator(".admin-review-field-section")
+        .filter({ hasText: familyEmailSectionLabel })
+        .first();
+      if (
+        !(await section.evaluate((element) => (element as HTMLDetailsElement).open))
+      ) {
+        await section.locator("summary").click();
+      }
+      const emailRow = section
+        .locator(
+          '.admin-review-field-row:has(.admin-review-row-label:text-is("Email"))',
+        )
+        .first();
+      await expect(emailRow).toBeVisible();
+      if (["pending_review", "adding_issue"].includes(state.stage)) {
+        await expect(
+          emailRow.getByRole("button", {
+            name: `Добавить замечание: ${familyEmailFieldLabel}`,
+          }),
+        ).toBeVisible();
+      } else {
+        await expect(emailRow).toHaveAttribute("data-review-state", "error");
+      }
+    },
+    () => closeSession(session, evidence),
+  );
 }
 
 test.describe("production family contact remediation", () => {

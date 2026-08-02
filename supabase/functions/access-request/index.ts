@@ -143,7 +143,9 @@ function assertRegistrationInput(input: AccessRequestInput | undefined) {
   return normalized;
 }
 
-function publicAccessRequestResponse(input: ReturnType<typeof assertRegistrationInput>) {
+function publicAccessRequestResponse(
+  input: ReturnType<typeof assertRegistrationInput>,
+) {
   const nowIso = new Date().toISOString();
   return jsonResponse(200, {
     request: {
@@ -191,7 +193,8 @@ async function handleSubmit(
   admin: ReturnType<typeof supabaseAdmin>,
   input: AccessRequestInput | undefined,
 ) {
-  if (!admin) return jsonResponse(503, { error: "Supabase admin client is unavailable." });
+  if (!admin)
+    return jsonResponse(503, { error: "Supabase admin client is unavailable." });
 
   const normalized = assertRegistrationInput(input);
   const { data: existingProfile, error: profileError } = await admin
@@ -301,17 +304,13 @@ async function handleApprove(
 
   const approvedUserId =
     accessRequest.user_id ??
-    (await resolveAccessRequestUserId(
-      admin.auth.admin,
-      accessRequest.email,
-      {
-        city: accessRequest.city,
-        display_name: accessRequest.full_name,
-        organization_name: accessRequest.company_name,
-        password_setup_required: true,
-        phone: accessRequest.phone,
-      },
-    ));
+    (await resolveAccessRequestUserId(admin.auth.admin, accessRequest.email, {
+      city: accessRequest.city,
+      display_name: accessRequest.full_name,
+      organization_name: accessRequest.company_name,
+      password_setup_required: true,
+      phone: accessRequest.phone,
+    }));
 
   const { data: updatedRequest, error: finalizeError } = await admin.rpc(
     "finalize_access_request_review",
@@ -373,7 +372,20 @@ async function handleReject(
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (request.method !== "POST") return jsonResponse(405, { error: "Method not allowed." });
+  if (request.method === "GET" && new URL(request.url).pathname.endsWith("/health")) {
+    const admin = supabaseAdmin();
+    const healthRead = admin
+      ? await admin.from("profiles").select("id", { count: "exact", head: true })
+      : { error: new Error("Supabase admin client is unavailable.") };
+    const ready = Boolean(admin && !healthRead.error);
+    return jsonResponse(ready ? 200 : 503, {
+      capability: "registration-ready",
+      function: "access-request",
+      status: ready ? "ok" : "blocked",
+    });
+  }
+  if (request.method !== "POST")
+    return jsonResponse(405, { error: "Method not allowed." });
 
   try {
     const body = (await request.json()) as RequestBody;
@@ -390,8 +402,10 @@ Deno.serve(async (request) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     const errorCode = isRecord(error) ? error.code : undefined;
-    if (message === "AUTH_REQUIRED") return jsonResponse(401, { error: "AUTH_REQUIRED" });
-    if (message === "ADMIN_REQUIRED") return jsonResponse(403, { error: "ADMIN_REQUIRED" });
+    if (message === "AUTH_REQUIRED")
+      return jsonResponse(401, { error: "AUTH_REQUIRED" });
+    if (message === "ADMIN_REQUIRED")
+      return jsonResponse(403, { error: "ADMIN_REQUIRED" });
     if (message === "SUPABASE_ADMIN_UNAVAILABLE") {
       return jsonResponse(503, { error: "Supabase admin client is unavailable." });
     }

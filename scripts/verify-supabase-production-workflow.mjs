@@ -4,6 +4,11 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { testArtifactPath } from "./lib/artifact-paths.mjs";
 import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
+import {
+  assertProductionMutationAllowed,
+  productionApprovalPacketPath,
+} from "./lib/supabase-production-mutation-gate.mjs";
+import { cleanupProductionWorkflowFixtures } from "./lib/supabase-production-cleanup.mjs";
 
 const repoRoot = process.cwd();
 const publicEnvPath = resolve(repoRoot, ".env.supabase-production.local");
@@ -15,7 +20,6 @@ const readinessPath = resolve(
 const evidencePath = testArtifactPath("supabase-production-workflow-smoke-20260701.md");
 const productionProjectId = SUPABASE_PRODUCTION_TARGET.projectId;
 const productionProjectUrl = SUPABASE_PRODUCTION_TARGET.projectUrl;
-const sandboxProjectId = "oevvaowoklqttqkraxho";
 const bucket = "submission-media";
 const stamp = new Date()
   .toISOString()
@@ -34,6 +38,17 @@ const uploadPaths = requiredMediaSlots.map((slot) =>
 const uploadPath = storagePathFor(runId, applicantId, "selfie", "v19smoke_selfie.jpg");
 const checks = [];
 const cleanupPaths = new Set(uploadPaths);
+const caseRevisions = new Map();
+
+try {
+  assertProductionMutationAllowed({
+    action: "workflow-smoke",
+    repoRoot,
+    readinessPath: productionApprovalPacketPath(repoRoot),
+  });
+} catch (error) {
+  failBeforeMutation(error.message);
+}
 
 const publicEnv = readEnv(publicEnvPath);
 const adminEnv = readEnv(adminEnvPath);
@@ -53,16 +68,16 @@ const adminCleanupKey = clean(
 
 await main();
 
+function failBeforeMutation(message) {
+  console.error(`BLOCKED ${message}`);
+  process.exit(1);
+}
+
 async function main() {
   assert(
     projectId === productionProjectId,
     "target is production project",
     "project id mismatch",
-  );
-  assert(
-    projectId !== sandboxProjectId,
-    "target is not sandbox",
-    "sandbox project selected",
   );
   assert(
     projectUrl === productionProjectUrl,
@@ -97,9 +112,9 @@ async function main() {
   try {
     await cleanup(adminService);
 
-    await save(agent.client, draftPayload(agent.userId, runId));
+    await saveAgent(agent.client, draftPayload(agent.userId, runId));
     await expectStatus(adminService, runId, "draft");
-    pass("agent can create draft through save_submission_draft");
+    pass("agent can create draft through revision-checked CAS RPC");
 
     await uploadPrivateMedia(agent.client);
     await createScopedSignedUrl(agent.client, true);
@@ -107,7 +122,7 @@ async function main() {
     pass("agent can upload private media and signed URLs are owner-scoped");
 
     await expectRejected(
-      save(
+      saveAgent(
         agent.client,
         incompleteWaitingReviewPayload(agent.userId, `${runId}-incomplete`),
       ),
@@ -124,56 +139,66 @@ async function main() {
       agent.userId,
     );
 
-    await save(
+    await saveAgent(
       agent.client,
       validReviewPayload(agent.userId, runId, "ready_for_review"),
     );
-    await save(agent.client, validReviewPayload(agent.userId, runId, "waiting_review"));
+    await saveAgent(
+      agent.client,
+      validReviewPayload(agent.userId, runId, "waiting_review"),
+    );
     await expectStatus(adminService, runId, "waiting_review");
     pass("valid waiting_review reaches admin queue");
 
-    await save(
+    await saveAdmin(
       adminUser.client,
+      adminUser.userId,
       returnedPayload(agent.userId, adminUser.userId, runId),
     );
     await expectStatus(adminService, runId, "returned");
     pass("admin can return case with blocking correction");
 
     await expectRejected(
-      otherAgent.client.rpc("submit_corrections_handoff", {
-        payload: fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
-      }),
+      saveAgent(
+        otherAgent.client,
+        fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
+        "correction_handoff",
+      ),
       "other agent cannot submit assigned correction handoff",
     );
     await expectRejected(
-      adminUser.client.rpc("submit_corrections_handoff", {
-        payload: fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
-      }),
+      saveAgent(
+        adminUser.client,
+        fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
+        "correction_handoff",
+      ),
       "admin cannot impersonate assigned agent correction handoff",
     );
 
-    const handoff = await agent.client.rpc("submit_corrections_handoff", {
-      payload: fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
-    });
-    if (handoff.error) throw new Error(handoff.error.message);
+    await saveAgent(
+      agent.client,
+      fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
+      "correction_handoff",
+    );
     await expectStatus(adminService, runId, "waiting_review");
     pass("assigned agent can hand off fixed corrections");
 
-    await save(
+    await saveAdmin(
       adminUser.client,
+      adminUser.userId,
       acceptedPayload(agent.userId, adminUser.userId, runId),
     );
     await expectStatus(adminService, runId, "accepted");
     pass("admin can accept case");
 
     await expectRejected(
-      save(agent.client, draftPayload(agent.userId, runId)),
+      saveAgent(agent.client, draftPayload(agent.userId, runId)),
       "agent mutation is blocked after admin handoff",
     );
 
-    await save(agent.client, familyDraftPayload(agent.userId, familyRunId, false));
+    await saveAgent(agent.client, familyDraftPayload(agent.userId, familyRunId, false));
     await uploadFamilyPrivateMedia(agent.client, familyRunId);
-    await save(
+    await saveAgent(
       agent.client,
       familyDraftPayload(agent.userId, familyRunId, true, "waiting_review"),
     );
@@ -245,9 +270,50 @@ async function signedClient(emailKey, passwordKey) {
   return { client, userId: data.user.id };
 }
 
-async function save(client, payload) {
-  const { error } = await client.rpc("save_submission_draft", { payload });
+async function saveAgent(client, payload, mutationKind = "draft") {
+  const submissionId = payload?.submission?.id;
+  if (typeof submissionId !== "string" || !submissionId) {
+    throw new Error("Agent smoke payload submission id is missing");
+  }
+  const operationId = randomUUID();
+  const { data, error } = await client.rpc("save_agent_submission_if_current", {
+    expected_revision: caseRevisions.get(submissionId) ?? null,
+    mutation_kind: mutationKind,
+    operation_id: operationId,
+    payload,
+  });
   if (error) throw new Error(error.message);
+  if (
+    data?.operationId !== operationId ||
+    data?.submissionId !== submissionId ||
+    !Number.isSafeInteger(data?.caseRevision)
+  ) {
+    throw new Error("Agent smoke CAS receipt is invalid");
+  }
+  caseRevisions.set(submissionId, data.caseRevision);
+  return data;
+}
+
+async function saveAdmin(client, actorId, payload) {
+  const submissionId = payload?.submission?.id;
+  const expectedRevision = caseRevisions.get(submissionId);
+  if (typeof submissionId !== "string" || expectedRevision === undefined) {
+    throw new Error("Admin smoke payload has no canonical case revision");
+  }
+  const operationId = randomUUID();
+  const { data, error } = await client.rpc("save_admin_submission_batch_if_current", {
+    actor_id: actorId,
+    expected_revisions: { [submissionId]: expectedRevision },
+    operation_id: operationId,
+    payloads: [payload],
+  });
+  if (error) throw new Error(error.message);
+  const nextRevision = data?.caseRevisions?.[submissionId];
+  if (data?.operationId !== operationId || !Number.isSafeInteger(nextRevision)) {
+    throw new Error("Admin smoke CAS receipt is invalid");
+  }
+  caseRevisions.set(submissionId, nextRevision);
+  return data;
 }
 
 async function expectRejected(action, label) {
@@ -373,7 +439,7 @@ async function expectMalformedBucketReadinessRejected(
   adminClient,
   agentId,
 ) {
-  await save(
+  await saveAgent(
     agentClient,
     malformedMediaReadinessPayload(agentId, malformedBucketReadinessId),
   );
@@ -410,7 +476,7 @@ async function expectMalformedBucketReadinessRejected(
 }
 
 async function expectMalformedPathReadinessRejected(agentClient, adminClient, agentId) {
-  await save(
+  await saveAgent(
     agentClient,
     malformedMediaReadinessPayload(agentId, malformedPathReadinessId),
   );
@@ -456,20 +522,18 @@ function isCanonicalStorageIdentityError(error) {
 }
 
 async function cleanup(client) {
-  await client.storage.from(bucket).remove([...cleanupPaths]);
-  for (const id of [
-    runId,
-    `${runId}-incomplete`,
-    malformedBucketReadinessId,
-    malformedPathReadinessId,
-    familyRunId,
-  ]) {
-    await client.from("corrections").delete().eq("submission_id", id);
-    await client.from("status_history").delete().eq("submission_id", id);
-    await client.from("media_assets").delete().eq("submission_id", id);
-    await client.from("applicants").delete().eq("submission_id", id);
-    await client.from("submissions").delete().eq("id", id);
-  }
+  await cleanupProductionWorkflowFixtures({
+    bucket,
+    client,
+    cleanupPaths,
+    submissionIds: [
+      runId,
+      `${runId}-incomplete`,
+      malformedBucketReadinessId,
+      malformedPathReadinessId,
+      familyRunId,
+    ],
+  });
 }
 
 function draftPayload(agentId, id) {

@@ -41,8 +41,7 @@ export type SupabasePersistenceOperation =
   | "status_history.list"
   | "status_history.insert"
   | "rpc.save_admin_submission_batch_if_current"
-  | "rpc.save_submission_draft"
-  | "rpc.submit_corrections_handoff"
+  | "rpc.save_agent_submission_if_current"
   | "storage.upload_media"
   | "storage.upload_agent_return_package_artifact"
   | "storage.delete_media"
@@ -90,8 +89,7 @@ interface SupabaseErrorShape {
 
 const userMessages: Record<PersistenceFailureKind, string> = {
   auth: "Unable to sign in. Check email, password, and Supabase profile.",
-  database:
-    "Supabase data could not be loaded. No private details were exposed.",
+  database: "Supabase data could not be loaded. No private details were exposed.",
   rls: "Access was denied by Supabase policy. Ask an operator to confirm access.",
   rpc: "Supabase could not complete the save request. Try again after reload.",
   save: "Remote save failed. Last saved Supabase data was reloaded.",
@@ -144,7 +142,7 @@ function kindForOperation(
 ): PersistenceFailureKind {
   if (operation.startsWith("auth.")) return "auth";
   if (
-    operation === "rpc.save_submission_draft" ||
+    operation === "rpc.save_agent_submission_if_current" ||
     operation === "rpc.save_admin_submission_batch_if_current"
   ) {
     return "save";
@@ -213,11 +211,7 @@ function safeCodeFor(
 ): string {
   const code =
     supabaseCode ??
-    (status
-      ? `HTTP_${status}`
-      : networkOrTimeoutFailure
-        ? "NETWORK"
-        : "UNKNOWN");
+    (status ? `HTTP_${status}` : networkOrTimeoutFailure ? "NETWORK" : "UNKNOWN");
   return `${operation}:${kind}:${code}`;
 }
 

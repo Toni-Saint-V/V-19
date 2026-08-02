@@ -181,18 +181,6 @@ export type Database = {
         };
         Returns: AgentReturnPackageArtifactUploadAbortResult;
       };
-      save_submission_draft: {
-        Args: {
-          payload: SubmissionDraftPersistencePayload;
-        };
-        Returns: {
-          submissionId: string;
-          applicants: number;
-          questionnaireAnswers?: number;
-          mediaAssets: number;
-          statusHistory: number;
-        };
-      };
       save_admin_submission_batch_if_current: {
         Args: {
           actor_id: string;
@@ -210,6 +198,27 @@ export type Database = {
             mediaAssets: number;
             statusHistory: number;
           }>;
+        };
+      };
+      save_agent_submission_if_current: {
+        Args: {
+          expected_revision: number | null;
+          mutation_kind: "draft" | "correction_handoff";
+          operation_id: string;
+          payload: SubmissionDraftPersistencePayload;
+        };
+        Returns: {
+          caseRevision: number;
+          operationId: string;
+          result: {
+            submissionId: string;
+            applicants: number;
+            questionnaireAnswers?: number;
+            mediaAssets: number;
+            statusHistory: number;
+            idempotent?: boolean;
+          };
+          submissionId: string;
         };
       };
       claim_access_request_review: {
@@ -231,19 +240,6 @@ export type Database = {
           p_user_id?: string | null;
         };
         Returns: AccessRequestRow;
-      };
-      submit_corrections_handoff: {
-        Args: {
-          payload: SubmissionDraftPersistencePayload;
-        };
-        Returns: {
-          submissionId: string;
-          applicants: number;
-          questionnaireAnswers?: number;
-          mediaAssets: number;
-          statusHistory: number;
-          idempotent?: boolean;
-        };
       };
       upsert_questionnaire_answers: {
         Args: {
@@ -402,10 +398,7 @@ export interface ApplicantRow extends DbRecord {
   updated_at: string;
 }
 
-export type ApplicantInsert = Omit<
-  ApplicantRow,
-  "created_at" | "updated_at"
-> & {
+export type ApplicantInsert = Omit<ApplicantRow, "created_at" | "updated_at"> & {
   created_at?: string;
   updated_at?: string;
 };
@@ -422,11 +415,7 @@ export interface MediaAssetRow extends DbRecord {
   mime_type: string | null;
   size_bytes: number | null;
   upload_status: "none" | "uploaded";
-  review_status:
-    | "not_reviewed"
-    | "accepted"
-    | "replace_required"
-    | "poor_quality";
+  review_status: "not_reviewed" | "accepted" | "replace_required" | "poor_quality";
   uploaded_at: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
@@ -485,10 +474,7 @@ export interface CorrectionRow extends DbRecord {
   fixed_at: string | null;
 }
 
-export type CorrectionInsert = Omit<
-  CorrectionRow,
-  "id" | "created_at" | "fixed_at"
-> & {
+export type CorrectionInsert = Omit<CorrectionRow, "id" | "created_at" | "fixed_at"> & {
   id?: string;
   created_at?: string;
   fixed_at?: string | null;
@@ -551,10 +537,7 @@ export interface AdminPdfArtifactRow extends DbRecord {
   uploaded_at: string;
 }
 
-export type AdminPdfArtifactInsert = Omit<
-  AdminPdfArtifactRow,
-  "id" | "uploaded_at"
-> & {
+export type AdminPdfArtifactInsert = Omit<AdminPdfArtifactRow, "id" | "uploaded_at"> & {
   id?: string;
   uploaded_at?: string;
 };
@@ -604,10 +587,7 @@ export interface ExportBatchMemberRow extends DbRecord {
   created_at: string;
 }
 
-export type ExportBatchMemberInsert = Omit<
-  ExportBatchMemberRow,
-  "created_at"
-> & {
+export type ExportBatchMemberInsert = Omit<ExportBatchMemberRow, "created_at"> & {
   created_at?: string;
 };
 
@@ -636,9 +616,7 @@ export type AgentReturnPackageInsert = Omit<
   status?: AgentReturnPackageStatus;
 };
 
-export type AgentReturnPackageArtifactKind =
-  | "agent_list_pdf"
-  | "visa_application_pdf";
+export type AgentReturnPackageArtifactKind = "agent_list_pdf" | "visa_application_pdf";
 
 export interface AgentReturnPackageArtifactRow extends DbRecord {
   id: string;
@@ -734,11 +712,7 @@ export interface DocumentExportEventRow extends DbRecord {
 
 export type DocumentExportEventInsert = Omit<
   DocumentExportEventRow,
-  | "id"
-  | "created_by"
-  | "created_at"
-  | "applicant_count"
-  | "workbook_file_name"
+  "id" | "created_by" | "created_at" | "applicant_count" | "workbook_file_name"
 > & {
   applicant_count?: number | null;
   id?: string;
@@ -829,10 +803,7 @@ export interface StatusHistoryRow extends DbRecord {
   changed_at: string;
 }
 
-export type StatusHistoryInsert = Omit<
-  StatusHistoryRow,
-  "id" | "changed_at"
-> & {
+export type StatusHistoryInsert = Omit<StatusHistoryRow, "id" | "changed_at"> & {
   id?: string;
   changed_at?: string;
 };

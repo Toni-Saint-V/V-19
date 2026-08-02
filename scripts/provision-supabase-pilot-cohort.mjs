@@ -3,13 +3,19 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
+import {
+  assertProductionMutationAllowed,
+  productionApprovalPacketPath,
+} from "./lib/supabase-production-mutation-gate.mjs";
 
 const repoRoot = process.cwd();
-const sandboxProjectRef = "oevvaowoklqttqkraxho";
 const adminEnvPath = resolve(repoRoot, ".env.supabase-production-admin.local");
 const publicEnvPath = resolve(repoRoot, ".env.supabase-production.local");
 const cohortPath = resolve(repoRoot, ".supabase-pilot-cohort.local.json");
-const readinessPath = resolve(repoRoot, "docs/release/supabase-production-readiness.json");
+const trackedReadinessPath = resolve(
+  repoRoot,
+  "docs/release/supabase-production-readiness.json",
+);
 
 const args = new Set(process.argv.slice(2));
 const writeTemplate = args.has("--write-template");
@@ -27,6 +33,21 @@ if ([writeTemplate, checkOnly, provision].filter(Boolean).length > 1) {
   fail("Use exactly one mode: --write-template, --check, or --provision.");
 }
 
+let productionApprovalPath = "";
+if (provision) {
+  try {
+    productionApprovalPath = productionApprovalPacketPath(repoRoot);
+    assertProductionMutationAllowed({
+      action: "pilot-provision",
+      repoRoot,
+      readinessPath: productionApprovalPath,
+    });
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
+const readinessPath = provision ? productionApprovalPath : trackedReadinessPath;
 const readiness = readJsonIfExists(readinessPath);
 const adminEnv = readEnvIfExists(adminEnvPath);
 const publicEnv = readEnvIfExists(publicEnvPath);
@@ -69,7 +90,9 @@ await provisionPilotUsers(desiredUsers);
 function usage() {
   console.log("Usage:");
   console.log("  node scripts/provision-supabase-pilot-cohort.mjs --write-template");
-  console.log("  node scripts/provision-supabase-pilot-cohort.mjs --check [--required-size 20]");
+  console.log(
+    "  node scripts/provision-supabase-pilot-cohort.mjs --check [--required-size 20]",
+  );
   console.log(
     "  node scripts/provision-supabase-pilot-cohort.mjs --provision [--verify-sign-in] [--required-size 20]",
   );
@@ -121,19 +144,30 @@ function writePilotTemplate() {
     organization:
       clean(adminEnv.SUPABASE_ORGANIZATION) ||
       clean(readiness.productionTarget?.supabaseOrganization),
-    productionNotSandboxConfirmed: Boolean(projectRef && projectRef !== sandboxProjectRef),
+    productionNotSandboxConfirmed: productionTargetMatchesDescriptor(),
     cohorts: existing.cohorts ?? {
-      agent: { email: "", exists: false, roleVerified: false, identifierRecorded: false },
+      agent: {
+        email: "",
+        exists: false,
+        roleVerified: false,
+        identifierRecorded: false,
+      },
       otherAgent: {
         email: "",
         exists: false,
         roleVerified: false,
         identifierRecorded: false,
       },
-      admin: { email: "", exists: false, roleVerified: false, identifierRecorded: false },
+      admin: {
+        email: "",
+        exists: false,
+        roleVerified: false,
+        identifierRecorded: false,
+      },
     },
     pilotUsers: existing.pilotUsers ?? defaultPilotUsers(),
-    orphanAuthUsersWithoutProfileCount: existing.orphanAuthUsersWithoutProfileCount ?? null,
+    orphanAuthUsersWithoutProfileCount:
+      existing.orphanAuthUsersWithoutProfileCount ?? null,
     notes:
       existing.notes ??
       "Fill email/password/displayName locally. This file is ignored and must not be committed.",
@@ -184,11 +218,17 @@ function validatePreflight({ desiredUsers, needAdminKey, needPublishableKey }) {
   const uniqueEmails = new Set(desiredUsers.map((user) => user.email).filter(Boolean));
 
   add(Boolean(projectRef), "production project ref is recorded");
-  add(projectRef !== sandboxProjectRef, "target is not sandbox");
   add(Boolean(projectUrl), "production project URL is recorded");
   add(
     productionTargetMatchesDescriptor(),
     "production target matches canonical descriptor",
+  );
+  add(
+    !provision ||
+      (readiness.scope === "supabase-production-cutover" &&
+        readiness.status === "GO" &&
+        readiness.phase === "approved"),
+    "pilot provisioning requires an approved production cutover",
   );
   add(
     !needPublishableKey || Boolean(publishableKey),
@@ -202,7 +242,10 @@ function validatePreflight({ desiredUsers, needAdminKey, needPublishableKey }) {
       ? "admin API key is available locally"
       : "admin API key is not required for local cohort check",
   );
-  add(desiredUsers.length >= requiredPilotSize, `pilot cohort has at least ${requiredPilotSize} users`);
+  add(
+    desiredUsers.length >= requiredPilotSize,
+    `pilot cohort has at least ${requiredPilotSize} users`,
+  );
   add(
     desiredUsers.every((user) => user.email.includes("@")),
     "every pilot user has an email",
@@ -241,7 +284,9 @@ function printReport(checks, desiredUsers) {
   }
   const adminCount = desiredUsers.filter((user) => user.role === "admin").length;
   const agentCount = desiredUsers.filter((user) => user.role === "agent").length;
-  console.log(`Pilot cohort summary: total=${desiredUsers.length}, admins=${adminCount}, agents=${agentCount}`);
+  console.log(
+    `Pilot cohort summary: total=${desiredUsers.length}, admins=${adminCount}, agents=${agentCount}`,
+  );
 }
 
 async function provisionPilotUsers(desiredUsers) {
@@ -259,7 +304,13 @@ async function provisionPilotUsers(desiredUsers) {
     const signInVerified = verifySignIn
       ? await verifyUserSignIn(publicClient, user)
       : false;
-    results.push({ ...user, authUserId: authUser.id, exists: true, roleVerified: true, signInVerified });
+    results.push({
+      ...user,
+      authUserId: authUser.id,
+      exists: true,
+      roleVerified: true,
+      signInVerified,
+    });
   }
 
   const updated = {
@@ -268,9 +319,10 @@ async function provisionPilotUsers(desiredUsers) {
     projectRef,
     projectUrl,
     cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
-    productionNotSandboxConfirmed: projectRef !== sandboxProjectRef,
+    productionNotSandboxConfirmed: productionTargetMatchesDescriptor(),
     pilotUsers: mergePilotResults(cohort.pilotUsers ?? [], results),
-    orphanAuthUsersWithoutProfileCount: cohort.orphanAuthUsersWithoutProfileCount ?? null,
+    orphanAuthUsersWithoutProfileCount:
+      cohort.orphanAuthUsersWithoutProfileCount ?? null,
   };
 
   updated.cohorts = updateSmokeCohorts(updated.cohorts ?? {}, results);
@@ -293,7 +345,9 @@ async function ensureAuthUser(admin, user) {
   });
 
   if (error || !data.user) {
-    throw new Error(`Could not create pilot auth user for ${user.key}: ${error?.message ?? "missing user"}`);
+    throw new Error(
+      `Could not create pilot auth user for ${user.key}: ${error?.message ?? "missing user"}`,
+    );
   }
 
   return data.user;
@@ -322,7 +376,8 @@ async function upsertProfile(admin, user, userId) {
     { onConflict: "id" },
   );
 
-  if (error) throw new Error(`Could not upsert profile for ${user.key}: ${error.message}`);
+  if (error)
+    throw new Error(`Could not upsert profile for ${user.key}: ${error.message}`);
 
   const { data, error: readError } = await admin
     .from("profiles")
@@ -340,7 +395,8 @@ async function verifyUserSignIn(publicClient, user) {
     password: user.password,
   });
   await publicClient.auth.signOut();
-  if (error || !data.user) throw new Error(`Sign-in verification failed for ${user.key}.`);
+  if (error || !data.user)
+    throw new Error(`Sign-in verification failed for ${user.key}.`);
   return true;
 }
 

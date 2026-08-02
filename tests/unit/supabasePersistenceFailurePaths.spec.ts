@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import type { Submission } from "../../src/types/domain";
 
 const supabaseMock = vi.hoisted(() => ({
   client: null as null | Record<string, unknown>,
@@ -26,49 +25,12 @@ import {
   signOutCurrentSession,
   signInSupabaseWithPassword,
 } from "../../src/services/authService";
-import { saveSubmissionDraft } from "../../src/services/submissionService";
 import {
   buildMediaStoragePath,
   deleteMediaFromStorage,
   downloadMediaFromStorage,
   uploadMediaToStorage,
 } from "../../src/services/storageService";
-
-function makeSubmission(): Submission {
-  return {
-    id: "VF-1044",
-    title: "Ivan Petrov",
-    type: "single",
-    agentId: "00000000-0000-4000-8000-000000000001",
-    agentName: "Nord Travel",
-    country: "Spain",
-    city: "Madrid",
-    travelDate: "2026-08-20",
-    updated: "2026-06-12T10:00:00.000Z",
-    status: "draft",
-    appointment: "not_started",
-    priority: "Средний",
-    fields: 0,
-    media: 0,
-    mediaRequired: 0,
-    applicants: [
-      {
-        id: "applicant-1",
-        name: "Ivan Petrov",
-        role: "Заявитель",
-        passport: "75 1234567",
-        form: 100,
-        media: 0,
-        mediaRequired: 0,
-        country: "Spain",
-        city: "Madrid",
-        tripDates: "2026-08-20",
-      },
-    ],
-    mediaRows: [],
-    notes: [],
-  };
-}
 
 describe("Supabase persistence failure paths", () => {
   beforeEach(() => {
@@ -214,37 +176,6 @@ describe("Supabase persistence failure paths", () => {
         retryable: true,
       },
       userMessage: "Supabase storage could not complete the file action.",
-    });
-  });
-
-  test("wraps RPC save RLS failures before they reach UI", async () => {
-    const rpc = vi.fn(async () => ({
-      error: {
-        name: "PostgrestError",
-        code: "42501",
-        status: 403,
-        message: "new row violates row-level security policy",
-      },
-    }));
-    supabaseMock.client = { rpc };
-
-    await expect(
-      saveSubmissionDraft(makeSubmission(), {
-        actorId: "00000000-0000-4000-8000-000000000001",
-        role: "agent",
-      }),
-    ).rejects.toMatchObject({
-      diagnostics: {
-        operation: "rpc.save_submission_draft",
-        kind: "rls",
-        safeCode: "rpc.save_submission_draft:rls:42501",
-        retryable: false,
-      },
-      userMessage:
-        "Access was denied by Supabase policy. Ask an operator to confirm access.",
-    });
-    expect(rpc).toHaveBeenCalledWith("save_submission_draft", {
-      payload: expect.any(Object),
     });
   });
 
@@ -641,5 +572,4 @@ describe("Supabase persistence failure paths", () => {
     expect(upsert).not.toHaveBeenCalled();
     expect(signOut).toHaveBeenCalledTimes(1);
   });
-
 });
