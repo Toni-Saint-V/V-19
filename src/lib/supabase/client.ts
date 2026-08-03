@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { supabaseRuntimeConfig } from "./config";
 import type { Database } from "./database.types";
+import { createEdgeFunctionsRoutingFetch } from "./edgeFunctionsRoutingFetch";
 import { createSupabaseResilientFetch } from "./resilientFetch";
 
 export type VisaFlowSupabaseClient = SupabaseClient<Database>;
@@ -21,7 +22,11 @@ export function getSupabaseClient(): VisaFlowSupabaseClient | null {
         detectSessionInUrl: true,
       },
       global: {
-        fetch: createSupabaseResilientFetch(),
+        fetch: createEdgeFunctionsRoutingFetch(createSupabaseResilientFetch(), {
+          edgeFunctionsUrl: supabaseRuntimeConfig.edgeFunctionsUrl,
+          projectId: supabaseRuntimeConfig.projectId,
+          supabaseUrl: supabaseRuntimeConfig.url,
+        }),
       },
     },
   );
