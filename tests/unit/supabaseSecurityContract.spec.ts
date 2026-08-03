@@ -80,6 +80,40 @@ describe("Supabase security contract", () => {
     expect(authService).not.toContain(".signUp(");
   });
 
+  test("repairs the agent CAS writer variable scope without widening execute access", () => {
+    const originalMigration = readProjectFile(
+      "supabase/migrations/20260803000100_agent_submission_concurrency.sql",
+    );
+    const migration = readProjectFile(
+      "supabase/migrations/20260803130255_fix_agent_submission_concurrency_variable_scope.sql",
+    );
+    const functionMarker =
+      "create or replace function public.save_agent_submission_if_current(";
+    const extractFunction = (sql: string) => {
+      const start = sql.indexOf(functionMarker);
+      const end = sql.indexOf("$function$;", start) + "$function$;".length;
+
+      return sql.slice(start, end);
+    };
+
+    expect(migration).toContain("<<save_agent_submission_if_current>>");
+    expect(migration).toContain(
+      "create or replace function public.save_agent_submission_if_current(",
+    );
+    expect(migration).not.toContain("pg_get_functiondef");
+    expect(
+      extractFunction(migration).replace(
+        "as $function$\n<<save_agent_submission_if_current>>\n",
+        "as $function$\n",
+      ),
+    ).toBe(extractFunction(originalMigration));
+    expect(migration).toContain("security invoker");
+    expect(migration).toContain(
+      "from public, anon, authenticated",
+    );
+    expect(migration).toContain("to authenticated");
+  });
+
   test("uses the active admin UUID for atomic passport-section persistence", () => {
     const app = readProjectFile("src/App.tsx");
 

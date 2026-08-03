@@ -64,6 +64,7 @@ export const requiredMigrationOrder = [
   "20260722003000_atomic_return_package_artifact_upload.sql",
   "20260802000100_clean_cutover_schema_inventory.sql",
   "20260803000100_agent_submission_concurrency.sql",
+  "20260803130255_fix_agent_submission_concurrency_variable_scope.sql",
 ];
 
 export const legacyRemoteMigrationOrder = [
