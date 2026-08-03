@@ -100,19 +100,21 @@ is supplied. The required functions are `access-request`, `ai-helper`, and
 secret-name contract and performs a read-only `/health` invocation against each
 deployed function. Names and `/health` responses are diagnostic only: they can
 never set readiness to PASS without exact deployed-source identity and real
-handler semantic evidence. `ai-helper` reports healthy in production only when its
-quota RPC, audit-table OpenAPI contract, and configured LiteLLM model are
-reachable by read-only probes. `passport-extract` reports the explicitly safe
-manual-review fallback; automated OCR is not claimed by this activation gate.
+handler semantic evidence. Public `/health` checks only the presence of the
+canonical server-side configuration and never performs an admin database or AI
+provider request. Privileged database/provider reachability belongs to the
+operator-only semantic receipts. `passport-extract` reports the explicitly safe
+manual-review fallback; automated OCR is not claimed by the public health gate.
 
 After deployment, `npm run verify:deployment-identity` verifies that the
 canonical Vercel alias serves a clean `supabase-production` bundle built from
 the exact pre-activation Git SHA.
 
-Cutover readiness currently progresses only through
-`awaiting-fresh-evidence -> evidence-complete`; both phases are `NO_GO`.
-The former self-declared `approved/GO` transition is intentionally disabled
-until an authenticated detached owner-approval mechanism is configured.
+Tracked cutover readiness progresses only through
+`awaiting-fresh-evidence -> evidence-complete`; both tracked phases are `NO_GO`.
+An `approved/GO` transition is accepted only from an immutable external packet
+bound to the tracked readiness SHA-256 and a detached owner signature over the
+exact evidence root. The tracked packet can never self-declare approval.
 Predictable `projectId:generation` confirmation strings do not authorize a
 production write. Evidence files must be fresh and bound to the exact project,
 cutover generation, Git SHA, source digest, timestamp, and SHA-256.

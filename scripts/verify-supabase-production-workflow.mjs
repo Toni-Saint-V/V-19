@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { testArtifactPath } from "./lib/artifact-paths.mjs";
 import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
@@ -8,7 +9,11 @@ import {
   assertProductionMutationAllowed,
   productionApprovalPacketPath,
 } from "./lib/supabase-production-mutation-gate.mjs";
-import { cleanupProductionWorkflowFixtures } from "./lib/supabase-production-cleanup.mjs";
+import {
+  cleanupProductionWorkflowFixtures,
+  productionWorkflowFailureMessage,
+} from "./lib/supabase-production-cleanup.mjs";
+import { releaseSourceSha256FromGitHead } from "./lib/release-source-identity.mjs";
 
 const repoRoot = process.cwd();
 const publicEnvPath = resolve(repoRoot, ".env.supabase-production.local");
@@ -17,7 +22,9 @@ const readinessPath = resolve(
   repoRoot,
   "docs/release/supabase-production-readiness.json",
 );
-const evidencePath = testArtifactPath("supabase-production-workflow-smoke-20260701.md");
+const evidencePath = testArtifactPath(
+  "supabase-production-workflow-smoke-20260701.json",
+);
 const productionProjectId = SUPABASE_PRODUCTION_TARGET.projectId;
 const productionProjectUrl = SUPABASE_PRODUCTION_TARGET.projectUrl;
 const bucket = "submission-media";
@@ -27,6 +34,7 @@ const stamp = new Date()
   .slice(0, 14);
 const runId = `VF-PROD-WORKFLOW-${stamp}`;
 const familyRunId = `${runId}-FAMILY`;
+const casRunId = `${runId}-CAS`;
 const malformedBucketReadinessId = `${runId}-MALFORMED-BUCKET`;
 const malformedPathReadinessId = `${runId}-MALFORMED-PATH`;
 const correctionId = randomUUID();
@@ -39,6 +47,7 @@ const uploadPath = storagePathFor(runId, applicantId, "selfie", "v19smoke_selfie
 const checks = [];
 const cleanupPaths = new Set(uploadPaths);
 const caseRevisions = new Map();
+let casReceipts = null;
 
 try {
   assertProductionMutationAllowed({
@@ -111,6 +120,12 @@ async function main() {
 
   try {
     await cleanup(adminService);
+
+    casReceipts = await verifyAgentCasSemantics(
+      agent.client,
+      adminService,
+      agent.userId,
+    );
 
     await saveAgent(agent.client, draftPayload(agent.userId, runId));
     await expectStatus(adminService, runId, "draft");
@@ -208,12 +223,18 @@ async function main() {
     );
 
     await cleanup(adminService);
-    await writeEvidenceAndReadiness();
+    await writeEvidence("PASS", "");
     printReport("PASS");
   } catch (error) {
-    await cleanup(adminService).catch(() => undefined);
-    await writeEvidence("BLOCKED", error.message);
-    printReport("BLOCKED", error.message);
+    let cleanupError = null;
+    try {
+      await cleanup(adminService);
+    } catch (caughtCleanupError) {
+      cleanupError = caughtCleanupError;
+    }
+    const failure = productionWorkflowFailureMessage(error, cleanupError);
+    await writeEvidence("BLOCKED", failure);
+    printReport("BLOCKED", failure);
     process.exit(1);
   }
 }
@@ -292,6 +313,178 @@ async function saveAgent(client, payload, mutationKind = "draft") {
   }
   caseRevisions.set(submissionId, data.caseRevision);
   return data;
+}
+
+async function verifyAgentCasSemantics(agentClient, adminClient, agentId) {
+  const initialPayload = draftPayload(agentId, casRunId);
+  const replayOperationId = randomUUID();
+  const first = await invokeAgentMutation(agentClient, {
+    expectedRevision: null,
+    mutationKind: "draft",
+    operationId: replayOperationId,
+    payload: initialPayload,
+  });
+  const firstResult = requireAgentCasSuccess(first, replayOperationId, casRunId);
+  const beforeReplay = await readCanonicalCasState(adminClient, casRunId);
+  const replay = await invokeAgentMutation(agentClient, {
+    expectedRevision: null,
+    mutationKind: "draft",
+    operationId: replayOperationId,
+    payload: initialPayload,
+  });
+  const replayResult = requireAgentCasSuccess(replay, replayOperationId, casRunId);
+  const afterReplay = await readCanonicalCasState(adminClient, casRunId);
+  if (
+    hashJson(firstResult) !== hashJson(replayResult) ||
+    firstResult.caseRevision !== replayResult.caseRevision ||
+    beforeReplay.caseRevision !== afterReplay.caseRevision ||
+    beforeReplay.rowSha256 !== afterReplay.rowSha256
+  ) {
+    throw new Error("Agent CAS identical replay changed its receipt or canonical row");
+  }
+  pass("agent CAS identical replay preserves receipt and canonical revision");
+
+  const mismatchedPayload = withSmokeTitle(
+    initialPayload,
+    "Production Workflow Smoke Fingerprint Mismatch",
+  );
+  const mismatch = await invokeAgentMutation(agentClient, {
+    expectedRevision: null,
+    mutationKind: "draft",
+    operationId: replayOperationId,
+    payload: mismatchedPayload,
+  });
+  requireAgentCasError(mismatch, "23514", "different request");
+  const afterMismatch = await readCanonicalCasState(adminClient, casRunId);
+  if (
+    afterMismatch.caseRevision !== afterReplay.caseRevision ||
+    afterMismatch.rowSha256 !== afterReplay.rowSha256
+  ) {
+    throw new Error("Agent CAS fingerprint mismatch changed the canonical row");
+  }
+  pass("agent CAS operation fingerprint mismatch is denied without mutation");
+
+  const updateOperationId = randomUUID();
+  const updatedPayload = withSmokeTitle(
+    draftPayload(agentId, casRunId),
+    "Production Workflow Smoke CAS Revision Two",
+  );
+  const updated = await invokeAgentMutation(agentClient, {
+    expectedRevision: firstResult.caseRevision,
+    mutationKind: "draft",
+    operationId: updateOperationId,
+    payload: updatedPayload,
+  });
+  const updatedResult = requireAgentCasSuccess(updated, updateOperationId, casRunId);
+  caseRevisions.set(casRunId, updatedResult.caseRevision);
+  const beforeStale = await readCanonicalCasState(adminClient, casRunId);
+  const staleOperationId = randomUUID();
+  const stale = await invokeAgentMutation(agentClient, {
+    expectedRevision: firstResult.caseRevision,
+    mutationKind: "draft",
+    operationId: staleOperationId,
+    payload: withSmokeTitle(
+      draftPayload(agentId, casRunId),
+      "Production Workflow Smoke Stale Revision",
+    ),
+  });
+  requireAgentCasError(stale, "40001", "V19_AGENT_SUBMISSION_CONFLICT");
+  const afterStale = await readCanonicalCasState(adminClient, casRunId);
+  if (
+    beforeStale.caseRevision !== afterStale.caseRevision ||
+    beforeStale.rowSha256 !== afterStale.rowSha256
+  ) {
+    throw new Error("Agent CAS stale revision changed the canonical row");
+  }
+  pass("agent CAS stale revision is denied with unchanged canonical readback");
+
+  return {
+    identicalReplay: {
+      canonicalCaseRevision: afterReplay.caseRevision,
+      firstCaseRevision: firstResult.caseRevision,
+      firstResultSha256: hashJson(firstResult),
+      operationId: replayOperationId,
+      passed: true,
+      replayCaseRevision: replayResult.caseRevision,
+      replayResultSha256: hashJson(replayResult),
+    },
+    fingerprintMismatch: {
+      canonicalCaseRevision: afterMismatch.caseRevision,
+      errorCode: mismatch.error.code,
+      operationId: replayOperationId,
+      passed: true,
+    },
+    staleRevision: {
+      canonicalCaseRevisionAfter: afterStale.caseRevision,
+      canonicalCaseRevisionBefore: beforeStale.caseRevision,
+      canonicalRowAfterSha256: afterStale.rowSha256,
+      canonicalRowBeforeSha256: beforeStale.rowSha256,
+      errorCode: stale.error.code,
+      operationId: staleOperationId,
+      passed: true,
+      staleExpectedRevision: firstResult.caseRevision,
+    },
+  };
+}
+
+async function invokeAgentMutation(
+  client,
+  { expectedRevision, mutationKind, operationId, payload },
+) {
+  return client.rpc("save_agent_submission_if_current", {
+    expected_revision: expectedRevision,
+    mutation_kind: mutationKind,
+    operation_id: operationId,
+    payload,
+  });
+}
+
+function requireAgentCasSuccess(result, operationId, submissionId) {
+  if (result.error) throw new Error(result.error.message);
+  if (
+    result.data?.operationId !== operationId ||
+    result.data?.submissionId !== submissionId ||
+    !Number.isSafeInteger(result.data?.caseRevision)
+  ) {
+    throw new Error("Agent smoke CAS receipt is invalid");
+  }
+  return result.data;
+}
+
+function requireAgentCasError(result, errorCode, messageFragment) {
+  if (
+    result.data ||
+    result.error?.code !== errorCode ||
+    !result.error.message?.includes(messageFragment)
+  ) {
+    throw new Error(
+      `Agent CAS expected ${errorCode}/${messageFragment}, got ${result.error?.code ?? "success"}`,
+    );
+  }
+}
+
+async function readCanonicalCasState(client, submissionId) {
+  const { data, error } = await client
+    .from("submissions")
+    .select("id,agent_id,status,title,case_revision,updated_at,family_intelligence")
+    .eq("id", submissionId)
+    .single();
+  if (error) throw new Error(`Agent CAS canonical readback failed: ${error.message}`);
+  if (!Number.isSafeInteger(data.case_revision)) {
+    throw new Error("Agent CAS canonical case revision is invalid");
+  }
+  return { caseRevision: data.case_revision, rowSha256: hashJson(data) };
+}
+
+function withSmokeTitle(payload, title) {
+  return {
+    ...payload,
+    submission: { ...payload.submission, title },
+  };
+}
+
+function hashJson(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
 async function saveAdmin(client, actorId, payload) {
@@ -528,6 +721,7 @@ async function cleanup(client) {
     cleanupPaths,
     submissionIds: [
       runId,
+      casRunId,
       `${runId}-incomplete`,
       malformedBucketReadinessId,
       malformedPathReadinessId,
@@ -938,48 +1132,25 @@ function storagePathFor(id, applicantId, slot, generatedFileName) {
   return `submissions/${id}/applicants/${applicantId}/${slot}/${generatedFileName}`;
 }
 
-async function writeEvidenceAndReadiness() {
-  await writeEvidence("PASS", "");
-  const packet = readJson(readinessPath);
-  packet.productionEnvEvidence = {
-    ...packet.productionEnvEvidence,
-    transactionalPersistenceTested: true,
-    rlsPolicyTestsPassed: true,
-    storagePolicyTestsPassed: true,
-    productionWorkflowEvidenceArtifact: evidencePath,
-  };
-  packet.postActivationChecks = {
-    ...packet.postActivationChecks,
-    agentSignInWorks: true,
-    adminSignInWorks: true,
-    agentCanCreateDraft: true,
-    agentCanUploadRequiredMedia: true,
-    incompleteWaitingReviewRejected: true,
-    validWaitingReviewReachesQueue: true,
-    adminCanAcceptOrReturnCase: true,
-    postHandoffAgentMutationBlocked: true,
-    privateMediaSignedUrlScoped: true,
-    workflowEvidenceArtifact: evidencePath,
-  };
-  writeFileSync(readinessPath, `${JSON.stringify(packet, null, 2)}\n`);
-}
-
 async function writeEvidence(result, failure) {
-  const lines = [
-    "# Supabase Production Workflow Smoke",
-    "",
-    `Result: \`${result}\``,
-    `Project: \`${projectId}\``,
-    `Checked at: \`${new Date().toISOString()}\``,
-    "",
-    "No email, password, service-role key, signed URL, or personal identifier is recorded in this artifact.",
-    "",
-    "## Checks",
-    "",
-    ...checks.map((check) => `- PASS ${check.label}`),
-  ];
-  if (failure) lines.push("", `Failure: \`${failure.replace(/`/g, "'")}\``);
-  writeFileSync(evidencePath, `${lines.join("\n")}\n`);
+  const gitHead = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }).trim();
+  const evidence = {
+    schemaVersion: 1,
+    scope: "supabase-production-workflow-smoke",
+    status: result,
+    checkedAt: new Date().toISOString(),
+    projectRef: projectId,
+    cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
+    gitHead,
+    sourceSha256: releaseSourceSha256FromGitHead(repoRoot),
+    casReceipts,
+    checks: checks.map((check) => ({ label: check.label, passed: true })),
+    failure: failure || null,
+  };
+  writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 }
 
 function printReport(result, failure = "") {

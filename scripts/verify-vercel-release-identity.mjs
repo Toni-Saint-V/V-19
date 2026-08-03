@@ -6,7 +6,7 @@ import { testArtifactPath } from "./lib/artifact-paths.mjs";
 import { releaseSourceSha256FromGitHead } from "./lib/release-source-identity.mjs";
 import { isVercelReleaseIdentityMatch } from "./lib/vercel-release-identity.mjs";
 
-const canonicalHost = "document-intake-system.vercel.app";
+const canonicalHost = SUPABASE_PRODUCTION_TARGET.canonicalApplicationHost;
 const gitHead = execFileSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf8",
 }).trim();

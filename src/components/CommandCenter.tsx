@@ -89,6 +89,7 @@ import {
   buildMediaStoragePath,
   mediaMimeTypeForFile,
   uploadMediaToStorage,
+  type MediaStorageTarget,
 } from "../modules/submissions/mediaStorage";
 import {
   applyAgentSubmitForReviewResult,
@@ -126,6 +127,7 @@ type CommandCenterProps = {
   onSubmissionUpdate?: (
     submissionId: string,
     update: (submission: Submission) => Submission,
+    uploadedMediaTarget?: MediaStorageTarget,
   ) => Promise<Submission>;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   submissions?: Submission[];
@@ -807,6 +809,7 @@ export function CommandCenter({
       sizeBytes: file.size,
       uploadedAtIso,
     };
+    let uploadedMediaTarget: MediaStorageTarget | undefined;
     let metadata:
       | (typeof baseMetadata & {
           storageAdapter: "local-dev";
@@ -835,6 +838,7 @@ export function CommandCenter({
         storageBucket: target.bucket,
         storagePath: uploaded.path,
       };
+      uploadedMediaTarget = target;
     } else {
       metadata = { ...baseMetadata, storageAdapter: "local-dev" };
     }
@@ -875,7 +879,11 @@ export function CommandCenter({
     };
 
     const nextSubmission = onSubmissionUpdate
-      ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
+      ? await onSubmissionUpdate(
+          submission.id,
+          applyUploadToLatest,
+          uploadedMediaTarget,
+        )
       : applyUploadToLatest(submission);
     if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
     setCanonicalOverrides((current) => ({

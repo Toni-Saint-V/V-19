@@ -8,6 +8,12 @@ const cleanupTables = Object.freeze([
   "submissions",
 ]);
 
+export function productionWorkflowFailureMessage(primaryError, cleanupError = null) {
+  const primary = errorMessage(primaryError);
+  if (!cleanupError) return primary;
+  return `Primary workflow failure: ${primary}; cleanup/readback failure: ${errorMessage(cleanupError)}`;
+}
+
 export async function cleanupProductionWorkflowFixtures({
   bucket,
   client,
@@ -94,4 +100,8 @@ async function collectCleanupResult(failures, label, operation) {
   } catch (error) {
     failures.push(`${label}: ${error.message}`);
   }
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

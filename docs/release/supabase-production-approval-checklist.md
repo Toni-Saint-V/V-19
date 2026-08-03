@@ -82,6 +82,9 @@ Backup owner:
 - `npm run verify:auth-data-readiness`
 - `npm run verify:supabase-release`
 - `npm run verify:production-packet`
+- `agentDatabaseReadback` contains closed CAS receipts proving identical replay,
+  operation-fingerprint mismatch denial, and stale-revision denial with an
+  unchanged authenticated canonical row readback.
 - expected before production evidence refresh: fail-closed `NO_GO`
 - expected before activation: pass
 
@@ -107,6 +110,9 @@ These environment values are configuration only and do not authorize a write.
 The production writers remain blocked until the repository verifies an
 authenticated detached owner-approval receipt bound to the exact project,
 generation, Git SHA, source digest, allowed action, and expiration. The current
-schema-v3 packet has no `approved/GO` transition and therefore remains `NO_GO`.
+tracked schema-v3 packet has no self-declared `approved/GO` transition and
+therefore remains `NO_GO`. `GO` is reachable only through an immutable external
+packet bound to the tracked readiness SHA-256 and a detached owner signature
+over the exact evidence root.
 
 Go / No-Go:

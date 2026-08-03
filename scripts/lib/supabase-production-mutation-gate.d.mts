@@ -6,6 +6,8 @@ export interface ProductionMutationIdentity {
 
 export function assertProductionMutationAllowed(options: {
   action: "migration-apply" | "function-deploy" | "pilot-provision" | "workflow-smoke";
+  expectedOwnerPublicKeySha256?: string;
+  now?: number;
   repoRoot: string;
   readinessPath?: string;
 }): ProductionMutationIdentity;

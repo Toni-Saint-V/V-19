@@ -18,6 +18,8 @@ const productionTargetConsumers = [
   "scripts/prepare-supabase-production-packet.mjs",
   "scripts/provision-supabase-pilot-cohort.mjs",
   "scripts/verify-agent-interaction-evidence.mjs",
+  "scripts/verify-vercel-release-identity.mjs",
+  "scripts/lib/supabase-external-evidence.mjs",
   "scripts/verify-production-readiness.mjs",
   "scripts/verify-pilot-volume-envelope.mjs",
   "scripts/verify-supabase-production-ui-e2e.mjs",
@@ -38,6 +40,7 @@ describe("Supabase production target", () => {
       schemaVersion: 1,
       projectId: "pwaasuqljxeypeqhvzqs",
       projectUrl: "https://pwaasuqljxeypeqhvzqs.supabase.co",
+      canonicalApplicationHost: "document-intake-system.vercel.app",
       cutoverGeneration: "v19-supabase-clean-cutover-20260802-g5",
       baselineGitSha: "8658e26ac0c6abf0c4ebe14727fa7b30d83bf774",
       evidenceNotBefore: "2026-08-02T00:00:00.000Z",
@@ -106,6 +109,9 @@ describe("Supabase production target", () => {
         "adminReloadReadbackPassed",
         "agentSignInWorks",
         "agentCreateWriteReadbackPassed",
+        "agentCasIdenticalReplayPassed",
+        "agentCasOperationFingerprintMismatchDenied",
+        "agentCasStaleRevisionReadbackPassed",
         "agentReloadReadbackPassed",
         "secondAgentSignInWorks",
         "secondAgentBrowserIsolationPassed",
@@ -158,6 +164,9 @@ describe("Supabase production target", () => {
           scope: "supabase-production-agent-database-readback",
           checks: [
             "agentCreateWriteReadbackPassed",
+            "agentCasIdenticalReplayPassed",
+            "agentCasOperationFingerprintMismatchDenied",
+            "agentCasStaleRevisionReadbackPassed",
             "adminReadsAgentRecordPassed",
             "crossAgentDatabaseReadDenied",
             "authenticatedRoleEscalationDenied",
@@ -283,9 +292,20 @@ describe("Supabase production target", () => {
       expect(read(path), path).toContain("assertProductionMutationAllowed");
       expect(read(path), path).toContain("productionApprovalPacketPath");
     }
+    const workflowSmoke = read("scripts/verify-supabase-production-workflow.mjs");
+    expect(workflowSmoke).not.toContain("writeEvidenceAndReadiness");
+    expect(workflowSmoke).not.toContain("packet.productionEnvEvidence");
+    expect(workflowSmoke).not.toContain("packet.postActivationChecks");
+    expect(workflowSmoke).not.toContain("writeFileSync(readinessPath");
+    expect(workflowSmoke).toContain("supabase-production-workflow-smoke-20260701.json");
+    expect(workflowSmoke).toContain('scope: "supabase-production-workflow-smoke"');
+    expect(workflowSmoke).toContain("releaseSourceSha256FromGitHead(repoRoot)");
     const mutationGate = read("scripts/lib/supabase-production-mutation-gate.mjs");
+    const externalEvidence = read("scripts/lib/supabase-external-evidence.mjs");
     expect(mutationGate).toContain("SUPABASE_PRODUCTION_APPROVAL_PACKET_PATH");
-    expect(mutationGate).toContain("must be outside the repository");
+    expect(mutationGate).toContain("readStableExternalFile");
+    expect(externalEvidence).toContain("must exist outside the repository");
+    expect(externalEvidence).toContain("changed while it was read");
     expect(mutationGate).toContain("working tree must be clean");
     expect(mutationGate).toContain("filesystem source differs from Git HEAD");
     expect(mutationGate).toContain("successful migration dry-run evidence is absent");

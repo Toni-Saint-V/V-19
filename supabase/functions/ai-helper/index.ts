@@ -51,89 +51,10 @@ function runtimeReady(env: ReturnType<typeof runtimeEnv>) {
   );
 }
 
-async function supabaseContractReady(env: ReturnType<typeof runtimeEnv>) {
-  if (!env.SUPABASE_URL?.trim() || !env.SUPABASE_FUNCTION_ADMIN_KEY?.trim()) {
-    return false;
-  }
-  try {
-    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/`, {
-      headers: {
-        accept: "application/openapi+json",
-        apikey: env.SUPABASE_FUNCTION_ADMIN_KEY,
-        authorization: `Bearer ${env.SUPABASE_FUNCTION_ADMIN_KEY}`,
-      },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) return false;
-    const contract = await response.json();
-    const paths = contract?.paths ?? {};
-    const auditContract = JSON.stringify({
-      path: paths[`/${CANONICAL_AUDIT_TABLE}`] ?? {},
-      schema:
-        contract?.definitions?.[CANONICAL_AUDIT_TABLE] ??
-        contract?.components?.schemas?.[CANONICAL_AUDIT_TABLE] ??
-        {},
-    });
-    const quotaContract = JSON.stringify(paths[`/rpc/${CANONICAL_QUOTA_RPC}`] ?? {});
-    return Boolean(
-      [
-        "event",
-        "intent",
-        "actor_id",
-        "actor_role",
-        "request_id",
-        "reason",
-        "created_at",
-      ].every((field) => auditContract.includes(`"${field}"`)) &&
-      ["p_actor_id", "p_actor_role", "p_intent", "p_request_id"].every((field) =>
-        quotaContract.includes(`"${field}"`),
-      ),
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function liteLlmReady(env: ReturnType<typeof runtimeEnv>) {
-  if (
-    !env.AI_HELPER_LITELLM_BASE_URL?.trim() ||
-    !env.AI_HELPER_LITELLM_API_KEY?.trim() ||
-    !env.AI_HELPER_LITELLM_MODEL_GENERAL?.trim()
-  ) {
-    return false;
-  }
-  try {
-    const response = await fetch(
-      `${env.AI_HELPER_LITELLM_BASE_URL.replace(/\/$/, "")}/v1/models`,
-      {
-        headers: {
-          authorization: `Bearer ${env.AI_HELPER_LITELLM_API_KEY}`,
-        },
-        signal: AbortSignal.timeout(5000),
-      },
-    );
-    if (!response.ok) return false;
-    const body = await response.json();
-    return (
-      Array.isArray(body?.data) &&
-      body.data.some(
-        (model: { id?: unknown }) =>
-          model?.id === env.AI_HELPER_LITELLM_MODEL_GENERAL?.trim(),
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
 Deno.serve(async (request) => {
   const env = runtimeEnv();
   if (request.method === "GET" && new URL(request.url).pathname.endsWith("/health")) {
-    const [databaseContractReady, providerReady] = await Promise.all([
-      supabaseContractReady(env),
-      liteLlmReady(env),
-    ]);
-    const ready = runtimeReady(env) && databaseContractReady && providerReady;
+    const ready = runtimeReady(env);
     return Response.json(
       {
         capability: "provider-ready",

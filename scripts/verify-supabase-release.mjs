@@ -829,6 +829,21 @@ function verifySmokeGuard() {
     "Production workflow smoke proves reduced family media reaches review",
   );
   expectContains(
+    productionWorkflowSmoke,
+    "agent CAS identical replay preserves receipt and canonical revision",
+    "Production workflow smoke proves identical agent CAS replay",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "agent CAS operation fingerprint mismatch is denied without mutation",
+    "Production workflow smoke proves operation fingerprint mismatch denial",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "agent CAS stale revision is denied with unchanged canonical readback",
+    "Production workflow smoke proves stale-revision denial and canonical readback",
+  );
+  expectContains(
     productionCohortReconcile,
     "const expectedAssetCount = expected.applicantCount + 2",
     "Production cohort reconciliation uses passports per applicant plus two primary selfies",
@@ -1081,6 +1096,10 @@ function verifyDocsAndScripts() {
     resolve(repoRoot, "supabase/functions/passport-extract/index.ts"),
     "Passport Edge Function exists",
   );
+  const accessRequestFunction = readProjectFile(
+    resolve(repoRoot, "supabase/functions/access-request/index.ts"),
+    "Access request Edge Function exists",
+  );
   expectContains(
     aiHelperFunction,
     "env.AI_HELPER_AUDIT_TABLE === undefined",
@@ -1088,8 +1107,28 @@ function verifyDocsAndScripts() {
   );
   expectContains(
     passportFunction,
-    "env.PASSPORT_EXTRACTION_AUDIT_TABLE !== undefined",
+    "env.PASSPORT_EXTRACTION_AUDIT_TABLE === undefined",
     "Passport health rejects an explicitly empty or non-canonical audit table",
+  );
+  expectNotContains(
+    aiHelperFunction,
+    "fetch(",
+    "AI helper public health performs no privileged provider or database request",
+  );
+  expectNotContains(
+    passportFunction,
+    "fetch(",
+    "Passport public health performs no privileged database request",
+  );
+  expectNotContains(
+    accessRequestFunction,
+    '.from("profiles").select("id", { count: "exact", head: true })',
+    "Access request public health performs no privileged count query",
+  );
+  expectContains(
+    accessRequestFunction,
+    "npm:@supabase/supabase-js@2.108.1",
+    "Edge external dependency resolution is pinned exactly",
   );
   for (const [key, expected] of Object.entries(
     SUPABASE_PRODUCTION_TARGET.requiredCleanDataState,

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 
+import { SUPABASE_PRODUCTION_TARGET } from "../../config/supabase-production-target.mjs";
+
 import { isVercelReleaseIdentityMatch } from "../../scripts/lib/vercel-release-identity.mjs";
 
-const canonicalHost = "document-intake-system.vercel.app";
+const canonicalHost = SUPABASE_PRODUCTION_TARGET.canonicalApplicationHost;
 const expectedGitSha = "a".repeat(40);
 const expectedSourceSha256 = "b".repeat(64);
 const deployment = {

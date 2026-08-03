@@ -2,6 +2,7 @@ export interface SupabaseProductionTargetDescriptor {
   readonly schemaVersion: number;
   readonly projectId: string;
   readonly projectUrl: string;
+  readonly canonicalApplicationHost: string;
   readonly cutoverGeneration: string;
   readonly baselineGitSha: string;
   readonly evidenceNotBefore: string;

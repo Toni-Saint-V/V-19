@@ -1,8 +1,13 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { cleanupProductionWorkflowFixtures } from "../../scripts/lib/supabase-production-cleanup.mjs";
+import {
+  cleanupProductionWorkflowFixtures,
+  productionWorkflowFailureMessage,
+} from "../../scripts/lib/supabase-production-cleanup.mjs";
 
-function cleanupClient(options: { deleteError?: Error; rowStillExists?: boolean } = {}) {
+function cleanupClient(
+  options: { deleteError?: Error; rowStillExists?: boolean } = {},
+) {
   const predicates: Array<{
     column: string;
     id: string;
@@ -84,5 +89,19 @@ describe("Supabase production workflow cleanup", () => {
         submissionIds: ["submission"],
       }),
     ).rejects.toThrow(/row still exists/);
+  });
+
+  test("preserves both the primary workflow failure and cleanup/readback failure", () => {
+    expect(
+      productionWorkflowFailureMessage(
+        new Error("agent write failed"),
+        new Error("storage object still exists"),
+      ),
+    ).toBe(
+      "Primary workflow failure: agent write failed; cleanup/readback failure: storage object still exists",
+    );
+    expect(productionWorkflowFailureMessage(new Error("agent write failed"))).toBe(
+      "agent write failed",
+    );
   });
 });

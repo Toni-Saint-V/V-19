@@ -18,7 +18,10 @@ export interface SupabaseCleanupClient {
       eq(column: string, value: string): Promise<SupabaseCleanupResult>;
     };
     select(columns: string): {
-      eq(column: string, value: string): {
+      eq(
+        column: string,
+        value: string,
+      ): {
         limit(count: number): Promise<SupabaseCleanupResult<Array<{ id: string }>>>;
       };
     };
@@ -31,3 +34,8 @@ export function cleanupProductionWorkflowFixtures(options: {
   cleanupPaths: Iterable<string>;
   submissionIds: Iterable<string>;
 }): Promise<void>;
+
+export function productionWorkflowFailureMessage(
+  primaryError: unknown,
+  cleanupError?: unknown,
+): string;

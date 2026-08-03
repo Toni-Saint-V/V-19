@@ -1746,6 +1746,23 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("pg_catalog.pg_advisory_xact_lock");
     expect(migration).toContain("using errcode = '40001'");
     expect(migration).toContain("receipt_result is not null");
+    expect(migration).toContain(
+      "delete from app_private.agent_submission_mutation_receipts as excess_receipt",
+    );
+    expect(migration).toContain("order by retained_receipt.created_at desc");
+    expect(migration).toContain("offset 511");
+    const actorRetentionLock = migration.indexOf(
+      "pg_catalog.hashtextextended(actor_id::text, 868918)",
+    );
+    const receiptRetention = migration.indexOf(
+      "delete from app_private.agent_submission_mutation_receipts as stale_receipt",
+    );
+    const submissionMutationLock = migration.indexOf(
+      "pg_catalog.hashtextextended(submission_id, 868919)",
+    );
+    expect(actorRetentionLock).toBeGreaterThan(-1);
+    expect(actorRetentionLock).toBeLessThan(receiptRetention);
+    expect(submissionMutationLock).toBeGreaterThan(receiptRetention);
     expect(migration).toContain("mutation_kind = 'correction_handoff'");
     expectSqlStatement(
       migration,

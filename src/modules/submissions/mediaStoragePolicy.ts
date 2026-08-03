@@ -335,6 +335,11 @@ export function validateMediaStorageTarget({
   return target;
 }
 
+export function mediaStorageTargetSubmissionId(target: MediaStorageTarget): string {
+  validateMediaStorageTarget({ target });
+  return parseStoragePath(target.path).submissionId;
+}
+
 export function isPassportScanUploadFileAccepted(
   file: Pick<File, "name" | "type">,
 ): boolean {

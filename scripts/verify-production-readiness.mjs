@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import {
   migrationContractEntriesFromFileSystem,
   migrationContractEntriesFromGitHead,
@@ -495,7 +495,7 @@ const blockerActions = [
   },
   {
     match:
-      /Agent sign-in|Agent reload|cross-agent|cross-role|cross-owner|role escalation|agentSignInWorks|agentCreateWriteReadbackPassed|agentReloadReadbackPassed|secondAgentSignInWorks|secondAgentBrowserIsolationPassed|adminReadsAgentRecordPassed|crossAgentDatabaseReadDenied|crossAgentStorageReadDenied|agentStorageWriteReadbackPassed|agentStorageReloadReadbackPassed|authenticatedRoleEscalationDenied|anonymousDatabaseWriteDenied|privateMediaAnonymousIsolationPassed|storageWriteReadbackPassed/i,
+      /Agent sign-in|Agent reload|agent CAS|cross-agent|cross-role|cross-owner|role escalation|agentSignInWorks|agentCreateWriteReadbackPassed|agentCas|agentReloadReadbackPassed|secondAgentSignInWorks|secondAgentBrowserIsolationPassed|adminReadsAgentRecordPassed|crossAgentDatabaseReadDenied|crossAgentStorageReadDenied|agentStorageWriteReadbackPassed|agentStorageReloadReadbackPassed|authenticatedRoleEscalationDenied|anonymousDatabaseWriteDenied|privateMediaAnonymousIsolationPassed|storageWriteReadbackPassed/i,
     owner: "Supabase production browser verifier",
     command: "npm run verify:production-readiness",
     artifact: testArtifactPath("supabase-production-role-isolation-runtime.json"),
@@ -2637,7 +2637,7 @@ function verifyCutoverProductionEvidence(packet) {
       block(`Production evidence artifact ${label} is recorded`, "missing");
       continue;
     }
-    const artifactPath = resolve(repoRoot, artifact.path);
+    const artifactPath = resolve(dirname(production.evidenceManifest), artifact.path);
     if (!existsSync(artifactPath)) {
       block(
         `Production evidence artifact ${label} exists`,
@@ -2709,7 +2709,7 @@ function verifyCutoverProductionEvidence(packet) {
     if (label === "deploymentIdentity") {
       requireEqual(
         validation.document?.canonicalHost,
-        "document-intake-system.vercel.app",
+        SUPABASE_PRODUCTION_TARGET.canonicalApplicationHost,
         "Deployment identity proves the canonical production host",
       );
       if (/^dpl_[A-Za-z0-9]+$/.test(validation.document?.deploymentId ?? "")) {
@@ -2940,7 +2940,10 @@ if (process.env.SUPABASE_PRODUCTION_APPROVAL_PACKET_PATH?.trim()) {
       trackedPacket: trackedReadiness,
     });
     if (bindingIssues.length > 0) {
-      block("External approval packet binds the tracked evidence root", bindingIssues.join(", "));
+      block(
+        "External approval packet binds the tracked evidence root",
+        bindingIssues.join(", "),
+      );
     } else {
       pass("External approval packet binds the tracked evidence root");
     }

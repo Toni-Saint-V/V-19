@@ -34,6 +34,11 @@ import {
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
 } from "./modules/submissions/exportRules";
+import { persistUploadedMediaWithRecovery } from "./modules/submissions/mediaUploadPersistence";
+import {
+  deleteMediaFromStorage,
+  type MediaStorageTarget,
+} from "./modules/submissions/mediaStorage";
 import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submissions/exportPackageDocumentCommit";
 import {
   ensureSubmissionPublicNumber,
@@ -1022,6 +1027,7 @@ export default function App({
     (
       submissionId: string,
       update: (submission: Submission) => Submission,
+      uploadedMediaTarget?: MediaStorageTarget,
     ): Promise<Submission> => {
       const session = activeApprovedSession;
       if (!session || session.role !== "agent") {
@@ -1030,26 +1036,63 @@ export default function App({
         );
       }
       const ownerAgentId = session.ownerAgentId ?? session.userId;
-      return enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
-        const current = submissionsRef.current.find(
-          (submission) => submission.id === submissionId,
-        );
-        if (!current || current.agentId !== ownerAgentId) {
-          throw new Error("Подача недоступна текущему агенту.");
-        }
-        const nextSubmission = update(current);
-        if (nextSubmission === current) return current;
-        const nextSubmissions = submissionsRef.current.map((submission) =>
-          submission.id === submissionId ? nextSubmission : submission,
-        );
-        await persistSubmissions(nextSubmissions, fence);
-        return (
-          submissionsRef.current.find((submission) => submission.id === submissionId) ??
-          nextSubmission
-        );
+      const persistUpdate = () =>
+        enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+          const current = submissionsRef.current.find(
+            (submission) => submission.id === submissionId,
+          );
+          if (!current || current.agentId !== ownerAgentId) {
+            throw new Error("Подача недоступна текущему агенту.");
+          }
+          const nextSubmission = update(current);
+          if (nextSubmission === current) return current;
+          const nextSubmissions = submissionsRef.current.map((submission) =>
+            submission.id === submissionId ? nextSubmission : submission,
+          );
+          await persistSubmissions(nextSubmissions, fence);
+          return (
+            submissionsRef.current.find(
+              (submission) => submission.id === submissionId,
+            ) ?? nextSubmission
+          );
+        });
+      if (!uploadedMediaTarget) return persistUpdate();
+      const recoveryFence = createWorkspaceMutationFence(session.userId);
+
+      return persistUploadedMediaWithRecovery({
+        deleteUploadedMedia: async (target) => {
+          recoveryFence.assertCurrent();
+          await deleteMediaFromStorage(target);
+        },
+        persist: persistUpdate,
+        readCanonical: async () => {
+          recoveryFence.assertCurrent();
+          if (!activeProfile) {
+            throw new Error(
+              "Активный профиль недоступен для канонической сверки файла.",
+            );
+          }
+          const loaded = await loadCockpitSubmissionsForProfile(activeProfile);
+          recoveryFence.assertCurrent();
+          return (
+            loaded.submissions.find((submission) => submission.id === submissionId) ??
+            null
+          );
+        },
+        submissionId,
+        target: uploadedMediaTarget,
+      }).finally(() => {
+        void refreshCanonicalSubmissions();
       });
     },
-    [activeApprovedSession, enqueueWorkspaceSubmissionMutation, persistSubmissions],
+    [
+      activeApprovedSession,
+      activeProfile,
+      createWorkspaceMutationFence,
+      enqueueWorkspaceSubmissionMutation,
+      persistSubmissions,
+      refreshCanonicalSubmissions,
+    ],
   );
 
   const assignVisibleAgentSubmissionPublicNumber = useCallback(

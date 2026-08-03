@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { SUPABASE_PRODUCTION_TARGET } from "../../config/supabase-production-target.mjs";
 import {
@@ -18,11 +18,20 @@ import {
   releaseSourceSha256FromFileSystem,
   releaseSourceSha256FromGitHead,
 } from "./release-source-identity.mjs";
-import { validateExternalEvidenceImportReceipt } from "./supabase-external-evidence.mjs";
+import {
+  readStableExternalFile,
+  validateExternalEvidenceImportReceipt,
+} from "./supabase-external-evidence.mjs";
 
-export function assertProductionMutationAllowed({ action, repoRoot, readinessPath }) {
+export function assertProductionMutationAllowed({
+  action,
+  expectedOwnerPublicKeySha256 = SUPABASE_PRODUCTION_TARGET.ownerApprovalPublicKeySha256,
+  now = Date.now(),
+  repoRoot,
+  readinessPath,
+}) {
   const issues = [];
-  const externalReadinessPath = externalPath(
+  const externalReadiness = externalFile(
     readinessPath,
     repoRoot,
     "production approval packet",
@@ -31,7 +40,11 @@ export function assertProductionMutationAllowed({ action, repoRoot, readinessPat
   if (issues.length > 0) {
     throw new Error(`Production mutation refused: ${issues.join("; ")}`);
   }
-  const packet = readJson(externalReadinessPath, issues);
+  const packet = parseJson(
+    externalReadiness.content.toString("utf8"),
+    "production approval packet",
+    issues,
+  );
   const trackedReadinessPath = resolve(
     repoRoot,
     "docs/release/supabase-production-readiness.json",
@@ -122,12 +135,14 @@ export function assertProductionMutationAllowed({ action, repoRoot, readinessPat
     action,
     approval: packet.ownerApproval ?? {},
     evidenceRootSha256: cutoverEvidenceRootSha256(packet),
+    expectedPublicKeySha256: expectedOwnerPublicKeySha256,
     gitHead,
     issues,
+    now,
     repoRoot,
     sourceSha256: gitSourceSha256,
   });
-  issues.push(...validateExternalEvidenceImportReceipt({ packet, repoRoot }));
+  issues.push(...validateExternalEvidenceImportReceipt({ now, packet, repoRoot }));
   if (action === "migration-apply") {
     requireEqual(
       packet.migrationContract?.dryRunPassed,
@@ -159,7 +174,7 @@ export function assertProductionMutationAllowed({ action, repoRoot, readinessPat
 
 export function productionApprovalPacketPath(repoRoot) {
   const issues = [];
-  const path = externalPath(
+  const file = externalFile(
     process.env.SUPABASE_PRODUCTION_APPROVAL_PACKET_PATH,
     repoRoot,
     "production approval packet",
@@ -168,7 +183,7 @@ export function productionApprovalPacketPath(repoRoot) {
   if (issues.length > 0) {
     throw new Error(`Production mutation refused: ${issues.join("; ")}`);
   }
-  return path;
+  return file.path;
 }
 
 function verifyMigrationDryRunReceipt({
@@ -180,15 +195,15 @@ function verifyMigrationDryRunReceipt({
   sourceSha256,
 }) {
   const migration = packet.migrationContract ?? {};
-  const receiptPath = evidencePath(
+  const receiptFile = externalFile(
     migration.dryRunEvidenceArtifact,
     repoRoot,
     "migration dry-run receipt",
     issues,
   );
-  if (!receiptPath) return;
+  if (!receiptFile) return;
   try {
-    const content = readFileSync(receiptPath, "utf8");
+    const content = receiptFile.content.toString("utf8");
     const validation = validateBoundEvidence({
       content,
       expectedCheckedAt: migration.dryRunCheckedAt,
@@ -242,25 +257,33 @@ export function verifyDetachedOwnerApproval({
     issues.push("owner approval public-key fingerprint is not configured");
     return;
   }
-  const receiptPath = externalPath(approval.receiptPath, repoRoot, "receipt", issues);
-  const signaturePath = externalPath(
+  const receiptFile = externalFile(
+    approval.receiptPath,
+    repoRoot,
+    "owner approval receipt",
+    issues,
+  );
+  const signatureFile = externalFile(
     approval.signaturePath,
     repoRoot,
-    "signature",
+    "owner approval signature",
     issues,
   );
-  const publicKeyPath = externalPath(
+  const publicKeyFile = externalFile(
     approval.publicKeyPath,
     repoRoot,
-    "public key",
+    "owner approval public key",
     issues,
   );
-  if (!receiptPath || !signaturePath || !publicKeyPath) return;
+  if (!receiptFile || !signatureFile || !publicKeyFile) return;
 
   try {
-    const receiptContent = readFileSync(receiptPath);
-    const signature = Buffer.from(readFileSync(signaturePath, "utf8").trim(), "base64");
-    const publicKey = createPublicKey(readFileSync(publicKeyPath));
+    const receiptContent = receiptFile.content;
+    const signature = Buffer.from(
+      signatureFile.content.toString("utf8").trim(),
+      "base64",
+    );
+    const publicKey = createPublicKey(publicKeyFile.content);
     const publicKeySha256 = createHash("sha256")
       .update(publicKey.export({ format: "der", type: "spki" }))
       .digest("hex");
@@ -332,39 +355,8 @@ export function verifyDetachedOwnerApproval({
   }
 }
 
-function externalPath(value, repoRoot, label, issues) {
-  return evidencePath(value, repoRoot, `owner approval ${label}`, issues);
-}
-
-function evidencePath(value, repoRoot, label, issues) {
-  if (typeof value !== "string" || !value.trim()) {
-    issues.push(`${label} path is missing`);
-    return "";
-  }
-  const path = isAbsolute(value) ? value : resolve(repoRoot, value);
-  const relation = relative(repoRoot, path);
-  if (!relation.startsWith("..") || relation === "") {
-    issues.push(`${label} must be outside the repository`);
-    return "";
-  }
-  if (!existsSync(path)) {
-    issues.push(`${label} is missing`);
-    return "";
-  }
-  return path;
-}
-
-function readJson(path, issues) {
-  if (!existsSync(path)) {
-    issues.push(`readiness packet is missing: ${path}`);
-    return {};
-  }
-  try {
-    return JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    issues.push(`readiness packet is invalid: ${error.message}`);
-    return {};
-  }
+function externalFile(value, repoRoot, label, issues) {
+  return readStableExternalFile({ issues, label, repoRoot, value });
 }
 
 function readText(path, label, issues) {

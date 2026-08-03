@@ -15,7 +15,7 @@ import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target
 
 const fallbackSchemaVersion = "v19-agent-interaction-evidence-v2";
 const repoRoot = realpathSync(process.cwd());
-const productionAlias = "https://document-intake-system.vercel.app";
+const productionAlias = `https://${SUPABASE_PRODUCTION_TARGET.canonicalApplicationHost}`;
 const productionBackendProjectRef = SUPABASE_PRODUCTION_TARGET.projectId;
 const productionBackendOrigin = SUPABASE_PRODUCTION_TARGET.projectUrl;
 const trustedRepository = "Toni-Saint-V/V-19";
@@ -153,8 +153,7 @@ function isOutsideRepository(path) {
 function isWithinDirectory(directory, path) {
   const relativePath = relative(directory, path);
   return (
-    relativePath === "" ||
-    (!relativePath.startsWith("..") && !isAbsolute(relativePath))
+    relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
   );
 }
 
@@ -190,7 +189,9 @@ function readEvidenceFile(evidenceDirectory, value) {
     !isWithinDirectory(evidenceDirectory, realPath) ||
     !isOutsideRepository(realPath)
   ) {
-    throw new Error("evidence path escapes its external evidence root or uses a symlink");
+    throw new Error(
+      "evidence path escapes its external evidence root or uses a symlink",
+    );
   }
   return { bytes: readStableFile(realPath), path: realPath };
 }
@@ -482,7 +483,9 @@ function verifyRecordArtifactContent({
     content.recordId !== record.id ||
     content.runId !== record.execution?.runId
   ) {
-    blockers.push(`artifact ${artifact.id} does not correlate to its interaction record`);
+    blockers.push(
+      `artifact ${artifact.id} does not correlate to its interaction record`,
+    );
   }
 
   const commonKeys = [
@@ -543,22 +546,26 @@ function verifyRecordArtifactContent({
           (expected) =>
             !content.requests.some((request) => requestMatches(request, expected)),
         ) ||
-        content.requests.some((request) =>
-          request.write &&
-          !declaredResponses.some((expected) => requestMatches(request, expected)),
+        content.requests.some(
+          (request) =>
+            request.write &&
+            !declaredResponses.some((expected) => requestMatches(request, expected)),
         ) ||
         content.requests.some(
           (request) =>
             request.actorId !== synthetic?.actor?.id ||
             request.actorRole !== record.role ||
             request.operationId !== synthetic?.operationId ||
-            request.entityIds.some((entityId) =>
-              !syntheticEntityIds.has(entityId) ||
-              syntheticEntityById.get(entityId)?.target !== request.target,
+            request.entityIds.some(
+              (entityId) =>
+                !syntheticEntityIds.has(entityId) ||
+                syntheticEntityById.get(entityId)?.target !== request.target,
             ),
         )
       ) {
-        blockers.push(`artifact ${artifact.id} does not match the declared network responses`);
+        blockers.push(
+          `artifact ${artifact.id} does not match the declared network responses`,
+        );
       }
       if (record.mutation?.networkResponse) {
         const expected = record.mutation.networkResponse;
@@ -570,7 +577,9 @@ function verifyRecordArtifactContent({
             request.write === true,
         );
         if (!matchesMutation) {
-          blockers.push(`artifact ${artifact.id} does not prove the declared mutation response`);
+          blockers.push(
+            `artifact ${artifact.id} does not prove the declared mutation response`,
+          );
         }
       }
       if (contract?.kind === "mutation") {
@@ -649,8 +658,7 @@ function verifyRecordArtifactContent({
         content.entityId !== synthetic?.primaryEntityId ||
         content.operationId !== synthetic?.operationId ||
         content.markerSha256 !== synthetic?.markerSha256 ||
-        (canonicalEffect &&
-          primaryEntity?.target !== canonicalEffect.primaryTarget) ||
+        (canonicalEffect && primaryEntity?.target !== canonicalEffect.primaryTarget) ||
         !reloadedAt ||
         !capturedAt ||
         reloadedAt < capturedAt ||
@@ -701,20 +709,16 @@ function verifyRecordArtifactContent({
           isObject(snapshot) &&
           hasOnlyKeys(
             snapshot,
-            new Set([
-              "afterSha256",
-              "beforeSha256",
-              "entityIds",
-              "target",
-            ]),
+            new Set(["afterSha256", "beforeSha256", "entityIds", "target"]),
           ) &&
           isNonEmptyString(snapshot.target) &&
           validSha256(snapshot.beforeSha256) &&
           validSha256(snapshot.afterSha256) &&
           validStringArray(snapshot.entityIds) &&
-          snapshot.entityIds.every((entityId) =>
-            syntheticEntityIds.has(entityId) &&
-            syntheticEntityById.get(entityId)?.target === snapshot.target,
+          snapshot.entityIds.every(
+            (entityId) =>
+              syntheticEntityIds.has(entityId) &&
+              syntheticEntityById.get(entityId)?.target === snapshot.target,
           ),
       );
       const derivedChangedTargets = snapshots
@@ -761,13 +765,9 @@ function verifyRecordArtifactContent({
           ) ||
         !record.mutation?.unintendedWrites ||
         JSON.stringify([...content.checkedTargets].sort()) !==
-          JSON.stringify(
-            [...record.mutation.unintendedWrites.checkedTargets].sort(),
-          ) ||
+          JSON.stringify([...record.mutation.unintendedWrites.checkedTargets].sort()) ||
         JSON.stringify([...content.changedTargets].sort()) !==
-          JSON.stringify(
-            [...record.mutation.unintendedWrites.changedTargets].sort(),
-          ) ||
+          JSON.stringify([...record.mutation.unintendedWrites.changedTargets].sort()) ||
         normalizeSnapshots(snapshots) !==
           normalizeSnapshots(record.mutation.unintendedWrites.targetSnapshots)
       ) {
@@ -775,9 +775,8 @@ function verifyRecordArtifactContent({
       }
       break;
     }
-    case "no-network-write":
-      {
-        const declaredResponses = record.network?.responses;
+    case "no-network-write": {
+      const declaredResponses = record.network?.responses;
       if (
         !hasOnlyKeys(content, allowed("observedRequests", "unexpectedWrites")) ||
         !Array.isArray(content.observedRequests) ||
@@ -792,19 +791,13 @@ function verifyRecordArtifactContent({
         blockers.push(`artifact ${artifact.id} zero-write ledger is invalid`);
       }
       break;
-      }
+    }
     case "storage-readback": {
       const synthetic = record.fixture?.synthetic;
       if (
         !hasOnlyKeys(
           content,
-          allowed(
-            "actorId",
-            "entityId",
-            "markerSha256",
-            "operationId",
-            "slots",
-          ),
+          allowed("actorId", "entityId", "markerSha256", "operationId", "slots"),
         ) ||
         content.actorId !== synthetic?.actor?.id ||
         content.entityId !== synthetic?.primaryEntityId ||
@@ -948,16 +941,13 @@ function verifyRecordArtifactContent({
         !record.fixture?.returnPackageArtifact ||
         content.canonicalArtifactId !==
           record.fixture.returnPackageArtifact.artifactId ||
-        content.canonicalPackageId !==
-          record.fixture.returnPackageArtifact.packageId ||
+        content.canonicalPackageId !== record.fixture.returnPackageArtifact.packageId ||
         content.fileName !== record.fixture.returnPackageArtifact.fileName ||
         content.fileSha256 !== record.fixture.returnPackageArtifact.sha256 ||
         content.byteLength !== record.fixture.returnPackageArtifact.sizeBytes ||
         content.owner !== record.fixture.returnPackageArtifact.owner ||
-        content.packageStatus !==
-          record.fixture.returnPackageArtifact.packageStatus ||
-        content.storageBucket !==
-          record.fixture.returnPackageArtifact.storageBucket ||
+        content.packageStatus !== record.fixture.returnPackageArtifact.packageStatus ||
+        content.storageBucket !== record.fixture.returnPackageArtifact.storageBucket ||
         content.storagePath !== record.fixture.returnPackageArtifact.storagePath
       ) {
         blockers.push(`artifact ${artifact.id} download metadata is invalid`);
@@ -968,7 +958,13 @@ function verifyRecordArtifactContent({
   }
 }
 
-function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, blockers }) {
+function verifyGlobalArtifactContent({
+  artifact,
+  content,
+  manifest,
+  contracts,
+  blockers,
+}) {
   verifyCommonStructuredArtifact(content, artifact, manifest, blockers);
   const commonKeys = new Set([
     "capturedAt",
@@ -1010,9 +1006,7 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
         !Number.isInteger(content.wrongRoleDenials) ||
         content.wrongRoleDenials < 2 ||
         !Array.isArray(content.viewports) ||
-        !["1440x900", "390x844"].every((entry) =>
-          content.viewports.includes(entry),
-        ) ||
+        !["1440x900", "390x844"].every((entry) => content.viewports.includes(entry)) ||
         !Array.isArray(content.roles) ||
         !["admin", "agent", "anonymous"].every((entry) =>
           content.roles.includes(entry),
@@ -1020,9 +1014,7 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
         !Array.isArray(content.surfaces) ||
         ![...requiredSurfaces].every((entry) => content.surfaces.includes(entry)) ||
         !Array.isArray(content.statusFixtures) ||
-        ![...requiredStatuses].every((entry) =>
-          content.statusFixtures.includes(entry),
-        )
+        ![...requiredStatuses].every((entry) => content.statusFixtures.includes(entry))
       ) {
         blockers.push(`artifact ${artifact.id} deployed DOM inventory is incomplete`);
       }
@@ -1071,7 +1063,9 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
           entry.enabled ? "enabled" : "disabled",
         ].join(":");
         if (controlKeys.has(entryKey)) {
-          blockers.push(`artifact ${artifact.id} contains duplicate control ${entryKey}`);
+          blockers.push(
+            `artifact ${artifact.id} contains duplicate control ${entryKey}`,
+          );
         }
         controlKeys.add(entryKey);
         if (
@@ -1090,16 +1084,13 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
             record.interactionId !== entry.interactionId ||
             record.role !== entry.role ||
             record.surface !== entry.surface ||
-            (record.fixture.submissionStatuses?.[0] ?? null) !==
-              entry.statusFixture
+            (record.fixture.submissionStatuses?.[0] ?? null) !== entry.statusFixture
           ) {
             blockers.push(
               `artifact ${artifact.id} enabled control ${entry.interactionId} has no exact evidence record`,
             );
           }
-        } else if (
-          !contract.disabledStatusFixtures?.includes(entry.statusFixture)
-        ) {
+        } else if (!contract.disabledStatusFixtures?.includes(entry.statusFixture)) {
           blockers.push(
             `artifact ${artifact.id} disabled control ${entry.interactionId} has an unregistered status`,
           );
@@ -1184,174 +1175,169 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
         blockers.push(`artifact ${artifact.id} Chrome ledger is incomplete`);
       }
       break;
-    case "supabase-readback":
-      {
-        const requiredReadbackRecords = manifest.records.filter((record) =>
-          contracts[record.interactionId]?.proof?.includes("reload-readback"),
-        );
-        const canonicalReadbacks = Array.isArray(content.canonicalReadbacks)
-          ? content.canonicalReadbacks
-          : [];
-        const validCanonicalReadback = (readback) => {
-          if (
-            !isObject(readback) ||
-            !hasOnlyKeys(
-              readback,
-              new Set([
-                "actorId",
-                "actorRole",
-                "entityId",
-                "markerSha256",
-                "operationId",
-                "recordId",
-                "reloadedAt",
-              ]),
-            )
-          ) {
-            return false;
-          }
-          const record = manifest.records.find(
-            (candidate) => candidate.id === readback.recordId,
-          );
-          const synthetic = record?.fixture?.synthetic;
-          return (
-            Boolean(record) &&
-            readback.actorId === synthetic?.actor?.id &&
-            readback.actorRole === record?.role &&
-            readback.entityId === synthetic?.primaryEntityId &&
-            readback.markerSha256 === synthetic?.markerSha256 &&
-            readback.operationId === synthetic?.operationId &&
-            Boolean(isoTimestamp(readback.reloadedAt))
-          );
-        };
-        const isolationCases = Array.isArray(content.isolationCases)
-          ? content.isolationCases
-          : [];
-        const validIsolationCase = (isolationCase) =>
-          isObject(isolationCase) &&
-          hasOnlyKeys(
-            isolationCase,
-            new Set([
-              "action",
-              "actorId",
-              "actorRole",
-              "afterSha256",
-              "beforeSha256",
-              "entityId",
-              "errorCode",
-              "markerSha256",
-              "method",
-              "observedAt",
-              "operationId",
-              "ownerActorId",
-              "path",
-              "result",
-              "rowCount",
-              "status",
-            ]),
-          ) &&
-          ["read", "write"].includes(isolationCase.action) &&
-          isNonEmptyString(isolationCase.actorId) &&
-          isolationCase.actorRole === "agent" &&
-          isNonEmptyString(isolationCase.ownerActorId) &&
-          isolationCase.actorId !== isolationCase.ownerActorId &&
-          isNonEmptyString(isolationCase.entityId) &&
-          validSha256(isolationCase.markerSha256) &&
-          isNonEmptyString(isolationCase.operationId) &&
-          ["GET", "PATCH"].includes(isolationCase.method) &&
-          isNonEmptyString(isolationCase.path) &&
-          isolationCase.path ===
-            (isolationCase.action === "read"
-              ? exactSubmissionReadPath(isolationCase.entityId)
-              : exactSubmissionWritePath(isolationCase.entityId)) &&
-          Number.isInteger(isolationCase.status) &&
-          Number.isInteger(isolationCase.rowCount) &&
-          isolationCase.rowCount === 0 &&
-          validSha256(isolationCase.beforeSha256) &&
-          isolationCase.afterSha256 === isolationCase.beforeSha256 &&
-          Boolean(isoTimestamp(isolationCase.observedAt)) &&
-          (isolationCase.action === "read"
-            ? isolationCase.method === "GET" &&
-              isolationCase.status === 200 &&
-              isolationCase.result === "zero-rows" &&
-              isolationCase.errorCode === null
-            : isolationCase.method === "PATCH" &&
-              (([401, 403].includes(isolationCase.status) &&
-                isolationCase.result === "denied" &&
-                isolationCase.errorCode === "42501") ||
-                ([200, 204].includes(isolationCase.status) &&
-                  isolationCase.result === "zero-rows" &&
-                  isolationCase.errorCode === null)));
-        const readIsolation = isolationCases.find(
-          (isolationCase) => isolationCase.action === "read",
-        );
-        const writeIsolation = isolationCases.find(
-          (isolationCase) => isolationCase.action === "write",
-        );
-        const ownerRecord = manifest.records.find((record) =>
-          record.fixture?.synthetic?.entities?.some(
-            (entity) =>
-              entity.id === readIsolation?.entityId &&
-              entity.ownerActorId === readIsolation?.ownerActorId &&
-              entity.target === "submissions",
-          ),
-        );
-        const ownerEntity = ownerRecord?.fixture?.synthetic?.entities?.find(
-          (entity) =>
-            entity.id === readIsolation?.entityId &&
-            entity.ownerActorId === readIsolation?.ownerActorId &&
-            entity.target === "submissions",
-        );
-        const ownerReadback = content.ownerReadback;
-        const ownerReadbackAfter = content.ownerReadbackAfter;
-        const expectedOwnerRow = ownerEntity
-          ? canonicalSubmissionOwnerRow(ownerEntity.id, ownerEntity.ownerActorId)
-          : undefined;
-        const expectedOwnerSnapshot = ownerEntity
-          ? canonicalSubmissionOwnerRowSha256(
-              ownerEntity.id,
-              ownerEntity.ownerActorId,
-            )
-          : undefined;
-        const validOwnerReadback = (readback) =>
-          isObject(readback) &&
-          hasOnlyKeys(
+    case "supabase-readback": {
+      const requiredReadbackRecords = manifest.records.filter((record) =>
+        contracts[record.interactionId]?.proof?.includes("reload-readback"),
+      );
+      const canonicalReadbacks = Array.isArray(content.canonicalReadbacks)
+        ? content.canonicalReadbacks
+        : [];
+      const validCanonicalReadback = (readback) => {
+        if (
+          !isObject(readback) ||
+          !hasOnlyKeys(
             readback,
             new Set([
               "actorId",
               "actorRole",
               "entityId",
               "markerSha256",
-              "method",
-              "observedAt",
               "operationId",
-              "path",
-              "result",
-              "row",
-              "rowCount",
-              "snapshotSha256",
-              "status",
+              "recordId",
+              "reloadedAt",
             ]),
-          ) &&
-          readback.actorId === ownerEntity?.ownerActorId &&
-          readback.actorId === ownerRecord?.fixture?.synthetic?.actor?.id &&
-          readback.actorRole === "agent" &&
-          ownerRecord?.role === "agent" &&
-          readback.entityId === ownerEntity?.id &&
-          readback.markerSha256 ===
-            ownerRecord?.fixture?.synthetic?.markerSha256 &&
-          readback.method === "GET" &&
-          readback.path === exactSubmissionReadPath(readback.entityId) &&
-          readback.status === 200 &&
-          readback.result === "one-row" &&
-          readback.rowCount === 1 &&
-          isObject(readback.row) &&
-          hasOnlyKeys(readback.row, new Set(["agent_id", "id"])) &&
-          readback.row.id === expectedOwnerRow?.id &&
-          readback.row.agent_id === expectedOwnerRow?.agent_id &&
-          readback.snapshotSha256 === expectedOwnerSnapshot &&
-          isNonEmptyString(readback.operationId) &&
-          Boolean(isoTimestamp(readback.observedAt));
+          )
+        ) {
+          return false;
+        }
+        const record = manifest.records.find(
+          (candidate) => candidate.id === readback.recordId,
+        );
+        const synthetic = record?.fixture?.synthetic;
+        return (
+          Boolean(record) &&
+          readback.actorId === synthetic?.actor?.id &&
+          readback.actorRole === record?.role &&
+          readback.entityId === synthetic?.primaryEntityId &&
+          readback.markerSha256 === synthetic?.markerSha256 &&
+          readback.operationId === synthetic?.operationId &&
+          Boolean(isoTimestamp(readback.reloadedAt))
+        );
+      };
+      const isolationCases = Array.isArray(content.isolationCases)
+        ? content.isolationCases
+        : [];
+      const validIsolationCase = (isolationCase) =>
+        isObject(isolationCase) &&
+        hasOnlyKeys(
+          isolationCase,
+          new Set([
+            "action",
+            "actorId",
+            "actorRole",
+            "afterSha256",
+            "beforeSha256",
+            "entityId",
+            "errorCode",
+            "markerSha256",
+            "method",
+            "observedAt",
+            "operationId",
+            "ownerActorId",
+            "path",
+            "result",
+            "rowCount",
+            "status",
+          ]),
+        ) &&
+        ["read", "write"].includes(isolationCase.action) &&
+        isNonEmptyString(isolationCase.actorId) &&
+        isolationCase.actorRole === "agent" &&
+        isNonEmptyString(isolationCase.ownerActorId) &&
+        isolationCase.actorId !== isolationCase.ownerActorId &&
+        isNonEmptyString(isolationCase.entityId) &&
+        validSha256(isolationCase.markerSha256) &&
+        isNonEmptyString(isolationCase.operationId) &&
+        ["GET", "PATCH"].includes(isolationCase.method) &&
+        isNonEmptyString(isolationCase.path) &&
+        isolationCase.path ===
+          (isolationCase.action === "read"
+            ? exactSubmissionReadPath(isolationCase.entityId)
+            : exactSubmissionWritePath(isolationCase.entityId)) &&
+        Number.isInteger(isolationCase.status) &&
+        Number.isInteger(isolationCase.rowCount) &&
+        isolationCase.rowCount === 0 &&
+        validSha256(isolationCase.beforeSha256) &&
+        isolationCase.afterSha256 === isolationCase.beforeSha256 &&
+        Boolean(isoTimestamp(isolationCase.observedAt)) &&
+        (isolationCase.action === "read"
+          ? isolationCase.method === "GET" &&
+            isolationCase.status === 200 &&
+            isolationCase.result === "zero-rows" &&
+            isolationCase.errorCode === null
+          : isolationCase.method === "PATCH" &&
+            (([401, 403].includes(isolationCase.status) &&
+              isolationCase.result === "denied" &&
+              isolationCase.errorCode === "42501") ||
+              ([200, 204].includes(isolationCase.status) &&
+                isolationCase.result === "zero-rows" &&
+                isolationCase.errorCode === null)));
+      const readIsolation = isolationCases.find(
+        (isolationCase) => isolationCase.action === "read",
+      );
+      const writeIsolation = isolationCases.find(
+        (isolationCase) => isolationCase.action === "write",
+      );
+      const ownerRecord = manifest.records.find((record) =>
+        record.fixture?.synthetic?.entities?.some(
+          (entity) =>
+            entity.id === readIsolation?.entityId &&
+            entity.ownerActorId === readIsolation?.ownerActorId &&
+            entity.target === "submissions",
+        ),
+      );
+      const ownerEntity = ownerRecord?.fixture?.synthetic?.entities?.find(
+        (entity) =>
+          entity.id === readIsolation?.entityId &&
+          entity.ownerActorId === readIsolation?.ownerActorId &&
+          entity.target === "submissions",
+      );
+      const ownerReadback = content.ownerReadback;
+      const ownerReadbackAfter = content.ownerReadbackAfter;
+      const expectedOwnerRow = ownerEntity
+        ? canonicalSubmissionOwnerRow(ownerEntity.id, ownerEntity.ownerActorId)
+        : undefined;
+      const expectedOwnerSnapshot = ownerEntity
+        ? canonicalSubmissionOwnerRowSha256(ownerEntity.id, ownerEntity.ownerActorId)
+        : undefined;
+      const validOwnerReadback = (readback) =>
+        isObject(readback) &&
+        hasOnlyKeys(
+          readback,
+          new Set([
+            "actorId",
+            "actorRole",
+            "entityId",
+            "markerSha256",
+            "method",
+            "observedAt",
+            "operationId",
+            "path",
+            "result",
+            "row",
+            "rowCount",
+            "snapshotSha256",
+            "status",
+          ]),
+        ) &&
+        readback.actorId === ownerEntity?.ownerActorId &&
+        readback.actorId === ownerRecord?.fixture?.synthetic?.actor?.id &&
+        readback.actorRole === "agent" &&
+        ownerRecord?.role === "agent" &&
+        readback.entityId === ownerEntity?.id &&
+        readback.markerSha256 === ownerRecord?.fixture?.synthetic?.markerSha256 &&
+        readback.method === "GET" &&
+        readback.path === exactSubmissionReadPath(readback.entityId) &&
+        readback.status === 200 &&
+        readback.result === "one-row" &&
+        readback.rowCount === 1 &&
+        isObject(readback.row) &&
+        hasOnlyKeys(readback.row, new Set(["agent_id", "id"])) &&
+        readback.row.id === expectedOwnerRow?.id &&
+        readback.row.agent_id === expectedOwnerRow?.agent_id &&
+        readback.snapshotSha256 === expectedOwnerSnapshot &&
+        isNonEmptyString(readback.operationId) &&
+        Boolean(isoTimestamp(readback.observedAt));
       if (
         !hasOnlyKeys(
           content,
@@ -1380,9 +1366,7 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
         !canonicalReadbacks.every(validCanonicalReadback) ||
         requiredReadbackRecords.some(
           (record) =>
-            !canonicalReadbacks.some(
-              (readback) => readback.recordId === record.id,
-            ),
+            !canonicalReadbacks.some((readback) => readback.recordId === record.id),
         ) ||
         isolationCases.length !== 2 ||
         !isolationCases.every(validIsolationCase) ||
@@ -1396,8 +1380,7 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
         readIsolation.entityId !== writeIsolation.entityId ||
         readIsolation.ownerActorId !== writeIsolation.ownerActorId ||
         readIsolation.markerSha256 !== writeIsolation.markerSha256 ||
-        readIsolation.markerSha256 !==
-          ownerRecord.fixture?.synthetic?.markerSha256 ||
+        readIsolation.markerSha256 !== ownerRecord.fixture?.synthetic?.markerSha256 ||
         ownerReadback.markerSha256 !== readIsolation.markerSha256 ||
         ownerReadback.snapshotSha256 !== readIsolation.beforeSha256 ||
         ownerReadback.snapshotSha256 !== writeIsolation.beforeSha256 ||
@@ -1421,7 +1404,7 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
         blockers.push(`artifact ${artifact.id} Supabase proof is incomplete`);
       }
       break;
-      }
+    }
     case "vercel-inspect":
       if (
         !hasOnlyKeys(
@@ -1443,7 +1426,9 @@ function verifyGlobalArtifactContent({ artifact, content, manifest, contracts, b
         content.gitHead !== manifest.deployedCommit ||
         content.gitDirty !== false ||
         !Array.isArray(content.aliases) ||
-        !content.aliases.map((alias) => alias.replace(/\/$/u, "")).includes(productionAlias)
+        !content.aliases
+          .map((alias) => alias.replace(/\/$/u, ""))
+          .includes(productionAlias)
       ) {
         blockers.push(`artifact ${artifact.id} Vercel inspect proof is invalid`);
       }
@@ -1495,7 +1480,9 @@ function verifyTrustedAttestation(
     subjectFile = readEvidenceFile(evidenceDirectory, attestation.subjectPath);
     bundleFile = readEvidenceFile(evidenceDirectory, attestation.bundlePath);
   } catch {
-    blockers.push("trusted GitHub evidence attestation files are missing or in-repository");
+    blockers.push(
+      "trusted GitHub evidence attestation files are missing or in-repository",
+    );
     return;
   }
   if (
@@ -1524,7 +1511,9 @@ function verifyTrustedAttestation(
     subject?.backendProjectRef !== manifest.backendProjectRef ||
     subject?.backendOrigin !== manifest.backendOrigin
   ) {
-    blockers.push("trusted GitHub evidence attestation subject does not bind the manifest");
+    blockers.push(
+      "trusted GitHub evidence attestation subject does not bind the manifest",
+    );
     return;
   }
 
@@ -1562,7 +1551,9 @@ function verifyTrustedAttestation(
     );
     const verifiedAttestations = JSON.parse(verification);
     if (!Array.isArray(verifiedAttestations) || !verifiedAttestations.length) {
-      blockers.push("trusted GitHub evidence attestation returned no verified identity");
+      blockers.push(
+        "trusted GitHub evidence attestation returned no verified identity",
+      );
     }
   } catch {
     blockers.push("trusted GitHub evidence attestation verification failed");
@@ -1591,7 +1582,9 @@ function verify() {
     }
     manifestBytes = readStableFile(evidencePath);
   } catch {
-    blockers.push("configured interaction evidence manifest does not exist or is unsafe");
+    blockers.push(
+      "configured interaction evidence manifest does not exist or is unsafe",
+    );
     return blockers;
   }
   const evidenceDirectory = dirname(evidencePath);
@@ -1626,10 +1619,14 @@ function verify() {
   if (shapeFindings.length) return blockers;
 
   if (forbiddenKeys(manifest, "manifest").length) {
-    blockers.push("interaction evidence manifest contains forbidden credential or PII fields");
+    blockers.push(
+      "interaction evidence manifest contains forbidden credential or PII fields",
+    );
   }
   if (forbiddenText(JSON.stringify(manifest))) {
-    blockers.push("interaction evidence manifest contains credential or email-shaped content");
+    blockers.push(
+      "interaction evidence manifest contains credential or email-shaped content",
+    );
   }
 
   const head = currentGitHead();
@@ -1640,7 +1637,9 @@ function verify() {
     manifest.backendProjectRef !== productionBackendProjectRef ||
     manifest.backendOrigin?.replace(/\/$/u, "") !== productionBackendOrigin
   ) {
-    blockers.push("interaction evidence is not bound to the production Supabase backend");
+    blockers.push(
+      "interaction evidence is not bound to the production Supabase backend",
+    );
   }
   if (manifest.deployedCommit !== head) {
     blockers.push("interaction evidence deployedCommit does not match current HEAD");
@@ -1710,14 +1709,18 @@ function verify() {
     }
     const raw = bytes.toString("utf8");
     if (forbiddenText(raw)) {
-      blockers.push(`artifact ${artifact.id} contains credential or email-shaped content`);
+      blockers.push(
+        `artifact ${artifact.id} contains credential or email-shaped content`,
+      );
       continue;
     }
     try {
       const content = JSON.parse(raw);
       if (!isObject(content)) throw new Error("not an object");
       if (forbiddenKeys(content).length) {
-        blockers.push(`artifact ${artifact.id} contains forbidden credential or PII fields`);
+        blockers.push(
+          `artifact ${artifact.id} contains forbidden credential or PII fields`,
+        );
       }
       artifactContentById.set(artifact.id, content);
     } catch {
@@ -1730,7 +1733,9 @@ function verify() {
       (artifact) => artifact.kind === requiredKind,
     );
     if (matching.length !== 1) {
-      blockers.push(`production evidence requires exactly one artifact kind: ${requiredKind}`);
+      blockers.push(
+        `production evidence requires exactly one artifact kind: ${requiredKind}`,
+      );
     } else {
       const artifact = matching[0];
       const content = artifactContentById.get(artifact.id);
@@ -1757,7 +1762,8 @@ function verify() {
 
   const artifactOwnerById = new Map();
   for (const record of manifest.records) {
-    const contract = contractModule.V19_AGENT_INTERACTION_CONTRACTS[record.interactionId];
+    const contract =
+      contractModule.V19_AGENT_INTERACTION_CONTRACTS[record.interactionId];
     if (!validSyntheticFixtureForRecord(record, manifest, contract)) {
       blockers.push(
         `interaction ${record.interactionId}: synthetic actor/entity/operation fixture is invalid`,
@@ -1765,10 +1771,14 @@ function verify() {
     }
     const artifactIds = record.execution.artifactIds;
     if (new Set(artifactIds).size !== artifactIds.length) {
-      blockers.push(`interaction ${record.interactionId}: executable artifact ids are duplicated`);
+      blockers.push(
+        `interaction ${record.interactionId}: executable artifact ids are duplicated`,
+      );
     }
     if (record.execution.runId !== manifest.runId) {
-      blockers.push(`interaction ${record.interactionId}: execution runId does not match manifest`);
+      blockers.push(
+        `interaction ${record.interactionId}: execution runId does not match manifest`,
+      );
     }
     const executionTimestamp = isoTimestamp(record.execution.capturedAt);
     if (
@@ -1776,7 +1786,9 @@ function verify() {
       !capturedAt ||
       Math.abs(executionTimestamp - capturedAt) > 24 * 60 * 60 * 1000
     ) {
-      blockers.push(`interaction ${record.interactionId}: execution timestamp is invalid`);
+      blockers.push(
+        `interaction ${record.interactionId}: execution timestamp is invalid`,
+      );
     }
 
     const artifacts = [];
@@ -1791,7 +1803,9 @@ function verify() {
       }
       const artifact = artifactById.get(artifactId);
       if (!artifact) {
-        blockers.push(`interaction ${record.interactionId}: executable artifact id is unknown`);
+        blockers.push(
+          `interaction ${record.interactionId}: executable artifact id is unknown`,
+        );
         continue;
       }
       artifacts.push(artifact);
@@ -1810,7 +1824,10 @@ function verify() {
 
     for (const proof of contract?.proof ?? []) {
       const allowedKinds = proofArtifactKinds[proof];
-      if (!allowedKinds || !artifacts.some((artifact) => allowedKinds.has(artifact.kind))) {
+      if (
+        !allowedKinds ||
+        !artifacts.some((artifact) => allowedKinds.has(artifact.kind))
+      ) {
         blockers.push(
           `interaction ${record.interactionId}: proof ${proof} has no executable artifact`,
         );
@@ -1827,11 +1844,11 @@ function verify() {
       const sessionRequest =
         isObject(networkContent) && Array.isArray(networkContent.requests)
           ? networkContent.requests.find(
-            (request) =>
-              request.operationClass === expectedSessionRequest?.operationClass &&
-              request.path === expectedSessionRequest?.path &&
-              request.query === expectedSessionRequest?.query,
-          )
+              (request) =>
+                request.operationClass === expectedSessionRequest?.operationClass &&
+                request.path === expectedSessionRequest?.path &&
+                request.query === expectedSessionRequest?.query,
+            )
           : undefined;
       if (contract.proof.includes("session-transition")) {
         const transitionArtifact = artifacts.find(
@@ -1915,8 +1932,7 @@ function verify() {
               canonicalArtifact.storageBucket,
             "agent_return_package_artifacts.storage_path":
               canonicalArtifact.storagePath,
-            "agent_return_packages.agent_id":
-              record.fixture.synthetic?.actor?.id,
+            "agent_return_packages.agent_id": record.fixture.synthetic?.actor?.id,
             "agent_return_packages.status": canonicalArtifact.packageStatus,
           }
         : undefined;
@@ -1942,7 +1958,9 @@ function verify() {
         metadata.fileSha256 !== fileArtifact.sha256 ||
         metadata.byteLength !== artifactByteLengthById.get(fileArtifact.id)
       ) {
-        blockers.push(`interaction ${record.interactionId}: PDF download metadata is incomplete`);
+        blockers.push(
+          `interaction ${record.interactionId}: PDF download metadata is incomplete`,
+        );
       }
     }
   }

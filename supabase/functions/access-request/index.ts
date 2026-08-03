@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.108.1";
 import { resolveAccessRequestUserId } from "../_shared/accessRequestProvisioning.ts";
 
 type AccessRequestAction = "approve" | "reject" | "submit";
@@ -374,10 +374,7 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method === "GET" && new URL(request.url).pathname.endsWith("/health")) {
     const admin = supabaseAdmin();
-    const healthRead = admin
-      ? await admin.from("profiles").select("id", { count: "exact", head: true })
-      : { error: new Error("Supabase admin client is unavailable.") };
-    const ready = Boolean(admin && !healthRead.error);
+    const ready = Boolean(admin);
     return jsonResponse(ready ? 200 : 503, {
       capability: "registration-ready",
       function: "access-request",

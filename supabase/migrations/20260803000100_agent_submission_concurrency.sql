@@ -132,10 +132,24 @@ begin
     'hex'
   );
 
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(actor_id::text, 868918)
+  );
+
   delete from app_private.agent_submission_mutation_receipts as stale_receipt
   where stale_receipt.actor_id = save_agent_submission_if_current.actor_id
     and stale_receipt.completed_at is not null
     and stale_receipt.created_at < clock_timestamp() - interval '90 days';
+
+  delete from app_private.agent_submission_mutation_receipts as excess_receipt
+  where excess_receipt.operation_id in (
+    select retained_receipt.operation_id
+    from app_private.agent_submission_mutation_receipts as retained_receipt
+    where retained_receipt.actor_id = save_agent_submission_if_current.actor_id
+      and retained_receipt.completed_at is not null
+    order by retained_receipt.created_at desc
+    offset 511
+  );
 
   insert into app_private.agent_submission_mutation_receipts (
     operation_id,
