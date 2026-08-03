@@ -7860,6 +7860,11 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   cursor: pointer;
 }
 
+.v19-agent-submissions-board button.v19-applicant-card-status.is-ready {
+  align-items: flex-start;
+  padding-block-start: var(--v19b-size-4);
+}
+
 .v19-agent-submissions-board button.v19-applicant-card-status:hover {
   background: var(--v19b-color-control-hover);
 }
