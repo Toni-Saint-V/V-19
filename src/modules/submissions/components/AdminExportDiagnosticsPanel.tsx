@@ -127,7 +127,7 @@ export function AdminExportDiagnosticsPanel({
 
       {onShowPackage ? (
         <button
-          className="mt-3 h-9 rounded-[9px] border border-[var(--v19b-admin-red-border)] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
+          className="mt-3 h-9 rounded-[9px] border border-[var(--v19b-admin-red-border)] bg-[var(--v19-depth-control)] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[var(--v19-depth-control-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
           onClick={onShowPackage}
           type="button"
         >

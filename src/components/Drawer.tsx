@@ -425,10 +425,10 @@ function drawerTab(activeTab: DrawerTab | undefined): TabId {
 
 function questionnaireSectionIconClass(status: QuestionnaireSectionDetail["status"]) {
   if (status === "done") {
-    return "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
+    return "bg-[var(--vf-success-soft)] border-[var(--vf-success-border)] text-[var(--vf-success)]";
   }
   if (status === "in_progress") {
-    return "bg-[#3a45b4]/10 border-[#3a45b4]/20 text-[#8fa3ff]";
+    return "bg-[var(--v19-depth-accent-soft)] border-[var(--v19-depth-accent-border)] text-[var(--v19-depth-accent-text)]";
   }
   return "bg-white/5 border-white/10 text-white/40";
 }
@@ -436,16 +436,16 @@ function questionnaireSectionIconClass(status: QuestionnaireSectionDetail["statu
 function questionnaireSectionProgressClass(
   status: QuestionnaireSectionDetail["status"],
 ) {
-  if (status === "done") return "bg-emerald-500";
-  if (status === "in_progress") return "bg-[#3a45b4]";
+  if (status === "done") return "bg-[var(--vf-success)]";
+  if (status === "in_progress") return "bg-[var(--v19-depth-accent)]";
   return "bg-white/10";
 }
 
 function historyEventBorderClass(tone: string) {
   if (tone === "warning") {
-    return "border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.2)]";
+    return "border-[var(--vf-warning-border)] shadow-none";
   }
-  if (tone === "info") return "border-[#3a45b4]/50";
+  if (tone === "info") return "border-[var(--vf-info-border)]";
   return "border-white/10";
 }
 
@@ -469,31 +469,38 @@ const statusBadgePresentation = {
   },
   in_progress: {
     Icon: Clock,
-    toneClassName: "bg-blue-500/10 border-blue-500/20 text-blue-400",
+    toneClassName:
+      "bg-[var(--vf-info-soft)] border-[var(--vf-info-border)] text-[var(--vf-info)]",
   },
   requires_action: {
     Icon: AlertCircle,
-    toneClassName: "bg-orange-500/10 border-orange-500/20 text-orange-400",
+    toneClassName:
+      "bg-[var(--vf-warning-soft)] border-[var(--vf-warning-border)] text-[var(--vf-warning)]",
   },
   submitted_for_review: {
     Icon: ShieldAlert,
-    toneClassName: "bg-[#3a45b4]/20 border-[#3a45b4]/30 text-[#8fa3ff]",
+    toneClassName:
+      "bg-[var(--v19-depth-accent-soft)] border-[var(--v19-depth-accent-border)] text-[var(--v19-depth-accent-text)]",
   },
   returned: {
     Icon: AlertCircle,
-    toneClassName: "bg-orange-500/10 border-orange-500/20 text-orange-400",
+    toneClassName:
+      "bg-[var(--vf-warning-soft)] border-[var(--vf-warning-border)] text-[var(--vf-warning)]",
   },
   corrections_received: {
     Icon: ShieldAlert,
-    toneClassName: "bg-[#3a45b4]/20 border-[#3a45b4]/30 text-[#8fa3ff]",
+    toneClassName:
+      "bg-[var(--v19-depth-accent-soft)] border-[var(--v19-depth-accent-border)] text-[var(--v19-depth-accent-text)]",
   },
   ready_for_export: {
     Icon: CheckCircle2,
-    toneClassName: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+    toneClassName:
+      "bg-[var(--vf-success-soft)] border-[var(--vf-success-border)] text-[var(--vf-success)]",
   },
   exported: {
     Icon: CheckCircle2,
-    toneClassName: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
+    toneClassName:
+      "bg-[var(--vf-success-soft)] border-[var(--vf-success-border)] text-[var(--vf-success)]",
   },
 } satisfies Record<SubmissionStatus, StatusBadgePresentation>;
 
@@ -577,7 +584,7 @@ const OverviewTab = ({
             >
               Чеклист документов
             </h3>
-            <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
+            <span className="text-[11px] font-mono text-[var(--vf-success)] font-medium bg-[var(--vf-success-soft)] px-2 py-0.5 rounded-md">
               {readyFilesCount}/{packageItems.length}
             </span>
           </div>
@@ -648,7 +655,7 @@ const OverviewTab = ({
               type="button"
               onClick={() => onOpenQuestionnaire({ applicantId: applicant.id })}
             >
-              <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
+              <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[var(--v19-depth-control-hover)] to-[var(--v19-depth-panel-strong)] border border-[var(--v19-depth-border)] flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
                 {applicantInitials(applicant.name)}
               </div>
               <div className="flex-1 min-w-0">
@@ -658,7 +665,7 @@ const OverviewTab = ({
                 <div className="text-[11px] text-white/50 mt-0.5">{applicant.role}</div>
               </div>
               <div className="text-right">
-                <div className="text-[12px] font-mono font-medium text-emerald-400">
+                <div className="text-[12px] font-mono font-medium text-[var(--vf-success)]">
                   {applicant.completedSections}/{applicant.sectionsCount}
                 </div>
                 <div className="text-[11px] text-white/50 mt-0.5">разделов готово</div>
@@ -1034,10 +1041,10 @@ function historyEventTone(text: string) {
 
 function historyEventIcon(tone: string) {
   if (tone === "warning") {
-    return <AlertCircle className="w-4 h-4 text-orange-400" />;
+    return <AlertCircle className="w-4 h-4 text-[var(--vf-warning)]" />;
   }
   if (tone === "info") {
-    return <UploadCloud className="w-4 h-4 text-[#8fa3ff]" />;
+    return <UploadCloud className="w-4 h-4 text-[var(--v19-depth-accent-text)]" />;
   }
   return <FileText className="w-4 h-4 text-white/40" />;
 }
@@ -1057,7 +1064,7 @@ const HistoryTab = ({ submission }: { submission: Submission }) =>
         return (
           <div className="relative flex gap-5" key={event.id}>
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10
+              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[var(--v19-depth-page)] z-10
           ${historyEventBorderClass(tone)}`}
             >
               {historyEventIcon(tone)}
@@ -1349,7 +1356,7 @@ export function Drawer({
     footerInstructionToneClassName = "text-white/70";
   }
   if (actionError) {
-    footerInstructionToneClassName = "text-orange-400";
+    footerInstructionToneClassName = "text-[var(--vf-warning)]";
   }
   let footerInstructionRole: "alert" | "status" | undefined;
   if (footerActionNotice || actionAnnouncement) {
@@ -1795,7 +1802,7 @@ export function Drawer({
                         ) : null}
                         {count > 0 ? (
                           <span
-                            className={`v19-submission-drawer-tab-count px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${tab.isWarning ? "bg-orange-500/20 text-orange-400" : "bg-white/10 text-white/70"}`}
+                            className={`v19-submission-drawer-tab-count px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${tab.isWarning ? "bg-[var(--vf-warning-soft)] text-[var(--vf-warning)]" : "bg-white/10 text-white/70"}`}
                           >
                             {count}
                           </span>

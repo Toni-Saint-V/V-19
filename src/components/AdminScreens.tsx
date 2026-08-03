@@ -344,10 +344,10 @@ type ReviewAiWatchItem =
 
 function watchToneClass(tone: ReviewAiWatchItem["tone"]) {
   if (tone === "critical") {
-    return "border-[#5b2b32]/45 bg-[#24191b]/50";
+    return "border-[rgb(var(--danger)/0.45)] bg-[var(--v19-depth-control)]";
   }
   if (tone === "ready") {
-    return "border-[#244238]/40 bg-[#14251f]/35";
+    return "border-[rgb(var(--success)/0.4)] bg-[var(--v19-depth-control)]";
   }
   return "border-[var(--v19b-color-primary-soft-30)] bg-[var(--v19b-color-primary-soft-10)]";
 }

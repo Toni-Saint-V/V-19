@@ -109,9 +109,8 @@ export function RemarkForm({
       if (event.key !== "Tab") return;
 
       const controls = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          focusableControlSelector,
-        ) ?? [],
+        dialogRef.current?.querySelectorAll<HTMLElement>(focusableControlSelector) ??
+          [],
       ).filter((control) => control.getClientRects().length > 0);
       const first = controls[0];
       const last = controls.at(-1);
@@ -213,7 +212,7 @@ export function RemarkForm({
             aria-busy={isSubmitting}
             aria-labelledby={remarkFormHeadingId}
             aria-modal="true"
-            className="v19-remark-form-dialog fixed inset-x-3 bottom-3 max-h-[calc(100dvh-24px)] overflow-x-hidden overflow-y-auto overscroll-contain bg-[#111113] border border-white/10 rounded-3xl shadow-[0_24px_100px_rgba(0,0,0,0.65)] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[560px] sm:-translate-x-1/2 sm:-translate-y-1/2"
+            className="v19-remark-form-dialog fixed inset-x-3 bottom-3 max-h-[calc(100dvh-24px)] overflow-x-hidden overflow-y-auto overscroll-contain bg-[var(--v19-depth-page)] border border-[var(--v19-depth-border)] rounded-3xl shadow-[0_24px_100px_rgba(0,0,0,0.65)] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[560px] sm:-translate-x-1/2 sm:-translate-y-1/2"
             exit={{ opacity: 0, scale: 0.98, y: 22 }}
             initial={{ opacity: 0, scale: 0.98, y: 22 }}
             ref={dialogRef}
@@ -255,7 +254,7 @@ export function RemarkForm({
 
             <div className="v19-remark-form-body p-5 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-2xl bg-[#161617] border border-[#242529]">
+                <div className="p-3 rounded-2xl bg-[var(--v19-depth-panel)] border border-[var(--v19-depth-border)]">
                   <div className="flex items-center gap-2 text-[11px] text-white/40 uppercase tracking-wider font-medium mb-2">
                     <FileText className="w-3.5 h-3.5" />
                     Поле или файл
@@ -264,7 +263,7 @@ export function RemarkForm({
                     {defaultField || defaultFileType || "Паспортная секция"}
                   </div>
                 </div>
-                <div className="p-3 rounded-2xl bg-[#161617] border border-[#242529]">
+                <div className="p-3 rounded-2xl bg-[var(--v19-depth-panel)] border border-[var(--v19-depth-border)]">
                   <div className="flex items-center gap-2 text-[11px] text-white/40 uppercase tracking-wider font-medium mb-2">
                     <User className="w-3.5 h-3.5" />
                     Заявитель
@@ -282,7 +281,7 @@ export function RemarkForm({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     aria-pressed={severity === "warning"}
-                    className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === "warning" ? "bg-white/[0.045] border-white/10 text-white/62" : "bg-[#161617] border-[#242529] text-white/60 hover:text-white"}`}
+                    className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === "warning" ? "bg-[var(--vf-warning-soft)] border-[var(--vf-warning-border)] text-[var(--vf-warning)]" : "bg-[var(--v19-depth-panel)] border-[var(--v19-depth-border)] text-white/60 hover:text-white"}`}
                     disabled={isSubmitting}
                     onClick={() => {
                       setSeverity("warning");
@@ -295,7 +294,7 @@ export function RemarkForm({
                   </button>
                   <button
                     aria-pressed={severity === "critical"}
-                    className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === "critical" ? "bg-[#24191b]/60 border-[#5b2b32]/45 text-[#d59aa3]" : "bg-[#161617] border-[#242529] text-white/60 hover:text-white"}`}
+                    className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === "critical" ? "bg-[var(--vf-danger-soft)] border-[var(--vf-danger-border)] text-[var(--vf-red-soft-text)]" : "bg-[var(--v19-depth-panel)] border-[var(--v19-depth-border)] text-white/60 hover:text-white"}`}
                     disabled={isSubmitting}
                     onClick={() => {
                       setSeverity("critical");
@@ -319,7 +318,7 @@ export function RemarkForm({
                 <textarea
                   aria-describedby={submitError ? "remark-message-error" : undefined}
                   aria-invalid={submitError ? true : undefined}
-                  className="min-h-[120px] w-full resize-none rounded-2xl bg-[#161617] border border-[#242529] px-4 py-3 text-[14px] text-white placeholder-white/35 outline-none focus:border-[#6f64ff]/55 focus:ring-1 focus:ring-[#6f64ff]/25"
+                  className="min-h-[120px] w-full resize-none rounded-2xl bg-[var(--v19-depth-panel)] border border-[var(--v19-depth-border)] px-4 py-3 text-[14px] text-white placeholder-white/35 outline-none focus:border-[var(--v19-depth-accent-border)] focus:ring-1 focus:ring-[var(--v19-depth-focus)]"
                   disabled={isSubmitting}
                   id="remark-message"
                   onChange={(event) => {
@@ -333,7 +332,7 @@ export function RemarkForm({
               </div>
               {submitError ? (
                 <p
-                  className="v19-remark-form-error m-0 text-[13px] leading-5 text-red-300"
+                  className="v19-remark-form-error m-0 text-[13px] leading-5 text-[var(--vf-danger)]"
                   id="remark-message-error"
                   role="alert"
                 >
@@ -347,7 +346,7 @@ export function RemarkForm({
                 </div>
                 {templates.map((template) => (
                   <button
-                    className="w-full text-left p-3 rounded-xl bg-[#161617] hover:bg-[#1e1e21] border border-[#242529] text-[12px] text-white/65 hover:text-white transition-colors"
+                    className="w-full text-left p-3 rounded-xl bg-[var(--v19-depth-panel)] hover:bg-[var(--v19-depth-control)] border border-[var(--v19-depth-border)] text-[12px] text-white/65 hover:text-white transition-colors"
                     disabled={isSubmitting}
                     key={template}
                     onClick={() => {
@@ -362,7 +361,7 @@ export function RemarkForm({
               </div>
             </div>
 
-            <footer className="v19-remark-form-footer sticky bottom-0 p-4 border-t border-white/10 bg-[#111113]/95 flex justify-end gap-3">
+            <footer className="v19-remark-form-footer sticky bottom-0 p-4 border-t border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] flex justify-end gap-3">
               {discardConfirmationOpen ? (
                 <div
                   aria-label="Несохранённое замечание"
@@ -391,7 +390,7 @@ export function RemarkForm({
               </button>
               <button
                 aria-label="Отправить замечание"
-                className="h-11 px-5 rounded-xl bg-[#24242a] hover:bg-[#2a2b32] text-[13px] font-semibold text-white flex items-center gap-2 shadow-[0_0_28px_rgba(111,100,255,0.14)] transition-colors disabled:opacity-55"
+                className="h-11 px-5 rounded-xl bg-[var(--v19-depth-accent)] hover:bg-[var(--v19-depth-accent-hover)] text-[13px] font-semibold text-[var(--v19-depth-text-strong)] flex items-center gap-2 shadow-[var(--v19-depth-inner-highlight)] transition-colors disabled:bg-[var(--v19-depth-disabled-background)] disabled:text-[var(--v19-depth-disabled-text)] disabled:opacity-100"
                 data-testid="remark-form-submit"
                 disabled={isSubmitting}
                 onClick={() => void handleSubmit()}

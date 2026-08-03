@@ -45,22 +45,16 @@
     padding: var(--v19b-size-16) !important;
   }
 
-  .admin-passport-workspace
-    .admin-passport-fields
-    .admin-review-field-row {
+  .admin-passport-workspace .admin-passport-fields .admin-review-field-row {
     grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
   }
 
-  .admin-passport-workspace
-    .admin-passport-fields
-    .admin-review-row-actions {
+  .admin-passport-workspace .admin-passport-fields .admin-review-row-actions {
     width: auto !important;
     min-width: var(--v19b-size-0) !important;
   }
 
-  .admin-passport-workspace
-    .admin-passport-fields
-    .admin-review-row-remark {
+  .admin-passport-workspace .admin-passport-fields .admin-review-row-remark {
     width: var(--v19b-size-120) !important;
     min-width: var(--v19b-size-120) !important;
     height: var(--v19b-size-40) !important;
@@ -70,16 +64,12 @@
     white-space: nowrap !important;
   }
 
-  .admin-passport-workspace
-    .admin-passport-fields
-    .admin-review-row-remark
-    > span {
+  .admin-passport-workspace .admin-passport-fields .admin-review-row-remark > span {
     display: inline !important;
   }
 }
 
-.admin-review-drawer[data-admin-review-drawer-surface="workspace"]
-  .admin-review-meta,
+.admin-review-drawer[data-admin-review-drawer-surface="workspace"] .admin-review-meta,
 .admin-review-drawer[data-admin-review-drawer-surface="workspace"]
   .admin-review-drawer-assist {
   display: none !important;
@@ -109,8 +99,7 @@
   color: var(--v19b-admin-drawer-orange-text) !important;
 }
 
-.admin-review-drawer[data-admin-review-drawer-surface="workspace"]
-  .admin-review-tabs {
+.admin-review-drawer[data-admin-review-drawer-surface="workspace"] .admin-review-tabs {
   margin: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-16) !important;
   overflow-x: auto !important;
   border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint) !important;
@@ -28566,7 +28555,7 @@ section[data-testid="agent-actions-screen"]
 .v19-questionnaire-complete-button.is-ready {
   border: var(--vf-ref-size-1px) solid var(--v19-success);
   background: var(--vf-accent-active, var(--vf-ref-color-hexneg-5964d6));
-  box-shadow: 0 0 var(--vf-ref-size-24px) rgba(52, 211, 153, 0.28);
+  box-shadow: var(--v19-depth-inner-highlight);
 }
 
 .v19-questionnaire-complete-button.is-blocked,
@@ -28822,8 +28811,7 @@ section[data-testid="agent-actions-screen"]
   line-height: var(--v19b-line-height-copy);
 }
 
-.vf-figma-questionnaire-screen
-  .v19-questionnaire-work-toolbar.has-copy {
+.vf-figma-questionnaire-screen .v19-questionnaire-work-toolbar.has-copy {
   gap: var(--v19b-size-12) !important;
 }
 
@@ -28832,8 +28820,8 @@ section[data-testid="agent-actions-screen"]
   .v19-questionnaire-copy-button {
   border-radius: var(--v19b-radius-control) !important;
   box-shadow:
-    inset var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-0)
-      var(--v19b-size-1) var(--v19b-color-primary-soft-20),
+    inset var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-1)
+      var(--v19b-color-primary-soft-20),
     var(--v19b-shadow-row-inner) !important;
 }
 
@@ -30665,9 +30653,7 @@ section[data-testid="agent-actions-screen"]
 }
 
 .access-card .access-password-control input {
-  padding-right: calc(
-    var(--v19b-size-40) + var(--v19b-size-12)
-  ) !important;
+  padding-right: calc(var(--v19b-size-40) + var(--v19b-size-12)) !important;
 }
 
 .access-card .access-password-control .access-password-toggle {
@@ -30858,9 +30844,7 @@ section[data-testid="agent-actions-screen"]
   }
 
   .access-card .access-password-control input {
-    padding-right: calc(
-      var(--v19b-size-40) + var(--v19b-size-12)
-    ) !important;
+    padding-right: calc(var(--v19b-size-40) + var(--v19b-size-12)) !important;
   }
 
   .access-card .access-password-control .access-password-toggle {
@@ -38145,7 +38129,7 @@ select,
 
 .vf-figma-questionnaire-screen .v19-questionnaire-complete-button.is-ready {
   border-color: var(--v19-success) !important;
-  box-shadow: 0 0 var(--v19b-size-28) rgba(52, 211, 153, 0.3) !important;
+  box-shadow: var(--v19-depth-inner-highlight) !important;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-complete-button.is-blocked,
@@ -38247,10 +38231,7 @@ select,
    then place review actions below instead of squeezing text between buttons. */
 [data-admin-review-drawer-surface="workspace"] .admin-review-field-row {
   display: grid !important;
-  grid-template-columns: minmax(
-    var(--v19b-size-0),
-    var(--v19b-grid-fr)
-  ) !important;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
   grid-template-areas:
     "field"
     "actions" !important;
@@ -38290,9 +38271,7 @@ select,
   justify-content: flex-end !important;
 }
 
-[data-admin-review-drawer-surface="workspace"]
-  .admin-review-row-actions
-  > button {
+[data-admin-review-drawer-surface="workspace"] .admin-review-row-actions > button {
   white-space: nowrap !important;
 }
 
@@ -38394,10 +38373,7 @@ select,
 
   [data-admin-review-drawer-surface="workspace"] .admin-review-field-row {
     display: grid !important;
-    grid-template-columns: minmax(
-      var(--v19b-size-0),
-      var(--v19b-grid-fr)
-    ) !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
     grid-template-areas:
       "field"
       "actions" !important;

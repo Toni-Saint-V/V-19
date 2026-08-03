@@ -1,4 +1,5 @@
 import type { ExportContractPreview } from "../modules/submissions/exportContract";
+import { ChevronDown } from "lucide-react";
 
 function rowCountLabel(rowCount: number): string {
   const remainder100 = rowCount % 100;
@@ -17,6 +18,20 @@ function rowCountLabel(rowCount: number): string {
   return `${rowCount} строк`;
 }
 
+function previewApplicantLabel(
+  headers: string[],
+  row: string[],
+  rowIndex: number,
+) {
+  const firstName = row[headers.indexOf("FirstName")] ?? "";
+  const lastName = row[headers.indexOf("Surname (Family Name)")] ?? "";
+  return [firstName, lastName].filter(Boolean).join(" ") || `Заявитель ${rowIndex + 1}`;
+}
+
+function previewPassportLabel(headers: string[], row: string[]) {
+  return row[headers.indexOf("Passport No")] || "Паспорт не указан";
+}
+
 export function ExportWorkbookPreview({
   preview,
 }: {
@@ -25,15 +40,15 @@ export function ExportWorkbookPreview({
   return (
     <section
       aria-label="Данные Excel Preview"
-      className="rounded-xl border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-page)] p-3"
+      className="v19-excel-preview rounded-xl border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-page)] p-3"
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="v19-excel-preview-head mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h5 className="text-sm font-semibold text-[var(--v19b-color-text)]">
-            Excel Preview · {preview.sheetName}
+            Excel · {rowCountLabel(preview.rows.length)}
           </h5>
           <p className="mt-1 text-xs text-[var(--v19b-color-text-muted)]">
-            {preview.range} · {preview.columnCount} колонок · {rowCountLabel(preview.rows.length)}
+            {preview.sheetName} · {preview.columnCount} полей
           </p>
         </div>
       </div>
@@ -78,15 +93,29 @@ export function ExportWorkbookPreview({
         className="space-y-3 lg:hidden"
       >
         {preview.rows.map((row, rowIndex) => (
-          <article
+          <details
             aria-label={`Строка Excel ${rowIndex + 1}`}
-            className="rounded-lg border border-[var(--v19b-color-border)] bg-[var(--v19b-color-panel)] p-3"
+            className="v19-excel-preview-person rounded-lg border border-[var(--v19b-color-border)] bg-[var(--v19b-color-panel)]"
             key={`excel-preview-mobile-row-${rowIndex + 1}`}
           >
-            <h6 className="mb-3 text-xs font-semibold text-[var(--v19b-color-text)]">
-              Заявитель {rowIndex + 1}
-            </h6>
-            <dl className="space-y-2">
+            <summary className="cursor-pointer list-none text-xs text-[var(--v19b-color-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19b-color-focus)]">
+              <span aria-hidden="true" className="v19-excel-preview-person-index">
+                {String(rowIndex + 1).padStart(2, "0")}
+              </span>
+              <span className="v19-excel-preview-person-copy">
+                <strong>
+                  {previewApplicantLabel(preview.headers, row, rowIndex)}
+                </strong>
+                <span>
+                  Паспорт {previewPassportLabel(preview.headers, row)}
+                </span>
+              </span>
+              <span className="v19-excel-preview-person-count">
+                {preview.columnCount}
+              </span>
+              <ChevronDown aria-hidden="true" />
+            </summary>
+            <dl className="mt-3 space-y-2 border-t border-[var(--v19b-color-border)] pt-3">
               {preview.headers.map((header, columnIndex) => (
                 <div
                   className="grid gap-1 border-b border-[var(--v19b-color-border)] pb-2 last:border-b-0 last:pb-0"
@@ -101,7 +130,7 @@ export function ExportWorkbookPreview({
                 </div>
               ))}
             </dl>
-          </article>
+          </details>
         ))}
       </div>
     </section>

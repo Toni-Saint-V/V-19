@@ -1181,7 +1181,7 @@ export function V19QueueToolbar({
 
   return (
     <V19TwoRowToolbar
-      className="v19-admin-queue-toolbar border-b border-[#242529] p-4 lg:p-5"
+      className="v19-admin-queue-toolbar border-b border-[var(--v19-depth-border)] p-4 lg:p-5"
       filters={
         <>
           {controls ? (
@@ -1210,7 +1210,7 @@ export function V19QueueToolbar({
           <input
             aria-label={searchAriaLabel ?? searchPlaceholder}
             name="queue-search"
-            className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[11px] font-medium text-white/70 placeholder:text-[#525151] outline-none focus:border-[#6f64ff]/55"
+            className="h-10 w-full rounded-[10px] border border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] pl-9 pr-3 text-[11px] font-medium text-[var(--v19-depth-text-muted)] placeholder:text-[var(--v19-depth-text-faint)] outline-none focus:border-[var(--v19-depth-accent-border)]"
             data-v19-interaction-id={interactionIds?.search}
             placeholder={searchPlaceholder}
             value={searchValue}
@@ -1223,7 +1223,7 @@ export function V19QueueToolbar({
           <button
             aria-label={filterLabel}
             title={filterLabel}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] text-[var(--v19-depth-text-muted)] hover:bg-[var(--v19-depth-control-hover)] hover:text-[var(--v19-depth-text-strong)] disabled:cursor-not-allowed disabled:text-[var(--v19-depth-disabled-text)] disabled:opacity-100"
             data-v19-interaction-id={interactionIds?.reset}
             disabled={actionDisabled}
             type="button"

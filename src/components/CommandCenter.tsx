@@ -1070,7 +1070,7 @@ export function CommandCenter({
           : "settings";
 
   return (
-    <div className="has-persistent-operational-sidebar relative h-full w-full overflow-hidden bg-[#101011]">
+    <div className="has-persistent-operational-sidebar relative h-full w-full overflow-hidden bg-[var(--v19-depth-canvas)]">
       <AnimatePresence mode="wait">
         {currentView === "questionnaire" && selectedRow && (
           <QuestionnaireScreen

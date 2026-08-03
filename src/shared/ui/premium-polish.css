@@ -714,6 +714,11 @@ select:-webkit-autofill {
   background: var(--v19-depth-accent);
 }
 
+.v19-fullscreen-app:has([data-testid="agent-actions-screen"])
+  .v19-action-surface-create:not(:disabled):active {
+  background: var(--v19-depth-accent-active) !important;
+}
+
 /* Toasts and compact system feedback */
 .v19-admin-toast {
   position: fixed;
@@ -727,9 +732,9 @@ select:-webkit-autofill {
   gap: 12px;
   padding: 12px 14px;
   transform: translateX(-50%);
-  border: 1px solid rgb(255 92 103 / 0.28);
+  border: 1px solid rgb(var(--danger) / 0.28);
   border-radius: 12px;
-  background: rgb(33 20 22 / 0.96);
+  background: rgb(var(--danger) / 0.1);
   box-shadow: var(--v19-polish-shadow-toast);
   color: var(--v19-fg);
   font-size: 13px;
@@ -987,7 +992,7 @@ select:-webkit-autofill {
   border: 1px solid var(--v19-polish-line-soft);
   border-radius: 12px;
   background:
-    radial-gradient(circle at 12% 0%, rgb(91 96 201 / 0.12), transparent 42%),
+    radial-gradient(circle at 12% 0%, rgb(var(--accent) / 0.12), transparent 42%),
     var(--v19-depth-page);
 }
 
@@ -1011,21 +1016,21 @@ select:-webkit-autofill {
 }
 
 .v19-command-ai-icon.is-critical {
-  border-color: rgb(255 92 103 / 0.28);
+  border-color: rgb(var(--danger) / 0.28);
   background: var(--v19b-dot-halo-danger);
   color: var(--v19b-dot-danger);
 }
 
 .v19-command-ai-icon.is-attention,
 .v19-command-ai-icon.is-waiting {
-  border-color: rgb(245 158 11 / 0.25);
+  border-color: rgb(var(--warning) / 0.25);
   background: var(--v19b-dot-halo-warning);
   color: var(--v19b-dot-warning);
 }
 
 .v19-command-ai-icon.is-clear,
 .v19-command-ai-icon.is-ready {
-  border-color: rgb(52 211 153 / 0.25);
+  border-color: rgb(var(--success) / 0.25);
   background: var(--v19b-dot-halo-success);
   color: var(--v19b-dot-success);
 }
@@ -1651,7 +1656,7 @@ button.v19-case-copilot-signal:hover {
   border: 1px solid var(--v19-polish-line-soft);
   border-radius: 16px;
   background:
-    radial-gradient(circle at 92% -20%, rgb(91 96 201 / 0.17), transparent 40%),
+    radial-gradient(circle at 92% -20%, rgb(var(--accent) / 0.17), transparent 40%),
     linear-gradient(120deg, rgb(255 255 255 / 0.025), transparent 48%),
     var(--v19-depth-panel);
   box-shadow: var(--v19-depth-shadow-card);
@@ -1664,7 +1669,7 @@ button.v19-case-copilot-signal:hover {
   bottom: -76px;
   width: 180px;
   height: 180px;
-  border: 1px solid rgb(173 182 255 / 0.09);
+  border: 1px solid rgb(var(--accent-focus) / 0.09);
   border-radius: 50%;
   content: "";
 }
@@ -1799,19 +1804,19 @@ button.v19-case-copilot-signal:hover {
 }
 
 .v19-access-metric.is-amber > span {
-  border-color: rgb(245 158 11 / 0.22);
+  border-color: rgb(var(--warning) / 0.22);
   background: var(--v19b-dot-halo-warning);
   color: var(--v19b-dot-warning);
 }
 
 .v19-access-metric.is-teal > span {
-  border-color: rgb(52 211 153 / 0.22);
+  border-color: rgb(var(--success) / 0.22);
   background: var(--v19b-dot-halo-success);
   color: var(--v19b-dot-success);
 }
 
 .v19-access-metric.is-danger > span {
-  border-color: rgb(255 92 103 / 0.22);
+  border-color: rgb(var(--danger) / 0.22);
   background: var(--v19b-dot-halo-danger);
   color: var(--v19b-dot-danger);
 }
@@ -1895,7 +1900,7 @@ button.v19-case-copilot-signal:hover {
 }
 
 .v19-access-tabs button.is-active span {
-  background: rgb(173 182 255 / 0.12);
+  background: rgb(var(--accent-focus) / 0.12);
   color: var(--v19-depth-accent-text);
 }
 
@@ -1960,10 +1965,10 @@ button.v19-case-copilot-signal:hover {
   gap: 8px;
   margin: 10px 12px 0;
   padding: 9px 11px;
-  border: 1px solid rgb(52 211 153 / 0.2);
+  border: 1px solid rgb(var(--success) / 0.2);
   border-radius: 9px;
   background: var(--v19b-dot-halo-success);
-  color: rgb(164 239 207);
+  color: rgb(var(--success));
   font-size: 11px;
 }
 
@@ -2113,7 +2118,7 @@ button.v19-case-copilot-signal:hover {
   height: 48px;
   place-items: center;
   margin-bottom: 4px;
-  border: 1px solid rgb(52 211 153 / 0.22);
+  border: 1px solid rgb(var(--success) / 0.22);
   border-radius: 13px;
   background: var(--v19b-dot-halo-success);
   color: var(--v19b-dot-success);

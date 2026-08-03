@@ -207,35 +207,43 @@ describe("Drawer interactions", () => {
     });
   });
 
-  test("renders the canonical label and original semantic tone for every lifecycle status", () => {
+  test("renders the canonical label and semantic token tone for every lifecycle status", () => {
     const expectations = [
       { label: "Черновик", status: "draft", toneClassName: "text-white/70" },
-      { label: "В работе", status: "in_progress", toneClassName: "text-blue-400" },
+      {
+        label: "В работе",
+        status: "in_progress",
+        toneClassName: "text-[var(--vf-info)]",
+      },
       {
         label: "Возвращено",
         status: "requires_action",
-        toneClassName: "text-orange-400",
+        toneClassName: "text-[var(--vf-warning)]",
       },
       {
         label: "На проверке",
         status: "submitted_for_review",
-        toneClassName: "text-[#8fa3ff]",
+        toneClassName: "text-[var(--v19-depth-accent-text)]",
       },
-      { label: "Возвращено", status: "returned", toneClassName: "text-orange-400" },
+      {
+        label: "Возвращено",
+        status: "returned",
+        toneClassName: "text-[var(--vf-warning)]",
+      },
       {
         label: "Исправления получены",
         status: "corrections_received",
-        toneClassName: "text-[#8fa3ff]",
+        toneClassName: "text-[var(--v19-depth-accent-text)]",
       },
       {
         label: "Готово к выгрузке",
         status: "ready_for_export",
-        toneClassName: "text-emerald-400",
+        toneClassName: "text-[var(--vf-success)]",
       },
       {
         label: "Выгружено",
         status: "exported",
-        toneClassName: "text-emerald-400",
+        toneClassName: "text-[var(--vf-success)]",
       },
     ] satisfies ReadonlyArray<{
       label: string;
@@ -447,9 +455,7 @@ describe("Drawer interactions", () => {
     expect(
       screen.queryByText("Подтвердите ручную проверку паспортных данных"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Отправить на проверку" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Отправить на проверку" })).toBeEnabled();
   });
 
   test("keeps rejected primary-action feedback visible and associated with the CTA", async () => {

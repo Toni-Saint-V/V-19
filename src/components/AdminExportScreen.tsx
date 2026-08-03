@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowUpDown,
   ArrowRight,
-  CalendarDays,
   CheckCircle2,
   CheckSquare,
   ChevronRight,
@@ -1012,10 +1011,9 @@ export function AdminExportScreen({
           />
 
           <OperationalTableHeader
-            className="v19-admin-export-table-head-v2"
+            className="v19-admin-export-table-head-v2 is-without-dates"
             columns={[
               { key: "applicant", label: "ID / имя и фамилия" },
-              { key: "dates", label: "Даты поездки" },
               { key: "city", label: "Город" },
               { key: "agent", label: "Агент" },
             ]}
@@ -1060,7 +1058,7 @@ export function AdminExportScreen({
                         : undefined
                     }
                     key={item.id}
-                    className={`export-row v19-admin-export-row-v2 ${item.selected ? "is-selected" : ""} ${activeId === item.id ? "is-active" : ""} ${item.blockers > 0 ? "is-blocked" : ""}`}
+                    className={`export-row v19-admin-export-row-v2 is-without-dates ${item.selected ? "is-selected" : ""} ${activeId === item.id ? "is-active" : ""} ${item.blockers > 0 ? "is-blocked" : ""}`}
                     data-testid={`admin-export-row-${item.id}`}
                     onClick={() => setActiveId(item.id)}
                     onKeyDown={(event) => {
@@ -1097,18 +1095,6 @@ export function AdminExportScreen({
                           {item.applicantName}
                         </strong>
                       </div>
-                    </div>
-
-                    <div className="v19-admin-export-row-dates-v2">
-                      <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
-                        <CalendarDays />
-                      </span>
-                      <small className="v19-admin-export-row-label-v2">
-                        Даты поездки
-                      </small>
-                      <span className="v19-admin-export-row-value-v2">
-                        {item.appointmentDate}
-                      </span>
                     </div>
 
                     <div className="v19-admin-export-row-city-v2">
@@ -1185,7 +1171,32 @@ export function AdminExportScreen({
             title={diagnosticTitle}
           />
 
-          <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
+          <section
+            aria-label="Excel выбранных заявителей"
+            className="v19-selected-excel-card rounded-2xl border border-[var(--v19-depth-border)] bg-[var(--v19-depth-panel)] p-4"
+            data-testid="selected-excel-preview"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[12px] text-white/45">Выбранные люди</div>
+                <h4 className="mt-1 text-[14px] font-semibold text-white">
+                  Excel
+                </h4>
+              </div>
+              <StatusPill tone={selectedCount > 0 ? "green" : "neutral"}>
+                {selectedApplicants}
+              </StatusPill>
+            </div>
+            {selectedCount > 0 ? (
+              <ExportWorkbookPreview preview={selectedPlan.preview} />
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/10 px-4 py-5 text-center text-[12px] text-white/40">
+                Выберите людей слева
+              </div>
+            )}
+          </section>
+
+          <div className="v19-export-active-card rounded-2xl border border-[var(--v19-depth-border)] bg-[var(--v19-depth-panel)] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[12px] text-white/45">Активный пакет</div>
@@ -1242,7 +1253,7 @@ export function AdminExportScreen({
           </div>
 
           {selectedCount > 0 && diagnosticReasons.length === 0 ? (
-            <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
+            <div className="rounded-2xl border border-[var(--v19-depth-border)] bg-[var(--v19-depth-panel)] p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h4 className="text-[14px] font-semibold text-white">
                   Проверка перед выгрузкой
@@ -1268,7 +1279,7 @@ export function AdminExportScreen({
               </div>
               <div className="mb-3 grid grid-cols-2 gap-2">
                 <button
-                  className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-white/45"
+                  className="h-9 rounded-[9px] border border-[var(--v19-depth-border)] bg-[var(--v19-depth-control)] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-[var(--v19-depth-disabled-text)]"
                   disabled={selectedCount === 0 || hasExportBlockers || isExporting}
                   type="button"
                   onClick={handlePrepareExcel}
@@ -1277,7 +1288,7 @@ export function AdminExportScreen({
                 </button>
                 {preparedExport && workbookDownloadUrl ? (
                   <a
-                    className="flex h-9 items-center justify-center rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
+                    className="flex h-9 items-center justify-center rounded-[9px] border border-[var(--v19-depth-border)] bg-[var(--v19-depth-control)] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-[var(--v19-depth-control-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
                     download={preparedExport.workbookArtifact.fileName}
                     href={workbookDownloadUrl}
                     onClick={handleWorkbookDownloadClick}
@@ -1286,7 +1297,7 @@ export function AdminExportScreen({
                   </a>
                 ) : (
                   <button
-                    className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white/45 disabled:cursor-not-allowed"
+                    className="h-9 rounded-[9px] border border-[var(--v19-depth-border)] bg-[var(--v19-depth-disabled-background)] px-3 text-[12px] font-semibold text-[var(--v19-depth-disabled-text)] disabled:cursor-not-allowed"
                     disabled
                     type="button"
                     title="Сначала сформируйте Excel"
@@ -1333,16 +1344,11 @@ export function AdminExportScreen({
                   </div>
                 </div>
               ) : null}
-              {selectedCount > 0 && !hasExportBlockers ? (
-                <div className="mt-3">
-                  <ExportWorkbookPreview preview={selectedPlan.preview} />
-                </div>
-              ) : null}
             </div>
           ) : null}
 
           {selectedCount > 0 && diagnosticReasons.length === 0 ? (
-            <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
+            <div className="rounded-2xl border border-[var(--v19-depth-border)] bg-[var(--v19-depth-panel)] p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h4 className="text-[14px] font-semibold text-white">
                   Состав выгрузки
@@ -1387,7 +1393,7 @@ export function AdminExportScreen({
           ) : null}
 
           {selectedHistory.length > 0 && diagnosticReasons.length === 0 ? (
-            <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
+            <div className="rounded-2xl border border-[var(--v19-depth-border)] bg-[var(--v19-depth-panel)] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <History className="h-4 w-4 text-white/40" />
                 <h4 className="text-[14px] font-semibold text-white">
@@ -1408,13 +1414,12 @@ export function AdminExportScreen({
               </div>
             </div>
           ) : null}
-        </div>
 
-        <div className="shrink-0 border-t border-[#242529] bg-[#1a1a1d] p-4">
+        <div className="v19-admin-export-action-v2 shrink-0">
           {preparedArchive && archiveDownloadUrl && archiveDownloadStarted ? (
             <div className="space-y-2">
               <button
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-wait disabled:opacity-60"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-control)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-control-hover)] disabled:cursor-wait disabled:bg-[var(--v19-depth-disabled-background)] disabled:text-[var(--v19-depth-disabled-text)]"
                 data-testid="confirm-export-download"
                 disabled={isExporting}
                 onClick={handleConfirmArchiveDownload}
@@ -1424,7 +1429,7 @@ export function AdminExportScreen({
                 {isExporting ? "Фиксируем выгрузку…" : "Подтвердить скачивание"}
               </button>
               <a
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#242529] bg-[#1e1e21] text-[12px] font-semibold text-white/75 transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--v19-depth-border)] bg-[var(--v19-depth-control)] text-[12px] font-semibold text-white/75 transition-colors hover:bg-[var(--v19-depth-control-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
                 data-testid="repeat-export-download"
                 download={preparedArchive.artifact.fileName}
                 href={archiveDownloadUrl}
@@ -1501,6 +1506,7 @@ export function AdminExportScreen({
               </>
             )}
           </div>
+        </div>
         </div>
       </aside>
       {mobileControlOpen ? (

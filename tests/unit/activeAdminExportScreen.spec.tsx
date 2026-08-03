@@ -364,11 +364,11 @@ describe("active admin export screen", () => {
     ).toBeInTheDocument();
     expect(
       container.querySelector(".v19-admin-export-row-dates-v2"),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(
       container.querySelector(".v19-admin-export-row-agent-v2"),
     ).toBeInTheDocument();
-    expect(container.querySelectorAll(".v19-admin-export-row-icon-v2")).toHaveLength(4);
+    expect(container.querySelectorAll(".v19-admin-export-row-icon-v2")).toHaveLength(3);
     expect(
       container.querySelector(".v19-admin-export-row-family-count-v2"),
     ).not.toBeInTheDocument();
@@ -396,7 +396,8 @@ describe("active admin export screen", () => {
     expect(
       within(table).getByText(preview.rows[0]?.[passportColumn] ?? "missing-passport"),
     ).toBeInTheDocument();
-    expect(screen.getByText("A:BD · 56 колонок · 1 строка")).toBeInTheDocument();
+    expect(screen.getByText("Excel · 1 строка")).toBeInTheDocument();
+    expect(screen.getByText("Sheet1 · 56 полей")).toBeInTheDocument();
   });
 
   test("counts only canonical family media and keeps one Excel row per tourist", async () => {
@@ -416,7 +417,8 @@ describe("active admin export screen", () => {
       name: "Excel Preview Sheet1",
     });
     expect(within(table).getAllByRole("row")).toHaveLength(4);
-    expect(screen.getByText("A:BD · 56 колонок · 3 строки")).toBeInTheDocument();
+    expect(screen.getByText("Excel · 3 строки")).toBeInTheDocument();
+    expect(screen.getByText("Sheet1 · 56 полей")).toBeInTheDocument();
     expect(screen.getByText("5 файлов")).toBeInTheDocument();
     expect(screen.queryByText("9 файлов")).not.toBeInTheDocument();
   });

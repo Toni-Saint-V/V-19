@@ -55,7 +55,7 @@ export function WorkspaceSurface({
 
   return (
     <VisaflowBusinessBridgeProvider bridge={bridge}>
-      <div className="h-dvh w-full bg-[#101011] text-white overflow-hidden">
+      <div className="h-dvh w-full bg-[var(--v19-depth-canvas)] text-white overflow-hidden">
         <div aria-live="polite" className="sr-only" role="status">
           {workspaceDataState.status === "loading"
             ? "Загрузка данных Supabase"
@@ -67,7 +67,7 @@ export function WorkspaceSurface({
         </div>
         {workspaceDataState.status === "error" ? (
           <div
-            className="fixed left-1/2 top-3 z-[80] w-[min(92vw,560px)] -translate-x-1/2 rounded-[12px] border border-[#7f3d45] bg-[#211416] px-4 py-3 text-[13px] text-white shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
+            className="fixed left-1/2 top-3 z-[80] w-[min(92vw,560px)] -translate-x-1/2 rounded-[12px] border border-[rgb(var(--danger)/0.46)] bg-[var(--v19-depth-panel)] px-4 py-3 text-[13px] text-white shadow-[0_18px_60px_rgba(0,0,0,0.35)]"
             role="alert"
           >
             <div className="flex items-center gap-3">
@@ -75,7 +75,7 @@ export function WorkspaceSurface({
                 {workspaceDataState.error ?? "Не удалось синхронизировать Supabase."}
               </span>
               <button
-                className="h-10 shrink-0 rounded-[10px] border border-[#7f3d45] px-3 text-[12px] font-semibold text-white"
+                className="h-10 shrink-0 rounded-[10px] border border-[rgb(var(--danger)/0.46)] px-3 text-[12px] font-semibold text-white"
                 type="button"
                 onClick={() => void onRetryWorkspace()}
               >

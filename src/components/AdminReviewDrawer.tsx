@@ -131,7 +131,7 @@ function issueSeverityLabel(issue: Issue) {
 }
 
 function fileStatusTone(file: SubmissionFile) {
-  if (file.status === "accepted") return "text-[#b8baff]";
+  if (file.status === "accepted") return "text-[var(--v19-depth-accent-text)]";
   if (file.status === "needs_replacement" || file.status === "missing")
     return "text-white/62";
   return "text-white/55";
@@ -173,9 +173,7 @@ function issueTargetsFile(issue: Issue) {
 function fieldStatus(field: QuestionnaireField, issues: Issue[]): FieldReviewStatus {
   if (
     field.error ||
-    issues.some(
-      (issue) => issue.status === "open" && fieldMatchesIssue(field, issue),
-    )
+    issues.some((issue) => issue.status === "open" && fieldMatchesIssue(field, issue))
   )
     return "error";
   if (field.adminReviewApprovedAtIso && field.adminReviewApprovedBy) {
@@ -1204,7 +1202,7 @@ function MediaTab({
               )}
               <button
                 aria-label={`Добавить замечание: ${fileTypeLabels[file.type]} — ${applicant?.fullName ?? "заявитель"}`}
-                className="admin-review-file-remark flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-transparent bg-white/[0.045] px-3 text-[12px] font-medium text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+                className="admin-review-file-remark flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-transparent bg-white/[0.045] px-3 text-[12px] font-medium text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]"
                 data-testid="admin-review-add-file-remark"
                 title="Добавить замечание к файлу"
                 type="button"
@@ -1542,9 +1540,11 @@ export function AdminReviewDrawer({
         id: "questionnaire" as const,
         label: "Анкета",
         icon: ClipboardPenLine,
-        count: submission?.applicants.flatMap((applicant) =>
-          applicant.sections.flatMap((section) => section.fields),
-        ).filter((field) => hasReviewValue(field.value)).length,
+        count: submission?.applicants
+          .flatMap((applicant) =>
+            applicant.sections.flatMap((section) => section.fields),
+          )
+          .filter((field) => hasReviewValue(field.value)).length,
       },
     ],
     [submission],
@@ -1700,10 +1700,10 @@ export function AdminReviewDrawer({
               stiffness: 220,
               mass: 1,
             }}
-            className="admin-review-drawer fixed inset-x-0 bottom-0 top-12 z-50 flex flex-col overflow-hidden rounded-t-[28px] border-x border-t border-white/10 bg-[#111113] shadow-[0_24px_80px_rgba(0,0,0,0.6)] lg:inset-y-2 lg:right-2 lg:left-auto lg:w-[860px] lg:rounded-2xl lg:border"
+            className="admin-review-drawer fixed inset-x-0 bottom-0 top-12 z-50 flex flex-col overflow-hidden rounded-t-[28px] border-x border-t border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] shadow-[0_24px_80px_rgba(0,0,0,0.6)] lg:inset-y-2 lg:right-2 lg:left-auto lg:w-[860px] lg:rounded-2xl lg:border"
             data-admin-review-drawer-surface="workspace"
           >
-            <header className="admin-review-drawer-header z-20 shrink-0 border-b border-white/5 bg-[#111113]/90 px-5 pb-0 pt-5 backdrop-blur-md lg:px-8">
+            <header className="admin-review-drawer-header z-20 shrink-0 border-b border-[var(--v19-depth-border)] bg-[var(--v19-depth-page)] px-5 pb-0 pt-5 backdrop-blur-md lg:px-8">
               <div className="admin-review-titlebar mb-5 flex items-start justify-between gap-4">
                 <div className="admin-review-titlecopy min-w-0">
                   <div className="admin-review-titlemeta">
@@ -1770,12 +1770,12 @@ export function AdminReviewDrawer({
                       type="button"
                       onClick={() => selectTab(tab.id)}
                       onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-                      className={`relative flex min-h-[44px] items-center gap-2 whitespace-nowrap px-4 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#3a45b4]
+                      className={`relative flex min-h-[44px] items-center gap-2 whitespace-nowrap px-4 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--v19-depth-focus)]
                         ${activeTab === tab.id ? "is-active text-white" : "text-white/50 hover:text-white/80"}
                       `}
                     >
                       <tab.icon
-                        className={`h-4 w-4 ${activeTab === tab.id ? (tab.isWarning ? "text-white/62" : "text-[#b8baff]") : "opacity-70"}`}
+                        className={`h-4 w-4 ${activeTab === tab.id ? (tab.isWarning ? "text-white/62" : "text-[var(--v19-depth-accent-text)]") : "opacity-70"}`}
                       />
                       <span>{tab.label}</span>
                       {typeof tab.count === "number" && tab.count > 0 && (
@@ -1788,7 +1788,7 @@ export function AdminReviewDrawer({
                       {activeTab === tab.id && (
                         <motion.i
                           layoutId="adminActiveTab"
-                          className="absolute inset-x-0 bottom-0 h-0.5 bg-[#6f64ff]"
+                          className="absolute inset-x-0 bottom-0 h-0.5 bg-[var(--v19-depth-accent)]"
                           initial={false}
                           transition={{
                             type: "spring",

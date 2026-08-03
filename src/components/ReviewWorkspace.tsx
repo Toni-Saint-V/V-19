@@ -52,7 +52,6 @@ import {
   ReviewPassportFieldRow,
   type PassportReviewField,
 } from "./ReviewPassportFieldRow";
-import { ReviewReadinessPanel } from "./review/ReviewReadinessPanel";
 import { persistenceFailureMessage } from "./review/persistenceFailureMessage";
 import { useReviewWorkspaceShortcuts } from "./review/useReviewWorkspaceShortcuts";
 
@@ -195,6 +194,17 @@ function reviewActionLabel(
 ) {
   if (decision && pendingAction === decision.action) return pendingLabel;
   return decision?.label ?? fallback;
+}
+
+function reviewActionCompactLabel(
+  decision: ActionDecision | undefined,
+  pendingAction: SubmissionAction | null,
+  fallback: string,
+  pendingLabel: string,
+) {
+  if (decision && pendingAction === decision.action) return pendingLabel;
+  if (decision?.action === "close_issues_accept") return "Закрыть и принять";
+  return fallback;
 }
 
 export function ReviewWorkspace({
@@ -606,14 +616,6 @@ export function ReviewWorkspace({
     submission?.issues.filter(
       (issue) => issue.status === "open" && passportIssueInScope(issue),
     ).length ?? 0;
-  const fixedPassportIssueCount =
-    submission?.issues.filter(
-      (issue) => issue.status === "fixed_by_agent" && passportIssueInScope(issue),
-    ).length ?? 0;
-  const closedPassportIssueCount =
-    submission?.issues.filter(
-      (issue) => issue.status === "closed_by_admin" && passportIssueInScope(issue),
-    ).length ?? 0;
   const correctedIssuesAwaitingClosure =
     submission?.issues.filter((issue) => issue.status === "fixed_by_agent") ?? [];
   const hasOpenPassportIssue = openPassportIssueCount > 0;
@@ -882,48 +884,6 @@ export function ReviewWorkspace({
     mediaTabRefs.current[nextTarget.type]?.focus({ preventScroll: true });
   };
 
-  const handleNextReviewStep = useCallback(() => {
-    const nextMediaType = confirmationMediaTypes.find(
-      (type) =>
-        mediaPreviews[type]?.status !== "ready" || !visitedMediaTypes.has(type),
-    );
-    if (nextMediaType) {
-      handleMediaSelect(nextMediaType);
-      mediaTabRefs.current[nextMediaType]?.focus({ preventScroll: true });
-      return;
-    }
-
-    const nextField = reviewFields.find(
-      (field) =>
-        !field.sectionId ||
-        !hasAdminPassportReviewValue(field.value) ||
-        field.hasError,
-    );
-    if (nextField) {
-      const fieldElement = workspaceRef.current?.querySelector<HTMLElement>(
-        `[data-passport-field-id="${nextField.id}"]`,
-      );
-      fieldElement?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-      fieldElement
-        ?.querySelector<HTMLButtonElement>("button")
-        ?.focus({ preventScroll: true });
-      return;
-    }
-
-    workspaceRef.current
-      ?.querySelector<HTMLButtonElement>("#passport-review-confirm-button")
-      ?.focus({ preventScroll: true });
-  }, [
-    handleMediaSelect,
-    mediaPreviews,
-    confirmationMediaTypes,
-    reviewFields,
-    visitedMediaTypes,
-  ]);
-
   const shortcutMediaTypes = useMemo(
     () => mediaTargets.map((target) => target.type),
     [mediaTargets],
@@ -1174,39 +1134,15 @@ export function ReviewWorkspace({
           ) : null}
 
           <div className="v19-review-details-scroll">
-            <ReviewReadinessPanel
-              closedIssueCount={closedPassportIssueCount}
-              filledFieldCount={filledFieldCount}
-              fixedIssueCount={fixedPassportIssueCount}
-              mediaReadyCount={readyMediaCount}
-              mediaTotal={confirmationMediaTypes.length}
-              mediaLoadingCount={loadingMediaCount}
-              mediaPendingReviewCount={pendingMediaReviewCount}
-              mediaUnavailableCount={unavailableMediaCount}
-              onNextStep={handleNextReviewStep}
-              openIssueCount={openPassportIssueCount}
-              packageGuardReason={acceptDecision?.reason ?? reviewDecisionReason}
-              readOnly={!isEditableReviewStatus}
-              totalFieldCount={ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-            />
-
             {correctedIssuesAwaitingClosure.length > 0 ? (
               <section
                 aria-label="Исправления к закрытию"
                 className="v19-review-corrected-issues"
               >
                 <header>
-                  <div>
-                    <span>Решение администратора</span>
-                    <h2>Исправления к закрытию</h2>
-                  </div>
+                  <h2>Исправления</h2>
                   <strong>{correctedIssuesAwaitingClosure.length}</strong>
                 </header>
-                <p>
-                  Сверьте исправленные значения. Команда «Закрыть исправления и
-                  принять» закроет перечисленные замечания и передаст пакет на
-                  выгрузку.
-                </p>
                 <div className="v19-review-corrected-issue-list">
                   {correctedIssuesAwaitingClosure.map((issue) => {
                     const target = [
@@ -1223,7 +1159,6 @@ export function ReviewWorkspace({
                           <strong>{issue.reason}</strong>
                           {target ? <span>{target}</span> : null}
                         </div>
-                        <p>{issue.comment}</p>
                       </article>
                     );
                   })}
@@ -1232,13 +1167,22 @@ export function ReviewWorkspace({
             ) : null}
 
             <header className="v19-review-section-heading">
-              <div>
-                <span>Источник решения</span>
-                <h2>Все поля паспорта</h2>
-              </div>
-              <strong>
-                {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-              </strong>
+              <h2>Поля паспорта</h2>
+              <span
+                aria-label="Состояние проверки"
+                className="v19-review-field-summary"
+                role="status"
+              >
+                Поля {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
+                <b aria-hidden="true">·</b>
+                Оригиналы {readyMediaCount}/{confirmationMediaTypes.length}
+                {openPassportIssueCount > 0 ? (
+                  <>
+                    <b aria-hidden="true">·</b>
+                    Открыто {openPassportIssueCount}
+                  </>
+                ) : null}
+              </span>
             </header>
 
             <div className="v19-review-field-grid">
@@ -1330,6 +1274,12 @@ export function ReviewWorkspace({
             {isEditableReviewStatus ? (
             <div className="v19-review-decision-actions">
               <button
+                aria-label={reviewActionLabel(
+                  returnDecision,
+                  reviewActionPending,
+                  "Отправить на исправление",
+                  "Возвращаем…",
+                )}
                 aria-busy={Boolean(reviewActionPending)}
                 aria-describedby="admin-review-decision-reason"
                 className="v19-review-return"
@@ -1343,14 +1293,20 @@ export function ReviewWorkspace({
                 type="button"
               >
                 <MessageSquarePlus aria-hidden="true" />
-                {reviewActionLabel(
+                {reviewActionCompactLabel(
                   returnDecision,
                   reviewActionPending,
-                  "На исправление",
+                  "Исправить",
                   "Возвращаем…",
                 )}
               </button>
               <button
+                aria-label={reviewActionLabel(
+                  acceptDecision,
+                  reviewActionPending,
+                  "Принять",
+                  "Принимаем…",
+                )}
                 aria-busy={Boolean(reviewActionPending)}
                 aria-describedby="admin-review-decision-reason"
                 className="v19-review-accept"
@@ -1364,7 +1320,7 @@ export function ReviewWorkspace({
                 type="button"
               >
                 <CheckCircle2 aria-hidden="true" />
-                {reviewActionLabel(
+                {reviewActionCompactLabel(
                   acceptDecision,
                   reviewActionPending,
                   "Принять",
@@ -1373,7 +1329,9 @@ export function ReviewWorkspace({
               </button>
             </div>
             ) : (
-              <span className="v19-review-read-only-badge">Мутации недоступны</span>
+              <span className="v19-review-read-only-badge">
+                Просмотр без изменений
+              </span>
             )}
 
             {reviewActionError ? (

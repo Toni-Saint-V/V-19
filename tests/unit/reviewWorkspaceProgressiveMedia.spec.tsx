@@ -149,11 +149,10 @@ describe("ReviewWorkspace perceived feedback", () => {
     );
     expect(screen.getAllByText("Загружаем оригинал")[0]).toBeVisible();
 
-    const fileStatus = document.querySelector(
-      ".v19-review-status-strip > span:nth-child(3)",
-    );
-    expect(fileStatus).toHaveClass("is-loading");
-    expect(fileStatus).not.toHaveClass("has-warning");
+    const fileStatus = screen.getByRole("status", {
+      name: "Состояние проверки",
+    });
+    expect(fileStatus).toHaveTextContent("Оригиналы 0/3");
     expect(
       screen.getByText("Загружаем защищённые оригиналы для сверки…"),
     ).toBeVisible();
@@ -168,10 +167,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     });
     expect(passportImage).toHaveAttribute("src", "https://media.test/passport.jpg");
     expect(passportImage).toHaveClass("is-loading");
-    expect(fileStatus).toHaveAttribute(
-      "aria-label",
-      "Оригиналы: не просмотрено 2; доступно 1 из 3",
-    );
+    expect(fileStatus).toHaveTextContent("Оригиналы 1/3");
 
     fireEvent.load(passportImage);
 
@@ -231,23 +227,17 @@ describe("ReviewWorkspace perceived feedback", () => {
     await waitFor(() =>
       expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
-    const fileStatus = document.querySelector(
-      ".v19-review-status-strip > span:nth-child(3)",
-    );
-    expect(fileStatus).toHaveClass("is-loading");
-    expect(fileStatus).not.toHaveClass("has-warning");
+    const fileStatus = screen.getByRole("status", {
+      name: "Состояние проверки",
+    });
+    expect(fileStatus).toHaveTextContent("Оригиналы 0/3");
 
     await act(async () => {
       mediaRequests[0]?.reject(new Error("offline"));
       await Promise.allSettled([mediaRequests[0]?.promise]);
     });
 
-    await waitFor(() => expect(fileStatus).toHaveClass("has-warning"));
-    expect(fileStatus).not.toHaveClass("is-loading");
-    expect(fileStatus).toHaveAttribute(
-      "aria-label",
-      "Оригиналы: недоступно 1; не просмотрено 2; доступно 0 из 3",
-    );
+    await waitFor(() => expect(fileStatus).toHaveTextContent("Оригиналы 0/3"));
     expect(
       screen.getByText(
         "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи.",

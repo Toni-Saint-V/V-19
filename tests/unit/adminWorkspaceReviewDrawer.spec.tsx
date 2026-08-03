@@ -1242,7 +1242,7 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toHaveLength(1);
   });
 
-  test("shows questionnaire readiness only as a read-only package guard summary", () => {
+  test("keeps the review surface focused on passport fields", () => {
     const submission = singleSubmission();
 
     const { container } = render(
@@ -1259,10 +1259,11 @@ describe("ReviewWorkspace passport section contract", () => {
       screen.queryByRole("region", { name: "Необязательный просмотр анкеты" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Посмотреть" })).not.toBeInTheDocument();
-    expect(screen.getByText("Пакетный guard")).toBeInTheDocument();
+    expect(screen.queryByText("Пакетный guard")).not.toBeInTheDocument();
+    expect(container.querySelector(".v19-review-readiness")).not.toBeInTheDocument();
     expect(
-      container.querySelector(".v19-review-questionnaire-entry small"),
-    ).toHaveTextContent(/.+/);
+      screen.getByRole("status", { name: "Состояние проверки" }),
+    ).toHaveTextContent(/Поля \d+\/\d+.*Оригиналы \d+\/\d+/);
     expect(screen.queryByText(/AI-подсказ/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("img", { name: /Готовность \d+%/ }),
@@ -1311,7 +1312,6 @@ describe("ReviewWorkspace passport section contract", () => {
       name: "Исправления к закрытию",
     });
     expect(correctedIssues).toHaveTextContent("Проверьте новый адрес отеля");
-    expect(correctedIssues).toHaveTextContent("Адрес заменён на актуальный.");
     expect(correctedIssues).toHaveTextContent(
       `${applicant.fullName} · Поездка · Адрес отеля`,
     );
@@ -1473,7 +1473,7 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeDisabled();
     expect(
       screen.getAllByText("Подтвердите паспортные поля перед принятием"),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
 
     const approvedSubmission = adminApprovePassportFieldsForTest(submission);
     view.rerender(
@@ -1491,7 +1491,7 @@ describe("ReviewWorkspace passport section contract", () => {
       name: "Принять на выгрузку",
     });
     expect(acceptButton).toBeEnabled();
-    expect(screen.getAllByText("Проверка готова к решению.")).toHaveLength(2);
+    expect(screen.getAllByText("Проверка готова к решению.")).toHaveLength(1);
     expect(
       screen.queryByText("Нужно добавить точное замечание"),
     ).not.toBeInTheDocument();
