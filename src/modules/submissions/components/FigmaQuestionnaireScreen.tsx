@@ -151,6 +151,7 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
 
 const familyCopyUnavailableMessage =
   "У основного заявителя нет введённых пользователем значений для копирования в этом разделе.";
+const familyCopySuccessMessage = "Скопировано для всех";
 
 const familyCopySectionIds = new Set<SectionId>([
   "appointment",
@@ -2717,6 +2718,7 @@ export function FigmaQuestionnaireScreen({
   const [discardExitArmed, setDiscardExitArmed] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
   const familyCopyStatusId = useId();
+  const familyCopyPreviewStatusId = useId();
   const prefersReducedMotion = useReducedMotion();
   const autosaveRevisionRef = useRef(0);
   const failedSaveRevisionRef = useRef<number | undefined>(undefined);
@@ -3469,9 +3471,7 @@ export function FigmaQuestionnaireScreen({
     }
     replacePendingFieldUpdates(next);
     updateDirtyState(next);
-    setFamilyCopyMessage(
-      `Скопировано и подтверждено после предпросмотра: ${familyCopyPreview.updates.length} полей · заявителей: ${familyCopyPreview.affectedApplicants}.`,
-    );
+    setFamilyCopyMessage(familyCopySuccessMessage);
     setFamilyCopyPreview(undefined);
   }
 
@@ -5540,94 +5540,102 @@ export function FigmaQuestionnaireScreen({
                   </div>
 
                   {showFamilyCopyControl ? (
-                    <div className="v19-questionnaire-work-toolbar-copy">
+                    <div
+                      className={`v19-questionnaire-work-toolbar-copy${
+                        familyCopyMessage === familyCopySuccessMessage
+                          ? " has-success"
+                          : ""
+                      }`}
+                    >
                       <button
-                        {...agentInteractionProps("questionnaire.preview-family-copy")}
+                        {...agentInteractionProps(
+                          familyCopyPreview
+                            ? "questionnaire.copy-family"
+                            : "questionnaire.preview-family-copy",
+                        )}
                         aria-describedby={
-                          !familyCopyPreview && familyCopyMessage
-                            ? familyCopyStatusId
-                            : undefined
+                          familyCopyPreview
+                            ? familyCopyPreviewStatusId
+                            : familyCopyMessage
+                              ? familyCopyStatusId
+                              : undefined
                         }
-                        className="v19-questionnaire-draft-button v19-questionnaire-copy-button"
-                        disabled={
-                          !isEditable ||
-                          Boolean(familyCopyPreview) ||
-                          questionnaireInteractionPending
+                        aria-label={
+                          familyCopyPreview
+                            ? "Подтвердить копирование для всех"
+                            : "Копировать для всех"
                         }
+                        aria-pressed={Boolean(familyCopyPreview)}
+                        className={`v19-questionnaire-draft-button v19-questionnaire-copy-button${
+                          familyCopyPreview ? " is-ready" : ""
+                        }`}
+                        disabled={!isEditable || questionnaireInteractionPending}
                         type="button"
-                        onClick={copySharedDataToFamily}
+                        onClick={
+                          familyCopyPreview ? confirmFamilyCopy : copySharedDataToFamily
+                        }
+                        onKeyDown={(event) => {
+                          if (!familyCopyPreview || event.key !== "Escape") return;
+                          event.preventDefault();
+                          cancelFamilyCopy();
+                        }}
                       >
                         <Copy aria-hidden="true" />
                         Копировать для всех
                       </button>
+                      {familyCopyPreview ? (
+                        <span
+                          aria-live="polite"
+                          className="sr-only"
+                          id={familyCopyPreviewStatusId}
+                          role="status"
+                        >
+                          Будет скопировано полей: {familyCopyPreview.updates.length};
+                          заявителей: {familyCopyPreview.affectedApplicants}. Повторно
+                          нажмите кнопку для подтверждения. Для отмены нажмите Escape.
+                        </span>
+                      ) : null}
+                      {familyCopyMessage &&
+                      familyCopyMessage !== familyCopyUnavailableMessage ? (
+                        <span
+                          aria-live="polite"
+                          className={
+                            familyCopyMessage === familyCopySuccessMessage
+                              ? "v19-questionnaire-family-copy-success"
+                              : "sr-only"
+                          }
+                          id={familyCopyStatusId}
+                          role="status"
+                        >
+                          {familyCopyMessage === familyCopySuccessMessage ? (
+                            <CheckCircle2 aria-hidden="true" />
+                          ) : null}
+                          {familyCopyMessage}
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {showFamilyCopyControl && (familyCopyPreview || familyCopyMessage) ? (
+                {showFamilyCopyControl &&
+                familyCopyMessage === familyCopyUnavailableMessage ? (
                   <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
-                    {familyCopyPreview ? (
-                      <>
-                        <p
-                          aria-live="polite"
-                          className="v19-questionnaire-family-copy-status"
-                          role="status"
-                        >
-                          Будет скопировано заполненных пользователем полей:{" "}
-                          {familyCopyPreview.updates.length}
-                          {" · "}членов семьи: {familyCopyPreview.affectedApplicants}.
-                        </p>
-                        <button
-                          {...agentInteractionProps("questionnaire.copy-family")}
-                          className="v19-questionnaire-complete-button v19-questionnaire-family-copy-confirm is-ready"
-                          disabled={questionnaireInteractionPending}
-                          type="button"
-                          onClick={confirmFamilyCopy}
-                        >
-                          Подтвердить копирование
-                        </button>
-                        <button
-                          {...agentInteractionProps("questionnaire.cancel-family-copy")}
-                          className="v19-questionnaire-draft-button"
-                          disabled={questionnaireInteractionPending}
-                          type="button"
-                          onClick={cancelFamilyCopy}
-                        >
-                          Отмена
-                        </button>
-                      </>
-                    ) : null}
-                    {!familyCopyPreview &&
-                    familyCopyMessage === familyCopyUnavailableMessage ? (
-                      <div
-                        aria-atomic="true"
-                        className="v19-questionnaire-family-copy-alert"
-                        id={familyCopyStatusId}
-                        role="alert"
+                    <div
+                      aria-atomic="true"
+                      className="v19-questionnaire-family-copy-alert"
+                      id={familyCopyStatusId}
+                      role="alert"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="v19-questionnaire-family-copy-alert-icon"
                       >
-                        <span
-                          aria-hidden="true"
-                          className="v19-questionnaire-family-copy-alert-icon"
-                        >
-                          <AlertCircle />
-                        </span>
-                        <p>{familyCopyMessage}</p>
-                      </div>
-                    ) : null}
-                    {!familyCopyPreview &&
-                    familyCopyMessage &&
-                    familyCopyMessage !== familyCopyUnavailableMessage ? (
-                      <p
-                        aria-live="polite"
-                        className="v19-questionnaire-family-copy-status"
-                        id={familyCopyStatusId}
-                        role="status"
-                      >
-                        {familyCopyMessage}
-                      </p>
-                    ) : null}
+                        <AlertCircle />
+                      </span>
+                      <p>{familyCopyMessage}</p>
+                    </div>
                   </div>
                 ) : null}
                 <QuestionnaireFieldUiContext.Provider

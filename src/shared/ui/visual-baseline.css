@@ -28268,28 +28268,6 @@ body:has(.access-shell),
   background: var(--v19b-color-primary-soft-20) !important;
 }
 
-.vf-figma-questionnaire-screen
-  .v19-questionnaire-field-cell.is-copy-preview
-  .v19-questionnaire-field-label {
-  color: var(--v19b-color-primary-text) !important;
-}
-
-.vf-figma-questionnaire-screen
-  .v19-questionnaire-field-cell.is-copy-preview
-  .v19-questionnaire-field-control {
-  border-color: var(--v19b-color-primary-deep-border) !important;
-  background: var(--v19b-color-primary-soft-10) !important;
-  box-shadow: inset 0 0 0 var(--v19b-size-1) var(--v19b-color-primary-soft-20) !important;
-}
-
-.vf-figma-questionnaire-screen
-  .v19-questionnaire-field-cell.is-copy-preview
-  .v19-questionnaire-field-number {
-  border-color: var(--v19b-color-primary-deep-border) !important;
-  color: var(--v19b-color-primary-text) !important;
-  background: var(--v19b-color-primary-soft-10) !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .v19-preupload-prefill-overlay,
   .v19-preupload-prefill-sheet {
@@ -36362,10 +36340,10 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
 .vf-figma-questionnaire-screen .v19-questionnaire-copy-button {
   gap: var(--v19b-size-8);
-  border-color: var(--v19b-color-primary) !important;
-  background: var(--v19b-color-primary-soft-10) !important;
-  color: var(--v19b-color-primary-text) !important;
-  box-shadow: inset 0 0 0 var(--v19b-size-1) var(--v19b-color-primary-soft-20) !important;
+  border-color: var(--v19b-color-border-strong) !important;
+  color: var(--v19b-color-text-muted) !important;
+  background: var(--v19b-color-control) !important;
+  box-shadow: var(--v19b-shadow-row-inner) !important;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-copy-button > svg {
@@ -36376,9 +36354,69 @@ section[data-testid="agent-actions-screen"] .v19-legacy-action-cta {
 
 .vf-figma-questionnaire-screen
   .v19-questionnaire-copy-button:is(:hover, :focus-visible) {
-  border-color: var(--v19b-color-primary-bright) !important;
-  background: var(--v19b-color-primary-soft-20) !important;
+  border-color: var(--v19b-color-border-selected) !important;
   color: var(--v19b-color-text-strong) !important;
+  background: var(--v19b-color-control-hover) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-copy-button.is-ready {
+  border-color: var(--v19b-color-primary-bright) !important;
+  color: var(--v19b-color-text-strong) !important;
+  background: var(--v19b-color-primary-soft-20) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-copy-button.is-ready:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-primary) !important;
+  background: var(--v19b-color-primary-soft-30) !important;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-toolbar-copy.has-success {
+  display: grid;
+  grid-template-columns: auto minmax(0, var(--v19b-grid-fr));
+  align-items: center;
+  gap: var(--v19b-size-8);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-work-toolbar-copy.has-success
+  .v19-questionnaire-copy-button {
+  width: auto;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-family-copy-success {
+  display: inline-flex;
+  min-width: var(--v19b-size-0);
+  align-items: center;
+  gap: var(--v19b-size-6);
+  color: var(--v19b-dot-success);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-label);
+  white-space: nowrap;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-family-copy-success > svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  flex: none;
+}
+
+#root
+  .vf-figma-questionnaire-screen
+  .v19-questionnaire-field-cell[data-family-copy-preview="true"]
+  .v19-questionnaire-field-control {
+  border-color: var(--v19b-dot-info) !important;
+  background: color-mix(
+    in srgb,
+    var(--v19b-dot-halo-info) 72%,
+    var(--v19b-color-control)
+  ) !important;
+  box-shadow:
+    inset 0 0 0 var(--v19b-size-1) var(--v19b-dot-halo-info),
+    0 0 0 var(--v19b-size-2) var(--v19b-dot-halo-info) !important;
 }
 
 .vf-figma-questionnaire-screen

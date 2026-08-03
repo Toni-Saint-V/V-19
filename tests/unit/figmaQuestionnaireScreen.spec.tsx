@@ -469,7 +469,9 @@ describe("FigmaQuestionnaireScreen", () => {
         .map(([update]) => update)
         .filter((update) => update.applicantId === secondaryApplicantId),
     ).toEqual([]);
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердить копирование для всех" }),
+    );
 
     expect(onFieldChange.mock.calls.map(([update]) => update)).toEqual(
       expect.arrayContaining([
@@ -4008,6 +4010,8 @@ describe("FigmaQuestionnaireScreen", () => {
       screen.getByTestId("questionnaire-next-blocker"),
     );
     expect(copyButton.parentElement).toHaveClass("v19-questionnaire-work-toolbar-copy");
+    expect(copyButton).toHaveAttribute("aria-pressed", "false");
+    expect(copyButton).not.toHaveClass("is-ready");
     expect(screen.getByLabelText("Город проживания")).toHaveAttribute(
       "autocomplete",
       "off",
@@ -4019,11 +4023,27 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       result.container.querySelectorAll('[data-family-copy-preview="true"]').length,
     ).toBeGreaterThan(0);
-    const confirmCopyButton = screen.getByRole("button", {
-      name: "Подтвердить копирование",
-    });
-    expect(confirmCopyButton).toHaveClass("v19-questionnaire-family-copy-confirm");
-    fireEvent.click(confirmCopyButton);
+    expect(copyButton).toHaveAttribute("aria-pressed", "true");
+    expect(copyButton).toHaveClass("is-ready");
+    expect(copyButton).toHaveAccessibleName("Подтвердить копирование для всех");
+    const previewStatus = screen.getByText(/Будет скопировано полей:/);
+    expect(previewStatus).toHaveAttribute("role", "status");
+    expect(previewStatus).toHaveClass("sr-only");
+    expect(
+      screen.queryByRole("button", {
+        exact: true,
+        name: "Подтвердить копирование",
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Отмена" })).not.toBeInTheDocument();
+    fireEvent.keyDown(copyButton, { key: "Escape" });
+    expect(copyButton).toHaveAttribute("aria-pressed", "false");
+    expect(copyButton).toHaveAccessibleName("Копировать для всех");
+    expect(screen.getByText("Копирование отменено; данные не изменены.")).toHaveClass(
+      "sr-only",
+    );
+    fireEvent.click(copyButton);
+    fireEvent.click(copyButton);
 
     const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
     const affectedApplicantCount = new Set(
@@ -4031,11 +4051,9 @@ describe("FigmaQuestionnaireScreen", () => {
     ).size;
     expect(copiedUpdates.length).toBeGreaterThan(0);
     expect(affectedApplicantCount).toBe(2);
-    expect(
-      screen.getByText(
-        `Скопировано и подтверждено после предпросмотра: ${copiedUpdates.length} полей · заявителей: ${affectedApplicantCount}.`,
-      ),
-    ).toHaveAttribute("role", "status");
+    const copyStatus = screen.getByText("Скопировано для всех");
+    expect(copyStatus).toHaveAttribute("role", "status");
+    expect(copyStatus).toHaveClass("v19-questionnaire-family-copy-success");
     expect(copiedUpdates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -4135,7 +4153,9 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Поездка");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердить копирование для всех" }),
+    );
 
     const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
     expect(copiedUpdates).toEqual(
@@ -4205,25 +4225,22 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Адрес и контакты");
-    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    expect(
-      screen.getByRole("button", { name: "Подтвердить копирование" }),
-    ).toBeInTheDocument();
+    const copyButton = screen.getByRole("button", { name: "Копировать для всех" });
+    fireEvent.click(copyButton);
+    expect(copyButton).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.change(screen.getByLabelText("Город проживания"), {
       target: { value: "Казань" },
     });
-    expect(
-      screen.queryByRole("button", { name: "Подтвердить копирование" }),
-    ).not.toBeInTheDocument();
+    expect(copyButton).toHaveAttribute("aria-pressed", "false");
     expect(
       screen.getByText(
         "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
       ),
     ).toHaveAttribute("role", "status");
 
-    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(copyButton);
+    fireEvent.click(copyButton);
     expect(
       onFieldChange.mock.calls
         .map(([update]) => update)
@@ -4300,8 +4317,8 @@ describe("FigmaQuestionnaireScreen", () => {
 
     expect(onFieldChange).not.toHaveBeenCalled();
     expect(
-      screen.queryByRole("button", { name: "Подтвердить копирование" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Копировать для всех" }),
+    ).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("alert")).toHaveTextContent(
       "У основного заявителя нет введённых пользователем значений",
     );
@@ -4351,7 +4368,9 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     clickPinnedSection(result.container, "Адрес и контакты");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердить копирование для всех" }),
+    );
 
     expect(onFieldChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -4504,7 +4523,9 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Отель / приглашение");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердить копирование для всех" }),
+    );
     fireEvent.click(applicantTabs[1] as HTMLButtonElement);
     clickPinnedSection(result.container, "Отель / приглашение");
 

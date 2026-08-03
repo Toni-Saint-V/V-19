@@ -501,17 +501,16 @@ export async function fillQuestionnaire(
     }
 
     if (applicantIndex === 0 && applicantCount > 1) {
-      const copyShared = questionnaire.getByRole("button", {
-        name: "Копировать для всех",
-      });
+      const copyShared = questionnaire.locator(".v19-questionnaire-copy-button");
       await expect(copyShared).toBeVisible();
+      await expect(copyShared).toHaveAccessibleName("Копировать для всех");
       await copyShared.click();
       await onFamilyCopyState?.("preview", submissionId);
-      const confirmCopy = questionnaire.getByRole("button", {
-        name: "Подтвердить копирование",
-      });
-      await expect(confirmCopy).toBeVisible();
-      await confirmCopy.click();
+      await expect(copyShared).toHaveAttribute("aria-pressed", "true");
+      await expect(copyShared).toHaveAccessibleName(
+        "Подтвердить копирование для всех",
+      );
+      await copyShared.click();
       await onFamilyCopyState?.("complete", submissionId);
     }
   }
