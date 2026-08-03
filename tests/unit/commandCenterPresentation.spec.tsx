@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "vitest";
 
 import { tripDateRangeForSubmission } from "../../src/components/v19BusinessScreenAdapter";
@@ -8,7 +10,20 @@ import {
 } from "../../src/modules/submissions/agentActions";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 
+const commandCenterSource = readFileSync(
+  `${process.cwd()}/src/components/CommandCenter.tsx`,
+  "utf8",
+);
+
 describe("CommandCenter presentation helpers", () => {
+  test("keeps the shared collection shell across every agent section", () => {
+    expect(commandCenterSource).toContain(
+      'className="is-agent-shell-source-actions v19-agent-shell-frame"',
+    );
+    expect(commandCenterSource).toMatch(/collectionSurface\s+drawerOpen=/);
+    expect(commandCenterSource).not.toContain("collectionSurface={activeNav");
+  });
+
   test("omits a trip date when neither boundary is specified", () => {
     expect(
       tripDateRangeForSubmission({ tripDateFrom: "", tripDateTo: "не указано" }),

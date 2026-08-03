@@ -495,7 +495,8 @@ export function AdminWorkspace({
 
       <div className="contents">
         <AppShell
-          collectionSurface={activeNav === "review" || activeNav === "export"}
+          className="v19-admin-shell-frame"
+          collectionSurface
           drawerOpen={currentView === "review_workspace"}
           header={
             <PageHeader

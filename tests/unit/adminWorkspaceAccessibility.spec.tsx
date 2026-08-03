@@ -461,6 +461,27 @@ describe("AdminWorkspace production navigation", () => {
     expect(screen.getByRole("button", { name: "Настройки" })).toBeVisible();
   });
 
+  test("keeps the shared collection shell geometry across admin sections", () => {
+    render(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={vi.fn()}
+        submissions={[]}
+        usesSupabase
+      />,
+    );
+    const workspace = screen.getByRole("main", {
+      name: "Рабочая область администратора",
+    });
+
+    expect(workspace).toHaveClass("is-v19-collection-surface", "v19-admin-shell-frame");
+
+    for (const section of ["Выгрузка", "Пользователи", "Настройки", "Проверка"]) {
+      fireEvent.click(screen.getByRole("button", { name: section }));
+      expect(workspace).toHaveClass("is-v19-collection-surface");
+    }
+  });
+
   test("labels the mobile menu and restores focus after Escape", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,

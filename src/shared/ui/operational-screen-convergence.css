@@ -677,6 +677,164 @@
   }
 }
 
+/* Agent navigation uses the approved My Actions frame for every section.
+   Screen content and header actions may differ, while their shared owner,
+   header baseline, and scroll viewport remain fixed during navigation. */
+#root .ops-shell.v19-agent-shell-frame > .workspace.workspace {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: grid !important;
+  width: var(--v19b-size-full) !important;
+  max-width: none !important;
+  min-width: var(--v19b-size-0) !important;
+  height: var(--v19b-viewport-height) !important;
+  min-height: var(--v19b-size-0) !important;
+  grid-template-rows: var(--v19b-size-64) minmax(var(--v19b-size-0), 1fr) !important;
+  gap: var(--v19b-size-0) !important;
+  margin: var(--v19b-size-0) !important;
+  padding: var(--v19b-size-0) !important;
+  border: var(--v19b-size-0) solid transparent !important;
+  border-radius: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+}
+
+#root
+  .ops-shell.v19-agent-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header {
+  grid-row: 1 !important;
+  display: grid !important;
+  width: var(--v19b-size-full) !important;
+  max-width: none !important;
+  height: var(--v19b-size-64) !important;
+  min-height: var(--v19b-size-64) !important;
+  max-height: var(--v19b-size-64) !important;
+  grid-template-columns: minmax(var(--v19b-size-0), 1fr) auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-16) !important;
+  margin: var(--v19b-size-0) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-24) !important;
+  border-right-width: var(--v19b-size-0) !important;
+  border-left-width: var(--v19b-size-0) !important;
+  overflow: visible !important;
+}
+
+#root
+  .ops-shell.v19-agent-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  > .v19-topbar-menu {
+  flex: 0 0 var(--v19-control-row-height) !important;
+  width: var(--v19-control-row-height) !important;
+  min-width: var(--v19-control-row-height) !important;
+  height: var(--v19-control-row-height) !important;
+  min-height: var(--v19-control-row-height) !important;
+  margin: var(--v19b-size-0) !important;
+}
+
+#root
+  .ops-shell.v19-agent-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  .topbar-heading {
+  display: flex !important;
+  width: var(--v19b-size-full) !important;
+  max-width: none !important;
+  height: var(--v19b-size-24) !important;
+  min-height: var(--v19b-size-24) !important;
+  align-items: center !important;
+  margin: var(--v19b-size-0) !important;
+}
+
+#root
+  .ops-shell.v19-agent-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  h1 {
+  line-height: var(--v19b-size-24) !important;
+}
+
+#root
+  .ops-shell.v19-agent-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  .topbar-heading,
+#root
+  .ops-shell.v19-agent-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  h1 {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#root
+  .ops-shell.v19-agent-shell-frame
+  > .workspace.workspace
+  > .v19-agent-workspace-scroll {
+  grid-row: 2 !important;
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  min-height: var(--v19b-size-0) !important;
+}
+
+@media (max-width: 1024px) {
+  #root .ops-shell.v19-agent-shell-frame > .workspace.workspace {
+    grid-column: 1 !important;
+  }
+
+  #root
+    .ops-shell.v19-agent-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header {
+    grid-template-columns:
+      var(--v19-control-row-height)
+      minmax(var(--v19b-size-0), 1fr)
+      auto !important;
+    gap: var(--v19b-size-12) !important;
+  }
+
+  #root
+    .ops-shell.v19-agent-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-topbar-menu {
+    display: inline-flex !important;
+  }
+
+  #root
+    .ops-shell.v19-agent-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions,
+  #root
+    .ops-shell.v19-agent-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions
+    > div,
+  #root
+    .ops-shell.v19-agent-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions
+    button {
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  #root
+    .ops-shell.v19-agent-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header {
+    padding: var(--v19b-size-0) var(--v19b-size-16) !important;
+  }
+}
+
 @media (max-width: 768px) {
   #root .v19-access-search input {
     height: var(--v19b-size-44) !important;
@@ -696,5 +854,173 @@
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-agent-action-status-button {
     transition: none;
+  }
+}
+
+/* Admin navigation owns one invariant frame. Individual screens may change
+   their content composition, but they must not move the shared header/scroll
+   geometry when the active section changes. */
+#root .ops-shell.v19-admin-shell-frame > .workspace.workspace {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: grid !important;
+  width: var(--v19b-size-full) !important;
+  max-width: none !important;
+  min-width: var(--v19b-size-0) !important;
+  height: var(--v19b-viewport-height) !important;
+  min-height: var(--v19b-size-0) !important;
+  grid-template-rows: var(--v19b-size-64) minmax(var(--v19b-size-0), 1fr) !important;
+  margin: var(--v19b-size-0) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-24) var(--v19b-size-24) !important;
+  border: var(--v19b-size-0) solid transparent !important;
+  border-radius: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+}
+
+#root
+  .ops-shell.v19-admin-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header {
+  grid-row: 1 !important;
+  display: grid !important;
+  width: var(--v19b-size-full) !important;
+  max-width: none !important;
+  height: var(--v19b-size-64) !important;
+  min-height: var(--v19b-size-64) !important;
+  max-height: var(--v19b-size-64) !important;
+  grid-template-columns: minmax(var(--v19b-size-0), 1fr) auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-12) !important;
+  margin: var(--v19b-size-0) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-24) !important;
+  border-right-width: var(--v19b-size-0) !important;
+  border-left-width: var(--v19b-size-0) !important;
+  overflow: visible !important;
+}
+
+#root
+  .ops-shell.v19-admin-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  > .v19-topbar-menu {
+  flex: 0 0 var(--v19-control-row-height) !important;
+  width: var(--v19-control-row-height) !important;
+  min-width: var(--v19-control-row-height) !important;
+  height: var(--v19-control-row-height) !important;
+  min-height: var(--v19-control-row-height) !important;
+  margin: var(--v19b-size-0) !important;
+}
+
+#root
+  .ops-shell.v19-admin-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  .topbar-heading {
+  display: flex !important;
+  width: var(--v19b-size-full) !important;
+  max-width: none !important;
+  height: var(--v19b-size-24) !important;
+  min-height: var(--v19b-size-24) !important;
+  align-items: center !important;
+  margin: var(--v19b-size-0) !important;
+}
+
+#root
+  .ops-shell.v19-admin-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  h1 {
+  line-height: var(--v19b-size-24) !important;
+}
+
+#root
+  .ops-shell.v19-admin-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  .topbar-heading,
+#root
+  .ops-shell.v19-admin-shell-frame
+  > .workspace.workspace
+  > .topbar.v19-page-header
+  h1 {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#root
+  .ops-shell.v19-admin-shell-frame
+  > .workspace.workspace
+  > .v19-admin-workspace-scroll {
+  grid-row: 2 !important;
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  min-height: var(--v19b-size-0) !important;
+}
+
+@media (max-width: 1024px) {
+  #root .ops-shell.v19-admin-shell-frame > .workspace.workspace {
+    grid-column: 1 !important;
+  }
+
+  #root
+    .ops-shell.v19-admin-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header {
+    grid-template-columns:
+      var(--v19-control-row-height)
+      minmax(var(--v19b-size-0), 1fr)
+      auto !important;
+  }
+
+  #root
+    .ops-shell.v19-admin-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions
+    .v19-command-trigger {
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  #root .ops-shell.v19-admin-shell-frame > .workspace.workspace {
+    padding: var(--v19b-size-0) var(--v19b-size-16) !important;
+  }
+
+  #root
+    .ops-shell.v19-admin-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header {
+    padding: var(--v19b-size-0) var(--v19b-size-16) !important;
+  }
+
+  #root
+    .ops-shell.v19-admin-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions,
+  #root
+    .ops-shell.v19-admin-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions
+    .v19-command-trigger {
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  #root
+    .ops-shell.v19-admin-shell-frame
+    > .workspace.workspace
+    > .topbar.v19-page-header
+    > .v19-page-header-actions
+    .v19-command-trigger {
+    justify-content: center !important;
+    padding: var(--v19b-size-0) !important;
   }
 }

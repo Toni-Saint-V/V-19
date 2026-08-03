@@ -1109,8 +1109,8 @@ export function CommandCenter({
         inert={currentView !== "main" || drawerOpen || Boolean(pendingCreateExit)}
       >
         <AppShell
-          className="is-agent-shell-source-actions"
-          collectionSurface={activeNav !== "settings"}
+          className="is-agent-shell-source-actions v19-agent-shell-frame"
+          collectionSurface
           drawerOpen={drawerOpen}
           header={
             <PageHeader
