@@ -96,13 +96,14 @@ describe("AccessGate invite password setup", () => {
     await waitFor(() => expect(onSignOut).toHaveBeenCalledTimes(2));
   });
 
-  test("does not collect an unused password for a Supabase access request", async () => {
+  test("collects and validates the password for a Supabase access request", async () => {
     const onRegister = vi.fn(async () => undefined);
 
     render(
       <AccessGate
         error=""
         inviteSetupEmail=""
+        recoverySetupEmail=""
         pendingSession={null}
         usesSupabase
         onCompleteInvite={vi.fn(async () => undefined)}
@@ -113,7 +114,7 @@ describe("AccessGate invite password setup", () => {
       />,
     );
 
-    expect(screen.queryByLabelText("Пароль", { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Пароль", { exact: true })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Имя и фамилия"), {
       target: { value: "Test Agent" },
     });
@@ -129,12 +130,25 @@ describe("AccessGate invite password setup", () => {
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "new.agent@example.test" },
     });
+    fireEvent.change(screen.getByLabelText("Пароль", { exact: true }), {
+      target: { value: "short" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Подать заявку на доступ" }));
+
+    expect(
+      await screen.findByText("Пароль должен содержать не меньше 12 символов"),
+    ).toBeVisible();
+    expect(onRegister).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Пароль", { exact: true }), {
+      target: { value: "Unique-E2E-password-2026" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Подать заявку на доступ" }));
 
     await waitFor(() => expect(onRegister).toHaveBeenCalledTimes(1));
     expect(onRegister.mock.calls[0]?.[0]).toMatchObject({
       email: "new.agent@example.test",
-      password: "",
+      password: "Unique-E2E-password-2026",
     });
   });
 
@@ -145,6 +159,7 @@ describe("AccessGate invite password setup", () => {
       <AccessGate
         error=""
         inviteSetupEmail="invite.user@example.test"
+        recoverySetupEmail=""
         pendingSession={null}
         onCompleteInvite={onCompleteInvite}
         onLogin={vi.fn(async () => undefined)}

@@ -211,9 +211,12 @@ export async function requestPasswordReset(
   const runtime = globalThis as typeof globalThis & {
     location?: { origin: string; pathname: string };
   };
-  const redirectTo = runtime.location
-    ? `${runtime.location.origin}${runtime.location.pathname}`
-    : undefined;
+  let redirectTo: string | undefined;
+  if (runtime.location) {
+    const recoveryUrl = new URL(runtime.location.pathname, runtime.location.origin);
+    recoveryUrl.searchParams.set("type", "recovery");
+    redirectTo = recoveryUrl.toString();
+  }
   const { error } = await client.auth.resetPasswordForEmail(
     email,
     redirectTo ? { redirectTo } : undefined,

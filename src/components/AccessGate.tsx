@@ -251,13 +251,17 @@ export function AccessGate({
       password:
         (attempted || touched.password) && !registration.password.trim()
           ? 'Введите пароль'
-          : '',
+          : (attempted || touched.password) &&
+              usesSupabase &&
+              registration.password.length < 12
+            ? 'Пароль должен содержать не меньше 12 символов'
+            : '',
       phone:
         (attempted || touched.phone) && !registration.phone.trim()
           ? 'Введите телефон'
           : '',
     }),
-    [attempted, registration, touched],
+    [attempted, registration, touched, usesSupabase],
   );
 
   function clearMessages() {
@@ -315,7 +319,8 @@ export function AccessGate({
       registration.companyName.trim() &&
       registration.city.trim() &&
       registration.phone.trim() &&
-      (usesSupabase || registration.password.trim()) &&
+      registration.password.trim() &&
+      (!usesSupabase || registration.password.length >= 12) &&
       validEmail(registration.email);
     if (!complete) return;
 
@@ -719,41 +724,36 @@ export function AccessGate({
           );
         })}
 
-        {!usesSupabase ? (
-          <div className="access-field">
-            <label className="access-field-label" htmlFor="workspace-register-password">
-              Пароль
-            </label>
-            <div className="access-password-control">
-              <input
-                {...agentInteractionProps('access.edit-field')}
-                aria-describedby={registerErrors.password ? 'workspace-register-password-error' : undefined}
-                aria-invalid={Boolean(registerErrors.password)}
-                autoComplete="new-password"
-                id="workspace-register-password"
-                name="password"
-                placeholder="Введите пароль"
-                type={registerPasswordVisible ? 'text' : 'password'}
-                value={registration.password}
-                onBlur={() => setTouched((current) => ({ ...current, password: true }))}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setRegistration((current) => ({ ...current, password: value }));
-                }}
-              />
-              {renderPasswordToggle(registerPasswordVisible, setRegisterPasswordVisible)}
-            </div>
-            {registerErrors.password ? (
-              <small className="access-field-error" id="workspace-register-password-error">
-                {registerErrors.password}
-              </small>
-            ) : null}
+        <div className="access-field">
+          <label className="access-field-label" htmlFor="workspace-register-password">
+            Пароль
+          </label>
+          <div className="access-password-control">
+            <input
+              {...agentInteractionProps('access.edit-field')}
+              aria-describedby={registerErrors.password ? 'workspace-register-password-error' : undefined}
+              aria-invalid={Boolean(registerErrors.password)}
+              autoComplete="new-password"
+              id="workspace-register-password"
+              minLength={usesSupabase ? 12 : undefined}
+              name="password"
+              placeholder={usesSupabase ? 'Не меньше 12 символов' : 'Введите пароль'}
+              type={registerPasswordVisible ? 'text' : 'password'}
+              value={registration.password}
+              onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+              onChange={(event) => {
+                const value = event.target.value;
+                setRegistration((current) => ({ ...current, password: value }));
+              }}
+            />
+            {renderPasswordToggle(registerPasswordVisible, setRegisterPasswordVisible)}
           </div>
-        ) : (
-          <p className="access-intro">
-            После одобрения придёт приглашение Supabase — пароль задаётся только по этой ссылке.
-          </p>
-        )}
+          {registerErrors.password ? (
+            <small className="access-field-error" id="workspace-register-password-error">
+              {registerErrors.password}
+            </small>
+          ) : null}
+        </div>
 
         {localError || error ? (
           <p className="access-error" role="alert">

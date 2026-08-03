@@ -72,6 +72,48 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
       );
     }
 
+    const email = normalizeAuthEmail(input.email);
+    if (input.password.length < 12) {
+      throw new AuthAccessError(
+        "INVALID_PASSWORD",
+        "Пароль должен содержать не меньше 12 символов.",
+      );
+    }
+
+    const signUpResult = await client.auth.signUp({
+      email,
+      password: input.password,
+      options: {
+        data: {
+          password_setup_required: false,
+        },
+      },
+    });
+    let temporarySession = signUpResult.data.session;
+    if (signUpResult.error) {
+      const reconciliation = await client.auth.signInWithPassword({
+        email,
+        password: input.password,
+      });
+      if (reconciliation.error || !reconciliation.data.session) {
+        throw mapSupabasePersistenceError(signUpResult.error, {
+          operation: "auth.access_request_submit",
+          fallbackKind: "auth",
+        });
+      }
+      temporarySession = reconciliation.data.session;
+    }
+
+    if (temporarySession) {
+      const signOutResult = await client.auth.signOut({ scope: "local" });
+      if (signOutResult.error) {
+        throw mapSupabasePersistenceError(signOutResult.error, {
+          operation: "auth.sign_out",
+          fallbackKind: "auth",
+        });
+      }
+    }
+
     const { data, error } = await client.functions.invoke<AccessRequestEdgeResult>(
       "access-request",
       {
@@ -80,7 +122,7 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
           input: {
             city: input.city,
             companyName: input.companyName,
-            email: normalizeAuthEmail(input.email),
+            email,
             fullName: input.fullName,
             phone: input.phone,
           },

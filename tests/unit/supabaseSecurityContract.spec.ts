@@ -144,7 +144,11 @@ describe("Supabase security contract", () => {
     expect(accessRequestFunction).not.toContain("password:");
     expect(accessRequestFunction).not.toContain("display_name,organization_name,role");
     expect(supabaseRegistration).not.toContain("...input");
-    expect(supabaseRegistration).not.toContain("password:");
+    expect(supabaseRegistration).toContain("client.auth.signUp");
+    expect(supabaseRegistration).toContain("password: input.password");
+    expect(supabaseRegistration).toContain(
+      "client.functions.invoke<AccessRequestEdgeResult>",
+    );
   });
 
   test("keeps admin PDFs private, slot-limited, and linked before agent reads", () => {

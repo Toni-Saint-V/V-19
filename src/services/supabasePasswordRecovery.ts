@@ -14,6 +14,15 @@ type RecoveryAuthResult = {
 
 export type SupabaseRecoveryAuthClient = {
   getSession: () => Promise<RecoveryAuthResult>;
+  onAuthStateChange?: (
+    callback: (event: string, session: RecoverySession | null) => void,
+  ) => {
+    data: {
+      subscription: {
+        unsubscribe: () => void;
+      };
+    };
+  };
   signOut: (input: { scope: "local" }) => Promise<{ error: RecoveryAuthError | null }>;
   updateUser: (input: { password: string }) => Promise<{ error: RecoveryAuthError | null }>;
   verifyOtp: (input: {
@@ -32,8 +41,20 @@ export function parseSupabaseRecoveryCallbackUrl(
   const type = url.searchParams.get("type") ?? hash.get("type");
   if (type !== "recovery") return null;
 
+  const tokenHash = url.searchParams.get("token_hash") ?? hash.get("token_hash");
+  const hasCallbackEvidence = Boolean(
+    tokenHash ||
+      url.searchParams.get("code") ||
+      hash.get("access_token") ||
+      url.searchParams.get("error") ||
+      hash.get("error") ||
+      url.searchParams.get("error_code") ||
+      hash.get("error_code"),
+  );
+  if (!hasCallbackEvidence) return null;
+
   return {
-    tokenHash: url.searchParams.get("token_hash") ?? hash.get("token_hash"),
+    tokenHash,
   };
 }
 
@@ -61,7 +82,7 @@ export async function beginSupabasePasswordRecovery(
 
   const result = callback.tokenHash
     ? await auth.verifyOtp({ token_hash: callback.tokenHash, type: "recovery" })
-    : await auth.getSession();
+    : await recoverySessionFromCallback(auth);
   if (result.error) {
     throw recoveryError(result.error, "Ссылка восстановления недействительна или устарела.");
   }
@@ -72,6 +93,34 @@ export async function beginSupabasePasswordRecovery(
     throw new Error("Supabase не подтвердил сессию восстановления пароля.");
   }
   return { email, userId };
+}
+
+async function recoverySessionFromCallback(
+  auth: SupabaseRecoveryAuthClient,
+): Promise<RecoveryAuthResult> {
+  let resolveRecoveryEvent!: (session: RecoverySession | null) => void;
+  let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+  const recoveryEvent = new Promise<RecoverySession | null>((resolve) => {
+    resolveRecoveryEvent = resolve;
+  });
+  const listener = auth.onAuthStateChange?.((event, session) => {
+    if (event === "PASSWORD_RECOVERY" && session) {
+      resolveRecoveryEvent(session);
+    }
+  });
+
+  try {
+    const current = await auth.getSession();
+    if (current.error) return current;
+    if (!listener) return { data: { session: null }, error: null };
+
+    timeout = globalThis.setTimeout(() => resolveRecoveryEvent(null), 2_000);
+    const eventSession = await recoveryEvent;
+    return { data: { session: eventSession }, error: null };
+  } finally {
+    if (timeout !== undefined) globalThis.clearTimeout(timeout);
+    listener?.data.subscription.unsubscribe();
+  }
 }
 
 export async function completeSupabasePasswordRecovery(

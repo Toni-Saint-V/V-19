@@ -339,7 +339,9 @@ describe("Supabase persistence failure paths", () => {
     });
     expect(resetPasswordForEmail).toHaveBeenCalledWith(
       "agent@example.com",
-      expect.objectContaining({ redirectTo: expect.any(String) }),
+      expect.objectContaining({
+        redirectTo: expect.stringContaining("type=recovery"),
+      }),
     );
   });
 

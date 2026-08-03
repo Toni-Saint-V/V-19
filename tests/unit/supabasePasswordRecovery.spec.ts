@@ -15,6 +15,13 @@ function authClient(): SupabaseRecoveryAuthClient {
       },
       error: null,
     })),
+    onAuthStateChange: vi.fn(() => ({
+      data: {
+        subscription: {
+          unsubscribe: vi.fn(),
+        },
+      },
+    })),
     signOut: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ error: null })),
     verifyOtp: vi.fn(async () => ({
@@ -41,6 +48,9 @@ describe("Supabase password recovery", () => {
       type: "recovery",
     });
     expect(cleanSupabaseRecoveryCallbackUrl(url)).toBe("https://app.example/");
+    expect(
+      parseSupabaseRecoveryCallbackUrl("https://app.example/?type=recovery"),
+    ).toBeNull();
   });
 
   test("updates the password and closes the temporary recovery session", async () => {
@@ -48,6 +58,57 @@ describe("Supabase password recovery", () => {
     await completeSupabasePasswordRecovery(auth, "a-secure-password");
     expect(auth.updateUser).toHaveBeenCalledWith({ password: "a-secure-password" });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  test("accepts the PASSWORD_RECOVERY session emitted while the callback initializes", async () => {
+    const auth = authClient();
+    vi.mocked(auth.getSession).mockResolvedValueOnce({
+      data: { session: null },
+      error: null,
+    });
+    vi.mocked(auth.onAuthStateChange!).mockImplementationOnce((callback) => {
+      queueMicrotask(() => {
+        callback("PASSWORD_RECOVERY", {
+          user: { email: "recovery@example.com", id: "recovery-user" },
+        });
+      });
+      return {
+        data: {
+          subscription: {
+            unsubscribe: vi.fn(),
+          },
+        },
+      };
+    });
+
+    await expect(
+      beginSupabasePasswordRecovery(
+        auth,
+        "https://app.example/?type=recovery#access_token=temporary",
+      ),
+    ).resolves.toEqual({
+      email: "recovery@example.com",
+      userId: "recovery-user",
+    });
+  });
+
+  test("rejects an unrelated current session when no recovery event arrives", async () => {
+    vi.useFakeTimers();
+    try {
+      const auth = authClient();
+      const recovery = beginSupabasePasswordRecovery(
+        auth,
+        "https://app.example/?type=recovery#access_token=untrusted",
+      );
+      const rejection = expect(recovery).rejects.toThrow(
+        "Supabase не подтвердил сессию восстановления пароля",
+      );
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("rejects weak passwords before writing", async () => {
