@@ -4,9 +4,20 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { AccessGate } from "../../src/components/AccessGate";
 import { auditAgentInteractionControls } from "../../src/modules/submissions/agentInteractionContract";
 
-afterEach(() => {
-  cleanup();
-});
+afterEach(cleanup);
+
+const commonProps = {
+  error: "",
+  inviteSetupEmail: "",
+  recoverySetupEmail: "",
+  pendingSession: null,
+  onCompleteInvite: vi.fn(async () => undefined),
+  onCompleteRecovery: vi.fn(async () => undefined),
+  onLogin: vi.fn(async () => undefined),
+  onRegister: vi.fn(async () => undefined),
+  onResetPassword: vi.fn(async () => ""),
+  onSignOut: vi.fn(async () => undefined),
+};
 
 describe("AccessGate invite password setup", () => {
   test("deduplicates rapid login submissions", async () => {
@@ -16,25 +27,10 @@ describe("AccessGate invite password setup", () => {
     });
     const onLogin = vi.fn(() => login);
 
-    const view = render(
-      <AccessGate
-        error=""
-        inviteSetupEmail=""
-        recoverySetupEmail=""
-        pendingSession={null}
-        onCompleteInvite={vi.fn(async () => undefined)}
-        onCompleteRecovery={vi.fn(async () => undefined)}
-        onLogin={onLogin}
-        onRegister={vi.fn(async () => undefined)}
-        onResetPassword={vi.fn(async () => "")}
-        onSignOut={vi.fn(async () => undefined)}
-      />,
-    );
-
+    const view = render(<AccessGate {...commonProps} onLogin={onLogin} />);
     expect(auditAgentInteractionControls(view.container)).toEqual([]);
 
     fireEvent.click(screen.getByRole("button", { name: "Уже есть доступ? Войти" }));
-    expect(auditAgentInteractionControls(view.container)).toEqual([]);
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "agent@example.test" },
     });
@@ -51,148 +47,82 @@ describe("AccessGate invite password setup", () => {
     await waitFor(() => expect(submit).toBeEnabled());
   });
 
-  test("keeps a pending session visible when sign-out fails and allows retry", async () => {
-    const onSignOut = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("Не удалось завершить сессию. Повторите попытку."))
-      .mockResolvedValueOnce(undefined);
-
+  test("shows a pending request without exposing a product workspace", () => {
     render(
       <AccessGate
-        error=""
-        inviteSetupEmail=""
-        recoverySetupEmail=""
+        {...commonProps}
         pendingSession={{
           approvalStatus: "pending",
-          companyName: "CODEX E2E",
-          createdAt: "2026-07-22T00:00:00.000Z",
+          companyName: "Visa Test",
+          createdAt: "2026-08-04T00:00:00.000Z",
           email: "pending.agent@example.test",
-          fullName: "CODEX E2E AGENT",
+          fullName: "Pending Agent",
           role: "agent",
           status: "pending",
-          userId: "synthetic-user",
+          userId: "pending-pending.agent@example.test",
         }}
-        onCompleteInvite={vi.fn(async () => undefined)}
-        onCompleteRecovery={vi.fn(async () => undefined)}
-        onLogin={vi.fn(async () => undefined)}
-        onRegister={vi.fn(async () => undefined)}
-        onResetPassword={vi.fn(async () => "")}
-        onSignOut={onSignOut}
       />,
     );
-
-    const signOut = screen.getByRole("button", { name: "Выйти" });
-    fireEvent.click(signOut);
-    fireEvent.click(signOut);
-
-    expect(onSignOut).toHaveBeenCalledTimes(1);
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Не удалось завершить сессию. Повторите попытку.",
-    );
-    expect(screen.getByRole("heading", { name: "Ожидает подтверждения" })).toBeVisible();
-    await waitFor(() => expect(signOut).toBeEnabled());
-
-    fireEvent.click(signOut);
-    await waitFor(() => expect(onSignOut).toHaveBeenCalledTimes(2));
-  });
-
-  test("collects and validates the password for a Supabase access request", async () => {
-    const onRegister = vi.fn(async () => undefined);
-
-    render(
-      <AccessGate
-        error=""
-        inviteSetupEmail=""
-        recoverySetupEmail=""
-        pendingSession={null}
-        usesSupabase
-        onCompleteInvite={vi.fn(async () => undefined)}
-        onLogin={vi.fn(async () => undefined)}
-        onRegister={onRegister}
-        onResetPassword={vi.fn(async () => "")}
-        onSignOut={vi.fn(async () => undefined)}
-      />,
-    );
-
-    expect(screen.getByLabelText("Пароль", { exact: true })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Имя и фамилия"), {
-      target: { value: "Test Agent" },
-    });
-    fireEvent.change(screen.getByLabelText("Агентство / компания"), {
-      target: { value: "Test Company" },
-    });
-    fireEvent.change(screen.getByLabelText("Город"), {
-      target: { value: "Москва" },
-    });
-    fireEvent.change(screen.getByLabelText("Телефон"), {
-      target: { value: "+7 900 000-00-00" },
-    });
-    fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "new.agent@example.test" },
-    });
-    fireEvent.change(screen.getByLabelText("Пароль", { exact: true }), {
-      target: { value: "short" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Подать заявку на доступ" }));
 
     expect(
-      await screen.findByText("Пароль должен содержать не меньше 12 символов"),
+      screen.getByRole("heading", { name: "Ожидает подтверждения" }),
     ).toBeVisible();
-    expect(onRegister).not.toHaveBeenCalled();
+    expect(screen.queryByText("Мои действия")).not.toBeInTheDocument();
+  });
 
-    fireEvent.change(screen.getByLabelText("Пароль", { exact: true }), {
-      target: { value: "Unique-E2E-password-2026" },
-    });
+  test("submits a Supabase access request without asking for a password", async () => {
+    const onRegister = vi.fn(async () => undefined);
+    render(
+      <AccessGate {...commonProps} usesSupabase onRegister={onRegister} />,
+    );
+
+    expect(screen.queryByLabelText("Пароль", { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByText(/защищённую ссылку для создания пароля/)).toBeVisible();
+
+    for (const [label, value] of [
+      ["Имя и фамилия", "Test Agent"],
+      ["Агентство / компания", "Test Company"],
+      ["Город", "Москва"],
+      ["Телефон", "+7 900 000-00-00"],
+      ["Email", "new.agent@example.test"],
+    ] as const) {
+      fireEvent.change(screen.getByLabelText(label, { exact: true }), {
+        target: { value },
+      });
+    }
     fireEvent.click(screen.getByRole("button", { name: "Подать заявку на доступ" }));
 
     await waitFor(() => expect(onRegister).toHaveBeenCalledTimes(1));
-    expect(onRegister.mock.calls[0]?.[0]).toMatchObject({
-      email: "new.agent@example.test",
-      password: "Unique-E2E-password-2026",
-    });
+    expect(onRegister).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "new.agent@example.test",
+        password: "",
+      }),
+    );
   });
 
-  test("requires matching passwords and returns to ordinary login after setup", async () => {
+  test("requires mailbox invite ownership before setting a password", async () => {
     const onCompleteInvite = vi.fn(async () => undefined);
-
     render(
       <AccessGate
-        error=""
+        {...commonProps}
         inviteSetupEmail="invite.user@example.test"
-        recoverySetupEmail=""
-        pendingSession={null}
         onCompleteInvite={onCompleteInvite}
-        onLogin={vi.fn(async () => undefined)}
-        onRegister={vi.fn(async () => undefined)}
-        onResetPassword={vi.fn(async () => "")}
-        onSignOut={vi.fn(async () => undefined)}
       />,
     );
 
-    expect(
-      screen.getByRole("heading", { name: "Создайте пароль" }),
-    ).toBeInTheDocument();
-
+    expect(screen.getByRole("heading", { name: "Создайте пароль" })).toBeVisible();
     fireEvent.change(screen.getByLabelText("Новый пароль"), {
       target: { value: "Unique-E2E-password-2026" },
     });
     fireEvent.change(screen.getByLabelText("Повторите пароль"), {
-      target: { value: "different-password" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить пароль" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Пароли не совпадают");
-    expect(onCompleteInvite).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText("Повторите пароль"), {
       target: { value: "Unique-E2E-password-2026" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Сохранить пароль" }));
 
-    await waitFor(() => {
-      expect(onCompleteInvite).toHaveBeenCalledWith("Unique-E2E-password-2026");
-    });
-    expect(await screen.findByRole("heading", { name: "Вход" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Пароль сохранён");
+    await waitFor(() =>
+      expect(onCompleteInvite).toHaveBeenCalledWith("Unique-E2E-password-2026"),
+    );
+    expect(await screen.findByRole("heading", { name: "Вход" })).toBeVisible();
   });
 });

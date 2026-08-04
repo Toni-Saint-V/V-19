@@ -95,6 +95,7 @@ describe("Supabase security contract", () => {
       "supabase/migrations/20260629193805_v19_access_requests_admin_pdfs.sql",
     );
     const authService = readProjectFile("src/services/authService.ts");
+    const app = readProjectFile("src/App.tsx");
     const supabaseRegistration = readProjectFile(
       "src/shared/supabaseAuthRegistration.ts",
     );
@@ -103,6 +104,13 @@ describe("Supabase security contract", () => {
     );
     const accessRequestProvisioning = readProjectFile(
       "supabase/functions/_shared/accessRequestProvisioning.ts",
+    );
+    const publicSubmitSource = accessRequestFunction.slice(
+      accessRequestFunction.indexOf("async function handleSubmit"),
+      accessRequestFunction.indexOf("async function releaseAccessRequestReviewClaim"),
+    );
+    const supabaseInviteFlow = readProjectFile(
+      "src/services/supabaseInviteFlow.ts",
     );
 
     expect(migration).toContain("create table public.access_requests");
@@ -128,27 +136,55 @@ describe("Supabase security contract", () => {
     expect(authService).toContain("Заявка отклонена");
     expect(accessRequestFunction).toContain('action === "approve"');
     expect(accessRequestFunction).toContain("publicAccessRequestResponse");
-    expect(accessRequestFunction).toContain("resubmittedRequest");
+    expect(accessRequestFunction).toContain("rejectedRequest");
     expect(accessRequestFunction).toContain('.eq("status", "rejected")');
     expect(accessRequestFunction).toContain("rejection_reason: null");
     expect(accessRequestFunction).toContain("reviewed_at: null");
     expect(accessRequestFunction).toContain("reviewed_by_admin_id: null");
-    expect(accessRequestFunction).toContain("resolveAccessRequestUserId");
-    expect(accessRequestProvisioning).toContain("inviteUserByEmail");
     expect(accessRequestProvisioning).toContain("findAuthUserByEmail");
+    expect(accessRequestProvisioning).toContain("inviteUserByEmail");
+    expect(accessRequestProvisioning).toContain("deleteUser");
     expect(accessRequestProvisioning).toContain("listUsers");
     expect(accessRequestFunction).toContain("requireAdminProfile");
+    expect(accessRequestFunction).toContain("findAuthUserByEmail");
+    expect(accessRequestFunction).toContain("provisionAccessRequestInvite");
+    expect(
+      accessRequestFunction.match(/releaseAccessRequestReviewClaim/g),
+    ).toHaveLength(3);
+    expect(accessRequestFunction).toContain('.eq("id", existingAuthUser.id)');
+    expect(accessRequestFunction).not.toContain(
+      '.eq("email", normalizeEmail(accessRequest.email))',
+    );
+    expect(accessRequestFunction).not.toMatch(
+      /\.from\("profiles"\)[\s\S]{0,200}\.eq\("email"/,
+    );
+    expect(publicSubmitSource).not.toContain("findAuthUserByEmail");
+    expect(publicSubmitSource).not.toContain('.from("profiles")');
+    expect(publicSubmitSource).toContain('.eq("status", "approved")');
     expect(accessRequestFunction).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(accessRequestFunction).not.toContain("email_confirm: true");
     expect(accessRequestFunction).not.toContain("updateUserById");
     expect(accessRequestFunction).not.toContain("password:");
     expect(accessRequestFunction).not.toContain("display_name,organization_name,role");
     expect(supabaseRegistration).not.toContain("...input");
-    expect(supabaseRegistration).toContain("client.auth.signUp");
-    expect(supabaseRegistration).toContain("password: input.password");
+    expect(supabaseRegistration).not.toContain("client.auth.signUp");
+    expect(supabaseRegistration).not.toContain("client.auth.signInWithOtp");
+    expect(supabaseRegistration).not.toContain("client.auth.verifyOtp");
+    expect(supabaseRegistration).not.toContain("client.auth.updateUser");
+    expect(supabaseRegistration).not.toContain("client.auth.signInWithPassword");
+    expect(supabaseRegistration).not.toMatch(/password\s*:/);
     expect(supabaseRegistration).toContain(
       "client.functions.invoke<AccessRequestEdgeResult>",
     );
+    expect(supabaseInviteFlow).toContain('type: "invite"');
+    expect(supabaseInviteFlow).toContain("auth.verifyOtp");
+    expect(supabaseInviteFlow).toContain("auth.updateUser");
+    expect(supabaseInviteFlow).toContain("password,");
+    expect(accessRequestFunction).toContain('.eq("id", existingAuthUser.id)');
+    expect(app).toContain("recoveryProfile?.id === recoverySetup.userId");
+    expect(app).toContain("inviteProfile?.id === inviteSetup.userId");
+    expect(app).not.toContain("recoveryProfile?.email");
+    expect(app).not.toContain("inviteProfile.email");
   });
 
   test("keeps admin PDFs private, slot-limited, and linked before agent reads", () => {

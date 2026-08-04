@@ -60,6 +60,53 @@ function requireRequest(data: AccessRequestEdgeResult | null): AccessRequest {
   return mapAccessRequest(data.request);
 }
 
+function requireRegistrationInput(input: AccessRequestRegistrationInput): string {
+  const email = normalizeAuthEmail(input.email);
+  if (!email || !email.includes("@")) {
+    throw new AuthAccessError("INVALID_EMAIL", "Введите корректную рабочую почту.");
+  }
+  return email;
+}
+
+async function mapAccessRequestEdgeError(
+  error: unknown,
+  operation:
+    | "auth.access_request_approve"
+    | "auth.access_request_reject"
+    | "auth.access_request_submit",
+) {
+  const context =
+    error && typeof error === "object"
+      ? (error as { context?: unknown }).context
+      : undefined;
+  if (context instanceof Response) {
+    const body = (await context
+      .clone()
+      .json()
+      .catch(() => null)) as { error?: unknown } | null;
+    const code = typeof body?.error === "string" ? body.error : "";
+    if (code === "REQUEST_NOT_FOUND") {
+      return new AuthAccessError("REQUEST_NOT_FOUND", "Заявка не найдена.");
+    }
+    if (code === "ACCESS_REVIEW_CONFLICT") {
+      return new AuthAccessError(
+        "ACCESS_REVIEW_CONFLICT",
+        "Статус заявки изменился. Обновите список и повторите действие.",
+      );
+    }
+    if (code === "ACCESS_REQUEST_IDENTITY_CONFLICT") {
+      return new AuthAccessError(
+        "ACCESS_REQUEST_IDENTITY_CONFLICT",
+        "Заявка связана с другой подтверждённой учётной записью.",
+      );
+    }
+  }
+  return mapSupabasePersistenceError(error, {
+    operation,
+    fallbackKind: "auth",
+  });
+}
+
 export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
   async submitAccessRequest(
     input: AccessRequestRegistrationInput,
@@ -72,48 +119,7 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
       );
     }
 
-    const email = normalizeAuthEmail(input.email);
-    if (input.password.length < 12) {
-      throw new AuthAccessError(
-        "INVALID_PASSWORD",
-        "Пароль должен содержать не меньше 12 символов.",
-      );
-    }
-
-    const signUpResult = await client.auth.signUp({
-      email,
-      password: input.password,
-      options: {
-        data: {
-          password_setup_required: false,
-        },
-      },
-    });
-    let temporarySession = signUpResult.data.session;
-    if (signUpResult.error) {
-      const reconciliation = await client.auth.signInWithPassword({
-        email,
-        password: input.password,
-      });
-      if (reconciliation.error || !reconciliation.data.session) {
-        throw mapSupabasePersistenceError(signUpResult.error, {
-          operation: "auth.access_request_submit",
-          fallbackKind: "auth",
-        });
-      }
-      temporarySession = reconciliation.data.session;
-    }
-
-    if (temporarySession) {
-      const signOutResult = await client.auth.signOut({ scope: "local" });
-      if (signOutResult.error) {
-        throw mapSupabasePersistenceError(signOutResult.error, {
-          operation: "auth.sign_out",
-          fallbackKind: "auth",
-        });
-      }
-    }
-
+    const email = requireRegistrationInput(input);
     const { data, error } = await client.functions.invoke<AccessRequestEdgeResult>(
       "access-request",
       {
@@ -130,13 +136,11 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
       },
     );
     if (error) {
-      throw mapSupabasePersistenceError(error, {
-        operation: "auth.access_request_submit",
-        fallbackKind: "auth",
-      });
+      throw await mapAccessRequestEdgeError(error, "auth.access_request_submit");
     }
 
-    return requireRequest(data);
+    const request = requireRequest(data);
+    return request;
   }
 
   async listPendingAccessRequests(): Promise<AccessRequest[]> {
@@ -218,13 +222,12 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
       },
     );
     if (error) {
-      throw mapSupabasePersistenceError(error, {
-        operation:
-          action === "approve"
-            ? "auth.access_request_approve"
-            : "auth.access_request_reject",
-        fallbackKind: "auth",
-      });
+      throw await mapAccessRequestEdgeError(
+        error,
+        action === "approve"
+          ? "auth.access_request_approve"
+          : "auth.access_request_reject",
+      );
     }
 
     return requireRequest(data);

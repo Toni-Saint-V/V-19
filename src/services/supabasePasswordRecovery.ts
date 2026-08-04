@@ -24,7 +24,10 @@ export type SupabaseRecoveryAuthClient = {
     };
   };
   signOut: (input: { scope: "local" }) => Promise<{ error: RecoveryAuthError | null }>;
-  updateUser: (input: { password: string }) => Promise<{ error: RecoveryAuthError | null }>;
+  updateUser: (input: {
+    data: { password_setup_required: false };
+    password: string;
+  }) => Promise<{ error: RecoveryAuthError | null }>;
   verifyOtp: (input: {
     token_hash: string;
     type: "recovery";
@@ -131,7 +134,10 @@ export async function completeSupabasePasswordRecovery(
     throw new Error("Пароль должен содержать не меньше 12 символов.");
   }
 
-  const updateResult = await auth.updateUser({ password });
+  const updateResult = await auth.updateUser({
+    data: { password_setup_required: false },
+    password,
+  });
   if (updateResult.error) {
     throw recoveryError(updateResult.error, "Не удалось сохранить новый пароль.");
   }

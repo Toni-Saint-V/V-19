@@ -1,6 +1,7 @@
-type AuthAdminUser = {
+export type AuthAdminUser = {
   email?: string | null;
   id: string;
+  invited_at?: string | null;
 };
 
 type AuthAdminListUsersResult = {
@@ -14,6 +15,10 @@ type AuthAdminInviteResult = {
 };
 
 export type AccessRequestAuthAdmin = {
+  deleteUser: (
+    userId: string,
+    shouldSoftDelete?: boolean,
+  ) => Promise<{ data: unknown; error: unknown | null }>;
   inviteUserByEmail: (
     email: string,
     options: { data: Record<string, unknown> },
@@ -29,6 +34,10 @@ const authUserPageLimit = 100;
 
 function normalizedEmail(value: string | null | undefined) {
   return value?.trim().toLowerCase() ?? "";
+}
+
+function isAdminInvitedIdentity(user: AuthAdminUser | null): user is AuthAdminUser {
+  return Boolean(user?.id && user.invited_at?.trim());
 }
 
 export async function findAuthUserByEmail(
@@ -52,13 +61,19 @@ export async function findAuthUserByEmail(
   throw new Error("AUTH_USER_LOOKUP_PAGE_LIMIT_EXCEEDED");
 }
 
-export async function resolveAccessRequestUserId(
+export async function provisionAccessRequestInvite(
   authAdmin: AccessRequestAuthAdmin,
   email: string,
   metadata: Record<string, unknown>,
+  replaceUnapprovedUserId?: string,
 ): Promise<string> {
-  const existing = await findAuthUserByEmail(authAdmin, email);
-  if (existing?.id) return existing.id;
+  if (replaceUnapprovedUserId) {
+    const { error } = await authAdmin.deleteUser(replaceUnapprovedUserId, false);
+    if (error) throw error;
+  } else {
+    const existing = await findAuthUserByEmail(authAdmin, email);
+    if (existing) throw new Error("ACCESS_REQUEST_IDENTITY_CONFLICT");
+  }
 
   let inviteFailure: unknown = new Error("INVITE_USER_MISSING_ID");
   try {
@@ -71,10 +86,17 @@ export async function resolveAccessRequestUserId(
     inviteFailure = error;
   }
 
-  // The invite may have committed while its HTTP response was lost. Supabase
-  // Auth rejects an already confirmed email, so reconcile by paginated,
-  // server-side lookup before deciding that provisioning failed.
+  // An invite error leaves delivery uncertain even when Auth persisted an
+  // invited identity. Remove only an identity with server-owned invite
+  // provenance so an administrator can retry with a fresh, usable link.
+  // A same-email user without that provenance may have won a concurrent public
+  // signup race and must never be deleted or approved.
   const recovered = await findAuthUserByEmail(authAdmin, email);
-  if (recovered?.id) return recovered.id;
+  if (isAdminInvitedIdentity(recovered)) {
+    const { error } = await authAdmin.deleteUser(recovered.id, false);
+    if (error) throw error;
+    throw inviteFailure;
+  }
+  if (recovered) throw new Error("ACCESS_REQUEST_IDENTITY_CONFLICT");
   throw inviteFailure;
 }

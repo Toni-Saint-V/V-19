@@ -54,6 +54,18 @@ Expected state before owner approval:
 
 ## Auth And Profile Boundary
 
+- Public access requests are created without a password, Auth session, profile,
+  or product access. Duplicate submissions keep the same public lifecycle.
+- Admin approval replaces any unapproved same-email Auth identity, sends a fresh
+  Supabase invite, and creates the agent profile only for the invited Auth id.
+  Failed or uncertain invite delivery must release the review claim for an
+  immediate retry and must not finalize approval.
+- The mailbox owner sets a password only from a verified Supabase invite or a
+  profile-bound recovery callback. Passwords never enter the access-request
+  payload, database, or application logs.
+- The hosted Supabase Auth Site URL and allowed redirect URLs must point to the
+  deployed application origin. Prove the emitted invite and recovery links
+  without rewriting `redirect_to` before production activation.
 - Do not auto-create production profiles from Codex.
 - Missing production profiles require owner-approved role assignment, actor list,
   rollback note, and dry-run report.

@@ -1,5 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { resolveAccessRequestUserId } from "../_shared/accessRequestProvisioning.ts";
+import {
+  findAuthUserByEmail,
+  provisionAccessRequestInvite,
+} from "../_shared/accessRequestProvisioning.ts";
 
 type AccessRequestAction = "approve" | "reject" | "submit";
 
@@ -30,9 +33,6 @@ const corsHeaders = {
   "access-control-allow-methods": "POST, OPTIONS",
   "access-control-allow-origin": "*",
 };
-
-const accessRequestSelect =
-  "id,user_id,email,full_name,company_name,city,phone,requested_role,status,created_at,updated_at,reviewed_at,reviewed_by_admin_id,rejection_reason";
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -143,7 +143,9 @@ function assertRegistrationInput(input: AccessRequestInput | undefined) {
   return normalized;
 }
 
-function publicAccessRequestResponse(input: ReturnType<typeof assertRegistrationInput>) {
+function publicAccessRequestResponse(
+  input: ReturnType<typeof assertRegistrationInput>,
+) {
   const nowIso = new Date().toISOString();
   return jsonResponse(200, {
     request: {
@@ -170,7 +172,6 @@ async function requireAdminProfile(
   request: Request,
 ) {
   if (!admin) throw new Error("SUPABASE_ADMIN_UNAVAILABLE");
-
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) throw new Error("AUTH_REQUIRED");
 
@@ -191,16 +192,20 @@ async function handleSubmit(
   admin: ReturnType<typeof supabaseAdmin>,
   input: AccessRequestInput | undefined,
 ) {
-  if (!admin) return jsonResponse(503, { error: "Supabase admin client is unavailable." });
+  if (!admin)
+    return jsonResponse(503, { error: "Supabase admin client is unavailable." });
 
   const normalized = assertRegistrationInput(input);
-  const { data: existingProfile, error: profileError } = await admin
-    .from("profiles")
+  const { data: approvedRequest, error: approvedError } = await admin
+    .from("access_requests")
     .select("id")
     .eq("email", normalized.email)
+    .eq("status", "approved")
+    .order("reviewed_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  if (profileError) throw profileError;
-  if (existingProfile) {
+  if (approvedError) throw approvedError;
+  if (approvedRequest) {
     return publicAccessRequestResponse(normalized);
   }
 
@@ -228,7 +233,7 @@ async function handleSubmit(
 
   if (rejectedRequest) {
     const nowIso = new Date().toISOString();
-    const { data: resubmittedRequest, error: resubmitError } = await admin
+    const { error: resubmitError } = await admin
       .from("access_requests")
       .update({
         city: normalized.city,
@@ -242,12 +247,10 @@ async function handleSubmit(
         updated_at: nowIso,
       })
       .eq("id", rejectedRequest.id)
-      .eq("status", "rejected")
-      .select(accessRequestSelect)
-      .single();
+      .eq("status", "rejected");
     if (resubmitError) throw resubmitError;
 
-    return jsonResponse(200, { request: resubmittedRequest });
+    return publicAccessRequestResponse(normalized);
   }
 
   const { error: createRequestError } = await admin
@@ -274,6 +277,25 @@ async function handleSubmit(
   return publicAccessRequestResponse(normalized);
 }
 
+async function releaseAccessRequestReviewClaim(
+  admin: NonNullable<ReturnType<typeof supabaseAdmin>>,
+  requestId: string,
+  operationId: string,
+) {
+  const { error } = await admin
+    .from("access_requests")
+    .update({
+      review_claim_action: null,
+      review_claim_id: null,
+      review_claimed_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", requestId)
+    .eq("status", "pending")
+    .eq("review_claim_id", operationId);
+  if (error) throw error;
+}
+
 async function handleApprove(
   admin: ReturnType<typeof supabaseAdmin>,
   request: Request,
@@ -294,14 +316,32 @@ async function handleApprove(
     },
   );
   if (claimError) throw claimError;
-  const accessRequest = requireClaimedAccessRequest(claimedAccessRequest);
-  if (accessRequest?.status === "approved") {
-    return jsonResponse(200, { request: accessRequest });
-  }
 
-  const approvedUserId =
-    accessRequest.user_id ??
-    (await resolveAccessRequestUserId(
+  try {
+    const accessRequest = requireClaimedAccessRequest(claimedAccessRequest);
+    if (accessRequest.status === "approved") {
+      return jsonResponse(200, { request: accessRequest });
+    }
+
+    const existingAuthUser = await findAuthUserByEmail(
+      admin.auth.admin,
+      accessRequest.email,
+    );
+
+    if (existingAuthUser) {
+      const { data: profileById, error: profileByIdError } = await admin
+        .from("profiles")
+        .select("id,email")
+        .eq("id", existingAuthUser.id)
+        .maybeSingle();
+      if (profileByIdError) throw profileByIdError;
+      if (profileById) throw new Error("ACCESS_REQUEST_IDENTITY_CONFLICT");
+    }
+
+    // Replacing an unapproved same-email Auth identity gives the invitation a
+    // fresh user id. Any JWT retained by a pre-hijacker keeps the deleted id
+    // and therefore can never match the approved profile created below.
+    const approvedUserId = await provisionAccessRequestInvite(
       admin.auth.admin,
       accessRequest.email,
       {
@@ -311,22 +351,27 @@ async function handleApprove(
         password_setup_required: true,
         phone: accessRequest.phone,
       },
-    ));
+      existingAuthUser?.id,
+    );
 
-  const { data: updatedRequest, error: finalizeError } = await admin.rpc(
-    "finalize_access_request_review",
-    {
-      p_action: "approve",
-      p_admin_id: adminId,
-      p_operation_id: operationId,
-      p_rejection_reason: null,
-      p_request_id: accessRequest.id,
-      p_user_id: approvedUserId,
-    },
-  );
-  if (finalizeError) throw finalizeError;
+    const { data: updatedRequest, error: finalizeError } = await admin.rpc(
+      "finalize_access_request_review",
+      {
+        p_action: "approve",
+        p_admin_id: adminId,
+        p_operation_id: operationId,
+        p_rejection_reason: null,
+        p_request_id: accessRequest.id,
+        p_user_id: approvedUserId,
+      },
+    );
+    if (finalizeError) throw finalizeError;
 
-  return jsonResponse(200, { request: updatedRequest });
+    return jsonResponse(200, { request: updatedRequest });
+  } catch (error) {
+    await releaseAccessRequestReviewClaim(admin, requestId, operationId);
+    throw error;
+  }
 }
 
 async function handleReject(
@@ -350,30 +395,37 @@ async function handleReject(
     },
   );
   if (claimError) throw claimError;
-  const accessRequest = requireClaimedAccessRequest(claimedAccessRequest);
-  if (accessRequest?.status === "rejected") {
-    return jsonResponse(200, { request: accessRequest });
+
+  try {
+    const accessRequest = requireClaimedAccessRequest(claimedAccessRequest);
+    if (accessRequest.status === "rejected") {
+      return jsonResponse(200, { request: accessRequest });
+    }
+
+    const { data: updatedRequest, error: finalizeError } = await admin.rpc(
+      "finalize_access_request_review",
+      {
+        p_action: "reject",
+        p_admin_id: adminId,
+        p_operation_id: operationId,
+        p_rejection_reason: requiredString(reason) || null,
+        p_request_id: requestId,
+        p_user_id: null,
+      },
+    );
+    if (finalizeError) throw finalizeError;
+
+    return jsonResponse(200, { request: updatedRequest });
+  } catch (error) {
+    await releaseAccessRequestReviewClaim(admin, requestId, operationId);
+    throw error;
   }
-
-  const { data: updatedRequest, error: finalizeError } = await admin.rpc(
-    "finalize_access_request_review",
-    {
-      p_action: "reject",
-      p_admin_id: adminId,
-      p_operation_id: operationId,
-      p_rejection_reason: requiredString(reason) || null,
-      p_request_id: requestId,
-      p_user_id: null,
-    },
-  );
-  if (finalizeError) throw finalizeError;
-
-  return jsonResponse(200, { request: updatedRequest });
 }
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (request.method !== "POST") return jsonResponse(405, { error: "Method not allowed." });
+  if (request.method !== "POST")
+    return jsonResponse(405, { error: "Method not allowed." });
 
   try {
     const body = (await request.json()) as RequestBody;
@@ -390,8 +442,13 @@ Deno.serve(async (request) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     const errorCode = isRecord(error) ? error.code : undefined;
-    if (message === "AUTH_REQUIRED") return jsonResponse(401, { error: "AUTH_REQUIRED" });
-    if (message === "ADMIN_REQUIRED") return jsonResponse(403, { error: "ADMIN_REQUIRED" });
+    if (message === "AUTH_REQUIRED")
+      return jsonResponse(401, { error: "AUTH_REQUIRED" });
+    if (message === "ADMIN_REQUIRED")
+      return jsonResponse(403, { error: "ADMIN_REQUIRED" });
+    if (message === "ACCESS_REQUEST_IDENTITY_CONFLICT") {
+      return jsonResponse(409, { error: "ACCESS_REQUEST_IDENTITY_CONFLICT" });
+    }
     if (message === "SUPABASE_ADMIN_UNAVAILABLE") {
       return jsonResponse(503, { error: "Supabase admin client is unavailable." });
     }

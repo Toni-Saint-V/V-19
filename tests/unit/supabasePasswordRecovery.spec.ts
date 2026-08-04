@@ -56,7 +56,10 @@ describe("Supabase password recovery", () => {
   test("updates the password and closes the temporary recovery session", async () => {
     const auth = authClient();
     await completeSupabasePasswordRecovery(auth, "a-secure-password");
-    expect(auth.updateUser).toHaveBeenCalledWith({ password: "a-secure-password" });
+    expect(auth.updateUser).toHaveBeenCalledWith({
+      data: { password_setup_required: false },
+      password: "a-secure-password",
+    });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 

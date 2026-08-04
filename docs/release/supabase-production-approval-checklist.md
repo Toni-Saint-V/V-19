@@ -66,6 +66,7 @@ Backup owner:
 - `20260722001000_admin_submission_batch_concurrency.sql`
 - `20260722002000_access_request_review_claim.sql`
 - `20260722003000_atomic_return_package_artifact_upload.sql`
+- `20260804194432_grant_access_request_service_role_dml.sql`
 
 ## Required Evidence
 
@@ -79,6 +80,15 @@ Backup owner:
 
 ## Auth And Profile Gates
 
+- A public request contains no password and creates no Auth session or profile.
+- Approval sends a fresh Supabase invite to the requested email and binds the
+  approved profile to the invited Auth id; uncertain delivery fails closed and
+  leaves the request immediately retryable without finalizing approval.
+- Hosted Auth Site URL and allowed redirect URLs match the deployed application;
+  invite and recovery proof uses the emitted URL without rewriting it.
+- Supabase-backed proof covers duplicate public requests, failed claim release,
+  stale pre-hijack JWT denial, invite password setup, login/reload/relogin,
+  approved-email recovery, and profile/product isolation before approval.
 - Supabase organization/project plan supports leaked password protection.
 - Supabase plan eligibility for leaked password protection is confirmed.
 - Auth leaked password protection is enabled.

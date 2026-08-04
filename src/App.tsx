@@ -590,8 +590,7 @@ export default function App({
             if (cancelled) return;
             const recoveryProfile = await fetchCurrentProfile(recoverySetup.userId);
             const validRecoveryProfile =
-              Boolean(recoveryProfile) &&
-              recoveryProfile?.email.trim().toLowerCase() === recoverySetup.email;
+              recoveryProfile?.id === recoverySetup.userId;
             if (!validRecoveryProfile) {
               await client?.auth.signOut({ scope: "local" });
               throw new Error("Ссылка восстановления не связана с активным профилем.");
@@ -610,8 +609,7 @@ export default function App({
             if (cancelled) return;
             const inviteProfile = await fetchCurrentProfile(inviteSetup.userId);
             const validInviteProfile =
-              inviteProfile?.role === "agent" &&
-              inviteProfile.email.trim().toLowerCase() === inviteSetup.email;
+              inviteProfile?.id === inviteSetup.userId && inviteProfile.role === "agent";
             if (!validInviteProfile) {
               await client?.auth.signOut({ scope: "local" });
               throw new Error(

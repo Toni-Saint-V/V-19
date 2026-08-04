@@ -150,6 +150,12 @@ function verifyAuthProfileBoundary() {
   const accessRequestFunction = readProjectFile(
     "supabase/functions/access-request/index.ts",
   );
+  const accessRequestProvisioning = readProjectFile(
+    "supabase/functions/_shared/accessRequestProvisioning.ts",
+  );
+  const supabaseInviteFlow = readProjectFile(
+    "src/services/supabaseInviteFlow.ts",
+  );
 
   expectContains(
     authService,
@@ -168,7 +174,7 @@ function verifyAuthProfileBoundary() {
   );
   expectContains(
     authService,
-    ".from(\"access_requests\")",
+    '.from("access_requests")',
     "Supabase sign-in reads owner-visible access request status",
   );
   expectContains(
@@ -198,8 +204,13 @@ function verifyAuthProfileBoundary() {
   );
   expectNotMatching(
     supabaseAccessRegistration,
-    /password:/,
-    "Supabase registration payload has no password field",
+    /client\.auth\.(signUp|signInWithOtp|verifyOtp|updateUser|signInWithPassword)/,
+    "Supabase registration creates no Auth session before admin approval",
+  );
+  expectNotMatching(
+    supabaseAccessRegistration,
+    /password\s*:/,
+    "Supabase access-request adapter never accepts or forwards a password",
   );
   expectContains(
     accessRequestFunction,
@@ -208,13 +219,43 @@ function verifyAuthProfileBoundary() {
   );
   expectContains(
     accessRequestFunction,
-    "role: \"agent\"",
+    'role: "agent"',
     "Supabase access approval creates agent profiles only",
   );
   expectContains(
-    accessRequestFunction,
+    accessRequestProvisioning,
     "inviteUserByEmail",
-    "Supabase access approval invites Auth users server-side only",
+    "Supabase access approval sends the ownership-bound Auth invite",
+  );
+  expectContains(
+    accessRequestProvisioning,
+    "deleteUser",
+    "Supabase access approval replaces an unapproved same-email Auth identity",
+  );
+  expectContains(
+    accessRequestProvisioning,
+    "listUsers",
+    "Supabase access approval checks for a pre-existing Auth identity",
+  );
+  expectContains(
+    accessRequestFunction,
+    '.eq("id", existingAuthUser.id)',
+    "Supabase access approval checks profile ownership by authenticated user id",
+  );
+  expectContains(
+    accessRequestFunction,
+    "releaseAccessRequestReviewClaim",
+    "Failed review releases its claim for immediate retry",
+  );
+  expectContains(
+    supabaseInviteFlow,
+    'type: "invite"',
+    "Password setup verifies a Supabase invite ownership token",
+  );
+  expectContains(
+    supabaseInviteFlow,
+    "auth.updateUser",
+    "Password is set only inside the verified invite session",
   );
   expectContains(
     accessRequestFunction,

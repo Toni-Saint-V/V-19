@@ -249,13 +249,9 @@ export function AccessGate({
           ? 'Введите имя и фамилию'
           : '',
       password:
-        (attempted || touched.password) && !registration.password.trim()
+        !usesSupabase && (attempted || touched.password) && !registration.password.trim()
           ? 'Введите пароль'
-          : (attempted || touched.password) &&
-              usesSupabase &&
-              registration.password.length < 12
-            ? 'Пароль должен содержать не меньше 12 символов'
-            : '',
+          : '',
       phone:
         (attempted || touched.phone) && !registration.phone.trim()
           ? 'Введите телефон'
@@ -319,8 +315,7 @@ export function AccessGate({
       registration.companyName.trim() &&
       registration.city.trim() &&
       registration.phone.trim() &&
-      registration.password.trim() &&
-      (!usesSupabase || registration.password.length >= 12) &&
+      (usesSupabase || registration.password.trim()) &&
       validEmail(registration.email);
     if (!complete) return;
 
@@ -686,7 +681,7 @@ export function AccessGate({
         <ShieldCheck aria-hidden="true" />
       </div>
       <p className="access-intro" id="workspace-register-copy">
-        Заполните данные агентства. Доступ появится после подтверждения администратором.
+        Заполните данные агентства. После одобрения мы отправим на email защищённую ссылку для создания пароля.
       </p>
       <form className="access-form access-form--registration" onSubmit={(event) => void submitRegistration(event)} noValidate>
         {registrationFields.map((field) => {
@@ -724,6 +719,7 @@ export function AccessGate({
           );
         })}
 
+        {!usesSupabase ? (
         <div className="access-field">
           <label className="access-field-label" htmlFor="workspace-register-password">
             Пароль
@@ -735,9 +731,8 @@ export function AccessGate({
               aria-invalid={Boolean(registerErrors.password)}
               autoComplete="new-password"
               id="workspace-register-password"
-              minLength={usesSupabase ? 12 : undefined}
               name="password"
-              placeholder={usesSupabase ? 'Не меньше 12 символов' : 'Введите пароль'}
+              placeholder="Введите пароль"
               type={registerPasswordVisible ? 'text' : 'password'}
               value={registration.password}
               onBlur={() => setTouched((current) => ({ ...current, password: true }))}
@@ -754,6 +749,7 @@ export function AccessGate({
             </small>
           ) : null}
         </div>
+        ) : null}
 
         {localError || error ? (
           <p className="access-error" role="alert">

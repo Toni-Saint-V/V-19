@@ -99,6 +99,8 @@ export class AuthAccessError extends Error {
       | "INVALID_EMAIL"
       | "INVALID_REGISTRATION"
       | "INVALID_PASSWORD"
+      | "ACCESS_REVIEW_CONFLICT"
+      | "ACCESS_REQUEST_IDENTITY_CONFLICT"
       | "ACCESS_PENDING"
       | "ACCESS_REJECTED"
       | "ACCESS_NOT_FOUND"
