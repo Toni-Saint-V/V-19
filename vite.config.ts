@@ -6,10 +6,19 @@ import { releaseSourceSha256FromFileSystem } from "./scripts/lib/release-source-
 
 function releaseIdentity(mode: string): Plugin {
   const vercelGitSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
+  const archiveReleaseGitSha = process.env.V19_RELEASE_GIT_SHA?.trim();
+  const releaseGitSha =
+    process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production"
+      ? archiveReleaseGitSha
+      : undefined;
+  if (releaseGitSha && !/^[0-9a-f]{40}$/i.test(releaseGitSha)) {
+    throw new Error("V19_RELEASE_GIT_SHA must be a 40-character hexadecimal SHA.");
+  }
   const gitSha =
     vercelGitSha ||
+    releaseGitSha ||
     execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-  const dirty = vercelGitSha
+  const dirty = vercelGitSha || releaseGitSha
     ? false
     : Boolean(
         execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
