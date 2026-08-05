@@ -32,6 +32,12 @@ async function expectBodyMatches(page: Page, patterns: RegExp[], timeout = 20_00
     .toBe(true);
 }
 
+async function waitForAgentSubmissions(page: Page) {
+  const screen = page.locator('[data-agent-screen="submissions"]');
+  await screen.waitFor({ state: "visible" });
+  await screen.locator("[data-submission-id]").first().waitFor({ state: "visible" });
+}
+
 test.describe("V-19 pilot agent click flow", () => {
   test("agent navigation and create workspace stay wired on active root UI", async ({
     page,
@@ -50,6 +56,7 @@ test.describe("V-19 pilot agent click flow", () => {
     ).toBeVisible();
 
     await clickWorkspaceButton(page, /Мои подачи/);
+    await waitForAgentSubmissions(page);
     await expect(
       page.getByRole("heading", { level: 1, name: "Мои подачи" }),
     ).toBeVisible();
@@ -79,17 +86,14 @@ test.describe("V-19 pilot agent click flow", () => {
 
     await openFreshWorkspace(page, { heading: "Мои действия" });
     await clickWorkspaceButton(page, /Мои подачи/);
+    await waitForAgentSubmissions(page);
     await expect(
       page.getByRole("heading", { level: 1, name: "Мои подачи" }),
     ).toBeVisible();
 
-    const preferredCard = page.locator('[data-submission-id="ПД-1048"]').first();
-    const anyCard = page
-      .locator("[data-submission-id]")
-      .filter({ hasText: /ПД-|SUB-|Семья|заявител|Испания/i })
+    const targetCard = page
+      .locator('[data-agent-screen="submissions"] [data-submission-id]')
       .first();
-
-    const targetCard = (await isVisible(preferredCard)) ? preferredCard : anyCard;
     await expect(targetCard).toBeVisible();
     await targetCard.click();
 
