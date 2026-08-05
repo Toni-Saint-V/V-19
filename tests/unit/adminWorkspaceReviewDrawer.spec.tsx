@@ -160,7 +160,7 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       },
       {
         submission: reviewedCorrections,
-        button: "Принять на выгрузку",
+        button: "Закрыть исправления и принять",
         action: "close_issues_accept",
       },
       {
@@ -354,7 +354,9 @@ describe("AdminReviewDrawer visual hierarchy", () => {
       />,
     );
 
-    const accept = screen.getByRole("button", { name: "Принять на выгрузку" });
+    const accept = screen.getByRole("button", {
+      name: "Закрыть исправления и принять",
+    });
     expect(accept).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "Отправить на исправление" }),

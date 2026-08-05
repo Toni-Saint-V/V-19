@@ -352,7 +352,7 @@ describe("V-19 submission status rules", () => {
     expect(incompleteQuestionnaire.status).toBe("submitted_for_review");
   });
 
-  it("does not close or accept a corrected issue outside passport review scope", () => {
+  it("closes corrected issues across questionnaire and passport review scopes", () => {
     const corrected = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(byId("ПД-1055")),
     );
@@ -385,10 +385,7 @@ describe("V-19 submission status rules", () => {
     expect(hasMissingRequiredWork(correctedWithForeignIssue)).toBe(false);
     expect(
       canPerformAction(correctedWithForeignIssue, "close_issues_accept", "admin"),
-    ).toEqual({
-      ok: false,
-      reason: "Есть исправленные замечания вне паспортной проверки",
-    });
+    ).toEqual({ ok: true });
 
     const accepted = applySubmissionAction(
       correctedWithForeignIssue,
@@ -397,14 +394,13 @@ describe("V-19 submission status rules", () => {
       "local-demo-admin",
     );
 
-    expect(accepted).toEqual(correctedWithForeignIssue);
-    expect(accepted.status).toBe("corrections_received");
-    expect(accepted.issues.every((issue) => issue.status === "fixed_by_agent")).toBe(
+    expect(accepted.status).toBe("ready_for_export");
+    expect(accepted.issues.every((issue) => issue.status === "closed_by_admin")).toBe(
       true,
     );
   });
 
-  it("closes only an exact fixed passport issue during corrected acceptance", () => {
+  it("closes an exact fixed passport issue during corrected acceptance", () => {
     const source = adminAcceptRequiredMediaForTest(
       adminApprovePassportFieldsForTest(byId("ПД-1055")),
     );
@@ -1600,7 +1596,12 @@ describe("V-19 submission actions", () => {
     expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
       ok: true,
     });
-    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      inProgress,
+      "submit_for_review",
+      "agent",
+      inProgress.agentId,
+    );
     expect(submitted.status).toBe("submitted_for_review");
     expect(submitted.files.every((file) => file.status === "pending_review")).toBe(
       true,
@@ -2208,7 +2209,12 @@ describe("V-19 submission actions", () => {
     });
     const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const inProgress = applySubmissionAction(filled, "save_progress", "agent");
-    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      inProgress,
+      "submit_for_review",
+      "agent",
+      inProgress.agentId,
+    );
     const applicant = submitted.applicants[0];
     if (!applicant) throw new Error("Missing applicant");
 

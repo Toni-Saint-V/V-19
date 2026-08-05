@@ -22,13 +22,18 @@ import {
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
   applySubmissionAction,
+  applySubmissionActionResult,
   canAdminApproveForExport,
   canAgentSubmitForReview,
   canPerformAction,
   hasRequiredDocuments,
   transitionSubmissionStatus,
 } from "../../src/modules/submissions/status";
-import { reviewHandoffPersistenceIssues } from "../../src/modules/submissions/supabasePersistence";
+import {
+  attachDurableMediaAssetRows,
+  reviewHandoffPersistenceIssues,
+  toCockpitDraftPersistencePayload,
+} from "../../src/modules/submissions/supabasePersistence";
 import type {
   CommandResult,
   IssueInput,
@@ -106,6 +111,23 @@ function completeInProgressSubmission(): Submission {
   );
 }
 
+function readyForExportSubmission(): Submission {
+  const completed = completeInProgressSubmission();
+  const accepted: Submission = {
+    ...completed,
+    exportState: "ready",
+    files: completed.files.map((file) => ({
+      ...file,
+      status: "accepted",
+    })),
+    status: "ready_for_export",
+  };
+  const exportPackage = buildExportPackageIdentity([accepted]);
+  if (!exportPackage) throw new Error("Missing export package identity");
+
+  return { ...accepted, exportPackage };
+}
+
 describe("V-19 domain engine", () => {
   it("creates only single/family Spain submissions with derived completeness", () => {
     const draft = unwrap(
@@ -124,6 +146,32 @@ describe("V-19 domain engine", () => {
     expect(draft.completeness).toEqual(getCompleteness(draft));
   });
 
+  it("reserves local draft ids already owned by another agent", () => {
+    const firstAgentDraft = unwrap(
+      createDraft({
+        agentId: "agent-first",
+        city: "Москва",
+        familyCount: 1,
+        submissions: [],
+        type: "single",
+      }),
+    );
+    const secondAgentDraft = unwrap(
+      createDraft({
+        agentId: "agent-second",
+        city: "Санкт-Петербург",
+        familyCount: 2,
+        reservedSubmissionIds: [firstAgentDraft.id],
+        submissions: [],
+        type: "family",
+      }),
+    );
+
+    expect(firstAgentDraft.id).toBe("ПД-1059");
+    expect(secondAgentDraft.id).toBe("ПД-1060");
+    expect(secondAgentDraft.agentId).toBe("agent-second");
+  });
+
   it("keeps agent and admin command ownership separated", () => {
     const ready = completeInProgressSubmission();
 
@@ -134,10 +182,18 @@ describe("V-19 domain engine", () => {
         message: "Admin cannot edit agent-owned submission data.",
       },
     });
-    expect(submitForReview(ready, "admin")).toEqual({
+    expect(submitForReview(ready, "admin", "admin-reviewer")).toEqual({
       ok: false,
       error: { code: "PERMISSION_DENIED", message: "Only agent can submit." },
     });
+    expect(submitForReview(ready, "agent", "foreign-agent")).toEqual({
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Agent can submit only an owned submission.",
+      },
+    });
+    expect(canAgentSubmitForReview(ready, "foreign-agent")).toBe(false);
     expect(returnWithIssues(ready, "agent", [firstIssueInput(ready)])).toEqual({
       ok: false,
       error: {
@@ -160,10 +216,292 @@ describe("V-19 domain engine", () => {
       completeness: { questionnaire: 0, files: 0, total: 0 },
     };
 
-    const submitted = unwrap(submitForReview(stale, "agent"));
+    const submitted = unwrap(submitForReview(stale, "agent", stale.agentId));
 
     expect(submitted.status).toBe("submitted_for_review");
     expect(submitted.completeness.total).toBe(100);
+    expect(submitted.history[0]?.actorId).toBe(stale.agentId);
+  });
+
+  it("resubmits a complete accepted package through one canonical executor", () => {
+    const accepted = readyForExportSubmission();
+    const staleAccepted: Submission = {
+      ...accepted,
+      applicants: accepted.applicants.map((applicant) => ({
+        ...applicant,
+        fileStatus: "empty",
+      })),
+      completeness: { files: 0, questionnaire: 0, total: 0 },
+    };
+    const before = structuredClone(staleAccepted);
+
+    expect(canAgentSubmitForReview(staleAccepted, staleAccepted.agentId)).toBe(true);
+
+    const resubmitted = unwrap(
+      submitForReview(staleAccepted, "agent", staleAccepted.agentId),
+    );
+
+    expect(staleAccepted).toEqual(before);
+    expect(resubmitted).toMatchObject({
+      exportState: "not_ready",
+      status: "submitted_for_review",
+    });
+    expect(resubmitted.files.every((file) => file.status === "pending_review")).toBe(
+      true,
+    );
+    expect(
+      resubmitted.files.every(
+        (file) =>
+          file.reviewStatus === "not_reviewed" &&
+          file.reviewedAtIso === undefined &&
+          file.reviewedBy === undefined,
+      ),
+    ).toBe(true);
+    expect(resubmitted.applicants).toEqual(
+      before.applicants.map((applicant) => ({
+        ...applicant,
+        fileStatus: "complete",
+      })),
+    );
+    expect(
+      resubmitted.applicants.every((applicant) => applicant.fileStatus === "complete"),
+    ).toBe(true);
+    expect(resubmitted.completeness).toEqual({
+      files: 100,
+      questionnaire: 100,
+      total: 100,
+    });
+    expect(resubmitted.issues).toEqual(before.issues);
+    expect(resubmitted.exportPackage).toEqual(before.exportPackage);
+    expect(resubmitted.history).toHaveLength(before.history.length + 1);
+    expect(resubmitted.history[0]).toMatchObject({
+      actorId: staleAccepted.agentId,
+      fromStatus: "ready_for_export",
+      source: "agent",
+      toStatus: "submitted_for_review",
+    });
+  });
+
+  it("persists the media review reset and keeps reload fail-closed", () => {
+    const accepted = readyForExportSubmission();
+    const resubmitted = unwrap(submitForReview(accepted, "agent", accepted.agentId));
+    const payload = toCockpitDraftPersistencePayload(
+      resubmitted,
+      resubmitted.agentId,
+      resubmitted.agentId,
+    );
+
+    expect(payload.media_assets.length).toBeGreaterThan(0);
+    expect(
+      payload.media_assets.every(
+        (file) =>
+          file.review_status === "not_reviewed" &&
+          file.reviewed_at === null &&
+          file.reviewed_by === null,
+      ),
+    ).toBe(true);
+
+    const reloaded = attachDurableMediaAssetRows(
+      structuredClone(resubmitted),
+      payload.media_assets,
+    );
+    expect(
+      reloaded.files.every(
+        (file) =>
+          file.status === "pending_review" &&
+          file.reviewStatus === "not_reviewed" &&
+          file.reviewedAtIso === undefined &&
+          file.reviewedBy === undefined,
+      ),
+    ).toBe(true);
+    expect(acceptSubmission(reloaded, "admin")).toMatchObject({
+      ok: false,
+      error: { code: "VALIDATION_ERROR" },
+    });
+  });
+
+  it("fails accepted resubmission without mutating blocked, unauthorized, or terminal input", () => {
+    const accepted = readyForExportSubmission();
+    const acceptedBefore = structuredClone(accepted);
+    const applicant = accepted.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const blocked: Submission = {
+      ...accepted,
+      issues: [
+        {
+          comment: "Нужно повторно проверить маршрут.",
+          createdAt: "сейчас",
+          createdBy: "admin",
+          id: "accepted-open-issue",
+          reason: "Маршрут требует проверки",
+          severity: "warning",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Маршрут поездки",
+            section: "Анкета",
+          },
+          type: "field",
+        },
+      ],
+    };
+    const blockedBefore = structuredClone(blocked);
+    const unsupported: Submission = { ...accepted, status: "draft" };
+    const unsupportedBefore = structuredClone(unsupported);
+    const terminal: Submission = { ...accepted, status: "exported" };
+    const terminalBefore = structuredClone(terminal);
+
+    expect(canAgentSubmitForReview(blocked, blocked.agentId)).toBe(false);
+    expect(submitForReview(blocked, "agent", blocked.agentId)).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Есть незакрытые замечания",
+      },
+    });
+    expect(blocked).toEqual(blockedBefore);
+    expect(submitForReview(accepted, "admin", "admin-reviewer")).toEqual({
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Only agent can submit.",
+      },
+    });
+    expect(submitForReview(unsupported, "agent", unsupported.agentId)).toEqual({
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Only in-progress or export-ready submissions can be submitted.",
+      },
+    });
+    expect(unsupported).toEqual(unsupportedBefore);
+    expect(submitForReview(terminal, "agent", terminal.agentId)).toEqual({
+      ok: false,
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Exported is terminal for V-19.",
+      },
+    });
+    expect(terminal).toEqual(terminalBefore);
+    expect(accepted).toEqual(acceptedBefore);
+  });
+
+  it("fails raw accepted resubmission without an authenticated owner actor", () => {
+    const accepted: Submission = {
+      ...readyForExportSubmission(),
+      files: [],
+    };
+    const before = structuredClone(accepted);
+
+    expect(
+      applySubmissionActionResult(
+        accepted,
+        "submit_for_review",
+        "agent",
+      ),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Agent can submit only an owned submission.",
+      },
+    });
+    expect(
+      applySubmissionActionResult(
+        accepted,
+        "submit_for_review",
+        "agent",
+        "foreign-agent",
+      ),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Agent can submit only an owned submission.",
+      },
+    });
+    expect(accepted).toEqual(before);
+  });
+
+  it("fails export-ready resubmission when canonical intake data has drifted", () => {
+    const accepted = readyForExportSubmission();
+    const incompleteQuestionnaire: Submission = {
+      ...accepted,
+      applicants: accepted.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "hotel-name" ? { ...field, value: "" } : field,
+          ),
+        })),
+      })),
+    };
+    const missingRequiredMedia: Submission = {
+      ...accepted,
+      files: accepted.files.map((file) =>
+        file.type === "selfie_2"
+          ? { ...file, status: "missing", uploadStatus: "none" }
+          : file,
+      ),
+    };
+    const forbiddenLegacyMedia: Submission = {
+      ...accepted,
+      files: [
+        ...accepted.files,
+        {
+          ...accepted.files[0]!,
+          id: "legacy-video",
+          type: "video",
+        },
+      ],
+    };
+    const rejectedRequiredMedia: Submission = {
+      ...accepted,
+      files: accepted.files.map((file) =>
+        file.type === "selfie_2"
+          ? {
+              ...file,
+              reviewStatus: "replace_required",
+              status: "needs_replacement",
+            }
+          : file,
+      ),
+    };
+    const unknownLegacyMedia: Submission = {
+      ...accepted,
+      files: [
+        ...accepted.files,
+        {
+          ...accepted.files[0]!,
+          id: "legacy-unknown",
+          type: "unknown_media_slot" as Submission["files"][number]["type"],
+        },
+      ],
+    };
+    const missingTripDates: Submission = {
+      ...accepted,
+      tripDateFrom: "",
+      tripDateTo: "",
+    };
+
+    for (const drifted of [
+      incompleteQuestionnaire,
+      missingRequiredMedia,
+      forbiddenLegacyMedia,
+      rejectedRequiredMedia,
+      unknownLegacyMedia,
+      missingTripDates,
+    ]) {
+      const before = structuredClone(drifted);
+      expect(canAgentSubmitForReview(drifted, drifted.agentId)).toBe(false);
+      expect(submitForReview(drifted, "agent", drifted.agentId)).toMatchObject({
+        ok: false,
+        error: { code: "VALIDATION_ERROR" },
+      });
+      expect(drifted).toEqual(before);
+    }
   });
 
   it("blocks submission when derived questionnaire or file completeness is incomplete", () => {
@@ -175,7 +513,7 @@ describe("V-19 domain engine", () => {
       completeness: { questionnaire: 100, files: 100, total: 100 },
     };
 
-    expect(submitForReview(incomplete, "agent")).toEqual({
+    expect(submitForReview(incomplete, "agent", incomplete.agentId)).toEqual({
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
@@ -385,13 +723,15 @@ describe("V-19 domain engine", () => {
       reason: "Действие недоступно в текущем статусе",
     });
     expect(canPerformAction(corrected, "close_issues_accept", "admin")).toEqual({
-      ok: false,
-      reason: "Есть исправленные замечания вне паспортной проверки",
+      ok: true,
     });
-    expect(
-      applySubmissionAction(corrected, "close_issues_accept", "admin").issues[0]
-        ?.status,
-    ).toBe("fixed_by_agent");
+    const accepted = applySubmissionAction(
+      corrected,
+      "close_issues_accept",
+      "admin",
+    );
+    expect(accepted.status).toBe("ready_for_export");
+    expect(accepted.issues[0]?.status).toBe("closed_by_admin");
   });
 
   it("blocks acceptance for any open issue, not only blockers", () => {
@@ -690,7 +1030,7 @@ describe("V-19 domain engine", () => {
     };
 
     expect(hasRequiredDocuments(badFile)).toBe(false);
-    expect(canAgentSubmitForReview(badFile)).toBe(false);
+    expect(canAgentSubmitForReview(badFile, badFile.agentId)).toBe(false);
 
     const submittedWithIssue = {
       ...ready,

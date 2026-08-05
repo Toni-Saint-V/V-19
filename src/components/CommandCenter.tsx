@@ -130,6 +130,7 @@ type CommandCenterProps = {
     uploadedMediaTarget?: MediaStorageTarget,
   ) => Promise<Submission>;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
+  reservedSubmissionIds?: readonly Submission["id"][];
   submissions?: Submission[];
   onSignOut?: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
@@ -181,6 +182,7 @@ export function CommandCenter({
   onAssignPublicNumber,
   onSubmissionUpdate,
   onSubmissionsChange,
+  reservedSubmissionIds,
   submissions: canonicalSubmissions,
   onSignOut,
   onNavigateSettings,
@@ -707,6 +709,7 @@ export function CommandCenter({
         city: intent.city,
         familyCount: intent.familyCount,
         idScheme: usesSupabase ? "supabase" : "local",
+        reservedSubmissionIds,
         submissions: effectiveCanonicalSubmissions,
         type: intent.type,
       });

@@ -325,7 +325,11 @@ describe("canonical BLS questionnaire readiness", () => {
     expect(readiness.ready).toBe(false);
     expect(hasMissingRequiredWork(submission)).toBe(true);
     expect(
-      submitForReview({ ...submission, status: "in_progress" }, "agent").ok,
+      submitForReview(
+        { ...submission, status: "in_progress" },
+        "agent",
+        submission.agentId,
+      ).ok,
     ).toBe(false);
   });
 

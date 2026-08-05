@@ -101,7 +101,7 @@ describe("V-19 business click contract", () => {
 
     const result = applyAgentSubmitForReviewResult(
       draftReady,
-      "00000000-0000-4000-8000-000000000901",
+      draftReady.agentId,
     );
 
     expect(result.ok).toBe(true);
@@ -146,6 +146,7 @@ describe("V-19 business click contract", () => {
         fixture,
         contract.submissionAction,
         contract.ownerRole,
+        contract.ownerRole === "agent" ? fixture.agentId : "admin-reviewer",
       );
 
       expect(result.ok, contract.submissionAction).toBe(true);
@@ -380,10 +381,12 @@ function inProgressReadyFixture(): Submission {
 }
 
 function submittedFixture(): Submission {
+  const submission = inProgressReadyFixture();
   const result = applySubmissionActionResult(
-    inProgressReadyFixture(),
+    submission,
     "submit_for_review",
     "agent",
+    submission.agentId,
   );
   if (!result.ok) throw new Error(result.error.message);
   return result.data;

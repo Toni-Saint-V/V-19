@@ -148,6 +148,7 @@ import {
   buildExportPackageIdentity,
   exportSummaryForSelectedIds,
 } from "../../src/modules/submissions/exportRules";
+import { submitForReview } from "../../src/modules/submissions/domainEngine";
 import { normalizeSubmissionForCanonicalRuntime } from "../../src/modules/submissions/submissionActions";
 import {
   changedCockpitSubmissions,
@@ -228,6 +229,61 @@ afterEach(() => {
 });
 
 describe("V-19 Supabase cockpit persistence", () => {
+  it("reloads an accepted resubmission with pending media and inactive package identity", async () => {
+    const acceptedBase = normalizeSubmissionForCanonicalRuntime(
+      fillRequiredQuestionnaireForTest({
+        ...(initialSubmissions.find((item) => item.id === "ПД-1056") as Submission),
+        agentId: agentProfile.id,
+        id: "ПД-ACCEPTED-RESUBMISSION-RELOAD",
+      }),
+    );
+    const exportPackage = buildExportPackageIdentity([acceptedBase]);
+    if (!exportPackage) throw new Error("Expected export package identity");
+    const accepted: Submission = {
+      ...acceptedBase,
+      exportPackage,
+    };
+    const result = submitForReview(accepted, "agent", agentProfile.id);
+    if (!result.ok) throw new Error(result.error.message);
+    const payload = toCockpitDraftPersistencePayload(
+      result.data,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-07-26T12:00:00.000Z",
+        updated_at: "2026-07-26T12:01:00.000Z",
+      },
+    ];
+    mockState.mediaAssetRows = payload.media_assets;
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const reloaded = loaded.submissions[0];
+
+    expect(reloaded).toMatchObject({
+      exportPackage,
+      exportState: "not_ready",
+      status: "submitted_for_review",
+    });
+    expect(
+      reloaded?.files.every(
+        (file) =>
+          file.status === "pending_review" &&
+          file.reviewStatus === "not_reviewed" &&
+          file.reviewedAtIso === undefined &&
+          file.reviewedBy === undefined,
+      ),
+    ).toBe(true);
+    expect(reloaded?.history[0]).toMatchObject({
+      actorId: agentProfile.id,
+      fromStatus: "ready_for_export",
+      toStatus: "submitted_for_review",
+    });
+  });
+
   it("assigns a submission public number through the protected RPC", async () => {
     mockState.rpcResults = [
       {

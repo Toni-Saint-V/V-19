@@ -2098,6 +2098,7 @@ export default function App({
           onAssignPublicNumber: assignVisibleAgentSubmissionPublicNumber,
           onSubmissionUpdate: updateVisibleAgentSubmission,
           onSubmissionsChange: persistVisibleAgentSubmissions,
+          reservedSubmissionIds: submissions.map((submission) => submission.id),
           submissions: visibleSubmissions,
           usesSupabase: supabaseEnabled,
           onSignOut: handleSignOut,
