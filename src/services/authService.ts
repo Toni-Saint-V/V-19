@@ -1,7 +1,9 @@
 import type { Role } from "../types/domain";
 import type { AppProfile, AppSession } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
+import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { fetchCurrentProfile } from "./profileService";
+import { resolvePasswordResetRedirectTo } from "./passwordResetRedirect";
 import {
   mapSupabasePersistenceError,
   safeDiagnosticsForPersistenceError,
@@ -211,9 +213,10 @@ export async function requestPasswordReset(
   const runtime = globalThis as typeof globalThis & {
     location?: { origin: string; pathname: string };
   };
-  const redirectTo = runtime.location
-    ? `${runtime.location.origin}${runtime.location.pathname}`
-    : undefined;
+  const redirectTo = resolvePasswordResetRedirectTo(
+    runtime.location,
+    supabaseRuntimeConfig.evidence.target,
+  );
   const { error } = await client.auth.resetPasswordForEmail(
     email,
     redirectTo ? { redirectTo } : undefined,
