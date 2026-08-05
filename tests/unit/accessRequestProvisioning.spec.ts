@@ -60,11 +60,20 @@ describe("access request provisioning recovery", () => {
     });
 
     await expect(
-      resolveAccessRequestUserId(admin, "agent@example.com", {
-        display_name: "Agent",
-      }),
+      resolveAccessRequestUserId(
+        admin,
+        "agent@example.com",
+        {
+          display_name: "Agent",
+        },
+        "https://document-intake-system.vercel.app/",
+      ),
     ).resolves.toBe("recovered-user");
     expect(admin.inviteUserByEmail).toHaveBeenCalledTimes(1);
+    expect(admin.inviteUserByEmail).toHaveBeenCalledWith("agent@example.com", {
+      data: { display_name: "Agent" },
+      redirectTo: "https://document-intake-system.vercel.app/",
+    });
   });
 
   test("fails explicitly when both invite and reconciliation fail", async () => {
@@ -77,7 +86,12 @@ describe("access request provisioning recovery", () => {
     });
 
     await expect(
-      resolveAccessRequestUserId(admin, "agent@example.com", {}),
+      resolveAccessRequestUserId(
+        admin,
+        "agent@example.com",
+        {},
+        "https://document-intake-system.vercel.app/",
+      ),
     ).rejects.toBe(failure);
   });
 });
