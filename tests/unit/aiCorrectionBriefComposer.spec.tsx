@@ -126,9 +126,9 @@ describe("AiCorrectionBriefComposer", () => {
       expect.any(Object),
       expect.objectContaining({ role: "admin" }),
     );
-    expect(screen.getByTestId("ai-correction-draft")).toHaveValue(
-      expect.stringContaining(instruction),
-    );
+    expect(
+      (screen.getByTestId("ai-correction-draft") as HTMLTextAreaElement).value,
+    ).toContain(instruction);
     expect(screen.getByText("Что изменил AI")).toBeVisible();
     expect(screen.getByRole("button", { name: "Вступление улучшено" })).toBeDisabled();
   });
@@ -220,9 +220,9 @@ describe("AiCorrectionBriefComposer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Формально" }));
 
     await waitFor(() => expect(confirmation).not.toBeChecked());
-    expect(screen.getByTestId("ai-correction-draft")).toHaveValue(
-      expect.stringContaining("Перечень необходимых исправлений"),
-    );
+    expect(
+      (screen.getByTestId("ai-correction-draft") as HTMLTextAreaElement).value,
+    ).toContain("Перечень необходимых исправлений");
     expect(aiMocks.invokeAiHelperEdgeCached).not.toHaveBeenCalled();
   });
 });

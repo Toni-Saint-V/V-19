@@ -3338,7 +3338,7 @@ export function FigmaQuestionnaireScreen({
           fieldId: binding.fieldId,
           reviewOriginSource: isSmartImport
             ? "smart_import"
-            : modelField?.reviewOriginSource ?? modelField?.reviewSource ?? "manual",
+            : (modelField?.reviewOriginSource ?? modelField?.reviewSource ?? "manual"),
           reviewSource: isSmartImport ? "smart_import" : "manual",
           reviewState: isSmartImport
             ? "needs_review"
@@ -5284,20 +5284,7 @@ export function FigmaQuestionnaireScreen({
           <span aria-live="polite" className="sr-only" role="status">
             {saveMessage}
           </span>
-          {isEditable ? (
-            <button
-              {...agentInteractionProps("questionnaire.open-smart-import")}
-              aria-haspopup="dialog"
-              aria-label="Умный импорт"
-              className="v19-questionnaire-smart-import-button"
-              disabled={questionnaireInteractionPending}
-              type="button"
-              onClick={() => setSmartImportOpen(true)}
-            >
-              <Sparkles aria-hidden="true" size={16} strokeWidth={1.9} />
-              <span>Умный импорт</span>
-            </button>
-          ) : null}
+
           {isEditable ? (
             <button
               {...agentInteractionProps("questionnaire.save-exit")}
@@ -5627,6 +5614,20 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel" ref={workPanelRef}>
+              {isEditable ? (
+                <div className="v19-questionnaire-work-toolbar">
+                  <button
+                    {...agentInteractionProps("questionnaire.open-smart-import")}
+                    aria-haspopup="dialog"
+                    className="v19-questionnaire-smart-import-button"
+                    type="button"
+                    onClick={() => setSmartImportOpen(true)}
+                  >
+                    Умный импорт
+                  </button>
+                </div>
+              ) : null}
+
               {showWorkToolbar ? (
                 <div
                   className={`v19-questionnaire-work-toolbar${

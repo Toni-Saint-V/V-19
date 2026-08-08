@@ -95,9 +95,7 @@ describe("active admin export screen", () => {
     };
 
     render(
-      <AdminExportScreen
-        submissions={[ready, returnedForRework, incompletePackage]}
-      />,
+      <AdminExportScreen submissions={[ready, returnedForRework, incompletePackage]} />,
     );
 
     expect(screen.getByTestId(`admin-export-row-${ready.id}`)).toBeInTheDocument();
@@ -230,7 +228,7 @@ describe("active admin export screen", () => {
     expect(within(row).queryByText("Москва")).not.toBeInTheDocument();
   });
 
-  test("shows family, applicant, country, and readiness context inside export cells", () => {
+  test("shows family, applicant, country, and readiness context inside export cells", async () => {
     const submission = initialSubmissions.find((item) => item.id === "SUB-1102");
     if (!submission) {
       throw new Error("Missing family export fixture SUB-1102");
@@ -239,10 +237,12 @@ describe("active admin export screen", () => {
     render(<AdminExportScreen submissions={[submission]} />);
 
     const row = screen.getByTestId(`admin-export-row-${submission.id}`);
-    expect(within(row).getByText(submission.applicants[0]?.fullName ?? "")).toBeVisible();
-    expect(
-      within(row).getByText(/Волковы · 3 заявителя · 3 строки/u),
-    ).toBeVisible();
+    await waitFor(() => {
+      expect(
+        within(row).getByText(submission.applicants[0]?.fullName ?? ""),
+      ).toBeVisible();
+    });
+    expect(within(row).getByText(/Волковы · 3 заявителя · 3 строки/u)).toBeVisible();
     expect(within(row).getByText(submission.country)).toBeVisible();
     expect(within(row).getByText("Готовность 100%")).toBeVisible();
     expect(within(row).getByText("Даты поездки")).toBeVisible();
