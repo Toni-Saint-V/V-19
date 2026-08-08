@@ -245,7 +245,13 @@ async function runCriticalAgentInventorySweep(page: Page) {
   await createWorkspace
     .getByRole("button", { name: "Продолжить без паспорта" })
     .click();
-  await expect(page.getByRole("heading", { level: 1, name: /^Анкета:/ })).toBeVisible();
+  const questionnaire = page.locator(".vf-figma-questionnaire-screen");
+  await expect(questionnaire).toBeVisible();
+  const questionnaireAnchor =
+    (page.viewportSize()?.width ?? 1440) < 768
+      ? questionnaire.getByTestId("questionnaire-mobile-footer")
+      : questionnaire.locator("section.v19-readiness-card:visible").first();
+  await expect(questionnaireAnchor).toBeVisible();
   await expectCompleteInteractionInventory(page, "questionnaire", [
     "agent-shell",
     "questionnaire",

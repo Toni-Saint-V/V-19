@@ -266,8 +266,7 @@ export function agentQuestionnaireStatusPresentation(
       canEdit: false,
       completionLabel: "Отправить на проверку",
       drawerActionLabel: "Смотреть анкету",
-      drawerDescription:
-        "Подача принята к выгрузке и доступна только для просмотра.",
+      drawerDescription: "Подача принята к выгрузке и доступна только для просмотра.",
       readOnly: {
         label: "Готово к выгрузке",
         mobileLabel: "К выгрузке",
@@ -285,7 +284,8 @@ export function agentQuestionnaireStatusPresentation(
       readOnly: {
         label: "Выгружено",
         mobileLabel: "Выгружено",
-        message: "Подача уже выгружена. История и данные остаются доступны для просмотра.",
+        message:
+          "Подача уже выгружена. История и данные остаются доступны для просмотра.",
       },
     };
   }
@@ -429,10 +429,7 @@ export function hasRequiredDocuments(submission: Submission) {
   return canonicalRequiredMediaReadiness(submission).ok;
 }
 
-export type ApplicantChecklistStatus =
-  | "ready"
-  | "missing_docs"
-  | "in_progress";
+export type ApplicantChecklistStatus = "ready" | "missing_docs" | "in_progress";
 
 export function applicantChecklistStatus(
   submission: Submission,
@@ -484,9 +481,8 @@ export function calculateSubmissionProgress(
       (file) => file.applicantId === slot.applicantId && file.type === slot.type,
     ),
   );
-  const readyFiles = requiredFiles.filter(
-    (file): file is Submission["files"][number] =>
-      Boolean(file && isFileReadyForProgress(file)),
+  const readyFiles = requiredFiles.filter((file): file is Submission["files"][number] =>
+    Boolean(file && isFileReadyForProgress(file)),
   );
   const files = percent(readyFiles.length, requiredFiles.length);
   let total = Math.round((questionnaire + files) / 2);
@@ -519,9 +515,7 @@ function percent(ready: number, total: number) {
   return Math.round((ready / total) * 100);
 }
 
-export function withRecalculatedSubmissionProgress(
-  submission: Submission,
-): Submission {
+export function withRecalculatedSubmissionProgress(submission: Submission): Submission {
   return {
     ...submission,
     applicants: submission.applicants.map((applicant) => ({
@@ -534,27 +528,20 @@ export function withRecalculatedSubmissionProgress(
   };
 }
 
-export function canAgentSubmitForReview(
-  submission: Submission,
-  actorId: AgentOwnerId,
-) {
+export function canAgentSubmitForReview(submission: Submission, actorId: AgentOwnerId) {
   return (
     submissionBelongsToAgent(submission, actorId) &&
     canPerformAction(submission, "submit_for_review", "agent").ok
   );
 }
 
-export function agentQuestionnaireCompletionDecision(
-  submission: Submission,
-): {
+export function agentQuestionnaireCompletionDecision(submission: Submission): {
   action: "submit_corrections" | "submit_for_review";
   ok: boolean;
   reason?: string;
 } {
   const action =
-    submission.status === "returned"
-      ? "submit_corrections"
-      : "submit_for_review";
+    submission.status === "returned" ? "submit_corrections" : "submit_for_review";
   const candidate =
     submission.status === "draft"
       ? { ...submission, status: "in_progress" as const }
@@ -565,7 +552,9 @@ export function agentQuestionnaireCompletionDecision(
 }
 
 export function canAdminReturnSubmission(submission: Submission) {
-  return adminIssueStatuses.includes(submission.status) && openIssueCount(submission) > 0;
+  return (
+    adminIssueStatuses.includes(submission.status) && openIssueCount(submission) > 0
+  );
 }
 
 export function canAdminApproveForExport(submission: Submission) {
@@ -617,11 +606,7 @@ export function hasMissingRequiredWork(submission: Submission) {
   const progress = calculateSubmissionProgress(submission);
   const questionnaire = blsQuestionnaireReadiness(submission);
 
-  return (
-    !questionnaire.ready ||
-    progress.files < 100 ||
-    !media.ok
-  );
+  return !questionnaire.ready || progress.files < 100 || !media.ok;
 }
 
 export function adminQuestionnaireReviewReadiness(submission: Submission): {
@@ -635,9 +620,7 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
         .map((field) => [field.id, field] as const),
     );
 
-    return ADMIN_PASSPORT_REVIEW_FIELD_IDS.map((fieldId) =>
-      fieldsById.get(fieldId),
-    );
+    return ADMIN_PASSPORT_REVIEW_FIELD_IDS.map((fieldId) => fieldsById.get(fieldId));
   });
 
   if (fields.some((field) => !field || !hasAdminPassportReviewValue(field.value))) {
@@ -647,8 +630,8 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
     };
   }
 
-  const passportFields = fields.filter(
-    (field): field is NonNullable<typeof field> => Boolean(field),
+  const passportFields = fields.filter((field): field is NonNullable<typeof field> =>
+    Boolean(field),
   );
 
   if (passportFields.some((field) => Boolean(field.error))) {
@@ -659,8 +642,7 @@ export function adminQuestionnaireReviewReadiness(submission: Submission): {
   }
 
   const hasUnapprovedValue = passportFields.some(
-    (field) =>
-      (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
+    (field) => !field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy,
   );
 
   return hasUnapprovedValue
@@ -781,47 +763,41 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
-  if (
-    action === "submit_for_review" &&
-    hasMissingRequiredWork(submission)
-  ) {
+  if (action === "submit_for_review" && hasMissingRequiredWork(submission)) {
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
-  if (
-    requiresPassportGateBeforeAction(submission, action)
-  ) {
+  if (requiresPassportGateBeforeAction(submission, action)) {
     return {
       ok: false,
       reason: passportGateReason(submission),
     };
   }
 
-  if (
-    requiresPassportExtractionReviewBeforeAction(submission, action)
-  ) {
+  if (requiresPassportExtractionReviewBeforeAction(submission, action)) {
     return {
       ok: false,
       reason: "Проверьте распознанные паспортные данные перед отправкой",
     };
   }
 
-  if (
-    action === "submit_for_review" &&
-    !hasUsableTripDateRange(submission)
-  ) {
+  if (action === "submit_for_review" && !hasUsableTripDateRange(submission)) {
     return { ok: false, reason: missingTripDateRangeReason };
   }
 
-  if (
-    action === "submit_corrections" &&
-    fixedIssueCount(submission) === 0
-  ) {
+  if (action === "submit_corrections" && fixedIssueCount(submission) === 0) {
     return { ok: false, reason: "Сначала отметьте замечания исправленными" };
   }
 
   if (action === "submit_corrections" && openIssueCount(submission) > 0) {
     return { ok: false, reason: "Сначала отметьте замечания исправленными" };
+  }
+
+  if (action === "submit_corrections" && hasMissingRequiredWork(submission)) {
+    return {
+      ok: false,
+      reason: "Есть незаполненные поля или недостающие файлы",
+    };
   }
 
   if (action === "return_with_issues" && !canAdminReturnSubmission(submission)) {
@@ -870,10 +846,7 @@ function validateSubmissionActionPolicy(
     return { ok: false, reason: "Подтвердите обязательные файлы перед принятием" };
   }
 
-  if (
-    action === "mark_exported" &&
-    !canAdminMarkExported(submission)
-  ) {
+  if (action === "mark_exported" && !canAdminMarkExported(submission)) {
     return { ok: false, reason: "Сначала сформируйте и скачайте пакет выгрузки" };
   }
 
@@ -883,10 +856,7 @@ function validateSubmissionActionPolicy(
 const directStatusTransitionActions = Object.entries(transitionMatrix).filter(
   ([action]) => action !== "generate_export" && action !== "open_history",
 ) as Array<
-  [
-    SubmissionAction,
-    { from: SubmissionStatus[]; to: SubmissionStatus; role: Role },
-  ]
+  [SubmissionAction, { from: SubmissionStatus[]; to: SubmissionStatus; role: Role }]
 >;
 
 function submissionActionForStatusTransition(
@@ -947,8 +917,7 @@ export function transitionSubmissionStatus(
 ): CommandResult<Submission> {
   if (
     input.nextStatus === "submitted_for_review" &&
-    (submission.status === "in_progress" ||
-      submission.status === "ready_for_export")
+    (submission.status === "in_progress" || submission.status === "ready_for_export")
   ) {
     return {
       ok: false,
@@ -1297,9 +1266,7 @@ export function getAdminReviewActions(
   }
 
   const acceptAction =
-    submission.status === "corrections_received"
-      ? "close_issues_accept"
-      : "accept";
+    submission.status === "corrections_received" ? "close_issues_accept" : "accept";
   const returnAction =
     submission.status === "corrections_received"
       ? "return_again"
@@ -1343,7 +1310,7 @@ export function applySubmissionActionResult(
   actorId?: AgentOwnerId,
 ): CommandResult<Submission> {
   if (
-    action === "submit_for_review" &&
+    (action === "submit_for_review" || action === "submit_corrections") &&
     role === "agent" &&
     (!actorId || !submissionBelongsToAgent(submission, actorId))
   ) {
@@ -1364,8 +1331,22 @@ export function applySubmissionActionResult(
 
   if (action === "submit_corrections") {
     const corrected = clearOpenQuestionnaireIssueErrors(submission);
+    const prepared: Submission = {
+      ...corrected,
+      files: corrected.files.map((file) =>
+        file.status === "uploaded"
+          ? {
+              ...file,
+              reviewedAtIso: undefined,
+              reviewedBy: undefined,
+              reviewStatus: "not_reviewed",
+              status: "pending_review",
+            }
+          : file,
+      ),
+    };
 
-    return transitionSubmissionStatus(corrected, {
+    return transitionSubmissionStatus(prepared, {
       actorId,
       actorRole: role,
       nextStatus: "corrections_received",
@@ -1479,12 +1460,7 @@ export function applyAgentSubmitForReviewResult(
 
   const preparedResult =
     submission.status === "draft"
-      ? applySubmissionActionResult(
-          submission,
-          "save_progress",
-          "agent",
-          actorId,
-        )
+      ? applySubmissionActionResult(submission, "save_progress", "agent", actorId)
       : { ok: true as const, data: submission };
 
   if (!preparedResult.ok) {

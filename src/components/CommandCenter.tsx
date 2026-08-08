@@ -83,9 +83,11 @@ import {
 } from "../modules/submissions/submissionActions";
 import {
   buildMediaStoragePath,
+  downloadMediaFromStorage,
   mediaMimeTypeForFile,
-  uploadMediaToStorage,
 } from "../modules/submissions/mediaStorage";
+import { replaceProtectedMediaWithCanonicalReadback } from "../modules/submissions/protectedMediaReplacement";
+import { readProtectedSubmissionMedia } from "../modules/submissions/protectedMediaRead";
 import {
   applyAgentSubmitForReviewResult,
   applySubmissionActionResult,
@@ -104,7 +106,7 @@ type NonCreateAgentShellNavSection = Extract<
   "actions" | "submissions" | "settings"
 >;
 type AgentShellNavSection = NonCreateAgentShellNavSection | "create";
-type ActionSort = "tripDate" | "createdAt";
+type ActionSort = "priority" | "tripDate" | "createdAt";
 type CreateNavigationState = {
   busy: boolean;
   dirty: boolean;
@@ -122,11 +124,12 @@ type CommandCenterProps = {
     submissionId: string,
     update: (submission: Submission) => Submission,
   ) => Promise<Submission>;
+  onSubmissionReadback?: (submissionId: string) => Promise<Submission>;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   reservedSubmissionIds?: readonly Submission["id"][];
   submissions?: Submission[];
   onSignOut?: () => void | Promise<void>;
-  onSwitchWorkspace?: () => void;
+  onSwitchWorkspace?: () => void | Promise<void>;
   onNavigateSettings?: () => void;
   usesSupabase?: boolean;
 };
@@ -165,12 +168,14 @@ function normalizeAgentNav(
 export function CommandCenter({
   agentId,
   onAssignPublicNumber,
+  onSubmissionReadback,
   onSubmissionUpdate,
   onSubmissionsChange,
   reservedSubmissionIds,
   submissions: canonicalSubmissions,
   onSignOut,
   onNavigateSettings,
+  onSwitchWorkspace,
   usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
@@ -200,7 +205,7 @@ export function CommandCenter({
     useState<AgentActionFilter>("open");
   const [actionCityFilter, setActionCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
-  const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
+  const [actionSort, setActionSort] = useState<ActionSort>("priority");
   const [selectedActionTaskId, setSelectedActionTaskId] = useState<string | null>(null);
   const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
   const questionnaireOriginSurfaceRef = useRef<"drawer" | "workspace">("workspace");
@@ -211,6 +216,7 @@ export function CommandCenter({
   const [canonicalOverrides, setCanonicalOverrides] = useState<
     Record<string, Submission>
   >({});
+  const canonicalOverrideBasesRef = useRef<Record<string, Submission | undefined>>({});
   const pendingCreatedSubmissionRef = useRef<Submission | null>(null);
   const createSubmissionPromiseRef = useRef<Promise<void> | null>(null);
   const attemptedCreateStoragePathsRef = useRef(new Set<string>());
@@ -221,22 +227,36 @@ export function CommandCenter({
       (canonicalSubmissions ?? []).map((submission) => [submission.id, submission]),
     );
     for (const submission of Object.values(canonicalOverrides)) {
+      const base = canonicalOverrideBasesRef.current[submission.id];
+      if (base && !byId.has(submission.id)) continue;
       byId.set(submission.id, submission);
     }
     return [...byId.values()];
   }, [canonicalOverrides, canonicalSubmissions]);
 
+  const rememberCanonicalOverride = (submission: Submission) => {
+    canonicalOverrideBasesRef.current[submission.id] = canonicalSubmissions?.find(
+      (candidate) => candidate.id === submission.id,
+    );
+    setCanonicalOverrides((current) => ({
+      ...current,
+      [submission.id]: submission,
+    }));
+  };
+
   useEffect(() => {
-    if (!canonicalSubmissions?.length || !Object.keys(canonicalOverrides).length)
-      return;
+    if (!canonicalSubmissions || !Object.keys(canonicalOverrides).length) return;
     setCanonicalOverrides((current) => {
       const next = { ...current };
       let changed = false;
-      for (const [id, override] of Object.entries(current)) {
-        if (
-          canonicalSubmissions.find((submission) => submission.id === id) === override
-        ) {
+      for (const id of Object.keys(current)) {
+        const canonical = canonicalSubmissions.find(
+          (submission) => submission.id === id,
+        );
+        const base = canonicalOverrideBasesRef.current[id];
+        if ((canonical && canonical !== base) || (!canonical && base)) {
           delete next[id];
+          delete canonicalOverrideBasesRef.current[id];
           changed = true;
         }
       }
@@ -286,7 +306,9 @@ export function CommandCenter({
       if (actionSummaryFilter === "blockers") return action.severity === "blocker";
       return matchesFilter(action.due);
     });
-    return searchAgentActions(filtered, searchQuery).sort((left, right) =>
+    const matchingActions = searchAgentActions(filtered, searchQuery);
+    if (actionSort === "priority") return matchingActions;
+    return matchingActions.sort((left, right) =>
       actionSort === "tripDate"
         ? left.submission.tripDateFrom.localeCompare(right.submission.tripDateFrom)
         : right.submission.createdAt.localeCompare(left.submission.createdAt),
@@ -311,11 +333,16 @@ export function CommandCenter({
     () => actionTasks.find((task) => task.id === selectedActionTaskId),
     [actionTasks, selectedActionTaskId],
   );
+  useEffect(() => {
+    if (selectedActionTaskId && !selectedActionTask) {
+      setSelectedActionTaskId(null);
+    }
+  }, [selectedActionTask, selectedActionTaskId]);
   const actionFiltersActive =
     actionSummaryFilter !== "open" ||
     actionCityFilter !== "Все города" ||
     Boolean(searchQuery.trim());
-  const actionControlsAreDefault = !actionFiltersActive && actionSort === "tripDate";
+  const actionControlsAreDefault = !actionFiltersActive && actionSort === "priority";
   const handleActionFilterChange = (filter: AgentActionFilter) => {
     setActionSummaryFilter(filter);
     setSelectedActionTaskId(null);
@@ -332,7 +359,7 @@ export function CommandCenter({
     setActionSummaryFilter("open");
     setActionCityFilter("Все города");
     setSearchQuery("");
-    setActionSort("tripDate");
+    setActionSort("priority");
     setSelectedActionTaskId(null);
   };
   const agentName = agentDisplayName(agentId);
@@ -348,12 +375,22 @@ export function CommandCenter({
       questionnaireSubmissionSnapshotRef.current = selectedCanonicalSubmission;
     }
   }, [selectedCanonicalSubmission]);
-  const selectedQuestionnaireSubmission =
-    selectedCanonicalSubmission ??
-    (questionnaireSubmissionSnapshotRef.current?.id === selectedRow
-      ? questionnaireSubmissionSnapshotRef.current
-      : undefined);
+  useEffect(() => {
+    if (!selectedRow || selectedCanonicalSubmission) return;
+    if (questionnaireSubmissionSnapshotRef.current?.id !== selectedRow) return;
+    questionnaireSubmissionSnapshotRef.current = undefined;
+    setQuestionnaireInitialFocus(undefined);
+    setDrawerFocusTarget(undefined);
+    setDrawerOpen(false);
+    setCurrentView("main");
+    setSelectedRow(null);
+  }, [selectedCanonicalSubmission, selectedRow]);
+  const selectedQuestionnaireSubmission = selectedCanonicalSubmission;
   const submissionCards = effectiveCanonicalSubmissions;
+  const visibleDrawerOpen = drawerOpen && Boolean(selectedCanonicalSubmission);
+  const visibleQuestionnaireOpen =
+    currentView === "questionnaire" &&
+    Boolean(selectedRow && selectedQuestionnaireSubmission);
 
   useEffect(() => {
     const handleResize = () => {
@@ -490,10 +527,6 @@ export function CommandCenter({
       });
       return;
     }
-    if (target.tab === "files") {
-      focusSubmissionInList(submissionId);
-      return;
-    }
     bridge.onSubmissionOpen?.(submissionId);
     emitVisaflowUiEvent(bridge, { type: "submission.open", submissionId });
     setDrawerActiveTab(target.tab);
@@ -581,6 +614,14 @@ export function CommandCenter({
       type: submission.type,
     }));
     setCurrentView("main");
+  };
+
+  const handleQuestionnaireSavedAndExit = (submission: Submission) => {
+    if (questionnaireOriginSurfaceRef.current === "drawer") {
+      handleQuestionnaireBack();
+      return;
+    }
+    showSavedSubmissionInList(submission);
   };
 
   const handleActionOpen = (action: AgentActionItem) => {
@@ -674,6 +715,7 @@ export function CommandCenter({
         city: intent.city,
         familyCount: intent.familyCount,
         idScheme: usesSupabase ? "supabase" : "local",
+        preliminaryIntake: intent.preliminaryIntake,
         reservedSubmissionIds,
         submissions: effectiveCanonicalSubmissions,
         type: intent.type,
@@ -694,21 +736,16 @@ export function CommandCenter({
       passportUploads,
       persistSubmission: async (submission) => {
         await onSubmissionsChange([submission]);
-        setCanonicalOverrides((current) => ({
-          ...current,
-          [submission.id]: submission,
-        }));
+        rememberCanonicalOverride(submission);
       },
+      simulatePrivateStorage: __V19_LOCAL_DEMO_BUILD__ && !usesSupabase,
       storageAdapter: usesSupabase ? "supabase-private" : "local-dev",
       submission: pendingSubmission,
     });
 
     pendingCreatedSubmissionRef.current = null;
     attemptedCreateStoragePathsRef.current.clear();
-    setCanonicalOverrides((current) => ({
-      ...current,
-      [nextSubmission.id]: nextSubmission,
-    }));
+    rememberCanonicalOverride(nextSubmission);
     setSearchQuery("");
     if (intent.destination === "questionnaire") {
       setActiveNav("submissions");
@@ -777,6 +814,8 @@ export function CommandCenter({
       sizeBytes: file.size,
       uploadedAtIso,
     };
+    let localDemoTarget: ReturnType<typeof buildMediaStoragePath> | undefined;
+    let protectedStorageTarget: ReturnType<typeof buildMediaStoragePath> | undefined;
     let metadata:
       | (typeof baseMetadata & {
           storageAdapter: "local-dev";
@@ -785,6 +824,7 @@ export function CommandCenter({
           storageAdapter: "supabase-private";
           storageBucket: string;
           storagePath: string;
+          localDemoMediaStored?: true;
         });
     if (usesSupabase) {
       const target = buildMediaStoragePath(
@@ -793,23 +833,35 @@ export function CommandCenter({
         mediaSlotTypeForSubmissionFileType(fileType),
         generatedFileName,
       );
-      const uploaded = await uploadMediaToStorage(target, file, {
-        contentType: mimeType,
-      });
-      if (!uploaded) {
-        throw new Error("Supabase Storage недоступен для загрузки файла.");
-      }
+      protectedStorageTarget = target;
       metadata = {
         ...baseMetadata,
         storageAdapter: "supabase-private",
         storageBucket: target.bucket,
-        storagePath: uploaded.path,
+        storagePath: target.path,
+      };
+    } else if (__V19_LOCAL_DEMO_BUILD__) {
+      localDemoTarget = buildMediaStoragePath(
+        submission.id,
+        applicantId,
+        mediaSlotTypeForSubmissionFileType(fileType),
+        generatedFileName,
+      );
+      metadata = {
+        ...baseMetadata,
+        localDemoMediaStored: true,
+        storageAdapter: "supabase-private",
+        storageBucket: localDemoTarget.bucket,
+        storagePath: localDemoTarget.path,
       };
     } else {
       metadata = { ...baseMetadata, storageAdapter: "local-dev" };
     }
 
-    const applyUploadToLatest = (latestSubmission: Submission) => {
+    const applyUploadToLatest = (
+      latestSubmission: Submission,
+      activeMetadata = metadata,
+    ) => {
       const latestPrepared = ensureApplicantMediaSlot(
         latestSubmission,
         applicantId,
@@ -818,7 +870,7 @@ export function CommandCenter({
       const uploadedSubmission = uploadRequiredFile(
         latestPrepared.submission,
         latestPrepared.file.id,
-        metadata,
+        activeMetadata,
       );
       if (uploadedSubmission === latestPrepared.submission) {
         throw new Error("Файл нельзя загрузить в текущем статусе подачи.");
@@ -844,14 +896,88 @@ export function CommandCenter({
       };
     };
 
-    const nextSubmission = onSubmissionUpdate
-      ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
-      : applyUploadToLatest(submission);
-    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({
-      ...current,
-      [nextSubmission.id]: nextSubmission,
-    }));
+    const persistUpload = async (storedPath?: string) => {
+      const activeMetadata =
+        storedPath && metadata.storageAdapter === "supabase-private"
+          ? { ...metadata, storagePath: storedPath }
+          : metadata;
+      const persistedSubmission = onSubmissionUpdate
+        ? await onSubmissionUpdate(submission.id, (latestSubmission) =>
+            applyUploadToLatest(latestSubmission, activeMetadata),
+          )
+        : applyUploadToLatest(submission, activeMetadata);
+      if (!onSubmissionUpdate) {
+        await onSubmissionsChange?.([persistedSubmission]);
+      }
+      return persistedSubmission;
+    };
+
+    const canonicalFileForSlot = (canonical: Submission) =>
+      canonical.files.find(
+        (candidate) =>
+          candidate.applicantId === applicantId && candidate.type === fileType,
+      );
+    const canonicalStorageTarget = (canonical: Submission) => {
+      const canonicalFile = canonicalFileForSlot(canonical);
+      if (
+        !canonicalFile?.generatedFileName ||
+        canonicalFile.storageAdapter !== "supabase-private" ||
+        !canonicalFile.storageBucket ||
+        !canonicalFile.storagePath
+      ) {
+        return undefined;
+      }
+      try {
+        const expectedTarget = buildMediaStoragePath(
+          canonical.id,
+          applicantId,
+          mediaSlotTypeForSubmissionFileType(fileType),
+          canonicalFile.generatedFileName,
+        );
+        return canonicalFile.storageBucket === expectedTarget.bucket &&
+          canonicalFile.storagePath === expectedTarget.path
+          ? expectedTarget
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const readCanonical = async () => {
+      if (!onSubmissionReadback) {
+        throw new Error("Canonical submission readback is unavailable.");
+      }
+      return onSubmissionReadback(submission.id);
+    };
+    const referencesStoredPath = (canonical: Submission, storedPath: string) =>
+      canonicalStorageTarget(canonical)?.path === storedPath;
+
+    const nextSubmission = protectedStorageTarget
+      ? await replaceProtectedMediaWithCanonicalReadback({
+          file,
+          lockKey: `${submission.id}:${applicantId}:${fileType}`,
+          persistCanonical: persistUpload,
+          readCanonical,
+          referencesStoredPath,
+          storageTargetForCanonical: canonicalStorageTarget,
+          target: protectedStorageTarget,
+        })
+      : localDemoTarget
+        ? await (
+            await import("../modules/submissions/localDemoMediaStorage")
+          ).replaceLocalDemoMediaWithCanonicalReadback({
+            file,
+            persistCanonical: persistUpload,
+            previousPath: prepared.file.localDemoMediaStored
+              ? prepared.file.storagePath
+              : undefined,
+            readCanonical,
+            referencesStoredPath: (canonical, storedPath) =>
+              canonicalFileForSlot(canonical)?.localDemoMediaStored === true &&
+              canonicalStorageTarget(canonical)?.path === storedPath,
+            target: localDemoTarget,
+          })
+        : await persistUpload();
+    rememberCanonicalOverride(nextSubmission);
     return nextSubmission;
   };
 
@@ -873,6 +999,34 @@ export function CommandCenter({
       targetFile.type,
       file,
     );
+  };
+
+  const readCanonicalApplicantFile = async (
+    submissionId: string,
+    applicantId: string,
+    fileType: SubmissionFileType,
+  ) => {
+    if (!onSubmissionReadback) {
+      throw new Error("Canonical submission readback is unavailable.");
+    }
+    const canonical = await onSubmissionReadback(submissionId);
+    const { blob, file } = await readProtectedSubmissionMedia({
+      applicantId,
+      fileType,
+      loadMedia:
+        __V19_LOCAL_DEMO_BUILD__ && !usesSupabase
+          ? async (target) => {
+              const { loadLocalDemoMedia } =
+                await import("../modules/submissions/localDemoMediaStorage");
+              return loadLocalDemoMedia(target.path);
+            }
+          : downloadMediaFromStorage,
+      submission: canonical,
+    });
+    return {
+      file,
+      url: URL.createObjectURL(blob),
+    };
   };
 
   const executeAgentSubmissionActionFor = async (
@@ -897,10 +1051,7 @@ export function CommandCenter({
       ? await onSubmissionUpdate(submissionId, applyAction)
       : applyAction(currentSubmission);
     if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({
-      ...current,
-      [nextSubmission.id]: nextSubmission,
-    }));
+    rememberCanonicalOverride(nextSubmission);
     return nextSubmission;
   };
 
@@ -923,15 +1074,29 @@ export function CommandCenter({
       ? await onSubmissionUpdate(selectedCanonicalSubmission.id, markFixedOnLatest)
       : markFixedOnLatest(selectedCanonicalSubmission);
     if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({
-      ...current,
-      [nextSubmission.id]: nextSubmission,
-    }));
+    rememberCanonicalOverride(nextSubmission);
     return nextSubmission;
   };
 
-  const persistQuestionnaireSubmission = (nextSubmission: Submission) => {
-    return onSubmissionsChange?.([nextSubmission]);
+  const persistQuestionnaireSubmissionUpdate = async (
+    update: (submission: Submission) => Submission,
+  ) => {
+    if (!selectedRow) {
+      throw new Error("Не удалось определить подачу для сохранения анкеты.");
+    }
+    const currentSubmission = effectiveCanonicalSubmissions.find(
+      (submission) => submission.id === selectedRow,
+    );
+    if (!currentSubmission) {
+      throw new Error("Подача больше не доступна.");
+    }
+
+    const nextSubmission = onSubmissionUpdate
+      ? await onSubmissionUpdate(selectedRow, update)
+      : update(currentSubmission);
+    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
+    rememberCanonicalOverride(nextSubmission);
+    return nextSubmission;
   };
 
   const renderActionsList = () => (
@@ -966,11 +1131,12 @@ export function CommandCenter({
             controls={
               <V19ToolbarSelect<ActionSort>
                 ariaLabel="Сортировка действий"
-                className={actionSort !== "tripDate" ? "is-active" : ""}
+                className={actionSort !== "priority" ? "is-active" : ""}
                 icon={ArrowUpDown}
                 interactionId="actions.sort"
                 label="Сортировка"
                 options={[
+                  { label: "По приоритету", value: "priority" },
                   { label: "По дате вылета", value: "tripDate" },
                   { label: "По дате создания", value: "createdAt" },
                 ]}
@@ -1072,7 +1238,7 @@ export function CommandCenter({
   return (
     <div className="has-persistent-operational-sidebar relative h-full w-full overflow-hidden bg-[#101011]">
       <AnimatePresence mode="wait">
-        {currentView === "questionnaire" && selectedRow && (
+        {visibleQuestionnaireOpen && selectedRow && selectedQuestionnaireSubmission && (
           <QuestionnaireScreen
             key={`questionnaire-${selectedRow}`}
             agentId={agentId}
@@ -1081,14 +1247,9 @@ export function CommandCenter({
             submission={selectedQuestionnaireSubmission}
             onAssignPublicNumber={onAssignPublicNumber}
             onBack={handleQuestionnaireBack}
-            onSavedAndExit={showSavedSubmissionInList}
+            onSavedAndExit={handleQuestionnaireSavedAndExit}
             onOpenDocuments={() => focusSubmissionInList(selectedRow)}
-            onSubmissionUpdate={
-              onSubmissionUpdate
-                ? (update) => onSubmissionUpdate(selectedRow, update)
-                : undefined
-            }
-            onSubmissionChange={persistQuestionnaireSubmission}
+            onSubmissionUpdate={persistQuestionnaireSubmissionUpdate}
             onMarkIssueFixed={markAgentIssueFixed}
             onUploadFile={
               selectedRow
@@ -1103,15 +1264,19 @@ export function CommandCenter({
 
       <div
         aria-hidden={
-          currentView !== "main" || drawerOpen || pendingCreateExit ? true : undefined
+          visibleQuestionnaireOpen || visibleDrawerOpen || pendingCreateExit
+            ? true
+            : undefined
         }
         className="contents"
-        inert={currentView !== "main" || drawerOpen || Boolean(pendingCreateExit)}
+        inert={
+          visibleQuestionnaireOpen || visibleDrawerOpen || Boolean(pendingCreateExit)
+        }
       >
         <AppShell
           className="is-agent-shell-source-actions v19-agent-shell-frame"
           collectionSurface
-          drawerOpen={drawerOpen}
+          drawerOpen={visibleDrawerOpen}
           header={
             <PageHeader
               actions={
@@ -1171,6 +1336,7 @@ export function CommandCenter({
             onCloseMobile: () => setMobileNavOpen(false),
             onCommandSearch: openCommandPalette,
             onResetWorkspace: () => onSignOut?.(),
+            onSwitchWorkspace,
             role: "agent",
             sessionDisplayName: agentName,
             sessionInitials: agentAvatar,
@@ -1178,7 +1344,7 @@ export function CommandCenter({
           }}
           sideMenuMode="regular"
           surface={surface}
-          workspaceInactive={currentView !== "main"}
+          workspaceInactive={visibleQuestionnaireOpen}
         >
           <div className="v19-agent-workspace-scroll flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
             <AnimatePresence initial={false} mode="wait">
@@ -1236,7 +1402,7 @@ export function CommandCenter({
         <Drawer
           activeTab={drawerActiveTab}
           focusTarget={drawerFocusTarget}
-          isOpen={drawerOpen}
+          isOpen={visibleDrawerOpen}
           submission={selectedCanonicalSubmission}
           onAction={executeAgentSubmissionAction}
           onClearFocusTarget={() => setDrawerFocusTarget(undefined)}
@@ -1247,6 +1413,7 @@ export function CommandCenter({
           onOpenWorkspaceTarget={(target) =>
             handleOpenWorkspaceTarget(selectedCanonicalSubmission.id, target)
           }
+          onReadApplicantFile={readCanonicalApplicantFile}
           onUploadApplicantFile={uploadCanonicalApplicantFile}
         />
       ) : null}

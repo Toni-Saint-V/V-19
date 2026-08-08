@@ -714,7 +714,12 @@ describe("V-19 domain engine", () => {
     const fixed = unwrap(
       markIssueFixed(changeRouteIssueTarget(returned), "agent", issueId),
     );
-    const corrected = applySubmissionAction(fixed, "submit_corrections", "agent");
+    const corrected = applySubmissionAction(
+      fixed,
+      "submit_corrections",
+      "agent",
+      fixed.agentId,
+    );
 
     expect(corrected.status).toBe("corrections_received");
     expect(corrected.issues[0]?.status).toBe("fixed_by_agent");

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "expectedProjectRef": "tsymifccglpepvbmrcgh",
+  "expectedProjectUrl": "https://tsymifccglpepvbmrcgh.supabase.co",
+  "resultPath": ".supabase-auth-repair-result.local.json",
+  "users": [
+    {
+      "key": "agent-account",
+      "email": "dachazanachka@gmail.com",
+      "role": "agent",
+      "displayName": "",
+      "organizationName": "",
+      "createIfMissing": false,
+      "passwordMode": "generate",
+      "passwordEnv": ""
+    },
+    {
+      "key": "admin-account",
+      "email": "antoniovolkoff@gmail.com",
+      "role": "admin",
+      "displayName": "",
+      "organizationName": "",
+      "createIfMissing": false,
+      "passwordMode": "generate",
+      "passwordEnv": ""
+    }
+  ]
+}

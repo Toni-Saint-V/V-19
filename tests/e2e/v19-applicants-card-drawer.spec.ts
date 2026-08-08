@@ -60,7 +60,8 @@ test("opens the submission drawer from the card surface at every locked viewport
 
     if (viewport.width <= 768) {
       const headerBox = await page
-        .locator('main[aria-label="Рабочая область подач"] > header')
+        .locator("header.v19-page-header")
+        .first()
         .boundingBox();
       expect(headerBox, `${viewport.label}: header geometry`).not.toBeNull();
       expect(
@@ -90,10 +91,7 @@ test("opens the submission drawer from the card surface at every locked viewport
         await page.waitForTimeout(80);
         const after = await submissionDrawer.boundingBox();
         if (!before || !after) return viewport.height;
-        return Math.max(
-          Math.abs(after.x - before.x),
-          Math.abs(after.y - before.y),
-        );
+        return Math.max(Math.abs(after.x - before.x), Math.abs(after.y - before.y));
       })
       .toBeLessThanOrEqual(0.5);
     const drawerBox = await submissionDrawer.boundingBox();
@@ -121,7 +119,7 @@ test("opens the submission drawer from the card surface at every locked viewport
     });
 
     const primaryDrawerAction = submissionDrawer.getByRole("button", {
-      name: /^(Сохранить черновик|Отправить на проверку|Отправить исправления)$/,
+      name: /^(Начать работу|Сохранить черновик|Отправить на проверку|Отправить исправления)$/,
     });
     await primaryDrawerAction.scrollIntoViewIfNeeded();
     await expect(primaryDrawerAction).toBeVisible();
@@ -130,9 +128,10 @@ test("opens the submission drawer from the card surface at every locked viewport
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
     }));
-    expect(overflow.scrollWidth, `${viewport.label}: horizontal overflow`).toBeLessThanOrEqual(
-      overflow.clientWidth + 1,
-    );
+    expect(
+      overflow.scrollWidth,
+      `${viewport.label}: horizontal overflow`,
+    ).toBeLessThanOrEqual(overflow.clientWidth + 1);
 
     await page.keyboard.press("Escape");
     await expect(submissionDrawer).toBeHidden();

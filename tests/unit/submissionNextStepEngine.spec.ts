@@ -97,12 +97,7 @@ function visibleCopy(brief: ReturnType<typeof buildSubmissionNextStepBrief>) {
 
 function submittedForReviewSubmission(): Submission {
   const ready = readyForReviewSubmission();
-  return applySubmissionAction(
-    ready,
-    "submit_for_review",
-    "agent",
-    ready.agentId,
-  );
+  return applySubmissionAction(ready, "submit_for_review", "agent", ready.agentId);
 }
 
 describe("submission next-step engine", () => {
@@ -181,6 +176,119 @@ describe("submission next-step engine", () => {
       kind: "wait",
     });
   });
+
+  test("routes unavailable passport extraction to canonical manual review", () => {
+    const ready = readyForReviewSubmission();
+    const applicant = ready.applicants[0];
+    if (!applicant) throw new Error("expected applicant");
+    const passportSection = applicant.sections.find((section) =>
+      section.fields.some((field) => field.id === "passport-no"),
+    );
+    if (!passportSection) throw new Error("expected passport section");
+    const unavailable: Submission = {
+      ...ready,
+      applicants: ready.applicants.map((candidate) =>
+        candidate.id === applicant.id
+          ? {
+              ...candidate,
+              passportExtraction: {
+                appliedFieldKeys: [],
+                extractedFields: [],
+                sourceFileId: passportFile(ready).id,
+                status: "unavailable",
+                summary: "OCR недоступен; нужна ручная проверка.",
+              },
+              sections: candidate.sections.map((section) =>
+                section.id === passportSection.id
+                  ? {
+                      ...section,
+                      fields: section.fields.map((field) =>
+                        field.id === "passport-no" ? { ...field, value: "" } : field,
+                      ),
+                    }
+                  : section,
+              ),
+            }
+          : candidate,
+      ),
+    };
+
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: unavailable,
+      surface: "agent",
+    });
+
+    expect(brief.primaryAction).toMatchObject({
+      id: "manual_passport_entry",
+      kind: "passport_review",
+      target: {
+        applicantId: applicant.id,
+        field: "passport-no",
+        section: "Паспортные данные",
+        tab: "questionnaire",
+      },
+    });
+  });
+
+  test.each([
+    ["passport-type", "Diplomatic Passport"],
+    ["passport-expiry-date", "01.01.2025"],
+  ])(
+    "routes unavailable passport extraction to the failing %s field",
+    (fieldId, value) => {
+      const ready = readyForReviewSubmission();
+      const applicant = ready.applicants[0];
+      if (!applicant) throw new Error("expected applicant");
+      const unavailable: Submission = {
+        ...ready,
+        files: ready.files.map((file) =>
+          file.type === "passport_scan" && file.applicantId === applicant.id
+            ? {
+                ...file,
+                mimeType: "image/jpeg",
+                originalFileName: "passport.jpg",
+              }
+            : file,
+        ),
+        applicants: ready.applicants.map((candidate) =>
+          candidate.id === applicant.id
+            ? {
+                ...candidate,
+                passportExtraction: {
+                  appliedFieldKeys: [],
+                  extractedFields: [],
+                  sourceFileId: passportFile(ready).id,
+                  status: "unavailable",
+                  summary: "OCR недоступен; нужна ручная проверка.",
+                },
+                sections: candidate.sections.map((section) => ({
+                  ...section,
+                  fields: section.fields.map((field) =>
+                    field.id === fieldId ? { ...field, value } : field,
+                  ),
+                })),
+              }
+            : candidate,
+        ),
+      };
+
+      const brief = buildSubmissionNextStepBrief({
+        role: "agent",
+        submission: unavailable,
+        surface: "agent",
+      });
+
+      expect(brief.primaryAction).toMatchObject({
+        id: "manual_passport_entry",
+        target: {
+          applicantId: applicant.id,
+          field: fieldId,
+          tab: "questionnaire",
+        },
+      });
+    },
+  );
 
   test("does not repeat passport review after confirmed OCR fields survive without aggregate metadata", () => {
     const draft = draftSubmission();
@@ -286,9 +394,7 @@ describe("submission next-step engine", () => {
 
   test("returns admin accept and export actions from lifecycle state", () => {
     const submitted = adminAcceptRequiredMediaForTest(
-      adminApprovePassportFieldsForTest(
-        submittedForReviewSubmission(),
-      ),
+      adminApprovePassportFieldsForTest(submittedForReviewSubmission()),
     );
     const adminReview = buildSubmissionNextStepBrief({
       role: "admin",

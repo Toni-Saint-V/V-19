@@ -1,3 +1,4 @@
+// tests/unit/aiHelperContract.spec.ts
 import { describe, expect, test, vi } from "vitest";
 import {
   buildAiHelperProviderRequest,
@@ -16,6 +17,7 @@ import {
   handleAiHelperRequest,
   type AiHelperHandlerOptions,
 } from "../../supabase/functions/_shared/ai-helper-handler";
+import { createAiHelperLocalProvider } from "../../supabase/functions/_shared/ai-helper-local-provider";
 
 const adminActor: AiHelperActor = {
   id: "admin-1",
@@ -256,10 +258,7 @@ describe("AI helper shared contract", () => {
           fields: 65,
         },
         issueCodes: expect.arrayContaining(["invalid_email", "missing_media"]),
-        readinessStates: expect.arrayContaining([
-          "status:draft",
-          "severity:blocking",
-        ]),
+        readinessStates: expect.arrayContaining(["status:draft", "severity:blocking"]),
         applicants: [
           expect.objectContaining({
             label: "applicant_1",
@@ -348,9 +347,7 @@ describe("AI helper shared contract", () => {
       ],
     });
     expect(providerRequest.context.applicants[0]).not.toHaveProperty("role");
-    expect(providerRequest.context.applicants[0]).not.toHaveProperty(
-      "readinessState",
-    );
+    expect(providerRequest.context.applicants[0]).not.toHaveProperty("readinessState");
     for (const unsafeToken of [
       "Sokolov",
       "Petrov",
@@ -522,7 +519,8 @@ describe("AI helper shared contract", () => {
     expect(
       parseAiHelperResult({
         ...buildSafeAiHelperStubResult("admin_issue_remark_draft", "edge-provider"),
-        issueRemarkDraft: "Уточните данные и отправьте исправление на повторную проверку.",
+        issueRemarkDraft:
+          "Уточните данные и отправьте исправление на повторную проверку.",
       }),
     ).toMatchObject({
       ok: true,
@@ -533,10 +531,7 @@ describe("AI helper shared contract", () => {
     });
     expect(
       parseAiHelperResult({
-        ...buildSafeAiHelperStubResult(
-          "admin_readiness_explanation",
-          "edge-provider",
-        ),
+        ...buildSafeAiHelperStubResult("admin_readiness_explanation", "edge-provider"),
         readinessExplanation:
           "Пакет не готов: есть открытые замечания и недостающие данные.",
       }),
@@ -1182,9 +1177,7 @@ describe("AI helper shared contract", () => {
     expect(providerCall).toBeDefined();
     if (!providerCall) return;
 
-    expect(String(providerCall[0])).toBe(
-      "http://127.0.0.1:4000/v1/chat/completions",
-    );
+    expect(String(providerCall[0])).toBe("http://127.0.0.1:4000/v1/chat/completions");
     expect(providerCall[1]).toMatchObject({
       method: "POST",
       headers: expect.objectContaining({
@@ -1192,16 +1185,13 @@ describe("AI helper shared contract", () => {
       }),
     });
 
-    const body = JSON.parse(String(providerCall[1]?.body)) as Record<
-      string,
-      unknown
-    >;
+    const body = JSON.parse(String(providerCall[1]?.body)) as Record<string, unknown>;
     const serializedBody = JSON.stringify(body);
 
     expect(body).toMatchObject({
       model: "qwen2.5:7b",
       temperature: 0,
-      max_tokens: 700,
+      max_tokens: 600,
       response_format: { type: "json_object" },
     });
     expect(serializedBody).toContain("sanitizedContext");
@@ -1209,9 +1199,67 @@ describe("AI helper shared contract", () => {
     expect(serializedBody).not.toContain("+79990000000");
     expect(serializedBody).not.toContain("72 1190482");
     expect(serializedBody).not.toContain("submission-media");
-    expect(serializedBody).not.toContain(
-      "raw applicant context must not be audited",
+    expect(serializedBody).not.toContain("raw applicant context must not be audited");
+  });
+
+  test("uses a small free-tier token budget and correction-specific prompt", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                title: "Вступление",
+                summary:
+                  "Здравствуйте! Пожалуйста, исправьте перечисленные ниже пункты.",
+                suggestions: [],
+                blockers: [],
+                guardrails: ["Оператор проверяет текст вручную."],
+                operatorSummary: [],
+                agentFollowUpDrafts: [],
+                issueRemarkDraft:
+                  "Здравствуйте! Пожалуйста, исправьте перечисленные ниже пункты.",
+              }),
+            },
+          },
+        ],
+      }),
     );
+    const provider = createAiHelperLocalProvider(
+      {
+        AI_HELPER_RUNTIME_ENV: "local",
+        AI_HELPER_PROVIDER_MODE: "local_litellm",
+        AI_HELPER_LITELLM_BASE_URL: "http://127.0.0.1:4000",
+        AI_HELPER_LITELLM_MODEL_GENERAL: "qwen2.5:7b",
+        AI_HELPER_LITELLM_MAX_OUTPUT_TOKENS: "700",
+      },
+      fetchMock as typeof fetch,
+    );
+
+    await provider.generate({
+      intent: "correction_draft",
+      actorRole: "admin",
+      context: {
+        facts: {},
+        counts: { openIssueCount: 2 },
+        issueCodes: ["blocking_issue_open"],
+        readinessStates: ["returned"],
+        applicants: [],
+        redaction: "raw_context_removed",
+        truncated: false,
+      },
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    const messages = body.messages as Array<{ content: string; role: string }>;
+
+    expect(body.max_tokens).toBe(220);
+    expect(messages[0]?.content).toContain("one or two neutral opening sentences");
+    expect(messages[0]?.content).toContain("Do not include names");
+    expect(JSON.stringify(body)).not.toContain("private@example.com");
   });
 
   test("rejects malformed LiteLLM output instead of normalizing it into success", async () => {

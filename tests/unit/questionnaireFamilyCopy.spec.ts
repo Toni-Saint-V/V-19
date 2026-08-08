@@ -2,7 +2,9 @@
 import { describe, expect, test, vi } from "vitest";
 
 import {
+  buildAutomaticQuestionnaireFamilyCopyUpdates,
   buildQuestionnaireFamilyCopyPlan,
+  isQuestionnaireFamilyCopyField,
   type QuestionnaireFamilyCopyBinding,
 } from "../../src/modules/submissions/questionnaireFamilyCopy";
 import type {
@@ -57,13 +59,60 @@ function binding(
 }
 
 describe("questionnaire family copy plan", () => {
+  test("mirrors a live source edit to every recipient, including an empty value", () => {
+    const source = applicant("main", [
+      questionnaireField("home-city", "Москва", { reviewSource: "manual" }),
+    ]);
+    const spouse = applicant("spouse", [questionnaireField("home-city", "Казань")]);
+    const child = applicant("child", [questionnaireField("home-city", "Самара")]);
+
+    const updates = buildAutomaticQuestionnaireFamilyCopyUpdates({
+      binding: binding("home-city"),
+      recipients: [source, spouse, child],
+      sourceApplicant: source,
+      sourceUpdate: {
+        applicantId: source.id,
+        fieldId: "home-city",
+        sectionId: "contacts",
+        value: "",
+      },
+      validate: () => undefined,
+    });
+
+    expect(updates).toEqual([
+      expect.objectContaining({
+        applicantId: "spouse",
+        fieldId: "home-city",
+        reviewSource: "family_shared",
+        reviewState: "confirmed",
+        value: "",
+      }),
+      expect.objectContaining({
+        applicantId: "child",
+        fieldId: "home-city",
+        reviewSource: "family_shared",
+        reviewState: "confirmed",
+        value: "",
+      }),
+    ]);
+  });
+
+  test("rejects contact identity and residence fields outside the Russia address allowlist", () => {
+    expect(isQuestionnaireFamilyCopyField("contacts", "home-city")).toBe(true);
+    expect(isQuestionnaireFamilyCopyField("hotel", "hotel-address")).toBe(true);
+    expect(isQuestionnaireFamilyCopyField("contacts", "email")).toBe(false);
+    expect(isQuestionnaireFamilyCopyField("contacts", "phone")).toBe(false);
+    expect(isQuestionnaireFamilyCopyField("contacts", "livesOutsideRussia")).toBe(
+      false,
+    );
+    expect(isQuestionnaireFamilyCopyField("trip", "arrival-date")).toBe(false);
+  });
+
   test("copies manual values as confirmed family-shared updates", () => {
     const source = applicant("main", [
       questionnaireField("home-city", "Москва", { reviewSource: "manual" }),
     ]);
-    const recipient = applicant("spouse", [
-      questionnaireField("home-city", "Казань"),
-    ]);
+    const recipient = applicant("spouse", [questionnaireField("home-city", "Казань")]);
     const validate = vi.fn(() => "Проверьте значение");
 
     const plan = buildQuestionnaireFamilyCopyPlan({
@@ -190,9 +239,7 @@ describe("questionnaire family copy plan", () => {
     const source = applicant("main", [
       questionnaireField("home-city", "Самара", { reviewSource: "manual" }),
     ]);
-    const recipient = applicant("spouse", [
-      questionnaireField("home-city", "Москва"),
-    ]);
+    const recipient = applicant("spouse", [questionnaireField("home-city", "Москва")]);
     const recipientWithoutField = applicant("child", []);
 
     const plan = buildQuestionnaireFamilyCopyPlan({

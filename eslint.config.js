@@ -15,6 +15,8 @@ export default tseslint.config(
       "test-results-*",
       "public/tesseract",
       "docs/References/**",
+      // Local execution worktrees are isolated runtime copies, not part of this checkout.
+      ".runtime/**",
       // Immutable visual handoff sources are reference-only, not product runtime code.
       "V19_ADMIN_AGENT_UI_HANDOFF/REFERENCE_UI/**",
     ],

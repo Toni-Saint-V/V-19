@@ -327,6 +327,27 @@ export class LocalDevAuthRegistrationAdapter
 {
   readonly adapterName = "local/dev";
 
+  async activateApprovedRole(role: Role): Promise<Session> {
+    const state = readLocalDevState();
+    const user = state.users.find(
+      (candidate) =>
+        candidate.role === role &&
+        candidate.status === "active" &&
+        candidate.approvalStatus === "approved",
+    );
+    if (!user) {
+      throw new AuthAccessError(
+        "ACCESS_NOT_FOUND",
+        "Подтверждённый пользователь для локальной demo-роли не найден.",
+      );
+    }
+
+    const session = sessionFromUser(user);
+    state.session = session;
+    writeLocalDevState(state);
+    return session;
+  }
+
   async submitAccessRequest(
     input: AccessRequestRegistrationInput,
   ): Promise<AccessRequest> {

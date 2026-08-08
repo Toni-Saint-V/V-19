@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { mergeAuthRepairMetadata } from "./lib/supabase-auth-repair.mjs";
 
 const repoRoot = process.cwd();
 const sandboxProjectRef = "oevvaowoklqttqkraxho";
@@ -15,6 +16,7 @@ const writeTemplate = args.has("--write-template");
 const checkOnly = args.has("--check");
 const provision = args.has("--provision");
 const verifySignIn = args.has("--verify-sign-in");
+const rotateExistingPasswords = args.has("--rotate-existing-passwords");
 const requiredPilotSize = numberArg("--required-size", 20);
 
 if (![writeTemplate, checkOnly, provision].some(Boolean)) {
@@ -24,6 +26,14 @@ if (![writeTemplate, checkOnly, provision].some(Boolean)) {
 
 if ([writeTemplate, checkOnly, provision].filter(Boolean).length > 1) {
   fail("Use exactly one mode: --write-template, --check, or --provision.");
+}
+
+if (rotateExistingPasswords && !provision) {
+  fail("--rotate-existing-passwords is allowed only with --provision.");
+}
+
+if (rotateExistingPasswords && !verifySignIn) {
+  fail("--rotate-existing-passwords requires --verify-sign-in.");
 }
 
 const readiness = readJsonIfExists(readinessPath);
@@ -67,7 +77,7 @@ function usage() {
   console.log("  node scripts/provision-supabase-pilot-cohort.mjs --write-template");
   console.log("  node scripts/provision-supabase-pilot-cohort.mjs --check [--required-size 20]");
   console.log(
-    "  node scripts/provision-supabase-pilot-cohort.mjs --provision [--verify-sign-in] [--required-size 20]",
+    "  node scripts/provision-supabase-pilot-cohort.mjs --provision [--verify-sign-in] [--rotate-existing-passwords] [--required-size 20]",
   );
 }
 
@@ -238,10 +248,10 @@ async function provisionPilotUsers(desiredUsers) {
 
   const results = [];
   for (const user of desiredUsers) {
-    const authUser = await ensureAuthUser(admin, user);
+    const authUser = await ensureAuthUser(admin, user, rotateExistingPasswords);
     await upsertProfile(admin, user, authUser.id);
     const signInVerified = verifySignIn
-      ? await verifyUserSignIn(publicClient, user)
+      ? await verifyUserSignIn(publicClient, user, rotateExistingPasswords)
       : false;
     results.push({ ...user, authUserId: authUser.id, exists: true, roleVerified: true, signInVerified });
   }
@@ -264,19 +274,40 @@ async function provisionPilotUsers(desiredUsers) {
   console.log(`Updated ignored pilot evidence: ${cohortPath}`);
 }
 
-async function ensureAuthUser(admin, user) {
+async function ensureAuthUser(admin, user, shouldRotateExistingPassword) {
   const existing = await findUserByEmail(admin, user.email);
-  if (existing) return existing;
+  if (existing && !shouldRotateExistingPassword) return existing;
+
+  const userMetadata = mergeAuthRepairMetadata(
+    existing?.user_metadata,
+    user.displayName,
+  );
+
+  if (existing) {
+    const { data, error } = await admin.auth.admin.updateUserById(existing.id, {
+      password: user.password,
+      email_confirm: true,
+      user_metadata: userMetadata,
+    });
+    if (error || !data.user) {
+      throw new Error(
+        `Could not rotate pilot auth user for ${user.key}: ${error?.message ?? "missing user"}`,
+      );
+    }
+    return data.user;
+  }
 
   const { data, error } = await admin.auth.admin.createUser({
     email: user.email,
     password: user.password || randomPassword(),
     email_confirm: true,
-    user_metadata: { display_name: user.displayName },
+    user_metadata: userMetadata,
   });
 
   if (error || !data.user) {
-    throw new Error(`Could not create pilot auth user for ${user.key}: ${error?.message ?? "missing user"}`);
+    throw new Error(
+      `Could not create pilot auth user for ${user.key}: ${error?.message ?? "missing user"}`,
+    );
   }
 
   return data.user;
@@ -317,13 +348,35 @@ async function upsertProfile(admin, user, userId) {
   }
 }
 
-async function verifyUserSignIn(publicClient, user) {
+async function verifyUserSignIn(
+  publicClient,
+  user,
+  shouldRevokeOtherSessions,
+) {
   const { data, error } = await publicClient.auth.signInWithPassword({
     email: user.email,
     password: user.password,
   });
-  await publicClient.auth.signOut();
-  if (error || !data.user) throw new Error(`Sign-in verification failed for ${user.key}.`);
+  if (error || !data.user || !data.session) {
+    throw new Error(`Sign-in verification failed for ${user.key}.`);
+  }
+  const passwordSetupRequired =
+    data.user.user_metadata?.password_setup_required === true;
+  if (shouldRevokeOtherSessions) {
+    const otherSessions = await publicClient.auth.signOut({ scope: "others" });
+    if (otherSessions.error) {
+      throw new Error(`Could not revoke other sessions for ${user.key}.`);
+    }
+  }
+  const localSession = await publicClient.auth.signOut({ scope: "local" });
+  if (localSession.error) {
+    throw new Error(`Could not close verification session for ${user.key}.`);
+  }
+  if (passwordSetupRequired) {
+    throw new Error(
+      `${user.key} still requires password setup; rerun with --rotate-existing-passwords.`,
+    );
+  }
   return true;
 }
 

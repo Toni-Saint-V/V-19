@@ -505,10 +505,7 @@ function canSubmitForReviewFromList(
 ) {
   if (!canSubmitForReview) return false;
   const completionDecision = agentQuestionnaireCompletionDecision(submission);
-  return (
-    completionDecision.action === "submit_for_review" &&
-    completionDecision.ok
-  );
+  return completionDecision.action === "submit_for_review" && completionDecision.ok;
 }
 
 function FamilySubmissionCard({
@@ -812,14 +809,14 @@ export function ApplicantsScreen({
     let secondFrame: number | undefined;
     const firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(() => {
-        document
-          .querySelector<HTMLElement>(
-            `[data-submission-id="${CSS.escape(focusSubmissionId)}"]`,
-          )
-          ?.scrollIntoView({
-            behavior: prefersReducedMotion ? "auto" : "smooth",
-            block: "start",
-          });
+        const focusedCard = document.querySelector<HTMLElement>(
+          `[data-submission-id="${CSS.escape(focusSubmissionId)}"]`,
+        );
+        focusedCard?.scrollIntoView({
+          behavior: prefersReducedMotion ? "auto" : "smooth",
+          block: "start",
+        });
+        focusedCard?.focus({ preventScroll: true });
       });
     });
     return () => {
@@ -984,8 +981,10 @@ export function ApplicantsScreen({
   return (
     <motion.div
       animate={{ opacity: 1, y: 0 }}
+      aria-label="Мои подачи"
       className="v19-agent-shared-screen"
       initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+      role="region"
       transition={{ duration: 0.3 }}
     >
       <V19MetricStrip>

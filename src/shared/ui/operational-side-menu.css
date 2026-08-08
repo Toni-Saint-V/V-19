@@ -13,7 +13,7 @@
   --v19-operational-side-menu-control-border: rgb(255 255 255 / 0.08);
   --v19-operational-side-menu-active: #27272b;
   --v19-operational-side-menu-text: rgb(255 255 255 / 0.7);
-  --v19-operational-side-menu-text-muted: rgb(255 255 255 / 0.52);
+  --v19-operational-side-menu-text-muted: rgb(255 255 255 / 0.62);
   --v19-operational-side-menu-duration: 180ms;
   --v19-operational-side-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
 import { clickWorkspaceButton, openFreshWorkspace } from "./v19-pilot-helpers";
+import { expect, test } from "./v19-localhost-test";
 
 async function expectNoAxeViolations(page: Page, context: string, include?: string) {
   const dialog = page.getByRole("dialog").first();

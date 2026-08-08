@@ -1,3 +1,4 @@
+// src/components/AdminExportScreen.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
@@ -73,13 +74,9 @@ interface ExportItem {
   approvedDate: string;
   selected: boolean;
   readiness: number;
-  warnings: number;
-  blockers: number;
   files: number;
   agent: string;
   packageSize: string;
-  blockerReasons: string[];
-  warningReasons: string[];
 }
 
 interface PreparedExportPackage {
@@ -95,7 +92,7 @@ interface PreparedExportArchive {
   prepared: PreparedExportPackage;
 }
 
-type ExportQueueTab = "ready" | "selected" | "blocked";
+type ExportQueueTab = "ready" | "selected";
 type ExportSort = "tripDate" | "createdAt";
 type ExportTypeFilter = "all" | "family" | "single";
 type ExportFailureKind =
@@ -199,7 +196,7 @@ function ManifestRow({
 function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
   return submissions.flatMap((submission) => {
     const summary = exportSummary([submission]);
-    if (submission.status !== "ready_for_export") {
+    if (!summary.ready) {
       return [];
     }
     const mainApplicant =
@@ -220,13 +217,9 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
         approvedDate: submission.updatedAt,
         selected: false,
         readiness: submission.completeness.total,
-        warnings: summary.warnings.length,
-        blockers: summary.blockers.length,
         files: requiredPassportReviewMediaSlots(submission).length,
         agent: submission.agentId,
         packageSize: `${summary.rowCount} ${rowCountLabel(summary.rowCount)}`,
-        blockerReasons: summary.blockers.map((blocker) => blocker.reason),
-        warningReasons: summary.warnings.map((warning) => warning.reason),
       },
     ];
   });
@@ -288,6 +281,36 @@ function exportAgentFilterLabel(agentId: string) {
   }
 
   return `Агент ${exportAgentName(agentId)}`;
+}
+
+function exportItemIdentityMeta(item: ExportItem) {
+  let packageLabel = "Индивидуальная подача";
+
+  if (item.type === "family") {
+    const applicantLabel = `${item.applicantsCount} ${applicantCountLabel(item.applicantsCount)}`;
+    packageLabel =
+      item.title === item.applicantName
+        ? applicantLabel
+        : `${item.title} · ${applicantLabel}`;
+  }
+
+  return `${packageLabel} · ${item.packageSize}`;
+}
+
+function exportItemStatus(item: ExportItem) {
+  if (item.selected) {
+    return {
+      detail: "Пакет добавлен в текущую выгрузку",
+      label: "В пакете",
+      tone: "selected",
+    } as const;
+  }
+
+  return {
+    detail: "Пакет готов к выбору",
+    label: "Готов",
+    tone: "ready",
+  } as const;
 }
 
 export function AdminExportScreen({
@@ -386,15 +409,12 @@ export function AdminExportScreen({
 
   useEffect(() => {
     setSelectedRealIds((current) => {
-      const selectableItems = realItems.filter((item) => item.blockers === 0);
-      const available = new Set(selectableItems.map((item) => item.id));
+      const available = new Set(realItems.map((item) => item.id));
       return current.filter((id) => available.has(id));
     });
     setActiveId((current) => {
       if (realItems.some((item) => item.id === current)) return current;
-      return (
-        realItems.find((item) => item.blockers === 0)?.id ?? realItems[0]?.id ?? ""
-      );
+      return realItems[0]?.id ?? "";
     });
   }, [realItems]);
 
@@ -440,11 +460,10 @@ export function AdminExportScreen({
       });
   }, [agentFilter, cityFilter, enrichedItems, searchQuery, sortBy, typeFilter]);
   const displayItems = useMemo(() => {
-    if (activeQueueTab === "selected")
+    if (activeQueueTab === "selected") {
       return baseFilteredItems.filter((item) => item.selected);
-    if (activeQueueTab === "blocked")
-      return baseFilteredItems.filter((item) => item.blockers > 0);
-    return baseFilteredItems.filter((item) => item.blockers === 0);
+    }
+    return baseFilteredItems;
   }, [activeQueueTab, baseFilteredItems]);
   const selectedItems = useMemo(
     () => enrichedItems.filter((item) => item.selected),
@@ -489,8 +508,7 @@ export function AdminExportScreen({
     displayItems[0] ??
     selectedItems[0];
   const selectedCount = selectedItems.length;
-  const availableCount = enrichedItems.filter((item) => item.blockers === 0).length;
-  const blockedCount = enrichedItems.filter((item) => item.blockers > 0).length;
+  const availableCount = enrichedItems.length;
   const selectedApplicants = selectedItems.reduce(
     (sum, item) => sum + item.applicantsCount,
     0,
@@ -499,20 +517,11 @@ export function AdminExportScreen({
   const selectedWarnings = selectedCount ? selectedPlan.warnings.length : 0;
   const selectedBlockers = selectedCount ? selectedPlan.blockers.length : 0;
   const hasExportBlockers = selectedCount > 0 && selectedBlockers > 0;
-  const activeBlockerReasons = activeItem?.blockerReasons ?? [];
-  const selectedDiagnosticReasons = hasExportBlockers
+  const diagnosticReasons = hasExportBlockers
     ? selectedPlan.blockers.map((blocker) => blocker.reason)
     : [];
-  const diagnosticTargetsSelection =
-    activeQueueTab !== "blocked" && selectedDiagnosticReasons.length > 0;
-  const diagnosticReasons = diagnosticTargetsSelection
-    ? selectedDiagnosticReasons
-    : activeBlockerReasons;
-  const showBlockedPackageFocus =
-    !diagnosticTargetsSelection && activeBlockerReasons.length > 0;
-  const diagnosticTitle = showBlockedPackageFocus
-    ? `${activeItem?.publicId ?? "Пакет"} нельзя выгрузить`
-    : selectedCount > 1
+  const diagnosticTitle =
+    selectedCount > 1
       ? `${selectedCount} ${packageCountLabel(selectedCount)} нельзя выгрузить`
       : "Выбранный пакет нельзя выгрузить";
   const hasActiveFilters =
@@ -522,30 +531,19 @@ export function AdminExportScreen({
     searchQuery.length > 0 ||
     sortBy !== "tripDate" ||
     typeFilter !== "all";
-  const selectableDisplayItems = displayItems.filter((item) => item.blockers === 0);
   const allDisplaySelected =
-    selectableDisplayItems.length > 0 &&
-    selectableDisplayItems.every((item) => item.selected);
+    displayItems.length > 0 && displayItems.every((item) => item.selected);
   const emptyStateCopy =
     activeQueueTab === "selected"
       ? {
           title: "Пакеты не выбраны",
           description: "Вернитесь в «Доступно» и отметьте нужные пакеты.",
         }
-      : activeQueueTab === "blocked"
-        ? {
-            title: "Пакетов с ограничениями нет",
-            description: "Все пакеты прошли обязательные проверки.",
-          }
-        : blockedCount > 0
-          ? {
-              title: "Нет пакетов без ограничений",
-              description: "Откройте «Стоп», чтобы увидеть причины блокировки.",
-            }
-          : {
-              title: "Очередь выгрузки пуста",
-              description: "Новые пакеты появятся после принятия проверки.",
-            };
+      : {
+          title: "Очередь выгрузки пуста",
+          description:
+            "Здесь появятся только пакеты, прошедшие все обязательные проверки.",
+        };
   const selectedHistory = selectedSubmissions
     .flatMap((submission) =>
       submission.history.map((item) => ({
@@ -554,27 +552,17 @@ export function AdminExportScreen({
       })),
     )
     .slice(0, 3);
-  const revealBlockedPackage = () => {
-    setActiveQueueTab("blocked");
-    setAgentFilter("Все агенты");
-    setCityFilter("Все города");
-    setSearchQuery("");
-    setSortBy("tripDate");
-    setTypeFilter("all");
-    setMobileControlOpen(false);
-  };
   const toggleAll = () => {
     setExportError("");
     clearPreparedExport();
-    const selectableItems = displayItems.filter((item) => item.blockers === 0);
     const allSelected =
-      selectableItems.length > 0 && selectableItems.every((item) => item.selected);
-    setSelectedRealIds(allSelected ? [] : selectableItems.map((item) => item.id));
+      displayItems.length > 0 && displayItems.every((item) => item.selected);
+    setSelectedRealIds(allSelected ? [] : displayItems.map((item) => item.id));
   };
 
   const toggleItem = (id: string) => {
     const item = enrichedItems.find((candidate) => candidate.id === id);
-    if (!item || item.blockers > 0) return;
+    if (!item) return;
     setExportError("");
     clearPreparedExport();
     if (selectedRealIds.includes(id)) {
@@ -902,30 +890,11 @@ export function AdminExportScreen({
             tone="blue"
             onClick={() => setActiveQueueTab("selected")}
           />
-          <V19MetricCard
-            active={activeQueueTab === "blocked"}
-            detail={packageCountLabel(blockedCount)}
-            icon={blockedCount ? XCircle : ShieldCheck}
-            label="Стоп"
-            value={blockedCount}
-            tone={blockedCount ? "red" : "green"}
-            onClick={() => setActiveQueueTab("blocked")}
-          />
         </V19MetricStrip>
 
         <AdminContextToggle
-          badge={
-            hasExportBlockers || (activeItem?.blockers ?? 0) > 0
-              ? "Стоп"
-              : selectedCount
-                ? "Готов"
-                : "—"
-          }
-          badgeClassName={
-            hasExportBlockers || (activeItem?.blockers ?? 0) > 0
-              ? "tone-danger"
-              : "tone-ready"
-          }
+          badge={hasExportBlockers ? "Стоп" : selectedCount ? "Готов" : "—"}
+          badgeClassName={hasExportBlockers ? "tone-danger" : "tone-ready"}
           className="v19-admin-export-context-toggle-v2"
           detail={
             selectedCount
@@ -940,19 +909,13 @@ export function AdminExportScreen({
 
         <div className="v19-admin-export-workspace-v2">
           <AdminListHeader
-            actionDisabled={
-              activeQueueTab !== "ready" || selectableDisplayItems.length === 0
-            }
+            actionDisabled={activeQueueTab !== "ready" || displayItems.length === 0}
             actionLabel={allDisplaySelected ? "Снять" : "Все"}
             className="v19-admin-export-list-head-v2"
             countLabel={`${displayItems.length} ${packageCountLabel(displayItems.length)}`}
             onAction={toggleAll}
             title={
-              activeQueueTab === "ready"
-                ? "Пакеты к выгрузке"
-                : activeQueueTab === "selected"
-                  ? "Выбранные пакеты"
-                  : "Требуют решения"
+              activeQueueTab === "ready" ? "Пакеты к выгрузке" : "Выбранные пакеты"
             }
           />
 
@@ -1014,10 +977,10 @@ export function AdminExportScreen({
           <OperationalTableHeader
             className="v19-admin-export-table-head-v2"
             columns={[
-              { key: "applicant", label: "ID / имя и фамилия" },
-              { key: "dates", label: "Даты поездки" },
-              { key: "city", label: "Город" },
-              { key: "agent", label: "Агент" },
+              { key: "applicant", label: "Пакет / заявитель" },
+              { key: "dates", label: "Период поездки" },
+              { key: "city", label: "Город подачи" },
+              { key: "agent", label: "Ответственный" },
             ]}
             leadingControl={
               <button
@@ -1051,91 +1014,151 @@ export function AdminExportScreen({
               </div>
             ) : (
               <div className="space-y-1">
-                {displayItems.map((item) => (
-                  <V19QueueCard
-                    as="label"
-                    aria-label={
-                      item.blockers > 0
-                        ? `Показать причины для ${item.title}`
-                        : undefined
-                    }
-                    key={item.id}
-                    className={`export-row v19-admin-export-row-v2 ${item.selected ? "is-selected" : ""} ${activeId === item.id ? "is-active" : ""} ${item.blockers > 0 ? "is-blocked" : ""}`}
-                    data-testid={`admin-export-row-${item.id}`}
-                    onClick={() => setActiveId(item.id)}
-                    onKeyDown={(event) => {
-                      if (
-                        item.blockers > 0 &&
-                        (event.key === "Enter" || event.key === " ")
-                      ) {
-                        event.preventDefault();
-                        setActiveId(item.id);
-                      }
-                    }}
-                    role={item.blockers > 0 ? "button" : undefined}
-                    tabIndex={item.blockers > 0 ? 0 : undefined}
-                  >
-                    <input
-                      aria-label={`Выбрать ${item.title}`}
-                      checked={item.selected}
-                      disabled={item.blockers > 0}
-                      className="h-5 w-5 shrink-0 accent-[var(--v19-depth-accent)]"
-                      type="checkbox"
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={() => toggleItem(item.id)}
-                    />
+                {displayItems.map((item) => {
+                  const status = exportItemStatus(item);
+                  const identityMeta = exportItemIdentityMeta(item);
+                  const agentName = exportAgentName(item.agent);
+                  const rowClassName = [
+                    "export-row v19-admin-export-row-v2",
+                    item.selected && "is-selected",
+                    activeId === item.id && "is-active",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  const agentClassName = [
+                    "v19-admin-export-row-cell-v2 v19-admin-export-row-agent-v2",
+                    isOpaqueAgentId(item.agent) && "is-opaque-agent",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
 
-                    <div className="v19-admin-export-row-identity-v2 min-w-0">
-                      <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
-                        <IdCard />
-                      </span>
-                      <div className="v19-admin-export-row-copy-v2">
-                        <span className="v19-admin-export-row-public-id-v2">
-                          {item.publicId}
-                        </span>
-                        <strong className="v19-admin-export-row-title-v2">
-                          {item.applicantName}
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div className="v19-admin-export-row-dates-v2">
-                      <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
-                        <CalendarDays />
-                      </span>
-                      <small className="v19-admin-export-row-label-v2">
-                        Даты поездки
-                      </small>
-                      <span className="v19-admin-export-row-value-v2">
-                        {item.appointmentDate}
-                      </span>
-                    </div>
-
-                    <div className="v19-admin-export-row-city-v2">
-                      <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
-                        <MapPin />
-                      </span>
-                      <small className="v19-admin-export-row-label-v2">Город</small>
-                      <span className="v19-admin-export-row-value-v2">{item.city}</span>
-                    </div>
-
-                    <div
-                      className={
-                        isOpaqueAgentId(item.agent)
-                          ? "v19-admin-export-row-agent-v2 is-opaque-agent"
-                          : "v19-admin-export-row-agent-v2"
-                      }
+                  return (
+                    <V19QueueCard
+                      as="label"
+                      aria-current={activeId === item.id ? "true" : undefined}
+                      key={item.id}
+                      className={rowClassName}
+                      data-export-state={status.tone}
+                      data-testid={`admin-export-row-${item.id}`}
+                      onClick={() => setActiveId(item.id)}
                     >
-                      <span aria-hidden="true" className="v19-admin-export-row-icon-v2">
-                        <User />
-                      </span>
-                      <small className="v19-admin-export-row-label-v2">Агент</small>
-                      <span className="v19-admin-export-row-value-v2">
-                        {exportAgentName(item.agent)}
-                      </span>
-                    </div>
-                  </V19QueueCard>
-                ))}
+                      <input
+                        aria-label={`Выбрать ${item.title}`}
+                        checked={item.selected}
+                        className="v19-admin-export-row-checkbox-v2"
+                        type="checkbox"
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleItem(item.id)}
+                      />
+
+                      <div
+                        className="v19-admin-export-row-cell-v2 v19-admin-export-row-identity-v2"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="v19-admin-export-row-icon-v2"
+                        >
+                          <IdCard />
+                        </span>
+                        <div className="v19-admin-export-row-copy-v2">
+                          <div className="v19-admin-export-row-eyebrow-v2">
+                            <span className="v19-admin-export-row-public-id-v2">
+                              {item.publicId}
+                            </span>
+                            <span
+                              className={`v19-admin-export-row-state-v2 tone-${status.tone}`}
+                              title={status.detail}
+                            >
+                              <span aria-hidden="true" />
+                              {status.label}
+                            </span>
+                          </div>
+                          <strong
+                            className="v19-admin-export-row-title-v2"
+                            title={item.applicantName}
+                          >
+                            {item.applicantName}
+                          </strong>
+                          <span
+                            className="v19-admin-export-row-meta-v2"
+                            title={identityMeta}
+                          >
+                            {identityMeta}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="v19-admin-export-row-cell-v2 v19-admin-export-row-dates-v2">
+                        <span
+                          aria-hidden="true"
+                          className="v19-admin-export-row-icon-v2"
+                        >
+                          <CalendarDays />
+                        </span>
+                        <div className="v19-admin-export-row-detail-copy-v2">
+                          <small className="v19-admin-export-row-label-v2">
+                            Даты поездки
+                          </small>
+                          <span
+                            className="v19-admin-export-row-value-v2"
+                            title={item.appointmentDate}
+                          >
+                            {item.appointmentDate}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="v19-admin-export-row-cell-v2 v19-admin-export-row-city-v2">
+                        <span
+                          aria-hidden="true"
+                          className="v19-admin-export-row-icon-v2"
+                        >
+                          <MapPin />
+                        </span>
+                        <div className="v19-admin-export-row-detail-copy-v2">
+                          <small className="v19-admin-export-row-label-v2">
+                            Город
+                          </small>
+                          <span
+                            className="v19-admin-export-row-value-v2"
+                            title={item.city}
+                          >
+                            {item.city}
+                          </span>
+                          <span
+                            className="v19-admin-export-row-meta-v2"
+                            title={item.country}
+                          >
+                            {item.country}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={agentClassName}>
+                        <span
+                          aria-hidden="true"
+                          className="v19-admin-export-row-icon-v2"
+                        >
+                          <User />
+                        </span>
+                        <div className="v19-admin-export-row-detail-copy-v2">
+                          <small className="v19-admin-export-row-label-v2">
+                            Агент
+                          </small>
+                          <span
+                            className="v19-admin-export-row-value-v2"
+                            title={agentName}
+                          >
+                            {agentName}
+                          </span>
+                          <span className="v19-admin-export-row-meta-v2">
+                            Готовность {item.readiness}%
+                          </span>
+                        </div>
+                      </div>
+                    </V19QueueCard>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1180,7 +1203,6 @@ export function AdminExportScreen({
           tabIndex={0}
         >
           <AdminExportDiagnosticsPanel
-            onShowPackage={showBlockedPackageFocus ? revealBlockedPackage : undefined}
             reasons={diagnosticReasons}
             title={diagnosticTitle}
           />
@@ -1194,22 +1216,8 @@ export function AdminExportScreen({
                 </div>
               </div>
               {activeItem && (
-                <StatusPill
-                  tone={
-                    activeItem.blockers > 0
-                      ? "danger"
-                      : activeItem.warnings > 0
-                        ? "blue"
-                        : "green"
-                  }
-                >
-                  {activeItem.blockers > 0
-                    ? "заблокирован"
-                    : diagnosticTargetsSelection
-                      ? "сам пакет готов"
-                      : activeItem.warnings > 0
-                        ? "есть предупреждения"
-                        : "готов"}
+                <StatusPill tone="green">
+                  {diagnosticReasons.length > 0 ? "сам пакет готов" : "готов"}
                 </StatusPill>
               )}
             </div>
@@ -1495,9 +1503,7 @@ export function AdminExportScreen({
                         : preparedExport
                           ? "Excel готов и будет добавлен в ZIP"
                           : "ZIP включает Excel и обязательные документы"
-                    : showBlockedPackageFocus
-                      ? "Исправьте пакет перед выгрузкой"
-                      : "Выберите хотя бы одну подачу")}
+                    : "Выберите хотя бы одну подачу")}
               </>
             )}
           </div>

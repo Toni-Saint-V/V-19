@@ -18,8 +18,11 @@ import { auditAgentInteractionControls } from "../../src/modules/submissions/age
 import { questionnaireBlueprintContract } from "../../src/modules/submissions/questionnaire";
 import {
   createDraftSubmission,
+  uploadRequiredFile,
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
+import { startPassportExtraction } from "../../src/modules/submissions/passportExtraction";
+import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
 import type { Submission } from "../../src/modules/submissions/types";
 
 afterEach(() => {
@@ -302,6 +305,136 @@ function expectDropdownOption(name: string) {
 }
 
 describe("FigmaQuestionnaireScreen", () => {
+  test("does not offer manual passport confirmation before durable upload or while extracting", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicant = draft.applicants[0];
+    const passportFile = draft.files.find(
+      (file) => file.applicantId === applicant?.id && file.type === "passport_scan",
+    );
+    if (!applicant || !passportFile) throw new Error("expected passport slot");
+
+    const pendingView = render(
+      <FigmaQuestionnaireScreen
+        initialFocus={{ applicantId: applicant.id, field: "passport-no" }}
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onConfirmPassportReview={vi.fn(async () => draft)}
+        submission={draft}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: "Подтвердить ручную проверку паспорта",
+      }),
+    ).not.toBeInTheDocument();
+    pendingView.unmount();
+
+    const generatedFileName = "abc_passport_scan.png";
+    const storageTarget = buildMediaStoragePath(
+      draft.id,
+      applicant.id,
+      "passport_scan",
+      generatedFileName,
+    );
+    const uploaded = uploadRequiredFile(draft, passportFile.id, {
+      generatedFileName,
+      mimeType: "image/png",
+      originalFileName: "passport-extracting.png",
+      sizeBytes: 1024,
+      storageAdapter: "supabase-private",
+      storageBucket: storageTarget.bucket,
+      storagePath: storageTarget.path,
+      uploadedAtIso: "2026-07-28T00:00:00.000Z",
+    });
+    const uploadedPassport = uploaded.files.find((file) => file.id === passportFile.id);
+    if (!uploadedPassport) throw new Error("expected uploaded passport");
+    const extracting = startPassportExtraction(uploaded, uploadedPassport);
+
+    render(
+      <FigmaQuestionnaireScreen
+        initialFocus={{ applicantId: applicant.id, field: "passport-no" }}
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onConfirmPassportReview={vi.fn(async () => extracting)}
+        submission={extracting}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: "Подтвердить ручную проверку паспорта",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Ручная проверка паспорта подтверждена."),
+    ).not.toBeInTheDocument();
+  });
+
+  test("rejects a manual passport callback that does not return durable verification", async () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicant = draft.applicants[0];
+    const passportFile = draft.files.find(
+      (file) => file.applicantId === applicant?.id && file.type === "passport_scan",
+    );
+    if (!applicant || !passportFile) throw new Error("expected passport slot");
+    const generatedFileName = "def_passport_scan.png";
+    const storageTarget = buildMediaStoragePath(
+      draft.id,
+      applicant.id,
+      "passport_scan",
+      generatedFileName,
+    );
+    const uploaded = uploadRequiredFile(draft, passportFile.id, {
+      generatedFileName,
+      mimeType: "image/png",
+      originalFileName: "passport-ready.png",
+      sizeBytes: 1024,
+      storageAdapter: "supabase-private",
+      storageBucket: storageTarget.bucket,
+      storagePath: storageTarget.path,
+      uploadedAtIso: "2026-07-28T00:00:00.000Z",
+    });
+    const onConfirmPassportReview = vi.fn(async () => uploaded);
+
+    render(
+      <FigmaQuestionnaireScreen
+        initialFocus={{ applicantId: applicant.id, field: "passport-no" }}
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onConfirmPassportReview={onConfirmPassportReview}
+        submission={uploaded}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Подтвердить ручную проверку паспорта",
+      }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Паспорт ещё нельзя подтвердить: дождитесь загрузки и завершения обработки.",
+      ),
+    ).toHaveAttribute("role", "alert");
+    expect(onConfirmPassportReview).toHaveBeenCalledWith(applicant.id);
+    expect(
+      screen.queryByText("Ручная проверка паспорта подтверждена."),
+    ).not.toBeInTheDocument();
+  });
+
   test("renders passport values from the active submission instead of static defaults", () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -849,11 +982,13 @@ describe("FigmaQuestionnaireScreen", () => {
         .sort(),
     );
     expect(
-      [...new Set(
-        bindings
-          .filter((binding) => blueprintFieldIds.has(binding.fieldId))
-          .map((binding) => binding.sectionId),
-      )].sort(),
+      [
+        ...new Set(
+          bindings
+            .filter((binding) => blueprintFieldIds.has(binding.fieldId))
+            .map((binding) => binding.sectionId),
+        ),
+      ].sort(),
     ).toEqual([...blueprintSectionIds].sort());
 
     const draft = fillEveryQuestionnaireField(
@@ -898,17 +1033,13 @@ describe("FigmaQuestionnaireScreen", () => {
       .sort();
     expect(missingFields).toEqual(Object.keys(dispositions).sort());
     expect(
-      [...renderedFieldIds]
-        .filter((fieldId) => !blueprintFieldIds.has(fieldId))
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => !blueprintFieldIds.has(fieldId)).sort(),
     ).toEqual(
-      [...renderedFieldIds]
-        .filter((fieldId) => fieldId in legacyBindings)
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => fieldId in legacyBindings).sort(),
     );
   });
 
-  test("shows family copy only in shared contact, trip, appointment, and hotel sections", () => {
+  test("shows family copy only for Russia address, Spain address, and appointment", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON", "VOLKOVA MARIA"],
       city: "Москва",
@@ -925,19 +1056,14 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    for (const title of ["Личные данные", "Паспорт", "Работа / учеба"]) {
+    for (const title of ["Личные данные", "Паспорт", "Работа / учеба", "Поездка"]) {
       clickPinnedSection(result.container, title);
       expect(
         screen.queryByRole("button", { name: "Копировать для всех" }),
       ).not.toBeInTheDocument();
     }
 
-    for (const title of [
-      "Адрес и контакты",
-      "Поездка",
-      "Запись",
-      "Отель / приглашение",
-    ]) {
+    for (const title of ["Адрес и контакты", "Запись", "Отель / приглашение"]) {
       clickPinnedSection(result.container, title);
       expect(
         screen.getByRole("button", { name: "Копировать для всех" }),
@@ -1881,9 +2007,9 @@ describe("FigmaQuestionnaireScreen", () => {
       fireEvent.change(screen.getByLabelText("Имя"), {
         target: { value: "MUST NOT WRITE" },
       });
-      expect(
-        onFieldChange.mock.calls.map(([update]) => update.fieldId),
-      ).toEqual(["surname"]);
+      expect(onFieldChange.mock.calls.map(([update]) => update.fieldId)).toEqual([
+        "surname",
+      ]);
 
       await act(async () => {
         save.resolve();
@@ -1936,7 +2062,9 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
       "Не удалось сохранить и выйти",
     );
-    expect(screen.queryByText("Подача недоступна текущему агенту.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Подача недоступна текущему агенту."),
+    ).not.toBeInTheDocument();
     expect(onBack).not.toHaveBeenCalled();
     expect(onSaveDraft).toHaveBeenCalledWith(
       expect.objectContaining({ saveIntent: "navigation" }),
@@ -1947,9 +2075,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       screen.getByText(/Последние несохранённые изменения будут потеряны/),
     ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Да, выйти без сохранения" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Да, выйти без сохранения" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
@@ -2053,9 +2179,7 @@ describe("FigmaQuestionnaireScreen", () => {
       expect.objectContaining({ saveIntent: "autosave" }),
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).not.toHaveBeenCalled();
 
@@ -2110,9 +2234,7 @@ describe("FigmaQuestionnaireScreen", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
 
     await act(async () => {
       autosave.reject(new Error("temporary autosave failure"));
@@ -3939,6 +4061,92 @@ describe("FigmaQuestionnaireScreen", () => {
     }
   });
 
+  test("automatically mirrors Russia, Spain, and appointment edits after preupload yes/yes", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["IVANOVA MARIA", "IVANOV ANTON", "IVANOVA ANNA"],
+      city: "Москва",
+      familyCount: 3,
+      idScheme: "local",
+      preliminaryIntake: {
+        arrivalPlace: "",
+        homeAddress: "",
+        sameArrivalPlace: false,
+        sameHomeAddress: true,
+        sameSpainStay: true,
+        sameTripDates: false,
+        spainStayAddress: "",
+        spainStayCity: "",
+        spainStayName: "",
+        tripDateFrom: "",
+        tripDateTo: "",
+      },
+      submissions: [],
+      type: "family",
+    });
+    const recipientIds = submission.applicants
+      .slice(1)
+      .map((applicant) => applicant.id);
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Адрес и контакты");
+    fireEvent.change(screen.getByLabelText("Город проживания"), {
+      target: { value: "Самара" },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "main-only@example.com" },
+    });
+
+    clickPinnedSection(result.container, "Отель / приглашение");
+    fireEvent.change(screen.getByLabelText("Город"), {
+      target: { value: "Madrid" },
+    });
+
+    clickPinnedSection(result.container, "Запись");
+    fireEvent.change(screen.getByLabelText("С какого числа"), {
+      target: { value: "01082027" },
+    });
+
+    const recipientUpdates = onFieldChange.mock.calls
+      .map(([update]) => update)
+      .filter((update) => recipientIds.includes(update.applicantId));
+    for (const applicantId of recipientIds) {
+      expect(recipientUpdates).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            applicantId,
+            fieldId: "home-city",
+            reviewSource: "family_shared",
+            value: "Самара",
+          }),
+          expect.objectContaining({
+            applicantId,
+            fieldId: "hotel-city",
+            reviewSource: "family_shared",
+            value: "Madrid",
+          }),
+          expect.objectContaining({
+            applicantId,
+            fieldId: "desired-date-1",
+            reviewSource: "family_shared",
+            value: "01.08.2027",
+          }),
+        ]),
+      );
+    }
+    expect(recipientUpdates.some((update) => update.fieldId === "email")).toBe(false);
+    expect(
+      screen.getByRole("button", { name: "Копировать для всех" }),
+    ).toBeInTheDocument();
+  });
+
   test("copies every field in the active shared section and overwrites existing values", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["IVANOVA MARIA", "IVANOV ANTON", "IVANOVA ANNA"],
@@ -4060,18 +4268,17 @@ describe("FigmaQuestionnaireScreen", () => {
           fieldId: "home-house",
           value: "1",
         }),
-        expect.objectContaining({
-          applicantId: thirdApplicantId,
-          fieldId: "email",
-          value: "family@example.com",
-        }),
-        expect.objectContaining({
-          applicantId: thirdApplicantId,
-          fieldId: "contact-number",
-          value: "79000000000",
-        }),
       ]),
     );
+    expect(
+      copiedUpdates.some(
+        (update) =>
+          update.fieldId === "email" ||
+          update.fieldId === "contact-number" ||
+          update.fieldId === "lives-outside-citizenship" ||
+          update.fieldId.startsWith("residence-permit-"),
+      ),
+    ).toBe(false);
     expect(
       copiedUpdates.some(
         (update) => update.sectionId === "personal" || update.sectionId === "passport",
@@ -4093,7 +4300,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("copies every trip field, including fields outside the former shared subset", () => {
+  test("does not expose family copy for applicant-specific trip fields", () => {
     const draft = createDraftSubmission({
       applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
       city: "Москва",
@@ -4134,48 +4341,10 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Поездка");
-    fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
-
-    const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
-    expect(copiedUpdates).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          fieldId: "entry-count",
-          sectionId: "trip",
-          value: "Многократная",
-        }),
-        expect.objectContaining({
-          fieldId: "previous-biometrics",
-          sectionId: "trip",
-          value: "Нет",
-        }),
-        expect.objectContaining({
-          fieldId: "previous-biometrics-date",
-          sectionId: "trip",
-          value: "01.02.2024",
-        }),
-        expect.objectContaining({
-          fieldId: "previous-visa-number",
-          sectionId: "trip",
-          value: "VISA-123",
-        }),
-      ]),
-    );
-
-    const applicantTabs = result.container.querySelectorAll(
-      ".v19-questionnaire-applicant-tab",
-    );
-    fireEvent.click(applicantTabs[1] as HTMLButtonElement);
-    clickPinnedSection(result.container, "Поездка");
-    expect(screen.getByRole("button", { name: "Многократная" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: "Нет" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      screen.queryByRole("button", { name: "Копировать для всех" }),
+    ).not.toBeInTheDocument();
+    expect(onFieldChange).not.toHaveBeenCalled();
   });
 
   test("invalidates a family-copy preview when the source value changes", () => {
@@ -4316,7 +4485,9 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "family",
     });
-    const mainApplicant = draft.applicants.find((applicant) => applicant.role === "main");
+    const mainApplicant = draft.applicants.find(
+      (applicant) => applicant.role === "main",
+    );
     const secondaryApplicant = draft.applicants.find(
       (applicant) => applicant.role !== "main",
     );
@@ -4600,9 +4771,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Место рождения")).toHaveClass("is-filled");
-    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass(
-      "is-filled",
-    );
+    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass("is-filled");
   });
 
   test("does not duplicate a field issue as the next blocker notice", () => {
@@ -4905,9 +5074,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Повторить сохранение" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Повторить сохранение" }));
 
     await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(2));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);

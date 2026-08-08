@@ -816,6 +816,64 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     expectedEffect: "Cancel the family-copy preview without changing data.",
     proof: domProof,
   },
+  "questionnaire.open-smart-import": {
+    id: "questionnaire.open-smart-import",
+    kind: "dialog",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Open the local smart-import review flow without uploading or changing questionnaire data.",
+    proof: domProof,
+  },
+  "questionnaire.smart-import-source": {
+    id: "questionnaire.smart-import-source",
+    kind: "input",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Stage an ephemeral local file or text source without a network write.",
+    proof: ["dom-state", "no-network-write"],
+  },
+  "questionnaire.smart-import-run": {
+    id: "questionnaire.smart-import-run",
+    kind: "dialog",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Parse the ephemeral source locally and show sanitized field candidates without a write.",
+    proof: ["dom-state", "no-network-write"],
+  },
+  "questionnaire.smart-import-review": {
+    id: "questionnaire.smart-import-review",
+    kind: "input",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Select or deselect one sanitized smart-import candidate without a write.",
+    proof: domProof,
+  },
+  "questionnaire.smart-import-cancel": {
+    id: "questionnaire.smart-import-cancel",
+    kind: "dialog",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Abort smart import, clear ephemeral state, and leave questionnaire values unchanged.",
+    proof: ["dom-state", "no-network-write"],
+  },
+  "questionnaire.smart-import-apply": {
+    canonicalEffect: questionnaireUpdateCanonicalEffect,
+    id: "questionnaire.smart-import-apply",
+    kind: "mutation",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Apply only explicitly selected sanitized candidates through questionnaire field updates.",
+    proof: mutationProof,
+    businessIntent: "update_questionnaire_field",
+    statusFixtures: editableStatusFixtures,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
+  },
   "questionnaire.save-exit": {
     canonicalEffect: questionnaireUpdateCanonicalEffect,
     id: "questionnaire.save-exit",

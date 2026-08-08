@@ -1,10 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { testArtifactPath } from "../support/artifacts";
 
+import { expect, test } from "./v19-localhost-test";
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
 
 const evidenceDirectory = testArtifactPath("agent-action-p0-2026-07-15");
 const returnedSubmissionId = "ПД-1048";
+const returnedSubmissionPublicId = "VF-1048";
 
 async function assertNoHorizontalOverflow(page: Page) {
   const dimensions = await page.evaluate(() => {
@@ -25,32 +27,52 @@ async function openReturnedSubmission(page: Page) {
 
   const action = page
     .locator(
-      `[data-testid="agent-action-row"][data-agent-action-id^="replace-${returnedSubmissionId}-"]`,
+      [
+        `[data-testid="agent-action-queue-item"][data-agent-action-id^="replace-${returnedSubmissionId}-"]:visible`,
+        `.v19-actions-timeline-event[data-submission-id="${returnedSubmissionId}"] .v19-actions-timeline-hit:visible`,
+      ].join(", "),
     )
     .first();
   await expect(action).toBeVisible();
-  await expect(action).toHaveAccessibleName(/^Исправить:/);
+  await expect(action).toHaveAccessibleName(
+    /Выбрать действие: .*Мария Иванова.*Заменить селфи 1/,
+  );
   await action.click();
-
-  const submissions = page
-    .getByRole("heading", { name: "Мои подачи", exact: true })
+  const detail = page
+    .locator(
+      '[data-testid="agent-action-inline-detail"]:visible, [data-testid="agent-action-mobile-detail"]:visible',
+    )
     .first();
-  await expect(submissions).toBeVisible();
+  await expect(detail).toBeVisible();
+  await detail.locator('[data-v19-interaction-id="actions.open-primary"]').click();
+
+  const submissionDrawer = page.getByRole("dialog", { name: "Семья Ивановых" });
+  await expect(submissionDrawer).toBeVisible();
+  await expect(submissionDrawer).toContainText(returnedSubmissionPublicId);
+  await expect(submissionDrawer.getByTestId("drawer-next-step")).toHaveText(
+    "Загрузить: Мария Иванова • Селфи 1",
+  );
   await expect(
-    page.locator(`[data-submission-id="${returnedSubmissionId}"]:visible`).first(),
-  ).toBeVisible();
+    submissionDrawer.locator("#workspace-media-з-1048-1-selfie"),
+  ).toBeFocused();
   await expect(
     page.locator(
       `.vf-figma-questionnaire-screen[data-submission-id="${returnedSubmissionId}"]`,
     ),
   ).toHaveCount(0);
-  await expect(page.locator('[role="dialog"]:visible')).toHaveCount(0);
+  await expect
+    .poll(async () => Math.round((await submissionDrawer.boundingBox())?.y ?? 999))
+    .toBeLessThanOrEqual(48);
+  await expect
+    .poll(async () => {
+      const box = await submissionDrawer.boundingBox();
+      const viewport = page.viewportSize();
+      return box && viewport ? Math.ceil(box.x + box.width - viewport.width) : 999;
+    })
+    .toBeLessThanOrEqual(0);
+  await expect(submissionDrawer.getByTestId("drawer-primary-action")).toBeVisible();
 
-  await expect(
-    page.getByRole("button", { name: "Сбор документов", exact: true }),
-  ).toHaveCount(0);
-
-  return submissions;
+  return submissionDrawer;
 }
 
 test.describe("V-19 P0 agent action routing", () => {

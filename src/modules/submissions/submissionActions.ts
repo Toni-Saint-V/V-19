@@ -91,6 +91,7 @@ export type UploadedFileMetadata = {
   storageBucket?: string;
   storagePath?: string;
   uploadedAtIso: string;
+  localDemoMediaStored?: true;
 };
 
 export type AdminQuestionnaireFieldApproval = {
@@ -112,8 +113,7 @@ export function approveQuestionnaireFieldForAdmin(
 
   const section = applicant.sections.find(
     (candidate) =>
-      candidate.id === input.sectionId ||
-      candidate.id.endsWith(`-${input.sectionId}`),
+      candidate.id === input.sectionId || candidate.id.endsWith(`-${input.sectionId}`),
   );
   const field = section?.fields.find((candidate) => candidate.id === input.fieldId);
   if (!section || !field || !field.value.trim() || field.error) return submission;
@@ -236,8 +236,10 @@ export function approvePassportReviewSectionForAdmin(
   const passportIssueFields = passportFields.filter(
     (field): field is NonNullable<typeof field> => Boolean(field),
   );
-  const allowedPassportReviewMediaTypes =
-    passportReviewMediaTypesVisibleForApplicant(submission, applicant.id);
+  const allowedPassportReviewMediaTypes = passportReviewMediaTypesVisibleForApplicant(
+    submission,
+    applicant.id,
+  );
 
   const passportIssueInScope = (issue: Submission["issues"][number]) => {
     return isAdminPassportReviewIssueInScope(issue, {
@@ -247,9 +249,7 @@ export function approvePassportReviewSectionForAdmin(
     });
   };
   const passportIssues = submission.issues.filter(passportIssueInScope);
-  const hasOpenPassportIssue = passportIssues.some(
-    (issue) => issue.status === "open",
-  );
+  const hasOpenPassportIssue = passportIssues.some((issue) => issue.status === "open");
   if (hasOpenPassportIssue) {
     return {
       ok: false,
@@ -313,8 +313,7 @@ export function approvePassportReviewSectionForAdmin(
 
   const hasFieldChanges = passportFields.some(
     (field) =>
-      field &&
-      (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
+      field && (!field.adminReviewApprovedAtIso || !field.adminReviewApprovedBy),
   );
   const hasFileChanges = requiredFiles.some(
     (file) =>
@@ -356,10 +355,7 @@ export function approvePassportReviewSectionForAdmin(
           },
     ),
     files: submission.files.map((file) => {
-      if (
-        file.applicantId !== applicant.id ||
-        !requiredMediaTypeSet.has(file.type)
-      ) {
+      if (file.applicantId !== applicant.id || !requiredMediaTypeSet.has(file.type)) {
         return file;
       }
       if (
@@ -476,10 +472,7 @@ export function cockpitUploadExtensionForMimeType(
   mimeType: string,
   fileType: SubmissionFileType,
 ): "jpg" | "png" | "heic" | "heif" | "pdf" | "mp4" {
-  if (
-    !isCanonicalFrontendMediaType(fileType) &&
-    !isRejectedLegacyMediaType(fileType)
-  ) {
+  if (!isCanonicalFrontendMediaType(fileType) && !isRejectedLegacyMediaType(fileType)) {
     throw new Error("Unsupported media type for Package 1 upload slot.");
   }
   if (fileType === "passport_scan" && mimeType === "application/pdf") return "pdf";
@@ -562,6 +555,15 @@ export function createDraftSubmission({
         ? preliminaryIntake.tripDateTo.trim()
         : "не указано",
     status: "draft",
+    familyCopyPreferences:
+      type === "family" && preliminaryIntake
+        ? {
+            appointment:
+              preliminaryIntake.sameHomeAddress && preliminaryIntake.sameSpainStay,
+            sameHomeAddress: preliminaryIntake.sameHomeAddress,
+            sameSpainStay: preliminaryIntake.sameSpainStay,
+          }
+        : undefined,
     applicants,
     issues: [],
     files: requiredFilesForApplicants(applicants, draftIdToken, idScheme),
@@ -730,11 +732,7 @@ export function updateQuestionnaireField(
 ): Submission {
   const updated = updateQuestionnaireFieldInSubmission(submission, update);
   const withTripDates = syncTripDateRangeFromQuestionnaireUpdate(updated, update);
-  return syncApplicantNameFromQuestionnaireUpdate(
-    submission,
-    withTripDates,
-    update,
-  );
+  return syncApplicantNameFromQuestionnaireUpdate(submission, withTripDates, update);
 }
 
 function syncApplicantNameFromQuestionnaireUpdate(
@@ -775,7 +773,8 @@ function syncApplicantNameFromQuestionnaireUpdate(
   }
 
   const fields = applicant.sections.flatMap((section) => section.fields);
-  const firstName = fields.find((field) => field.id === "first-name")?.value.trim() ?? "";
+  const firstName =
+    fields.find((field) => field.id === "first-name")?.value.trim() ?? "";
   const surname = fields.find((field) => field.id === "surname")?.value.trim() ?? "";
   const fullName = [firstName, surname].filter(Boolean).join(" ");
   if (!fullName || fullName === applicant.fullName) {
@@ -794,7 +793,7 @@ function syncApplicantNameFromQuestionnaireUpdate(
     applicants,
     listTitle:
       submission.type === "family"
-        ? familyListTitleFromMainApplicantName(surname) ?? submission.listTitle
+        ? (familyListTitleFromMainApplicantName(surname) ?? submission.listTitle)
         : submission.listTitle,
     title: draftTitle(submission.type, fullName, surname),
   };
@@ -931,13 +930,16 @@ export function uploadRequiredFile(
           reviewedBy: undefined,
           reviewStatus: "not_reviewed" as const,
           sizeBytes: metadata?.sizeBytes ?? file.sizeBytes,
-          storageAdapter: metadata?.storageAdapter ?? file.storageAdapter ?? "local-dev",
+          storageAdapter:
+            metadata?.storageAdapter ?? file.storageAdapter ?? "local-dev",
           storageBucket: metadata?.storageBucket ?? file.storageBucket,
           storagePath: metadata?.storagePath ?? file.storagePath,
           uploadedAtIso: metadata?.uploadedAtIso ?? file.uploadedAtIso,
           uploadStatus: "uploaded" as const,
           uploadedBy: file.uploadedBy ?? "Агент",
           uploadedAt: "сейчас",
+          localDemoMediaStored:
+            metadata?.localDemoMediaStored ?? file.localDemoMediaStored,
         }
       : file,
   );
@@ -1046,9 +1048,7 @@ function passportReplacementManualFallback(
     lastAttemptAtIso: metadata?.uploadedAtIso,
     sourceFileId: file.id,
     sourceFileName:
-      metadata?.originalFileName ??
-      file.originalFileName ??
-      file.generatedFileName,
+      metadata?.originalFileName ?? file.originalFileName ?? file.generatedFileName,
     sourceStoragePath: metadata?.storagePath ?? file.storagePath,
     status: "unavailable",
     summary: "Новый скан загружен. OCR не выполнен; проверьте паспортные поля вручную.",
@@ -1085,10 +1085,9 @@ export function addPreciseAdminIssue(
       : undefined;
   if (
     passportReviewMediaType &&
-    !requiredPassportReviewMediaTypesForApplicant(
-      submission,
-      applicant.id,
-    ).includes(passportReviewMediaType)
+    !requiredPassportReviewMediaTypesForApplicant(submission, applicant.id).includes(
+      passportReviewMediaType,
+    )
   ) {
     return submission;
   }
@@ -1115,11 +1114,12 @@ export function addPreciseAdminIssue(
   const withTargetFlag = newIssue.target.fileType
     ? markIssueFileForReplacement(submission, newIssue, actorId)
     : flagQuestionnaireField(
-          submission,
-          applicant.id,
-          newIssue.target.field ?? "Маршрут поездки",
-          newIssue.reason,
+        submission,
+        applicant.id,
+        newIssue.target.field ?? "Маршрут поездки",
+        newIssue.reason,
       );
+  const issueHistoryId = `и-${submission.id}-замечание`;
 
   return {
     ...withTargetFlag,
@@ -1127,7 +1127,9 @@ export function addPreciseAdminIssue(
     updatedAt: "сейчас",
     history: [
       {
-        id: `и-${submission.id}-замечание`,
+        id: submission.history.some((item) => item.id === issueHistoryId)
+          ? `${issueHistoryId}-${submission.issues.length + 1}`
+          : issueHistoryId,
         text: "Администратор добавил точное замечание",
         at: "сейчас",
         source: "admin",
@@ -1172,12 +1174,7 @@ export function applyActionToSubmissionListResult(
     }
 
     matchedSubmission = true;
-    const actionResult = applySubmissionActionResult(
-      submission,
-      action,
-      role,
-      actorId,
-    );
+    const actionResult = applySubmissionActionResult(submission, action, role, actorId);
 
     if (!actionResult.ok) {
       return {
@@ -1315,7 +1312,10 @@ function nextSubmissionIndex(
   submissions: Submission[],
   reservedSubmissionIds: readonly Submission["id"][] = [],
 ) {
-  const indexes = [...submissions.map((submission) => submission.id), ...reservedSubmissionIds]
+  const indexes = [
+    ...submissions.map((submission) => submission.id),
+    ...reservedSubmissionIds,
+  ]
     .map(submissionIndexFromId)
     .filter(Number.isFinite);
   return Math.max(1058, ...indexes) + 1;
@@ -1423,6 +1423,7 @@ function mergeUploadedStorageFields(
     uploadedAt: file.uploadedAt ?? "сейчас",
     uploadedBy: file.uploadedBy ?? "Агент",
     uploadStatus: "uploaded",
+    localDemoMediaStored: metadata.localDemoMediaStored ?? file.localDemoMediaStored,
   };
 }
 
@@ -1505,7 +1506,9 @@ function applyCanonicalIssueReplacementState(
   if (replacementByCanonicalKey.size === 0) return files;
 
   return files.map((file) => {
-    const replacement = replacementByCanonicalKey.get(`${file.applicantId}:${file.type}`);
+    const replacement = replacementByCanonicalKey.get(
+      `${file.applicantId}:${file.type}`,
+    );
     if (!replacement) return file;
 
     return {
@@ -1539,17 +1542,17 @@ function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {
   const requiredFiles = submission.applicants.flatMap((applicant) =>
     requiredPassportReviewMediaTypesForApplicant(submission, applicant.id).map(
       (type) => {
-      const key = `${applicant.id}:${type}`;
-      const existing = canonicalFiles.get(key);
-      if (existing) return existing;
-      const template = templatesByKey.get(key);
-      if (template) return template;
-      return {
-        id: `ф-${submission.id}-${applicant.id}-${type}`,
-        applicantId: applicant.id,
-        type,
-        status: "missing" as const,
-      };
+        const key = `${applicant.id}:${type}`;
+        const existing = canonicalFiles.get(key);
+        if (existing) return existing;
+        const template = templatesByKey.get(key);
+        if (template) return template;
+        return {
+          id: `ф-${submission.id}-${applicant.id}-${type}`,
+          applicantId: applicant.id,
+          type,
+          status: "missing" as const,
+        };
       },
     ),
   );
@@ -1635,13 +1638,13 @@ function requiredFilesForApplicants(
       (type) => {
         const fileIndex = CANONICAL_FRONTEND_MEDIA_TYPES.indexOf(type);
         return {
-        id:
-          idScheme === "supabase"
-            ? `file-${draftIdToken}-${applicantIndex + 1}-${fileIndex + 1}`
-            : `ф-${draftIdToken}-${applicantIndex + 1}-${fileIndex + 1}`,
-        applicantId: applicant.id,
-        type,
-        status: "missing" as const,
+          id:
+            idScheme === "supabase"
+              ? `file-${draftIdToken}-${applicantIndex + 1}-${fileIndex + 1}`
+              : `ф-${draftIdToken}-${applicantIndex + 1}-${fileIndex + 1}`,
+          applicantId: applicant.id,
+          type,
+          status: "missing" as const,
         };
       },
     ),

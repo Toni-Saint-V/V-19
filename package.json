@@ -42,6 +42,7 @@
     "verify:pilot-volume": "node scripts/verify-pilot-volume-envelope.mjs",
     "supabase:prepare-production": "node scripts/prepare-supabase-production-packet.mjs",
     "supabase:pilot-cohort": "node scripts/provision-supabase-pilot-cohort.mjs",
+    "supabase:repair-auth": "node scripts/repair-supabase-auth-users.mjs",
     "supabase:production-workflow-smoke": "node scripts/verify-supabase-production-workflow.mjs",
     "verify:production-readiness": "node scripts/verify-production-readiness.mjs",
     "verify:production-packet": "node scripts/verify-production-readiness.mjs",

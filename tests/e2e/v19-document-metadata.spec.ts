@@ -1,4 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function fetchAssetThroughBrowser(page: Page, path: string) {
+  return page.evaluate(async (assetPath) => {
+    const response = await fetch(assetPath, { cache: "no-store" });
+    return {
+      body: Array.from(new Uint8Array(await response.arrayBuffer())),
+      contentType: response.headers.get("content-type") ?? "",
+      status: response.status,
+    };
+  }, path);
+}
 
 function expectPngDimensions(bytes: Buffer, size: number) {
   expect(bytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
@@ -40,64 +51,71 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
     "VisaFlow",
   );
 
-  const iconResponse = await page.request.get("/v19-app-icon.svg");
-  expect(iconResponse.status()).toBe(200);
-  expect(iconResponse.headers()["content-type"]).toContain("image/svg+xml");
-  expect(await iconResponse.text()).toContain('aria-label="VisaFlow V-19"');
-
-  const robotsResponse = await page.request.get("/robots.txt");
-  expect(robotsResponse.status()).toBe(200);
-  expect(await robotsResponse.text()).toBe("User-agent: *\nDisallow: /\n");
-
-  const manifestResponse = await page.request.get("/manifest.webmanifest");
-  expect(manifestResponse.status()).toBe(200);
-  expect(manifestResponse.headers()["content-type"]).toContain(
-    "application/manifest+json",
+  const iconResponse = await fetchAssetThroughBrowser(page, "/v19-app-icon.svg");
+  expect(iconResponse.status).toBe(200);
+  expect(iconResponse.contentType).toContain("image/svg+xml");
+  expect(Buffer.from(iconResponse.body).toString("utf8")).toContain(
+    'aria-label="VisaFlow V-19"',
   );
-  expect(await manifestResponse.json()).toMatchObject({
-    background_color: "#101011",
-    display: "fullscreen",
-    display_override: ["fullscreen", "standalone"],
-    icons: [
-      {
-        purpose: "any",
-        sizes: "192x192",
-        src: "/v19-app-icon-192-v1.png",
-        type: "image/png",
-      },
-      {
-        purpose: "any",
-        sizes: "512x512",
-        src: "/v19-app-icon-512-v1.png",
-        type: "image/png",
-      },
-      {
-        purpose: "maskable",
-        sizes: "192x192",
-        src: "/v19-app-icon-maskable-192-v1.png",
-        type: "image/png",
-      },
-      {
-        purpose: "maskable",
-        sizes: "512x512",
-        src: "/v19-app-icon-maskable-512-v1.png",
-        type: "image/png",
-      },
-      {
-        purpose: "any",
-        sizes: "any",
-        src: "/v19-app-icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    id: "/",
-    lang: "ru",
-    name: "VisaFlow",
-    scope: "/",
-    short_name: "VisaFlow",
-    start_url: "/",
-    theme_color: "#101011",
-  });
+
+  const robotsResponse = await fetchAssetThroughBrowser(page, "/robots.txt");
+  expect(robotsResponse.status).toBe(200);
+  expect(Buffer.from(robotsResponse.body).toString("utf8")).toBe(
+    "User-agent: *\nDisallow: /\n",
+  );
+
+  const manifestResponse = await fetchAssetThroughBrowser(
+    page,
+    "/manifest.webmanifest",
+  );
+  expect(manifestResponse.status).toBe(200);
+  expect(manifestResponse.contentType).toContain("application/manifest+json");
+  expect(JSON.parse(Buffer.from(manifestResponse.body).toString("utf8"))).toMatchObject(
+    {
+      background_color: "#101011",
+      display: "fullscreen",
+      display_override: ["fullscreen", "standalone"],
+      icons: [
+        {
+          purpose: "any",
+          sizes: "192x192",
+          src: "/v19-app-icon-192-v1.png",
+          type: "image/png",
+        },
+        {
+          purpose: "any",
+          sizes: "512x512",
+          src: "/v19-app-icon-512-v1.png",
+          type: "image/png",
+        },
+        {
+          purpose: "maskable",
+          sizes: "192x192",
+          src: "/v19-app-icon-maskable-192-v1.png",
+          type: "image/png",
+        },
+        {
+          purpose: "maskable",
+          sizes: "512x512",
+          src: "/v19-app-icon-maskable-512-v1.png",
+          type: "image/png",
+        },
+        {
+          purpose: "any",
+          sizes: "any",
+          src: "/v19-app-icon.svg",
+          type: "image/svg+xml",
+        },
+      ],
+      id: "/",
+      lang: "ru",
+      name: "VisaFlow",
+      scope: "/",
+      short_name: "VisaFlow",
+      start_url: "/",
+      theme_color: "#101011",
+    },
+  );
 
   for (const [assetPath, size] of [
     ["/v19-apple-touch-icon-v1.png", 180],
@@ -106,16 +124,19 @@ test("production shell exposes the V-19 browser identity", async ({ page }) => {
     ["/v19-app-icon-maskable-192-v1.png", 192],
     ["/v19-app-icon-maskable-512-v1.png", 512],
   ] as const) {
-    const response = await page.request.get(assetPath);
-    expect(response.status()).toBe(200);
-    expect(response.headers()["content-type"]).toContain("image/png");
-    expectPngDimensions(await response.body(), size);
+    const response = await fetchAssetThroughBrowser(page, assetPath);
+    expect(response.status).toBe(200);
+    expect(response.contentType).toContain("image/png");
+    expectPngDimensions(Buffer.from(response.body), size);
   }
 
-  const serviceWorkerResponse = await page.request.get("/service-worker.js");
-  expect(serviceWorkerResponse.status()).toBe(200);
-  expect(serviceWorkerResponse.headers()["content-type"]).toContain("javascript");
-  const serviceWorkerSource = await serviceWorkerResponse.text();
+  const serviceWorkerResponse = await fetchAssetThroughBrowser(
+    page,
+    "/service-worker.js",
+  );
+  expect(serviceWorkerResponse.status).toBe(200);
+  expect(serviceWorkerResponse.contentType).toContain("javascript");
+  const serviceWorkerSource = Buffer.from(serviceWorkerResponse.body).toString("utf8");
   expect(serviceWorkerSource).toContain('const CACHE_PREFIX = "visaflow-app-shell-"');
   expect(serviceWorkerSource).toContain('url.hostname.endsWith(".supabase.co")');
   expect(serviceWorkerSource).toContain('"/api"');

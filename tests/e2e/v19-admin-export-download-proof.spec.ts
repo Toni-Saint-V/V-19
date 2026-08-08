@@ -1,11 +1,7 @@
-import {
-  expect,
-  test,
-  type Download,
-  type Page,
-} from "@playwright/test";
+import { type Download, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
 import JSZip from "jszip";
+import { expect, test } from "./v19-localhost-test";
 import {
   clearExportSelection,
   clickWorkspaceButton,
@@ -146,19 +142,27 @@ async function expectDownloadedSingleArchive(download: Download) {
 }
 
 function blockingBrowserProblems(problems: string[]) {
-  return problems.filter(
-    (problem) =>
-      !/ResizeObserver loop|favicon|net::ERR_ABORTED|Download the React DevTools/i.test(
-        problem,
-      ),
-  );
+  return problems;
+}
+
+async function expectArchiveDownloadReady(page: Page, downloadLink: Locator) {
+  const feedback = page.getByTestId("export-action-feedback");
+  const failure = page.locator('[data-testid="export-action-feedback"][role="alert"]');
+  await expect(downloadLink.or(failure)).toBeVisible();
+  if (await failure.isVisible()) {
+    throw new Error(`ZIP preparation failed: ${await feedback.innerText()}`);
+  }
+  await expect(downloadLink).toBeVisible();
 }
 
 async function expectBodyMatches(page: Page, patterns: RegExp[], timeout = 20_000) {
   await expect
     .poll(
       async () => {
-        const text = await page.locator("body").innerText().catch(() => "");
+        const text = await page
+          .locator("body")
+          .innerText()
+          .catch(() => "");
         return patterns.some((pattern) => pattern.test(text));
       },
       { timeout },
@@ -200,7 +204,9 @@ test.describe("V-19 admin export download proof", () => {
     const controlRail = page.getByRole("complementary", {
       name: "Контроль пакета",
     });
-    await expect(controlRail).toContainText(/Пакет выбран|Excel preview|Excel rows/i);
+    await expect(controlRail).toContainText(
+      /Пакет выбран|Проверка перед выгрузкой|Строки Excel/i,
+    );
 
     const prepareButton = page
       .getByRole("button", { name: /Сформировать Excel|Excel готов/i })
@@ -218,24 +224,23 @@ test.describe("V-19 admin export download proof", () => {
     await expect(prepareArchiveButton).toBeEnabled();
     await prepareArchiveButton.click();
     const downloadLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(downloadLink).toBeVisible();
+    await expectArchiveDownloadReady(page, downloadLink);
 
     const downloadPromise = page.waitForEvent("download");
     await downloadLink.click();
     const download = await downloadPromise;
 
-    expect(download.suggestedFilename()).toMatch(
-      /^visaflow-export-.+_documents\.zip$/,
-    );
+    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+_documents\.zip$/);
     await expect(download.failure()).resolves.toBeNull();
     await expectDownloadedFamilyArchive(download);
 
     await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
     await expectBodyMatches(page, [/пакет зафиксирован|Выгрузка завершена/i]);
 
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
-    );
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 
   test("admin downloads a single-applicant ZIP with both selfies", async ({ page }) => {
@@ -271,7 +276,7 @@ test.describe("V-19 admin export download proof", () => {
     await prepareArchiveButton.click();
 
     const downloadLink = page.getByRole("link", { name: "Скачать ZIP" });
-    await expect(downloadLink).toBeVisible();
+    await expectArchiveDownloadReady(page, downloadLink);
     const downloadPromise = page.waitForEvent("download");
     await downloadLink.click();
     const download = await downloadPromise;
@@ -314,7 +319,9 @@ test.describe("V-19 admin export download proof", () => {
       name: "Контроль пакета",
     });
     await expect(controlRail).toBeVisible();
-    await expect(controlRail).toContainText(/Пакет выбран|Excel preview|Excel rows/i);
+    await expect(controlRail).toContainText(
+      /Пакет выбран|Проверка перед выгрузкой|Строки Excel/i,
+    );
     await expectNoHorizontalOverflow(page, "mobile export control sheet");
 
     const prepareButton = controlRail
@@ -332,22 +339,77 @@ test.describe("V-19 admin export download proof", () => {
     await prepareArchiveButton.click();
 
     const downloadLink = controlRail.getByRole("link", { name: "Скачать ZIP" });
-    await expect(downloadLink).toBeVisible();
+    await expectArchiveDownloadReady(page, downloadLink);
     const downloadPromise = page.waitForEvent("download");
     await downloadLink.click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(
-      /^visaflow-export-.+_documents\.zip$/,
-    );
+    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+_documents\.zip$/);
     await expect(download.failure()).resolves.toBeNull();
 
-    await controlRail
-      .getByRole("button", { name: "Подтвердить скачивание" })
-      .click();
+    await controlRail.getByRole("button", { name: "Подтвердить скачивание" }).click();
     await expectBodyMatches(page, [/пакет зафиксирован|Выгрузка завершена/i]);
 
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
-      [],
-    );
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
+  });
+
+  test("a conflicting selection shows the reason and recovery step before secondary details", async ({
+    page,
+  }) => {
+    const browserProblems = collectBrowserProblems(page);
+    const evidenceRoot = process.env.V19_TEST_ARTIFACTS_DIR?.trim();
+    const viewports = [
+      { height: 844, label: "mobile", width: 390 },
+      { height: 1024, label: "tablet", width: 768 },
+      { height: 900, label: "desktop", width: 1440 },
+    ] as const;
+
+    for (const viewport of viewports) {
+      await page.setViewportSize({ height: viewport.height, width: viewport.width });
+      await openFreshWorkspace(page, {
+        heading: "Очередь на проверку",
+        workspaceEmail: "admin@visaflow.local",
+      });
+      await clickWorkspaceButton(page, /Выгрузка/);
+      await clearExportSelection(page);
+      await page.getByTestId("admin-export-row-SUB-1101").getByRole("checkbox").check();
+      await page.getByTestId("admin-export-row-SUB-1103").getByRole("checkbox").check();
+
+      const controlToggle = page.getByRole("button", {
+        name: /^Контроль пакета/,
+      });
+      if (await controlToggle.isVisible()) {
+        await controlToggle.click();
+      }
+
+      const diagnostics = page.getByRole("region", {
+        name: "Почему выгрузка остановлена",
+      });
+      await expect(diagnostics).toBeVisible();
+      await expect(diagnostics).toContainText("Выгрузка остановлена");
+      await expect(diagnostics).toContainText("Нельзя смешивать разные города");
+      await expect(diagnostics).toContainText("Что сделать");
+      await expect(diagnostics).toContainText("Оставьте в выборе подачи одного города");
+      await expect(page.getByText("Тихая AI-помощь")).toHaveCount(0);
+      await expect(page.getByText("Pre-flight checks")).toHaveCount(0);
+      await expect(page.getByText("Проверка перед выгрузкой")).toHaveCount(0);
+      await expect(page.getByText("Состав выгрузки")).toHaveCount(0);
+      await expectNoHorizontalOverflow(
+        page,
+        `${viewport.label} export blocker diagnostics`,
+      );
+      if (evidenceRoot) {
+        await page.screenshot({
+          path: `${evidenceRoot}/export-blocker-${viewport.width}x${viewport.height}.png`,
+        });
+      }
+    }
+
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 });

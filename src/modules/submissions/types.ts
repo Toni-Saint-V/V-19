@@ -54,6 +54,7 @@ export const questionnaireReviewSources = [
   "passport_ocr",
   "family_shared",
   "pdf_reconciliation",
+  "smart_import",
 ] as const;
 export type QuestionnaireReviewSource = (typeof questionnaireReviewSources)[number];
 
@@ -260,6 +261,12 @@ export type PreliminaryIntakeDraft = {
   tripDateTo: string;
 };
 
+export type FamilyCopyPreferences = {
+  appointment: boolean;
+  sameHomeAddress: boolean;
+  sameSpainStay: boolean;
+};
+
 export type SubmissionAction =
   | "save_progress"
   | "submit_for_review"
@@ -405,6 +412,8 @@ export type SubmissionFile = {
   uploadedBy?: string;
   uploadedAt?: string;
   linkedIssueId?: string;
+  localDemoMediaStored?: true;
+  localDemoSeedMedia?: true;
 };
 
 export type CollectionDocumentUpload = {
@@ -447,6 +456,7 @@ export type Submission = {
   tripDateFrom: string;
   tripDateTo: string;
   status: SubmissionStatus;
+  familyCopyPreferences?: FamilyCopyPreferences;
   returnedPdfPackage?: ReturnedPdfPackageState;
   visaApplicationPdfReview?: VisaApplicationPdfReviewState;
   visaApplicationPdfReviews?: VisaApplicationPdfReviewState[];

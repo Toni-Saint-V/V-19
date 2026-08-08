@@ -1611,7 +1611,12 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     const download = await downloadPromise;
     await expect(download.failure()).resolves.toBeNull();
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+/);
-    await page.getByRole("button", { name: "Подтвердить скачивание" }).click();
+    await clickAndWaitForSupabaseWrite(
+      page,
+      () =>
+        page.getByRole("button", { name: "Подтвердить скачивание" }).click(),
+      /\/rest\/v1\/rpc\/complete_export_package$/,
+    );
     await expect(page.locator("#export-action-hint")).toContainText(
       "Скачивание подтверждено, пакет зафиксирован",
     );
@@ -1688,6 +1693,36 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
     await signOut(page);
     await signIn(page, "agent");
     await clickWorkspaceButton(page, /Мои подачи/);
+
+    const exportedSubmission = page
+      .locator(`[data-submission-id="${singleSubmissionId}"]`)
+      .first();
+    await page.getByRole("searchbox").first().fill(singleSubmissionId);
+    await expect(exportedSubmission).toBeVisible({ timeout: 20_000 });
+    await expect(exportedSubmission).toContainText(/Выгружено|Открыть историю/);
+    await exportedSubmission.click();
+    await expect(drawer(page)).toContainText(/Выгружено|Подача уже выгружена/);
+
+    await page.reload();
+    await clickWorkspaceButton(page, /Мои подачи/);
+    await page.getByRole("searchbox").first().fill(singleSubmissionId);
+    await expect(exportedSubmission).toBeVisible({ timeout: 20_000 });
+    await expect(exportedSubmission).toContainText(/Выгружено|Открыть историю/);
+    await exportedSubmission.click();
+    await expect(drawer(page)).toContainText(/Выгружено|Подача уже выгружена/);
+    await assertNoOverflow(page);
+    await captureUiEvidence({
+      description:
+        "Новая agent-сессия и последующий reload читают terminal status «Выгружено» из Supabase для того же submission ID.",
+      page,
+      role: "agent",
+      step: "08-exported-fresh-session-reload-readback",
+      submissionId: singleSubmissionId,
+      testInfo,
+    });
+    await page.keyboard.press("Escape");
+    await expect(drawer(page)).toHaveCount(0);
+
     const received = page.getByTestId("agent-return-packages-panel");
     await expect(received).toBeVisible();
     await expect(received).toContainText("PDF-список");
@@ -1711,6 +1746,23 @@ test.describe("V-19 Supabase sandbox UI-only closure", () => {
       page,
       role: "agent",
       step: "08-agent-return-package-received",
+      testInfo,
+    });
+
+    await signOut(page);
+    await signIn(page, "otherAgent");
+    await clickWorkspaceButton(page, /Мои подачи/);
+    await page.getByRole("searchbox").first().fill(singleSubmissionId);
+    await expect(
+      page.locator(`[data-submission-id="${singleSubmissionId}"]`),
+    ).toHaveCount(0);
+    await captureUiEvidence({
+      description:
+        "После terminal export новая сессия другого агента по-прежнему не видит чужую подачу.",
+      page,
+      role: "otherAgent",
+      step: "08-exported-other-agent-isolation",
+      submissionId: singleSubmissionId,
       testInfo,
     });
     expect(browserProblems()).toEqual([]);

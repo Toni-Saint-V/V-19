@@ -8,7 +8,7 @@ import {
   firstActionableIdentityFinding,
   type IdentityConsistencyReport,
 } from "./identityConsistency";
-import { passportGateIssues } from "./passportExtractionGuards";
+import { passportGateIssues, type PassportGateIssue } from "./passportExtractionGuards";
 import { requiredPassportReviewMediaSlots } from "./passportReviewContract";
 import {
   blockerCount,
@@ -71,6 +71,15 @@ const guardrails = [
   "Детерминированные проверки остаются источником истины.",
   "Файлы остаются частью ручной проверки.",
 ];
+
+function passportGateQuestionnaireField(code: PassportGateIssue["code"]): string {
+  if (code === "passport_expired" || code === "passport_expires_before_trip") {
+    return "passport-expiry-date";
+  }
+  if (code === "passport_issued_after_expiry") return "passport-issue-date";
+  if (code === "passport_type_not_ordinary") return "passport-type";
+  return "passport-no";
+}
 
 export function buildSubmissionNextStepBrief({
   role,
@@ -170,10 +179,11 @@ function passportPrimaryAction(
     // An unavailable OCR result may already have an explicit manual decision.
     // Do not send the operator back to the passport step when the canonical
     // passport gate confirms that the manually entered data is valid.
-    if (passportGateIssues(submission).length === 0) return null;
+    const gateIssue = passportGateIssues(submission)[0];
+    if (!gateIssue) return null;
 
-    const applicant = submission.applicants.find((item) =>
-      ["failed", "unavailable"].includes(item.passportExtraction?.status ?? ""),
+    const applicant = submission.applicants.find(
+      (item) => item.id === gateIssue.applicantId,
     );
     return {
       id: "manual_passport_entry",
@@ -182,8 +192,9 @@ function passportPrimaryAction(
       target: applicant
         ? {
             applicantId: applicant.id,
-            fileType: "passport_scan",
-            tab: "files",
+            field: passportGateQuestionnaireField(gateIssue.code),
+            section: "Паспортные данные",
+            tab: "questionnaire",
           }
         : undefined,
     };
@@ -297,9 +308,7 @@ function passportRowTarget(match: NonNullable<ReturnType<typeof firstPassportRow
   };
 }
 
-function isExpiredPassportRow(
-  row: ReturnType<typeof passportExtractionRows>[number],
-) {
+function isExpiredPassportRow(row: ReturnType<typeof passportExtractionRows>[number]) {
   if (row.key !== "passportExpiresAt") return false;
   const parsed = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(row.extractedValue.trim());
   if (!parsed) return false;
@@ -360,13 +369,17 @@ function titleFor(
   primaryAction: SubmissionNextStepAction,
   blockers: string[],
 ) {
-  if (primaryAction.id === "resolve_passport_conflicts") return "Есть конфликт паспорта";
-  if (primaryAction.id === "resolve_identity_consistency") return "Есть конфликт источников";
+  if (primaryAction.id === "resolve_passport_conflicts")
+    return "Есть конфликт паспорта";
+  if (primaryAction.id === "resolve_identity_consistency")
+    return "Есть конфликт источников";
   if (primaryAction.id === "apply_passport_fields") return "Паспорт готов к применению";
   if (primaryAction.id === "wait_passport_extraction") return "Паспорт распознается";
   if (primaryAction.id === "manual_passport_entry") return "Паспорт заполнить вручную";
   if (surface === "export") {
-    return submission.status === "exported" ? "Пакет уже выгружен" : "Пакет принят к выгрузке";
+    return submission.status === "exported"
+      ? "Пакет уже выгружен"
+      : "Пакет принят к выгрузке";
   }
   if (role === "admin" && surface === "review") {
     return blockers.length ? "Нужна ручная проверка блокеров" : "Фокус проверки";
@@ -423,7 +436,9 @@ function nextActions({
     if (openIssueCount(submission)) {
       actions.push("Верните точечные замечания агенту вместо общего комментария.");
     } else if (blockers.length) {
-      actions.push("Сначала закройте пункты готовности, затем возвращайтесь к приемке.");
+      actions.push(
+        "Сначала закройте пункты готовности, затем возвращайтесь к приемке.",
+      );
     } else if (fileCounts.accepted < fileCounts.required) {
       actions.push("Примите каждый файл вручную или запросите замену с причиной.");
     } else {
@@ -541,7 +556,8 @@ function mediaCounts(submission: Submission) {
     accepted: requiredFiles.filter((file) => file?.status === "accepted").length,
     required: requiredFiles.length,
     uploaded: requiredFiles.filter(
-      (file) => file && file.status !== "missing" && file.status !== "needs_replacement",
+      (file) =>
+        file && file.status !== "missing" && file.status !== "needs_replacement",
     ).length,
   };
 }

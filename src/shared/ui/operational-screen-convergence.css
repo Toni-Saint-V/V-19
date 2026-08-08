@@ -30,6 +30,14 @@
   background: var(--v19b-color-control);
 }
 
+/* Keep the primary list and its context rail visually balanced on desktop. */
+@media (min-width: 1280px) {
+  #root .ops-shell.role-admin.surface-admin-review .v19-admin-review-screen,
+  #root .ops-shell.role-admin.surface-export .v19-admin-export-screen-v2 {
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), 1fr)) !important;
+  }
+}
+
 #root
   :is(
     .v19-admin-review-board,

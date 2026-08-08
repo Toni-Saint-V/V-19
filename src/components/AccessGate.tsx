@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
-import visaflowLogo from "../assets/v-logo-premium-black-style.webp";
+import visaflowLogo from '../assets/v-logo-premium-black-style.webp';
 import type { AccessRequestRegistrationInput, Session } from '../shared/authContract';
-import {
-  agentInteractionProps,
-  type AgentInteractionId,
-} from '../modules/submissions/agentInteractionContract';
+import { agentInteractionProps, type AgentInteractionId } from '../modules/submissions/agentInteractionContract';
 
-type AccessGateMode = 'invite' | 'login' | 'register' | 'reset' | 'pending' | 'recovery';
+type AccessGateMode =
+  | 'invite'
+  | 'login'
+  | 'register'
+  | 'reset'
+  | 'pending'
+  | 'recovery';
 
 type AccessGateProps = {
   error: string;
@@ -159,11 +162,7 @@ function AccessShell({
           </div>
         </section>
 
-        <section
-          className="access-card"
-          aria-labelledby={activeTitleId}
-          aria-describedby={activeCopyId}
-        >
+        <section className="access-card" aria-labelledby={activeTitleId} aria-describedby={activeCopyId}>
           {children}
         </section>
       </div>
@@ -232,30 +231,16 @@ export function AccessGate({
 
   const registerErrors = useMemo(
     () => ({
-      city:
-        (attempted || touched.city) && !registration.city.trim()
-          ? 'Введите город'
-          : '',
+      city: (attempted || touched.city) && !registration.city.trim() ? 'Введите город' : '',
       companyName:
-        (attempted || touched.companyName) && !registration.companyName.trim()
-          ? 'Введите название агентства'
-          : '',
-      email:
-        (attempted || touched.email) && !validEmail(registration.email)
-          ? 'Введите корректный email'
-          : '',
-      fullName:
-        (attempted || touched.fullName) && !registration.fullName.trim()
-          ? 'Введите имя и фамилию'
-          : '',
+        (attempted || touched.companyName) && !registration.companyName.trim() ? 'Введите название агентства' : '',
+      email: (attempted || touched.email) && !validEmail(registration.email) ? 'Введите корректный email' : '',
+      fullName: (attempted || touched.fullName) && !registration.fullName.trim() ? 'Введите имя и фамилию' : '',
       password:
         !usesSupabase && (attempted || touched.password) && !registration.password.trim()
           ? 'Введите пароль'
           : '',
-      phone:
-        (attempted || touched.phone) && !registration.phone.trim()
-          ? 'Введите телефон'
-          : '',
+      phone: (attempted || touched.phone) && !registration.phone.trim() ? 'Введите телефон' : '',
     }),
     [attempted, registration, touched, usesSupabase],
   );
@@ -364,8 +349,7 @@ export function AccessGate({
     if (!startAction()) return;
     try {
       const setupEmail = mode === 'recovery' ? recoverySetupEmail : inviteSetupEmail;
-      const completePassword =
-        mode === 'recovery' ? onCompleteRecovery : onCompleteInvite;
+      const completePassword = mode === 'recovery' ? onCompleteRecovery : onCompleteInvite;
       await completePassword(invitePassword);
       rememberWorkspaceEmail(setupEmail);
       setEmail(setupEmail);
@@ -375,9 +359,7 @@ export function AccessGate({
       setSuccess('Пароль сохранён. Войдите в кабинет с новым паролем.');
       setMode('login');
     } catch (caught) {
-      setLocalError(
-        caught instanceof Error ? caught.message : 'Не удалось сохранить пароль.',
-      );
+      setLocalError(caught instanceof Error ? caught.message : 'Не удалось сохранить пароль.');
     } finally {
       finishAction();
     }
@@ -414,12 +396,8 @@ export function AccessGate({
       <AccessShell activeCopyId={activeCopyId} activeTitleId={activeTitleId}>
         <div className="access-card-header">
           <div>
-            <p className="access-kicker">
-              {isRecovery ? 'Восстановление подтверждено' : 'Приглашение подтверждено'}
-            </p>
-            <h1 id={activeTitleId}>
-              {isRecovery ? 'Установите новый пароль' : 'Создайте пароль'}
-            </h1>
+            <p className="access-kicker">{isRecovery ? 'Восстановление подтверждено' : 'Приглашение подтверждено'}</p>
+            <h1 id={activeTitleId}>{isRecovery ? 'Установите новый пароль' : 'Создайте пароль'}</h1>
           </div>
           <ShieldCheck aria-hidden="true" />
         </div>
@@ -467,11 +445,7 @@ export function AccessGate({
           ) : null}
           <PrimaryButton
             busy={busy}
-            interactionId={
-              isRecovery
-                ? 'access.submit-recovery-password'
-                : 'access.submit-invite-password'
-            }
+            interactionId={isRecovery ? 'access.submit-recovery-password' : 'access.submit-invite-password'}
           >
             {busy ? 'Сохраняем...' : 'Сохранить пароль'}
           </PrimaryButton>
@@ -509,9 +483,7 @@ export function AccessGate({
             if (!startAction()) return;
             void onSignOut()
               .catch((caught) => {
-                setLocalError(
-                  caught instanceof Error ? caught.message : 'Не удалось выйти.',
-                );
+                setLocalError(caught instanceof Error ? caught.message : 'Не удалось выйти.');
               })
               .finally(finishAction);
           }}
@@ -653,8 +625,16 @@ export function AccessGate({
               onChange={(event) => setResetEmail(event.target.value)}
             />
           </div>
-          {localError ? <p className="access-error" role="alert">{localError}</p> : null}
-          {success ? <p className="access-success" role="status">{success}</p> : null}
+          {localError ? (
+            <p className="access-error" role="alert">
+              {localError}
+            </p>
+          ) : null}
+          {success ? (
+            <p className="access-success" role="status">
+              {success}
+            </p>
+          ) : null}
           <PrimaryButton busy={busy} interactionId="access.submit-reset">
             {busy ? 'Отправляем...' : 'Отправить инструкции'}
           </PrimaryButton>
@@ -683,7 +663,11 @@ export function AccessGate({
       <p className="access-intro" id="workspace-register-copy">
         Заполните данные агентства. После одобрения мы отправим на email защищённую ссылку для создания пароля.
       </p>
-      <form className="access-form access-form--registration" onSubmit={(event) => void submitRegistration(event)} noValidate>
+      <form
+        className="access-form access-form--registration"
+        onSubmit={(event) => void submitRegistration(event)}
+        noValidate
+      >
         {registrationFields.map((field) => {
           const errorId = `${field.id}-error`;
           const fieldError = registerErrors[field.key];
@@ -719,8 +703,7 @@ export function AccessGate({
           );
         })}
 
-        {!usesSupabase ? (
-        <div className="access-field">
+        {!usesSupabase ? <div className="access-field">
           <label className="access-field-label" htmlFor="workspace-register-password">
             Пароль
           </label>
@@ -748,8 +731,7 @@ export function AccessGate({
               {registerErrors.password}
             </small>
           ) : null}
-        </div>
-        ) : null}
+        </div> : null}
 
         {localError || error ? (
           <p className="access-error" role="alert">

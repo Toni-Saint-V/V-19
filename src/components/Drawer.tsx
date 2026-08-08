@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { LucideIcon } from "lucide-react";
 import { useDrawerDesktopQuery } from "../shared/ui/drawer/drawerMotion";
@@ -28,6 +28,11 @@ import {
 } from "lucide-react";
 
 import { historyTimestampForUser } from "../modules/submissions/historyPresentation";
+import { isCompletedFileAsset } from "../modules/submissions/fileAsset";
+import {
+  isCanonicalMutationOutcomeUnknownError,
+  isCanonicalMutationRetryBlockedError,
+} from "../modules/submissions/canonicalMutationOutcome";
 import { ConfirmationDialog } from "../modules/submissions/components/Primitives";
 import {
   agentInteractionProps,
@@ -62,6 +67,7 @@ import {
   tripDatesForSubmission,
   updatedLabel,
 } from "./v19BusinessScreenAdapter";
+import { ReviewMediaPreview, type ReviewMediaPreviewState } from "./ReviewMediaPreview";
 
 interface ApplicantDetail {
   completedSections: number;
@@ -95,6 +101,11 @@ interface DrawerProps {
   onClose: () => void;
   onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
   onOpenWorkspaceTarget: (target: WorkspaceTarget) => void;
+  onReadApplicantFile?: (
+    submissionId: string,
+    applicantId: string,
+    fileType: SubmissionFileType,
+  ) => Promise<{ file: SubmissionFile; url: string }>;
   onUploadApplicantFile?: (
     submissionId: string,
     applicantId: string,
@@ -104,6 +115,15 @@ interface DrawerProps {
 }
 
 type TabId = "overview" | "questionnaire" | "issues" | "history";
+type FileWorkspaceTarget = Extract<WorkspaceTarget, { tab: "files" }>;
+
+type ProtectedFilePreviewState = {
+  canonicalVersion?: string;
+  error?: string;
+  file?: SubmissionFile;
+  preview: ReviewMediaPreviewState;
+  target: FileWorkspaceTarget;
+};
 
 type QuestionnaireFocusTarget = {
   applicantId?: string;
@@ -416,6 +436,34 @@ function uploadTargetKey(applicantId: string, fileType: SubmissionFileType) {
   return `${applicantId}:${fileType}`;
 }
 
+function submissionUploadTargetKey(
+  submissionId: string,
+  applicantId: string,
+  fileType: SubmissionFileType,
+) {
+  return `${submissionId}:${uploadTargetKey(applicantId, fileType)}`;
+}
+
+function uploadTargetCanonicalVersion(
+  submission: Submission,
+  applicantId: string,
+  fileType: SubmissionFileType,
+) {
+  const file = submission.files.find(
+    (candidate) => candidate.applicantId === applicantId && candidate.type === fileType,
+  );
+  return [
+    file?.id,
+    file?.status,
+    file?.uploadStatus,
+    file?.storageAdapter,
+    file?.storageBucket,
+    file?.storagePath,
+    file?.generatedFileName,
+    file?.uploadedAtIso,
+  ].join("|");
+}
+
 function drawerTab(activeTab: DrawerTab | undefined): TabId {
   if (activeTab === "questionnaire") return "questionnaire";
   if (activeTab === "issues") return "issues";
@@ -455,6 +503,23 @@ function primaryIntentToneClass(intent: DrawerActionIntent) {
   }
   if (intent.kind === "wait") return "is-waiting";
   return "is-primary";
+}
+
+function canonicalReadbackUncertainty(error: unknown) {
+  if (
+    isCanonicalMutationOutcomeUnknownError(error) ||
+    isCanonicalMutationRetryBlockedError(error)
+  ) {
+    return error.message;
+  }
+  if (!(error instanceof Error)) return undefined;
+  if (
+    error.message.includes("canonical readback") ||
+    error.message.includes("Повторная загрузка отключена")
+  ) {
+    return error.message;
+  }
+  return undefined;
 }
 
 type StatusBadgePresentation = {
@@ -584,6 +649,11 @@ const OverviewTab = ({
           <div className="v19-agent-drawer-document-list">
             {packageItems.map((doc) => {
               const targetKey = uploadTargetKey(doc.applicantId, doc.fileType);
+              const targetId = targetElementId({
+                applicantId: doc.applicantId,
+                fileType: doc.fileType,
+                tab: "files",
+              });
               const isUploading = uploadingTargetKey === targetKey;
               const content = (
                 <>
@@ -609,6 +679,7 @@ const OverviewTab = ({
                   aria-busy={isUploading}
                   className="v19-agent-drawer-document-row is-actionable"
                   disabled={Boolean(uploadingTargetKey)}
+                  id={targetId}
                   key={targetKey}
                   type="button"
                   onClick={() => onSelectUploadTarget(doc.applicantId, doc.fileType)}
@@ -618,7 +689,9 @@ const OverviewTab = ({
               ) : (
                 <div
                   className="v19-agent-drawer-document-row is-complete"
+                  id={targetId}
                   key={targetKey}
+                  tabIndex={-1}
                 >
                   {content}
                 </div>
@@ -805,15 +878,26 @@ function issueActionLabel(issue: Issue) {
 const IssuesTab = ({
   canEdit,
   data,
+  onCanonicalOutcomeUnknown,
   onOpenWorkspaceTarget,
   onUploadApplicantFile,
   submission,
+  uploadUncertaintyFor,
 }: {
   canEdit: boolean;
   data: SubmissionDetail;
+  onCanonicalOutcomeUnknown: (
+    applicantId: string,
+    fileType: SubmissionFileType,
+    message: string,
+  ) => void;
   onOpenWorkspaceTarget: (target: WorkspaceTarget) => void;
   onUploadApplicantFile?: DrawerProps["onUploadApplicantFile"];
   submission: Submission;
+  uploadUncertaintyFor: (
+    applicantId: string,
+    fileType: SubmissionFileType,
+  ) => string | undefined;
 }) => {
   const [uploadingIssueId, setUploadingIssueId] = useState<string | null>(null);
   const [uploadFeedback, setUploadFeedback] = useState<{
@@ -852,11 +936,21 @@ const IssuesTab = ({
         tone: "success",
       });
     } catch (error) {
+      const uncertainReadback = canonicalReadbackUncertainty(error);
+      if (uncertainReadback) {
+        onCanonicalOutcomeUnknown(
+          issue.target.applicantId,
+          issue.target.fileType,
+          uncertainReadback,
+        );
+      }
       setUploadFeedback({
         issueId: issue.id,
-        message: `${
-          error instanceof Error ? error.message : "Не удалось загрузить файл."
-        } Состояние файла не изменено. Повторите попытку.`,
+        message:
+          uncertainReadback ??
+          `${
+            error instanceof Error ? error.message : "Не удалось загрузить файл."
+          } Состояние файла не изменено. Повторите попытку.`,
         tone: "error",
       });
     } finally {
@@ -873,13 +967,26 @@ const IssuesTab = ({
     });
     const uploadInputId = `${issueElementId}-upload`;
     const uploadStatusId = `${issueElementId}-upload-status`;
+    const uploadUncertainty = issue.target.fileType
+      ? uploadUncertaintyFor(issue.target.applicantId, issue.target.fileType)
+      : undefined;
     const canUploadReplacement =
       canEdit &&
       Boolean(issue.target.fileType) &&
       issue.status === "open" &&
-      Boolean(onUploadApplicantFile);
+      Boolean(onUploadApplicantFile) &&
+      !uploadUncertainty;
     const isUploadingThisIssue = uploadingIssueId === issue.id;
-    const feedback = uploadFeedback?.issueId === issue.id ? uploadFeedback : null;
+    const feedback =
+      uploadFeedback?.issueId === issue.id
+        ? uploadFeedback
+        : uploadUncertainty
+          ? {
+              issueId: issue.id,
+              message: uploadUncertainty,
+              tone: "error" as const,
+            }
+          : null;
 
     return (
       <article
@@ -904,6 +1011,7 @@ const IssuesTab = ({
           {feedback ? (
             <p
               className={`v19-agent-drawer-inline-feedback is-${feedback.tone}`}
+              id={`${issueElementId}-feedback`}
               role={feedback.tone === "error" ? "alert" : "status"}
             >
               {feedback.message}
@@ -916,8 +1024,14 @@ const IssuesTab = ({
               canUploadReplacement ? "drawer.upload-file" : "drawer.open-target",
             )}
             aria-busy={isUploadingThisIssue}
-            aria-describedby={isUploadingThisIssue ? uploadStatusId : undefined}
-            disabled={Boolean(uploadingIssueId)}
+            aria-describedby={
+              isUploadingThisIssue
+                ? uploadStatusId
+                : uploadUncertainty
+                  ? `${issueElementId}-feedback`
+                  : undefined
+            }
+            disabled={Boolean(uploadingIssueId) || Boolean(uploadUncertainty)}
             type="button"
             onClick={() => {
               if (canUploadReplacement) {
@@ -932,6 +1046,8 @@ const IssuesTab = ({
                 <LoaderCircle aria-hidden="true" className="w-4 h-4 animate-spin" />
                 Загрузка…
               </>
+            ) : uploadUncertainty ? (
+              "Обновите данные"
             ) : canUploadReplacement ? (
               issueActionLabel(issue)
             ) : issue.target.fileType ? (
@@ -1190,6 +1306,7 @@ export function Drawer({
   onClose,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
+  onReadApplicantFile,
   onUploadApplicantFile,
 }: DrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>(() => drawerTab(requestedTab));
@@ -1199,16 +1316,28 @@ export function Drawer({
   const [contextExpanded, setContextExpanded] = useState(false);
   const [missingTargetMessage, setMissingTargetMessage] = useState("");
   const [reviewConfirmationOpen, setReviewConfirmationOpen] = useState(false);
+  const [protectedFilePreview, setProtectedFilePreview] =
+    useState<ProtectedFilePreviewState | null>(null);
+  const [pendingProtectedFilePreviewTarget, setPendingProtectedFilePreviewTarget] =
+    useState<FileWorkspaceTarget | null>(null);
   const [selectedUploadTarget, setSelectedUploadTarget] = useState<{
     applicantId: string;
     fileType: SubmissionFileType;
     label: string;
   } | null>(null);
+  const [uploadUncertaintyByTarget, setUploadUncertaintyByTarget] = useState(
+    () => new Map<string, { canonicalVersion: string; message: string }>(),
+  );
   const actionRequestIdRef = useRef(0);
   const actionPendingRef = useRef(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onClearFocusTargetRef = useRef(onClearFocusTarget);
+  const onCloseRef = useRef(onClose);
+  const onReadApplicantFileRef = useRef(onReadApplicantFile);
   const primaryUploadInputRef = useRef<HTMLInputElement>(null);
+  const protectedFilePreviewRequestIdRef = useRef(0);
+  const protectedFilePreviewUrlRef = useRef<string | null>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const reviewConfirmationTriggerRef = useRef<HTMLButtonElement>(null);
   const reviewConfirmationOpenRef = useRef(false);
@@ -1217,7 +1346,39 @@ export function Drawer({
   const isDesktop = useDrawerDesktopQuery();
   const prefersReducedMotion = useReducedMotion();
   const shouldReduceMotion = Boolean(prefersReducedMotion);
+  onClearFocusTargetRef.current = onClearFocusTarget;
+  onCloseRef.current = onClose;
+  onReadApplicantFileRef.current = onReadApplicantFile;
   reviewConfirmationOpenRef.current = reviewConfirmationOpen;
+
+  function uploadUncertaintyFor(applicantId: string, fileType: SubmissionFileType) {
+    const uncertainty = uploadUncertaintyByTarget.get(
+      submissionUploadTargetKey(submission.id, applicantId, fileType),
+    );
+    if (!uncertainty) return undefined;
+    return uncertainty.canonicalVersion ===
+      uploadTargetCanonicalVersion(submission, applicantId, fileType)
+      ? uncertainty.message
+      : undefined;
+  }
+
+  function recordCanonicalOutcomeUnknown(
+    applicantId: string,
+    fileType: SubmissionFileType,
+    message: string,
+  ) {
+    const targetKey = submissionUploadTargetKey(submission.id, applicantId, fileType);
+    const canonicalVersion = uploadTargetCanonicalVersion(
+      submission,
+      applicantId,
+      fileType,
+    );
+    setUploadUncertaintyByTarget((current) => {
+      const next = new Map(current);
+      next.set(targetKey, { canonicalVersion, message });
+      return next;
+    });
+  }
   const panelInitial = shouldReduceMotion
     ? { opacity: 1, x: 0, y: 0 }
     : {
@@ -1275,6 +1436,21 @@ export function Drawer({
     primaryIntent = {
       kind: "history",
       label: "Открыть историю",
+    };
+  } else if (
+    submission.status === "returned" &&
+    !primaryAction.disabled &&
+    primaryAction.action === "submit_corrections"
+  ) {
+    primaryIntent = {
+      action: primaryAction.action,
+      kind: "submission",
+      label: footerActionLabel(
+        primaryAction.action,
+        primaryAction.label,
+        submission.status,
+      ),
+      reason: primaryAction.reason,
     };
   } else if (nextStepBrief.primaryAction.kind === "wait") {
     primaryIntent = {
@@ -1364,7 +1540,12 @@ export function Drawer({
     footerInstructionToneClassName,
   ].join(" ");
   const primaryButtonClassName = primaryIntentToneClass(primaryIntent);
-  const primaryIntentDisabled = actionPending || primaryIntent.kind === "wait";
+  const primaryUploadUncertainty =
+    primaryIntent.kind === "upload"
+      ? uploadUncertaintyFor(primaryIntent.applicantId, primaryIntent.fileType)
+      : undefined;
+  const primaryIntentDisabled =
+    actionPending || primaryIntent.kind === "wait" || Boolean(primaryUploadUncertainty);
   const primaryIntentLabel = actionPending
     ? pendingLabelForIntent(primaryIntent)
     : primaryIntent.label;
@@ -1373,6 +1554,146 @@ export function Drawer({
     actionPending && selectedUploadTarget
       ? uploadTargetKey(selectedUploadTarget.applicantId, selectedUploadTarget.fileType)
       : null;
+
+  const revokeProtectedFilePreviewUrl = useCallback(() => {
+    const url = protectedFilePreviewUrlRef.current;
+    protectedFilePreviewUrlRef.current = null;
+    if (url && typeof URL.revokeObjectURL === "function") {
+      URL.revokeObjectURL(url);
+    }
+  }, []);
+
+  const closeProtectedFilePreview = useCallback(() => {
+    protectedFilePreviewRequestIdRef.current += 1;
+    revokeProtectedFilePreviewUrl();
+    setProtectedFilePreview(null);
+  }, [revokeProtectedFilePreviewUrl]);
+
+  const requestProtectedFilePreview = useCallback(
+    async (target: FileWorkspaceTarget) => {
+      const requestId = protectedFilePreviewRequestIdRef.current + 1;
+      protectedFilePreviewRequestIdRef.current = requestId;
+      const canonicalFile = submission.files.find(
+        (file) =>
+          file.applicantId === target.applicantId && file.type === target.fileType,
+      );
+      const canonicalVersion = canonicalFile
+        ? [
+            canonicalFile.storagePath,
+            canonicalFile.generatedFileName,
+            canonicalFile.uploadedAtIso,
+          ].join("|")
+        : undefined;
+      revokeProtectedFilePreviewUrl();
+      setProtectedFilePreview({
+        canonicalVersion,
+        preview: { status: "loading" },
+        target,
+      });
+
+      try {
+        const readApplicantFile = onReadApplicantFileRef.current;
+        if (!readApplicantFile) {
+          throw new Error("Чтение защищённого файла недоступно.");
+        }
+        const result = await readApplicantFile(
+          submission.id,
+          target.applicantId,
+          target.fileType,
+        );
+        if (protectedFilePreviewRequestIdRef.current !== requestId) {
+          if (typeof URL.revokeObjectURL === "function") {
+            URL.revokeObjectURL(result.url);
+          }
+          return;
+        }
+        protectedFilePreviewUrlRef.current = result.url;
+        setProtectedFilePreview({
+          canonicalVersion,
+          file: result.file,
+          preview: { status: "ready", url: result.url },
+          target,
+        });
+      } catch (error) {
+        if (protectedFilePreviewRequestIdRef.current !== requestId) return;
+        setProtectedFilePreview({
+          canonicalVersion,
+          error:
+            error instanceof Error ? error.message : "Защищённый оригинал недоступен.",
+          preview: {
+            reason: "expired_or_error",
+            status: "unavailable",
+          },
+          target,
+        });
+      }
+    },
+    [revokeProtectedFilePreviewUrl, submission.files, submission.id],
+  );
+  const protectedPreviewTarget = protectedFilePreview?.target;
+  const protectedPreviewCanonicalFile = protectedPreviewTarget
+    ? submission.files.find(
+        (file) =>
+          file.applicantId === protectedPreviewTarget.applicantId &&
+          file.type === protectedPreviewTarget.fileType,
+      )
+    : undefined;
+  const protectedPreviewCanonicalVersion = protectedPreviewCanonicalFile
+    ? [
+        protectedPreviewCanonicalFile.storagePath,
+        protectedPreviewCanonicalFile.generatedFileName,
+        protectedPreviewCanonicalFile.uploadedAtIso,
+      ].join("|")
+    : undefined;
+  const pendingProtectedPreviewCanonicalFile = pendingProtectedFilePreviewTarget
+    ? submission.files.find(
+        (file) =>
+          file.applicantId === pendingProtectedFilePreviewTarget.applicantId &&
+          file.type === pendingProtectedFilePreviewTarget.fileType,
+      )
+    : undefined;
+
+  useEffect(() => {
+    if (
+      !pendingProtectedFilePreviewTarget ||
+      !pendingProtectedPreviewCanonicalFile ||
+      !isCompletedFileAsset(pendingProtectedPreviewCanonicalFile)
+    ) {
+      return;
+    }
+
+    const target = pendingProtectedFilePreviewTarget;
+    setPendingProtectedFilePreviewTarget(null);
+    void requestProtectedFilePreview(target);
+  }, [
+    pendingProtectedFilePreviewTarget,
+    pendingProtectedPreviewCanonicalFile,
+    requestProtectedFilePreview,
+  ]);
+
+  useEffect(() => {
+    if (!protectedPreviewTarget || !protectedPreviewCanonicalFile) return;
+    if (
+      protectedPreviewCanonicalFile.status === "missing" ||
+      protectedPreviewCanonicalFile.status === "needs_replacement" ||
+      protectedFilePreview?.preview.status === "loading"
+    ) {
+      return;
+    }
+    if (protectedFilePreview?.canonicalVersion === protectedPreviewCanonicalVersion) {
+      return;
+    }
+
+    void requestProtectedFilePreview(protectedPreviewTarget);
+  }, [
+    protectedFilePreview?.file?.storagePath,
+    protectedFilePreview?.canonicalVersion,
+    protectedFilePreview?.preview.status,
+    protectedPreviewCanonicalFile,
+    protectedPreviewCanonicalVersion,
+    protectedPreviewTarget,
+    requestProtectedFilePreview,
+  ]);
 
   useEffect(() => {
     if (scrollSubmissionIdRef.current !== submission.id) {
@@ -1388,13 +1709,23 @@ export function Drawer({
     setMissingTargetMessage("");
     setReviewConfirmationOpen(false);
     setSelectedUploadTarget(null);
+    setPendingProtectedFilePreviewTarget(null);
+    closeProtectedFilePreview();
     if (isOpen) setActiveTab(drawerTab(requestedTab));
 
     return () => {
       actionRequestIdRef.current += 1;
       actionPendingRef.current = false;
     };
-  }, [isOpen, requestedTab, submission.id]);
+  }, [closeProtectedFilePreview, isOpen, requestedTab, submission.id]);
+
+  useEffect(
+    () => () => {
+      protectedFilePreviewRequestIdRef.current += 1;
+      revokeProtectedFilePreviewUrl();
+    },
+    [revokeProtectedFilePreviewUrl],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1415,6 +1746,73 @@ export function Drawer({
   }, [focusTarget, isOpen]);
 
   useEffect(() => {
+    if (!isOpen || focusTarget?.tab !== "files") return;
+
+    setActiveTab("overview");
+  }, [focusTarget, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== "overview" || focusTarget?.tab !== "files") {
+      return;
+    }
+
+    let cancelled = false;
+    let frame = 0;
+    let attempt = 0;
+    const focusRequestedTarget = () => {
+      if (cancelled) return;
+      const target = document.getElementById(targetElementId(focusTarget));
+      if (target) {
+        target.scrollIntoView({
+          behavior: shouldReduceMotion ? "auto" : "smooth",
+          block: "center",
+        });
+        target.focus({ preventScroll: true });
+        setMissingTargetMessage("");
+        const canonicalFile = submission.files.find(
+          (file) =>
+            file.applicantId === focusTarget.applicantId &&
+            file.type === focusTarget.fileType,
+        );
+        if (canonicalFile && isCompletedFileAsset(canonicalFile)) {
+          setPendingProtectedFilePreviewTarget(null);
+          void requestProtectedFilePreview(focusTarget);
+        } else {
+          closeProtectedFilePreview();
+          setPendingProtectedFilePreviewTarget(focusTarget);
+        }
+        onClearFocusTargetRef.current?.();
+        return;
+      }
+
+      if (attempt < 120) {
+        attempt += 1;
+        frame = window.requestAnimationFrame(focusRequestedTarget);
+        return;
+      }
+
+      setMissingTargetMessage(
+        "Точный файл не найден. Откройте чеклист документов и выберите доступный файл.",
+      );
+      onClearFocusTargetRef.current?.();
+    };
+    frame = window.requestAnimationFrame(focusRequestedTarget);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [
+    activeTab,
+    closeProtectedFilePreview,
+    focusTarget,
+    isOpen,
+    requestProtectedFilePreview,
+    shouldReduceMotion,
+    submission.files,
+  ]);
+
+  useEffect(() => {
     if (!isOpen || activeTab !== "issues" || focusTarget?.tab !== "issues") {
       return;
     }
@@ -1432,7 +1830,7 @@ export function Drawer({
         });
         target.focus({ preventScroll: true });
         setMissingTargetMessage("");
-        onClearFocusTarget?.();
+        onClearFocusTargetRef.current?.();
         return;
       }
 
@@ -1445,7 +1843,7 @@ export function Drawer({
       setMissingTargetMessage(
         "Точный объект замечания не найден. Откройте список замечаний и выберите доступную задачу.",
       );
-      onClearFocusTarget?.();
+      onClearFocusTargetRef.current?.();
     };
     frame = window.requestAnimationFrame(focusRequestedTarget);
 
@@ -1453,7 +1851,7 @@ export function Drawer({
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [activeTab, focusTarget, isOpen, onClearFocusTarget, shouldReduceMotion]);
+  }, [activeTab, focusTarget, isOpen, shouldReduceMotion]);
 
   function selectTab(nextTab: TabId) {
     if (bodyRef.current) {
@@ -1469,13 +1867,12 @@ export function Drawer({
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !reviewConfirmationOpenRef.current) onClose();
+      if (event.key === "Escape" && !reviewConfirmationOpenRef.current)
+        onCloseRef.current();
     };
     window.addEventListener("keydown", handleKeyDown);
     document.body.style.overflow = "hidden";
-    window.requestAnimationFrame(() =>
-      dialogRef.current?.focus({ preventScroll: true }),
-    );
+    window.queueMicrotask(() => dialogRef.current?.focus({ preventScroll: true }));
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -1484,7 +1881,7 @@ export function Drawer({
         previouslyFocusedElementRef.current.focus({ preventScroll: true });
       }
     };
-  }, [isOpen, onClose, submission.id]);
+  }, [isOpen, submission.id]);
 
   function handleDialogKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "Tab") return;
@@ -1534,6 +1931,7 @@ export function Drawer({
     operation: () => void | Promise<unknown>,
     successMessage: string,
     errorMessage = "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
+    onError?: (error: unknown) => void,
   ) {
     if (actionPendingRef.current) return false;
     const requestId = ++actionRequestIdRef.current;
@@ -1546,9 +1944,10 @@ export function Drawer({
       if (requestId !== actionRequestIdRef.current) return false;
       setActionAnnouncement(successMessage);
       return true;
-    } catch {
+    } catch (error) {
       if (requestId !== actionRequestIdRef.current) return false;
-      setActionError(errorMessage);
+      onError?.(error);
+      setActionError(canonicalReadbackUncertainty(error) ?? errorMessage);
       return false;
     } finally {
       if (requestId === actionRequestIdRef.current) {
@@ -1568,6 +1967,11 @@ export function Drawer({
     label = `Загрузить ${fileLabel(fileType)}`,
   ) {
     if (!onUploadApplicantFile || actionPendingRef.current) return;
+    const uncertainty = uploadUncertaintyFor(applicantId, fileType);
+    if (uncertainty) {
+      setActionError(uncertainty);
+      return;
+    }
     setActionError("");
     setActionAnnouncement("");
     setSelectedUploadTarget({ applicantId, fileType, label });
@@ -1588,6 +1992,16 @@ export function Drawer({
         onUploadApplicantFile(submission.id, target.applicantId, target.fileType, file),
       `${fileLabel(target.fileType)} загружен. Готовность подачи обновлена.`,
       "Не удалось загрузить файл. Состояние подачи не изменено. Повторите попытку.",
+      (error) => {
+        const uncertainty = canonicalReadbackUncertainty(error);
+        if (uncertainty) {
+          recordCanonicalOutcomeUnknown(
+            target.applicantId,
+            target.fileType,
+            uncertainty,
+          );
+        }
+      },
     );
     setSelectedUploadTarget(null);
   }
@@ -1836,6 +2250,84 @@ export function Drawer({
                   </button>
                 </div>
               ) : null}
+              {protectedFilePreview ? (
+                <section
+                  aria-labelledby="agent-protected-media-preview-title"
+                  className="mb-5 rounded-2xl border border-white/10 bg-black/20 p-4"
+                  data-testid="agent-protected-media-preview-panel"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+                        Canonical object readback
+                      </span>
+                      <h3
+                        className="mt-1 text-[15px] font-semibold text-white"
+                        id="agent-protected-media-preview-title"
+                      >
+                        {fileLabel(protectedFilePreview.target.fileType)}
+                      </h3>
+                    </div>
+                    <button
+                      {...agentInteractionProps("drawer.dismiss-notice")}
+                      aria-label="Закрыть защищённый оригинал"
+                      className="min-h-11 min-w-11 rounded-xl border border-white/10 text-white/70"
+                      type="button"
+                      onClick={closeProtectedFilePreview}
+                    >
+                      <X aria-hidden="true" className="mx-auto h-4 w-4" />
+                    </button>
+                  </div>
+                  {protectedFilePreview.error ? (
+                    <div className="mb-3">
+                      <p
+                        className="rounded-xl border border-orange-400/30 bg-orange-400/10 px-3 py-2 text-[12px] text-orange-100"
+                        role="alert"
+                      >
+                        {protectedFilePreview.error}
+                      </p>
+                      <button
+                        {...agentInteractionProps("drawer.open-target")}
+                        className="mt-2 min-h-11 rounded-xl border border-white/15 px-4 text-[12px] font-semibold text-white"
+                        type="button"
+                        onClick={() =>
+                          void requestProtectedFilePreview(protectedFilePreview.target)
+                        }
+                      >
+                        Повторить чтение
+                      </button>
+                    </div>
+                  ) : null}
+                  {protectedFilePreview.error ? null : (
+                    <div style={{ height: "clamp(220px, 42vh, 420px)" }}>
+                      <ReviewMediaPreview
+                        alt={`${fileLabel(protectedFilePreview.target.fileType)}: защищённый оригинал`}
+                        file={protectedFilePreview.file}
+                        label={fileLabel(protectedFilePreview.target.fileType)}
+                        preview={protectedFilePreview.preview}
+                        testId="agent-protected-media-preview"
+                        variant="single"
+                        onError={() => {
+                          revokeProtectedFilePreviewUrl();
+                          setProtectedFilePreview((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  error:
+                                    "Защищённый объект не удалось отобразить. Повторите canonical readback.",
+                                  preview: {
+                                    reason: "expired_or_error",
+                                    status: "unavailable",
+                                  },
+                                }
+                              : current,
+                          );
+                        }}
+                      />
+                    </div>
+                  )}
+                </section>
+              ) : null}
               <AnimatePresence mode="wait">
                 <motion.div
                   aria-labelledby={`submission-drawer-tab-${activeTab}`}
@@ -1873,9 +2365,11 @@ export function Drawer({
                       canEdit={questionnairePresentation.canEdit}
                       data={data}
                       key={submission.id}
+                      onCanonicalOutcomeUnknown={recordCanonicalOutcomeUnknown}
                       onOpenWorkspaceTarget={onOpenWorkspaceTarget}
                       onUploadApplicantFile={onUploadApplicantFile}
                       submission={submission}
+                      uploadUncertaintyFor={uploadUncertaintyFor}
                     />
                   ) : null}
                   {activeTab === "history" ? (

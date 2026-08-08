@@ -25,13 +25,6 @@ import {
   signOut,
 } from "./ui-helpers";
 
-type MailTmAccount = {
-  address: string;
-  id: string;
-  password: string;
-  token: string;
-};
-
 type ApplicantInput = {
   birthDate: string;
   birthPlace: string;
@@ -89,7 +82,6 @@ type Evidence = {
   };
 };
 
-const mailTmOrigin = "https://api.mail.tm";
 const phone = "+7 900 111-22-33";
 const tripStart = "15.01.2027";
 const tripEnd = "22.01.2027";
@@ -145,145 +137,6 @@ function requireSmokeFile() {
   return readFileSync(path, "utf8");
 }
 
-async function mailTmRequest<T>(
-  path: string,
-  input: {
-    body?: unknown;
-    method?: string;
-    token?: string;
-  } = {},
-): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    try {
-      const response = await fetch(`${mailTmOrigin}${path}`, {
-        body: input.body === undefined ? undefined : JSON.stringify(input.body),
-        headers: {
-          accept: "application/ld+json, application/json",
-          ...(input.body === undefined ? {} : { "content-type": "application/json" }),
-          ...(input.token ? { authorization: `Bearer ${input.token}` } : {}),
-        },
-        method: input.method ?? (input.body === undefined ? "GET" : "POST"),
-        signal: AbortSignal.timeout(25_000),
-      });
-      if (!response.ok) {
-        throw new Error(
-          `mail.tm ${input.method ?? "GET"} ${path} failed with ${response.status}`,
-        );
-      }
-      if (response.status === 204) return undefined as T;
-      return (await response.json()) as T;
-    } catch (error) {
-      lastError = error;
-      if (attempt < 4)
-        await new Promise((resolveDelay) => setTimeout(resolveDelay, 1_000));
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error(`mail.tm ${path} failed.`);
-}
-
-function collectionMembers<T>(collection: unknown): T[] {
-  if (Array.isArray(collection)) return collection as T[];
-  if (!collection || typeof collection !== "object") return [];
-  const candidate = collection as {
-    "hydra:member"?: T[];
-    member?: T[];
-  };
-  return candidate["hydra:member"] ?? candidate.member ?? [];
-}
-
-async function createMailTmAccount(label: string): Promise<MailTmAccount> {
-  const domains = await mailTmRequest<unknown>("/domains?page=1");
-  const domain = collectionMembers<{ domain: string; isActive: boolean }>(domains).find(
-    (candidate) => candidate.isActive,
-  )?.domain;
-  if (!domain) throw new Error("mail.tm returned no active domain.");
-
-  const suffix = `${Date.now()}-${randomBytes(5).toString("hex")}`;
-  const address = `v19-${label}-${suffix}@${domain}`.toLowerCase();
-  const password = `Mail-${randomBytes(18).toString("base64url")}!`;
-  const account = await mailTmRequest<{ address: string; id: string }>("/accounts", {
-    body: { address, password },
-  });
-  const auth = await mailTmRequest<{ token: string }>("/token", {
-    body: { address, password },
-  });
-
-  return { address: account.address, id: account.id, password, token: auth.token };
-}
-
-async function deleteMailTmAccount(account: MailTmAccount) {
-  await mailTmRequest<void>(`/accounts/${account.id}`, {
-    method: "DELETE",
-    token: account.token,
-  }).catch(() => undefined);
-}
-
-function htmlDecode(value: string) {
-  return value
-    .replaceAll("&amp;", "&")
-    .replaceAll("&#x3D;", "=")
-    .replaceAll("&#61;", "=");
-}
-
-function inviteTokenFromMessage(message: { html?: string[] | string; text?: string }) {
-  const html = Array.isArray(message.html)
-    ? message.html.join("\n")
-    : (message.html ?? "");
-  const body = htmlDecode(`${html}\n${message.text ?? ""}`);
-  const urls = body.match(/https?:\/\/[^\s"'<>]+/g) ?? [];
-
-  for (const candidate of urls) {
-    try {
-      const url = new URL(candidate.replace(/[),.;]+$/, ""));
-      const type = url.searchParams.get("type");
-      const tokenHash =
-        url.searchParams.get("token_hash") ?? url.searchParams.get("token");
-      if (type === "invite" && tokenHash) return tokenHash;
-
-      const redirect = url.searchParams.get("redirect_to");
-      if (redirect) {
-        const redirectUrl = new URL(redirect);
-        const nestedType = redirectUrl.searchParams.get("type");
-        const nestedToken =
-          redirectUrl.searchParams.get("token_hash") ??
-          redirectUrl.searchParams.get("token");
-        if (nestedType === "invite" && nestedToken) return nestedToken;
-      }
-    } catch {
-      // Ignore unrelated malformed URLs in the email footer.
-    }
-  }
-
-  return null;
-}
-
-async function waitForInviteToken(account: MailTmAccount): Promise<string> {
-  const deadline = Date.now() + 180_000;
-  const seen = new Set<string>();
-
-  while (Date.now() < deadline) {
-    const list = await mailTmRequest<unknown>("/messages?page=1", {
-      token: account.token,
-    });
-
-    for (const item of collectionMembers<{ id: string; subject?: string }>(list)) {
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      const message = await mailTmRequest<{ html?: string[] | string; text?: string }>(
-        `/messages/${item.id}`,
-        { token: account.token },
-      );
-      const token = inviteTokenFromMessage(message);
-      if (token) return token;
-    }
-
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 2_000));
-  }
-
-  throw new Error(`Supabase invite email did not arrive for ${account.address}.`);
-}
-
 async function clearBrowserState(page: Page) {
   await page.goto("/");
   await page.evaluate(() => {
@@ -295,15 +148,21 @@ async function clearBrowserState(page: Page) {
 
 async function ensureLoginMode(page: Page) {
   const heading = page.getByRole("heading", { level: 1, name: "Вход" });
-  if (await isVisible(heading)) return;
   const back = page.getByRole("button", {
     name: /^(Уже есть доступ\? Войти|Вернуться ко входу)$/,
   });
-  if (await isVisible(back.first())) await clickFirstVisible(back);
-  await expect(heading).toBeVisible();
+  await expect(heading.or(back.first())).toBeVisible({ timeout: 45_000 });
+  if (await isVisible(heading)) return;
+  await clickFirstVisible(back);
+  await expect(heading).toBeVisible({ timeout: 45_000 });
 }
 
-async function submitAccessRequest(page: Page, email: string, label: string) {
+async function submitAccessRequest(
+  page: Page,
+  email: string,
+  label: string,
+  password: string,
+) {
   await clearBrowserState(page);
   await ensureLoginMode(page);
   await page.getByRole("button", { name: "Запросить доступ" }).click();
@@ -315,7 +174,9 @@ async function submitAccessRequest(page: Page, email: string, label: string) {
   await page.getByLabel("Город").fill("Москва");
   await page.getByLabel("Телефон").fill(phone);
   await page.getByLabel("Email").fill(email);
-  await expect(page.getByLabel("Пароль", { exact: true })).toHaveCount(0);
+  const passwordField = page.getByLabel("Пароль", { exact: true });
+  await expect(passwordField).toHaveAttribute("minlength", "12");
+  await passwordField.fill(password);
 
   const submitButton = page.getByRole("button", { name: "Подать заявку на доступ" });
   let response: Awaited<ReturnType<Page["waitForResponse"]>> | null = null;
@@ -411,29 +272,10 @@ async function approveAccessRequest(page: Page, email: string) {
   }
 }
 
-async function activateInviteAndLogin(
-  page: Page,
-  email: string,
-  tokenHash: string,
-  password: string,
-) {
+async function loginApprovedUser(page: Page, email: string, password: string) {
   const pendingLogout = page.getByRole("button", { name: /^Выйти$/ });
   if (await isVisible(pendingLogout.first())) await clickFirstVisible(pendingLogout);
-  await page.goto(`/?token_hash=${encodeURIComponent(tokenHash)}&type=invite`);
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Создайте пароль" }),
-  ).toBeVisible({
-    timeout: 45_000,
-  });
-  await expect(page.getByText(email, { exact: false })).toBeVisible();
-  await page.getByLabel("Новый пароль").fill(password);
-  await page.getByLabel("Повторите пароль").fill(password);
-  await page.getByRole("button", { name: "Сохранить пароль" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible({
-    timeout: 45_000,
-  });
-  await expect(page.getByRole("status")).toContainText("Пароль сохранён");
-
+  await ensureLoginMode(page);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Пароль", { exact: true }).fill(password);
   const loginResponse = page.waitForResponse(
@@ -1002,7 +844,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
     const publishableKey = env.VITE_SUPABASE_PUBLISHABLE_KEY;
     expect(publishableKey).toBeTruthy();
 
-    const ownerMailbox = await createMailTmAccount("owner");
+    const ownerEmail = `v19-owner-${Date.now()}-${randomBytes(5).toString("hex")}@example.test`;
     const ownerPassword = `Owner-${randomBytes(18).toString("base64url")}!`;
     const owner = await newContextPage(browser);
     const admin = await newContextPage(browser);
@@ -1011,17 +853,11 @@ test.describe("real new-user Supabase family application ZIP", () => {
     let applicationId = "";
 
     try {
-      await submitAccessRequest(owner.page, ownerMailbox.address, "OWNER");
+      await submitAccessRequest(owner.page, ownerEmail, "OWNER", ownerPassword);
 
       await signInAdminWithRetry(admin.page);
-      await approveAccessRequest(admin.page, ownerMailbox.address);
-      const ownerInviteToken = await waitForInviteToken(ownerMailbox);
-      await activateInviteAndLogin(
-        owner.page,
-        ownerMailbox.address,
-        ownerInviteToken,
-        ownerPassword,
-      );
+      await approveAccessRequest(admin.page, ownerEmail);
+      await loginApprovedUser(owner.page, ownerEmail, ownerPassword);
 
       await expect(
         owner.page.getByRole("button", { name: /Проверка|Выгрузка/ }),
@@ -1043,22 +879,12 @@ test.describe("real new-user Supabase family application ZIP", () => {
       ]);
       applicationId = created.applicationId;
       const questionnaire = created.questionnaire;
-      await fillApplicantQuestionnaire(
-        questionnaire,
-        0,
-        applicants[0]!,
-        ownerMailbox.address,
-      );
+      await fillApplicantQuestionnaire(questionnaire, 0, applicants[0]!, ownerEmail);
       await uploadApplicantSelfies(owner.page, questionnaire, 0, [
         sourcePaths[1]!,
         sourcePaths[2]!,
       ]);
-      await fillApplicantQuestionnaire(
-        questionnaire,
-        1,
-        applicants[1]!,
-        ownerMailbox.address,
-      );
+      await fillApplicantQuestionnaire(questionnaire, 1, applicants[1]!, ownerEmail);
       await uploadApplicantSelfies(owner.page, questionnaire, 1, [
         sourcePaths[4]!,
         sourcePaths[5]!,
@@ -1122,7 +948,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
       await openDrawerTab(admin.page, /Анкета/);
       await expect(drawer(admin.page)).toContainText("TEST PERSON ONE");
       await expect(drawer(admin.page)).toContainText("TEST PERSON TWO");
-      await expect(drawer(admin.page)).toContainText(ownerMailbox.address);
+      await expect(drawer(admin.page)).toContainText(ownerEmail);
       await expect(drawer(admin.page)).toContainText("910000001");
       await expect(drawer(admin.page)).toContainText("910000002");
       await openDrawerTab(admin.page, /Файлы/);
@@ -1172,7 +998,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
       const previewTable = preview.getByRole("table", { name: "Excel Preview Sheet1" });
       await expect(previewTable.getByRole("columnheader")).toHaveCount(56);
       await expect(previewTable.getByRole("row")).toHaveCount(3);
-      await expect(preview).toContainText(ownerMailbox.address);
+      await expect(preview).toContainText(ownerEmail);
       await expect(preview).toContainText("910000001");
       await expect(preview).toContainText("910000002");
       await expect(preview).toContainText("HOTEL E2E MADRID");
@@ -1205,7 +1031,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
 
       await signOut(owner.page);
       await ensureLoginMode(owner.page);
-      await owner.page.getByLabel("Email").fill(ownerMailbox.address);
+      await owner.page.getByLabel("Email").fill(ownerEmail);
       await owner.page.getByLabel("Пароль", { exact: true }).fill(ownerPassword);
       await owner.page.getByRole("button", { name: /Войти/ }).click();
       await expect(
@@ -1224,7 +1050,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
       const inspected = await inspectGeneratedZip(
         zipPath,
         applicationId,
-        ownerMailbox.address,
+        ownerEmail,
         sourcePaths,
       );
       const browserProblems = [...ownerProblems(), ...adminProblems()];
@@ -1252,7 +1078,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
           afterSubmission,
           beforeSubmission,
         },
-        testUserEmail: ownerMailbox.address,
+        testUserEmail: ownerEmail,
         viewports: [
           { height: 844, surface: "agent questionnaire and uploads", width: 390 },
           { height: 932, surface: "agent submit and status", width: 430 },
@@ -1268,11 +1094,7 @@ test.describe("real new-user Supabase family application ZIP", () => {
         "utf8",
       );
     } finally {
-      await Promise.all([
-        owner.context.close(),
-        admin.context.close(),
-        deleteMailTmAccount(ownerMailbox),
-      ]);
+      await Promise.all([owner.context.close(), admin.context.close()]);
     }
   });
 });

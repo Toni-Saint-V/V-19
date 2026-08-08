@@ -93,8 +93,9 @@ test.describe("V-19 release ops lists export flow", () => {
     await expect(page.getByRole("link", { name: "Скачать Excel" })).toBeVisible();
 
     await clearExportSelection(page);
-    await page.getByRole("button", { name: "Стоп" }).click();
-    await expect(page.getByText("Пакетов с ограничениями нет")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Стоп" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Выбрано" }).click();
+    await expect(page.getByText("Пакеты не выбраны")).toBeVisible();
     await expect(page.getByRole("button", { name: "Сформировать Excel" })).toBeDisabled();
 
     await openFreshWorkspace(page, {

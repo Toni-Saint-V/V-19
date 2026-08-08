@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -89,7 +90,7 @@ export function AccessibleSelectMenu({
   );
   const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : undefined;
 
-  const updateMenuPosition = () => {
+  const updateMenuPosition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
@@ -118,7 +119,7 @@ export function AccessibleSelectMenu({
       ? Math.max(viewportMargin, rect.top - maxHeight - gap)
       : rect.bottom + gap;
     setMenuPosition({ left, maxHeight, top, width });
-  };
+  }, [options.length, variant]);
 
   const openMenu = (preferredIndex = selectedIndex) => {
     if (disabled || !options.length) return;
@@ -185,7 +186,7 @@ export function AccessibleSelectMenu({
   useLayoutEffect(() => {
     if (!open) return;
     updateMenuPosition();
-  }, [open, options.length, variant]);
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -205,7 +206,7 @@ export function AccessibleSelectMenu({
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("scroll", handleViewportChange, true);
     };
-  }, [open, options.length, variant]);
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open || !disabled) return;

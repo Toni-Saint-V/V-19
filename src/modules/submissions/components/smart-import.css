@@ -1,0 +1,537 @@
+.vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  border: 1px solid rgb(140 126 255 / 24%);
+  border-radius: 10px;
+  background: rgb(119 104 232 / 8%);
+  color: #bcb3ff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-smart-import-button:is(:hover, :focus-visible) {
+  border-color: rgb(153 140 255 / 46%);
+  background: rgb(119 104 232 / 14%);
+  color: #eeeaff;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.v19-smart-import-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(7 7 9 / 78%);
+  backdrop-filter: blur(12px);
+}
+
+.v19-smart-import-dialog {
+  width: min(760px, 100%);
+  max-height: min(860px, calc(100dvh - 48px));
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 92% 0%, rgb(119 104 232 / 14%), transparent 32%),
+    #131316;
+  box-shadow: 0 30px 90px rgb(0 0 0 / 52%);
+  color: #f6f6f8;
+}
+
+.v19-smart-import-header,
+.v19-smart-import-footer,
+.v19-smart-import-review-heading,
+.v19-smart-import-title-lockup,
+.v19-smart-import-privacy,
+.v19-smart-import-processing,
+.v19-smart-import-error,
+.v19-smart-import-review-meta {
+  display: flex;
+  align-items: center;
+}
+
+.v19-smart-import-header {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 12px;
+}
+
+.v19-smart-import-title-lockup {
+  gap: 12px;
+}
+
+.v19-smart-import-title-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgb(132 118 246 / 28%);
+  border-radius: 12px;
+  background: rgb(119 104 232 / 12%);
+  color: #b6aaff;
+}
+
+.v19-smart-import-eyebrow,
+.v19-smart-import-review-heading p {
+  margin: 0 0 3px;
+  color: #9d92f5;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.v19-smart-import-header h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.v19-smart-import-icon-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 3%);
+  color: #bebec6;
+}
+
+.v19-smart-import-icon-button:hover,
+.v19-smart-import-ghost-button:hover,
+.v19-smart-import-secondary-button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 7%);
+  color: #fff;
+}
+
+.v19-smart-import-intro {
+  margin: 0;
+  padding: 0 24px 18px;
+  color: #a8a8b1;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.v19-smart-import-privacy {
+  gap: 12px;
+  margin: 0 24px 18px;
+  padding: 14px 16px;
+  border: 1px solid rgb(96 208 155 / 18%);
+  border-radius: 14px;
+  background: rgb(43 133 90 / 8%);
+  color: #83d7aa;
+}
+
+.v19-smart-import-privacy > div,
+.v19-smart-import-processing > div {
+  display: grid;
+  gap: 3px;
+}
+
+.v19-smart-import-privacy strong,
+.v19-smart-import-processing strong {
+  color: #e7f8ee;
+  font-size: 13px;
+}
+
+.v19-smart-import-privacy span,
+.v19-smart-import-processing span {
+  color: #9db4a7;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.v19-smart-import-source-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  padding: 0 24px 18px;
+}
+
+.v19-smart-import-file-card,
+.v19-smart-import-text-card {
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 2.5%);
+}
+
+.v19-smart-import-file-card {
+  display: flex;
+  min-height: 170px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  cursor: pointer;
+  color: #b9afff;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.v19-smart-import-file-card:hover {
+  border-color: rgb(140 126 255 / 34%);
+  background: rgb(119 104 232 / 7%);
+}
+
+.v19-smart-import-file-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.v19-smart-import-file-card span {
+  display: grid;
+  gap: 6px;
+}
+
+.v19-smart-import-file-card strong {
+  color: #f4f2ff;
+  font-size: 14px;
+}
+
+.v19-smart-import-file-card small {
+  max-width: 220px;
+  color: #9595a0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.v19-smart-import-text-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.v19-smart-import-text-card label {
+  color: #d7d7dc;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.v19-smart-import-text-card textarea {
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 11px;
+  outline: none;
+  background: #0d0d0f;
+  color: #f4f4f6;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 11px 12px;
+}
+
+.v19-smart-import-text-card textarea:focus {
+  border-color: rgb(142 128 255 / 54%);
+  box-shadow: 0 0 0 3px rgb(119 104 232 / 10%);
+}
+
+.v19-smart-import-secondary-button,
+.v19-smart-import-ghost-button,
+.v19-smart-import-primary-button,
+.v19-smart-import-icon-button {
+  cursor: pointer;
+  font: inherit;
+  transition: background 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.v19-smart-import-secondary-button {
+  justify-self: end;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 4%);
+  color: #d8d8de;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 8px 11px;
+}
+
+.v19-smart-import-secondary-button:disabled,
+.v19-smart-import-primary-button:disabled,
+.v19-smart-import-file-card:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.v19-smart-import-processing,
+.v19-smart-import-error {
+  gap: 11px;
+  margin: 0 24px 18px;
+  padding: 13px 15px;
+  border-radius: 12px;
+}
+
+.v19-smart-import-processing {
+  border: 1px solid rgb(124 111 235 / 18%);
+  background: rgb(119 104 232 / 8%);
+  color: #b9afff;
+}
+
+.v19-smart-import-processing span {
+  color: #a3a1b0;
+}
+
+.v19-smart-import-spinner {
+  animation: v19-smart-import-spin 800ms linear infinite;
+}
+
+.v19-smart-import-error {
+  border: 1px solid rgb(238 113 113 / 20%);
+  background: rgb(170 51 51 / 10%);
+  color: #f0a0a0;
+  font-size: 13px;
+}
+
+.v19-smart-import-review {
+  margin: 0 24px 20px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.v19-smart-import-review-heading {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  background: rgb(255 255 255 / 2%);
+}
+
+.v19-smart-import-review-heading span,
+.v19-smart-import-review-heading > strong {
+  color: #9696a0;
+  font-size: 12px;
+}
+
+.v19-smart-import-review-heading > strong {
+  white-space: nowrap;
+}
+
+.v19-smart-import-review-list {
+  display: grid;
+}
+
+.v19-smart-import-review-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgb(255 255 255 / 6%);
+  cursor: pointer;
+}
+
+.v19-smart-import-review-row:last-child {
+  border-bottom: 0;
+}
+
+.v19-smart-import-review-row:hover {
+  background: rgb(255 255 255 / 2.5%);
+}
+
+.v19-smart-import-review-row input {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  accent-color: #8071f0;
+}
+
+.v19-smart-import-review-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.v19-smart-import-review-meta {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.v19-smart-import-review-meta strong {
+  color: #d7d7dd;
+  font-size: 12px;
+}
+
+.v19-smart-import-review-meta em {
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  padding: 4px 7px;
+}
+
+.v19-smart-import-review-meta em[data-tone="new"] {
+  background: rgb(75 163 113 / 12%);
+  color: #7bd19f;
+}
+
+.v19-smart-import-review-meta em[data-tone="same"] {
+  background: rgb(117 117 129 / 13%);
+  color: #a7a7b0;
+}
+
+.v19-smart-import-review-meta em[data-tone="conflict"] {
+  background: rgb(214 128 68 / 13%);
+  color: #e6a06e;
+}
+
+.v19-smart-import-review-meta em[data-tone="uncertain"] {
+  background: rgb(193 166 64 / 12%);
+  color: #d8bf69;
+}
+
+.v19-smart-import-review-value {
+  overflow-wrap: anywhere;
+  color: #f3f3f6;
+  font-size: 14px;
+  font-weight: 580;
+}
+
+.v19-smart-import-review-copy small {
+  color: #8f8f9a;
+  font-size: 11px;
+}
+
+.v19-smart-import-footer {
+  position: sticky;
+  bottom: 0;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+  background: rgb(19 19 22 / 94%);
+  backdrop-filter: blur(12px);
+}
+
+.v19-smart-import-ghost-button,
+.v19-smart-import-primary-button {
+  min-height: 40px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 15px;
+}
+
+.v19-smart-import-ghost-button {
+  border: 1px solid rgb(255 255 255 / 8%);
+  background: transparent;
+  color: #bcbcc5;
+}
+
+.v19-smart-import-primary-button {
+  border: 1px solid rgb(151 139 255 / 24%);
+  background: #7465e7;
+  color: #fff;
+  box-shadow: 0 8px 24px rgb(91 76 205 / 24%);
+}
+
+.v19-smart-import-primary-button:hover:not(:disabled) {
+  background: #8172ed;
+}
+
+@keyframes v19-smart-import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 680px) {
+  .v19-smart-import-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .v19-smart-import-dialog {
+    width: 100%;
+    max-height: 94dvh;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .v19-smart-import-header {
+    padding: 18px 18px 10px;
+  }
+
+  .v19-smart-import-intro {
+    padding: 0 18px 15px;
+  }
+
+  .v19-smart-import-privacy,
+  .v19-smart-import-processing,
+  .v19-smart-import-error,
+  .v19-smart-import-review {
+    margin-right: 18px;
+    margin-left: 18px;
+  }
+
+  .v19-smart-import-source-grid {
+    grid-template-columns: 1fr;
+    padding: 0 18px 16px;
+  }
+
+  .v19-smart-import-file-card {
+    min-height: 108px;
+    justify-content: flex-start;
+  }
+
+  .v19-smart-import-footer {
+    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .v19-smart-import-primary-button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 767px) {
+  .vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v19-smart-import-spinner {
+    animation: none;
+  }
+
+  .v19-smart-import-secondary-button,
+  .v19-smart-import-ghost-button,
+  .v19-smart-import-primary-button,
+  .v19-smart-import-icon-button,
+  .v19-smart-import-file-card {
+    transition: none;
+  }
+}

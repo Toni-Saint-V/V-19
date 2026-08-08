@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./v19-localhost-test";
 
 const accessViewports = [
   { width: 320, height: 568 },

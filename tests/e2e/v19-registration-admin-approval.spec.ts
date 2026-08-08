@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./v19-localhost-test";
 import {
   clickWorkspaceButton,
   collectBrowserProblems,
@@ -25,11 +26,15 @@ async function ensureRegisterMode(page: Page) {
     level: 1,
     name: "Заявка на доступ",
   });
+  const requestAccess = page.getByRole("button", { name: "Запросить доступ" });
+  await expect(registerHeading.or(requestAccess)).toBeVisible({ timeout: 10_000 });
   if (await registerHeading.isVisible().catch(() => false)) return;
 
-  const requestAccess = page.getByRole("button", { name: "Запросить доступ" });
-  await expect(requestAccess).toBeVisible({ timeout: 10_000 });
-  await requestAccess.click();
+  try {
+    await requestAccess.click();
+  } catch (error) {
+    if (!(await registerHeading.isVisible().catch(() => false))) throw error;
+  }
 
   await expect(registerHeading).toBeVisible();
 }

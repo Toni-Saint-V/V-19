@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { testArtifactPath } from "../support/artifacts";
+import { openFreshWorkspace } from "./v19-pilot-helpers";
 
 const viewports = [
   { height: 900, label: "1440x900", width: 1440 },
@@ -25,17 +26,17 @@ async function clickWorkspaceButton(page: Page, name: string | RegExp) {
 
   if (!(await isVisible(button.first()))) {
     await openMobileMenu(page);
+    const menuDialog = page.getByRole("dialog", { name: "Меню агента" });
+    await expect(menuDialog).toBeVisible();
+    await menuDialog.getByRole("button", { name }).click();
+    return;
   }
 
   await button.first().click();
 }
 
 async function openFreshAgentActions(page: Page) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    (globalThis as unknown as { localStorage: { clear(): void } }).localStorage.clear();
-  });
-  await page.reload();
+  await openFreshWorkspace(page, { heading: "Мои действия" });
   await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 }
 
@@ -57,7 +58,7 @@ async function expectNoHorizontalOverflow(page: Page, context: string) {
 }
 
 async function expectActionBoardFits(page: Page) {
-  const board = page.locator(".vf-figma-view-stage").first();
+  const board = page.getByRole("region", { name: "Мои действия" });
   await expect(board).toBeVisible();
 
   const metrics = await board.evaluate((element) => {
@@ -93,20 +94,27 @@ test.describe("V-19 agent actions triage UX", () => {
 
     const agentActionSurface = page.getByRole("region", { name: "Мои действия" });
     const returnedRow = agentActionSurface
-      .locator('.vf-figma-action-row[data-submission-id="ПД-1048"]')
+      .locator('[data-testid="agent-action-queue-item"][data-submission-id="ПД-1048"]')
       .first();
 
     await expect(returnedRow).toBeVisible();
-    await expect(returnedRow).toContainText("ПД-1048");
+    await expect(returnedRow).toContainText("VF-1048");
     await expect(returnedRow).toHaveAttribute(
       "aria-label",
-      /Открыть подачу: .*ПД-1048/,
+      /Выбрать действие: .*Мария Иванова.*Заменить селфи 1/,
     );
 
     await returnedRow.click();
-    const openedDrawer = page.getByRole("dialog", { name: "Подача ПД-1048" });
+    const inlineDetail = agentActionSurface.getByTestId("agent-action-inline-detail");
+    await expect(inlineDetail).toBeVisible();
+    await inlineDetail
+      .locator('[data-v19-interaction-id="actions.open-secondary"]')
+      .click();
+    const openedDrawer = page.getByRole("dialog").first();
     await expect(openedDrawer).toBeVisible();
-    await expect(openedDrawer).toContainText("Семья Ивановых");
+    await expect(
+      openedDrawer.getByRole("heading", { name: "Семья Ивановых" }),
+    ).toBeVisible();
     expect(browserProblems).toEqual([]);
   });
 
@@ -155,7 +163,6 @@ test.describe("V-19 agent actions triage UX", () => {
       });
       await openFreshAgentActions(page);
 
-      await clickWorkspaceButton(page, /Мои действия/);
       await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
       await expectNoHorizontalOverflow(page, `${viewport.label}: agent actions`);
 

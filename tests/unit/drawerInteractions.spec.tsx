@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { Drawer } from "../../src/components/Drawer";
 import { auditAgentInteractionControls } from "../../src/modules/submissions/agentInteractionContract";
+import { CanonicalMutationOutcomeUnknownError } from "../../src/modules/submissions/canonicalMutationOutcome";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
   applySafePassportExtractionFields,
@@ -20,6 +21,8 @@ import type { PassportExtractionResult } from "../../src/modules/submissions/pas
 import { requiredPassportReviewMediaSlots } from "../../src/modules/submissions/passportReviewContract";
 import {
   createDraftSubmission,
+  ensureApplicantMediaSlot,
+  uploadRequiredFile,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import type {
@@ -57,6 +60,7 @@ type RenderDrawerOptions = {
     section?: string;
   }) => void;
   onOpenWorkspaceTarget?: (target: WorkspaceTarget) => void;
+  onReadApplicantFile?: React.ComponentProps<typeof Drawer>["onReadApplicantFile"];
   onUploadApplicantFile?: (
     submissionId: string,
     applicantId: string,
@@ -157,6 +161,7 @@ function renderDrawer({
   onClose = vi.fn(),
   onOpenQuestionnaire = vi.fn(),
   onOpenWorkspaceTarget = vi.fn(),
+  onReadApplicantFile,
   onUploadApplicantFile = vi.fn().mockResolvedValue(undefined),
   submission = returnedSubmission(),
 }: RenderDrawerOptions = {}) {
@@ -178,6 +183,7 @@ function renderDrawer({
         onClose={onClose}
         onOpenQuestionnaire={onOpenQuestionnaire}
         onOpenWorkspaceTarget={onOpenWorkspaceTarget}
+        onReadApplicantFile={onReadApplicantFile}
         onUploadApplicantFile={onUploadApplicantFile}
       />,
     ),
@@ -413,6 +419,65 @@ describe("Drawer interactions", () => {
     );
   });
 
+  test("does not claim a protected file stayed unchanged after uncertain canonical readback", async () => {
+    const onUploadApplicantFile = vi
+      .fn()
+      .mockRejectedValue(
+        new CanonicalMutationOutcomeUnknownError(new Error("network failed")),
+      );
+    renderDrawer({ activeTab: "issues", onUploadApplicantFile });
+
+    fireEvent.change(
+      screen.getByLabelText("Выбрать файл: Мария Иванова • Селфи 1", {
+        selector: "input",
+      }),
+      {
+        target: {
+          files: [new File(["replacement"], "selfie.png", { type: "image/png" })],
+        },
+      },
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Не удалось подтвердить сохранение файла");
+    expect(alert).toHaveTextContent("Повторная загрузка отключена");
+    expect(alert).not.toHaveTextContent("Состояние файла не изменено");
+    const blockedRetry = screen.getByRole("button", { name: "Обновите данные" });
+    expect(blockedRetry).toBeDisabled();
+    fireEvent.click(blockedRetry);
+    expect(onUploadApplicantFile).toHaveBeenCalledTimes(1);
+  });
+
+  test("blocks a second primary upload while canonical outcome is unknown", async () => {
+    const onUploadApplicantFile = vi
+      .fn()
+      .mockRejectedValue(
+        new CanonicalMutationOutcomeUnknownError(new Error("network failed")),
+      );
+    renderDrawer({ onUploadApplicantFile });
+
+    const primaryUpload = screen.getByRole("button", {
+      name: "Загрузить: Мария Иванова • Селфи 1",
+    });
+    fireEvent.click(primaryUpload);
+    fireEvent.change(
+      screen.getByLabelText("Выбрать файл: Загрузить: Мария Иванова • Селфи 1", {
+        selector: "input",
+      }),
+      {
+        target: {
+          files: [new File(["replacement"], "selfie.png", { type: "image/png" })],
+        },
+      },
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Повторная загрузка отключена");
+    expect(primaryUpload).toBeDisabled();
+    fireEvent.click(primaryUpload);
+    expect(onUploadApplicantFile).toHaveBeenCalledTimes(1);
+  });
+
   test("executes a ready lifecycle action and routes blocked corrections to the exact upload", async () => {
     const onAction = vi.fn().mockResolvedValue(undefined);
     renderDrawer({ onAction, submission: readySubmission() });
@@ -441,15 +506,62 @@ describe("Drawer interactions", () => {
     expect(returnedAction).not.toHaveBeenCalled();
   });
 
+  test("prioritizes canonical corrections handoff after every returned issue is fixed", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const source = returnedSubmission();
+    const issuesFixed = source.files
+      .filter((file) => file.status === "needs_replacement")
+      .reduce(
+        (submission, file, index) =>
+          uploadRequiredFile(submission, file.id, {
+            generatedFileName: `replacement-${index}.png`,
+            mimeType: "image/png",
+            originalFileName: `replacement-${index}.png`,
+            sizeBytes: 64,
+            storageAdapter: "local-dev",
+            uploadedAtIso: "2026-08-03T00:00:00.000Z",
+          }),
+        source,
+      );
+    const withRequiredSlots = requiredPassportReviewMediaSlots(issuesFixed).reduce(
+      (submission, slot) =>
+        ensureApplicantMediaSlot(submission, slot.applicantId, slot.type).submission,
+      issuesFixed,
+    );
+    const correctionsReady = uploadRequiredFiles(
+      fillRequiredQuestionnaireForTest(withRequiredSlots),
+    );
+
+    expect(issuesFixed.issues.every((issue) => issue.status === "fixed_by_agent")).toBe(
+      true,
+    );
+    renderDrawer({ onAction, submission: issuesFixed });
+    expect(
+      screen.queryByRole("button", { name: "Отправить исправления" }),
+    ).not.toBeInTheDocument();
+
+    cleanup();
+    renderDrawer({ onAction, submission: correctionsReady });
+
+    const submitCorrections = screen.getByRole("button", {
+      name: "Отправить исправления",
+    });
+    expect(submitCorrections).toBeEnabled();
+    expect(submitCorrections).toHaveAttribute(
+      "data-v19-interaction-id",
+      "drawer.submit-corrections",
+    );
+    fireEvent.click(submitCorrections);
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith("submit_corrections"));
+  });
+
   test("does not repeat passport review after persisted OCR confirmations", () => {
     renderDrawer({ submission: persistedReviewedPassportSubmission() });
 
     expect(
       screen.queryByText("Подтвердите ручную проверку паспортных данных"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Отправить на проверку" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Отправить на проверку" })).toBeEnabled();
   });
 
   test("keeps rejected primary-action feedback visible and associated with the CTA", async () => {
@@ -742,6 +854,35 @@ describe("Drawer interactions", () => {
     fireEvent.click(overlay);
 
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  test("focuses an incomplete file target without attempting protected readback", async () => {
+    const onReadApplicantFile = vi.fn();
+    const onClearFocusTarget = vi.fn();
+    renderDrawer({
+      focusTarget: {
+        applicantId: "з-1048-1",
+        fileType: "selfie",
+        tab: "files",
+      },
+      onClearFocusTarget,
+      onReadApplicantFile,
+    });
+
+    await waitFor(() => expect(onClearFocusTarget).toHaveBeenCalledOnce());
+    expect(onReadApplicantFile).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId("agent-protected-media-preview-panel"),
+    ).not.toBeInTheDocument();
+    expect(
+      document.getElementById(
+        targetElementId({
+          applicantId: "з-1048-1",
+          fileType: "selfie",
+          tab: "files",
+        }),
+      ),
+    ).toHaveFocus();
   });
 
   test("reports a missing requested issue target without breaking navigation", async () => {

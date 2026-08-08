@@ -517,6 +517,43 @@ describe("submission action safety", () => {
       uploadStatus: "uploaded",
     });
     expect(uploaded.history[0]?.detail).toContain("old/path.jpg");
+
+    const missingActor = applySubmissionActionResult(
+      uploaded,
+      "submit_corrections",
+      "agent",
+    );
+    expect(missingActor).toEqual({
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Agent can submit only an owned submission.",
+      },
+    });
+    expect(
+      applySubmissionActionResult(
+        uploaded,
+        "submit_corrections",
+        "agent",
+        "00000000-0000-4000-8000-000000000099",
+      ),
+    ).toEqual(missingActor);
+
+    const submittedCorrections = applySubmissionAction(
+      uploaded,
+      "submit_corrections",
+      "agent",
+      uploaded.agentId,
+    );
+    expect(submittedCorrections.status).toBe("corrections_received");
+    expect(
+      submittedCorrections.files.find((file) => file.id === targetFile.id),
+    ).toMatchObject({
+      reviewStatus: "not_reviewed",
+      status: "pending_review",
+      storagePath: "new/path.jpg",
+      uploadStatus: "uploaded",
+    });
   });
 
   test("exported blocks upload and status changes", () => {

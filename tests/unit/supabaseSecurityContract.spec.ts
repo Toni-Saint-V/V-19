@@ -1672,9 +1672,7 @@ describe("Supabase security contract", () => {
       "create unique index submissions_public_number_uidx on public.submissions (public_number)",
     );
     expect(migration).toContain("Submission public number is immutable");
-    expect(migration).toContain(
-      "nextval('public.submission_public_number_seq')",
-    );
+    expect(migration).toContain("nextval('public.submission_public_number_seq')");
     expectSqlStatement(
       migration,
       "revoke all on function app_private.assign_submission_public_number() from public",

@@ -461,6 +461,35 @@ describe("AdminWorkspace production navigation", () => {
     expect(screen.getByRole("button", { name: "Настройки" })).toBeVisible();
   });
 
+  test("resets the shared workspace scroll position when changing admin sections", () => {
+    const { container } = render(
+      <AdminWorkspace
+        currentEmail="qa-admin@example.test"
+        onSignOut={vi.fn()}
+        submissions={[]}
+        usesSupabase
+      />,
+    );
+    const workspaceScroll = container.querySelector<HTMLDivElement>(
+      ".v19-admin-workspace-scroll",
+    );
+    if (!workspaceScroll)
+      throw new Error("Admin workspace scroll owner was not rendered.");
+    workspaceScroll.scrollTop = 141;
+    workspaceScroll.scrollLeft = 17;
+
+    fireEvent.click(screen.getByRole("button", { name: "Пользователи" }));
+
+    expect(workspaceScroll.scrollTop).toBe(0);
+    expect(workspaceScroll.scrollLeft).toBe(0);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Управление пользователями",
+      }),
+    ).toBeVisible();
+  });
+
   test("keeps the shared collection shell geometry across admin sections", () => {
     render(
       <AdminWorkspace

@@ -299,7 +299,9 @@ test.describe("Linear submission Drawer regression", () => {
         .first();
       await expect(questionnaireScreen).toBeVisible();
       await expect(submissionDrawer).toBeHidden();
-      await questionnaireScreen.getByRole("button", { name: "Назад" }).click();
+      await questionnaireScreen
+        .getByRole("button", { name: "Сохранить и выйти" })
+        .click();
 
       await expect(submissionDrawer).toBeVisible();
       await expect(

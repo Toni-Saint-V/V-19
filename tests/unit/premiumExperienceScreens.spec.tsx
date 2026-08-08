@@ -41,7 +41,14 @@ describe("premium product experience screens", () => {
   });
 
   test("turns access requests into an actionable admin queue", async () => {
-    const onApprove = vi.fn().mockResolvedValue(undefined);
+    let resolveApproval!: () => void;
+    const approval = new Promise<void>((resolve) => {
+      resolveApproval = resolve;
+    });
+    const onApprove = vi.fn(() => {
+      if (onApprove.mock.calls.length === 1) fireEvent.click(approveButton);
+      return approval;
+    });
     render(
       <AdminUsersAccessScreen
         currentIdentity="qa-admin@example.test"
@@ -56,9 +63,12 @@ describe("premium product experience screens", () => {
       screen.getByRole("heading", { name: "Пользователи и заявки" }),
     ).toBeVisible();
     expect(screen.getByText("Мария Соколова")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Одобрить" }));
+    const approveButton = screen.getByRole("button", { name: "Одобрить" });
+    fireEvent.click(approveButton);
 
     await waitFor(() => expect(onApprove).toHaveBeenCalledWith("request-1"));
+    expect(onApprove).toHaveBeenCalledTimes(1);
+    resolveApproval();
     expect(await screen.findByText(/доступ для мария соколова одобрен/i)).toBeVisible();
   });
 
@@ -88,6 +98,25 @@ describe("premium product experience screens", () => {
     fireEvent.click(screen.getByRole("tab", { name: /одобрено/i }));
     expect(screen.getByText("Антон Волков")).toBeVisible();
     expect(screen.queryByText("Мария Соколова")).not.toBeInTheDocument();
+  });
+
+  test("announces failed access decisions without removing the pending request", async () => {
+    const onApprove = vi.fn().mockRejectedValue(new Error("revision conflict"));
+    render(
+      <AdminUsersAccessScreen
+        currentIdentity="qa-admin@example.test"
+        onApprove={onApprove}
+        requests={[pendingRequest]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Одобрить" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Действие не выполнено. Данные не были изменены.",
+    );
+    expect(screen.getByText("Мария Соколова")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Одобрить" })).toBeEnabled();
   });
 
   test("persists visible interface preferences and applies them immediately", async () => {

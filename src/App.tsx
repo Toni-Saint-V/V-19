@@ -79,6 +79,10 @@ import {
 } from "./lib/supabase/workspaceRuntime";
 import type { Role, Submission, SubmissionAction } from "./modules/submissions/types";
 import type { AppProfile, AppSession } from "./types/session";
+import {
+  canShowLocalDemoRoleSwitch,
+  canUseLocalDemoSeedAutoLogin,
+} from "./shared/pilotAccessGate";
 
 type Workspace = "agent" | "admin";
 
@@ -295,6 +299,15 @@ export default function App({
     authSession?.status === "active" && authSession.approvalStatus === "approved"
       ? authSession
       : null;
+  const localDemoRoleSwitchEnabled =
+    __V19_LOCAL_DEMO_BUILD__ &&
+    canShowLocalDemoRoleSwitch({
+      env: import.meta.env,
+      isSupabaseMode: supabaseEnabled,
+      session: activeApprovedSession
+        ? { role: activeApprovedSession.role }
+        : null,
+    });
 
   const invalidateWorkspaceSession = useCallback((nextUserId: string | null) => {
     workspaceSessionGenerationRef.current += 1;
@@ -626,8 +639,15 @@ export default function App({
           const appSession = await getCurrentAppSession();
           restored = appSession ? sessionFromSupabase(appSession) : null;
         } else if (__V19_LOCAL_DEMO_BUILD__ && localDemoEnabled) {
-          const { authRepository } = await import("./shared/authRegistration");
+          const {
+            authRepository,
+            localDevAuthRegistrationAdapter,
+          } = await import("./shared/authRegistration");
           restored = await authRepository.restoreSession();
+          if (!restored && canUseLocalDemoSeedAutoLogin(import.meta.env)) {
+            restored =
+              await localDevAuthRegistrationAdapter.activateApprovedRole("agent");
+          }
         } else {
           restored = null;
         }
@@ -678,8 +698,19 @@ export default function App({
         if (!__V19_LOCAL_DEMO_BUILD__) return;
         const { loadSubmissions } = await import("./modules/submissions/persistence");
         const localSubmissions = loadSubmissions();
+        let cleanupError: string | undefined;
+        try {
+          const { pruneUnreferencedLocalDemoMedia } = await import(
+            "./modules/submissions/localDemoMediaStorage"
+          );
+          await pruneUnreferencedLocalDemoMedia(localSubmissions);
+        } catch {
+          cleanupError =
+            "Не удалось очистить несвязанные локальные файлы. Канонические подачи не изменены.";
+        }
         setSubmissions(localSubmissions);
         setWorkspaceDataState({
+          error: cleanupError,
           refreshedAt: new Date().toISOString(),
           status: workspaceDataStatusForCount(localSubmissions.length),
         });
@@ -972,6 +1003,49 @@ export default function App({
     ],
   );
 
+  const readVisibleAgentSubmission = useCallback(
+    async (submissionId: string): Promise<Submission> => {
+      const session = activeApprovedSession;
+      if (!session || session.role !== "agent") {
+        throw new Error("Только активный агент может прочитать свою подачу.");
+      }
+      const fence = createWorkspaceMutationFence(session.userId);
+      const ownerAgentId = session.ownerAgentId ?? session.userId;
+      let canonicalSubmissions: Submission[];
+
+      if (supabaseEnabled) {
+        if (!activeProfile || activeProfile.role !== "agent") {
+          throw new Error("Профиль агента недоступен для canonical readback.");
+        }
+        const loaded = await loadCockpitSubmissionsForProfile(activeProfile);
+        fence.assertCurrent();
+        canonicalSubmissions = loaded.submissions;
+      } else {
+        if (!localDemoEnabled || !__V19_LOCAL_DEMO_BUILD__) {
+          throw new Error("Canonical submission readback is unavailable.");
+        }
+        const { loadSubmissions } = await import("./modules/submissions/persistence");
+        canonicalSubmissions = loadSubmissions();
+        fence.assertCurrent();
+      }
+
+      const canonical = canonicalSubmissions.find(
+        (submission) => submission.id === submissionId,
+      );
+      if (!canonical || canonical.agentId !== ownerAgentId) {
+        throw new Error("Подача недоступна текущему агенту.");
+      }
+      return canonical;
+    },
+    [
+      activeApprovedSession,
+      activeProfile,
+      createWorkspaceMutationFence,
+      localDemoEnabled,
+      supabaseEnabled,
+    ],
+  );
+
   const assignVisibleAgentSubmissionPublicNumber = useCallback(
     (submissionId: string): Promise<PublicNumberAssignment> => {
       const session = activeApprovedSession;
@@ -1078,6 +1152,38 @@ export default function App({
     },
     [commitAuthSession, localDemoEnabled, refreshAccessRequests, supabaseEnabled],
   );
+
+  const handleLocalDemoWorkspaceSwitch = useCallback(async () => {
+    if (!__V19_LOCAL_DEMO_BUILD__) {
+      throw new Error("Переключение роли недоступно в production-сборке.");
+    }
+    const currentSession = activeApprovedSession;
+    if (
+      !currentSession ||
+      !canShowLocalDemoRoleSwitch({
+        env: import.meta.env,
+        isSupabaseMode: supabaseEnabled,
+        session: { role: currentSession.role },
+      })
+    ) {
+      throw new Error("Переключение роли доступно только в локальном demo-контуре.");
+    }
+
+    const nextRole: Role = currentSession.role === "agent" ? "admin" : "agent";
+    const { localDevAuthRegistrationAdapter } =
+      await import("./shared/authRegistration");
+    const nextSession =
+      await localDevAuthRegistrationAdapter.activateApprovedRole(nextRole);
+
+    commitAuthSession(nextSession);
+    setWorkspace(nextRole);
+    await refreshAccessRequests(nextSession);
+  }, [
+    activeApprovedSession,
+    commitAuthSession,
+    refreshAccessRequests,
+    supabaseEnabled,
+  ]);
 
   const handleRegister = useCallback(
     async (input: AccessRequestRegistrationInput) => {
@@ -1749,6 +1855,27 @@ export default function App({
             createdBy: session.userId,
             documentExport,
             format: "xlsx" as const,
+            ...(!supabaseEnabled
+              ? {
+                  persistExportedSubmissions: async (
+                    exportedSelection: Submission[],
+                  ) => {
+                    fence.assertCurrent();
+                    const exportedById = new Map(
+                      exportedSelection.map((submission) => [
+                        submission.id,
+                        submission,
+                      ]),
+                    );
+                    const exportedWorkspace = downloadedSubmissions.map(
+                      (submission) =>
+                        exportedById.get(submission.id) ?? submission,
+                    );
+                    await persistSubmissions(exportedWorkspace, fence);
+                    fence.assertCurrent();
+                  },
+                }
+              : {}),
           };
           let completed: Awaited<ReturnType<typeof completeExportPackage>>;
           try {
@@ -1846,6 +1973,7 @@ export default function App({
       enqueueWorkspaceSubmissionMutation,
       persistSubmissions,
       refreshCanonicalSubmissions,
+      supabaseEnabled,
       updateAdminSubmission,
       workspace,
     ],
@@ -1966,18 +2094,25 @@ export default function App({
           onApproveAccessRequest: handleApproveAccessRequest,
           onRejectAccessRequest: handleRejectAccessRequest,
           onSignOut: handleSignOut,
+          onSwitchWorkspace: localDemoRoleSwitchEnabled
+            ? handleLocalDemoWorkspaceSwitch
+            : undefined,
           submissions,
           usesSupabase: supabaseEnabled,
         }}
         agentWorkspaceProps={{
           agentId: activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId,
           onAssignPublicNumber: assignVisibleAgentSubmissionPublicNumber,
+          onSubmissionReadback: readVisibleAgentSubmission,
           onSubmissionUpdate: updateVisibleAgentSubmission,
           onSubmissionsChange: persistVisibleAgentSubmissions,
           reservedSubmissionIds: submissions.map((submission) => submission.id),
           submissions: visibleSubmissions,
           usesSupabase: supabaseEnabled,
           onSignOut: handleSignOut,
+          onSwitchWorkspace: localDemoRoleSwitchEnabled
+            ? handleLocalDemoWorkspaceSwitch
+            : undefined,
         }}
         bridge={appBridge}
         onRetryWorkspace={refreshCanonicalSubmissions}

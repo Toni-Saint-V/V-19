@@ -9,8 +9,11 @@ import {
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
+  ArrowRight,
   BookUser,
+  CheckCircle2,
   Plus,
+  RotateCcw,
   UploadCloud,
   UserRound,
   UsersRound,
@@ -23,7 +26,6 @@ import {
   passportIntakeApplicantName,
   passportIntakePreviewFields,
   passportScanUploadAccept,
-  passportScanUploadFormatLabel,
   passportUploadFromIntakeItem,
   submissionIntakeApplicantCount,
   submissionIntakeFamilyMax,
@@ -121,9 +123,7 @@ function applicantCellLabel(
 ) {
   const applicantName = passportIntakeApplicantName(item);
   if (applicantName) return applicantName;
-  if (type === "single" || index === 0) return "Основной";
-  if (index === 1) return "Супруг/а";
-  return `Ребёнок ${index - 1}`;
+  return applicantRoleLabel(index, type);
 }
 
 function extractedValue(item: PassportIntakeItem | undefined, key: string) {
@@ -250,6 +250,10 @@ export function PreUploadScreen({
     useState<Submission["type"]>(initialPackageType);
   const [city, setCity] = useState<City | "">(initialCity ?? "");
   const [familyApplicantCount, setFamilyApplicantCount] = useState(2);
+  const [familyResidence, setFamilyResidence] = useState({
+    russia: true,
+    spain: true,
+  });
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
   const [items, setItems] = useState<PassportIntakeItem[]>([]);
   const [dropActive, setDropActive] = useState(false);
@@ -261,7 +265,7 @@ export function PreUploadScreen({
   const [pendingAssignments, setPendingAssignments] = useState<PendingAssignment[]>([]);
   const [confirmation, setConfirmation] = useState<ConfirmationAction | null>(null);
 
-  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const initialFocusRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingApplicantIndexRef = useRef<number | null>(null);
   const actionPendingRef = useRef(false);
@@ -275,6 +279,7 @@ export function PreUploadScreen({
   const prefillSheetRef = useRef<HTMLElement | null>(null);
   const assignmentDialogRef = useRef<HTMLElement | null>(null);
   const confirmationDialogRef = useRef<HTMLElement | null>(null);
+  const manualContinueRef = useRef<HTMLButtonElement | null>(null);
 
   const applicantCount = submissionIntakeApplicantCount(
     packageType,
@@ -294,7 +299,10 @@ export function PreUploadScreen({
     city ||
     items.length ||
     packageType !== initialPackageType ||
-    (packageType === "family" && familyApplicantCount !== 2),
+    (packageType === "family" &&
+      (familyApplicantCount !== 2 ||
+        !familyResidence.russia ||
+        !familyResidence.spain)),
   );
   const isBusy = actionPending || busyItems.length > 0;
   const submissionDisabledReason = actionPending
@@ -307,6 +315,8 @@ export function PreUploadScreen({
           ? "Дождитесь распознавания или выберите «Заполнить вручную»."
           : "";
   const submitDisabled = Boolean(submissionDisabledReason);
+  const visibleSubmissionDisabledReason =
+    city && !actionPending ? submissionDisabledReason : "";
 
   useEffect(() => {
     itemsRef.current = items;
@@ -330,7 +340,7 @@ export function PreUploadScreen({
     focusOriginRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     window.requestAnimationFrame(() =>
-      headingRef.current?.focus({ preventScroll: true }),
+      initialFocusRef.current?.focus({ preventScroll: true }),
     );
     return () => {
       for (const controller of ocrControllers.values()) controller.abort();
@@ -602,8 +612,19 @@ export function PreUploadScreen({
     patchItem(item.id, {
       extractedFields: [],
       status: "unavailable",
-      summary: "Паспорт сохранится, данные нужно заполнить вручную.",
+      summary: "Паспорт добавлен. Данные нужно заполнить вручную.",
     });
+    setActionError("");
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => {
+        const nextStep = manualContinueRef.current;
+        nextStep?.scrollIntoView?.({
+          behavior: reduceMotion ? "auto" : "smooth",
+          block: "nearest",
+        });
+        nextStep?.focus({ preventScroll: true });
+      }),
+    );
   };
 
   const retryOcr = (item: PassportIntakeItem) => {
@@ -652,6 +673,22 @@ export function PreUploadScreen({
           passportUploads: [...items]
             .sort((left, right) => left.applicantIndex - right.applicantIndex)
             .map(passportUploadFromIntakeItem),
+          preliminaryIntake:
+            packageType === "family"
+              ? {
+                  arrivalPlace: "",
+                  homeAddress: "",
+                  sameArrivalPlace: false,
+                  sameHomeAddress: familyResidence.russia,
+                  sameSpainStay: familyResidence.spain,
+                  sameTripDates: false,
+                  spainStayAddress: "",
+                  spainStayCity: "",
+                  spainStayName: "",
+                  tripDateFrom: "",
+                  tripDateTo: "",
+                }
+              : undefined,
           type: packageType,
         },
         setPersistenceProgress,
@@ -731,13 +768,7 @@ export function PreUploadScreen({
 
               <div className="v19-preupload-card-body">
                 <div className="v19-preupload-card-intro relative z-10">
-                  <h2
-                    id="new-submission-workspace-title"
-                    ref={headingRef}
-                    tabIndex={-1}
-                  >
-                    Данные подачи
-                  </h2>
+                  <h2 id="new-submission-workspace-title">Данные подачи</h2>
                   <p>Выберите тип и город. Паспорт можно добавить сейчас или позже.</p>
                 </div>
 
@@ -772,6 +803,7 @@ export function PreUploadScreen({
                             disabled={actionPending}
                             key={option.type}
                             onClick={() => requestSwitchType(option.type)}
+                            ref={active ? initialFocusRef : undefined}
                             role="radio"
                             type="button"
                           >
@@ -783,7 +815,6 @@ export function PreUploadScreen({
                     </div>
 
                     <div className="v19-preupload-city-field">
-                      <span>Город подачи</span>
                       <AccessibleSelectMenu
                         ariaLabel="Город подачи"
                         disabled={actionPending}
@@ -801,7 +832,102 @@ export function PreUploadScreen({
                     </div>
                   </div>
 
+                  {packageType === "family" ? (
+                    <div
+                      aria-label="Общие данные семьи"
+                      className="grid gap-2 rounded-xl border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-panel)] p-3 sm:grid-cols-2"
+                      data-testid="preupload-family-sharing"
+                      role="group"
+                    >
+                      {[
+                        {
+                          key: "russia" as const,
+                          question: "Одинаковый адрес проживания в России?",
+                        },
+                        {
+                          key: "spain" as const,
+                          question: "Одинаковый адрес проживания в Испании?",
+                        },
+                      ].map(({ key, question }) => (
+                        <div
+                          className="flex min-w-0 items-center justify-between gap-3"
+                          key={key}
+                        >
+                          <span className="text-xs leading-5 text-[var(--v19-depth-text)]">
+                            {question}
+                          </span>
+                          <div
+                            aria-label={question}
+                            className="flex shrink-0 rounded-lg border border-[var(--v19-depth-border-strong)] bg-[var(--v19-depth-page)] p-0.5"
+                            role="radiogroup"
+                          >
+                            {[
+                              { label: "Да", value: true },
+                              { label: "Нет", value: false },
+                            ].map((option) => {
+                              const active = familyResidence[key] === option.value;
+                              return (
+                                <button
+                                  {...agentInteractionProps("new-submission.configure")}
+                                  aria-checked={active}
+                                  aria-label={`${question}: ${option.label}`}
+                                  className={`min-h-11 min-w-11 rounded-md px-3 text-xs font-semibold transition-colors ${
+                                    active
+                                      ? "bg-[var(--v19-depth-accent-soft)] text-[var(--v19-depth-text-strong)]"
+                                      : "text-[var(--v19-depth-text-strong)] hover:text-[var(--v19-depth-text-strong)]"
+                                  }`}
+                                  disabled={actionPending}
+                                  key={option.label}
+                                  onClick={() =>
+                                    setFamilyResidence((current) => ({
+                                      ...current,
+                                      [key]: option.value,
+                                    }))
+                                  }
+                                  role="radio"
+                                  type="button"
+                                >
+                                  {option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-[11px] leading-4 text-[var(--v19-depth-text-strong)] sm:col-span-2">
+                        При двух ответах «Да» адреса и данные записи основного заявителя
+                        будут автоматически применяться ко всей семье.
+                      </p>
+                    </div>
+                  ) : null}
+
                   <div className="v19-preupload-applicant-controls">
+                    {packageType === "family" ? (
+                      <button
+                        {...agentInteractionProps("new-submission.configure")}
+                        aria-label={
+                          applicantCount >= submissionIntakeFamilyMax
+                            ? `Максимум ${submissionIntakeFamilyMax} заявителей`
+                            : "Добавить следующего заявителя"
+                        }
+                        className="v19-preupload-family-add"
+                        data-testid="preupload-family-add"
+                        disabled={
+                          actionPending ||
+                          busyItems.length > 0 ||
+                          applicantCount >= submissionIntakeFamilyMax
+                        }
+                        onClick={() =>
+                          setFamilyApplicantCount((current) =>
+                            Math.min(submissionIntakeFamilyMax, current + 1),
+                          )
+                        }
+                        type="button"
+                      >
+                        <Plus aria-hidden="true" />
+                        <span className="sr-only">Добавить заявителя</span>
+                      </button>
+                    ) : null}
                     <div
                       className="v19-preupload-applicant-grid"
                       data-package-type={packageType}
@@ -865,9 +991,11 @@ export function PreUploadScreen({
                                     {applicantDetails}
                                   </span>
                                 ) : null}
-                                <span className="v19-preupload-applicant-state">
-                                  {statusLabel(item)}
-                                </span>
+                                {item ? (
+                                  <span className="v19-preupload-applicant-state">
+                                    {statusLabel(item)}
+                                  </span>
+                                ) : null}
                               </span>
                             </button>
                             <button
@@ -914,35 +1042,6 @@ export function PreUploadScreen({
                           </article>
                         );
                       })}
-                      {packageType === "family" ? (
-                        <article
-                          className="v19-preupload-add-applicant"
-                          role="listitem"
-                        >
-                          <button
-                            {...agentInteractionProps("new-submission.configure")}
-                            aria-label={
-                              applicantCount >= submissionIntakeFamilyMax
-                                ? `Максимум ${submissionIntakeFamilyMax} заявителей`
-                                : "Добавить следующего заявителя"
-                            }
-                            disabled={
-                              actionPending ||
-                              busyItems.length > 0 ||
-                              applicantCount >= submissionIntakeFamilyMax
-                            }
-                            onClick={() =>
-                              setFamilyApplicantCount((current) =>
-                                Math.min(submissionIntakeFamilyMax, current + 1),
-                              )
-                            }
-                            type="button"
-                          >
-                            <Plus aria-hidden="true" />
-                            <span className="sr-only">Добавить заявителя</span>
-                          </button>
-                        </article>
-                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -990,21 +1089,62 @@ export function PreUploadScreen({
                     ) : activeItem &&
                       (activeItem.status === "failed" ||
                         activeItem.status === "unavailable") ? (
-                      <div className="v19-preupload-manual-state" role="status">
-                        <span>{activeItem.summary}</span>
-                        <button
-                          {...agentInteractionProps("new-submission.manage-file")}
-                          onClick={() => retryOcr(activeItem)}
-                          type="button"
+                      <section
+                        aria-labelledby="preupload-manual-title"
+                        aria-live="polite"
+                        className="v19-preupload-manual-state"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="v19-preupload-manual-state-icon"
                         >
-                          Распознать снова
-                        </button>
-                      </div>
+                          <CheckCircle2 />
+                        </span>
+                        <div className="v19-preupload-manual-state-copy">
+                          <span className="v19-preupload-manual-state-kicker">
+                            Ручное заполнение
+                          </span>
+                          <h3 id="preupload-manual-title">Паспорт добавлен</h3>
+                          <p>
+                            {activeItem.status === "failed"
+                              ? "Распознавание не удалось. Откройте анкету и заполните паспортные данные вручную."
+                              : "Распознавание пропущено. Откройте анкету и заполните паспортные данные вручную."}
+                          </p>
+                        </div>
+                        <div className="v19-preupload-manual-state-actions">
+                          <button
+                            {...agentInteractionProps("new-submission.manage-file")}
+                            className="v19-preupload-manual-retry"
+                            onClick={() => retryOcr(activeItem)}
+                            type="button"
+                          >
+                            <RotateCcw aria-hidden="true" />
+                            <span>Распознать снова</span>
+                          </button>
+                          <button
+                            {...agentInteractionProps("new-submission.continue")}
+                            aria-describedby={
+                              visibleSubmissionDisabledReason
+                                ? "preupload-disabled-reason"
+                                : undefined
+                            }
+                            className="v19-preupload-manual-continue"
+                            disabled={submitDisabled}
+                            onClick={() => void submit("questionnaire")}
+                            ref={manualContinueRef}
+                            type="button"
+                          >
+                            <span>Далее: открыть анкету</span>
+                            <ArrowRight aria-hidden="true" />
+                          </button>
+                        </div>
+                      </section>
                     ) : null}
 
                     <button
                       {...agentInteractionProps("new-submission.choose-files")}
-                      aria-label="Выбрать файлы"
+                      aria-describedby="preupload-passport-upload-title preupload-passport-upload-description"
+                      aria-labelledby="preupload-file-picker-label"
                       className={`v19-preupload-dropzone relative flex min-h-[180px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-3xl border border-dashed p-6 text-center transition-colors ${dropActive ? "is-drag-active" : ""}`}
                       disabled={actionPending || busyItems.length > 0}
                       onClick={() => openFilePicker(null)}
@@ -1060,15 +1200,28 @@ export function PreUploadScreen({
                           />
                         )}
                       </motion.div>
-                      <h3 className="text-[18px] font-semibold text-white">
+                      <h3
+                        className="text-[18px] font-semibold text-white"
+                        id="preupload-passport-upload-title"
+                      >
                         {activeItem
                           ? `Заменить паспорт: ${activeApplicantLabel}`
-                          : `Паспорт: ${activeApplicantLabel}`}
+                          : `${activeApplicantLabel}.`}
                       </h3>
-                      <p className="v19-preupload-dropzone-copy">
-                        {passportScanUploadFormatLabel}, до 50 МБ. Распознаём данные на
-                        этом устройстве. Файл загрузится только после сохранения.
+                      <p
+                        className="v19-preupload-dropzone-copy"
+                        id="preupload-passport-upload-description"
+                      >
+                        {activeItem
+                          ? "Выберите новый файл, если паспорт нужно заменить."
+                          : "Загрузите скан загранпаспорта. Это позволит вам меньше заполнять анкету за счет извлеченных данных."}
                       </p>
+                      <span
+                        className="v19-file-picker-button v19-preupload-file-picker-button"
+                        id="preupload-file-picker-label"
+                      >
+                        Выбрать файл
+                      </span>
                     </button>
                     <input
                       {...agentInteractionProps("new-submission.choose-files")}
@@ -1105,18 +1258,20 @@ export function PreUploadScreen({
                     {actionError}
                   </p>
                 ) : null}
-                {submissionDisabledReason && !actionPending ? (
+                {visibleSubmissionDisabledReason ? (
                   <p
                     className="v19-preupload-disabled-reason"
                     id="preupload-disabled-reason"
                   >
-                    {submissionDisabledReason}
+                    {visibleSubmissionDisabledReason}
                   </p>
                 ) : null}
                 <button
                   {...agentInteractionProps("new-submission.save-draft")}
                   aria-describedby={
-                    submitDisabled ? "preupload-disabled-reason" : undefined
+                    visibleSubmissionDisabledReason
+                      ? "preupload-disabled-reason"
+                      : undefined
                   }
                   className="v19-preupload-secondary-action"
                   disabled={submitDisabled}
@@ -1129,19 +1284,31 @@ export function PreUploadScreen({
                 </button>
                 <button
                   {...agentInteractionProps("new-submission.continue")}
+                  aria-label={
+                    actionPending
+                      ? persistenceLabel(persistenceProgress)
+                      : items.length
+                        ? "Создать и открыть анкету"
+                        : "Продолжить без паспорта"
+                  }
                   aria-describedby={
-                    submitDisabled ? "preupload-disabled-reason" : undefined
+                    visibleSubmissionDisabledReason
+                      ? "preupload-disabled-reason"
+                      : undefined
                   }
                   className="v19-preupload-primary-action"
                   disabled={submitDisabled}
                   onClick={() => void submit("questionnaire")}
                   type="button"
                 >
-                  {actionPending
-                    ? persistenceLabel(persistenceProgress)
-                    : items.length
-                      ? "Создать и открыть анкету"
-                      : "Продолжить без паспорта"}
+                  <span>
+                    {actionPending
+                      ? persistenceLabel(persistenceProgress)
+                      : items.length
+                        ? "Далее: открыть анкету"
+                        : "Продолжить без паспорта"}
+                  </span>
+                  {!actionPending ? <ArrowRight aria-hidden="true" /> : null}
                 </button>
               </div>
             </motion.div>

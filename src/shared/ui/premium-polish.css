@@ -1863,7 +1863,7 @@ button.v19-case-copilot-signal:hover {
 
 .v19-access-tabs button {
   display: inline-flex;
-  min-height: 34px;
+  min-height: 40px;
   align-items: center;
   gap: 6px;
   padding: 0 10px;
@@ -1902,7 +1902,7 @@ button.v19-case-copilot-signal:hover {
 .v19-access-search {
   display: grid;
   width: min(340px, 100%);
-  min-height: 38px;
+  min-height: 40px;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
@@ -1924,6 +1924,7 @@ button.v19-case-copilot-signal:hover {
 }
 
 .v19-access-search input {
+  height: 100%;
   min-width: 0;
   border: 0;
   outline: 0;
@@ -1938,8 +1939,8 @@ button.v19-case-copilot-signal:hover {
 
 .v19-access-search button {
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   border-radius: 7px;
 }
@@ -2283,12 +2284,24 @@ button.v19-case-copilot-signal:hover {
 
 .v19-preference-row > button[role="switch"] {
   position: relative;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.v19-preference-row > button[role="switch"]::before {
+  position: absolute;
+  top: 10px;
+  left: 1px;
   width: 42px;
   height: 24px;
-  flex: 0 0 auto;
   border: 1px solid var(--v19-polish-line-hover);
-  border-radius: 999px;
+  border-radius: inherit;
   background: var(--v19-depth-control);
+  content: "";
   transition:
     border-color var(--v19-polish-motion-fast) var(--v19-polish-ease),
     background-color var(--v19-polish-motion-fast) var(--v19-polish-ease);
@@ -2296,8 +2309,8 @@ button.v19-case-copilot-signal:hover {
 
 .v19-preference-row > button[role="switch"] span {
   position: absolute;
-  top: 3px;
-  left: 3px;
+  top: 14px;
+  left: 4px;
   width: 16px;
   height: 16px;
   border-radius: 50%;
@@ -2309,6 +2322,10 @@ button.v19-case-copilot-signal:hover {
 }
 
 .v19-preference-row > button[role="switch"].is-on {
+  background: transparent;
+}
+
+.v19-preference-row > button[role="switch"].is-on::before {
   border-color: var(--v19-depth-accent-border);
   background: var(--v19-depth-accent);
 }
@@ -2560,6 +2577,19 @@ html[data-v19-reduced-motion="on"] *::after {
 }
 
 @media (max-width: 640px) {
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-queue-toolbar.v19-two-row-toolbar {
+    grid-template-rows: 44px !important;
+    min-height: 44px !important;
+  }
+
+  :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-queue-toolbar-search
+    input,
+  .v19-admin-export-rail-v2 :is(button, a) {
+    min-height: 44px;
+  }
+
   .v19-command-trigger span,
   .v19-command-trigger kbd {
     display: none;
@@ -2692,7 +2722,22 @@ html[data-v19-reduced-motion="on"] *::after {
   }
 
   .v19-access-tabs button {
+    min-height: 44px;
     justify-content: space-between;
+  }
+
+  .v19-access-search {
+    min-height: 44px;
+  }
+
+  .v19-access-search input {
+    min-height: 44px;
+  }
+
+  .v19-access-search button {
+    width: 44px;
+    height: 44px;
+    margin-right: -9px;
   }
 
   .v19-access-row {
@@ -2719,7 +2764,7 @@ html[data-v19-reduced-motion="on"] *::after {
   }
 
   .v19-access-actions .mp-button {
-    min-height: 42px;
+    min-height: 44px;
   }
 
   .v19-preference-row {
@@ -2734,7 +2779,7 @@ html[data-v19-reduced-motion="on"] *::after {
 
   .v19-settings-panel-footer .mp-button {
     width: 100%;
-    min-height: 42px;
+    min-height: 44px;
   }
 }
 

@@ -18,9 +18,11 @@ function deferred() {
 function renderAgentMenu({
   onCloseMobile = vi.fn(),
   onResetWorkspace,
+  onSwitchWorkspace,
 }: {
   onCloseMobile?: ReturnType<typeof vi.fn>;
   onResetWorkspace: () => void | Promise<void>;
+  onSwitchWorkspace?: () => void | Promise<void>;
 }) {
   render(
     <V19SideMenu
@@ -40,6 +42,7 @@ function renderAgentMenu({
       mobileTitle="Меню"
       onCloseMobile={onCloseMobile}
       onResetWorkspace={onResetWorkspace}
+      onSwitchWorkspace={onSwitchWorkspace}
       role="agent"
       sessionDisplayName="CODEX E2E Agent"
       sessionInitials="CE"
@@ -99,5 +102,41 @@ describe("V19SideMenu sign out", () => {
 
     await waitFor(() => expect(onCloseMobile).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("button", { name: "Выйти" })).toBeEnabled();
+  });
+});
+
+describe("V19SideMenu local demo role switch", () => {
+  test("does not expose a role switch unless the guarded callback is provided", () => {
+    renderAgentMenu({ onResetWorkspace: vi.fn() });
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Переключиться в кабинет администратора",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("coalesces role switching and closes the mobile menu after success", async () => {
+    const switchWorkspace = deferred();
+    const onSwitchWorkspace = vi.fn().mockReturnValue(switchWorkspace.promise);
+    const { onCloseMobile } = renderAgentMenu({
+      onResetWorkspace: vi.fn(),
+      onSwitchWorkspace,
+    });
+    const button = screen.getByRole("button", {
+      name: "Переключиться в кабинет администратора",
+    });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(onSwitchWorkspace).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(onCloseMobile).not.toHaveBeenCalled();
+
+    switchWorkspace.resolve();
+
+    await waitFor(() => expect(onCloseMobile).toHaveBeenCalledTimes(1));
   });
 });

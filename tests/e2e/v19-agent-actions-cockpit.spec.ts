@@ -2,7 +2,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { testArtifactPath } from "../support/artifacts";
 
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./v19-localhost-test";
 import { openFreshWorkspace } from "./v19-pilot-helpers";
 
 const proofDir = testArtifactPath("2026-07-01-agent-actions-cockpit");
@@ -179,18 +180,26 @@ async function assertDesktopCockpit(page: Page) {
   await expect(surface.getByTestId("agent-action-active-panel")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-table-rank")).toHaveCount(0);
   await expect(surface.locator(".v19-actions-table-priority")).toHaveCount(0);
-  await expect(surface.locator(".v19-actions-table-city")).toHaveCount(0);
-  await expect(surface.locator(".v19-actions-table-dates")).toHaveCount(0);
 
   const headerCells = surface.locator(".v19-actions-table-head > span");
-  await expect(headerCells).toHaveCount(3);
-  await expect(headerCells).toHaveText(["Заявитель / ID", "Следующий шаг", "Статус"]);
+  await expect(headerCells).toHaveCount(5);
+  await expect(headerCells).toHaveText([
+    "ID",
+    "Имя, фамилия",
+    "Даты поездки",
+    "Город",
+    "Действие",
+  ]);
 
   const firstRowCells = [
-    rows.first().locator(".v19-actions-cell-identity"),
-    rows.first().locator(".v19-actions-cell-next"),
-    rows.first().locator(".v19-actions-cell-status"),
+    rows.first().locator(".v19-actions-cell-id"),
+    rows.first().locator(".v19-actions-cell-applicant"),
+    rows.first().locator(".v19-actions-cell-dates"),
+    rows.first().locator(".v19-actions-cell-city"),
+    rows.first().locator(".v19-actions-cell-action"),
   ];
+  const headerBoxes = [];
+  const rowCellBoxes = [];
 
   for (let index = 0; index < firstRowCells.length; index += 1) {
     const header = headerCells.nth(index);
@@ -207,14 +216,41 @@ async function assertDesktopCockpit(page: Page) {
       throw new Error(`Column ${index + 1} does not expose measurable geometry.`);
     }
 
+    headerBoxes.push(headerBox);
+    rowCellBoxes.push(rowCellBox);
     const horizontalOverlap =
       Math.min(headerBox.x + headerBox.width, rowCellBox.x + rowCellBox.width) -
       Math.max(headerBox.x, rowCellBox.x);
     expect(
       horizontalOverlap,
-      `Column ${index + 1} header aligns with its row value`,
+      `Column ${index + 1} header stays aligned with its row value`,
     ).toBeGreaterThan(0);
   }
+
+  const headerWidth = headerBoxes.reduce((sum, box) => sum + box.width, 0);
+  const rowWidth = rowCellBoxes.reduce((sum, box) => sum + box.width, 0);
+  for (let index = 0; index < headerBoxes.length; index += 1) {
+    expect(
+      Math.abs(
+        headerBoxes[index]!.width / headerWidth - rowCellBoxes[index]!.width / rowWidth,
+      ),
+      `Column ${index + 1} preserves the same proportional grid in header and row`,
+    ).toBeLessThanOrEqual(0.01);
+  }
+  expect(
+    Math.max(...rowCellBoxes.map((box) => box.height)) -
+      Math.min(...rowCellBoxes.map((box) => box.height)),
+    "all row values share one vertical alignment box",
+  ).toBeLessThanOrEqual(1);
+
+  const actionTagLabels = await rows
+    .locator(".v19-actions-action-tag")
+    .allTextContents();
+  expect(actionTagLabels.length).toBeGreaterThan(0);
+  expect(
+    actionTagLabels.every((label) => label.trim().split(/\s+/).length <= 2),
+    "rightmost action tags stay within two words",
+  ).toBe(true);
 
   const queue = surface.locator(".v19-actions-queue-list");
   const initialOrder = await rows.evaluateAll((items) =>
@@ -329,8 +365,13 @@ async function assertActionFilters(page: Page) {
 
 async function assertPrimaryActionRouting(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
+  const firstPriorityAction = surface.getByTestId("agent-action-queue-item").first();
+  await expect(firstPriorityAction).toHaveAttribute(
+    "data-agent-action-id",
+    /^replace-ПД-1048-/,
+  );
   if ((await surface.getByTestId("agent-action-inline-detail").count()) === 0) {
-    await surface.getByTestId("agent-action-queue-item").first().click();
+    await firstPriorityAction.click();
   }
   const detail = surface.getByTestId("agent-action-inline-detail");
   const primaryAction = detail.locator(
@@ -339,8 +380,11 @@ async function assertPrimaryActionRouting(page: Page) {
 
   await expect(primaryAction).toBeEnabled();
   await primaryAction.click();
-  await expect(page.locator(".vf-figma-questionnaire-screen")).toBeVisible();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const submissionDrawer = page.getByRole("dialog", { name: "Семья Ивановых" });
+  await expect(submissionDrawer).toBeVisible();
+  await expect(submissionDrawer.getByTestId("drawer-next-step")).toHaveText(
+    "Загрузить: Мария Иванова • Селфи 1",
+  );
 }
 
 test.describe("V-19 My Actions submission command cockpit", () => {

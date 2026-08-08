@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   applyPassportExtractionField,
   applySafePassportExtractionFields,
+  canConfirmApplicantPassportReview,
   canStartPassportExtraction,
   confirmApplicantPassportReview,
   finishPassportExtraction,
@@ -20,6 +21,7 @@ import {
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
 import { canPerformAction } from "../../src/modules/submissions/status";
+import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import { parsePassportMrzText } from "../../src/modules/submissions/passportExtractionService";
@@ -268,11 +270,7 @@ describe("passport extraction state", () => {
       summary: "Страна рождения подготовлена.",
     };
 
-    const readyDefault = finishPassportExtraction(
-      draft,
-      file,
-      extractedBirthCountry,
-    );
+    const readyDefault = finishPassportExtraction(draft, file, extractedBirthCountry);
     const autofilledDefault = applySafePassportExtractionFields(
       readyDefault,
       applicantId,
@@ -295,10 +293,7 @@ describe("passport extraction state", () => {
       file,
       extractedBirthCountry,
     );
-    const preservedManual = applySafePassportExtractionFields(
-      readyManual,
-      applicantId,
-    );
+    const preservedManual = applySafePassportExtractionFields(readyManual, applicantId);
     expect(questionnaireValue(preservedManual, "birth-country")).toBe("Spain");
     expect(passportExtractionRows(preservedManual.applicants[0]!)).toEqual(
       expect.arrayContaining([
@@ -607,13 +602,21 @@ describe("passport extraction state", () => {
   test("allows an explicit manual passport review when OCR state is absent", () => {
     const base = fillRequiredQuestionnaireForTest(draftSubmission());
     const file = passportFile(base);
+    const generatedFileName = "abc_passport_scan.png";
+    const storageTarget = buildMediaStoragePath(
+      base.id,
+      file.applicantId,
+      "passport_scan",
+      generatedFileName,
+    );
     const uploaded = uploadRequiredFile(base, file.id, {
-      generatedFileName: "passport-test.png",
+      generatedFileName,
       mimeType: "image/png",
       originalFileName: "passport-test.png",
       sizeBytes: 1024,
-      storageBucket: "submission-media",
-      storagePath: `${base.id}/${file.applicantId}/passport_scan/passport-test.png`,
+      storageAdapter: "supabase-private",
+      storageBucket: storageTarget.bucket,
+      storagePath: storageTarget.path,
       uploadedAtIso: "2026-07-15T00:00:00.000Z",
     });
 
@@ -621,7 +624,11 @@ describe("passport extraction state", () => {
       "passport_not_confirmed",
     );
 
-    const confirmed = confirmApplicantPassportReview(uploaded, file.applicantId);
+    const confirmed = confirmApplicantPassportReview(
+      uploaded,
+      file.applicantId,
+      uploaded.agentId,
+    );
 
     expect(confirmed.applicants[0]?.passportExtraction).toMatchObject({
       status: "unavailable",
@@ -631,6 +638,152 @@ describe("passport extraction state", () => {
       "passport_not_confirmed",
     );
     expect(confirmed.history[0]?.text).toContain("проверил паспорт");
+
+    const confirmedAgain = confirmApplicantPassportReview(
+      confirmed,
+      file.applicantId,
+      confirmed.agentId,
+    );
+    expect(confirmedAgain).toBe(confirmed);
+    expect(
+      confirmedAgain.history.filter((entry) => entry.text.includes("проверил паспорт")),
+    ).toHaveLength(1);
+  });
+
+  test("keeps manual passport review fail-closed before a durable upload and while extracting", () => {
+    const base = fillRequiredQuestionnaireForTest(draftSubmission());
+    const file = passportFile(base);
+
+    expect(
+      canConfirmApplicantPassportReview(base, file.applicantId, base.agentId),
+    ).toBe(false);
+    expect(
+      confirmApplicantPassportReview(base, file.applicantId, base.agentId),
+    ).toBe(base);
+
+    const incompleteMetadata = uploadRequiredFile(base, file.id, {
+      generatedFileName: "abc_passport_scan.png",
+      mimeType: "image/png",
+      originalFileName: "passport-incomplete.png",
+      sizeBytes: 1024,
+      uploadedAtIso: "2026-07-28T00:00:00.000Z",
+    });
+    expect(
+      canConfirmApplicantPassportReview(
+        incompleteMetadata,
+        file.applicantId,
+        incompleteMetadata.agentId,
+      ),
+    ).toBe(false);
+
+    const generatedFileName = "def_passport_scan.png";
+    const storageTarget = buildMediaStoragePath(
+      base.id,
+      file.applicantId,
+      "passport_scan",
+      generatedFileName,
+    );
+    const foreignStorage = uploadRequiredFile(base, file.id, {
+      generatedFileName,
+      mimeType: "image/png",
+      originalFileName: "passport-foreign.png",
+      sizeBytes: 1024,
+      storageAdapter: "supabase-private",
+      storageBucket: storageTarget.bucket,
+      storagePath: storageTarget.path.replace(base.id, "foreign-submission"),
+      uploadedAtIso: "2026-07-28T00:00:00.000Z",
+    });
+    expect(
+      canConfirmApplicantPassportReview(
+        foreignStorage,
+        file.applicantId,
+        foreignStorage.agentId,
+      ),
+    ).toBe(false);
+
+    const uploaded = uploadRequiredFile(base, file.id, {
+      generatedFileName,
+      mimeType: "image/png",
+      originalFileName: "passport-extracting.png",
+      sizeBytes: 1024,
+      storageAdapter: "supabase-private",
+      storageBucket: storageTarget.bucket,
+      storagePath: storageTarget.path,
+      uploadedAtIso: "2026-07-28T00:00:00.000Z",
+    });
+    const uploadedFile = passportFile(uploaded);
+    const extracting = startPassportExtraction(uploaded, uploadedFile);
+
+    expect(
+      canConfirmApplicantPassportReview(
+        extracting,
+        file.applicantId,
+        extracting.agentId,
+      ),
+    ).toBe(false);
+    expect(
+      confirmApplicantPassportReview(
+        extracting,
+        file.applicantId,
+        extracting.agentId,
+      ),
+    ).toBe(extracting);
+  });
+
+  test("denies passport confirmation to a foreign agent and in read-only lifecycle states", () => {
+    const base = fillRequiredQuestionnaireForTest(draftSubmission());
+    const file = passportFile(base);
+    const generatedFileName = "guarded_passport_scan.png";
+    const storageTarget = buildMediaStoragePath(
+      base.id,
+      file.applicantId,
+      "passport_scan",
+      generatedFileName,
+    );
+    const uploaded = uploadRequiredFile(base, file.id, {
+      generatedFileName,
+      mimeType: "image/png",
+      originalFileName: "guarded-passport.png",
+      sizeBytes: 1024,
+      storageAdapter: "supabase-private",
+      storageBucket: storageTarget.bucket,
+      storagePath: storageTarget.path,
+      uploadedAtIso: "2026-07-28T00:00:00.000Z",
+    });
+
+    expect(
+      canConfirmApplicantPassportReview(
+        uploaded,
+        file.applicantId,
+        "foreign-agent",
+      ),
+    ).toBe(false);
+    expect(
+      confirmApplicantPassportReview(uploaded, file.applicantId, "foreign-agent"),
+    ).toBe(uploaded);
+
+    for (const status of [
+      "submitted_for_review",
+      "corrections_received",
+      "ready_for_export",
+      "exported",
+    ] as const) {
+      const readOnlySubmission = { ...uploaded, status };
+      expect(
+        canConfirmApplicantPassportReview(
+          readOnlySubmission,
+          file.applicantId,
+          readOnlySubmission.agentId,
+        ),
+      ).toBe(false);
+      expect(
+        confirmApplicantPassportReview(
+          readOnlySubmission,
+          file.applicantId,
+          readOnlySubmission.agentId,
+        ),
+      ).toBe(readOnlySubmission);
+    }
   });
 
   test("requires review before submitting corrections after passport extraction", () => {

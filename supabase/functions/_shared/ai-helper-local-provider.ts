@@ -1,3 +1,4 @@
+// supabase/functions/_shared/ai-helper-local-provider.ts
 import {
   aiHelperBaseGuardrails,
   buildSafeAiHelperStubResult,
@@ -95,7 +96,9 @@ function normalizeBaseUrl(value: string | undefined): string | null {
   return trimmed.replace(/\/$/, "");
 }
 
-function buildLiteLlmConfig(env: AiHelperLocalProviderEnv): LiteLlmProviderConfig | null {
+function buildLiteLlmConfig(
+  env: AiHelperLocalProviderEnv,
+): LiteLlmProviderConfig | null {
   const baseUrl = normalizeBaseUrl(env.AI_HELPER_LITELLM_BASE_URL);
   const model = env.AI_HELPER_LITELLM_MODEL_GENERAL?.trim() || "qwen2.5:7b";
 
@@ -212,13 +215,46 @@ function normalizeProviderResult(
   };
 }
 
-function systemPrompt(): string {
+function intentInstructions(intent: AiHelperIntent): string {
+  if (intent === "correction_draft" || intent === "admin_issue_remark_draft") {
+    return [
+      "Write in Russian.",
+      "The summary must be one or two neutral opening sentences for a correction message.",
+      "Do not invent, restate, add, remove, or prioritize concrete correction facts.",
+      "Do not include names, identifiers, dates, contacts, document numbers, links, deadlines, or outcome promises.",
+      "Suggestions may contain at most three short clarifying questions for the human operator.",
+      "If issueRemarkDraft is returned, it must contain only the same safe opening copy as summary.",
+    ].join(" ");
+  }
+
+  if (
+    intent === "admin_review" ||
+    intent === "admin_next_action" ||
+    intent === "admin_readiness_explanation"
+  ) {
+    return [
+      "Write in Russian for an internal operator.",
+      "Explain uncertainty and ask concise clarifying questions when evidence is incomplete.",
+      "Never override deterministic action availability or claim that the package is accepted.",
+      "Keep checklists prioritized and limited to five items.",
+    ].join(" ");
+  }
+
+  return [
+    "Write in Russian.",
+    "Prefer concise explanations and actionable questions.",
+    "Do not repeat raw context or invent facts.",
+  ].join(" ");
+}
+
+function systemPrompt(intent: AiHelperIntent): string {
   return [
     "You are a VisaFlow helper running behind a server-side governance gateway.",
     "Return only valid JSON with keys: title, summary, suggestions, blockers, guardrails, operatorSummary, agentFollowUpDrafts.",
     "For admin intents you may also return adminReviewChecklist, nextAction, issueRemarkDraft, readinessExplanation.",
     "Use only the sanitized context. Do not infer identity, outcome likelihood, authority validation, guarantees, OCR, MRZ, passport data, contacts, addresses, document paths, or image content.",
     "Keep every field concise. Deterministic checks remain the source of truth.",
+    intentInstructions(intent),
   ].join(" ");
 }
 
@@ -228,6 +264,22 @@ function userPrompt(request: AiHelperProviderRequest): string {
     actorRole: request.actorRole,
     sanitizedContext: request.context,
   });
+}
+
+function outputTokenBudget(intent: AiHelperIntent, configuredLimit: number): number {
+  if (intent === "correction_draft" || intent === "admin_issue_remark_draft") {
+    return Math.min(configuredLimit, 220);
+  }
+
+  if (
+    intent === "admin_review" ||
+    intent === "admin_next_action" ||
+    intent === "admin_readiness_explanation"
+  ) {
+    return Math.min(configuredLimit, 480);
+  }
+
+  return Math.min(configuredLimit, 600);
 }
 
 function buildLiteLlmProvider(
@@ -249,10 +301,10 @@ function buildLiteLlmProvider(
           body: JSON.stringify({
             model: config.model,
             temperature: 0,
-            max_tokens: config.maxOutputTokens,
+            max_tokens: outputTokenBudget(request.intent, config.maxOutputTokens),
             response_format: { type: "json_object" },
             messages: [
-              { role: "system", content: systemPrompt() },
+              { role: "system", content: systemPrompt(request.intent) },
               { role: "user", content: userPrompt(request) },
             ],
           }),

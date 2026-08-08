@@ -1,3 +1,4 @@
+// tests/unit/activeAdminExportScreen.spec.tsx
 import {
   act,
   cleanup,
@@ -76,58 +77,53 @@ function changeQuestionnaireField(
 }
 
 describe("active admin export screen", () => {
-  test("puts a blocked package reason and next step before secondary export details", () => {
+  test("shows only submissions that pass the canonical export readiness gate", () => {
     const ready = readySubmission();
-    const blockedSubmission: Submission = {
+    const returnedForRework: Submission = {
       ...ready,
-      id: "BLOCKED-EXPORT-1",
-      listTitle: "Пакет с ошибкой",
-      title: "Пакет с ошибкой",
+      id: "RETURNED-FOR-REWORK-1",
+      listTitle: "Пакет на доработке",
+      status: "returned",
+      title: "Пакет на доработке",
+    };
+    const incompletePackage: Submission = {
+      ...ready,
+      id: "INCOMPLETE-EXPORT-1",
       files: [],
+      listTitle: "Пакет без документов",
+      title: "Пакет без документов",
     };
 
-    render(<AdminExportScreen submissions={[ready, blockedSubmission]} />);
-    fireEvent.click(
-      screen.getByRole("checkbox", {
-        name: `Выбрать ${ready.listTitle ?? ready.title}`,
-      }),
+    render(
+      <AdminExportScreen
+        submissions={[ready, returnedForRework, incompletePackage]}
+      />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Стоп" }));
 
-    const diagnostics = screen.getByRole("region", {
-      name: "Почему выгрузка остановлена",
-    });
-    expect(diagnostics).toHaveTextContent("нельзя выгрузить");
-    expect(diagnostics).toHaveTextContent(
-      "В выборке есть подачи без полного канонического пакета медиа",
-    );
-    expect(diagnostics).toHaveTextContent("Что сделать");
-    expect(diagnostics).toHaveTextContent(
-      "добавьте или примите обязательные документы",
-    );
+    expect(screen.getByTestId(`admin-export-row-${ready.id}`)).toBeInTheDocument();
     expect(
-      within(diagnostics).getByRole("button", { name: "Показать пакет в очереди" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Тихая AI-помощь")).not.toBeInTheDocument();
-    expect(screen.queryByText("Проверка перед выгрузкой")).not.toBeInTheDocument();
-    expect(screen.queryByText("Состав выгрузки")).not.toBeInTheDocument();
+      screen.queryByTestId(`admin-export-row-${returnedForRework.id}`),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`admin-export-row-${incompletePackage.id}`),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", {
+        name: `Выбрать ${returnedForRework.listTitle ?? returnedForRework.title}`,
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Стоп" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Доступно" })).toHaveTextContent("1");
   });
 
-  test("shows the active blocked package instead of a stale selection conflict", () => {
+  test("keeps selection-level blockers for individually ready packages", () => {
     const ready = readySubmission();
     const crossCity = initialSubmissions.find((item) => item.id === "SUB-1103");
     if (!crossCity) {
       throw new Error("Missing cross-city export fixture SUB-1103");
     }
-    const blockedSubmission: Submission = {
-      ...ready,
-      id: "BLOCKED-EXPORT-COLLISION",
-      listTitle: "Пакет без документов",
-      title: "Пакет без документов",
-      files: [],
-    };
 
-    render(<AdminExportScreen submissions={[ready, crossCity, blockedSubmission]} />);
+    render(<AdminExportScreen submissions={[ready, crossCity]} />);
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: `Выбрать ${ready.listTitle ?? ready.title}`,
@@ -139,54 +135,14 @@ describe("active admin export screen", () => {
       }),
     );
 
-    expect(
-      screen.getByRole("region", { name: "Почему выгрузка остановлена" }),
-    ).toHaveTextContent("Нельзя смешивать разные города");
-
-    fireEvent.click(screen.getByRole("button", { name: "Стоп" }));
-
     const diagnostics = screen.getByRole("region", {
       name: "Почему выгрузка остановлена",
     });
+    expect(diagnostics).toHaveTextContent("Нельзя смешивать разные города");
     expect(
       screen.getByRole("region", { name: "Панель контроля выгрузки" }),
-    ).toHaveTextContent(/Активный пакет\s*Пакет без документов/);
-    expect(diagnostics).toHaveTextContent(
-      "В выборке есть подачи без полного канонического пакета медиа",
-    );
-    expect(diagnostics).not.toHaveTextContent("Нельзя смешивать разные города");
-  });
-
-  test("opens blocked package reasons with the keyboard", () => {
-    const base = readySubmission();
-    const firstBlocked: Submission = {
-      ...base,
-      id: "BLOCKED-EXPORT-KEYBOARD-1",
-      listTitle: "Первый пакет",
-      title: "Первый пакет",
-      files: [],
-    };
-    const secondBlocked: Submission = {
-      ...base,
-      id: "BLOCKED-EXPORT-KEYBOARD-2",
-      listTitle: "Второй пакет",
-      title: "Второй пакет",
-      files: [],
-    };
-
-    render(<AdminExportScreen submissions={[firstBlocked, secondBlocked]} />);
-    fireEvent.click(screen.getByRole("button", { name: "Стоп" }));
-
-    const secondRow = screen.getByRole("button", {
-      name: "Показать причины для Второй пакет",
-    });
-    secondRow.focus();
-    fireEvent.keyDown(secondRow, { key: "Enter" });
-
-    expect(secondRow).toHaveFocus();
-    expect(
-      screen.getByRole("region", { name: "Панель контроля выгрузки" }),
-    ).toHaveTextContent(/Активный пакет\s*Второй пакет/);
+    ).toHaveTextContent("сам пакет готов");
+    expect(screen.queryByRole("button", { name: "Стоп" })).not.toBeInTheDocument();
   });
 
   test("shows an action failure as a readable alert with a recovery step", async () => {
@@ -274,6 +230,26 @@ describe("active admin export screen", () => {
     expect(within(row).queryByText("Москва")).not.toBeInTheDocument();
   });
 
+  test("shows family, applicant, country, and readiness context inside export cells", () => {
+    const submission = initialSubmissions.find((item) => item.id === "SUB-1102");
+    if (!submission) {
+      throw new Error("Missing family export fixture SUB-1102");
+    }
+
+    render(<AdminExportScreen submissions={[submission]} />);
+
+    const row = screen.getByTestId(`admin-export-row-${submission.id}`);
+    expect(within(row).getByText(submission.applicants[0]?.fullName ?? "")).toBeVisible();
+    expect(
+      within(row).getByText(/Волковы · 3 заявителя · 3 строки/u),
+    ).toBeVisible();
+    expect(within(row).getByText(submission.country)).toBeVisible();
+    expect(within(row).getByText("Готовность 100%")).toBeVisible();
+    expect(within(row).getByText("Даты поездки")).toBeVisible();
+    expect(within(row).getByText("Город")).toBeVisible();
+    expect(within(row).getByText("Агент")).toBeVisible();
+  });
+
   test("moves the active package to the remaining selected submission", () => {
     const first = readySubmission();
     const second = initialSubmissions.find((item) => item.id === "ПД-1054");
@@ -355,7 +331,16 @@ describe("active admin export screen", () => {
     const passportColumn = preview.headers.indexOf("Passport No");
 
     const { container } = render(<AdminExportScreen submissions={[submission]} />);
+    const queueRow = screen.getByTestId(`admin-export-row-${submission.id}`);
 
+    expect(queueRow).toHaveAttribute("data-export-state", "ready");
+    expect(within(queueRow).getByText("Готов")).toBeInTheDocument();
+    expect(
+      within(queueRow).getByText(/Индивидуальная подача · 1 строка/u),
+    ).toBeInTheDocument();
+    expect(within(queueRow).getByText(submission.country)).toBeInTheDocument();
+    expect(within(queueRow).getByText("Готовность 100%")).toBeInTheDocument();
+    expect(container.querySelectorAll(".v19-admin-export-row-cell-v2")).toHaveLength(4);
     expect(
       container.querySelector(".v19-admin-export-row-identity-v2"),
     ).toBeInTheDocument();
@@ -381,6 +366,8 @@ describe("active admin export screen", () => {
     });
     expect(packageCheckbox).not.toBeChecked();
     fireEvent.click(packageCheckbox);
+    expect(queueRow).toHaveAttribute("data-export-state", "selected");
+    expect(within(queueRow).getByText("В пакете")).toBeInTheDocument();
 
     const table = await screen.findByRole("table", {
       name: "Excel Preview Sheet1",
@@ -421,7 +408,7 @@ describe("active admin export screen", () => {
     expect(screen.queryByText("9 файлов")).not.toBeInTheDocument();
   });
 
-  test("keeps canonical media counts in package control without repeating them in the queue row", () => {
+  test("keeps packages with an ambiguous primary applicant out of export", () => {
     const submission = initialSubmissions.find((item) => item.id === "SUB-1102");
     if (!submission) {
       throw new Error("Missing family export fixture SUB-1102");
@@ -435,12 +422,17 @@ describe("active admin export screen", () => {
     };
 
     render(<AdminExportScreen submissions={[ambiguousPrimary]} />);
-    fireEvent.click(screen.getByRole("button", { name: "Стоп" }));
 
-    const filesMetric = screen.getByText("Файлы").parentElement;
-    expect(filesMetric).not.toBeNull();
-    expect(within(filesMetric as HTMLElement).getByText("3")).toBeInTheDocument();
-    expect(screen.queryByText(/Excel \+ \d+/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(`admin-export-row-${ambiguousPrimary.id}`),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Очередь выгрузки пуста")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Здесь появятся только пакеты, прошедшие все обязательные проверки.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Стоп" })).not.toBeInTheDocument();
   });
 
   test("shows a compact agent reference instead of a raw UUID", () => {

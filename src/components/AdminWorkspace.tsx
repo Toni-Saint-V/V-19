@@ -43,7 +43,7 @@ interface AdminWorkspaceProps {
   onApproveAccessRequest?: (requestId: string) => void | Promise<void>;
   onRejectAccessRequest?: (requestId: string) => void | Promise<void>;
   onSignOut: () => void | Promise<void>;
-  onSwitchWorkspace?: () => void;
+  onSwitchWorkspace?: () => void | Promise<void>;
   submissions?: Submission[];
   usesSupabase?: boolean;
 }
@@ -56,6 +56,7 @@ export function AdminWorkspace({
   onApproveAccessRequest,
   onRejectAccessRequest,
   onSignOut,
+  onSwitchWorkspace,
   submissions,
   usesSupabase = false,
 }: AdminWorkspaceProps) {
@@ -76,6 +77,7 @@ export function AdminWorkspace({
   }>({});
   const reviewReturnFocusRef = useRef<HTMLElement | null>(null);
   const mobileNavTriggerRef = useRef<HTMLElement | null>(null);
+  const workspaceScrollRef = useRef<HTMLDivElement | null>(null);
   const adminIssuePendingRef = useRef(false);
   const adminPassportApprovalPendingRef = useRef(false);
   const adminReviewActionPendingRef = useRef(false);
@@ -357,6 +359,10 @@ export function AdminWorkspace({
       bridge.onAdminNavChange?.(nav);
       emitVisaflowUiEvent(bridge, { type: "admin.nav", section: nav });
     }
+    if (workspaceScrollRef.current) {
+      workspaceScrollRef.current.scrollTop = 0;
+      workspaceScrollRef.current.scrollLeft = 0;
+    }
     setRemarkFormOpen(false);
     setCurrentView("main");
     setSelectedRow(null);
@@ -552,6 +558,7 @@ export function AdminWorkspace({
             onCloseMobile: () => setMobileNavOpen(false),
             onCommandSearch: openCommandPalette,
             onResetWorkspace: handleSignOut,
+            onSwitchWorkspace,
             role: "admin",
             sessionDisplayName: adminIdentity,
             sessionInitials: adminInitials,
@@ -561,7 +568,10 @@ export function AdminWorkspace({
           surface={surface}
           workspaceInactive={currentView === "review_workspace"}
         >
-          <div className="v19-admin-workspace-scroll flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+          <div
+            className="v19-admin-workspace-scroll flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]"
+            ref={workspaceScrollRef}
+          >
             <div className="max-w-[1460px] mx-auto h-full">
               {activeNav === "review" ? (
                 <ReviewScreen

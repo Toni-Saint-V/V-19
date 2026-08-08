@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Check,
   Clock3,
@@ -39,7 +39,9 @@ export function AdminUsersAccessScreen({
     id: string;
     kind: "approve" | "reject";
   } | null>(null);
+  const actionPendingRef = useRef(false);
   const [feedback, setFeedback] = useState("");
+  const [feedbackIsError, setFeedbackIsError] = useState(false);
 
   const totals = useMemo(
     () => ({
@@ -73,9 +75,11 @@ export function AdminUsersAccessScreen({
 
   async function runAction(request: AccessRequest, kind: "approve" | "reject") {
     const handler = kind === "approve" ? onApprove : onReject;
-    if (!handler || pendingAction || busy) return;
+    if (!handler || actionPendingRef.current || busy) return;
 
+    actionPendingRef.current = true;
     setFeedback("");
+    setFeedbackIsError(false);
     setPendingAction({ id: request.id, kind });
     try {
       await Promise.resolve(handler(request.id));
@@ -85,8 +89,10 @@ export function AdminUsersAccessScreen({
           : `Заявка ${request.fullName} отклонена.`,
       );
     } catch {
+      setFeedbackIsError(true);
       setFeedback("Действие не выполнено. Данные не были изменены.");
     } finally {
+      actionPendingRef.current = false;
       setPendingAction(null);
     }
   }
@@ -180,7 +186,12 @@ export function AdminUsersAccessScreen({
         </div>
 
         {feedback ? (
-          <div className="v19-access-feedback" role="status" aria-live="polite">
+          <div
+            aria-atomic="true"
+            aria-live={feedbackIsError ? "assertive" : "polite"}
+            className="v19-access-feedback"
+            role={feedbackIsError ? "alert" : "status"}
+          >
             <Check aria-hidden="true" />
             {feedback}
           </div>

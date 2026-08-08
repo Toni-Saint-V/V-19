@@ -727,7 +727,7 @@ describe("ApplicantsScreen interactions", () => {
     );
   });
 
-  it("resets filters and ordering, then scrolls the saved card into view", async () => {
+  it("resets filters and ordering, then scrolls and focuses the saved card", async () => {
     const older = createSubmission("family", "2026-07-18T10:00:00.000Z");
     const focused = createSubmission("family", "2026-07-19T10:00:00.000Z");
     const scrolledElements: HTMLElement[] = [];
@@ -780,6 +780,9 @@ describe("ApplicantsScreen interactions", () => {
     expect(onTypeFilterChange).toHaveBeenCalledWith("family");
     expect(visibleSubmissionIds()).toEqual([focused.id, older.id]);
     expect(scrolledElements).toContain(
+      document.querySelector(`[data-submission-id="${focused.id}"]`),
+    );
+    expect(document.activeElement).toBe(
       document.querySelector(`[data-submission-id="${focused.id}"]`),
     );
   });

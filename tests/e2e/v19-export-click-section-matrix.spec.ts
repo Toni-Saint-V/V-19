@@ -101,8 +101,7 @@ test.describe("V-19 export click and section matrix", () => {
     await page.getByRole("button", { name: "Выбрано" }).click();
     await expect(page.getByText("Пакеты не выбраны")).toBeVisible();
 
-    await page.getByRole("button", { name: "Стоп" }).click();
-    await expect(page.getByText("Пакетов с ограничениями нет")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Стоп" })).toHaveCount(0);
     await expect(
       exportRail(page).getByRole("button", {
         name: "Сформировать ZIP с Excel",

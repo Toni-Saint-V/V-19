@@ -129,7 +129,31 @@ They must not:
 All discrepancies must remain visible for manual review, field opening, or
 admin remarks.
 
-### 1.9 Demo and production boundary
+### 1.9 Universal Smart Import privacy boundary
+
+Universal Smart Import may accept an image, PDF, camera capture, or pasted text
+only as an ephemeral local source. The source bytes, filename, thumbnail, pasted
+text, raw OCR, unrecognised text, and classifier evidence must not be uploaded,
+persisted, cached by application code, logged, or included in analytics/error
+telemetry. Closing, cancelling, switching applicant, or unmounting must abort
+active extraction and clear the sanitized review state.
+
+Only agent-selected questionnaire values may persist through the existing
+questionnaire mutation path. Every imported value remains advisory with
+`reviewOriginSource=smart_import`, `reviewSource=smart_import`, and
+`reviewState=needs_review` until manual confirmation. Conflicts and low-confidence
+values require explicit selection and no source may silently overwrite an
+existing field.
+
+Smart Import must never write canonical passport-section fields. A Russian
+internal passport can propose personal identity fields but cannot satisfy or
+replace the required international `passport_scan`. Registration pages may
+propose structured home-address fields; the source document and raw OCR remain
+ephemeral, while the agent-confirmed address becomes ordinary questionnaire
+data. User-derived documents must never populate an address dictionary or retain
+a relationship between a public address entry and an applicant.
+
+### 1.10 Demo and production boundary
 
 Local demo and e2e helpers are not production proof. Demo auth, seed users,
 role switching, local bypass flags, mocked OCR, and local media adapters may

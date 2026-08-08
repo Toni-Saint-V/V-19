@@ -71,7 +71,7 @@ test.describe("V-19 privacy-safe passport intake proof", () => {
       .toEqual({
         city: "Самара",
         legacyDraftExists: false,
-        storageAdapter: "local-dev",
+        storageAdapter: "supabase-private",
       });
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

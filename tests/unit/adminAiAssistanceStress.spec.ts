@@ -1,3 +1,4 @@
+// tests/unit/adminAiAssistanceStress.spec.ts
 import { describe, expect, test } from "vitest";
 import {
   buildSafeAiHelperStubResult,
@@ -76,6 +77,9 @@ describe("admin AI assistance adversarial stress gate", () => {
     expect(serialized).not.toContain("ready_for_export");
     expect(serialized).not.toContain("send automatically");
     expect(serialized).not.toContain(phrase("AI ", "решил"));
+    expect(serialized).not.toContain(source.id);
+    expect(serialized).not.toContain(source.city);
+    expect(serialized).not.toContain(source.title);
     expect(serialized).not.toContain(source.applicants[0]?.fullName);
     expect(serialized).not.toContain(source.issues[0]?.comment);
   });
@@ -120,6 +124,9 @@ describe("admin AI assistance adversarial stress gate", () => {
     expect(context).not.toHaveProperty("createIssue");
     expect(context).not.toHaveProperty("autoSend");
     expect(context).not.toHaveProperty("issueId");
+    expect(visible(context)).not.toContain("Маршрут");
+    expect(visible(context)).not.toContain("Нужно уточнить маршрут");
+    expect(visible(context)).not.toContain(injectedSubmission().id);
   });
 
   test("unavailable and failed states are safe manual-review states", () => {
@@ -179,7 +186,7 @@ describe("admin AI assistance adversarial stress gate", () => {
     );
 
     expect(copy).toBe(
-      "Следующее действие: Проверьте открытые замечания и выберите действие вручную.. Администратор подтверждает вручную.",
+      "Следующее действие: Проверьте открытые замечания и выберите действие вручную. Администратор подтверждает вручную.",
     );
     expect(canPerformAction(source, "accept", "admin")).toEqual({
       ok: false,

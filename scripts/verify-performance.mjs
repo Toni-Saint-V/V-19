@@ -58,7 +58,6 @@ if (!existsSync(manifestPath)) {
 }
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-
 const assets = readdirSync(distAssets)
   .filter((file) => /\.(js|css)$/.test(file))
   .map((file) => {
@@ -144,8 +143,7 @@ const totalJsRawKb =
   initialJsAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const totalJsGzipKb =
   initialJsAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
-const totalCssRawKb =
-  cssAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
+const totalCssRawKb = cssAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const totalCssGzipKb =
   cssAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
 const lazyWorkbookRawKb =
@@ -213,18 +211,16 @@ if (entryManifestKeys.length !== 1) {
   failures.push("production manifest must expose exactly one initial entry");
 }
 
-const activeSettingsOwnersStayLazy = activeSettingsOwnerManifestKeys.every(
-  (key) => {
-    const entry = manifest[key];
-    const assetFile = entry?.file?.replace(/^assets\//, "");
-    return (
-      workspaceRoleManifestKeys.includes(key) &&
-      entry?.isDynamicEntry === true &&
-      assetFile?.endsWith(".js") &&
-      !initialJsAssetFiles.has(assetFile)
-    );
-  },
-);
+const activeSettingsOwnersStayLazy = activeSettingsOwnerManifestKeys.every((key) => {
+  const entry = manifest[key];
+  const assetFile = entry?.file?.replace(/^assets\//, "");
+  return (
+    workspaceRoleManifestKeys.includes(key) &&
+    entry?.isDynamicEntry === true &&
+    assetFile?.endsWith(".js") &&
+    !initialJsAssetFiles.has(assetFile)
+  );
+});
 
 if (!activeSettingsOwnersStayLazy) {
   failures.push(

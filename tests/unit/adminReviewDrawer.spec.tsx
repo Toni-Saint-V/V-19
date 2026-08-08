@@ -1,16 +1,31 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+// tests/unit/adminReviewDrawer.spec.tsx
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AdminReviewDrawer } from "../../src/modules/submissions/components/AdminReviewDrawer";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { ADMIN_PASSPORT_REVIEW_FIELD_IDS } from "../../src/modules/submissions/passportReviewContract";
-import type { DrawerTab, IssueInput, Submission } from "../../src/modules/submissions/types";
+import type {
+  DrawerTab,
+  IssueInput,
+  Submission,
+} from "../../src/modules/submissions/types";
 
 const aiMocks = vi.hoisted(() => ({
   invokeAiHelperEdge: vi.fn(),
+  invokeAiHelperEdgeCached: vi.fn(),
 }));
 
 vi.mock("../../src/services/aiEdgeClient", () => ({
   invokeAiHelperEdge: aiMocks.invokeAiHelperEdge,
+  invokeAiHelperEdgeCached: aiMocks.invokeAiHelperEdgeCached,
 }));
 
 afterEach(() => {
@@ -20,6 +35,8 @@ afterEach(() => {
 beforeEach(() => {
   aiMocks.invokeAiHelperEdge.mockReset();
   aiMocks.invokeAiHelperEdge.mockResolvedValue(null);
+  aiMocks.invokeAiHelperEdgeCached.mockReset();
+  aiMocks.invokeAiHelperEdgeCached.mockResolvedValue(null);
 });
 
 Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -173,7 +190,9 @@ describe("AdminReviewDrawer", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "Новое замечание" })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole("dialog", { name: "Новое замечание" }),
+      ).not.toBeInTheDocument(),
     );
     expect(onClose).not.toHaveBeenCalled();
     await waitFor(() => expect(trigger).toHaveFocus());
@@ -188,7 +207,8 @@ describe("AdminReviewDrawer", () => {
     const source = adminReviewSubmission();
     const firstApplicant = source.applicants[0];
     const passport = source.files.find((file) => file.type === "passport_scan");
-    if (!firstApplicant || !passport) throw new Error("Expected applicant and passport fixture.");
+    if (!firstApplicant || !passport)
+      throw new Error("Expected applicant and passport fixture.");
     const secondApplicant = {
       ...firstApplicant,
       fullName: "Ирина Волкова",
@@ -239,7 +259,8 @@ describe("AdminReviewDrawer", () => {
       candidate.fields.some((field) => field.id === "passport-no"),
     );
     const field = section?.fields.find((candidate) => candidate.id === "passport-no");
-    if (!applicant || !section || !field) throw new Error("Expected questionnaire fixture.");
+    if (!applicant || !section || !field)
+      throw new Error("Expected questionnaire fixture.");
     const submission: Submission = {
       ...source,
       issues: [
@@ -269,11 +290,13 @@ describe("AdminReviewDrawer", () => {
         "aria-selected",
         "true",
       );
-      expect(container.querySelector(".admin-review-field-row.is-ai-target")).toBeTruthy();
+      expect(
+        container.querySelector(".admin-review-field-row.is-ai-target"),
+      ).toBeTruthy();
     });
-    expect(container.querySelector(".admin-review-field-row.is-ai-target")).toHaveTextContent(
-      field.label,
-    );
+    expect(
+      container.querySelector(".admin-review-field-row.is-ai-target"),
+    ).toHaveTextContent(field.label);
   });
 
   test("renders truthful zero states without exposing a no-op remark action", async () => {
@@ -331,9 +354,9 @@ describe("AdminReviewDrawer", () => {
     const questionnairePane = await screen.findByRole("region", {
       name: "Поля анкеты",
     });
-    expect(
-      questionnairePane.querySelectorAll(".admin-review-field-row"),
-    ).toHaveLength(8);
+    expect(questionnairePane.querySelectorAll(".admin-review-field-row")).toHaveLength(
+      8,
+    );
     expect(questionnairePane).toHaveTextContent("Фамилия");
     expect(questionnairePane).toHaveTextContent("Номер паспорта");
     expect(questionnairePane).not.toHaveTextContent("Тип паспорта");
@@ -480,9 +503,7 @@ describe("AdminReviewDrawer", () => {
 
     expect(screen.getByLabelText("Новое замечание")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Анкета" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Скан паспорта" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Скан паспорта" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Селфи 1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Селфи 2" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Документ" })).toBeNull();
@@ -514,73 +535,132 @@ describe("AdminReviewDrawer", () => {
     expect(onVerifyDocument).toHaveBeenCalledWith(applicant.id);
   });
 
-  test("runs admin drawer AI through the edge helper and fails closed when unavailable", async () => {
+  test("runs one optional admin AI call and preserves the local review when unavailable", async () => {
     const onAction = vi.fn();
     renderDrawer({ activeTab: "files", onAction });
 
-    fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Улучшить формулировки" }));
 
     await waitFor(() =>
       expect(screen.getAllByText(/локальный AI не настроен/).length).toBeGreaterThan(0),
     );
-    expect(aiMocks.invokeAiHelperEdge).toHaveBeenCalledTimes(3);
-    expect(aiMocks.invokeAiHelperEdge.mock.calls.map((call) => call[0])).toEqual([
-      "admin_review",
-      "admin_next_action",
-      "admin_readiness_explanation",
-    ]);
-    expect(JSON.stringify(aiMocks.invokeAiHelperEdge.mock.calls)).not.toContain(
-      "Нина Волкова",
+    expect(aiMocks.invokeAiHelperEdgeCached).toHaveBeenCalledTimes(1);
+    expect(aiMocks.invokeAiHelperEdgeCached.mock.calls[0]?.[0]).toBe("admin_review");
+    const serializedContext = JSON.stringify(
+      aiMocks.invokeAiHelperEdgeCached.mock.calls[0]?.[1],
     );
+    expect(serializedContext).not.toContain("Нина Волкова");
+    expect(serializedContext).not.toContain("ПД-1053");
+    expect(screen.getByText(/локальная рекомендация сохранена/iu)).toBeVisible();
     expect(onAction).not.toHaveBeenCalled();
   });
 
-  test("renders safe admin AI review output without autonomous accept or export", async () => {
+  test("ignores a stale admin AI response after switching submissions", async () => {
+    const first = adminReviewSubmission();
+    const second: Submission = {
+      ...structuredClone(first),
+      id: "ПД-NEW",
+      title: "Новая заявка",
+    };
+    let resolveProvider:
+      | ((value: {
+          intent: "admin_review";
+          title: string;
+          summary: string;
+          suggestions: string[];
+          blockers: string[];
+          guardrails: string[];
+          source: "edge-provider";
+          adminReviewChecklist: string[];
+        }) => void)
+      | undefined;
+    const providerPromise = new Promise<{
+      intent: "admin_review";
+      title: string;
+      summary: string;
+      suggestions: string[];
+      blockers: string[];
+      guardrails: string[];
+      source: "edge-provider";
+      adminReviewChecklist: string[];
+    }>((resolve) => {
+      resolveProvider = resolve;
+    });
+    aiMocks.invokeAiHelperEdgeCached.mockReturnValue(providerPromise);
     const onAction = vi.fn();
-    aiMocks.invokeAiHelperEdge
-      .mockResolvedValueOnce({
+    const { rerender } = renderDrawer({
+      activeTab: "files",
+      onAction,
+      submission: first,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Улучшить формулировки" }));
+
+    rerender(
+      <AdminReviewDrawer
+        activeTab="files"
+        actionError=""
+        focusTarget={undefined}
+        submission={second}
+        onAction={onAction}
+        onAcceptAiSuggestion={() => undefined}
+        onAddIssue={() => undefined}
+        onClose={() => undefined}
+        onClearFocusTarget={() => undefined}
+        onDismissAiSuggestion={() => undefined}
+        onRunAiReview={() => undefined}
+        onTab={() => undefined}
+        onVerifyDocument={() => undefined}
+      />,
+    );
+
+    await act(async () => {
+      resolveProvider?.({
         intent: "admin_review",
         title: "Предварительная проверка",
         summary: "Проверьте комплект вручную.",
         suggestions: ["Проверьте паспорт и селфи."],
-        blockers: ["Есть открытое замечание."],
+        blockers: [],
         guardrails: ["Подсказка не является решением."],
         source: "edge-provider",
         adminReviewChecklist: ["Сверить анкету с файлами."],
-      })
-      .mockResolvedValueOnce({
-        intent: "admin_next_action",
-        title: "Следующее действие",
-        summary: "Верните точечное замечание.",
-        suggestions: ["Добавьте одно точное замечание и проверьте текст."],
-        blockers: [],
-        guardrails: ["Администратор подтверждает вручную."],
-        source: "edge-provider",
-        nextAction: "Добавьте одно точное замечание и проверьте текст.",
-      })
-      .mockResolvedValueOnce({
-        intent: "admin_readiness_explanation",
-        title: "Готовность",
-        summary: "Пакет не готов из-за открытого замечания.",
-        suggestions: ["Закройте замечание после проверки."],
-        blockers: ["Открытое замечание блокирует движение дальше."],
-        guardrails: ["Действия остаются ручными."],
-        source: "edge-provider",
-        readinessExplanation: "Пакет не готов из-за открытого замечания.",
       });
+      await providerPromise;
+    });
+
+    expect(screen.queryByText("Сверить анкету с файлами.")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI-polish готов")).not.toBeInTheDocument();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  test("renders safe optional AI explanation without autonomous accept or export", async () => {
+    const onAction = vi.fn();
+    aiMocks.invokeAiHelperEdgeCached.mockResolvedValueOnce({
+      intent: "admin_review",
+      title: "Предварительная проверка",
+      summary: "Проверьте комплект вручную.",
+      suggestions: ["Проверьте паспорт и селфи."],
+      blockers: ["Есть открытое замечание."],
+      guardrails: ["Подсказка не является решением."],
+      source: "edge-provider",
+      adminReviewChecklist: ["Сверить анкету с файлами."],
+    });
     renderDrawer({ activeTab: "files", onAction });
 
-    fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Улучшить формулировки" }));
 
     await screen.findByText("Сверить анкету с файлами.");
-    expect(screen.getByText("Пакет не готов из-за открытого замечания.")).toBeVisible();
-    expect(screen.getByText(/Принятие и выгрузка остаются ручными/)).toBeVisible();
+    expect(screen.getByText(/Пояснение дополняет локальный разбор/)).toBeVisible();
+    expect(
+      screen.getByText(/Статусы меняются только после ручного действия/),
+    ).toBeVisible();
+    expect(aiMocks.invokeAiHelperEdgeCached).toHaveBeenCalledTimes(1);
     expect(onAction).not.toHaveBeenCalled();
   });
 
   test("drafts an agent-facing remark for admin review without sending it", async () => {
     const onAddIssue = vi.fn();
-    aiMocks.invokeAiHelperEdge.mockResolvedValue({
+    aiMocks.invokeAiHelperEdgeCached.mockResolvedValue({
       intent: "admin_issue_remark_draft",
       title: "Черновик замечания",
       summary: "Уточните маршрут поездки и приложите корректные данные.",
