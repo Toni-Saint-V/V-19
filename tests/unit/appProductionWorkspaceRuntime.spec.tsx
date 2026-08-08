@@ -39,6 +39,7 @@ const runtime = vi.hoisted(() => ({
 }));
 
 const authMocks = vi.hoisted(() => ({
+  getCurrentAppSession: vi.fn(),
   signInSupabaseWithPassword: vi.fn(),
   signOutCurrentSession: vi.fn<() => Promise<SignOutCurrentSessionResult>>(
     async () => ({ status: "signed_out" }),
@@ -434,23 +435,7 @@ vi.mock("../../src/shared/supabaseAuthRegistration", () => ({
 }));
 
 vi.mock("../../src/services/authService", () => ({
-  getCurrentAppSession: vi.fn(async () => ({
-    mode: "supabase",
-    profile: {
-      displayName: "Production Admin",
-      email: "admin@example.test",
-      id: "admin-production-uuid",
-      organizationName: "VisaFlow",
-      role: "admin",
-    },
-    supabaseSession: {
-      expires_at: 2_000_000_000,
-      user: {
-        created_at: "2026-01-01T00:00:00.000Z",
-        id: "admin-production-uuid",
-      },
-    },
-  })),
+  getCurrentAppSession: authMocks.getCurrentAppSession,
   requestPasswordReset: vi.fn(),
   signInSupabaseWithPassword: authMocks.signInSupabaseWithPassword,
   signOutCurrentSession: authMocks.signOutCurrentSession,
@@ -545,6 +530,24 @@ beforeEach(() => {
   accessRequestMocks.rejectAccessRequest.mockReset();
   authMocks.signOutCurrentSession.mockReset();
   authMocks.signOutCurrentSession.mockResolvedValue({ status: "signed_out" });
+  authMocks.getCurrentAppSession.mockReset();
+  authMocks.getCurrentAppSession.mockResolvedValue({
+    mode: "supabase",
+    profile: {
+      displayName: "Production Admin",
+      email: "admin@example.test",
+      id: "admin-production-uuid",
+      organizationName: "VisaFlow",
+      role: "admin",
+    },
+    supabaseSession: {
+      expires_at: 2_000_000_000,
+      user: {
+        created_at: "2026-01-01T00:00:00.000Z",
+        id: "admin-production-uuid",
+      },
+    },
+  });
   authMocks.signInSupabaseWithPassword.mockReset();
   supabaseAuthLifecycle.onAuthStateChange.mockClear();
   supabaseAuthLifecycle.signOut.mockClear();
@@ -559,6 +562,162 @@ afterEach(() => {
 });
 
 describe("App production workspace runtime", () => {
+  test("keeps a freshly authenticated workspace during a SIGNED_IN profile-read race", async () => {
+    authMocks.getCurrentAppSession.mockResolvedValueOnce(null);
+    runtime.loadPromise = Promise.resolve({
+      ownerIdsBySubmissionId: new Map<string, string>(),
+      submissions: [],
+    });
+    const passwordLogin = deferred<unknown>();
+    authMocks.signInSupabaseWithPassword.mockReturnValueOnce(passwordLogin.promise);
+    render(<App />);
+
+    await screen.findByTestId("access-gate");
+    await waitFor(() => expect(supabaseAuthLifecycle.state.listener).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Login admin B" }));
+    await waitFor(() =>
+      expect(authMocks.signInSupabaseWithPassword).toHaveBeenCalled(),
+    );
+
+    act(() => {
+      supabaseAuthLifecycle.state.listener?.("SIGNED_IN", {
+        user: {
+          email: "admin-b@example.test",
+          id: "admin-production-b-uuid",
+        },
+      });
+    });
+    await act(async () => {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 10));
+    });
+
+    expect(supabaseAuthLifecycle.signOut).not.toHaveBeenCalled();
+    await act(async () => {
+      passwordLogin.resolve({
+        mode: "supabase",
+        profile: {
+          displayName: "Production Admin B",
+          email: "admin-b@example.test",
+          id: "admin-production-b-uuid",
+          organizationName: "VisaFlow",
+          role: "admin",
+        },
+        supabaseSession: {
+          expires_at: 2_000_000_100,
+          user: {
+            created_at: "2026-07-22T10:00:00.000Z",
+            id: "admin-production-b-uuid",
+          },
+        },
+      });
+      await runtime.lastMutationPromise;
+    });
+
+    expect(await screen.findByTestId("admin-workspace")).toBeInTheDocument();
+    expect(screen.queryByTestId("access-gate")).not.toBeInTheDocument();
+    expect(supabaseAuthLifecycle.signOut).not.toHaveBeenCalled();
+  });
+
+  test("reconciles a different principal from a SIGNED_IN event", async () => {
+    runtime.loadPromise = Promise.resolve({
+      ownerIdsBySubmissionId: new Map<string, string>(),
+      submissions: [],
+    });
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    await waitFor(() => expect(supabaseAuthLifecycle.state.listener).not.toBeNull());
+
+    authMocks.getCurrentAppSession.mockResolvedValueOnce({
+      mode: "supabase",
+      profile: {
+        displayName: "Production Admin B",
+        email: "admin-b@example.test",
+        id: "admin-production-b-uuid",
+        organizationName: "VisaFlow",
+        role: "admin",
+      },
+      supabaseSession: {
+        expires_at: 2_000_000_100,
+        user: {
+          created_at: "2026-07-22T10:00:00.000Z",
+          id: "admin-production-b-uuid",
+        },
+      },
+    });
+    act(() => {
+      supabaseAuthLifecycle.state.listener?.("SIGNED_IN", {
+        user: { id: "admin-production-b-uuid" },
+      });
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 10));
+    });
+    expect(authMocks.getCurrentAppSession).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("current-admin-email")).toHaveTextContent(
+      "admin-b@example.test",
+    );
+    expect(supabaseAuthLifecycle.signOut).not.toHaveBeenCalled();
+  });
+
+  test("fails closed when a refreshed token resolves to another profile", async () => {
+    runtime.loadPromise = Promise.resolve({
+      ownerIdsBySubmissionId: new Map<string, string>(),
+      submissions: [],
+    });
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    await waitFor(() => expect(supabaseAuthLifecycle.state.listener).not.toBeNull());
+
+    act(() => {
+      supabaseAuthLifecycle.state.listener?.("TOKEN_REFRESHED", {
+        user: { id: "agent-production-uuid" },
+      });
+    });
+
+    expect(await screen.findByTestId("access-gate")).toHaveTextContent(
+      "Доступ к профилю отозван. Войдите снова.",
+    );
+    expect(supabaseAuthLifecycle.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  test("reopens the correct workspace after USER_UPDATED changes the profile role", async () => {
+    runtime.loadPromise = Promise.resolve({
+      ownerIdsBySubmissionId: new Map<string, string>(),
+      submissions: [],
+    });
+    render(<App />);
+    await screen.findByTestId("admin-workspace");
+    await waitFor(() => expect(supabaseAuthLifecycle.state.listener).not.toBeNull());
+
+    authMocks.getCurrentAppSession.mockResolvedValueOnce({
+      mode: "supabase",
+      profile: {
+        displayName: "Production Agent",
+        email: "agent@example.test",
+        id: "agent-production-uuid",
+        organizationName: "VisaFlow",
+        role: "agent",
+      },
+      supabaseSession: {
+        expires_at: 2_000_000_100,
+        user: {
+          created_at: "2026-07-22T10:00:00.000Z",
+          id: "agent-production-uuid",
+        },
+      },
+    });
+    act(() => {
+      supabaseAuthLifecycle.state.listener?.("USER_UPDATED", {
+        user: { id: "agent-production-uuid" },
+      });
+    });
+
+    expect(await screen.findByTestId("agent-workspace")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-workspace")).not.toBeInTheDocument();
+    expect(supabaseAuthLifecycle.signOut).not.toHaveBeenCalled();
+  });
+
   test("fails closed and clears the workspace on a Supabase SIGNED_OUT event", async () => {
     runtime.loadPromise = Promise.resolve({
       ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),

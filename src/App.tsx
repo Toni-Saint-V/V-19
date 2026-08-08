@@ -301,6 +301,8 @@ export default function App({
   const workspaceSessionUserIdRef = useRef<string | null>(null);
   const workspaceSessionNeedsQueueDrainRef = useRef(false);
   const workspaceMutationStateRef = useRef({ count: 0, generation: 0 });
+  const pendingPasswordLoginEmailRef = useRef<string | null>(null);
+  const acceptedPasswordLoginEventUserIdRef = useRef<string | null>(null);
   const workspaceSubmissionMutationQueueRef = useRef<Promise<unknown>>(
     Promise.resolve(),
   );
@@ -337,6 +339,8 @@ export default function App({
 
   const clearAuthenticatedWorkspace = useCallback(
     (message = "Сессия завершена. Войдите снова.") => {
+      pendingPasswordLoginEmailRef.current = null;
+      acceptedPasswordLoginEventUserIdRef.current = null;
       commitAuthSession(null);
       setWorkspace("agent");
       setAccessRequests([]);
@@ -411,6 +415,19 @@ export default function App({
         validationSequence += 1;
         clearAuthenticatedWorkspace();
         return;
+      }
+      if (event === "SIGNED_IN") {
+        const eventEmail = nextSession.user.email?.trim().toLowerCase();
+        if (eventEmail && eventEmail === pendingPasswordLoginEmailRef.current) {
+          // The password-login path will validate this session before it opens
+          // a workspace. Avoid racing that validation with a second profile read.
+          acceptedPasswordLoginEventUserIdRef.current = nextSession.user.id;
+          return;
+        }
+        if (nextSession.user.id === acceptedPasswordLoginEventUserIdRef.current) {
+          acceptedPasswordLoginEventUserIdRef.current = null;
+          return;
+        }
       }
       if (
         event !== "SIGNED_IN" &&
@@ -1179,9 +1196,21 @@ export default function App({
       setAuthError("");
       let nextSession: Session;
       if (supabaseEnabled) {
-        nextSession = sessionFromSupabase(
-          await signInSupabaseWithPassword(email, password),
-        );
+        const normalizedEmail = email.trim().toLowerCase();
+        pendingPasswordLoginEmailRef.current = normalizedEmail;
+        acceptedPasswordLoginEventUserIdRef.current = null;
+        try {
+          nextSession = sessionFromSupabase(
+            await signInSupabaseWithPassword(email, password),
+          );
+          if (acceptedPasswordLoginEventUserIdRef.current === nextSession.userId) {
+            acceptedPasswordLoginEventUserIdRef.current = null;
+          } else {
+            acceptedPasswordLoginEventUserIdRef.current = nextSession.userId;
+          }
+        } finally {
+          pendingPasswordLoginEmailRef.current = null;
+        }
       } else {
         if (!__V19_LOCAL_DEMO_BUILD__ || !localDemoEnabled) {
           throw new Error("Supabase production data source is unavailable.");
