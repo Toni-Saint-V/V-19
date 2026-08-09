@@ -78,13 +78,23 @@ describe("release source identity", () => {
         root: process.cwd(),
       }),
     ).toThrow("V19_RELEASE_GIT_SHA");
-    expect(() =>
+    const mismatch = () =>
       releaseBuildIdentity({
         archiveGitSha,
         archiveSourceSha256: "b".repeat(64),
         isProductionArchive: true,
         root: process.cwd(),
-      }),
-    ).toThrow("must match the canonical production archive source");
+      });
+    expect(mismatch).toThrow(
+      `expected ${"b".repeat(64)}, received ${archiveSourceSha256}`,
+    );
+    try {
+      mismatch();
+    } catch (error) {
+      expect(error).toHaveProperty(
+        "message",
+        expect.stringMatching(/archive paths \(\d+\):/),
+      );
+    }
   });
 });

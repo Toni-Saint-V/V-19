@@ -20,6 +20,10 @@ const sourceFiles = [
 ];
 
 export function releaseSourceSha256FromFileSystem(root) {
+  return hashBlobEntries(releaseSourceEntriesFromFileSystem(root));
+}
+
+function releaseSourceEntriesFromFileSystem(root) {
   const paths = [
     ...new Set([
       ...sourceFiles,
@@ -28,9 +32,7 @@ export function releaseSourceSha256FromFileSystem(root) {
   ]
     .filter(isReleaseSourcePath)
     .sort(compareReleaseSourcePaths);
-  return hashBlobEntries(
-    paths.map((path) => [path, gitBlobSha1(readFileSync(resolve(root, path)))]),
-  );
+  return paths.map((path) => [path, gitBlobSha1(readFileSync(resolve(root, path)))]);
 }
 
 export function releaseSourceSha256FromGitHead(root) {
@@ -72,10 +74,11 @@ export function releaseBuildIdentity({
         "V19_RELEASE_SOURCE_SHA256 must be a 64-character hexadecimal SHA.",
       );
     }
-    const actualSourceSha256 = releaseSourceSha256FromFileSystem(root);
+    const actualSourceEntries = releaseSourceEntriesFromFileSystem(root);
+    const actualSourceSha256 = hashBlobEntries(actualSourceEntries);
     if (actualSourceSha256 !== archiveSourceSha256.toLowerCase()) {
       throw new Error(
-        "V19_RELEASE_SOURCE_SHA256 must match the canonical production archive source.",
+        `V19_RELEASE_SOURCE_SHA256 must match the canonical production archive source (expected ${archiveSourceSha256.toLowerCase()}, received ${actualSourceSha256}; archive paths (${actualSourceEntries.length}): ${actualSourceEntries.map(([path]) => path).join(",")}).`,
       );
     }
     return {
