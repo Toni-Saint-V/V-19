@@ -97,6 +97,24 @@ const occupationAliases: Array<[RegExp, string]> = [
 
 const fieldSpecs: DataImageFieldSpec[] = [
   {
+    fieldId: "appointment-city",
+    labels: ["город подачи", "application city", "appointment city"],
+    normalize: normalizeCityLikeValue,
+    sectionId: "appointment",
+  },
+  {
+    fieldId: "desired-date-1",
+    labels: ["желаемая дата 1", "preferred appointment date 1"],
+    normalize: normalizeDateValue,
+    sectionId: "appointment",
+  },
+  {
+    fieldId: "desired-date-2",
+    labels: ["желаемая дата 2", "preferred appointment date 2"],
+    normalize: normalizeDateValue,
+    sectionId: "appointment",
+  },
+  {
     fieldId: "previous-surname",
     labels: [
       "фамилия при рождении",
@@ -170,6 +188,12 @@ const fieldSpecs: DataImageFieldSpec[] = [
     sectionId: "personal",
   },
   {
+    fieldId: "guardian-info",
+    labels: ["данные опекуна", "guardian information", "guardian details"],
+    normalize: normalizeNameLikeValue,
+    sectionId: "personal",
+  },
+  {
     fieldId: "national-id",
     labels: ["национальный id", "national id", "id number"],
     sectionId: "personal",
@@ -216,6 +240,26 @@ const fieldSpecs: DataImageFieldSpec[] = [
     sectionId: "contacts",
   },
   {
+    fieldId: "home-street",
+    labels: ["улица проживания", "home street", "residential street"],
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "home-house",
+    labels: ["дом проживания", "home house", "residential house"],
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "home-building",
+    labels: ["корпус проживания", "home building", "residential building"],
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "home-unit",
+    labels: ["квартира проживания", "home unit", "residential unit"],
+    sectionId: "contacts",
+  },
+  {
     fieldId: "email",
     labels: ["email", "e-mail", "почта", "электронная почта"],
     normalize: normalizeEmailValue,
@@ -243,6 +287,40 @@ const fieldSpecs: DataImageFieldSpec[] = [
     fieldId: "postal-code",
     labels: ["почтовый индекс", "postal code", "zip code", "postcode", "индекс"],
     normalize: normalizePostalCodeValue,
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "lives-outside-citizenship",
+    labels: [
+      "есть вид на жительство в другой стране",
+      "resides outside country of citizenship",
+      "lives outside citizenship country",
+    ],
+    normalize: normalizeYesNoValue,
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "residence-permit-type",
+    labels: [
+      "вид на жительство / документ",
+      "тип вида на жительство",
+      "residence permit type",
+    ],
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "residence-permit-number",
+    labels: ["номер вида на жительство", "residence permit number"],
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "residence-permit-valid-until",
+    labels: [
+      "действителен до внж",
+      "вид на жительство действителен до",
+      "residence permit valid until",
+    ],
+    normalize: normalizeDateValue,
     sectionId: "contacts",
   },
   {
@@ -278,6 +356,15 @@ const fieldSpecs: DataImageFieldSpec[] = [
     fieldId: "purpose",
     labels: ["цель поездки", "purpose", "purpose of journey", "trip purpose"],
     normalize: normalizePurposeValue,
+    sectionId: "trip",
+  },
+  {
+    fieldId: "stay-purpose-details",
+    labels: [
+      "дополнительные сведения о цели",
+      "purpose details",
+      "purpose of stay details",
+    ],
     sectionId: "trip",
   },
   {
@@ -323,6 +410,22 @@ const fieldSpecs: DataImageFieldSpec[] = [
     sectionId: "trip",
   },
   {
+    fieldId: "previous-biometrics-date",
+    labels: ["дата предыдущей биометрии", "previous biometrics date"],
+    normalize: normalizeDateValue,
+    sectionId: "trip",
+  },
+  {
+    fieldId: "previous-visa-number",
+    labels: ["номер предыдущей визы", "previous visa number"],
+    sectionId: "trip",
+  },
+  {
+    fieldId: "inviting-party-type",
+    labels: ["тип принимающей стороны", "inviting party type"],
+    sectionId: "hotel",
+  },
+  {
     fieldId: "hotel-name",
     labels: ["название отеля", "отель", "hotel name", "hotel", "host name", "inviting party name"],
     normalize: normalizeNameLikeValue,
@@ -360,6 +463,35 @@ const fieldSpecs: DataImageFieldSpec[] = [
   {
     fieldId: "hotel-contact",
     labels: ["телефон отеля", "hotel phone", "hotel contact", "host phone"],
+    normalize: normalizePhoneValue,
+    sectionId: "hotel",
+  },
+  {
+    fieldId: "company-org-details",
+    labels: [
+      "данные организации принимающей стороны",
+      "inviting organisation details",
+      "host company details",
+    ],
+    sectionId: "hotel",
+  },
+  {
+    fieldId: "company-contact-person",
+    labels: [
+      "контактное лицо принимающей стороны",
+      "inviting organisation contact person",
+      "host company contact person",
+    ],
+    normalize: normalizeNameLikeValue,
+    sectionId: "hotel",
+  },
+  {
+    fieldId: "company-phone",
+    labels: [
+      "телефон принимающей стороны",
+      "inviting organisation phone",
+      "host company phone",
+    ],
     normalize: normalizePhoneValue,
     sectionId: "hotel",
   },
@@ -727,11 +859,11 @@ function normalizeOccupationValue(value: string) {
 
 function normalizeGenderValue(value: string) {
   const normalized = normalizeForMatch(value);
-  if (/^(m|male|м|мужскои|мужчина)$/.test(normalized) || normalized.includes("male") || normalized.includes("муж")) {
-    return "Мужской";
-  }
   if (/^(f|female|ж|женскии|женщина)$/.test(normalized) || normalized.includes("female") || normalized.includes("жен")) {
     return "Женский";
+  }
+  if (/^(m|male|м|мужскои|мужчина)$/.test(normalized) || normalized.includes("male") || normalized.includes("муж")) {
+    return "Мужской";
   }
   return normalized ? "Другое" : "";
 }

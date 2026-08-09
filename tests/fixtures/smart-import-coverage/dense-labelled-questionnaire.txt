@@ -1,0 +1,69 @@
+Application city: Moscow
+Preferred appointment date 1: 2026-10-10
+Preferred appointment date 2: 2026-10-12
+Surname: Demo
+First name: Applicant
+Previous surname: Sample
+Date of birth: 1990-01-02
+Place of birth: Tomsk
+Country of birth: Russia
+Gender: Female
+Marital status: Single
+Guardian information: Demo Guardian
+Passport type: Ordinary
+Passport number: P12345678
+Issue date: 2020-02-01
+Valid until: 2030-02-01
+Issuing country: Russia
+Place of issue: Moscow
+Home street: Test Street
+Home house: 101
+Home building: B
+Home unit: 7
+Email: demo.applicant@example.test
+Contact number: +1 202 555 0101
+Country of residence: Russia
+Home city: Tomsk
+Postal code: 634000
+Lives outside citizenship country: Yes
+Residence permit type: Demo Residence Permit
+Residence permit number: RP-000123
+Residence permit valid until: 2031-01-01
+Occupation: Engineer
+Employer: Demo Employer
+Employer phone: +1 202 555 0102
+Employer address: 1 Demo Office Road
+Purpose of journey: Tourism
+Purpose details: Museum visit
+Main destination: Spain
+First entry country: Spain
+Number of entries: Two
+Arrival date: 2026-10-20
+Departure date: 2026-10-30
+Stay duration: 10
+Biometrics: Yes
+Previous biometrics date: 2024-03-10
+Previous visa number: VISA-000123
+Inviting party type: Hotel
+Hotel name: Demo Hotel
+Hotel country: Spain
+Hotel city: Madrid
+Hotel postal: 28001
+Hotel address: 10 Demo Plaza
+Hotel email: stay@demo-hotel.example.test
+Hotel phone: +34 910 000 000
+Host company details: Demo Host Company
+Host company contact person: Demo Host Contact
+Host company phone: +34 910 000 001
+Nationality: Russia
+Nationality at birth: Russia
+Cost covered by: Applicant
+Means of support: Cash
+Home address: 101 Test Street
+Visa type: C
+Category: Service managed
+Final entry permit: Do not import
+Final entry permit issued by: Do not import
+Final entry permit valid from: 2026-01-01
+Final entry permit valid to: 2026-12-31
+National ID: INTERNAL-000

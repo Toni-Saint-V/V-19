@@ -13,7 +13,6 @@ import "../shared/ui/review-workspace.css";
 import "../shared/ui/admin-review-composition.css";
 import {
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
   Download,
   FileText,
@@ -31,7 +30,6 @@ import {
 import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { isPersistablePrivateFileAssetAtSubmissionTarget } from "../modules/submissions/fileAsset";
 import { getAdminReviewActions, statusLabelFor } from "../modules/submissions/status";
-import { questionnaireIssueFieldDisplayLabel } from "../modules/submissions/questionnaire";
 import {
   ADMIN_PASSPORT_REVIEW_FIELD_IDS,
   ADMIN_PASSPORT_REVIEW_FIELD_LABELS,
@@ -678,15 +676,10 @@ export function ReviewWorkspace({
     submission?.issues.filter(
       (issue) => issue.status === "open" && passportIssueInScope(issue),
     ).length ?? 0;
-  const fixedPassportIssueCount =
-    submission?.issues.filter(
-      (issue) => issue.status === "fixed_by_agent" && passportIssueInScope(issue),
-    ).length ?? 0;
-  const correctedIssuesAwaitingClosure =
-    submission?.issues.filter((issue) => issue.status === "fixed_by_agent") ?? [];
   const openSubmissionIssueCount =
     submission?.issues.filter((issue) => issue.status === "open").length ?? 0;
-  const fixedSubmissionIssueCount = correctedIssuesAwaitingClosure.length;
+  const fixedSubmissionIssueCount =
+    submission?.issues.filter((issue) => issue.status === "fixed_by_agent").length ?? 0;
   const reviewDecisionIssueLabel =
     [
       openSubmissionIssueCount > 0 ? `Открыто ${openSubmissionIssueCount}` : "",
@@ -752,26 +745,12 @@ export function ReviewWorkspace({
     !sectionAlreadyAccepted &&
     !sectionApprovalPending,
   );
-  const filledFieldCount = reviewFields.filter(
-    (field) => hasAdminPassportReviewValue(field.value) && !field.hasError,
-  ).length;
   const loadingMediaCount = confirmationMediaStates.filter(
     (status) => status === "loading",
   ).length;
   const unavailableMediaCount = confirmationMediaStates.filter(
     (status) => status === "unavailable",
   ).length;
-  const readyMediaCount = confirmationMediaStates.filter(
-    (status) => status === "ready",
-  ).length;
-  const mediaStatusLabel = [
-    unavailableMediaCount > 0 ? `недоступно ${unavailableMediaCount}` : "",
-    loadingMediaCount > 0 ? `загружается ${loadingMediaCount}` : "",
-    pendingMediaReviewCount > 0 ? `не просмотрено ${pendingMediaReviewCount}` : "",
-    `доступно ${readyMediaCount} из ${confirmationMediaTypes.length}`,
-  ]
-    .filter(Boolean)
-    .join("; ");
   const requiredMediaLabel = requiredMediaTypes.includes("selfie")
     ? "паспорт и оба селфи"
     : confirmationMediaTypes.length > requiredMediaTypes.length
@@ -808,14 +787,6 @@ export function ReviewWorkspace({
   } else if (sectionApprovalPending) {
     completionReason = "Сохраняем подтверждение паспортной секции…";
   }
-  const sectionReviewHeadline = !isEditableReviewStatus
-    ? "Просмотр без изменений"
-    : sectionAlreadyAccepted
-      ? "Паспортная секция принята"
-      : canConfirmSection
-        ? "Секция готова к принятию"
-        : "Завершите сверку паспорта";
-
   const returnDecision = adminReviewActions?.returnForCorrection;
   const acceptDecision = adminReviewActions?.acceptForExport;
   const nextIncompleteApplicant = applicantReviewStates.find(
@@ -1397,115 +1368,15 @@ export function ReviewWorkspace({
           ) : null}
 
           <div className="v19-review-details-scroll">
-            <section
-              aria-label="Готовность паспортной проверки"
-              className="v19-review-summary"
-            >
-              <div className="v19-review-summary-copy">
-                <span>Сверка документа</span>
-                <strong>{sectionReviewHeadline}</strong>
-                <p id="passport-review-completion-reason">{completionReason}</p>
-                {isEditableReviewStatus ? (
-                  <button
-                    aria-label="Перейти к следующему незавершённому шагу"
-                    className="v19-review-next-step"
-                    onClick={handleNextReviewStep}
-                    type="button"
-                  >
-                    Следующий шаг
-                    <ArrowRight aria-hidden="true" />
-                  </button>
-                ) : null}
-              </div>
-              <div
-                aria-label="Состояние проверки"
-                className="v19-review-status-strip"
-                role="status"
-              >
-                <span>
-                  Поля{" "}
-                  <strong>
-                    {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-                  </strong>
-                </span>
-                <span className={openPassportIssueCount ? "has-warning" : undefined}>
-                  Замечания{" "}
-                  <strong>{openPassportIssueCount + fixedPassportIssueCount}</strong>
-                </span>
-                <span
-                  aria-label={`Оригиналы: ${mediaStatusLabel}`}
-                  className={
-                    unavailableMediaCount > 0
-                      ? "has-warning"
-                      : loadingMediaCount > 0
-                        ? "is-loading"
-                        : pendingMediaReviewCount > 0
-                          ? "is-pending"
-                          : undefined
-                  }
-                >
-                  Оригиналы{" "}
-                  <strong>
-                    {readyMediaCount}/{confirmationMediaTypes.length}
-                  </strong>
-                </span>
-              </div>
-            </section>
-
-            {correctedIssuesAwaitingClosure.length > 0 ? (
-              <section
-                aria-label="Исправления к закрытию"
-                className="v19-review-corrected-issues"
-              >
-                <header>
-                  <div>
-                    <span>Решение администратора</span>
-                    <h2>Исправления к закрытию</h2>
-                  </div>
-                  <strong>{correctedIssuesAwaitingClosure.length}</strong>
-                </header>
-                <p>
-                  Сверьте исправленные значения. Команда «Закрыть исправления и принять»
-                  закроет перечисленные замечания и передаст пакет на выгрузку.
-                </p>
-                <div className="v19-review-corrected-issue-list">
-                  {correctedIssuesAwaitingClosure.map((issue) => {
-                    const fieldLabel = submission
-                      ? questionnaireIssueFieldDisplayLabel(submission, issue)
-                      : issue.target.field;
-                    const target = [
-                      issue.target.applicantName,
-                      issue.target.section,
-                      fieldLabel,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ");
-
-                    return (
-                      <article key={issue.id}>
-                        <div>
-                          <strong>{issue.reason}</strong>
-                          {target ? <span>{target}</span> : null}
-                        </div>
-                        <p>{issue.comment}</p>
-                      </article>
-                    );
-                  })}
-                </div>
-              </section>
-            ) : null}
-
             <header className="v19-review-section-heading is-controls-only">
               <div
                 aria-busy={sectionApprovalPending}
                 aria-live="polite"
                 className={`v19-review-section-controls${sectionApprovalPending ? " is-pending" : ""}${sectionAlreadyAccepted ? " is-complete" : ""}${acceptanceError ? " is-error" : ""}${canConfirmSection ? " is-ready" : ""}`}
               >
-                <strong
-                  aria-label={`Заполнено ${filledFieldCount} из ${ADMIN_PASSPORT_REVIEW_FIELD_IDS.length} паспортных полей`}
-                >
-                  {filledFieldCount}/{ADMIN_PASSPORT_REVIEW_FIELD_IDS.length}
-                </strong>
+                <p className="sr-only" id="passport-review-completion-reason">
+                  {completionReason}
+                </p>
                 {isEditableReviewStatus ? (
                   <button
                     aria-label={sectionActionAccessibleLabel(

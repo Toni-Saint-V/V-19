@@ -1042,6 +1042,13 @@ test.describe("V-19 responsive proof", () => {
         page.getByRole("heading", { level: 1, name: "Новая подача" }),
       ).toBeVisible();
       await expect(createWorkspace.getByTestId("preupload-workspace")).toBeVisible();
+      await expect(
+        createWorkspace.getByRole("button", { name: "Открыть данные из паспорта" }),
+      ).toHaveCount(0);
+      await expect(createWorkspace.locator(".v19-preupload-rail")).toHaveCount(0);
+      await expect(
+        createWorkspace.locator(".v19-preupload-layout"),
+      ).not.toHaveAttribute("data-has-prefill", "true");
       await expectNoHorizontalDocumentOverflow(
         page,
         `${viewport.label}: create workspace`,
@@ -1388,11 +1395,29 @@ test.describe("V-19 responsive proof", () => {
         `${viewport.label}: export`,
         viewport.width < 768,
       );
-      await expectMobileSheetKeyboardContract(page, {
-        closeName: "Закрыть контроль пакета",
-        dialogName: "Контроль пакета",
-        toggleName: /^Контроль пакета/,
-      });
+      if (viewport.width >= 1280) {
+        await expect(page.locator('aside[aria-label="Контроль пакета"]')).toHaveCount(
+          0,
+        );
+        await expect(
+          page.locator('.v19-admin-export-screen-v2[data-has-export-context="false"]'),
+        ).toBeVisible();
+        await screenshot(page, viewport, "export-idle");
+      }
+      const generateButton = await selectReadyExportPackage(page);
+      await generateButton.scrollIntoViewIfNeeded();
+      await expect(generateButton).toBeEnabled();
+      if (viewport.width < 1280) {
+        await page
+          .getByRole("dialog", { name: "Контроль пакета" })
+          .getByRole("button", { name: "Закрыть контроль пакета" })
+          .click();
+        await expectMobileSheetKeyboardContract(page, {
+          closeName: "Закрыть контроль пакета",
+          dialogName: "Контроль пакета",
+          toggleName: /^Контроль пакета/,
+        });
+      }
       if (viewport.width === 1024) {
         await expectModalDeactivatesAcrossBreakpoint(page, {
           desktopViewport: { height: 800, width: 1280 },
@@ -1401,18 +1426,6 @@ test.describe("V-19 responsive proof", () => {
           toggleName: /^Контроль пакета/,
         });
       }
-      if (viewport.width >= 1280) {
-        const exportSummary = page.getByRole("region", {
-          name: "Текущая выгрузка",
-        });
-        await expect(exportSummary).toContainText("Пакет в фокусе");
-        await expect(exportSummary).toContainText("Готовность");
-        await expect(exportSummary).toContainText("Даты поездки");
-        await screenshot(page, viewport, "export-idle");
-      }
-      const generateButton = await selectReadyExportPackage(page);
-      await generateButton.scrollIntoViewIfNeeded();
-      await expect(generateButton).toBeEnabled();
       await expectNoHorizontalDocumentOverflow(
         page,
         `${viewport.label}: selected export`,

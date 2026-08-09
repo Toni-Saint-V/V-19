@@ -321,9 +321,7 @@ export function AdminExportScreen({
     });
     setActiveId((current) => {
       if (realItems.some((item) => item.id === current)) return current;
-      return (
-        realItems.find((item) => item.blockers === 0)?.id ?? realItems[0]?.id ?? ""
-      );
+      return "";
     });
   }, [realItems]);
 
@@ -407,6 +405,8 @@ export function AdminExportScreen({
     displayItems.find((item) => item.id === activeId) ??
     displayItems[0] ??
     selectedItems[0];
+  const hasExplicitActiveItem =
+    activeId.length > 0 && displayItems.some((item) => item.id === activeId);
   const selectedCount = selectedItems.length;
   const availableCount = enrichedItems.filter((item) => item.blockers === 0).length;
   const blockedCount = enrichedItems.filter((item) => item.blockers > 0).length;
@@ -431,6 +431,12 @@ export function AdminExportScreen({
   const diagnosticReasons = diagnosticTargetsSelection
     ? selectedDiagnosticReasons
     : activeBlockerReasons;
+  const railHasUsefulContext =
+    selectedCount > 0 ||
+    hasExplicitActiveItem ||
+    (activeQueueTab === "blocked" && diagnosticReasons.length > 0) ||
+    Boolean(exportError) ||
+    Boolean(exportNotice);
   const showBlockedPackageFocus =
     !diagnosticTargetsSelection && activeBlockerReasons.length > 0;
   const diagnosticTitle = showBlockedPackageFocus
@@ -516,6 +522,9 @@ export function AdminExportScreen({
     setTypeFilter("all");
     closeMobileControl();
   };
+  useEffect(() => {
+    if (!railHasUsefulContext) closeMobileControl();
+  }, [closeMobileControl, railHasUsefulContext]);
   const toggleAll = () => {
     setExportError("");
     clearPreparedExport();
@@ -540,7 +549,6 @@ export function AdminExportScreen({
     }
 
     setSelectedRealIds((current) => [...current, id]);
-    setActiveId(id);
   };
 
   const prepareWorkbookForCurrentSelection =
@@ -827,7 +835,8 @@ export function AdminExportScreen({
   return (
     <motion.div
       {...surfaceMotion}
-      className="v19-admin-screen v19-admin-export-screen-v2"
+      className={`v19-admin-screen v19-admin-export-screen-v2 ${railHasUsefulContext ? "has-context-rail" : "without-context-rail"}`}
+      data-has-export-context={railHasUsefulContext ? "true" : "false"}
       data-ui-pattern="operational-table-with-context"
     >
       <section className="v19-admin-export-main-v2">
@@ -861,30 +870,32 @@ export function AdminExportScreen({
           />
         </V19MetricStrip>
 
-        <AdminContextToggle
-          badge={
-            hasExportBlockers || (activeItem?.blockers ?? 0) > 0
-              ? "Стоп"
-              : selectedCount
-                ? "Готов"
-                : "—"
-          }
-          badgeClassName={
-            hasExportBlockers || (activeItem?.blockers ?? 0) > 0
-              ? "tone-danger"
-              : "tone-ready"
-          }
-          className="v19-admin-export-context-toggle-v2"
-          detail={
-            selectedCount
-              ? `${selectedCount} ${packageCountLabel(selectedCount)} · ${selectedApplicants} ${applicantCountLabel(selectedApplicants)}`
-              : (activeItem?.title ?? "Пакет не выбран")
-          }
-          expanded={mobileControlOpen}
-          icon={FolderCheck}
-          onClick={() => setMobileControlOpen(true)}
-          title="Контроль пакета"
-        />
+        {railHasUsefulContext ? (
+          <AdminContextToggle
+            badge={
+              hasExportBlockers || (activeItem?.blockers ?? 0) > 0
+                ? "Стоп"
+                : selectedCount
+                  ? "Готов"
+                  : "—"
+            }
+            badgeClassName={
+              hasExportBlockers || (activeItem?.blockers ?? 0) > 0
+                ? "tone-danger"
+                : "tone-ready"
+            }
+            className="v19-admin-export-context-toggle-v2"
+            detail={
+              selectedCount
+                ? `${selectedCount} ${packageCountLabel(selectedCount)} · ${selectedApplicants} ${applicantCountLabel(selectedApplicants)}`
+                : (activeItem?.title ?? "Пакет не выбран")
+            }
+            expanded={mobileControlOpen}
+            icon={FolderCheck}
+            onClick={() => setMobileControlOpen(true)}
+            title="Контроль пакета"
+          />
+        ) : null}
 
         <div className="v19-admin-export-workspace-v2">
           <AdminListHeader
@@ -1092,159 +1103,163 @@ export function AdminExportScreen({
         </div>
       </section>
 
-      <aside
-        aria-label="Контроль пакета"
-        aria-modal={mobileControlModalOpen ? "true" : undefined}
-        className={`v19-admin-export-rail-v2 ${mobileControlOpen ? "is-mobile-open" : ""}`}
-        ref={mobileControlSheetRef}
-        role={mobileControlModalOpen ? "dialog" : undefined}
-        tabIndex={-1}
-      >
-        <button
-          aria-label="Закрыть контроль пакета"
-          className="v19-admin-export-rail-close-v2 v19-admin-export-rail-close-floating-v2"
-          type="button"
-          onClick={closeMobileControl}
+      {railHasUsefulContext ? (
+        <aside
+          aria-label="Контроль пакета"
+          aria-modal={mobileControlModalOpen ? "true" : undefined}
+          className={`v19-admin-export-rail-v2 ${mobileControlOpen ? "is-mobile-open" : ""}`}
+          ref={mobileControlSheetRef}
+          role={mobileControlModalOpen ? "dialog" : undefined}
+          tabIndex={-1}
         >
-          <X aria-hidden="true" />
-        </button>
-
-        <div
-          aria-label="Панель контроля выгрузки"
-          className="v19-admin-export-rail-content-v2 min-h-0 flex-1 overflow-y-auto p-5 space-y-5"
-          role="region"
-          tabIndex={0}
-        >
-          <AdminExportDiagnosticsPanel
-            onShowPackage={showBlockedPackageFocus ? revealBlockedPackage : undefined}
-            reasons={diagnosticReasons}
-            title={diagnosticTitle}
-          />
-
-          <section
-            aria-label="Текущая выгрузка"
-            className="v19-admin-export-summary-v2 rounded-2xl border border-[#242529] bg-[#141416] p-4"
+          <button
+            aria-label="Закрыть контроль пакета"
+            className="v19-admin-export-rail-close-v2 v19-admin-export-rail-close-floating-v2"
+            type="button"
+            onClick={closeMobileControl}
           >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[12px] text-white/45">
-                  {railSummaryTargetsSelection ? "Текущая выгрузка" : "Пакет в фокусе"}
-                </div>
-                <div className="mt-1 flex min-w-0 items-center gap-2">
-                  <div className="truncate text-[15px] font-semibold text-white">
-                    {railSummaryTitle}
-                  </div>
-                  {!railSummaryTargetsSelection && activeItem ? (
-                    <span className="shrink-0 rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[10px] font-medium text-white/60">
-                      {activeItem.publicId}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              <StatusPill tone={railSummaryStatusTone}>
-                {railSummaryStatusLabel}
-              </StatusPill>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
-              {railSummaryMetrics.map((metric) => (
-                <div
-                  className={`${metric.wide ? "col-span-2" : ""} rounded-xl bg-white/[0.03] p-3`}
-                  key={metric.label}
-                >
-                  <div className="text-white/35">{metric.label}</div>
-                  <div className="mt-1 truncate font-semibold text-white">
-                    {metric.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-white/45">
-              {railSummaryTargetsSelection
-                ? "Excel и обязательные документы будут подготовлены автоматически при скачивании."
-                : railSummaryDiagnosticReasons.length > 0
-                  ? "Исправьте ограничения выше, затем добавьте пакет в выгрузку."
-                  : "Отметьте пакет в списке, чтобы добавить его в текущую выгрузку."}
-            </p>
-            {selectedWarnings > 0 ? (
-              <div className="mt-3 text-[11px] text-[var(--vf-amber-text)]">
-                Предупреждения: {selectedWarnings}
-              </div>
-            ) : null}
-          </section>
+            <X aria-hidden="true" />
+          </button>
 
-          {exportError ? (
+          <div
+            aria-label="Панель контроля выгрузки"
+            className="v19-admin-export-rail-content-v2 min-h-0 flex-1 overflow-y-auto p-5 space-y-5"
+            role="region"
+            tabIndex={0}
+          >
+            <AdminExportDiagnosticsPanel
+              onShowPackage={showBlockedPackageFocus ? revealBlockedPackage : undefined}
+              reasons={diagnosticReasons}
+              title={diagnosticTitle}
+            />
+
             <section
-              className="v19-admin-export-action-error-v2 rounded-2xl border border-[#3a2c1c] bg-[#18140f] p-4"
-              role="alert"
+              aria-label="Текущая выгрузка"
+              className="v19-admin-export-summary-v2 rounded-2xl border border-[#242529] bg-[#141416] p-4"
             >
-              <div className="flex items-start gap-2.5">
-                <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--vf-amber-text)]" />
-                <div>
-                  <div className="text-[12px] font-semibold text-white">
-                    Выгрузка не выполнена
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[12px] text-white/45">
+                    {railSummaryTargetsSelection
+                      ? "Текущая выгрузка"
+                      : "Пакет в фокусе"}
                   </div>
-                  <p className="mt-1 text-[11px] leading-relaxed text-white/70">
-                    {exportError}
-                  </p>
-                  <p className="mt-1.5 text-[10.5px] leading-relaxed text-white/50">
-                    {exportActionFailureNextStep(exportFailureKind)}
-                  </p>
+                  <div className="mt-1 flex min-w-0 items-center gap-2">
+                    <div className="truncate text-[15px] font-semibold text-white">
+                      {railSummaryTitle}
+                    </div>
+                    {!railSummaryTargetsSelection && activeItem ? (
+                      <span className="shrink-0 rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[10px] font-medium text-white/60">
+                        {activeItem.publicId}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
+                <StatusPill tone={railSummaryStatusTone}>
+                  {railSummaryStatusLabel}
+                </StatusPill>
               </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
+                {railSummaryMetrics.map((metric) => (
+                  <div
+                    className={`${metric.wide ? "col-span-2" : ""} rounded-xl bg-white/[0.03] p-3`}
+                    key={metric.label}
+                  >
+                    <div className="text-white/35">{metric.label}</div>
+                    <div className="mt-1 truncate font-semibold text-white">
+                      {metric.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-white/45">
+                {railSummaryTargetsSelection
+                  ? "Excel и обязательные документы будут подготовлены автоматически при скачивании."
+                  : railSummaryDiagnosticReasons.length > 0
+                    ? "Исправьте ограничения выше, затем добавьте пакет в выгрузку."
+                    : "Отметьте пакет в списке, чтобы добавить его в текущую выгрузку."}
+              </p>
+              {selectedWarnings > 0 ? (
+                <div className="mt-3 text-[11px] text-[var(--vf-amber-text)]">
+                  Предупреждения: {selectedWarnings}
+                </div>
+              ) : null}
             </section>
-          ) : null}
 
-          <div className="v19-admin-export-download-action-v2 sticky bottom-0 pt-2">
-            <button
-              aria-describedby="export-action-hint"
-              className="linear-product-action linear-product-action--primary flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
-              data-testid="export-download"
-              disabled={
-                selectedCount === 0 ||
-                isExporting ||
-                hasExportBlockers ||
-                excelDownloadCompleted
-              }
-              type="button"
-              onClick={() => void handleDownloadBundle()}
-            >
-              {isExporting ? (
-                <UploadCloud className="h-4 w-4 animate-pulse" />
-              ) : excelDownloadCompleted ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              {isExporting
-                ? "Готовим выгрузку…"
-                : excelDownloadCompleted
-                  ? "Excel скачан"
-                  : archiveDownloadStarted
-                    ? "Подтвердить скачивание"
-                    : adminDocumentPackageExportEnabled
-                      ? "Скачать ZIP + Excel"
-                      : "Скачать Excel"}
-              {!isExporting && !excelDownloadCompleted && (
-                <ArrowRight className="h-4 w-4" />
-              )}
-            </button>
-            <p
-              className="sr-only"
-              data-testid="export-action-feedback"
-              id="export-action-hint"
-              role="status"
-            >
-              {exportNotice ||
-                (selectedCount
-                  ? hasExportBlockers
-                    ? "Устраните блокирующие ошибки выше"
-                    : "Excel и обязательные документы будут подготовлены автоматически"
-                  : "Выберите хотя бы одну подачу")}
-            </p>
+            {exportError ? (
+              <section
+                className="v19-admin-export-action-error-v2 rounded-2xl border border-[#3a2c1c] bg-[#18140f] p-4"
+                role="alert"
+              >
+                <div className="flex items-start gap-2.5">
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--vf-amber-text)]" />
+                  <div>
+                    <div className="text-[12px] font-semibold text-white">
+                      Выгрузка не выполнена
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-white/70">
+                      {exportError}
+                    </p>
+                    <p className="mt-1.5 text-[10.5px] leading-relaxed text-white/50">
+                      {exportActionFailureNextStep(exportFailureKind)}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            <div className="v19-admin-export-download-action-v2 sticky bottom-0 pt-2">
+              <button
+                aria-describedby="export-action-hint"
+                className="linear-product-action linear-product-action--primary flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--v19-depth-accent)] text-[14px] font-semibold text-[var(--v19-depth-text-strong)] shadow-[var(--v19-depth-inner-highlight)] transition-colors hover:bg-[var(--v19-depth-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--v19-depth-control)] disabled:text-[var(--v19-depth-text-faint)] disabled:shadow-none"
+                data-testid="export-download"
+                disabled={
+                  selectedCount === 0 ||
+                  isExporting ||
+                  hasExportBlockers ||
+                  excelDownloadCompleted
+                }
+                type="button"
+                onClick={() => void handleDownloadBundle()}
+              >
+                {isExporting ? (
+                  <UploadCloud className="h-4 w-4 animate-pulse" />
+                ) : excelDownloadCompleted ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {isExporting
+                  ? "Готовим выгрузку…"
+                  : excelDownloadCompleted
+                    ? "Excel скачан"
+                    : archiveDownloadStarted
+                      ? "Подтвердить скачивание"
+                      : adminDocumentPackageExportEnabled
+                        ? "Скачать ZIP + Excel"
+                        : "Скачать Excel"}
+                {!isExporting && !excelDownloadCompleted && (
+                  <ArrowRight className="h-4 w-4" />
+                )}
+              </button>
+              <p
+                className="sr-only"
+                data-testid="export-action-feedback"
+                id="export-action-hint"
+                role="status"
+              >
+                {exportNotice ||
+                  (selectedCount
+                    ? hasExportBlockers
+                      ? "Устраните блокирующие ошибки выше"
+                      : "Excel и обязательные документы будут подготовлены автоматически"
+                    : "Выберите хотя бы одну подачу")}
+              </p>
+            </div>
           </div>
-        </div>
-      </aside>
-      {mobileControlOpen ? (
+        </aside>
+      ) : null}
+      {railHasUsefulContext && mobileControlOpen ? (
         <button
           aria-label="Закрыть контроль пакета"
           className="v19-admin-export-backdrop-v2"

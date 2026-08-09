@@ -21,4 +21,19 @@ describe("pre-upload responsive layout contract", () => {
       ".v19-preupload-card { height: 100%; min-height: 100%;",
     );
   });
+
+  it("reserves the desktop rail only when an active applicant has extracted fields", () => {
+    const desktopRules = preUploadCss.match(
+      /@media \(min-width: 1280px\) \{([\s\S]*?)\n\}\n\n@media \(max-width: 1279px\)/,
+    );
+
+    expect(desktopRules?.[1]).toBeDefined();
+    const normalized = desktopRules?.[1].replace(/\s+/g, " ");
+    expect(normalized).toContain(
+      '.v19-preupload-layout[data-has-prefill="true"] { grid-template-columns: minmax(0, 1fr) 340px;',
+    );
+    expect(normalized).toContain(
+      '.v19-preupload-layout:not([data-has-prefill="true"]) { grid-template-columns: minmax(0, 1fr);',
+    );
+  });
 });

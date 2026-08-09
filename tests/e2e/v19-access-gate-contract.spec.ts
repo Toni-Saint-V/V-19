@@ -6,7 +6,12 @@ const accessViewports = [
   { width: 375, height: 812 },
   { width: 390, height: 844 },
   { width: 430, height: 932 },
+  { width: 760, height: 1024 },
+  { width: 761, height: 1024 },
   { width: 768, height: 1024 },
+  { width: 1023, height: 1024 },
+  { width: 1024, height: 1024 },
+  { width: 1439, height: 1024 },
   { width: 1440, height: 900 },
 ];
 
@@ -31,6 +36,21 @@ test.describe("V-19 access gate contract", () => {
             ".access-card input, .access-card button",
           ),
         );
+        const cardBounds = card?.getBoundingClientRect();
+        const logoBounds = logo?.getBoundingClientRect();
+        const logoCardOverlapArea =
+          cardBounds && logoBounds
+            ? Math.max(
+                0,
+                Math.min(cardBounds.right, logoBounds.right) -
+                  Math.max(cardBounds.left, logoBounds.left),
+              ) *
+              Math.max(
+                0,
+                Math.min(cardBounds.bottom, logoBounds.bottom) -
+                  Math.max(cardBounds.top, logoBounds.top),
+              )
+            : Number.POSITIVE_INFINITY;
 
         return {
           cardLeft: card?.getBoundingClientRect().left ?? -1,
@@ -40,6 +60,7 @@ test.describe("V-19 access gate contract", () => {
           firstInputTop:
             firstInput?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
           logoHeight: logo?.getBoundingClientRect().height ?? Number.POSITIVE_INFINITY,
+          logoCardOverlapArea,
           overflowX: document.documentElement.scrollWidth - window.innerWidth,
           shellScrollable: shell.scrollHeight > shell.clientHeight,
           submitBottom:
@@ -90,7 +111,38 @@ test.describe("V-19 access gate contract", () => {
           `${viewport.width}px keeps the primary CTA in the first viewport`,
         ).toBeLessThanOrEqual(viewport.height);
       }
+
+      if ([760, 761, 768, 1023, 1024, 1439, 1440].includes(viewport.width)) {
+        expect(
+          metrics.logoCardOverlapArea,
+          `${viewport.width}px keeps the brand mark outside the form card`,
+        ).toBe(0);
+      }
     }
+  });
+
+  test("registration validation moves focus to its first invalid field", async ({
+    page,
+  }) => {
+    const runtimeErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") runtimeErrors.push(message.text());
+    });
+    page.on("pageerror", (error) => runtimeErrors.push(error.message));
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+
+    await page.getByRole("button", { name: "Подать заявку на доступ" }).click();
+
+    const fullName = page.getByLabel("Имя и фамилия");
+    await expect(fullName).toHaveAttribute("aria-invalid", "true");
+    await expect(fullName).toBeFocused();
+
+    await fullName.fill("Анна Петрова");
+    await page.getByRole("button", { name: "Подать заявку на доступ" }).click();
+    await expect(page.getByLabel("Агентство / компания")).toBeFocused();
+    expect(runtimeErrors).toEqual([]);
   });
 
   test("login validation, password reveal, and recovery remain reachable", async ({

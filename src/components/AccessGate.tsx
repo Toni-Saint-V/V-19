@@ -198,6 +198,8 @@ export function AccessGate({
   const [localError, setLocalError] = useState('');
   const [success, setSuccess] = useState('');
   const [attempted, setAttempted] = useState(false);
+  const registrationFormRef = useRef<HTMLFormElement>(null);
+  const [registrationFocusRequest, setRegistrationFocusRequest] = useState(0);
   const [touched, setTouched] = useState<Partial<Record<keyof AccessRequestRegistrationInput, boolean>>>({});
   const [registration, setRegistration] = useState<AccessRequestRegistrationInput>({
     city: '',
@@ -260,6 +262,13 @@ export function AccessGate({
     [attempted, registration, touched],
   );
 
+  useEffect(() => {
+    if (!registrationFocusRequest) return;
+    registrationFormRef.current
+      ?.querySelector<HTMLInputElement>('input[aria-invalid="true"]')
+      ?.focus();
+  }, [registrationFocusRequest]);
+
   function clearMessages() {
     setLocalError('');
     setSuccess('');
@@ -317,7 +326,10 @@ export function AccessGate({
       registration.phone.trim() &&
       (usesSupabase || registration.password.trim()) &&
       validEmail(registration.email);
-    if (!complete) return;
+    if (!complete) {
+      setRegistrationFocusRequest((current) => current + 1);
+      return;
+    }
 
     if (!startAction()) return;
     try {
@@ -683,7 +695,12 @@ export function AccessGate({
       <p className="access-intro" id="workspace-register-copy">
         Заполните данные агентства. Доступ появится после подтверждения администратором.
       </p>
-      <form className="access-form access-form--registration" onSubmit={(event) => void submitRegistration(event)} noValidate>
+      <form
+        ref={registrationFormRef}
+        className="access-form access-form--registration"
+        onSubmit={(event) => void submitRegistration(event)}
+        noValidate
+      >
         {registrationFields.map((field) => {
           const errorId = `${field.id}-error`;
           const fieldError = registerErrors[field.key];

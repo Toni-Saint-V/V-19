@@ -1,7 +1,10 @@
-import { type Locator, type Page } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+
+import { type Locator, type Page, type TestInfo } from "@playwright/test";
 
 import { expect, test } from "./v19-localhost-test";
 import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
+import { testRunArtifactPath } from "../support/artifacts";
 
 async function expectNoHorizontalOverflow(page: Page) {
   const dimensions = await page.evaluate(() => {
@@ -73,6 +76,24 @@ async function expectCompletePassportFrame(reviewWorkspace: Locator) {
     });
 }
 
+async function capturePassportComposition(
+  page: Page,
+  testInfo: TestInfo,
+  viewport: { height: number; width: number },
+) {
+  const evidenceRoot = testRunArtifactPath("passport-review-composition");
+  mkdirSync(evidenceRoot, { recursive: true });
+  const screenshotPath = testRunArtifactPath(
+    "passport-review-composition",
+    `passport-review-${viewport.width}x${viewport.height}.png`,
+  );
+  await page.screenshot({ animations: "disabled", path: screenshotPath });
+  await testInfo.attach(`passport-review-${viewport.width}x${viewport.height}`, {
+    contentType: "image/png",
+    path: screenshotPath,
+  });
+}
+
 test.describe("V-19 P0 admin document review", () => {
   test("passport keeps its complete frame and reversible zoom across approved viewports", async ({
     page,
@@ -94,8 +115,10 @@ test.describe("V-19 P0 admin document review", () => {
       await expect(page.locator(".v19-review-focus-tabs")).toHaveCount(0);
       if (viewport.width < 768) {
         await expect(
-          page.locator(".v19-review-mobile-filters > summary"),
-        ).toBeVisible();
+          page.locator(
+            ".v19-admin-review-board .v19-inline-filter-buttons .v19-admin-toolbar-select:visible",
+          ),
+        ).toHaveCount(3);
       } else {
         await expect(
           page.locator(".v19-admin-review-board .v19-review-lane-filter:visible"),
@@ -108,6 +131,43 @@ test.describe("V-19 P0 admin document review", () => {
       let reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
       await expect(reviewWorkspace).toBeVisible();
       await expectCompletePassportFrame(reviewWorkspace);
+      await expect(reviewWorkspace.getByText("Сверка документа")).toHaveCount(0);
+      await expect(reviewWorkspace.getByText("Исправления к закрытию")).toHaveCount(0);
+      await expect(reviewWorkspace.getByText("Паспортная секция")).toHaveCount(0);
+      await expect(reviewWorkspace.getByText(/8\s*из\s*8/)).toHaveCount(0);
+      await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
+      await expect(reviewWorkspace.getByRole("tabpanel")).toBeVisible();
+      await expect(
+        reviewWorkspace.locator("#passport-review-confirm-button"),
+      ).toHaveCount(1);
+      await expect(
+        reviewWorkspace.getByRole("button", {
+          name: "Добавить замечание: Номер паспорта",
+        }),
+      ).toHaveCount(1);
+      if (viewport.width < 600) {
+        const actionLayout = await reviewWorkspace
+          .locator(".v19-review-decision-actions")
+          .evaluate((actions) => {
+            const style = getComputedStyle(actions);
+            const returnAction =
+              actions.querySelector<HTMLElement>(".v19-review-return");
+            if (!returnAction) return null;
+            return {
+              columns: style.gridTemplateColumns,
+              textFits: returnAction.scrollWidth <= returnAction.clientWidth + 1,
+            };
+          });
+        expect(actionLayout, "mobile decision actions are rendered").not.toBeNull();
+        expect(
+          actionLayout!.columns,
+          "mobile decision actions use one full-width column",
+        ).not.toContain(" ");
+        expect(actionLayout!.textFits, "mobile return action text is not clipped").toBe(
+          true,
+        );
+      }
+      await capturePassportComposition(page, testInfo, viewport);
       await reviewWorkspace
         .getByRole("button", { name: "Уменьшить изображение" })
         .click();
@@ -197,15 +257,22 @@ test.describe("V-19 P0 admin document review", () => {
 
     await expect(
       reviewWorkspace.getByRole("heading", { name: "Данные паспорта" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       reviewWorkspace.getByRole("alert").getByText("Оригинал нельзя принять"),
     ).toBeVisible();
     await expect(
-      reviewWorkspace.getByRole("button", {
-        name: "Принять всё",
-      }),
-    ).toBeDisabled();
+      reviewWorkspace.locator("#passport-review-confirm-button"),
+    ).toBeEnabled();
+    await expect(
+      reviewWorkspace.locator("#passport-review-confirm-button"),
+    ).toHaveAttribute("aria-label", "Перейти к следующему шагу в паспортной секции");
+    await expect(
+      reviewWorkspace.locator("#passport-review-confirm-button"),
+    ).toHaveAttribute(
+      "title",
+      "Заполнены не все паспортные поля или в данных есть ошибка.",
+    );
     await expect(
       reviewWorkspace.getByRole("button", { name: /^Подтвердить:/ }),
     ).toHaveCount(0);
@@ -258,9 +325,7 @@ test.describe("V-19 P0 admin document review", () => {
     await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
     await expect(reviewWorkspace.locator("[data-review-media]")).toHaveCount(3);
     await expect(
-      reviewWorkspace.getByRole("button", {
-        name: "Принять всё",
-      }),
+      reviewWorkspace.locator("#passport-review-confirm-button"),
     ).toHaveCount(1);
     await reviewWorkspace
       .getByRole("button", { name: "Добавить замечание: Номер паспорта" })

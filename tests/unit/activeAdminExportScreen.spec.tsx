@@ -126,21 +126,79 @@ describe("active admin export screen", () => {
     ).not.toBeInTheDocument();
   });
 
-  test("shows useful focused package details before selection", () => {
+  test("keeps the queue full width until a package is selected or opened", () => {
     const submission = readySubmission();
-    render(<AdminExportScreen submissions={[submission]} />);
+    const { container } = render(<AdminExportScreen submissions={[submission]} />);
+
+    expect(
+      container.querySelector('aside[aria-label="Контроль пакета"]'),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".without-context-rail")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: `Выбрать ${submission.listTitle ?? submission.title}`,
+      }),
+    );
+
+    const summary = screen.getByRole("region", { name: "Текущая выгрузка" });
+    expect(summary).toHaveTextContent("Текущая выгрузка");
+    expect(summary).toHaveTextContent("1 пакет");
+    expect(container.querySelector(".has-context-rail")).toBeInTheDocument();
+  });
+
+  test("does not retarget an explicit package focus after a filter hides it", () => {
+    const focused = readySubmission();
+    const other = initialSubmissions.find((item) => item.id === "ПД-1054");
+    if (!other) throw new Error("Missing second ready export fixture ПД-1054");
+    const { container } = render(<AdminExportScreen submissions={[focused, other]} />);
+
+    fireEvent.click(screen.getByTestId(`admin-export-row-${focused.id}`));
+    expect(
+      container.querySelector('aside[aria-label="Контроль пакета"]'),
+    ).toBeInTheDocument();
+    const focusedCheckbox = screen.getByRole("checkbox", {
+      name: `Выбрать ${focused.listTitle ?? focused.title}`,
+    }) as HTMLInputElement;
+    if (focusedCheckbox.checked) fireEvent.click(focusedCheckbox);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "ID, семья или агент" }), {
+      target: { value: other.listTitle },
+    });
+
+    expect(screen.getByTestId(`admin-export-row-${other.id}`)).toBeInTheDocument();
+    expect(
+      container.querySelector('aside[aria-label="Контроль пакета"]'),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".without-context-rail")).toBeInTheDocument();
+  });
+
+  test("shows useful focused package details when a blocked row is opened", () => {
+    const ready = readySubmission();
+    const blocked: Submission = {
+      ...ready,
+      id: "BLOCKED-FOCUSED-EXPORT-1",
+      listTitle: "Пакет с ошибкой",
+      title: "Пакет с ошибкой",
+      files: [],
+    };
+    render(<AdminExportScreen submissions={[ready, blocked]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Стоп" }));
+    const row = screen.getByTestId(`admin-export-row-${blocked.id}`);
+    fireEvent.click(row);
 
     const summary = screen.getByRole("region", { name: "Текущая выгрузка" });
     expect(summary).toHaveTextContent("Пакет в фокусе");
-    expect(summary).toHaveTextContent(submission.listTitle ?? submission.title);
-    expect(summary).toHaveTextContent(`${submission.completeness.total}%`);
+    expect(summary).toHaveTextContent(blocked.listTitle ?? blocked.title);
+    expect(summary).toHaveTextContent(`${blocked.completeness.total}%`);
     expect(summary).toHaveTextContent(
-      `${submission.tripDateFrom} – ${submission.tripDateTo}`,
+      `${blocked.tripDateFrom} – ${blocked.tripDateTo}`,
     );
-    expect(summary).toHaveTextContent(submission.city);
-    expect(summary).toHaveTextContent("готов к выбору");
+    expect(summary).toHaveTextContent(blocked.city);
+    expect(summary).toHaveTextContent("есть блокеры");
     expect(summary).toHaveTextContent(
-      "Отметьте пакет в списке, чтобы добавить его в текущую выгрузку.",
+      "Исправьте ограничения выше, затем добавьте пакет в выгрузку.",
     );
     expect(within(summary).queryByText("Пакеты")).not.toBeInTheDocument();
   });

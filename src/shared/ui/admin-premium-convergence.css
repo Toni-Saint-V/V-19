@@ -2822,7 +2822,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
   }
 }
 
-/* Review keeps all three icon-only queue filters inside the mobile toolbar. */
+/* Review keeps all three compact queue filters inside the mobile toolbar. */
 @media (max-width: 767px) {
   #root
     .v19-admin-workspace-root
@@ -2833,8 +2833,8 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
   }
 }
 
-/* Keep the three icon-only Admin filters visually identical to the standalone
-   controls used by Agent submissions. */
+/* Keep the three Admin filters visually identical to the standalone controls
+   used by Agent submissions. */
 #root
   .v19-admin-workspace-root
   :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
@@ -2911,7 +2911,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 @media (max-width: 767px) {
   #root
     .v19-admin-workspace-root
-    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-export-workspace-v2
     .v19-inline-filter-buttons {
     column-gap: var(--v19b-size-6) !important;
     padding: 0 !important;
@@ -2924,7 +2924,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 
   #root
     .v19-admin-workspace-root
-    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-export-workspace-v2
     .v19-inline-filter-buttons
     > .v19-admin-toolbar-select {
     box-sizing: border-box;
@@ -2943,7 +2943,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 
   #root
     .v19-admin-workspace-root
-    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-export-workspace-v2
     .v19-inline-filter-buttons
     .v19-admin-toolbar-select-trigger {
     width: var(--v19b-size-40) !important;
@@ -2956,7 +2956,7 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 
   #root
     .v19-admin-workspace-root
-    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-export-workspace-v2
     .v19-inline-filter-buttons
     .v19-admin-toolbar-select
     :is(
@@ -2969,11 +2969,132 @@ html[data-v19-reduced-motion="on"] #root .v19-admin-workspace-root *::after {
 
   #root
     .v19-admin-workspace-root
-    :is(.v19-admin-review-board, .v19-admin-export-workspace-v2)
+    .v19-admin-export-workspace-v2
     .v19-inline-filter-buttons
     .v19-admin-toolbar-select-icon {
     width: var(--v19b-size-16);
     height: var(--v19b-size-16);
     margin: 0;
+  }
+}
+
+/* A 44px icon alone is not enough to explain the filter on tablet and desktop.
+   Keep the compact one-row phone contract above, then expose both the filter
+   name and its current choice before those controls are wide enough to carry
+   useful text without clipping. */
+@media (min-width: 768px) {
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar:has(.v19-inline-filter-buttons) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: var(--v19b-size-44) auto !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-admin-queue-toolbar:has(.v19-inline-filter-buttons)
+    .v19-inline-filter-buttons {
+    display: grid !important;
+    width: 100%;
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--v19b-size-8) !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-inline-filter-buttons
+    > .v19-admin-toolbar-select {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 0 !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select-trigger {
+    display: grid;
+    min-width: 0 !important;
+    grid-template-columns: var(--v19b-size-18) minmax(0, 1fr) var(--v19b-size-14) !important;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    place-content: stretch !important;
+    align-items: center;
+    column-gap: var(--v19b-size-6);
+    padding: 0 var(--v19b-size-10) !important;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select
+    :is(
+      .v19-admin-toolbar-select-label,
+      .v19-admin-toolbar-select-value,
+      .v19-admin-toolbar-select-chevron
+    ) {
+    display: block !important;
+    min-width: 0;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select-label {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-10);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select-value {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    overflow: hidden;
+    color: var(--v19b-color-text);
+    font-size: var(--v19b-size-11);
+    line-height: 1.1;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select-chevron {
+    grid-column: 3;
+    grid-row: 1 / -1;
+    width: var(--v19b-size-14);
+    height: var(--v19b-size-14);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .v19-admin-export-workspace-v2
+    .v19-inline-filter-buttons
+    .v19-admin-toolbar-select-icon {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+
+  #root .v19-admin-workspace-root .v19-admin-export-screen-v2.without-context-rail {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

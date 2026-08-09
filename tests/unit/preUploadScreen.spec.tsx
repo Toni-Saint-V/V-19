@@ -67,6 +67,10 @@ describe("PreUploadScreen canonical intake", () => {
     expect(
       screen.getByText("Загрузите паспорт — данные появятся в анкете."),
     ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Открыть данные из паспорта" }),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector(".v19-preupload-rail")).not.toBeInTheDocument();
     const firstApplicant = screen.getAllByRole("listitem")[0];
     expect(
       firstApplicant?.querySelectorAll(".v19-preupload-applicant-state"),
@@ -151,6 +155,10 @@ describe("PreUploadScreen canonical intake", () => {
         screen.getByRole("button", { name: "Создать и открыть анкету" }),
       ).toBeEnabled(),
     );
+    expect(
+      screen.getByRole("button", { name: "Открыть данные из паспорта" }),
+    ).toBeVisible();
+    expect(document.querySelector(".v19-preupload-rail")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Создать и открыть анкету" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0]?.[0].passportUploads).toEqual([

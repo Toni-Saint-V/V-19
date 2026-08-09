@@ -1189,6 +1189,16 @@
   }
 }
 
+@media (min-width: 360px) and (max-width: 599px) {
+  .v19-review-decision-actions {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+  }
+
+  .v19-review-decision-actions button {
+    width: var(--v19b-size-full);
+  }
+}
+
 .v19-review-preview-canvas :is(img, object) {
   opacity: var(--v19b-opacity-zero);
   transition:

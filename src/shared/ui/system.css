@@ -30501,7 +30501,6 @@ section[data-testid="agent-actions-screen"]
 .access-brand-logo {
   display: block !important;
   margin-bottom: var(--vf-ref-size-20px) !important;
-  margin-left: var(--vf-ref-size-150px) !important;
 }
 
 .access-card h1,
@@ -30782,6 +30781,38 @@ section[data-testid="agent-actions-screen"]
   color: var(--vf-text-secondary) !important;
   font-size: var(--v19b-size-12) !important;
   font-weight: var(--v19b-weight-control) !important;
+}
+
+@media (min-width: 761px) and (max-width: 1023px) {
+  .access-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: var(--v19b-size-12) !important;
+    width: min(100%, var(--vf-ref-size-430px)) !important;
+  }
+
+  .access-brand-panel {
+    min-height: var(--v19b-size-96) !important;
+    align-content: center !important;
+    justify-items: center !important;
+    text-align: center !important;
+  }
+
+  .access-brand-lockup {
+    display: flex !important;
+    justify-content: center !important;
+    justify-self: center !important;
+    width: 100% !important;
+  }
+
+  .access-brand-logo {
+    width: var(--v19b-size-96) !important;
+    max-width: var(--v19b-size-full) !important;
+    height: auto !important;
+    margin-bottom: 0 !important;
+    margin-inline: auto !important;
+    object-fit: contain !important;
+    object-position: center center !important;
+  }
 }
 
 @media (max-width: 760px) {

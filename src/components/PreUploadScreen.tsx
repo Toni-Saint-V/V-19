@@ -353,6 +353,10 @@ export function PreUploadScreen({
   }, [mobilePrefillOpen]);
 
   useEffect(() => {
+    if (!previewFields.length) setMobilePrefillOpen(false);
+  }, [previewFields.length]);
+
+  useEffect(() => {
     if (pendingAssignments.length) {
       window.requestAnimationFrame(() => {
         assignmentDialogRef.current
@@ -706,7 +710,10 @@ export function PreUploadScreen({
       }
     >
       <div className="v19-preupload-main">
-        <div className="v19-preupload-layout">
+        <div
+          className="v19-preupload-layout"
+          data-has-prefill={previewFields.length ? "true" : undefined}
+        >
           <section className="v19-preupload-primary">
             <motion.div className="v19-preupload-card">
               <div className="v19-preupload-card-body">
@@ -1051,7 +1058,7 @@ export function PreUploadScreen({
                     />
                   </div>
 
-                  {!mobilePrefillOpen ? (
+                  {previewFields.length && !mobilePrefillOpen ? (
                     <button
                       {...agentInteractionProps("new-submission.toggle-prefill")}
                       aria-label="Открыть данные из паспорта"
@@ -1135,23 +1142,28 @@ export function PreUploadScreen({
             </motion.div>
           </section>
 
-          <aside className="v19-preupload-rail">
-            <div className="v19-preupload-rail-card">
-              <div className="v19-preupload-prefill-heading">
-                <div className="flex items-center justify-between gap-3">
-                  <h3>Данные из паспорта</h3>
-                  <span>
-                    {activeApplicantIndex + 1}/{applicantCount}
-                  </span>
+          {previewFields.length ? (
+            <aside className="v19-preupload-rail">
+              <div className="v19-preupload-rail-card">
+                <div className="v19-preupload-prefill-heading">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3>Данные из паспорта</h3>
+                    <span>
+                      {activeApplicantIndex + 1}/{applicantCount}
+                    </span>
+                  </div>
+                  <p>{activeApplicantLabel}. Проверьте распознанные данные в анкете.</p>
                 </div>
-                <p>{activeApplicantLabel}. Проверьте распознанные данные в анкете.</p>
+                <PrefillPreviewList
+                  fields={previewFields}
+                  reduceMotion={reduceMotion}
+                />
               </div>
-              <PrefillPreviewList fields={previewFields} reduceMotion={reduceMotion} />
-            </div>
-          </aside>
+            </aside>
+          ) : null}
 
           <AnimatePresence>
-            {mobilePrefillOpen ? (
+            {mobilePrefillOpen && previewFields.length ? (
               <motion.div
                 animate={{ opacity: 1 }}
                 className="v19-preupload-prefill-overlay"

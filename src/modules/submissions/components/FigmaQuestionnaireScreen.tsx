@@ -19,6 +19,7 @@ import {
   Copy,
   Plus,
   Save,
+  Sparkles,
   UsersRound,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
@@ -49,6 +50,7 @@ import {
 } from "../questionnaireBlsRules";
 import { agentQuestionnaireStatusPresentation } from "../status";
 import { agentInteractionProps } from "../agentInteractionContract";
+import type { SmartImportReviewItem } from "../smartImport";
 import {
   passportReviewMediaTypeForIssue,
   primaryApplicantIdForPassportReview,
@@ -63,6 +65,7 @@ import {
   QuestionnaireWorkspaceShell,
 } from "./QuestionnaireWorkspacePrimitives";
 import { AccessibleSelectMenu } from "../../../shared/ui/AccessibleSelectMenu";
+import { SmartImportDialog } from "./SmartImportDialog";
 import "./questionnaire-codex-polish-v1.css";
 
 type FieldState = "normal" | "needs_review" | "invalid";
@@ -403,6 +406,12 @@ type StructuredHomeAddressKey =
   | "homeHouse"
   | "homeStreet"
   | "homeUnit";
+
+type QuestionnaireFieldUpdateOrigin = "manual" | "smart_import";
+
+type QuestionnaireFieldUpdateOptions = {
+  origin?: QuestionnaireFieldUpdateOrigin;
+};
 
 const BLS_COUNTRY_OPTIONS = [
   "Russian Federation",
@@ -2704,6 +2713,7 @@ export function FigmaQuestionnaireScreen({
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
+  const [smartImportOpen, setSmartImportOpen] = useState(false);
   const [showGuardianDetails, setShowGuardianDetails] = useState(false);
   const [fieldSearchQuery, setFieldSearchQuery] = useState("");
   const [familyCopyMessage, setFamilyCopyMessage] = useState<string>();
@@ -2751,6 +2761,14 @@ export function FigmaQuestionnaireScreen({
   );
   const [formData, setFormData] = useState<QuestionnaireFormData>(() => sourceFormData);
   const formDataRef = useRef<QuestionnaireFormData>(sourceFormData);
+  const smartImportCurrentValues = useMemo(() => {
+    const values: Record<string, string> = {};
+    for (const binding of questionnaireFieldBindings) {
+      if (values[binding.fieldId] !== undefined) continue;
+      values[binding.fieldId] = formData[binding.formKey];
+    }
+    return values;
+  }, [formData]);
   const screenRef = useRef<HTMLDivElement>(null);
   const workPanelRef = useRef<HTMLDivElement>(null);
   const activeApplicantTabRef = useRef<HTMLButtonElement>(null);
@@ -2788,6 +2806,10 @@ export function FigmaQuestionnaireScreen({
   useEffect(() => {
     setShowGuardianDetails(false);
   }, [activeApplicant]);
+
+  useEffect(() => {
+    setSmartImportOpen(false);
+  }, [activeApplicant, submission.id]);
 
   useEffect(() => {
     setFamilyCopyMessage(undefined);
@@ -3250,7 +3272,11 @@ export function FigmaQuestionnaireScreen({
     setSaveMessage("Изменений нет");
   }
 
-  function updateField(key: keyof QuestionnaireFormData, value: string) {
+  function updateField(
+    key: keyof QuestionnaireFormData,
+    value: string,
+    options: QuestionnaireFieldUpdateOptions = {},
+  ) {
     if (
       !isEditable ||
       completionInFlightRef.current ||
@@ -3265,12 +3291,15 @@ export function FigmaQuestionnaireScreen({
         "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
       );
     }
-    const dependentKeys = dependentFieldKeysFor(
-      key,
-      value,
-      activeApplicantModel?.role,
-      formDataRef.current,
-    );
+    const isSmartImport = options.origin === "smart_import";
+    const dependentKeys = isSmartImport
+      ? []
+      : dependentFieldKeysFor(
+          key,
+          value,
+          activeApplicantModel?.role,
+          formDataRef.current,
+        );
     const buildUpdate = (fieldKey: keyof QuestionnaireFormData, fieldValue: string) => {
       const binding = questionnaireFieldBindingForApplicant(
         activeApplicantModel,
@@ -3287,11 +3316,15 @@ export function FigmaQuestionnaireScreen({
             ? validationMessageForQuestionnaireField(modelField, fieldValue)
             : undefined,
           fieldId: binding.fieldId,
-          reviewOriginSource:
-            modelField?.reviewOriginSource ?? modelField?.reviewSource ?? "manual",
-          reviewSource: "manual",
-          reviewState:
-            modelField?.reviewState === "needs_review" ? "confirmed" : undefined,
+          reviewOriginSource: isSmartImport
+            ? "smart_import"
+            : (modelField?.reviewOriginSource ?? modelField?.reviewSource ?? "manual"),
+          reviewSource: isSmartImport ? "smart_import" : "manual",
+          reviewState: isSmartImport
+            ? "needs_review"
+            : modelField?.reviewState === "needs_review"
+              ? "confirmed"
+              : undefined,
           sectionId: binding.sectionId,
           value: fieldValue,
         } satisfies QuestionnaireFieldUpdate,
@@ -3367,6 +3400,36 @@ export function FigmaQuestionnaireScreen({
     updateField("homeBuilding", structured.homeBuilding);
     updateField("homeUnit", structured.homeUnit);
     updateField("contactAddress", composeQuestionnaireHomeAddress(structured));
+  }
+
+  function applySmartImportItems(items: SmartImportReviewItem[]) {
+    if (!isEditable || !items.length) return;
+
+    const structuredAddressFieldIds = new Set([
+      "home-street",
+      "home-house",
+      "home-building",
+      "home-unit",
+    ]);
+    let structuredAddressChanged = false;
+
+    for (const item of items) {
+      const binding = questionnaireFieldBindings.find(
+        (candidate) => candidate.fieldId === item.fieldId,
+      );
+      if (!binding) continue;
+
+      updateField(binding.formKey, item.value, { origin: "smart_import" });
+      structuredAddressChanged ||= structuredAddressFieldIds.has(item.fieldId);
+    }
+
+    if (structuredAddressChanged) {
+      updateField(
+        "contactAddress",
+        composeQuestionnaireHomeAddress(formDataRef.current),
+        { origin: "smart_import" },
+      );
+    }
   }
 
   function updatePassportIssueDate(value: string) {
@@ -3588,6 +3651,9 @@ export function FigmaQuestionnaireScreen({
     }
     if (source === "passport_ocr") return "требует сверки OCR";
     if (source === "pdf_reconciliation") return "требует сверки с PDF";
+    if (source === "smart_import") {
+      return "перенесено через Умный импорт — проверьте";
+    }
     return source ? "требует ручной проверки" : undefined;
   }
 
@@ -5422,6 +5488,23 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel" ref={workPanelRef}>
+              {isEditable ? (
+                <div className="v19-questionnaire-work-toolbar">
+                  <button
+                    {...agentInteractionProps("questionnaire.open-smart-import")}
+                    aria-haspopup="dialog"
+                    aria-label="Умный импорт"
+                    className="linear-product-action linear-product-action--secondary v19-questionnaire-smart-import-button v19-smart-import-action--dark"
+                    disabled={questionnaireInteractionPending}
+                    type="button"
+                    onClick={() => setSmartImportOpen(true)}
+                  >
+                    <Sparkles aria-hidden="true" size={16} strokeWidth={1.9} />
+                    <span>Умный импорт</span>
+                  </button>
+                </div>
+              ) : null}
+
               {showWorkToolbar ? (
                 <div
                   className={`v19-questionnaire-work-toolbar${
@@ -5750,6 +5833,14 @@ export function FigmaQuestionnaireScreen({
           <ArrowRight aria-hidden="true" />
         </button>
       </footer>
+
+      <SmartImportDialog
+        applicantKey={`${draftSubmission.id}:${activeApplicant}`}
+        currentValues={smartImportCurrentValues}
+        open={isEditable && smartImportOpen}
+        onApply={applySmartImportItems}
+        onClose={() => setSmartImportOpen(false)}
+      />
     </motion.div>
   );
 }

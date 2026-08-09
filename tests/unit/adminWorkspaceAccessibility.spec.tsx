@@ -233,7 +233,9 @@ describe("AdminWorkspace production navigation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Готово" }));
 
-    expect((await screen.findAllByText("Только выгрузка")).length).toBeGreaterThan(0);
+    expect(
+      await screen.findByTestId("admin-export-row-ready-card"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Только проверка")).not.toBeInTheDocument();
     expect(screen.queryByText("Только агенту")).not.toBeInTheDocument();
   });

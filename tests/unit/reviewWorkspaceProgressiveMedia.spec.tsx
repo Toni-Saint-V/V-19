@@ -229,7 +229,7 @@ describe("ReviewWorkspace perceived feedback", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Перейти к следующему незавершённому шагу",
+        name: "Перейти к следующему шагу в паспортной секции",
       }),
     );
 
@@ -258,7 +258,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(await screen.findByText("Защищённый оригинал недоступен")).toBeVisible();
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Перейти к следующему незавершённому шагу",
+        name: "Перейти к следующему шагу в паспортной секции",
       }),
     );
 
@@ -300,14 +300,16 @@ describe("ReviewWorkspace perceived feedback", () => {
     );
     expect(screen.getAllByText("Загружаем оригинал")[0]).toBeVisible();
 
-    const fileStatus = document.querySelector(
-      ".v19-review-status-strip > span:nth-child(3)",
+    const sectionAction = screen.getByRole("button", {
+      name: "Перейти к следующему шагу в паспортной секции",
+    });
+    expect(sectionAction).toHaveAttribute(
+      "title",
+      "Загружаем защищённые оригиналы для сверки…",
     );
-    expect(fileStatus).toHaveClass("is-loading");
-    expect(fileStatus).not.toHaveClass("has-warning");
-    expect(
-      screen.getByText("Загружаем защищённые оригиналы для сверки…"),
-    ).toBeVisible();
+    expect(sectionAction).toHaveAccessibleDescription(
+      "Загружаем защищённые оригиналы для сверки…",
+    );
 
     await act(async () => {
       passport.resolve("https://media.test/passport.jpg");
@@ -319,23 +321,24 @@ describe("ReviewWorkspace perceived feedback", () => {
     });
     expect(passportImage).toHaveAttribute("src", "https://media.test/passport.jpg");
     expect(passportImage).toHaveClass("is-loading");
-    expect(fileStatus).toHaveAttribute(
-      "aria-label",
-      "Оригиналы: не просмотрено 2; доступно 1 из 3",
+    expect(sectionAction).toHaveAttribute(
+      "title",
+      "Откройте и проверьте каждый обязательный оригинал перед подтверждением.",
     );
 
     fireEvent.load(passportImage);
 
     await waitFor(() => expect(passportImage).toHaveClass("is-ready"));
-    const confirmButton = screen.getByRole("button", {
-      name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
-    });
-    expect(confirmButton).toBeEnabled();
-    expect(
-      screen.getByText(
+    expect(sectionAction).toBeEnabled();
+    await waitFor(() =>
+      expect(sectionAction).toHaveAttribute(
+        "title",
         "Откройте и проверьте каждый обязательный оригинал перед подтверждением.",
       ),
-    ).toBeVisible();
+    );
+    expect(sectionAction).toHaveAccessibleDescription(
+      "Откройте и проверьте каждый обязательный оригинал перед подтверждением.",
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
     await waitFor(() =>
@@ -348,7 +351,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(
       await screen.findByRole("img", { name: "Первое селфи заявителя" }),
     ).toHaveAttribute("src", "https://media.test/selfie.jpg");
-    expect(confirmButton).toBeEnabled();
+    expect(sectionAction).toBeEnabled();
 
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
@@ -358,7 +361,13 @@ describe("ReviewWorkspace perceived feedback", () => {
       secondSelfie.resolve("https://media.test/selfie-2.jpg");
       await secondSelfie.promise;
     });
-    await waitFor(() => expect(confirmButton).toBeEnabled());
+    await waitFor(() =>
+      expect(sectionAction).toHaveAttribute(
+        "aria-label",
+        "Подтвердить паспортную секцию",
+      ),
+    );
+    expect(sectionAction).not.toHaveAttribute("title");
   });
 
   test("shows a warning only after protected media becomes unavailable", async () => {
@@ -382,28 +391,28 @@ describe("ReviewWorkspace perceived feedback", () => {
     await waitFor(() =>
       expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1),
     );
-    const fileStatus = document.querySelector(
-      ".v19-review-status-strip > span:nth-child(3)",
+    const sectionAction = screen.getByRole("button", {
+      name: "Перейти к следующему шагу в паспортной секции",
+    });
+    expect(sectionAction).toHaveAttribute(
+      "title",
+      "Загружаем защищённые оригиналы для сверки…",
     );
-    expect(fileStatus).toHaveClass("is-loading");
-    expect(fileStatus).not.toHaveClass("has-warning");
 
     await act(async () => {
       mediaRequests[0]?.reject(new Error("offline"));
       await Promise.allSettled([mediaRequests[0]?.promise]);
     });
 
-    await waitFor(() => expect(fileStatus).toHaveClass("has-warning"));
-    expect(fileStatus).not.toHaveClass("is-loading");
-    expect(fileStatus).toHaveAttribute(
-      "aria-label",
-      "Оригиналы: недоступно 1; не просмотрено 2; доступно 0 из 3",
-    );
-    expect(
-      screen.getByText(
+    await waitFor(() =>
+      expect(sectionAction).toHaveAttribute(
+        "title",
         "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи.",
       ),
-    ).toBeVisible();
+    );
+    expect(sectionAction).toHaveAccessibleDescription(
+      "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи.",
+    );
   });
 
   test("retries a transient signed URL failure without reopening the workspace", async () => {

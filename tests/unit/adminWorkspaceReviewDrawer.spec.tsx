@@ -1254,7 +1254,7 @@ describe("ReviewWorkspace passport section contract", () => {
     ).toHaveLength(1);
   });
 
-  test("shows a compact document summary without technical guard blocks", () => {
+  test("keeps the review surface free from summary blocks and technical guard copy", () => {
     const submission = singleSubmission();
 
     render(
@@ -1273,11 +1273,12 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       screen.queryByRole("button", { name: "Посмотреть" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Готовность паспортной проверки")).toBeInTheDocument();
-    const reviewStatus = screen.getByRole("status", { name: "Состояние проверки" });
-    expect(reviewStatus).toHaveTextContent("Поля");
-    expect(reviewStatus).toHaveTextContent("Оригиналы");
-    expect(reviewStatus).toHaveTextContent("Замечания");
+    expect(
+      screen.queryByLabelText("Готовность паспортной проверки"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("status", { name: "Состояние проверки" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Пакетный guard")).not.toBeInTheDocument();
     expect(screen.queryByText(/исправлено агентом/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/закрыто администратором/i)).not.toBeInTheDocument();
@@ -1312,7 +1313,7 @@ describe("ReviewWorkspace passport section contract", () => {
       />,
     );
 
-    expect(screen.getByText("Просмотр без изменений")).toBeVisible();
+    expect(screen.queryByText("Просмотр без изменений")).not.toBeInTheDocument();
     expect(screen.getAllByText(/доступен только для чтения/).length).toBeGreaterThan(0);
     expect(
       screen.queryByRole("button", {
@@ -1513,6 +1514,31 @@ describe("ReviewWorkspace passport section contract", () => {
     expect(
       screen.getByText(/Заполнены не все паспортные поля или в данных есть ошибка/),
     ).toBeInTheDocument();
+  });
+
+  test("keeps passport review focused on media, field cells, and decisions", () => {
+    const submission = singleSubmission();
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={vi.fn()}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    expect(screen.queryByText("Сверка документа")).not.toBeInTheDocument();
+    expect(screen.queryByText("Исправления к закрытию")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Поля$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Оригиналы$/)).not.toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Отправить на исправление" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Принять на выгрузку" })).toBeVisible();
   });
 
   test("keeps a field remark attached to its exact applicant and label", () => {

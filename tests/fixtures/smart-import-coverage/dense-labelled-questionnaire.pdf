@@ -1,0 +1,186 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1788 >>
+stream
+BT
+/F1 10 Tf
+50 760 Td
+(Application city: Moscow) Tj
+0 -16 Td
+(Preferred appointment date 1: 2026-10-10) Tj
+0 -16 Td
+(Preferred appointment date 2: 2026-10-12) Tj
+0 -16 Td
+(Surname: Demo) Tj
+0 -16 Td
+(First name: Applicant) Tj
+0 -16 Td
+(Previous surname: Sample) Tj
+0 -16 Td
+(Date of birth: 1990-01-02) Tj
+0 -16 Td
+(Place of birth: Tomsk) Tj
+0 -16 Td
+(Country of birth: Russia) Tj
+0 -16 Td
+(Gender: Female) Tj
+0 -16 Td
+(Marital status: Single) Tj
+0 -16 Td
+(Guardian information: Demo Guardian) Tj
+0 -16 Td
+(Passport type: Ordinary) Tj
+0 -16 Td
+(Passport number: P12345678) Tj
+0 -16 Td
+(Issue date: 2020-02-01) Tj
+0 -16 Td
+(Valid until: 2030-02-01) Tj
+0 -16 Td
+(Issuing country: Russia) Tj
+0 -16 Td
+(Place of issue: Moscow) Tj
+0 -16 Td
+(Home street: Test Street) Tj
+0 -16 Td
+(Home house: 101) Tj
+0 -16 Td
+(Home building: B) Tj
+0 -16 Td
+(Home unit: 7) Tj
+0 -16 Td
+(Email: demo.applicant@example.test) Tj
+0 -16 Td
+(Contact number: +1 202 555 0101) Tj
+0 -16 Td
+(Country of residence: Russia) Tj
+0 -16 Td
+(Home city: Tomsk) Tj
+0 -16 Td
+(Postal code: 634000) Tj
+0 -16 Td
+(Lives outside citizenship country: Yes) Tj
+0 -16 Td
+(Residence permit type: Demo Residence Permit) Tj
+0 -16 Td
+(Residence permit number: RP-000123) Tj
+0 -16 Td
+(Residence permit valid until: 2031-01-01) Tj
+0 -16 Td
+(Occupation: Engineer) Tj
+0 -16 Td
+(Employer: Demo Employer) Tj
+0 -16 Td
+(Employer phone: +1 202 555 0102) Tj
+0 -16 Td
+(Employer address: 1 Demo Office Road) Tj
+0 -16 Td
+(Purpose of journey: Tourism) Tj
+0 -16 Td
+(Purpose details: Museum visit) Tj
+0 -16 Td
+(Main destination: Spain) Tj
+0 -16 Td
+(First entry country: Spain) Tj
+0 -16 Td
+(Number of entries: Two) Tj
+0 -16 Td
+(Arrival date: 2026-10-20) Tj
+0 -16 Td
+(Departure date: 2026-10-30) Tj
+0 -16 Td
+(Stay duration: 10) Tj
+0 -16 Td
+(Biometrics: Yes) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 1124 >>
+stream
+BT
+/F1 10 Tf
+50 760 Td
+(Previous biometrics date: 2024-03-10) Tj
+0 -16 Td
+(Previous visa number: VISA-000123) Tj
+0 -16 Td
+(Inviting party type: Hotel) Tj
+0 -16 Td
+(Hotel name: Demo Hotel) Tj
+0 -16 Td
+(Hotel country: Spain) Tj
+0 -16 Td
+(Hotel city: Madrid) Tj
+0 -16 Td
+(Hotel postal: 28001) Tj
+0 -16 Td
+(Hotel address: 10 Demo Plaza) Tj
+0 -16 Td
+(Hotel email: stay@demo-hotel.example.test) Tj
+0 -16 Td
+(Hotel phone: +34 910 000 000) Tj
+0 -16 Td
+(Host company details: Demo Host Company) Tj
+0 -16 Td
+(Host company contact person: Demo Host Contact) Tj
+0 -16 Td
+(Host company phone: +34 910 000 001) Tj
+0 -16 Td
+(Nationality: Russia) Tj
+0 -16 Td
+(Nationality at birth: Russia) Tj
+0 -16 Td
+(Cost covered by: Applicant) Tj
+0 -16 Td
+(Means of support: Cash) Tj
+0 -16 Td
+(Home address: 101 Test Street) Tj
+0 -16 Td
+(Visa type: C) Tj
+0 -16 Td
+(Category: Service managed) Tj
+0 -16 Td
+(Final entry permit: Do not import) Tj
+0 -16 Td
+(Final entry permit issued by: Do not import) Tj
+0 -16 Td
+(Final entry permit valid from: 2026-01-01) Tj
+0 -16 Td
+(Final entry permit valid to: 2026-12-31) Tj
+0 -16 Td
+(National ID: INTERNAL-000) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000253 00000 n 
+0000002093 00000 n 
+0000002219 00000 n 
+0000003395 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+3465
+%%EOF

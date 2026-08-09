@@ -54,6 +54,7 @@ export const questionnaireReviewSources = [
   "passport_ocr",
   "family_shared",
   "pdf_reconciliation",
+  "smart_import",
 ] as const;
 export type QuestionnaireReviewSource = (typeof questionnaireReviewSources)[number];
 
