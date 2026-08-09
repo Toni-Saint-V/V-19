@@ -35,6 +35,7 @@ describe("release source identity", () => {
         },
       );
       execFileSync("tar", ["-xf", archivePath, "-C", archiveRoot]);
+      rmSync(resolve(archiveRoot, "supabase"), { force: true, recursive: true });
 
       const gitSourceSha256 = releaseSourceSha256FromGitHead(repoRoot);
       const fileSourceSha256 = releaseSourceSha256FromFileSystem(archiveRoot);

@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-const sourceDirectories = ["config", "public", "scripts", "src", "supabase"];
+const sourceDirectories = ["config", "public", "scripts", "src"];
 const sourceFiles = [
   ".vercelignore",
   ".nvmrc",
