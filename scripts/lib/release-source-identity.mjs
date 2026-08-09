@@ -27,7 +27,7 @@ export function releaseSourceSha256FromFileSystem(root) {
     ]),
   ]
     .filter(isReleaseSourcePath)
-    .sort();
+    .sort(compareReleaseSourcePaths);
   return hashBlobEntries(
     paths.map((path) => [path, gitBlobSha1(readFileSync(resolve(root, path)))]),
   );
@@ -48,8 +48,58 @@ export function releaseSourceSha256FromGitHead(root) {
       return [entry.slice(tab + 1), metadata[2]];
     })
     .filter(([path]) => isReleaseSourcePath(path))
-    .sort(([left], [right]) => left.localeCompare(right));
+    .sort(([left], [right]) => compareReleaseSourcePaths(left, right));
   return hashBlobEntries(entries);
+}
+
+export function compareReleaseSourcePaths(left, right) {
+  return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+}
+
+export function releaseBuildIdentity({
+  root,
+  isProductionArchive,
+  archiveGitSha,
+  archiveSourceSha256,
+  vercelGitSha,
+}) {
+  if (isProductionArchive) {
+    if (!isSha(archiveGitSha, 40)) {
+      throw new Error("V19_RELEASE_GIT_SHA must be a 40-character hexadecimal SHA.");
+    }
+    if (!isSha(archiveSourceSha256, 64)) {
+      throw new Error(
+        "V19_RELEASE_SOURCE_SHA256 must be a 64-character hexadecimal SHA.",
+      );
+    }
+    const actualSourceSha256 = releaseSourceSha256FromFileSystem(root);
+    if (actualSourceSha256 !== archiveSourceSha256.toLowerCase()) {
+      throw new Error(
+        "V19_RELEASE_SOURCE_SHA256 must match the canonical production archive source.",
+      );
+    }
+    return {
+      dirty: false,
+      gitSha: archiveGitSha,
+      sourceSha256: actualSourceSha256,
+    };
+  }
+
+  const gitSha =
+    vercelGitSha ||
+    execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  return {
+    dirty: vercelGitSha
+      ? false
+      : Boolean(
+          execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
+            cwd: root,
+            encoding: "utf8",
+          }).trim(),
+        ),
+    gitSha,
+    sourceSha256: releaseSourceSha256FromFileSystem(root),
+  };
 }
 
 function isReleaseSourcePath(path) {
@@ -88,4 +138,10 @@ function hashBlobEntries(entries) {
     hash.update("\0");
   }
   return hash.digest("hex");
+}
+
+function isSha(value, length) {
+  return (
+    typeof value === "string" && new RegExp(`^[0-9a-f]{${length}}$`, "i").test(value)
+  );
 }

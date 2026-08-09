@@ -1,31 +1,20 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
-import { execFileSync } from "node:child_process";
 import { visaflowPwaServiceWorker } from "./config/pwa/visaflowPwaServiceWorker";
-import { releaseSourceSha256FromFileSystem } from "./scripts/lib/release-source-identity.mjs";
+import { releaseBuildIdentity } from "./scripts/lib/release-source-identity.mjs";
 
 function releaseIdentity(mode: string): Plugin {
   const vercelGitSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
   const archiveReleaseGitSha = process.env.V19_RELEASE_GIT_SHA?.trim();
-  const releaseGitSha =
-    process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production"
-      ? archiveReleaseGitSha
-      : undefined;
-  if (releaseGitSha && !/^[0-9a-f]{40}$/i.test(releaseGitSha)) {
-    throw new Error("V19_RELEASE_GIT_SHA must be a 40-character hexadecimal SHA.");
-  }
-  const gitSha =
-    vercelGitSha ||
-    releaseGitSha ||
-    execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-  const dirty = vercelGitSha || releaseGitSha
-    ? false
-    : Boolean(
-        execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
-          encoding: "utf8",
-        }).trim(),
-      );
-  const sourceSha256 = releaseSourceSha256FromFileSystem(process.cwd());
+  const archiveReleaseSourceSha256 = process.env.V19_RELEASE_SOURCE_SHA256?.trim();
+  const { dirty, gitSha, sourceSha256 } = releaseBuildIdentity({
+    archiveGitSha: archiveReleaseGitSha,
+    archiveSourceSha256: archiveReleaseSourceSha256,
+    isProductionArchive:
+      process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production",
+    root: process.cwd(),
+    vercelGitSha,
+  });
   return {
     name: "visaflow-release-identity",
     generateBundle() {
