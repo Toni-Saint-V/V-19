@@ -21,7 +21,10 @@ import {
   validateExternalApprovalPacketBinding,
   validateBoundEvidence,
 } from "./lib/supabase-cutover-evidence.mjs";
-import { releaseSourceSha256FromGitHead } from "./lib/release-source-identity.mjs";
+import {
+  releaseArchiveSourceSha256FromGitHead,
+  releaseSourceSha256FromGitHead,
+} from "./lib/release-source-identity.mjs";
 import { edgeFunctionSourceSha256FromGitHead } from "./lib/edge-function-source-identity.mjs";
 import {
   productionApprovalPacketPath,
@@ -43,6 +46,7 @@ const passes = [];
 const controlledPilotRiskEvidenceCache = new Map();
 let currentFullGitHeadCache;
 let currentReleaseSourceSha256Cache;
+let currentEffectiveArchiveSourceSha256Cache;
 let currentMigrationContractEntriesCache;
 let currentFunctionSourceSha256Cache;
 
@@ -191,6 +195,21 @@ function currentReleaseSourceSha256() {
     block("Current release source SHA-256 is readable", error.message);
     currentReleaseSourceSha256Cache = "";
     return currentReleaseSourceSha256Cache;
+  }
+}
+
+function currentEffectiveArchiveSourceSha256() {
+  if (currentEffectiveArchiveSourceSha256Cache !== undefined) {
+    return currentEffectiveArchiveSourceSha256Cache;
+  }
+  try {
+    currentEffectiveArchiveSourceSha256Cache =
+      releaseArchiveSourceSha256FromGitHead(repoRoot);
+    return currentEffectiveArchiveSourceSha256Cache;
+  } catch (error) {
+    block("Current effective archive source SHA-256 is readable", error.message);
+    currentEffectiveArchiveSourceSha256Cache = "";
+    return currentEffectiveArchiveSourceSha256Cache;
   }
 }
 
@@ -2733,19 +2752,24 @@ function verifyCutoverProductionEvidence(packet) {
         "Deployment identity proves a clean production build",
       );
       requireEqual(
-        validation.document?.observedSourceSha256,
-        validation.document?.expectedSourceSha256,
-        "Deployment identity source digest matches the committed checkout",
+        validation.document?.canonicalGitSourceSha256,
+        currentReleaseSourceSha256(),
+        "Deployment identity canonical Git digest matches current Git HEAD",
       );
       requireEqual(
-        validation.document?.expectedSourceSha256,
-        currentReleaseSourceSha256(),
-        "Deployment identity expected source digest matches current Git HEAD",
+        validation.document?.expectedEffectiveArchiveSourceSha256,
+        currentEffectiveArchiveSourceSha256(),
+        "Deployment identity expected effective archive digest matches current Git HEAD",
       );
       requireEqual(
-        validation.document?.observedSourceSha256,
-        currentReleaseSourceSha256(),
-        "Deployment identity observed source digest matches current Git HEAD",
+        validation.document?.observedEffectiveArchiveSourceSha256,
+        currentEffectiveArchiveSourceSha256(),
+        "Deployment identity observed effective archive digest matches current Git HEAD",
+      );
+      requireEqual(
+        validation.document?.observedReleaseIdentitySchemaVersion,
+        2,
+        "Deployment identity uses effective archive schema v2",
       );
     }
   }

@@ -1,13 +1,27 @@
 export function releaseSourceSha256FromFileSystem(root: string): string;
 export function releaseSourceSha256FromGitHead(root: string): string;
+export function releaseArchiveSourceSha256FromFileSystem(root: string): string;
+export function releaseArchiveSourceSha256FromGitHead(root: string): string;
 export function releaseSourceSegmentsFromFileSystem(
   root: string,
 ): Record<string, string>;
 export function releaseSourceSegmentsFromGitHead(root: string): Record<string, string>;
+export function releaseArchiveSourceSegmentsFromFileSystem(
+  root: string,
+): Record<string, string>;
+export function releaseArchiveSourceSegmentsFromGitHead(
+  root: string,
+): Record<string, string>;
 export function releaseSourceRootFilesFromFileSystem(
   root: string,
 ): Record<string, string>;
 export function releaseSourceRootFilesFromGitHead(root: string): Record<string, string>;
+export function releaseArchiveSourceRootFilesFromFileSystem(
+  root: string,
+): Record<string, string>;
+export function releaseArchiveSourceRootFilesFromGitHead(
+  root: string,
+): Record<string, string>;
 export function compareReleaseSourcePaths(left: string, right: string): number;
 export function releaseBuildIdentity(input: {
   root: string;

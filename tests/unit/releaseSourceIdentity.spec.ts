@@ -6,6 +6,12 @@ import { describe, expect, test } from "vitest";
 
 import {
   compareReleaseSourcePaths,
+  releaseArchiveSourceRootFilesFromFileSystem,
+  releaseArchiveSourceRootFilesFromGitHead,
+  releaseArchiveSourceSegmentsFromFileSystem,
+  releaseArchiveSourceSegmentsFromGitHead,
+  releaseArchiveSourceSha256FromFileSystem,
+  releaseArchiveSourceSha256FromGitHead,
   releaseBuildIdentity,
   releaseSourceRootFilesFromFileSystem,
   releaseSourceRootFilesFromGitHead,
@@ -47,11 +53,25 @@ describe("release source identity", () => {
       const fileSourceSegments = releaseSourceSegmentsFromFileSystem(archiveRoot);
       const gitSourceRootFiles = releaseSourceRootFilesFromGitHead(repoRoot);
       const fileSourceRootFiles = releaseSourceRootFilesFromFileSystem(archiveRoot);
+      const gitArchiveSourceSha256 = releaseArchiveSourceSha256FromGitHead(repoRoot);
+      const fileArchiveSourceSha256 =
+        releaseArchiveSourceSha256FromFileSystem(archiveRoot);
+      const gitArchiveSourceSegments =
+        releaseArchiveSourceSegmentsFromGitHead(repoRoot);
+      const fileArchiveSourceSegments =
+        releaseArchiveSourceSegmentsFromFileSystem(archiveRoot);
+      const gitArchiveSourceRootFiles =
+        releaseArchiveSourceRootFilesFromGitHead(repoRoot);
+      const fileArchiveSourceRootFiles =
+        releaseArchiveSourceRootFilesFromFileSystem(archiveRoot);
 
       expect(gitSourceSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(fileSourceSha256).toBe(gitSourceSha256);
       expect(fileSourceSegments).toEqual(gitSourceSegments);
       expect(fileSourceRootFiles).toEqual(gitSourceRootFiles);
+      expect(fileArchiveSourceSha256).toBe(gitArchiveSourceSha256);
+      expect(fileArchiveSourceSegments).toEqual(gitArchiveSourceSegments);
+      expect(fileArchiveSourceRootFiles).toEqual(gitArchiveSourceRootFiles);
       expect(Object.keys(gitSourceSegments)).toEqual([
         "root",
         "config",
@@ -63,7 +83,13 @@ describe("release source identity", () => {
         expect(value).toMatch(/^[0-9a-f]{64}$/);
       }
       expect(Object.keys(gitSourceRootFiles)).toHaveLength(12);
+      expect(gitSourceRootFiles).toHaveProperty("vercel.json");
       for (const value of Object.values(gitSourceRootFiles)) {
+        expect(value).toMatch(/^[0-9a-f]{64}$/);
+      }
+      expect(Object.keys(gitArchiveSourceRootFiles)).toHaveLength(11);
+      expect(gitArchiveSourceRootFiles).not.toHaveProperty("vercel.json");
+      for (const value of Object.values(gitArchiveSourceRootFiles)) {
         expect(value).toMatch(/^[0-9a-f]{64}$/);
       }
     } finally {

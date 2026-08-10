@@ -19,6 +19,10 @@ const sourceFiles = [
   "vite.config.ts",
   "vercel.json",
 ];
+// Vercel materializes its own effective vercel.json before Vite executes. Keep
+// the committed configuration in the canonical Git identity, but omit only
+// that transformed build input from the archive identity emitted at runtime.
+const archiveSourceFiles = sourceFiles.filter((path) => path !== "vercel.json");
 
 export function releaseSourceSha256FromFileSystem(root) {
   return hashBlobEntries(releaseSourceEntriesFromFileSystem(root));
@@ -32,10 +36,26 @@ export function releaseSourceRootFilesFromFileSystem(root) {
   return hashSourceRootFiles(releaseSourceEntriesFromFileSystem(root));
 }
 
-function releaseSourceEntriesFromFileSystem(root) {
+export function releaseArchiveSourceSha256FromFileSystem(root) {
+  return hashBlobEntries(releaseSourceEntriesFromFileSystem(root, archiveSourceFiles));
+}
+
+export function releaseArchiveSourceSegmentsFromFileSystem(root) {
+  return hashSourceSegments(
+    releaseSourceEntriesFromFileSystem(root, archiveSourceFiles),
+  );
+}
+
+export function releaseArchiveSourceRootFilesFromFileSystem(root) {
+  return hashSourceRootFiles(
+    releaseSourceEntriesFromFileSystem(root, archiveSourceFiles),
+  );
+}
+
+function releaseSourceEntriesFromFileSystem(root, rootFiles = sourceFiles) {
   const paths = [
     ...new Set([
-      ...sourceFiles,
+      ...rootFiles,
       ...sourceDirectories.flatMap((directory) => walk(resolve(root, directory), root)),
     ]),
   ]
@@ -56,10 +76,22 @@ export function releaseSourceRootFilesFromGitHead(root) {
   return hashSourceRootFiles(releaseSourceEntriesFromGitHead(root));
 }
 
-function releaseSourceEntriesFromGitHead(root) {
+export function releaseArchiveSourceSha256FromGitHead(root) {
+  return hashBlobEntries(releaseSourceEntriesFromGitHead(root, archiveSourceFiles));
+}
+
+export function releaseArchiveSourceSegmentsFromGitHead(root) {
+  return hashSourceSegments(releaseSourceEntriesFromGitHead(root, archiveSourceFiles));
+}
+
+export function releaseArchiveSourceRootFilesFromGitHead(root) {
+  return hashSourceRootFiles(releaseSourceEntriesFromGitHead(root, archiveSourceFiles));
+}
+
+function releaseSourceEntriesFromGitHead(root, rootFiles = sourceFiles) {
   const tree = execFileSync(
     "git",
-    ["ls-tree", "-r", "-z", "HEAD", "--", ...sourceDirectories, ...sourceFiles],
+    ["ls-tree", "-r", "-z", "HEAD", "--", ...sourceDirectories, ...rootFiles],
     { cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
   );
   return tree

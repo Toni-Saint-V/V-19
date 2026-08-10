@@ -13,7 +13,7 @@ const deployment = {
   target: "production",
 };
 
-function matches(dirty: boolean) {
+function matches(dirty: boolean, schemaVersion = 2) {
   return isVercelReleaseIdentityMatch({
     aliases: [canonicalHost],
     canonicalHost,
@@ -24,7 +24,7 @@ function matches(dirty: boolean) {
       dirty,
       gitSha: expectedGitSha,
       mode: "supabase-production",
-      schemaVersion: 1,
+      schemaVersion,
       sourceSha256: expectedSourceSha256,
     },
   });
@@ -37,5 +37,9 @@ describe("Vercel release identity", () => {
 
   test("rejects dirty:true even when every source identity field matches", () => {
     expect(matches(true)).toBe(false);
+  });
+
+  test("rejects the legacy identity schema", () => {
+    expect(matches(false, 1)).toBe(false);
   });
 });

@@ -20,7 +20,10 @@ import {
 import { externalEvidenceRootSha256 } from "../../scripts/lib/supabase-external-evidence.mjs";
 import { edgeFunctionSourceSha256FromGitHead } from "../../scripts/lib/edge-function-source-identity.mjs";
 import { assertProductionMutationAllowed } from "../../scripts/lib/supabase-production-mutation-gate.mjs";
-import { releaseSourceSha256FromGitHead } from "../../scripts/lib/release-source-identity.mjs";
+import {
+  releaseArchiveSourceSha256FromGitHead,
+  releaseSourceSha256FromGitHead,
+} from "../../scripts/lib/release-source-identity.mjs";
 import { requiredRemoteMigrationOrderForGeneration } from "../../scripts/supabase-migration-contract.mjs";
 import {
   migrationContractEntriesFromFileSystem,
@@ -133,6 +136,7 @@ function approvedFixture() {
     encoding: "utf8",
   }).trim();
   const sourceSha256 = releaseSourceSha256FromGitHead(root);
+  const archiveSourceSha256 = releaseArchiveSourceSha256FromGitHead(root);
   const migrationContract = migrationContractEntriesFromFileSystem(repoRoot);
   const migrationContractDigest = migrationContractSha256(migrationContract);
 
@@ -185,11 +189,13 @@ function approvedFixture() {
           ...(label === "deploymentIdentity"
             ? {
                 canonicalHost: SUPABASE_PRODUCTION_TARGET.canonicalApplicationHost,
+                canonicalGitSourceSha256: sourceSha256,
                 deploymentId: "dpl_test",
+                expectedEffectiveArchiveSourceSha256: archiveSourceSha256,
                 expectedGitSha: gitHead,
-                expectedSourceSha256: sourceSha256,
+                observedEffectiveArchiveSourceSha256: archiveSourceSha256,
                 observedGitSha: gitHead,
-                observedSourceSha256: sourceSha256,
+                observedReleaseIdentitySchemaVersion: 2,
                 observedDirty: false,
               }
             : {}),

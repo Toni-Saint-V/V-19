@@ -2,28 +2,33 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { visaflowPwaServiceWorker } from "./config/pwa/visaflowPwaServiceWorker";
 import {
+  releaseArchiveSourceRootFilesFromFileSystem,
+  releaseArchiveSourceSegmentsFromFileSystem,
+  releaseArchiveSourceSha256FromFileSystem,
   releaseBuildIdentity,
-  releaseSourceRootFilesFromFileSystem,
-  releaseSourceSegmentsFromFileSystem,
 } from "./scripts/lib/release-source-identity.mjs";
 
 function releaseIdentity(mode: string): Plugin {
   const vercelGitSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
-  const { dirty, gitSha, sourceSha256 } = releaseBuildIdentity({
+  const { dirty, gitSha } = releaseBuildIdentity({
     isProductionArchive:
       process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production",
     root: process.cwd(),
     vercelGitSha,
   });
-  const sourceSegments = releaseSourceSegmentsFromFileSystem(process.cwd());
-  const sourceRootFiles = releaseSourceRootFilesFromFileSystem(process.cwd());
+  // Vercel transforms vercel.json before this plugin runs. The exact Git SHA
+  // continues to bind that committed security configuration; this effective
+  // archive digest omits only the transformed copy.
+  const sourceSha256 = releaseArchiveSourceSha256FromFileSystem(process.cwd());
+  const sourceSegments = releaseArchiveSourceSegmentsFromFileSystem(process.cwd());
+  const sourceRootFiles = releaseArchiveSourceRootFilesFromFileSystem(process.cwd());
   return {
     name: "visaflow-release-identity",
     generateBundle() {
       this.emitFile({
         fileName: "release-identity.json",
         source: `${JSON.stringify({
-          schemaVersion: 1,
+          schemaVersion: 2,
           gitSha,
           dirty,
           mode,

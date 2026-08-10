@@ -26,7 +26,7 @@ const findings = [];
 const releaseIdentityPath = path.join(distDir, "release-identity.json");
 const releaseIdentity = JSON.parse(await readFile(releaseIdentityPath, "utf8"));
 if (
-  releaseIdentity.schemaVersion !== 1 ||
+  releaseIdentity.schemaVersion !== 2 ||
   releaseIdentity.mode !== "supabase-production" ||
   !/^[0-9a-f]{40}$/.test(releaseIdentity.gitSha) ||
   !/^[0-9a-f]{64}$/.test(releaseIdentity.sourceSha256) ||
@@ -48,6 +48,8 @@ function hasReleaseSourceSegments(segments) {
 }
 
 function hasReleaseSourceRootFiles(files) {
+  // This is the effective archive map. vercel.json remains part of the exact
+  // committed Git SHA, but Vercel rewrites it before Vite builds the archive.
   const names = [
     ".nvmrc",
     ".vercelignore",
@@ -59,7 +61,6 @@ function hasReleaseSourceRootFiles(files) {
     "tsconfig.app.json",
     "tsconfig.json",
     "tsconfig.node.json",
-    "vercel.json",
     "vite.config.ts",
   ];
   return (

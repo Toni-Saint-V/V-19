@@ -3,14 +3,18 @@ import { writeFileSync } from "node:fs";
 
 import { SUPABASE_PRODUCTION_TARGET } from "../config/supabase-production-target.mjs";
 import { testArtifactPath } from "./lib/artifact-paths.mjs";
-import { releaseSourceSha256FromGitHead } from "./lib/release-source-identity.mjs";
+import {
+  releaseArchiveSourceSha256FromGitHead,
+  releaseSourceSha256FromGitHead,
+} from "./lib/release-source-identity.mjs";
 import { isVercelReleaseIdentityMatch } from "./lib/vercel-release-identity.mjs";
 
 const canonicalHost = SUPABASE_PRODUCTION_TARGET.canonicalApplicationHost;
 const gitHead = execFileSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf8",
 }).trim();
-const expectedSourceSha256 = releaseSourceSha256FromGitHead(process.cwd());
+const expectedSourceSha256 = releaseArchiveSourceSha256FromGitHead(process.cwd());
+const canonicalGitSourceSha256 = releaseSourceSha256FromGitHead(process.cwd());
 const deployment = JSON.parse(
   execFileSync("vercel", ["inspect", canonicalHost, "--format=json"], {
     encoding: "utf8",
@@ -38,14 +42,18 @@ const evidence = {
   projectRef: SUPABASE_PRODUCTION_TARGET.projectId,
   cutoverGeneration: SUPABASE_PRODUCTION_TARGET.cutoverGeneration,
   gitHead,
-  sourceSha256: expectedSourceSha256,
+  // This envelope remains bound to the canonical Git tree. The two explicit
+  // effective archive fields below describe the Vercel-transformed build.
+  sourceSha256: canonicalGitSourceSha256,
+  canonicalGitSourceSha256,
   deploymentId: deployment.id ?? null,
   deploymentUrl: deployment.url ?? null,
   canonicalHost,
   expectedGitSha: gitHead,
-  expectedSourceSha256,
+  expectedEffectiveArchiveSourceSha256: expectedSourceSha256,
   observedGitSha: identity?.gitSha ?? null,
-  observedSourceSha256: identity?.sourceSha256 ?? null,
+  observedEffectiveArchiveSourceSha256: identity?.sourceSha256 ?? null,
+  observedReleaseIdentitySchemaVersion: identity?.schemaVersion ?? null,
   observedDirty: identity?.dirty ?? null,
   checks: { deploymentIdentityPassed: passed },
 };

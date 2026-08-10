@@ -450,12 +450,14 @@ function validateRoleEvidenceDocument({ artifact, issues, label, manifest, repoR
     agentBrowserFlow: ["canonicalHost", "deploymentId", "observedGitSha"],
     deploymentIdentity: [
       "canonicalHost",
+      "canonicalGitSourceSha256",
       "deploymentId",
+      "expectedEffectiveArchiveSourceSha256",
       "expectedGitSha",
-      "expectedSourceSha256",
       "observedDirty",
+      "observedEffectiveArchiveSourceSha256",
       "observedGitSha",
-      "observedSourceSha256",
+      "observedReleaseIdentitySchemaVersion",
     ],
     remoteMigrationHistory: [
       "contractSha256",
@@ -498,17 +500,31 @@ function validateRoleEvidenceDocument({ artifact, issues, label, manifest, repoR
     );
     equal(artifact?.observedDirty, false, `${label} observedDirty`, issues);
     equal(
-      artifact?.expectedSourceSha256,
+      artifact?.canonicalGitSourceSha256,
       manifest.sourceSha256,
-      `${label} expectedSourceSha256`,
+      `${label} canonicalGitSourceSha256`,
       issues,
     );
     equal(
-      artifact?.observedSourceSha256,
-      manifest.sourceSha256,
-      `${label} observedSourceSha256`,
+      artifact?.observedEffectiveArchiveSourceSha256,
+      artifact?.expectedEffectiveArchiveSourceSha256,
+      `${label} effective archive source SHA-256`,
       issues,
     );
+    equal(
+      artifact?.observedReleaseIdentitySchemaVersion,
+      2,
+      `${label} release identity schemaVersion`,
+      issues,
+    );
+    for (const key of [
+      "expectedEffectiveArchiveSourceSha256",
+      "observedEffectiveArchiveSourceSha256",
+    ]) {
+      if (!/^[a-f0-9]{64}$/.test(artifact?.[key] ?? "")) {
+        issues.push(`${label} ${key} is invalid`);
+      }
+    }
   }
   if (label === "agentDatabaseReadback") {
     validateAgentCasReceipts(artifact?.casReceipts, issues);

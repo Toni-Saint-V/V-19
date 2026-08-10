@@ -177,12 +177,14 @@ function writeBundle(
           ...(label === "deploymentIdentity"
             ? {
                 canonicalHost: SUPABASE_PRODUCTION_TARGET.canonicalApplicationHost,
+                canonicalGitSourceSha256: identity.sourceSha256,
                 deploymentId: "dpl_test",
+                expectedEffectiveArchiveSourceSha256: "c".repeat(64),
                 expectedGitSha: identity.gitHead,
-                expectedSourceSha256: identity.sourceSha256,
                 observedDirty: false,
+                observedEffectiveArchiveSourceSha256: "c".repeat(64),
                 observedGitSha: identity.gitHead,
-                observedSourceSha256: identity.sourceSha256,
+                observedReleaseIdentitySchemaVersion: 2,
               }
             : {}),
           ...(["adminBrowserFlow", "agentBrowserFlow"].includes(label)
