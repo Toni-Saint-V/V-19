@@ -28,6 +28,10 @@ export function releaseSourceSegmentsFromFileSystem(root) {
   return hashSourceSegments(releaseSourceEntriesFromFileSystem(root));
 }
 
+export function releaseSourceRootFilesFromFileSystem(root) {
+  return hashSourceRootFiles(releaseSourceEntriesFromFileSystem(root));
+}
+
 function releaseSourceEntriesFromFileSystem(root) {
   const paths = [
     ...new Set([
@@ -46,6 +50,10 @@ export function releaseSourceSha256FromGitHead(root) {
 
 export function releaseSourceSegmentsFromGitHead(root) {
   return hashSourceSegments(releaseSourceEntriesFromGitHead(root));
+}
+
+export function releaseSourceRootFilesFromGitHead(root) {
+  return hashSourceRootFiles(releaseSourceEntriesFromGitHead(root));
 }
 
 function releaseSourceEntriesFromGitHead(root) {
@@ -150,6 +158,14 @@ function hashSourceSegments(entries) {
   }
   return Object.fromEntries(
     sourceSegmentNames.map((name) => [name, hashBlobEntries(segments[name])]),
+  );
+}
+
+function hashSourceRootFiles(entries) {
+  return Object.fromEntries(
+    entries
+      .filter(([path]) => !path.includes("/"))
+      .map(([path, blobSha1]) => [path, hashBlobEntries([[path, blobSha1]])]),
   );
 }
 

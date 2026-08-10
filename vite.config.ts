@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import { visaflowPwaServiceWorker } from "./config/pwa/visaflowPwaServiceWorker";
 import {
   releaseBuildIdentity,
+  releaseSourceRootFilesFromFileSystem,
   releaseSourceSegmentsFromFileSystem,
 } from "./scripts/lib/release-source-identity.mjs";
 
@@ -15,6 +16,7 @@ function releaseIdentity(mode: string): Plugin {
     vercelGitSha,
   });
   const sourceSegments = releaseSourceSegmentsFromFileSystem(process.cwd());
+  const sourceRootFiles = releaseSourceRootFilesFromFileSystem(process.cwd());
   return {
     name: "visaflow-release-identity",
     generateBundle() {
@@ -27,6 +29,7 @@ function releaseIdentity(mode: string): Plugin {
           mode,
           sourceSha256,
           sourceSegments,
+          sourceRootFiles,
           builtAt: new Date().toISOString(),
         })}\n`,
         type: "asset",

@@ -7,6 +7,8 @@ import { describe, expect, test } from "vitest";
 import {
   compareReleaseSourcePaths,
   releaseBuildIdentity,
+  releaseSourceRootFilesFromFileSystem,
+  releaseSourceRootFilesFromGitHead,
   releaseSourceSegmentsFromFileSystem,
   releaseSourceSegmentsFromGitHead,
   releaseSourceSha256FromFileSystem,
@@ -43,10 +45,13 @@ describe("release source identity", () => {
       const fileSourceSha256 = releaseSourceSha256FromFileSystem(archiveRoot);
       const gitSourceSegments = releaseSourceSegmentsFromGitHead(repoRoot);
       const fileSourceSegments = releaseSourceSegmentsFromFileSystem(archiveRoot);
+      const gitSourceRootFiles = releaseSourceRootFilesFromGitHead(repoRoot);
+      const fileSourceRootFiles = releaseSourceRootFilesFromFileSystem(archiveRoot);
 
       expect(gitSourceSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(fileSourceSha256).toBe(gitSourceSha256);
       expect(fileSourceSegments).toEqual(gitSourceSegments);
+      expect(fileSourceRootFiles).toEqual(gitSourceRootFiles);
       expect(Object.keys(gitSourceSegments)).toEqual([
         "root",
         "config",
@@ -55,6 +60,10 @@ describe("release source identity", () => {
         "src",
       ]);
       for (const value of Object.values(gitSourceSegments)) {
+        expect(value).toMatch(/^[0-9a-f]{64}$/);
+      }
+      expect(Object.keys(gitSourceRootFiles)).toHaveLength(12);
+      for (const value of Object.values(gitSourceRootFiles)) {
         expect(value).toMatch(/^[0-9a-f]{64}$/);
       }
     } finally {

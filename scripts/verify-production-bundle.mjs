@@ -31,6 +31,7 @@ if (
   !/^[0-9a-f]{40}$/.test(releaseIdentity.gitSha) ||
   !/^[0-9a-f]{64}$/.test(releaseIdentity.sourceSha256) ||
   !hasReleaseSourceSegments(releaseIdentity.sourceSegments) ||
+  !hasReleaseSourceRootFiles(releaseIdentity.sourceRootFiles) ||
   typeof releaseIdentity.dirty !== "boolean"
 ) {
   findings.push("dist/release-identity.json: invalid production release identity");
@@ -43,6 +44,29 @@ function hasReleaseSourceSegments(segments) {
     typeof segments === "object" &&
     names.every((name) => /^[0-9a-f]{64}$/.test(segments[name])) &&
     Object.keys(segments).length === names.length
+  );
+}
+
+function hasReleaseSourceRootFiles(files) {
+  const names = [
+    ".nvmrc",
+    ".vercelignore",
+    "index.html",
+    "package-lock.json",
+    "package.json",
+    "postcss.config.js",
+    "tailwind.config.js",
+    "tsconfig.app.json",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    "vercel.json",
+    "vite.config.ts",
+  ];
+  return (
+    Boolean(files) &&
+    typeof files === "object" &&
+    names.every((name) => /^[0-9a-f]{64}$/.test(files[name])) &&
+    Object.keys(files).length === names.length
   );
 }
 
