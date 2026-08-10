@@ -796,6 +796,15 @@ function collectBrowserProblems(page: Page) {
   return problems;
 }
 
+function blockingBrowserProblems(problems: string[]) {
+  return problems.filter(
+    (problem) =>
+      !/ResizeObserver loop|favicon|net::ERR_ABORTED|Download the React DevTools/i.test(
+        problem,
+      ),
+  );
+}
+
 test.describe("V-19 operations workspace", () => {
   test.beforeEach(async ({ page }) => {
     await openFreshWorkspace(page, { heading: "Мои действия" });
