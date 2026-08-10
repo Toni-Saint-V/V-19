@@ -30,9 +30,20 @@ if (
   releaseIdentity.mode !== "supabase-production" ||
   !/^[0-9a-f]{40}$/.test(releaseIdentity.gitSha) ||
   !/^[0-9a-f]{64}$/.test(releaseIdentity.sourceSha256) ||
+  !hasReleaseSourceSegments(releaseIdentity.sourceSegments) ||
   typeof releaseIdentity.dirty !== "boolean"
 ) {
   findings.push("dist/release-identity.json: invalid production release identity");
+}
+
+function hasReleaseSourceSegments(segments) {
+  const names = ["root", "config", "public", "scripts", "src"];
+  return (
+    Boolean(segments) &&
+    typeof segments === "object" &&
+    names.every((name) => /^[0-9a-f]{64}$/.test(segments[name])) &&
+    Object.keys(segments).length === names.length
+  );
 }
 
 for (const file of files) {

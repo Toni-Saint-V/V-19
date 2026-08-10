@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 const sourceDirectories = ["config", "public", "scripts", "src"];
+const sourceSegmentNames = ["root", ...sourceDirectories];
 const sourceFiles = [
   ".vercelignore",
   ".nvmrc",
@@ -23,6 +24,10 @@ export function releaseSourceSha256FromFileSystem(root) {
   return hashBlobEntries(releaseSourceEntriesFromFileSystem(root));
 }
 
+export function releaseSourceSegmentsFromFileSystem(root) {
+  return hashSourceSegments(releaseSourceEntriesFromFileSystem(root));
+}
+
 function releaseSourceEntriesFromFileSystem(root) {
   const paths = [
     ...new Set([
@@ -36,12 +41,20 @@ function releaseSourceEntriesFromFileSystem(root) {
 }
 
 export function releaseSourceSha256FromGitHead(root) {
+  return hashBlobEntries(releaseSourceEntriesFromGitHead(root));
+}
+
+export function releaseSourceSegmentsFromGitHead(root) {
+  return hashSourceSegments(releaseSourceEntriesFromGitHead(root));
+}
+
+function releaseSourceEntriesFromGitHead(root) {
   const tree = execFileSync(
     "git",
     ["ls-tree", "-r", "-z", "HEAD", "--", ...sourceDirectories, ...sourceFiles],
     { cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
   );
-  const entries = tree
+  return tree
     .split("\0")
     .filter(Boolean)
     .map((entry) => {
@@ -51,18 +64,13 @@ export function releaseSourceSha256FromGitHead(root) {
     })
     .filter(([path]) => isReleaseSourcePath(path))
     .sort(([left], [right]) => compareReleaseSourcePaths(left, right));
-  return hashBlobEntries(entries);
 }
 
 export function compareReleaseSourcePaths(left, right) {
   return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
 }
 
-export function releaseBuildIdentity({
-  root,
-  isProductionArchive,
-  vercelGitSha,
-}) {
+export function releaseBuildIdentity({ root, isProductionArchive, vercelGitSha }) {
   if (isProductionArchive) {
     if (!isSha(vercelGitSha, 40)) {
       throw new Error(
@@ -129,6 +137,20 @@ function hashBlobEntries(entries) {
     hash.update("\0");
   }
   return hash.digest("hex");
+}
+
+function hashSourceSegments(entries) {
+  const segments = Object.fromEntries(sourceSegmentNames.map((name) => [name, []]));
+  for (const entry of entries) {
+    const [path] = entry;
+    const segment = sourceDirectories.find(
+      (directory) => path === directory || path.startsWith(`${directory}/`),
+    );
+    segments[segment ?? "root"].push(entry);
+  }
+  return Object.fromEntries(
+    sourceSegmentNames.map((name) => [name, hashBlobEntries(segments[name])]),
+  );
 }
 
 function isSha(value, length) {

@@ -1,5 +1,9 @@
 export function releaseSourceSha256FromFileSystem(root: string): string;
 export function releaseSourceSha256FromGitHead(root: string): string;
+export function releaseSourceSegmentsFromFileSystem(
+  root: string,
+): Record<string, string>;
+export function releaseSourceSegmentsFromGitHead(root: string): Record<string, string>;
 export function compareReleaseSourcePaths(left: string, right: string): number;
 export function releaseBuildIdentity(input: {
   root: string;

@@ -7,6 +7,8 @@ import { describe, expect, test } from "vitest";
 import {
   compareReleaseSourcePaths,
   releaseBuildIdentity,
+  releaseSourceSegmentsFromFileSystem,
+  releaseSourceSegmentsFromGitHead,
   releaseSourceSha256FromFileSystem,
   releaseSourceSha256FromGitHead,
 } from "../../scripts/lib/release-source-identity.mjs";
@@ -39,9 +41,22 @@ describe("release source identity", () => {
 
       const gitSourceSha256 = releaseSourceSha256FromGitHead(repoRoot);
       const fileSourceSha256 = releaseSourceSha256FromFileSystem(archiveRoot);
+      const gitSourceSegments = releaseSourceSegmentsFromGitHead(repoRoot);
+      const fileSourceSegments = releaseSourceSegmentsFromFileSystem(archiveRoot);
 
       expect(gitSourceSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(fileSourceSha256).toBe(gitSourceSha256);
+      expect(fileSourceSegments).toEqual(gitSourceSegments);
+      expect(Object.keys(gitSourceSegments)).toEqual([
+        "root",
+        "config",
+        "public",
+        "scripts",
+        "src",
+      ]);
+      for (const value of Object.values(gitSourceSegments)) {
+        expect(value).toMatch(/^[0-9a-f]{64}$/);
+      }
     } finally {
       rmSync(archiveRoot, { force: true, recursive: true });
     }
