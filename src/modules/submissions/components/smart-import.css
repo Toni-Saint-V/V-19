@@ -317,21 +317,59 @@
 }
 
 .v19-smart-import-review-heading {
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 16px;
   border-bottom: 1px solid rgb(255 255 255 / 7%);
   background: rgb(255 255 255 / 2%);
 }
 
-.v19-smart-import-review-heading span,
-.v19-smart-import-review-heading > strong {
-  color: #9696a0;
-  font-size: 12px;
+.v19-smart-import-review-heading-copy {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
 }
 
-.v19-smart-import-review-heading > strong {
+.v19-smart-import-review-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.v19-smart-import-review-summary span {
+  color: #9696a0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.v19-smart-import-review-privacy {
+  max-width: 54ch;
+  color: #8f9f96;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.v19-smart-import-review-selection {
+  display: inline-flex;
+  min-height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  border: 1px solid rgb(132 118 246 / 24%);
+  border-radius: 999px;
+  color: #c5bdff;
+  background: rgb(119 104 232 / 10%);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
   white-space: nowrap;
+}
+
+.v19-smart-import-review-selection > span {
+  color: #f3f1ff;
+  font-size: 14px;
 }
 
 .v19-smart-import-review-list {
@@ -369,6 +407,7 @@
 }
 
 .v19-smart-import-review-meta {
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
@@ -382,6 +421,7 @@
 .v19-smart-import-review-meta strong {
   color: #d7d7dd;
   font-size: 12px;
+  line-height: 1.35;
 }
 
 .v19-smart-import-review-heading-copy small {
@@ -390,6 +430,9 @@
 }
 
 .v19-smart-import-review-meta em {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
   flex: 0 0 auto;
   border-radius: 999px;
   font-size: 10px;
@@ -423,6 +466,7 @@
   color: #f3f3f6;
   font-size: 14px;
   font-weight: 580;
+  line-height: 1.4;
 }
 
 .v19-smart-import-review-copy small {
@@ -540,6 +584,24 @@
 
   .v19-smart-import-dialog[data-has-review="true"] .v19-smart-import-review {
     margin-top: 2px;
+  }
+
+  .v19-smart-import-review-heading {
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .v19-smart-import-review-summary {
+    gap: 3px 6px;
+  }
+
+  .v19-smart-import-review-privacy {
+    max-width: none;
+  }
+
+  .v19-smart-import-review-selection {
+    min-height: 28px;
+    padding: 0 8px;
   }
 
   .v19-smart-import-header {

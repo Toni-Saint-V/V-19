@@ -36,6 +36,7 @@ const pngScreenshot = testArtifactPath(
 const reviewViewports = [
   { height: 720, width: 320 },
   { height: 844, width: 390 },
+  { height: 932, width: 430 },
   { height: 1024, width: 768 },
   { height: 900, width: 1440 },
 ] as const;

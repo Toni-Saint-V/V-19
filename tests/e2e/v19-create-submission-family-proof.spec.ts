@@ -1,6 +1,10 @@
 import { mkdirSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
+import {
+  clickWorkspaceButton,
+  collectBrowserProblems,
+  openFreshWorkspace,
+} from "./v19-pilot-helpers";
 import { testArtifactPath } from "../support/artifacts";
 
 const qaDir = testArtifactPath("submission-intake-upgrade");
@@ -29,13 +33,9 @@ async function clickFirstVisible(locator: Locator) {
   await locator.nth(visibleIndex).click();
 }
 
-async function openCreateSubmission(page: Page, mobile: boolean) {
+async function openCreateSubmission(page: Page) {
   await openFreshWorkspace(page, { heading: "Мои действия" });
-  if (mobile) {
-    const menu = page.getByRole("button", { name: "Меню" });
-    if (await menu.isVisible()) await menu.click();
-  }
-  await clickFirstVisible(page.getByRole("button", { name: /Мои подачи/ }));
+  await clickWorkspaceButton(page, /^Мои подачи$/);
   await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
   const createButton = page
     .locator("header.v19-page-header")
@@ -74,8 +74,11 @@ async function chooseCity(page: Page, workspace: Locator, city: string) {
   await expect(workspace.getByLabel("Город подачи")).toContainText(city);
 }
 
-async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
-  const workspace = await openCreateSubmission(page, mobile);
+async function verifyFamilyCreateFlow(
+  page: Page,
+  { screenshotLabel }: { screenshotLabel: string },
+) {
+  const workspace = await openCreateSubmission(page);
   const saveButton = workspace.getByRole("button", {
     name: "Сохранить черновик",
   });
@@ -113,7 +116,7 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
 
   await page.screenshot({
     fullPage: true,
-    path: `${qaDir}/family-${mobile ? "mobile-390" : "desktop-1440"}.png`,
+    path: `${qaDir}/family-${screenshotLabel}.png`,
   });
 
   await primary.click();
@@ -130,7 +133,7 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
 }
 
 async function verifySingleCreateFlow(page: Page) {
-  const workspace = await openCreateSubmission(page, false);
+  const workspace = await openCreateSubmission(page);
   const singleType = workspace.getByRole("radio", { name: "Заявитель" });
   await singleType.click();
   await expect(singleType).toHaveAttribute("aria-checked", "true");
@@ -165,22 +168,39 @@ test.describe("V-19 canonical family intake", () => {
   test("creates a family submission on desktop", async ({ page }) => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 960, width: 1440 });
-    await verifyFamilyCreateFlow(page, false);
+    await verifyFamilyCreateFlow(page, {
+      screenshotLabel: "desktop-1440",
+    });
     expect(browserProblems).toEqual([]);
   });
 
   test("creates a family submission on mobile", async ({ page }) => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 844, width: 390 });
-    await verifyFamilyCreateFlow(page, true);
+    await verifyFamilyCreateFlow(page, { screenshotLabel: "mobile-390" });
     expect(browserProblems).toEqual([]);
   });
+
+  for (const viewport of [
+    { height: 720, width: 320 },
+    { height: 932, width: 430 },
+    { height: 1024, width: 768 },
+  ] as const) {
+    test(`keeps the family intake rhythm at ${viewport.width}px`, async ({ page }) => {
+      const browserProblems = collectBrowserProblems(page);
+      await page.setViewportSize(viewport);
+      await verifyFamilyCreateFlow(page, {
+        screenshotLabel: `responsive-${viewport.width}`,
+      });
+      expect(browserProblems).toEqual([]);
+    });
+  }
 
   test("keeps a dirty draft when command-palette navigation is cancelled", async ({
     page,
   }) => {
     await page.setViewportSize({ height: 960, width: 1440 });
-    const workspace = await openCreateSubmission(page, false);
+    const workspace = await openCreateSubmission(page);
     await chooseCity(page, workspace, "Казань");
 
     await page.keyboard.press("Control+K");

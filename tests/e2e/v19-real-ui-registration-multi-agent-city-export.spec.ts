@@ -210,9 +210,7 @@ async function createSingleDraft(page: Page, city: City) {
 }
 
 function agentSubmissionCard(page: Page, submissionId: string) {
-  return page.locator(
-    `[data-testid="agent-submission-card"][data-submission-id="${submissionId}"]`,
-  );
+  return page.locator(`[data-submission-id="${submissionId}"]:visible`).first();
 }
 
 async function saveQuestionnaireDraftAndReadId(page: Page) {
@@ -587,9 +585,6 @@ test.describe("V-19 real UI multi-agent intake", () => {
     await login(page, families[0].ownerEmail);
     const familySubmissionId = await createFamilyAndSubmit(page, families[0]);
     await page.reload();
-    await expect(
-      page.locator(`[data-submission-id="${familySubmissionId}"]`).first(),
-    ).toBeVisible();
     await openMySubmissions(page);
     await expect(agentSubmissionCard(page, familySubmissionId)).toBeVisible();
     await logoutThroughUi(page);

@@ -76,6 +76,38 @@ async function expectCompletePassportFrame(reviewWorkspace: Locator) {
     });
 }
 
+async function expectReadableMediaTabs(reviewWorkspace: Locator) {
+  const tabs = reviewWorkspace.getByRole("tab");
+  await expect(tabs).toHaveCount(3);
+
+  for (let index = 0; index < 3; index += 1) {
+    const tab = tabs.nth(index);
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+    await expect
+      .poll(() =>
+        tab.evaluate((element) => {
+          const label = element.querySelector<HTMLElement>(
+            ".v19-review-media-tab-label",
+          );
+          const tabStrip = element.closest<HTMLElement>(".v19-review-media-tabs");
+          if (!label || !tabStrip) return null;
+          const tabBounds = element.getBoundingClientRect();
+          const stripBounds = tabStrip.getBoundingClientRect();
+          return {
+            activeTabIsFullyVisible:
+              tabBounds.left >= stripBounds.left - 1 &&
+              tabBounds.right <= stripBounds.right + 1,
+            labelFits: label.scrollWidth <= label.clientWidth + 1,
+          };
+        }),
+      )
+      .toEqual({ activeTabIsFullyVisible: true, labelFits: true });
+  }
+
+  await reviewWorkspace.getByRole("tab", { exact: true, name: "Паспорт" }).click();
+}
+
 async function capturePassportComposition(
   page: Page,
   testInfo: TestInfo,
@@ -100,7 +132,9 @@ test.describe("V-19 P0 admin document review", () => {
   }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
     const viewports = [
+      { height: 720, width: 320 },
       { height: 844, width: 390 },
+      { height: 932, width: 430 },
       { height: 1024, width: 768 },
       { height: 900, width: 1440 },
     ] as const;
@@ -145,6 +179,7 @@ test.describe("V-19 P0 admin document review", () => {
           name: "Добавить замечание: Номер паспорта",
         }),
       ).toHaveCount(1);
+      await expectReadableMediaTabs(reviewWorkspace);
       if (viewport.width < 600) {
         const actionLayout = await reviewWorkspace
           .locator(".v19-review-decision-actions")
@@ -185,6 +220,9 @@ test.describe("V-19 P0 admin document review", () => {
       await selfieTab.click();
       await expect(selfieTab).toHaveAttribute("aria-selected", "true");
       await expect(
+        reviewWorkspace.getByRole("tab", { exact: true, name: "Паспорт" }),
+      ).toHaveAttribute("aria-selected", "false");
+      await expect(
         reviewWorkspace.getByTestId("protected-media-preview-passport_scan"),
       ).toBeVisible();
       await expect(
@@ -198,6 +236,14 @@ test.describe("V-19 P0 admin document review", () => {
           `passport-selfie-compare-${viewport.width}x${viewport.height}.png`,
         ),
       });
+      if (viewport.width === 768) {
+        const returnAction = reviewWorkspace.getByRole("button", {
+          name: "Отправить на исправление",
+        });
+        await returnAction.scrollIntoViewIfNeeded();
+        await expect(returnAction).toBeVisible();
+        expect(await isFullyWithinViewport(returnAction)).toBe(true);
+      }
 
       await page.reload();
       const reloadedSubmission = page.locator('[data-submission-id="ПД-1055"]').first();

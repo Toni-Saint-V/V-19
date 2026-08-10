@@ -102,6 +102,15 @@ function smartImportSectionLabel(sectionId: string) {
   return sectionCopy[sectionId] ?? "Анкета";
 }
 
+function smartImportSummarySegments(summary: string) {
+  return summary
+    .split(". ")
+    .map((segment, index, segments) =>
+      index < segments.length - 1 ? `${segment}.` : segment,
+    )
+    .filter(Boolean);
+}
+
 export function SmartImportDialog({
   applicantKey,
   currentValues,
@@ -357,7 +366,10 @@ export function SmartImportDialog({
     if (event.shiftKey && (activeIndex === 0 || activeIndex === -1)) {
       event.preventDefault();
       last.focus({ preventScroll: true });
-    } else if (!event.shiftKey && (activeIndex === focusable.length - 1 || activeIndex === -1)) {
+    } else if (
+      !event.shiftKey &&
+      (activeIndex === focusable.length - 1 || activeIndex === -1)
+    ) {
       event.preventDefault();
       first.focus({ preventScroll: true });
     }
@@ -497,14 +509,25 @@ export function SmartImportDialog({
             tabIndex={-1}
           >
             <div className="v19-smart-import-review-heading">
-              <div>
+              <div className="v19-smart-import-review-heading-copy">
                 <p>Проверьте перед применением</p>
-                <span>{review.summary}</span>
-                <span data-testid="smart-import-review-privacy" role="note">
-                  Файл обработан локально и очищается; сохраняются только выбранные поля.
+                <div className="v19-smart-import-review-summary">
+                  {smartImportSummarySegments(review.summary).map((segment) => (
+                    <span key={segment}>{segment}</span>
+                  ))}
+                </div>
+                <span
+                  className="v19-smart-import-review-privacy"
+                  data-testid="smart-import-review-privacy"
+                  role="note"
+                >
+                  Файл обработан локально и очищается; сохраняются только выбранные
+                  поля.
                 </span>
               </div>
-              <strong>{selectedItems.length} выбрано</strong>
+              <strong className="v19-smart-import-review-selection">
+                <span>{selectedItems.length}</span> выбрано
+              </strong>
             </div>
 
             <div className="v19-smart-import-review-list">

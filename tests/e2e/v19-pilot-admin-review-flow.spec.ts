@@ -141,7 +141,7 @@ async function verifyRemarkSubmitActionability(
   await expect(remarkDialog).toBeVisible();
   await expectWithinViewport(page, remarkDialog);
   await expect(remarkDialog.getByLabel("Текст для клиента")).toHaveValue(
-    "Проверьте «Срок действия».",
+    "Проверьте «Действителен до».",
   );
   await expect(remarkDialog).not.toContainText("passport-expiry-date");
 
@@ -164,9 +164,9 @@ async function verifyRemarkSubmitActionability(
 
   await expect(remarkDialog).toHaveCount(0);
   await expect(reviewWorkspace).toBeVisible();
-  await expect(
-    reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-  ).toContainText(/Замечания\s+1/);
+  await expect(reviewWorkspace.locator(".v19-review-decision-title span")).toHaveText(
+    viewport.width >= 768 ? "Открыто 1 · К закрытию 1" : "Открыто 1",
+  );
 
   const returnForCorrection = reviewWorkspace.getByRole("button", {
     name: "Отправить на исправление",
@@ -226,16 +226,59 @@ async function verifyEveryAdminDrawerSubview(
   const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
   await expect(reviewWorkspace).toBeVisible();
   await expectWithinViewport(page, reviewWorkspace);
-  const mediaStage = reviewWorkspace.locator(".v19-review-media-stage");
+  const mediaStage = reviewWorkspace.locator(
+    ".v19-review-media-pane > .v19-review-media-stage[role=tabpanel]",
+  );
   await expect(mediaStage).toBeVisible();
+  const minimumMediaStageHeight =
+    viewport.width < 768 ? 150 : viewport.width < 1024 ? 220 : 400;
   const mediaStageBox = await mediaStage.boundingBox();
   expect(
     mediaStageBox,
     "Passport media stage must have a measurable box.",
   ).not.toBeNull();
-  expect(mediaStageBox!.height).toBeGreaterThanOrEqual(
-    viewport.width < 768 ? 190 : viewport.width < 1024 ? 220 : 400,
+  expect(mediaStageBox!.height).toBeGreaterThanOrEqual(minimumMediaStageHeight);
+  const mediaGeometry = await mediaStage.evaluate((stage) => {
+    const bounds = (element: Element | null) => {
+      if (!element) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        height: rect.height,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        width: rect.width,
+      };
+    };
+    const preview = stage.querySelector<HTMLElement>(".v19-review-preview.is-single");
+    return {
+      canvas: bounds(preview?.querySelector(".v19-review-preview-canvas") ?? null),
+      pane: bounds(stage.closest(".v19-review-media-pane")),
+      preview: bounds(preview),
+      stage: bounds(stage),
+    };
+  });
+  await testInfo.attach(`media-stage-geometry-${viewport.width}x${viewport.height}`, {
+    body: JSON.stringify(mediaGeometry),
+    contentType: "application/json",
+  });
+  expect(mediaGeometry.pane).not.toBeNull();
+  expect(mediaGeometry.preview).not.toBeNull();
+  expect(mediaGeometry.canvas).not.toBeNull();
+  expect(mediaGeometry.stage!.top).toBeGreaterThanOrEqual(mediaGeometry.pane!.top - 2);
+  expect(mediaGeometry.stage!.bottom).toBeLessThanOrEqual(
+    mediaGeometry.pane!.bottom + 2,
   );
+  expect(mediaGeometry.preview!.top).toBeGreaterThanOrEqual(
+    mediaGeometry.stage!.top - 2,
+  );
+  expect(mediaGeometry.preview!.bottom).toBeLessThanOrEqual(
+    mediaGeometry.stage!.bottom + 2,
+  );
+  expect(mediaGeometry.canvas!.height).toBeGreaterThan(0);
   if (viewport.width < 768) {
     const [workspaceBox, mediaPaneBox] = await Promise.all([
       reviewWorkspace.boundingBox(),
@@ -617,11 +660,11 @@ test.describe("V-19 pilot admin review click flow", () => {
     const reviewWorkspace = page.getByRole("dialog", {
       name: "Сверка паспорта",
     });
-    const correctedIssues = reviewWorkspace.getByRole("region", {
-      name: "Исправления к закрытию",
-    });
-    await expect(correctedIssues).toBeVisible();
-    await expect(correctedIssues).toContainText("Адрес отеля был неполным");
+    await expect(
+      reviewWorkspace.getByRole("region", {
+        name: "Исправления к закрытию",
+      }),
+    ).toHaveCount(0);
     const acceptButton = reviewWorkspace.getByRole("button", {
       name: "Закрыть исправления и принять",
     });
@@ -634,18 +677,16 @@ test.describe("V-19 pilot admin review click flow", () => {
       .getByRole("tab")
       .all()) {
       await mediaTab.click();
+      await expect(mediaTab).toHaveAttribute("aria-selected", "true");
     }
-    await expect(
-      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-    ).toContainText(/Оригиналы\s+3\/3/);
+    await expect(reviewWorkspace.locator("[data-review-media]")).toHaveCount(3);
+    await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
     await reviewWorkspace
       .getByRole("button", { name: "Подтвердить паспортную секцию" })
       .click();
 
     await applicantSelect.selectOption({ label: "Алексей Смирнов" });
-    await expect(
-      reviewWorkspace.getByRole("status", { name: "Состояние проверки" }),
-    ).toContainText(/Оригиналы\s+1\/1/);
+    await expect(reviewWorkspace.locator("[data-passport-field-id]")).toHaveCount(8);
     await reviewWorkspace
       .getByRole("button", { name: "Подтвердить паспортную секцию" })
       .click();

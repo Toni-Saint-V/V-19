@@ -215,6 +215,7 @@
 .v19-review-media-tabs {
   display: inline-flex;
   min-width: var(--v19b-size-0);
+  flex: 1 1 auto;
   gap: var(--v19b-size-2);
   padding: var(--v19b-size-2);
   border: var(--v19b-size-1) solid var(--v19b-color-border);
@@ -223,13 +224,18 @@
 }
 
 .v19-review-media-tabs button {
+  display: inline-flex;
+  flex: 0 0 auto;
   min-height: var(--v19b-size-36);
+  align-items: center;
+  justify-content: center;
   padding: var(--v19b-size-0) var(--v19b-size-12);
   border: var(--v19b-size-1) solid transparent;
   border-radius: var(--v19b-radius-tab-button);
   color: var(--v19b-color-text-muted);
   background: transparent;
   font-size: var(--v19b-size-12);
+  font-variant-numeric: tabular-nums;
   font-weight: var(--v19b-weight-control);
   white-space: nowrap;
   transition:
@@ -246,7 +252,8 @@
 .v19-review-media-tabs button.is-active {
   border-color: var(--v19b-color-border-selected);
   color: var(--v19b-color-text-strong);
-  background: var(--v19b-color-control-hover);
+  background: var(--v19b-color-primary-soft-20);
+  box-shadow: inset 0 0 0 var(--v19b-size-1) var(--v19b-color-primary-soft-20);
 }
 
 .v19-review-file-remark {
@@ -802,6 +809,7 @@
   padding: var(--v19b-size-12) var(--v19b-size-20);
   border-top: var(--v19b-size-1) solid var(--v19b-color-border);
   background: var(--v19b-color-page);
+  box-shadow: 0 calc(var(--v19b-size-8) * -1) var(--v19b-size-16) rgb(0 0 0 / 14%);
 }
 
 .v19-review-decision-context {
@@ -824,6 +832,7 @@
 .v19-review-decision-context > p {
   color: var(--v19b-color-text-faint);
   font-size: var(--v19b-size-10);
+  font-variant-numeric: tabular-nums;
 }
 
 .v19-review-decision-context > p {
@@ -1009,9 +1018,20 @@
     overflow-x: auto;
   }
 
-  .v19-review-media-tabs button {
+  .v19-review-media-actions {
+    flex-wrap: wrap;
+  }
+
+  .v19-review-workspace .v19-review-media-actions .v19-review-media-tabs {
+    width: var(--v19b-size-full);
+    flex: 1 0 var(--v19b-size-full);
+  }
+
+  .v19-review-workspace .v19-review-media-actions .v19-review-media-tabs button {
+    flex: 0 0 auto;
     min-height: var(--v19b-size-40);
     padding: var(--v19b-size-0) var(--v19b-size-10);
+    font-size: var(--v19b-size-12);
   }
 
   .v19-review-media-controls button {
@@ -1138,6 +1158,7 @@
     gap: var(--v19b-size-8);
     padding: var(--v19b-size-12) var(--v19b-size-16)
       max(var(--v19b-size-12), env(safe-area-inset-bottom));
+    box-shadow: 0 calc(var(--v19b-size-8) * -1) var(--v19b-size-16) rgb(0 0 0 / 26%);
   }
 
   .v19-review-decision-context > p {
@@ -1870,7 +1891,6 @@
 .v19-review-media-tabs button {
   position: relative;
   display: inline-flex;
-  overflow: hidden;
   align-items: center;
   gap: var(--v19b-size-6);
   isolation: isolate;
@@ -1888,6 +1908,7 @@
 .v19-review-media-tab-label {
   position: relative;
   z-index: var(--v19b-z-base);
+  overflow: visible;
 }
 
 .v19-review-media-tab-visited {
