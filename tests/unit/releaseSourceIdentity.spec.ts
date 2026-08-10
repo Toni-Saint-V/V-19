@@ -47,54 +47,27 @@ describe("release source identity", () => {
     }
   });
 
-  test("uses the supplied SHA pair only for a production archive and fails closed otherwise", () => {
-    const archiveGitSha = "a".repeat(40);
+  test("uses only the trusted Vercel Git SHA for a production archive and fails closed otherwise", () => {
+    const vercelGitSha = "a".repeat(40);
     const archiveSourceSha256 = releaseSourceSha256FromFileSystem(process.cwd());
 
     expect(
       releaseBuildIdentity({
-        archiveGitSha,
-        archiveSourceSha256,
         isProductionArchive: true,
         root: process.cwd(),
+        vercelGitSha,
       }),
     ).toEqual({
       dirty: false,
-      gitSha: archiveGitSha,
+      gitSha: vercelGitSha,
       sourceSha256: archiveSourceSha256,
     });
     expect(() =>
       releaseBuildIdentity({
-        archiveGitSha,
         isProductionArchive: true,
         root: process.cwd(),
+        vercelGitSha: "not-a-sha",
       }),
-    ).toThrow("V19_RELEASE_SOURCE_SHA256");
-    expect(() =>
-      releaseBuildIdentity({
-        archiveGitSha: "not-a-sha",
-        archiveSourceSha256,
-        isProductionArchive: true,
-        root: process.cwd(),
-      }),
-    ).toThrow("V19_RELEASE_GIT_SHA");
-    const mismatch = () =>
-      releaseBuildIdentity({
-        archiveGitSha,
-        archiveSourceSha256: "b".repeat(64),
-        isProductionArchive: true,
-        root: process.cwd(),
-      });
-    expect(mismatch).toThrow(
-      `expected ${"b".repeat(64)}, received ${archiveSourceSha256}`,
-    );
-    try {
-      mismatch();
-    } catch (error) {
-      expect(error).toHaveProperty(
-        "message",
-        expect.stringMatching(/archive paths \(\d+\):/),
-      );
-    }
+    ).toThrow("VERCEL_GIT_COMMIT_SHA");
   });
 });

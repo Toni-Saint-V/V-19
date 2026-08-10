@@ -5,11 +5,7 @@ import { releaseBuildIdentity } from "./scripts/lib/release-source-identity.mjs"
 
 function releaseIdentity(mode: string): Plugin {
   const vercelGitSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();
-  const archiveReleaseGitSha = process.env.V19_RELEASE_GIT_SHA?.trim();
-  const archiveReleaseSourceSha256 = process.env.V19_RELEASE_SOURCE_SHA256?.trim();
   const { dirty, gitSha, sourceSha256 } = releaseBuildIdentity({
-    archiveGitSha: archiveReleaseGitSha,
-    archiveSourceSha256: archiveReleaseSourceSha256,
     isProductionArchive:
       process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production",
     root: process.cwd(),

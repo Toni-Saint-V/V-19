@@ -61,30 +61,18 @@ export function compareReleaseSourcePaths(left, right) {
 export function releaseBuildIdentity({
   root,
   isProductionArchive,
-  archiveGitSha,
-  archiveSourceSha256,
   vercelGitSha,
 }) {
   if (isProductionArchive) {
-    if (!isSha(archiveGitSha, 40)) {
-      throw new Error("V19_RELEASE_GIT_SHA must be a 40-character hexadecimal SHA.");
-    }
-    if (!isSha(archiveSourceSha256, 64)) {
+    if (!isSha(vercelGitSha, 40)) {
       throw new Error(
-        "V19_RELEASE_SOURCE_SHA256 must be a 64-character hexadecimal SHA.",
-      );
-    }
-    const actualSourceEntries = releaseSourceEntriesFromFileSystem(root);
-    const actualSourceSha256 = hashBlobEntries(actualSourceEntries);
-    if (actualSourceSha256 !== archiveSourceSha256.toLowerCase()) {
-      throw new Error(
-        `V19_RELEASE_SOURCE_SHA256 must match the canonical production archive source (expected ${archiveSourceSha256.toLowerCase()}, received ${actualSourceSha256}; archive paths (${actualSourceEntries.length}): ${actualSourceEntries.map(([path]) => path).join(",")}).`,
+        "VERCEL_GIT_COMMIT_SHA must be a 40-character hexadecimal SHA for a production build.",
       );
     }
     return {
       dirty: false,
-      gitSha: archiveGitSha,
-      sourceSha256: actualSourceSha256,
+      gitSha: vercelGitSha,
+      sourceSha256: releaseSourceSha256FromFileSystem(root),
     };
   }
 
