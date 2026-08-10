@@ -1697,13 +1697,13 @@
   .v19-review-row-priority
   > strong {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   color: #c7ccd6;
   font-size: clamp(var(--v19b-size-12), 1.5cqw, var(--v19b-size-16));
   font-weight: 650;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 #root

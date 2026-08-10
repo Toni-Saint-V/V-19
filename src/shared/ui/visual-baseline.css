@@ -18518,8 +18518,8 @@ body,
     height: var(--v19b-size-56) !important;
     min-height: var(--v19b-size-56) !important;
     margin-inline: calc(var(--v19b-size-16) * -1) !important;
-    padding: var(--v19b-size-0) var(--v19b-size-16) !important;
-    gap: var(--v19b-size-16) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-12) !important;
+    gap: var(--v19b-size-12) !important;
   }
 
   .ops-shell.role-admin.surface-admin-review .v19-topbar-menu.mp-button.icon-button {
@@ -18559,6 +18559,12 @@ body,
 
   .ops-shell.role-admin.surface-admin-review .v19-admin-cockpit-card {
     padding: var(--v19b-size-16) !important;
+  }
+}
+
+@media (max-width: 359px) {
+  .ops-shell.role-admin.surface-admin-review .workspace > .topbar h1 {
+    font-size: var(--v19b-size-18) !important;
   }
 }
 

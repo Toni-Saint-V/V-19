@@ -450,6 +450,53 @@ async function expectMobileAdminReviewDensity(page: Page, context: string) {
   );
 }
 
+async function expectAdminReviewTextReadability(
+  page: Page,
+  context: string,
+  requireCriticalReason = false,
+) {
+  const heading = page
+    .locator(".ops-shell.surface-admin-review .workspace > .topbar h1")
+    .first();
+  await expect(heading).toHaveText(/^(Очередь на проверку|Проверка)$/);
+
+  const headingWidths = await heading.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(
+    headingWidths.scrollWidth,
+    `${context}: admin review heading is fully visible`,
+  ).toBeLessThanOrEqual(headingWidths.clientWidth + 1);
+
+  const reasons = page.locator(
+    ".v19-admin-review-card:visible .v19-review-row-priority > strong",
+  );
+  await expect(reasons.first()).toBeVisible();
+  const reasonWidths = await reasons.evaluateAll((elements) =>
+    elements.map((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      text: element.textContent?.trim() ?? "",
+    })),
+  );
+  const criticalReasons = reasonWidths.filter(({ text }) =>
+    text.includes("исправление ждёт закрытия"),
+  );
+  expect(
+    reasonWidths.every(
+      ({ clientWidth, scrollWidth }) => scrollWidth <= clientWidth + 1,
+    ),
+    `${context}: priority reasons are not clipped`,
+  ).toBe(true);
+  if (requireCriticalReason) {
+    expect(
+      criticalReasons,
+      `${context}: seeded critical reason is present`,
+    ).not.toHaveLength(0);
+  }
+}
+
 async function expectMobileExportRowComposition(
   page: Page,
   context: string,
@@ -1167,6 +1214,11 @@ test.describe("V-19 responsive proof", () => {
       ).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Новая подача" })).toHaveCount(0);
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
+      await expectAdminReviewTextReadability(
+        page,
+        `${viewport.label}: admin review`,
+        true,
+      );
       if (viewport.width < 768) {
         await expectMobileAdminReviewDensity(page, `${viewport.label}: admin review`);
       }
@@ -1196,10 +1248,18 @@ test.describe("V-19 responsive proof", () => {
         page,
         `${viewport.label}: admin review tab`,
       );
+      await expectAdminReviewTextReadability(
+        page,
+        `${viewport.label}: admin review tab`,
+      );
       await screenshot(page, viewport, "admin-review-tab");
 
       await selectAdminReviewLane(page, "Правки");
       await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin corrections tab`,
+      );
+      await expectAdminReviewTextReadability(
         page,
         `${viewport.label}: admin corrections tab`,
       );
@@ -1217,11 +1277,19 @@ test.describe("V-19 responsive proof", () => {
         page,
         `${viewport.label}: admin review filter`,
       );
+      await expectAdminReviewTextReadability(
+        page,
+        `${viewport.label}: admin review filter`,
+      );
       await screenshot(page, viewport, "admin-review-filter");
 
       await selectAdminReviewLane(page, "Правки");
       await expect(page.locator(".v19-admin-review-card").first()).toBeVisible();
       await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin corrections filter`,
+      );
+      await expectAdminReviewTextReadability(
         page,
         `${viewport.label}: admin corrections filter`,
       );
@@ -1455,6 +1523,7 @@ test.describe("V-19 responsive proof", () => {
       workspaceEmail: "admin@visaflow.local",
     });
     await expectNoHorizontalDocumentOverflow(page, "720-4x3: admin review");
+    await expectAdminReviewTextReadability(page, "720-4x3: admin review");
     await expectMobileAdminReviewDensity(page, "720-4x3: admin review");
     await screenshot(page, viewport, "admin-review-compact");
 
