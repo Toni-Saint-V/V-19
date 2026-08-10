@@ -250,13 +250,54 @@ describe("questionnaire smart import", () => {
           expect.objectContaining({ fieldId: "home-unit", value: "14" }),
           expect.objectContaining({
             fieldId: "home-address",
-            reviewOriginSource: "smart_import",
-            reviewSource: "smart_import",
-            reviewState: "needs_review",
+            reviewOriginSource: "manual",
+            reviewSource: "manual",
+            reviewState: undefined,
             value: "проспект Ленинский, д 40, корп 2, кв 14",
           }),
         ]),
       );
+    });
+  });
+
+  test("renders explicit review controls for imported invitation-company fields", async () => {
+    const { onFieldChange } = renderQuestionnaire();
+
+    await importPastedText(`
+      Inviting party type: Hotel
+      Host company details: Demo Host Company
+      Host company contact person: Demo Host Contact
+      Host company phone: +34 910 000 001
+    `);
+    fireEvent.click(screen.getByRole("button", { name: "Применить выбранное" }));
+
+    await waitFor(() =>
+      expect(onFieldChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fieldId: "company-org-details",
+          reviewState: "needs_review",
+          value: "Demo Host Company",
+        }),
+      ),
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /^Отель \/ приглашение/ })[0],
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: "Подтвердить поле: Название и адрес компании/организации",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: "Подтвердить поле: Контактное лицо компании",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Подтвердить поле: Телефон компании" }),
+      ).toBeInTheDocument();
     });
   });
 });

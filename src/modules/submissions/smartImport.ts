@@ -147,7 +147,10 @@ const fieldMetadata: Record<SmartImportFieldId, { label: string; sectionId: stri
     "passport-no": { label: "Номер паспорта", sectionId: "passport" },
     "passport-issue-date": { label: "Дата выдачи паспорта", sectionId: "passport" },
     "passport-expiry-date": { label: "Действителен до", sectionId: "passport" },
-    "passport-issue-country": { label: "Страна выдачи паспорта", sectionId: "passport" },
+    "passport-issue-country": {
+      label: "Страна выдачи паспорта",
+      sectionId: "passport",
+    },
     "passport-issue-place": { label: "Место выдачи паспорта", sectionId: "passport" },
     "home-country": { label: "Страна проживания", sectionId: "contacts" },
     "home-city": { label: "Город", sectionId: "contacts" },
@@ -158,16 +161,25 @@ const fieldMetadata: Record<SmartImportFieldId, { label: string; sectionId: stri
     "postal-code": { label: "Почтовый индекс", sectionId: "contacts" },
     email: { label: "Email", sectionId: "contacts" },
     "contact-number": { label: "Телефон", sectionId: "contacts" },
-    "lives-outside-citizenship": { label: "Есть ВНЖ в другой стране", sectionId: "contacts" },
+    "lives-outside-citizenship": {
+      label: "Есть ВНЖ в другой стране",
+      sectionId: "contacts",
+    },
     "residence-permit-type": { label: "Тип ВНЖ", sectionId: "contacts" },
     "residence-permit-number": { label: "Номер ВНЖ", sectionId: "contacts" },
-    "residence-permit-valid-until": { label: "ВНЖ действителен до", sectionId: "contacts" },
+    "residence-permit-valid-until": {
+      label: "ВНЖ действителен до",
+      sectionId: "contacts",
+    },
     occupation: { label: "Должность / профессия", sectionId: "employment" },
     "employer-name": { label: "Работодатель", sectionId: "employment" },
     "employer-contact": { label: "Телефон работодателя", sectionId: "employment" },
     "employer-address": { label: "Адрес работодателя", sectionId: "employment" },
     purpose: { label: "Цель поездки", sectionId: "trip" },
-    "stay-purpose-details": { label: "Дополнительные сведения о цели", sectionId: "trip" },
+    "stay-purpose-details": {
+      label: "Дополнительные сведения о цели",
+      sectionId: "trip",
+    },
     "main-destination": { label: "Основная страна назначения", sectionId: "trip" },
     "first-entry-country": { label: "Страна первого въезда", sectionId: "trip" },
     "entry-count": { label: "Количество въездов", sectionId: "trip" },
@@ -175,7 +187,10 @@ const fieldMetadata: Record<SmartImportFieldId, { label: string; sectionId: stri
     "departure-date": { label: "Дата выезда", sectionId: "trip" },
     "stay-duration": { label: "Длительность поездки", sectionId: "trip" },
     "previous-biometrics": { label: "Предыдущая биометрия", sectionId: "trip" },
-    "previous-biometrics-date": { label: "Дата предыдущей биометрии", sectionId: "trip" },
+    "previous-biometrics-date": {
+      label: "Дата предыдущей биометрии",
+      sectionId: "trip",
+    },
     "previous-visa-number": { label: "Номер предыдущей визы", sectionId: "trip" },
     "inviting-party-type": { label: "Тип принимающей стороны", sectionId: "hotel" },
     "hotel-name": { label: "Отель / принимающая сторона", sectionId: "hotel" },
@@ -1370,6 +1385,9 @@ function candidate(
 function normalizeCandidateValue(fieldId: SmartImportFieldId, value: string) {
   const clean = cleanLongValue(value);
   if (!clean) return "";
+  if (fieldId === "inviting-party-type") {
+    return normalizeInvitingPartyType(clean);
+  }
   if (fieldId === "email" || fieldId === "hotel-email") {
     return (
       clean.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]?.toLowerCase() ?? ""
@@ -1637,6 +1655,20 @@ function normalizeOccupation(value: string) {
     aliases.find(([pattern]) => pattern.test(normalized))?.[1] ??
     cleanLongValue(value).toUpperCase()
   );
+}
+
+function normalizeInvitingPartyType(value: string) {
+  const normalized = normalizeForSearch(value);
+  if (/hotel|hostel|accommodation|отел|гостиниц|временн/u.test(normalized)) {
+    return "Гостиница/временное жилье";
+  }
+  if (/company|organization|компан|организа/u.test(normalized)) {
+    return "Приглашающая компания/организация";
+  }
+  if (/person|individual|приглашающ.*лиц|физическ.*лиц/u.test(normalized)) {
+    return "Приглашающее лицо";
+  }
+  return cleanLongValue(value);
 }
 
 function normalizeCountry(value: string) {

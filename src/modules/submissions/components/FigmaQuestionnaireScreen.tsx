@@ -3193,7 +3193,13 @@ export function FigmaQuestionnaireScreen({
   );
   const guardianDetailsAreVisible =
     applicantIsMinor && (Boolean(formData.guardianInfo.trim()) || showGuardianDetails);
-  const showCompanyInviteFields = isBlsQuestionnaireInvitingCompanySelected(formData);
+  const showCompanyInviteFields =
+    isBlsQuestionnaireInvitingCompanySelected(formData) ||
+    [
+      formData.companyOrgDetails,
+      formData.companyContactPerson,
+      formData.companyPhone,
+    ].some((value) => Boolean(value.trim()));
   const primaryApplicantId = primaryApplicantIdForPassportReview(draftSubmission);
   const primaryApplicant = draftSubmission.applicants.find(
     (applicant) => applicant.id === primaryApplicantId,
@@ -3427,7 +3433,10 @@ export function FigmaQuestionnaireScreen({
       updateField(
         "contactAddress",
         composeQuestionnaireHomeAddress(formDataRef.current),
-        { origin: "smart_import" },
+        // The canonical address is deterministically composed from the selected
+        // structured fields. It has no independent source value or visible
+        // confirmation control, so it must not become a hidden review blocker.
+        { origin: "manual" },
       );
     }
   }
@@ -4908,33 +4917,60 @@ export function FigmaQuestionnaireScreen({
           {showCompanyInviteFields ? (
             <>
               <FormField
+                errorMessage={fieldErrorMessage(
+                  "company-org-details",
+                  "Название и адрес компании/организации",
+                )}
                 excelMap="Анкета: company-org-details"
                 fullWidth
                 label="Название и адрес компании/организации"
                 modelFieldId="company-org-details"
                 number="9"
                 placeholder="Например, Acme SL, Calle Mayor, 10"
+                reviewSource={fieldReviewSource(
+                  "company-org-details",
+                  "Название и адрес компании/организации",
+                )}
+                state={fieldReviewState(
+                  "company-org-details",
+                  "Название и адрес компании/организации",
+                )}
                 type="textarea"
                 value={formData.companyOrgDetails}
                 onChange={(value) => updateField("companyOrgDetails", value)}
               />
               <FormField
+                errorMessage={fieldErrorMessage(
+                  "company-contact-person",
+                  "Контактное лицо компании",
+                )}
                 excelMap="Анкета: company-contact-person"
                 fullWidth
                 label="Контактное лицо компании"
                 modelFieldId="company-contact-person"
                 number="10"
                 placeholder="Например, Maria Garcia"
+                reviewSource={fieldReviewSource(
+                  "company-contact-person",
+                  "Контактное лицо компании",
+                )}
+                state={fieldReviewState(
+                  "company-contact-person",
+                  "Контактное лицо компании",
+                )}
                 type="textarea"
                 value={formData.companyContactPerson}
                 onChange={(value) => updateField("companyContactPerson", value)}
               />
               <FormField
+                errorMessage={fieldErrorMessage("company-phone", "Телефон компании")}
                 excelMap="Анкета: company-phone"
                 label="Телефон компании"
                 modelFieldId="company-phone"
                 number="11"
                 placeholder="Номер с кодом страны"
+                reviewSource={fieldReviewSource("company-phone", "Телефон компании")}
+                state={fieldReviewState("company-phone", "Телефон компании")}
                 type="tel"
                 value={formData.companyPhone}
                 onChange={(value) => updateField("companyPhone", value)}

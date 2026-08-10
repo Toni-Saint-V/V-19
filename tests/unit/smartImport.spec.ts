@@ -71,6 +71,21 @@ describe("parseSmartImportText", () => {
     );
   });
 
+  it("normalizes an imported inviting-party type to the exact questionnaire option", () => {
+    expect(
+      candidateValue(
+        parseSmartImportText("Inviting party type: Hotel"),
+        "inviting-party-type",
+      ),
+    ).toBe("Гостиница/временное жилье");
+    expect(
+      candidateValue(
+        parseSmartImportText("Inviting party type: Company"),
+        "inviting-party-type",
+      ),
+    ).toBe("Приглашающая компания/организация");
+  });
+
   it("allows exactly the directly rendered questionnaire field universe", () => {
     const nonRendered = new Set(
       dispositionFieldIds("questionnaireUiNonRenderedFieldDispositions"),
@@ -109,16 +124,17 @@ describe("parseSmartImportText", () => {
     expect(result.candidates.map((item) => item.fieldId).sort()).toEqual(
       [...expectedFieldIds].sort(),
     );
-    const expectedValues = coverageManifest.sources[
-      "dense-labelled-questionnaire"
-    ].expectedValues;
+    const expectedValues =
+      coverageManifest.sources["dense-labelled-questionnaire"].expectedValues;
     if (!expectedValues) throw new Error("Missing dense fixture expected values");
-    expect(Object.fromEntries(result.candidates.map((item) => [item.fieldId, item.value])))
-      .toEqual(expectedValues);
+    expect(
+      Object.fromEntries(result.candidates.map((item) => [item.fieldId, item.value])),
+    ).toEqual(expectedValues);
 
     const review = buildSmartImportReview({ currentValues: {}, parsed: result });
-    expect(Object.fromEntries(review.items.map((item) => [item.fieldId, item.value])))
-      .toEqual(expectedValues);
+    expect(
+      Object.fromEntries(review.items.map((item) => [item.fieldId, item.value])),
+    ).toEqual(expectedValues);
     expect(
       coverageManifest.candidateUniverse.excludedFieldIds.every(
         (fieldId) =>
