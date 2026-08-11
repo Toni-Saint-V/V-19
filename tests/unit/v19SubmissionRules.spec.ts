@@ -1078,10 +1078,10 @@ describe("V-19 submission actions", () => {
     );
 
     expect(queue.summary).toMatchObject({
-      open: 6,
+      open: 4,
       overdue: 1,
-      today: 3,
-      week: 4,
+      today: 2,
+      week: 3,
     });
     expect(queue.open[0]).toMatchObject({
       cta: "Исправить",
@@ -1113,7 +1113,7 @@ describe("V-19 submission actions", () => {
     openCount: number;
     status: SubmissionStatus;
   }>([
-    { completedCount: 0, openCount: 2, status: "draft" },
+    { completedCount: 0, openCount: 0, status: "draft" },
     { completedCount: 0, openCount: 2, status: "in_progress" },
     { completedCount: 0, openCount: 2, status: "returned" },
     { completedCount: 1, openCount: 0, status: "submitted_for_review" },
@@ -1155,6 +1155,23 @@ describe("V-19 submission actions", () => {
       }
     },
   );
+
+  it("keeps a newly created draft in submissions instead of the action queue", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      submissions: [],
+      type: "single",
+    });
+
+    expect(agentActionQueue([draft])).toMatchObject({
+      completed: [],
+      open: [],
+    });
+    expect(
+      agentActionQueue([{ ...draft, status: "in_progress" }]).open.length,
+    ).toBeGreaterThan(0);
+  });
 
   it("derives agent action tasks with status, reason, readiness, and fail-closed export CTA", () => {
     const queue = agentActionQueue(
@@ -2608,6 +2625,48 @@ describe("V-19 ББ helper suggestions", () => {
           suggestion.target.fileType === "selfie",
       ),
     ).toBe(false);
+  });
+
+  it("keeps pending passport OCR visible to review without creating an agent handoff blocker", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      submissions: [],
+      type: "single",
+    });
+    const complete = {
+      ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
+      status: "in_progress" as const,
+    };
+    const passportFile = complete.files.find((file) => file.type === "passport_scan");
+    if (!passportFile) throw new Error("Missing passport scan.");
+    const pendingReview = finishPassportExtraction(complete, passportFile, {
+      fields: [
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: true,
+          value: "765432100",
+        },
+      ],
+      guardrails: [],
+      source: "local-ocr",
+      status: "extracted",
+      summary: "Паспортные данные подготовлены.",
+    });
+
+    expect(
+      generateAiSuggestions(pendingReview).some(
+        (suggestion) =>
+          suggestion.reason === "Проверьте распознанные паспортные данные перед отправкой",
+      ),
+    ).toBe(false);
+    expect(
+      generateAiSuggestions({ ...pendingReview, status: "submitted_for_review" }).some(
+        (suggestion) =>
+          suggestion.reason === "Проверьте распознанные паспортные данные перед отправкой",
+      ),
+    ).toBe(true);
   });
 
   it("keeps agents from converting suggestions into issues", () => {

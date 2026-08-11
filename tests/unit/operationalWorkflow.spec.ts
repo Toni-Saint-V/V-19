@@ -16,13 +16,19 @@ import {
 } from "../../src/modules/submissions/operationalWorkflow";
 import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
-import { finishPassportExtraction } from "../../src/modules/submissions/passportExtraction";
+import {
+  finishPassportExtraction,
+  startPassportExtraction,
+} from "../../src/modules/submissions/passportExtraction";
 import {
   createDraftSubmission,
   uploadRequiredFile,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
-import { applySubmissionAction } from "../../src/modules/submissions/status";
+import {
+  applySubmissionAction,
+  canPerformAction,
+} from "../../src/modules/submissions/status";
 import {
   buildAppointmentPdfStorageTarget,
   buildVisaApplicationPdfStorageTarget,
@@ -186,6 +192,30 @@ describe("operational workflow logic spine", () => {
       unwrap(submitOperationalForReview(applied, "agent", applied.agentId)).status,
     ).toBe("submitted_for_review");
 
+    const legacyPassportOcrReview = {
+      ...applied,
+      applicants: applied.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.reviewOriginSource === "passport_ocr"
+              ? { ...field, reviewOriginSource: undefined }
+              : field,
+          ),
+        })),
+      })),
+    };
+    expect(
+      unwrap(
+        submitOperationalForReview(
+          legacyPassportOcrReview,
+          "agent",
+          legacyPassportOcrReview.agentId,
+        ),
+      ).status,
+    ).toBe("submitted_for_review");
+
     const confirmed = unwrap(
       confirmQuestionnaireReviewFields(applied, {
         applicantId: applied.applicants[0]?.id ?? "",
@@ -273,6 +303,13 @@ describe("operational workflow logic spine", () => {
       value: "123456789",
     });
     expect(applied.applicants[0]?.passportExtraction?.appliedFieldKeys).toEqual([]);
+    expect(submitOperationalForReview(applied, "agent", applied.agentId)).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "VALIDATION_ERROR",
+        message: "Есть конфликт между данными паспорта и анкетой",
+      }),
+    });
   });
 
   test("keeps unreviewed passport OCR for admin review without blocking agent handoff", () => {
@@ -302,6 +339,64 @@ describe("operational workflow logic spine", () => {
     expect(
       unwrap(submitOperationalForReview(extracted, "agent", extracted.agentId)).status,
     ).toBe("submitted_for_review");
+  });
+
+  test("allows direct handoff while passport extraction continues for admin review", () => {
+    const inProgress = completeInProgressSubmission();
+    const passportFile = inProgress.files.find(
+      (file) =>
+        file.type === "passport_scan" &&
+        file.applicantId === inProgress.applicants[0]?.id,
+    );
+    if (!passportFile) throw new Error("Missing passport file.");
+
+    const extracting = startPassportExtraction(inProgress, passportFile);
+
+    expect(canPerformAction(extracting, "submit_for_review", "agent")).toEqual({ ok: true });
+    expect(
+      unwrap(submitOperationalForReview(extracting, "agent", extracting.agentId)).status,
+    ).toBe("submitted_for_review");
+  });
+
+  test("blocks direct handoff for a critical identity mismatch", () => {
+    const inProgress = completeInProgressSubmission();
+    const applicant = inProgress.applicants[0];
+    if (!applicant) throw new Error("Missing applicant.");
+    const criticalReview = {
+      applicantId: applicant.id,
+      applicantName: applicant.fullName,
+      checkedAtIso: "2026-07-01T12:00:00.000Z",
+      data: { passportNumber: "990000001" },
+      findings: [],
+      handoffStatus: "ready_for_agent" as const,
+      id: `pdf-review-${applicant.id}`,
+      status: "clear" as const,
+    };
+    const withCriticalMismatch: Submission = {
+      ...inProgress,
+      visaApplicationPdfReview: criticalReview,
+      visaApplicationPdfReviews: [criticalReview],
+    };
+
+    expect(
+      canPerformAction(withCriticalMismatch, "submit_for_review", "agent"),
+    ).toEqual({
+      ok: false,
+      reason: "Есть критичные расхождения между анкетой, паспортом и PDF",
+    });
+    expect(
+      submitOperationalForReview(
+        withCriticalMismatch,
+        "agent",
+        withCriticalMismatch.agentId,
+      ),
+    ).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: "VALIDATION_ERROR",
+        message: "Есть критичные расхождения между анкетой, паспортом и PDF",
+      }),
+    });
   });
 
   test("preserves draft and manual fields when OCR fails", () => {

@@ -84,13 +84,28 @@ export function buildSubmissionNextStepBrief({
   const queue = buildReadinessQueue(submission);
   const passportBrief = buildPassportExtractionBrief(submission);
   const identityReport = buildIdentityConsistencyReport(submission);
-  const blockers = readinessBlockers(submission, role, identityReport);
+  const passportAction = passportPrimaryAction(submission, passportBrief);
+  const lifecycleAction = lifecyclePrimaryAction(submission, role, surface);
+  const agentCanSubmitCompletePackage =
+    role === "agent" &&
+    surface === "agent" &&
+    lifecycleAction.kind === "submission_action" &&
+    lifecycleAction.submissionAction === "submit_for_review" &&
+    canPrioritizeAgentReviewHandoff(passportAction, identityReport);
+  const blockers = readinessBlockers(
+    submission,
+    role,
+    identityReport,
+    agentCanSubmitCompletePackage,
+  );
   const primaryAction =
     agentWaitingPrimaryAction(submission, role, surface) ??
-    passportPrimaryAction(submission, passportBrief) ??
-    identityPrimaryAction(identityReport) ??
-    queuePrimaryAction(submission) ??
-    lifecyclePrimaryAction(submission, role, surface);
+    (agentCanSubmitCompletePackage
+      ? lifecycleAction
+      : passportAction ??
+        identityPrimaryAction(identityReport) ??
+        queuePrimaryAction(submission) ??
+        lifecycleAction);
   const fileCounts = mediaCounts(submission);
 
   return {
@@ -118,6 +133,26 @@ export function buildSubmissionNextStepBrief({
     summary: summaryFor(submission, surface, fileCounts),
     title: titleFor(submission, role, surface, primaryAction, blockers),
   };
+}
+
+function canPrioritizeAgentReviewHandoff(
+  passportAction: SubmissionNextStepAction | null,
+  identityReport: IdentityConsistencyReport,
+) {
+  if (identityReport.status === "blocked") return false;
+  if (
+    identityReport.findings.some(
+      (finding) =>
+        finding.severity !== "info" && finding.code !== "passport_ocr_unverified",
+    )
+  ) {
+    return false;
+  }
+
+  return ![
+    "manual_passport_entry",
+    "resolve_passport_conflicts",
+  ].includes(passportAction?.id ?? "");
 }
 
 function passportPrimaryAction(
@@ -490,6 +525,7 @@ function readinessBlockers(
   submission: Submission,
   role: Role,
   identityReport: IdentityConsistencyReport,
+  suppressPassportOcrReviewSuggestion = false,
 ): string[] {
   const blockers: string[] = [];
   const blockerTotal = blockerCount(submission);
@@ -517,9 +553,14 @@ function readinessBlockers(
       `${identityReport.totals.blocked} критичных расхождения анкеты, паспорта и PDF`,
     );
   } else if (identityReport.status === "needs_review") {
-    blockers.push(
-      `${identityReport.totals.needsReview} предупреждений согласованности данных`,
+    const activeWarnings = identityReport.findings.filter(
+      (finding) =>
+        finding.severity !== "info" &&
+        !(suppressPassportOcrReviewSuggestion && finding.code === "passport_ocr_unverified"),
     );
+    if (activeWarnings.length > 0) {
+      blockers.push(`${activeWarnings.length} предупреждений согласованности данных`);
+    }
   }
   if (submission.completeness.questionnaire < 100) {
     blockers.push(`Анкета заполнена на ${submission.completeness.questionnaire}%`);

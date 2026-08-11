@@ -1,8 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { join } from "node:path";
+import { finishPassportExtraction } from "../../src/modules/submissions/passportExtraction";
+import {
+  createDraftSubmission,
+  uploadRequiredFiles,
+} from "../../src/modules/submissions/submissionActions";
+import type { Submission } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "../unit/helpers/questionnaireTestFill";
 import {
   clickFirstVisible,
   collectBrowserProblems,
+  clickWorkspaceButton,
+  drawer,
   expectAtLeastOneVisible,
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
@@ -20,7 +29,112 @@ function evidencePath(
     : testInfo.outputPath(name);
 }
 
+function readySubmissionWithPendingPassportOcr(): Submission {
+  const draft = createDraftSubmission({
+    agentId: "local-agent-tony",
+    applicantNames: ["Паспорт OCR"],
+    city: "Самара",
+    familyCount: 1,
+    submissions: [],
+    type: "single",
+  });
+  const ready = {
+    ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
+    status: "in_progress" as const,
+  };
+  const passport = ready.files.find((file) => file.type === "passport_scan");
+  if (!passport) throw new Error("Expected an uploaded passport fixture.");
+
+  return finishPassportExtraction(ready, passport, {
+    fields: [
+      {
+        confidence: "high",
+        key: "passportNumber",
+        needsManualReview: true,
+        value: "765432100",
+      },
+    ],
+    guardrails: [],
+    source: "local-ocr",
+    status: "extracted",
+    summary: "Паспортные данные ожидают проверки администратора.",
+  });
+}
+
 test.describe("V-19 privacy-safe passport intake proof", () => {
+  test("keeps the review handoff actionable after all documents are ready", async ({
+    page,
+  }, testInfo) => {
+    const browserProblems = collectBrowserProblems(page);
+    const submission = readySubmissionWithPendingPassportOcr();
+
+    await openFreshWorkspace(page, { heading: "Мои действия" });
+    await page.evaluate((currentSubmission) => {
+      localStorage.setItem(
+        "visaflow.v19.submissions.v1",
+        JSON.stringify([currentSubmission]),
+      );
+    }, submission);
+    await page.reload();
+    await clickWorkspaceButton(page, /Мои подачи/);
+
+    const card = page.locator(`[data-submission-id="${submission.id}"]`);
+    await expect(card).toBeVisible();
+    await card.click();
+
+    const submissionDrawer = drawer(page);
+    const submit = submissionDrawer.getByRole("button", {
+      exact: true,
+      name: "Отправить на проверку",
+    });
+    for (const viewport of [
+      { height: 720, width: 320 },
+      { height: 844, width: 390 },
+      { height: 1024, width: 768 },
+      { height: 900, width: 1440 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await submit.scrollIntoViewIfNeeded();
+      await expect(submit).toBeVisible();
+      await expect(submit).toBeEnabled();
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+          ),
+        )
+        .toBe(true);
+      await submissionDrawer.screenshot({
+        path: evidencePath(testInfo, `submit-for-review-${viewport.width}.png`),
+      });
+    }
+
+    await submit.click();
+    await expect
+      .poll(() =>
+        page.evaluate((submissionId) => {
+          const stored = JSON.parse(
+            localStorage.getItem("visaflow.v19.submissions.v1") ?? "[]",
+          ) as Array<{ id?: string; status?: string }>;
+          return stored.find((candidate) => candidate.id === submissionId)?.status;
+        }, submission.id),
+      )
+      .toBe("submitted_for_review");
+    await page.reload();
+    await expect
+      .poll(() =>
+        page.evaluate((submissionId) => {
+          const stored = JSON.parse(
+            localStorage.getItem("visaflow.v19.submissions.v1") ?? "[]",
+          ) as Array<{ id?: string; status?: string }>;
+          return stored.find((candidate) => candidate.id === submissionId)?.status;
+        }, submission.id),
+      )
+      .toBe("submitted_for_review");
+
+    expect(browserProblems, browserProblems.join("\n")).toEqual([]);
+  });
+
   test("stores a synthetic manual-review passport only in the canonical draft", async ({
     page,
   }, testInfo) => {

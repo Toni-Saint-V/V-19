@@ -78,6 +78,7 @@ import {
   blockerCount,
   defaultDrawerTab,
   fixedIssueCount,
+  hasMissingRequiredWorkForAgentHandoff,
   hasMissingRequiredWork,
   nextProblem,
   openIssueCount,
@@ -1481,10 +1482,11 @@ function submissionNextActionLabel(submission: Submission) {
         : null;
 
   if (missingFile) return `Добавить ${missingFile}`;
-  if (
-    (submission.status === "draft" || submission.status === "in_progress") &&
-    hasMissingRequiredWork(submission)
-  ) {
+  const hasMissingWork =
+    submission.status === "in_progress"
+      ? hasMissingRequiredWorkForAgentHandoff(submission)
+      : hasMissingRequiredWork(submission);
+  if ((submission.status === "draft" || submission.status === "in_progress") && hasMissingWork) {
     return "Заполнить подачу";
   }
   if (

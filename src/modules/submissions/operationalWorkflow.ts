@@ -1308,7 +1308,7 @@ export function questionnaireReviewBlockers(submission: Submission): string[] {
       section.fields.flatMap((field) => {
         if (
           field.reviewState !== "needs_review" ||
-          field.reviewOriginSource === "passport_ocr"
+          (field.reviewOriginSource ?? field.reviewSource) === "passport_ocr"
         ) {
           return [];
         }

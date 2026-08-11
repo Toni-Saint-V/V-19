@@ -85,6 +85,27 @@ function readySubmission(): Submission {
   };
 }
 
+function pendingPassportReviewSubmission(): Submission {
+  const ready = readySubmission();
+  const passportFile = ready.files.find((file) => file.type === "passport_scan");
+  if (!passportFile) throw new Error("Expected passport slot.");
+
+  return finishPassportExtraction(ready, passportFile, {
+    fields: [
+      {
+        confidence: "high",
+        key: "passportNumber",
+        needsManualReview: true,
+        value: "765432100",
+      },
+    ],
+    guardrails: [],
+    source: "local-ocr",
+    status: "extracted",
+    summary: "Паспортные данные подготовлены.",
+  });
+}
+
 function persistedReviewedPassportSubmission(): Submission {
   const draft = createDraftSubmission({
     applicantNames: ["Мария Иванова"],
@@ -439,6 +460,17 @@ describe("Drawer interactions", () => {
     expect(screen.getByTestId("drawer-blocker-reason")).not.toBeEmptyDOMElement();
     fireEvent.click(exactUpload);
     expect(returnedAction).not.toHaveBeenCalled();
+  });
+
+  test("keeps review handoff visible while passport OCR awaits manual review", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    renderDrawer({ onAction, submission: pendingPassportReviewSubmission() });
+
+    const submit = screen.getByRole("button", { name: "Отправить на проверку" });
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith("submit_for_review"));
   });
 
   test("does not repeat passport review after persisted OCR confirmations", () => {

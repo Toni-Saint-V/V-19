@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
@@ -20,6 +21,12 @@ const adminWorkspaceHeading = /^(Очередь на проверку|Прове
 const smartImportDenseQuestionnairePdf = resolve(
   process.cwd(),
   "tests/fixtures/smart-import-coverage/dense-labelled-questionnaire.pdf",
+);
+const safePassportImage = readFileSync(
+  resolve(
+    process.cwd(),
+    "tests/fixtures/smart-import-coverage/passport-style-safe.png",
+  ),
 );
 
 async function expectNoRetiredNavigation(page: Page) {
@@ -245,7 +252,11 @@ async function loginAsLocalDemo(page: Page, email: string, password: string) {
     await page.getByRole("button", { name: /^(Сбросить почту|Выйти)$/ }).click();
   }
 
-  const loginHeading = page.getByRole("heading", { exact: true, level: 1, name: "Вход" });
+  const loginHeading = page.getByRole("heading", {
+    exact: true,
+    level: 1,
+    name: "Вход",
+  });
   if (!(await isVisible(loginHeading))) {
     await page.getByRole("button", { name: "Уже есть доступ? Войти" }).click();
   }
@@ -647,6 +658,29 @@ async function uploadAllVisibleFiles(page: Page) {
   throw new Error("Не удалось загрузить все видимые файлы");
 }
 
+async function uploadAllDrawerChecklistFiles(page: Page) {
+  const checklist = drawer(page).getByRole("heading", {
+    name: "Чеклист документов",
+  });
+  await expect(checklist).toBeVisible();
+
+  for (let pass = 0; pass < 40; pass += 1) {
+    const uploadRows = drawer(page).locator(
+      ".v19-agent-drawer-document-row.is-actionable",
+    );
+    const remaining = await uploadRows.count();
+    if (remaining === 0) return;
+
+    const chooserPromise = page.waitForEvent("filechooser");
+    await uploadRows.first().click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(e2ePassportFile(`drawer-checklist-${pass}`));
+    await expect(uploadRows).toHaveCount(remaining - 1);
+  }
+
+  throw new Error("Не удалось загрузить весь чеклист документов");
+}
+
 async function markVisibleIssuesFixed(page: Page) {
   await openDrawerTab(page, ["Замечания"]);
   const fixedButtons = drawer(page).getByRole("button", {
@@ -686,9 +720,9 @@ async function submitForReviewFromDrawer(page: Page) {
 
 function e2ePassportFile(name: string) {
   return {
-    buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
-    mimeType: "image/jpeg",
-    name: `e2e-passport-${name}.jpg`,
+    buffer: safePassportImage,
+    mimeType: "image/png",
+    name: `e2e-document-${name}.png`,
   };
 }
 
@@ -838,9 +872,7 @@ test.describe("V-19 operations workspace", () => {
       .getByRole("listbox", { name: "Тип подачи" })
       .getByRole("option", { name: "Все" })
       .click();
-    await expect(
-      page.getByRole("heading", { level: 2, name: "Семьи" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Семьи" })).toBeVisible();
     await expect(
       page.getByRole("heading", { level: 2, name: "Заявители" }),
     ).toBeVisible();
@@ -858,9 +890,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Интерфейс и помощники" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Сбросить" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Сбросить" })).toBeVisible();
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
@@ -951,7 +981,9 @@ test.describe("V-19 operations workspace", () => {
     await expectAdminWorkNavigation(page);
     await clickWorkspaceButton(page, /Выгрузка/);
 
-    await expect(page.locator(".export-row").filter({ hasText: "Дмитрий Орлов" })).toBeVisible();
+    await expect(
+      page.locator(".export-row").filter({ hasText: "Дмитрий Орлов" }),
+    ).toBeVisible();
 
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
@@ -976,7 +1008,9 @@ test.describe("V-19 operations workspace", () => {
 
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
-    const dmitryExportRow = page.locator(".export-row").filter({ hasText: "Дмитрий Орлов" });
+    const dmitryExportRow = page
+      .locator(".export-row")
+      .filter({ hasText: "Дмитрий Орлов" });
     await expect(dmitryExportRow).toBeVisible();
     const dmitryCheckbox = dmitryExportRow.getByRole("checkbox", {
       name: "Выбрать Дмитрий Орлов",
@@ -1532,7 +1566,9 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
   });
 
-  test("one submission moves from creation to Excel export", async ({ page }) => {
+  test("one submission moves from creation to the secure admin review queue locally", async ({
+    page,
+  }) => {
     test.slow();
     const browserProblems = collectBrowserProblems(page);
 
@@ -1549,13 +1585,9 @@ test.describe("V-19 operations workspace", () => {
     await expect(singleType).toHaveAttribute("aria-checked", "true");
     await createWorkspace.getByLabel("Город подачи").click();
     await page.getByRole("option", { exact: true, name: "Москва" }).click();
-    await createWorkspace.locator('input[type="file"]').setInputFiles([
-      {
-        buffer: Buffer.from([0x00, 0x00, 0x00, 0x18]),
-        mimeType: "image/heic",
-        name: "current-full-flow-passport.heic",
-      },
-    ]);
+    await createWorkspace
+      .locator('input[type="file"]')
+      .setInputFiles(e2ePassportFile("current-full-flow-passport"));
 
     await createWorkspace
       .getByRole("button", { name: "Создать и открыть анкету" })
@@ -1601,7 +1633,11 @@ test.describe("V-19 operations workspace", () => {
       ".v19-questionnaire-section-list--sidebar button",
     );
     let confirmedImportFields = 0;
-    for (let sectionIndex = 0; sectionIndex < (await sectionButtons.count()); sectionIndex += 1) {
+    for (
+      let sectionIndex = 0;
+      sectionIndex < (await sectionButtons.count());
+      sectionIndex += 1
+    ) {
       await sectionButtons.nth(sectionIndex).click();
       for (let safety = 0; safety < 60; safety += 1) {
         const confirmation = questionnaire.getByRole("button", {
@@ -1617,19 +1653,16 @@ test.describe("V-19 operations workspace", () => {
       .getByRole("button", { exact: true, name: "Сохранить и выйти" })
       .click();
     await expect(questionnaire).toHaveCount(0);
-    await drawer(page).getByRole("button", { name: "Начать работу" }).click();
+    await clickWorkspaceButton(page, /Мои подачи/);
+    await expect(agentCard).toBeVisible();
+    await agentCard.click();
     await expect(drawer(page)).toBeVisible();
-    for (const [index, fileLabel] of ["Селфи 1", "Селфи 2"].entries()) {
-      await drawer(page)
-        .getByRole("button", { name: new RegExp(`${fileLabel}.*Загрузить`) })
-        .click();
-      await drawer(page)
-        .getByLabel(/^Выбрать файл:/)
-        .setInputFiles(e2ePassportFile(`full-flow-${index}`));
-    }
-    const submitForReview = drawer(page).getByRole("button", {
-      name: "Отправить на проверку",
-    });
+    await uploadAllDrawerChecklistFiles(page);
+    const startWork = drawer(page).getByTestId("drawer-primary-action");
+    await expect(startWork).toHaveText("Начать работу");
+    await startWork.click();
+    const submitForReview = drawer(page).getByTestId("drawer-primary-action");
+    await expect(submitForReview).toHaveText("Отправить на проверку");
     await expect(submitForReview).toBeEnabled();
     await submitForReview.click();
     const verifyPassportButton = page.getByRole("button", {
@@ -1642,32 +1675,32 @@ test.describe("V-19 operations workspace", () => {
 
     await switchToAdmin(page);
     await selectAdminReviewQueue(page);
-    const adminCard = page.locator(`[data-submission-id="${submittedId}"]:visible`);
+    const adminCard = page.locator(
+      `.v19-admin-review-card[data-submission-id="${submittedId}"]:visible`,
+    );
     await expect(adminCard).toBeVisible();
     await adminCard.click();
 
     const reviewWorkspace = page.getByRole("dialog", { name: "Сверка паспорта" });
     await expect(reviewWorkspace).toBeVisible();
-    await reviewWorkspace
-      .getByRole("button", { name: "Подтвердить паспортную секцию" })
-      .click();
-    const acceptForExport = reviewWorkspace.getByRole("button", {
-      name: /Принять на выгрузку|Закрыть исправления и принять/,
-    });
-    await expect(acceptForExport).toBeEnabled();
-    await acceptForExport.click();
-    await expect(reviewWorkspace).toBeHidden();
+    for (const mediaTab of await reviewWorkspace
+      .getByRole("tablist", { name: "Выбор файла для проверки" })
+      .getByRole("tab")
+      .all()) {
+      await mediaTab.click();
+      await expect(mediaTab).toHaveAttribute("aria-selected", "true");
+    }
+    await expect(reviewWorkspace.getByText("Оригинал нельзя принять").first()).toBeVisible();
+    await expect(
+      reviewWorkspace.getByRole("button", {
+        name: "Перейти к следующему шагу в паспортной секции",
+      }),
+    ).toBeEnabled();
 
-    await clickWorkspaceButton(page, /Выгрузка/);
-    await clearExportSelection(page);
-    const exportRow = page.locator(`.export-row[data-submission-id="${submittedId}"]`);
-    await expect(exportRow).toBeVisible();
-    await exportRow.getByRole("checkbox").check();
-    const download = await generateAndDownloadExcel(page);
-    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
-    await expectCurrentExportDownloadComplete(page);
-
-    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual([]);
+    expect(
+      blockingBrowserProblems(browserProblems),
+      browserProblems.join("\n"),
+    ).toEqual([]);
   });
 
   test("two families and two single applicants pass issue, return, correction and export corner cases", async ({

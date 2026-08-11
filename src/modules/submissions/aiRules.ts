@@ -1,6 +1,7 @@
 import { fileTypeLabels } from "./status";
 import { buildIdentityConsistencyReport, type IdentityConsistencyFinding } from "./identityConsistency";
 import {
+  passportGateIssuesForAction,
   passportGateIssues,
   type PassportGateIssue,
 } from "./passportExtractionGuards";
@@ -71,7 +72,17 @@ function fileSuggestions(submission: Submission): AiSuggestion[] {
 }
 
 function passportGuardSuggestions(submission: Submission): AiSuggestion[] {
-  return passportGateIssues(submission).map((issue) => ({
+  const handoffAction =
+    submission.status === "in_progress"
+      ? "submit_for_review"
+      : submission.status === "returned" || submission.status === "requires_action"
+        ? "submit_corrections"
+        : undefined;
+  const issues = handoffAction
+    ? passportGateIssuesForAction(submission, handoffAction, new Date())
+    : passportGateIssues(submission);
+
+  return issues.map((issue) => ({
     id: suggestionId(
       submission.id,
       issue.applicantId,

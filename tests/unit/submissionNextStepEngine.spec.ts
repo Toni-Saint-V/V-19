@@ -133,17 +133,39 @@ describe("submission next-step engine", () => {
     expect(visibleCopy(brief)).not.toMatch(forbiddenTrustCopy);
   });
 
+  test("keeps a complete agent package submittable while passport OCR awaits review", () => {
+    const ready = readyForReviewSubmission();
+    const withPendingPassportReview = finishPassportExtraction(
+      ready,
+      passportFile(ready),
+      extractedPassport,
+    );
+
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: withPendingPassportReview,
+      surface: "agent",
+    });
+
+    expect(brief.primaryAction).toMatchObject({
+      id: "submission_submit_for_review",
+      kind: "submission_action",
+      submissionAction: "submit_for_review",
+    });
+    expect(brief.status).toBe("ready_for_action");
+  });
+
   test("prioritizes passport conflicts over queue and lifecycle actions", () => {
-    const draft = draftSubmission();
-    const withExistingPassport = updateQuestionnaireField(draft, {
-      applicantId: applicantId(draft),
+    const ready = readyForReviewSubmission();
+    const withExistingPassport = updateQuestionnaireField(ready, {
+      applicantId: applicantId(ready),
       fieldId: "passport-no",
-      sectionId: sectionIdForField(draft, "passport-no"),
+      sectionId: sectionIdForField(ready, "passport-no"),
       value: "OLD-PASSPORT",
     });
     const withPassport = finishPassportExtraction(
       withExistingPassport,
-      passportFile(draft),
+      passportFile(ready),
       extractedPassport,
     );
 
@@ -165,9 +187,9 @@ describe("submission next-step engine", () => {
     expect(brief.primaryAction.label).toContain("конфликт");
   });
 
-  test("waits when passport extraction is still running", () => {
-    const draft = draftSubmission();
-    const extracting = startPassportExtraction(draft, passportFile(draft));
+  test("prioritizes agent handoff while passport extraction continues", () => {
+    const ready = readyForReviewSubmission();
+    const extracting = startPassportExtraction(ready, passportFile(ready));
 
     const brief = buildSubmissionNextStepBrief({
       role: "agent",
@@ -175,10 +197,10 @@ describe("submission next-step engine", () => {
       surface: "agent",
     });
 
-    expect(brief.status).toBe("waiting");
+    expect(brief.status).toBe("ready_for_action");
     expect(brief.primaryAction).toMatchObject({
-      id: "wait_passport_extraction",
-      kind: "wait",
+      id: "submission_submit_for_review",
+      kind: "submission_action",
     });
   });
 

@@ -743,6 +743,9 @@ function activeFileCounts(submission: Submission) {
 }
 
 function agentOpenActions(submission: Submission): AgentActionItem[] {
+  // A just-created draft belongs in "Мои подачи". It becomes an operational
+  // action only after the agent explicitly starts work on it.
+  if (isNewDraft(submission)) return [];
   if (!canAgentEditSubmission(submission)) return [];
 
   const actions: AgentActionItem[] = [];
@@ -863,6 +866,10 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
   }
 
   return actions;
+}
+
+function isNewDraft(submission: Submission) {
+  return submission.status === "draft";
 }
 
 function firstMissingFilePerApplicant(files: SubmissionFile[]) {

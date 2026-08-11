@@ -165,6 +165,32 @@ test.describe("V-19 canonical family intake", () => {
     expect(browserProblems).toEqual([]);
   });
 
+  test("keeps a newly created draft out of My Actions", async ({ page }) => {
+    const browserProblems = collectBrowserProblems(page);
+    await page.setViewportSize({ height: 960, width: 1440 });
+    const workspace = await openCreateSubmission(page);
+    await workspace.getByRole("radio", { name: "Заявитель" }).click();
+    await chooseCity(page, workspace, "Москва");
+    await workspace.getByRole("button", { name: "Сохранить черновик" }).click();
+
+    const draftId = await page.evaluate(() => {
+      const submissions = JSON.parse(
+        localStorage.getItem("visaflow.v19.submissions.v1") ?? "[]",
+      ) as Array<{ id?: string; status?: string }>;
+      return submissions.find((submission) => submission.status === "draft")?.id;
+    });
+    expect(draftId).toBeTruthy();
+
+    await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
+    await clickWorkspaceButton(page, /^Мои действия$/);
+    await expect(
+      page.locator(
+        `[data-testid="agent-action-queue-item"][data-submission-id="${draftId}"]`,
+      ),
+    ).toHaveCount(0);
+    expect(browserProblems).toEqual([]);
+  });
+
   test("creates a family submission on desktop", async ({ page }) => {
     const browserProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 960, width: 1440 });

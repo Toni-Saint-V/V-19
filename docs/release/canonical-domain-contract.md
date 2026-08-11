@@ -153,15 +153,15 @@ production readiness.
 
 The canonical `SubmissionStatus` set for Package 1 is exactly:
 
-| Status | Meaning | Owner of next action |
-|---|---|---|
-| `draft` | Submission exists but work has not formally started. It may be incomplete. | Agent |
-| `in_progress` | Agent is filling questionnaire and uploading required media. | Agent |
-| `submitted_for_review` | Agent submitted a complete package for admin review. | Admin |
-| `returned` | Admin returned the package with open issues. | Agent |
-| `corrections_received` | Agent submitted fixes for returned issues. | Admin |
-| `ready_for_export` | Admin accepted the package; it is eligible for export. | Admin/System |
-| `exported` | Export was durably completed. Terminal state. | None; read-only |
+| Status                 | Meaning                                                                    | Owner of next action |
+| ---------------------- | -------------------------------------------------------------------------- | -------------------- |
+| `draft`                | Submission exists but work has not formally started. It may be incomplete. | Agent                |
+| `in_progress`          | Agent is filling questionnaire and uploading required media.               | Agent                |
+| `submitted_for_review` | Agent submitted a complete package for admin review.                       | Admin                |
+| `returned`             | Admin returned the package with open issues.                               | Agent                |
+| `corrections_received` | Agent submitted fixes for returned issues.                                 | Admin                |
+| `ready_for_export`     | Admin accepted the package; it is eligible for export.                     | Admin/System         |
+| `exported`             | Export was durably completed. Terminal state.                              | None; read-only      |
 
 ### 2.1 Forbidden canonical statuses
 
@@ -192,22 +192,22 @@ persistence, export readiness, and production decisions must normalize it to
 
 Legacy statuses must be mapped before they reach canonical business logic.
 
-| Legacy status | Canonical status | Guard / rule |
-|---|---|---|
-| `requires_action` | `returned` | Unconditional legacy alias. |
-| `filling` | `in_progress` | Unconditional legacy alias. |
-| `ready_for_review` | `submitted_for_review` | Unconditional legacy alias. |
-| `waiting_review` | `submitted_for_review` | Unconditional legacy alias. |
-| `in_review` | `submitted_for_review` | Unconditional legacy alias. |
-| `accepted` | `ready_for_export` | Acceptance does not mean exported. |
-| `ready_for_excel` | `ready_for_export` | Excel/export readiness maps to package export readiness. |
-| `attention_required` | `returned` | Unconditional legacy alias. |
-| `sent_to_appointment` | `exported` | Only if `exported_at` exists and is a valid persisted timestamp. |
-| `sent_to_appointment` | `ready_for_export` | If `exported_at` is missing. |
-| `appointment_scheduled` | `exported` | Only if `exported_at` exists and is a valid persisted timestamp. |
-| `appointment_scheduled` | `ready_for_export` | If `exported_at` is missing. |
-| `completed` | `exported` | Only if `exported_at` exists and is a valid persisted timestamp. |
-| `completed` | `ready_for_export` | If `exported_at` is missing. |
+| Legacy status           | Canonical status       | Guard / rule                                                     |
+| ----------------------- | ---------------------- | ---------------------------------------------------------------- |
+| `requires_action`       | `returned`             | Unconditional legacy alias.                                      |
+| `filling`               | `in_progress`          | Unconditional legacy alias.                                      |
+| `ready_for_review`      | `submitted_for_review` | Unconditional legacy alias.                                      |
+| `waiting_review`        | `submitted_for_review` | Unconditional legacy alias.                                      |
+| `in_review`             | `submitted_for_review` | Unconditional legacy alias.                                      |
+| `accepted`              | `ready_for_export`     | Acceptance does not mean exported.                               |
+| `ready_for_excel`       | `ready_for_export`     | Excel/export readiness maps to package export readiness.         |
+| `attention_required`    | `returned`             | Unconditional legacy alias.                                      |
+| `sent_to_appointment`   | `exported`             | Only if `exported_at` exists and is a valid persisted timestamp. |
+| `sent_to_appointment`   | `ready_for_export`     | If `exported_at` is missing.                                     |
+| `appointment_scheduled` | `exported`             | Only if `exported_at` exists and is a valid persisted timestamp. |
+| `appointment_scheduled` | `ready_for_export`     | If `exported_at` is missing.                                     |
+| `completed`             | `exported`             | Only if `exported_at` exists and is a valid persisted timestamp. |
+| `completed`             | `ready_for_export`     | If `exported_at` is missing.                                     |
 
 Canonical statuses pass through unchanged.
 
@@ -219,12 +219,12 @@ Unknown statuses fail closed. They must not be guessed, coerced, displayed as ca
 
 A Package 1 submission is review-submittable only when every applicant has exactly the required domain package:
 
-| Required artifact | Canonical domain key | Required for review | Required for export | Notes |
-|---|---|---:|---:|---|
-| Questionnaire | `questionnaire` | Yes | Yes | All required canonical fields must be complete and valid. |
-| Passport scan | `passport_scan` | Yes | Yes | Required for every applicant. Passport identity page scan/photo. |
-| Selfie, straight/front | `selfie` | Conditional | Conditional | Required only for a single applicant or the primary applicant of a family. |
-| Selfie, side/profile | `selfie_2` | Conditional | Conditional | Required only for a single applicant or the primary applicant of a family. Not video. |
+| Required artifact      | Canonical domain key | Required for review | Required for export | Notes                                                                                 |
+| ---------------------- | -------------------- | ------------------: | ------------------: | ------------------------------------------------------------------------------------- |
+| Questionnaire          | `questionnaire`      |                 Yes |                 Yes | All required canonical fields must be complete and valid.                             |
+| Passport scan          | `passport_scan`      |                 Yes |                 Yes | Required for every applicant. Passport identity page scan/photo.                      |
+| Selfie, straight/front | `selfie`             |         Conditional |         Conditional | Required only for a single applicant or the primary applicant of a family.            |
+| Selfie, side/profile   | `selfie_2`           |         Conditional |         Conditional | Required only for a single applicant or the primary applicant of a family. Not video. |
 
 There is no Package 1 requirement for a white-background photo.
 
@@ -234,11 +234,11 @@ There is no Package 1 video artifact.
 
 The canonical frontend media types for Package 1 are exactly:
 
-| Canonical frontend type | Semantic meaning | Required |
-|---|---|---:|
-| `passport_scan` | Passport scan | Yes, every applicant |
-| `selfie` | Straight/front selfie | Yes, single/primary family applicant only |
-| `selfie_2` | Side/profile selfie | Yes, single/primary family applicant only |
+| Canonical frontend type | Semantic meaning      |                                  Required |
+| ----------------------- | --------------------- | ----------------------------------------: |
+| `passport_scan`         | Passport scan         |                      Yes, every applicant |
+| `selfie`                | Straight/front selfie | Yes, single/primary family applicant only |
+| `selfie_2`              | Side/profile selfie   | Yes, single/primary family applicant only |
 
 The following values are not canonical frontend media types for Package 1:
 
@@ -269,11 +269,11 @@ For `ready_for_export` and `exported`, required media must have passed admin acc
 
 Canonical frontend media types map to Supabase/storage slots as follows:
 
-| Canonical frontend type | Supabase/storage slot | Direction | Required |
-|---|---|---|---:|
-| `passport_scan` | `passport_scan` | frontend ⇄ storage | Yes |
-| `selfie` | `selfie` | frontend ⇄ storage | Yes |
-| `selfie_2` | `selfie_2` | frontend ⇄ storage | Yes |
+| Canonical frontend type | Supabase/storage slot | Direction          | Required |
+| ----------------------- | --------------------- | ------------------ | -------: |
+| `passport_scan`         | `passport_scan`       | frontend ⇄ storage |      Yes |
+| `selfie`                | `selfie`              | frontend ⇄ storage |      Yes |
+| `selfie_2`              | `selfie_2`            | frontend ⇄ storage |      Yes |
 
 No Package 1 canonical storage slot exists for:
 
@@ -290,11 +290,11 @@ Storage policies, readiness checks, export checks, and persistence mappers must 
 
 Package 1 removes the old white-photo/video model.
 
-| Legacy/media value | Package 1 treatment | May satisfy required media? | May be written by canonical flow? |
-|---|---|---:|---:|
-| `photo` | Rejected as non-canonical. There is no Package 1 white-background photo. | No | No |
-| `photo_white` | Archive-only legacy value. Must not map to a canonical required artifact. | No | No |
-| `video` | Removed. Must not be accepted as `selfie_2`. | No | No |
+| Legacy/media value | Package 1 treatment                                                       | May satisfy required media? | May be written by canonical flow? |
+| ------------------ | ------------------------------------------------------------------------- | --------------------------: | --------------------------------: |
+| `photo`            | Rejected as non-canonical. There is no Package 1 white-background photo.  |                          No |                                No |
+| `photo_white`      | Archive-only legacy value. Must not map to a canonical required artifact. |                          No |                                No |
+| `video`            | Removed. Must not be accepted as `selfie_2`.                              |                          No |                                No |
 
 The deprecated mapping `photo_white -> photo` is invalid for Package 1 because `photo` is not a canonical media type.
 
@@ -308,18 +308,19 @@ Historical records containing `photo`, `photo_white`, or `video` may be preserve
 
 Every status-changing command must enforce these guards before mutation:
 
-| Guard | Rule |
-|---|---|
-| Known actor | Actor must be `agent`, `admin`, or authorized `system`. Unknown role fails. |
-| Correct role | Actor role must match the transition matrix. |
-| Canonical current status | Current status must be one of the seven canonical statuses. Unknown status fails. |
-| Exact `from` match | Stored status must match the transition `from` status. |
-| Canonical target status | Target status must be canonical. |
-| Export terminality | `exported` cannot transition to any mutable state. |
-| Required package | Questionnaire + `passport_scan` for every applicant, plus `selfie` + `selfie_2` for a single/primary family applicant, must satisfy the guard for the target state. |
-| Issue consistency | Open/fixed/closed issues must obey the issue lifecycle. |
-| Media consistency | `photo`, `photo_white`, `video`, and unknown media types fail at the canonical boundary. |
-| Atomic command | Failed command must not mutate status, issues, media, questionnaire, export metadata, or history. |
+| Guard                     | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Known actor               | Actor must be `agent`, `admin`, or authorized `system`. Unknown role fails.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Correct role              | Actor role must match the transition matrix.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Canonical current status  | Current status must be one of the seven canonical statuses. Unknown status fails.                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Exact `from` match        | Stored status must match the transition `from` status.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Canonical target status   | Target status must be canonical.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Export terminality        | `exported` cannot transition to any mutable state.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Required package          | Questionnaire + `passport_scan` for every applicant, plus `selfie` + `selfie_2` for a single/primary family applicant, must satisfy the guard for the target state.                                                                                                                                                                                                                                                                                                                  |
+| Passport review ownership | For agent handoff (`T2`/`T5`), non-conflicting passport extraction that is extracting, unavailable, unconfirmed, or pending review remains an admin-review cue and does not block the transition. Missing or rejected required media, hard passport-validity errors, unresolved OCR/questionnaire conflicts, and critical identity contradictions remain blocking. Admin acceptance/export transitions (`T4`/`T6`/`T8`/`T9`) require full passport and protected-media verification. |
+| Issue consistency         | Open/fixed/closed issues must obey the issue lifecycle.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Media consistency         | `photo`, `photo_white`, `video`, and unknown media types fail at the canonical boundary.                                                                                                                                                                                                                                                                                                                                                                                             |
+| Atomic command            | Failed command must not mutate status, issues, media, questionnaire, export metadata, or history.                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -327,18 +328,18 @@ Every status-changing command must enforce these guards before mutation:
 
 The following table is the complete Package 1 status transition matrix.
 
-| ID | Action | Actor / role | From status | To status | Guards |
-|---|---|---|---|---|---|
-| T0 | Create submission draft | `agent` | none | `draft` | Agent is known; ownership is assigned; initial status is canonical; no legacy status/media value is written. |
-| T1 | Save/start progress | `agent` | `draft` | `in_progress` | Agent owns the submission; at least one applicant exists; questionnaire/media may be incomplete; no admin issue exists yet. |
-| T2 | Submit for review | `agent` | `in_progress`, `ready_for_export` | `submitted_for_review` | Agent owns the submission; every applicant has a complete questionnaire and `passport_scan`; only a single/primary family applicant additionally requires `selfie` + `selfie_2`; no required media is missing/rejected; no `photo`, `photo_white`, `video`, or unknown media value exists in the canonical package; no unresolved issue exists; passport extraction/review gates pass if active. Re-submitting an export-ready package clears export readiness and returns accepted media to admin review. |
-| T3 | Return with issues | `admin` | `submitted_for_review` | `returned` | Admin is known; at least one valid `open` issue exists; each issue target points to an applicant/questionnaire field/section/media slot in the canonical package; no issue is closed directly from `open`; no export metadata is committed. |
-| T4 | Accept first review | `admin` | `submitted_for_review` | `ready_for_export` | Admin is known; no `open` issue exists; no `fixed_by_agent` issue exists; every applicant package is complete; required media has passed admin acceptance/export-readiness validation; export readiness is initialized but export is not yet completed. |
-| T5 | Submit corrections | `agent` | `returned` | `corrections_received` | Agent owns the submission; at least one `open` issue exists; every `open` issue has a concrete correction; corrected issues move to `fixed_by_agent`; questionnaire/media package remains complete; no closed issue is reopened; no forbidden media value is introduced. |
-| T6 | Close issues and accept | `admin` | `corrections_received` | `ready_for_export` | Admin is known; all `fixed_by_agent` issues are reviewed; accepted fixed issues move to `closed_by_admin`; no `open` issue remains; package is complete; required media has passed admin acceptance/export-readiness validation. |
-| T7 | Return again with new issues | `admin` | `corrections_received` | `returned` | Admin is known; at least one new valid `open` issue exists; closed issues remain closed; old issues are not reopened; package is not export-ready until the new open issues are resolved. |
-| T8 | Prepare/export package metadata | `admin` or authorized `system` | `ready_for_export` | `ready_for_export` | Status-preserving export preparation only; selected submissions are still `ready_for_export`; no unresolved issues exist; package identity/idempotency checks pass; generated/downloaded export metadata may be recorded only if the command succeeds. |
-| T9 | Mark exported / complete export commit | `admin` initiated, authorized `system` committed | `ready_for_export` | `exported` | Export package identity exists; export package was generated and downloaded/committed; selected submissions still match the package fingerprint/idempotency key; `exported_at` is written as a valid persisted timestamp; no unresolved issue exists; command is atomic. |
+| ID  | Action                                 | Actor / role                                     | From status                       | To status              | Guards                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --- | -------------------------------------- | ------------------------------------------------ | --------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T0  | Create submission draft                | `agent`                                          | none                              | `draft`                | Agent is known; ownership is assigned; initial status is canonical; no legacy status/media value is written.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| T1  | Save/start progress                    | `agent`                                          | `draft`                           | `in_progress`          | Agent owns the submission; at least one applicant exists; questionnaire/media may be incomplete; no admin issue exists yet.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| T2  | Submit for review                      | `agent`                                          | `in_progress`, `ready_for_export` | `submitted_for_review` | Agent owns the submission; every applicant has a complete questionnaire and `passport_scan`; only a single/primary family applicant additionally requires `selfie` + `selfie_2`; no required media is missing/rejected; no `photo`, `photo_white`, `video`, or unknown media value exists in the canonical package; no unresolved issue exists. Non-conflicting passport extraction may still be extracting, unavailable, unconfirmed, or pending review: it is queued for admin review rather than blocking agent handoff. Hard passport-validity errors, unresolved OCR/questionnaire conflicts, and critical identity contradictions block handoff. Re-submitting an export-ready package clears export readiness and returns accepted media to admin review. |
+| T3  | Return with issues                     | `admin`                                          | `submitted_for_review`            | `returned`             | Admin is known; at least one valid `open` issue exists; each issue target points to an applicant/questionnaire field/section/media slot in the canonical package; no issue is closed directly from `open`; no export metadata is committed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| T4  | Accept first review                    | `admin`                                          | `submitted_for_review`            | `ready_for_export`     | Admin is known; no `open` issue exists; no `fixed_by_agent` issue exists; every applicant package is complete; required media has passed admin acceptance/export-readiness validation; export readiness is initialized but export is not yet completed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| T5  | Submit corrections                     | `agent`                                          | `returned`                        | `corrections_received` | Agent owns the submission; at least one `open` issue exists; every `open` issue has a concrete correction; corrected issues move to `fixed_by_agent`; questionnaire/media package remains complete; no closed issue is reopened; no forbidden media value is introduced. The same agent-handoff passport rule as `T2` applies: pending non-conflicting passport extraction remains review context, while hard passport-validity errors, unresolved OCR/questionnaire conflicts, and critical identity contradictions block the transition.                                                                                                                                                                                                                       |
+| T6  | Close issues and accept                | `admin`                                          | `corrections_received`            | `ready_for_export`     | Admin is known; all `fixed_by_agent` issues are reviewed; accepted fixed issues move to `closed_by_admin`; no `open` issue remains; package is complete; required media has passed admin acceptance/export-readiness validation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| T7  | Return again with new issues           | `admin`                                          | `corrections_received`            | `returned`             | Admin is known; at least one new valid `open` issue exists; closed issues remain closed; old issues are not reopened; package is not export-ready until the new open issues are resolved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| T8  | Prepare/export package metadata        | `admin` or authorized `system`                   | `ready_for_export`                | `ready_for_export`     | Status-preserving export preparation only; selected submissions are still `ready_for_export`; no unresolved issues exist; package identity/idempotency checks pass; generated/downloaded export metadata may be recorded only if the command succeeds.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| T9  | Mark exported / complete export commit | `admin` initiated, authorized `system` committed | `ready_for_export`                | `exported`             | Export package identity exists; export package was generated and downloaded/committed; selected submissions still match the package fingerprint/idempotency key; `exported_at` is written as a valid persisted timestamp; no unresolved issue exists; command is atomic.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 No other status transition is allowed.
 
@@ -348,15 +349,15 @@ No other status transition is allowed.
 
 All transitions not listed in Section 8 are forbidden. The following forbidden matrix must be enforced explicitly.
 
-| From status | Forbidden target statuses |
-|---|---|
-| `draft` | `submitted_for_review`, `returned`, `corrections_received`, `ready_for_export`, `exported` |
-| `in_progress` | `draft`, `returned`, `corrections_received`, `ready_for_export`, `exported` |
-| `submitted_for_review` | `draft`, `in_progress`, `corrections_received`, `exported` |
-| `returned` | `draft`, `in_progress`, `submitted_for_review`, `ready_for_export`, `exported` |
-| `corrections_received` | `draft`, `in_progress`, `submitted_for_review`, `exported` |
-| `ready_for_export` | `draft`, `in_progress`, `returned`, `corrections_received` |
-| `exported` | `draft`, `in_progress`, `submitted_for_review`, `returned`, `corrections_received`, `ready_for_export`, and any state-mutating self-update |
+| From status            | Forbidden target statuses                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `draft`                | `submitted_for_review`, `returned`, `corrections_received`, `ready_for_export`, `exported`                                                 |
+| `in_progress`          | `draft`, `returned`, `corrections_received`, `ready_for_export`, `exported`                                                                |
+| `submitted_for_review` | `draft`, `in_progress`, `corrections_received`, `exported`                                                                                 |
+| `returned`             | `draft`, `in_progress`, `submitted_for_review`, `ready_for_export`, `exported`                                                             |
+| `corrections_received` | `draft`, `in_progress`, `submitted_for_review`, `exported`                                                                                 |
+| `ready_for_export`     | `draft`, `in_progress`, `returned`, `corrections_received`                                                                                 |
+| `exported`             | `draft`, `in_progress`, `submitted_for_review`, `returned`, `corrections_received`, `ready_for_export`, and any state-mutating self-update |
 
 ### 9.1 Explicitly forbidden shortcuts
 
@@ -386,30 +387,30 @@ open -> fixed_by_agent -> closed_by_admin
 
 ### 10.1 Issue status meanings
 
-| Issue status | Meaning | Actor responsible |
-|---|---|---|
-| `open` | Admin/system identified a concrete blocker or correction target. | Agent |
-| `fixed_by_agent` | Agent submitted a correction for an open issue. | Admin |
-| `closed_by_admin` | Admin accepted the correction and closed the issue. | None; terminal |
+| Issue status      | Meaning                                                          | Actor responsible |
+| ----------------- | ---------------------------------------------------------------- | ----------------- |
+| `open`            | Admin/system identified a concrete blocker or correction target. | Agent             |
+| `fixed_by_agent`  | Agent submitted a correction for an open issue.                  | Admin             |
+| `closed_by_admin` | Admin accepted the correction and closed the issue.              | None; terminal    |
 
 ### 10.2 Allowed issue transitions
 
-| From issue status | To issue status | Actor / role | Guard |
-|---|---|---|---|
-| none | `open` | `admin` or authorized `system` | Submission is `submitted_for_review` or `corrections_received`; target is valid; reason/comment is concrete; issue is attached to questionnaire field/section or canonical media slot. |
-| `open` | `fixed_by_agent` | `agent` | Submission is `returned`; target has been corrected; required package remains valid; transition occurs with `returned -> corrections_received`. |
-| `fixed_by_agent` | `closed_by_admin` | `admin` | Submission is `corrections_received`; admin verifies the correction; transition occurs with `corrections_received -> ready_for_export`. |
+| From issue status | To issue status   | Actor / role                   | Guard                                                                                                                                                                                  |
+| ----------------- | ----------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| none              | `open`            | `admin` or authorized `system` | Submission is `submitted_for_review` or `corrections_received`; target is valid; reason/comment is concrete; issue is attached to questionnaire field/section or canonical media slot. |
+| `open`            | `fixed_by_agent`  | `agent`                        | Submission is `returned`; target has been corrected; required package remains valid; transition occurs with `returned -> corrections_received`.                                        |
+| `fixed_by_agent`  | `closed_by_admin` | `admin`                        | Submission is `corrections_received`; admin verifies the correction; transition occurs with `corrections_received -> ready_for_export`.                                                |
 
 ### 10.3 Forbidden issue transitions
 
 The following issue transitions are forbidden:
 
-| Forbidden transition | Rule |
-|---|---|
-| `open -> closed_by_admin` | Agent correction is mandatory before admin closure. |
-| `closed_by_admin -> open` | Closed issues are terminal and must not be reopened. |
-| `fixed_by_agent -> open` | Rejection requires a new `open` issue, not reopening the fixed issue. |
-| `closed_by_admin -> fixed_by_agent` | Closed issues are terminal. |
+| Forbidden transition                | Rule                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------- |
+| `open -> closed_by_admin`           | Agent correction is mandatory before admin closure.                   |
+| `closed_by_admin -> open`           | Closed issues are terminal and must not be reopened.                  |
+| `fixed_by_agent -> open`            | Rejection requires a new `open` issue, not reopening the fixed issue. |
+| `closed_by_admin -> fixed_by_agent` | Closed issues are terminal.                                           |
 
 All issue transitions not listed as allowed are forbidden.
 
@@ -419,17 +420,17 @@ All issue transitions not listed as allowed are forbidden.
 
 ### 11.1 Agent actions
 
-| Agent action | Allowed statuses | Domain effect |
-|---|---|---|
-| Create draft | none | Creates `draft`. |
-| Edit questionnaire | `draft`, `in_progress`, `returned` | Mutates questionnaire only; does not bypass status guards. |
-| Upload/reupload `passport_scan` | `draft`, `in_progress`, `returned` | Mutates canonical passport media slot. |
-| Upload/reupload `selfie` | `draft`, `in_progress`, `returned` | Mutates straight/front selfie slot. |
-| Upload/reupload `selfie_2` | `draft`, `in_progress`, `returned` | Mutates side/profile selfie slot. |
-| Save/start progress | `draft` | `draft -> in_progress`. |
-| Submit for review | `in_progress`, `ready_for_export` | Moves the submission to `submitted_for_review`; re-submission clears export readiness. |
-| Submit corrections | `returned` | `returned -> corrections_received`; open issues become `fixed_by_agent` when corrected. |
-| View status/history | Any owned status | Read-only. |
+| Agent action                    | Allowed statuses                   | Domain effect                                                                           |
+| ------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| Create draft                    | none                               | Creates `draft`.                                                                        |
+| Edit questionnaire              | `draft`, `in_progress`, `returned` | Mutates questionnaire only; does not bypass status guards.                              |
+| Upload/reupload `passport_scan` | `draft`, `in_progress`, `returned` | Mutates canonical passport media slot.                                                  |
+| Upload/reupload `selfie`        | `draft`, `in_progress`, `returned` | Mutates straight/front selfie slot.                                                     |
+| Upload/reupload `selfie_2`      | `draft`, `in_progress`, `returned` | Mutates side/profile selfie slot.                                                       |
+| Save/start progress             | `draft`                            | `draft -> in_progress`.                                                                 |
+| Submit for review               | `in_progress`, `ready_for_export`  | Moves the submission to `submitted_for_review`; re-submission clears export readiness.  |
+| Submit corrections              | `returned`                         | `returned -> corrections_received`; open issues become `fixed_by_agent` when corrected. |
+| View status/history             | Any owned status                   | Read-only.                                                                              |
 
 Agent must not:
 
@@ -443,18 +444,18 @@ Agent must not:
 
 ### 11.2 Admin actions
 
-| Admin action | Allowed statuses | Domain effect |
-|---|---|---|
-| Review submitted package | `submitted_for_review` | Read/review questionnaire and required media. |
-| Create issue | `submitted_for_review`, `corrections_received` | Creates `open` issue with valid target. |
-| Return with issues | `submitted_for_review` | `submitted_for_review -> returned`. |
-| Accept first review | `submitted_for_review` | `submitted_for_review -> ready_for_export`. |
-| Review corrections | `corrections_received` | Reviews `fixed_by_agent` issues and corrected package. |
-| Close issues and accept | `corrections_received` | `corrections_received -> ready_for_export`; fixed issues become `closed_by_admin`. |
-| Return again with new issues | `corrections_received` | `corrections_received -> returned`; requires new `open` issue. |
-| Prepare export package | `ready_for_export` | Status remains `ready_for_export`; export metadata may be recorded after successful package generation/download. |
-| Mark exported | `ready_for_export` | `ready_for_export -> exported` after successful export commit. |
-| View history/exported record | `exported` | Read-only. |
+| Admin action                 | Allowed statuses                               | Domain effect                                                                                                    |
+| ---------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Review submitted package     | `submitted_for_review`                         | Read/review questionnaire and required media.                                                                    |
+| Create issue                 | `submitted_for_review`, `corrections_received` | Creates `open` issue with valid target.                                                                          |
+| Return with issues           | `submitted_for_review`                         | `submitted_for_review -> returned`.                                                                              |
+| Accept first review          | `submitted_for_review`                         | `submitted_for_review -> ready_for_export`.                                                                      |
+| Review corrections           | `corrections_received`                         | Reviews `fixed_by_agent` issues and corrected package.                                                           |
+| Close issues and accept      | `corrections_received`                         | `corrections_received -> ready_for_export`; fixed issues become `closed_by_admin`.                               |
+| Return again with new issues | `corrections_received`                         | `corrections_received -> returned`; requires new `open` issue.                                                   |
+| Prepare export package       | `ready_for_export`                             | Status remains `ready_for_export`; export metadata may be recorded after successful package generation/download. |
+| Mark exported                | `ready_for_export`                             | `ready_for_export -> exported` after successful export commit.                                                   |
+| View history/exported record | `exported`                                     | Read-only.                                                                                                       |
 
 Admin must not:
 
@@ -467,14 +468,14 @@ Admin must not:
 
 ### 11.3 System actions
 
-| System action | Allowed scope | Domain effect |
-|---|---|---|
-| Normalize legacy status | Boundary/import/read adapter | Applies Section 3 mapping before canonical logic. |
-| Reject unknown role/status/media | All commands | Fails closed without mutation. |
-| Calculate readiness | Canonical submissions stack | Derives readiness from questionnaire + per-applicant `passport_scan` + single/primary `selfie` + `selfie_2` + issue lifecycle. |
-| Preserve history/audit metadata | Successful commands only | Records canonical history after successful mutation. |
-| Prepare export metadata | `ready_for_export` only | Status-preserving; requires package identity/idempotency checks. |
-| Complete export commit | Admin-authorized export only | Writes `exported_at` and moves `ready_for_export -> exported` atomically. |
+| System action                    | Allowed scope                | Domain effect                                                                                                                  |
+| -------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Normalize legacy status          | Boundary/import/read adapter | Applies Section 3 mapping before canonical logic.                                                                              |
+| Reject unknown role/status/media | All commands                 | Fails closed without mutation.                                                                                                 |
+| Calculate readiness              | Canonical submissions stack  | Derives readiness from questionnaire + per-applicant `passport_scan` + single/primary `selfie` + `selfie_2` + issue lifecycle. |
+| Preserve history/audit metadata  | Successful commands only     | Records canonical history after successful mutation.                                                                           |
+| Prepare export metadata          | `ready_for_export` only      | Status-preserving; requires package identity/idempotency checks.                                                               |
+| Complete export commit           | Admin-authorized export only | Writes `exported_at` and moves `ready_for_export -> exported` atomically.                                                      |
 
 System must not:
 
@@ -505,29 +506,29 @@ Export package generation/download may record export metadata while status remai
 
 Package 1 must fail closed under these conditions:
 
-| Condition | Required behavior |
-|---|---|
-| Unknown role | Reject command; no mutation. |
-| Unknown status | Reject command; no mutation. |
-| Legacy status not in mapping | Reject command; no mutation. |
-| Invalid transition | Reject command; no mutation. |
-| Missing questionnaire | Reject submit/review/export command; no mutation. |
-| Incomplete questionnaire | Reject submit/review/export command; no mutation. |
-| Missing `passport_scan` | Reject submit/review/export command; no mutation. |
-| Missing required `selfie` for single/primary applicant | Reject submit/review/export command; no mutation. |
-| Missing required `selfie_2` for single/primary applicant | Reject submit/review/export command; no mutation. |
-| `photo` present as required media | Reject canonical readiness; no mutation. |
-| `photo_white` present as required media | Reject canonical readiness; no mutation. |
-| `video` present as required media | Reject canonical readiness; no mutation. |
-| Unknown media type | Reject command; no mutation. |
-| Unresolved `open` issue | Reject accept/export command; no mutation. |
-| Unclosed `fixed_by_agent` issue | Reject accept/export command unless the same admin command closes it according to Section 10. |
-| `open -> closed_by_admin` attempted | Reject issue transition; no mutation. |
-| `closed_by_admin -> open` attempted | Reject issue transition; no mutation. |
-| Export attempted before package identity is valid | Reject export command; no mutation. |
-| Export attempted after package selection/fingerprint drift | Reject export command; no mutation. |
-| Any mutation attempted on `exported` | Reject command; no mutation. |
-| Failed command at any guard | Must not mutate status, questionnaire, media, issues, export metadata, or history. |
+| Condition                                                  | Required behavior                                                                             |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Unknown role                                               | Reject command; no mutation.                                                                  |
+| Unknown status                                             | Reject command; no mutation.                                                                  |
+| Legacy status not in mapping                               | Reject command; no mutation.                                                                  |
+| Invalid transition                                         | Reject command; no mutation.                                                                  |
+| Missing questionnaire                                      | Reject submit/review/export command; no mutation.                                             |
+| Incomplete questionnaire                                   | Reject submit/review/export command; no mutation.                                             |
+| Missing `passport_scan`                                    | Reject submit/review/export command; no mutation.                                             |
+| Missing required `selfie` for single/primary applicant     | Reject submit/review/export command; no mutation.                                             |
+| Missing required `selfie_2` for single/primary applicant   | Reject submit/review/export command; no mutation.                                             |
+| `photo` present as required media                          | Reject canonical readiness; no mutation.                                                      |
+| `photo_white` present as required media                    | Reject canonical readiness; no mutation.                                                      |
+| `video` present as required media                          | Reject canonical readiness; no mutation.                                                      |
+| Unknown media type                                         | Reject command; no mutation.                                                                  |
+| Unresolved `open` issue                                    | Reject accept/export command; no mutation.                                                    |
+| Unclosed `fixed_by_agent` issue                            | Reject accept/export command unless the same admin command closes it according to Section 10. |
+| `open -> closed_by_admin` attempted                        | Reject issue transition; no mutation.                                                         |
+| `closed_by_admin -> open` attempted                        | Reject issue transition; no mutation.                                                         |
+| Export attempted before package identity is valid          | Reject export command; no mutation.                                                           |
+| Export attempted after package selection/fingerprint drift | Reject export command; no mutation.                                                           |
+| Any mutation attempted on `exported`                       | Reject command; no mutation.                                                                  |
+| Failed command at any guard                                | Must not mutate status, questionnaire, media, issues, export metadata, or history.            |
 
 ---
 

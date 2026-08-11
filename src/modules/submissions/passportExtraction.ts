@@ -37,6 +37,15 @@ export type PassportExtractionAttemptUsage = {
   used: number;
 };
 
+export function hasUnresolvedPassportExtractionConflict(submission: Submission) {
+  return submission.applicants.some((applicant) => {
+    const state = applicant.passportExtraction;
+    if (!state || state.verifiedAtIso || state.dismissedAtIso) return false;
+
+    return passportExtractionRows(applicant).some((row) => row.conflict);
+  });
+}
+
 type PassportFieldTarget = {
   fieldId: string;
   label: string;

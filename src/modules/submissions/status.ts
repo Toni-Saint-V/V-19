@@ -23,6 +23,8 @@ import {
   passportGateReason,
   requiresPassportGateBeforeAction,
 } from "./passportExtractionGuards";
+import { hasUnresolvedPassportExtractionConflict } from "./passportExtraction";
+import { buildIdentityConsistencyReport } from "./identityConsistency";
 import {
   canonicalRequiredMediaReadiness,
   canonicalRequiredMediaTypesForApplicant,
@@ -632,7 +634,7 @@ export function hasMissingRequiredWorkForAgentHandoff(submission: Submission) {
         ...section,
         fields: section.fields.map((field) =>
           field.reviewState === "needs_review" &&
-          field.reviewOriginSource === "passport_ocr"
+          (field.reviewOriginSource ?? field.reviewSource) === "passport_ocr"
             ? { ...field, reviewState: "confirmed" as const }
             : field,
         ),
@@ -815,6 +817,26 @@ function validateSubmissionActionPolicy(
     return {
       ok: false,
       reason: passportGateReason(submission, action),
+    };
+  }
+
+  if (
+    (action === "submit_for_review" || action === "submit_corrections") &&
+    hasUnresolvedPassportExtractionConflict(submission)
+  ) {
+    return {
+      ok: false,
+      reason: "Есть конфликт между данными паспорта и анкетой",
+    };
+  }
+
+  if (
+    (action === "submit_for_review" || action === "submit_corrections") &&
+    buildIdentityConsistencyReport(submission).status === "blocked"
+  ) {
+    return {
+      ok: false,
+      reason: "Есть критичные расхождения между анкетой, паспортом и PDF",
     };
   }
 

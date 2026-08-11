@@ -124,7 +124,7 @@ export function passportGateReason(
   return firstIssue?.message ?? "Паспортные данные не прошли боевую проверку.";
 }
 
-function passportGateIssuesForAction(
+export function passportGateIssuesForAction(
   submission: Submission,
   action: SubmissionAction,
   now: Date,
@@ -138,8 +138,8 @@ function passportGateIssuesForAction(
 
   return issues.filter(
     (issue) =>
-      issue.code !== "passport_not_confirmed" &&
-      issue.code !== "passport_extraction_not_reviewed",
+      issue.code !== "passport_extraction_not_reviewed" &&
+      issue.code !== "passport_not_confirmed",
   );
 }
 
