@@ -1590,7 +1590,26 @@
     .v19-legacy-actions-screen.surface-agent-actions
     .v19-agent-actions-board
     > .v19-admin-list-header {
-    display: none !important;
+    padding-inline: var(--v19b-size-12) !important;
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-actions-board
+    > .v19-admin-list-header
+    > div {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    row-gap: var(--v19b-size-0);
+  }
+
+  #root
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-actions-board
+    > .v19-admin-list-header
+    small {
+    flex-basis: 100%;
+    white-space: nowrap;
   }
 
   #root

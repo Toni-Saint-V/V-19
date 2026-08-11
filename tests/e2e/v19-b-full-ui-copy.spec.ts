@@ -48,6 +48,8 @@ const standardViewports: ProofViewport[] = [
   { height: 900, label: "1440", width: 1440 },
 ];
 
+const actionQueueClarityScreenshotViewports = new Set(["320", "390", "768", "1440"]);
+
 function collectBrowserProblems(page: Page) {
   const problems: string[] = [];
 
@@ -74,6 +76,17 @@ async function openAgent(page: Page) {
     email: "agent@visaflow.local",
     heading: "Мои действия",
   });
+}
+
+async function expectActionQueueCountBreakdown(page: Page) {
+  const header = page
+    .locator(".v19-admin-review-list-head")
+    .filter({ hasText: "Очередь задач" });
+
+  await expect(header).toBeVisible();
+  await expect(header.locator("small")).toHaveText(
+    /^\d+ (?:карточка|карточки|карточек) · \d+ (?:задача|задачи|задач)$/,
+  );
 }
 
 async function openAdmin(page: Page) {
@@ -358,6 +371,83 @@ async function captureProof(
 }
 
 test.describe("V-19 Codex B full UI copy proof", () => {
+  test("labels grouped action cards separately from individual tasks", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    test.skip(testInfo.project.name !== "chromium", "single-project responsive proof");
+
+    const approvedHosts = new Set(["127.0.0.1", "localhost"]);
+    const blockedOrigins: string[] = [];
+    const observedOrigins = new Set<string>();
+    const browserProblems = collectBrowserProblems(page);
+    const proofDir = testArtifactPath("2026-08-11-action-queue-clarity");
+    const results: Array<{
+      countLabel: string;
+      horizontalOverflow: boolean;
+      screenshotPath?: string;
+      viewport: string;
+    }> = [];
+
+    mkdirSync(proofDir, { recursive: true });
+    await page.context().route("**/*", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      if (!approvedHosts.has(requestUrl.hostname)) {
+        blockedOrigins.push(requestUrl.origin);
+        await route.abort();
+        return;
+      }
+
+      observedOrigins.add(requestUrl.origin);
+      await route.continue();
+    });
+
+    for (const viewport of agentActionViewports) {
+      await page.setViewportSize({ height: viewport.height, width: viewport.width });
+      await openAgent(page);
+
+      const header = page
+        .locator(".v19-admin-review-list-head")
+        .filter({ hasText: "Очередь задач" });
+      const countLabel = header.locator("small");
+      await expectActionQueueCountBreakdown(page);
+      await expect
+        .poll(() =>
+          countLabel.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth + 1,
+          ),
+        )
+        .toBe(true);
+
+      const screenshotPath = actionQueueClarityScreenshotViewports.has(viewport.label)
+        ? join(proofDir, `agent-actions-count-${viewport.label}.png`)
+        : undefined;
+      if (screenshotPath)
+        await page.screenshot({ fullPage: true, path: screenshotPath });
+
+      const horizontalOverflow = await hasHorizontalOverflow(page);
+      expect(horizontalOverflow, `${viewport.label}: page overflow`).toBe(false);
+      results.push({
+        countLabel: await countLabel.innerText(),
+        horizontalOverflow,
+        screenshotPath,
+        viewport: viewport.label,
+      });
+    }
+
+    const receipt = {
+      blockedOrigins,
+      browserProblems,
+      observedOrigins: [...observedOrigins].sort(),
+      results,
+    };
+    writeFileSync(join(proofDir, "receipt.json"), JSON.stringify(receipt, null, 2));
+
+    expect(blockedOrigins).toEqual([]);
+    expect(browserProblems).toEqual([]);
+    expect([...observedOrigins]).toEqual(["http://localhost:4217"]);
+  });
+
   test("captures required screenshots and proof metadata", async ({
     page,
   }, testInfo) => {
@@ -371,6 +461,7 @@ test.describe("V-19 Codex B full UI copy proof", () => {
     for (const viewport of agentActionViewports) {
       await page.setViewportSize({ height: viewport.height, width: viewport.width });
       await openAgent(page);
+      await expectActionQueueCountBreakdown(page);
       await exerciseAgentActions(page);
       await openAgent(page);
       await captureProof(page, entries, {

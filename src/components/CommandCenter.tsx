@@ -157,6 +157,25 @@ function navLabel(section: AgentShellNavSection) {
   }
 }
 
+function russianPlural(count: number, one: string, few: string, many: string) {
+  const remainder = Math.abs(count) % 100;
+  const lastDigit = remainder % 10;
+
+  if (remainder > 10 && remainder < 20) return many;
+  if (lastDigit === 1) return one;
+  if (lastDigit >= 2 && lastDigit <= 4) return few;
+  return many;
+}
+
+function actionQueueCountLabel(cardCount: number, actionCount: number) {
+  return `${cardCount} ${russianPlural(
+    cardCount,
+    "карточка",
+    "карточки",
+    "карточек",
+  )} · ${actionCount} ${russianPlural(actionCount, "задача", "задачи", "задач")}`;
+}
+
 function normalizeAgentNav(
   section: LegacyAgentNavSection,
 ): NonCreateAgentShellNavSection {
@@ -994,10 +1013,13 @@ export function CommandCenter({
             actionDisabled={actionControlsAreDefault}
             actionLabel="Все"
             className="v19-admin-review-list-head"
-            countLabel={`${visibleActions.length}`}
+            countLabel={actionQueueCountLabel(
+              actionTasks.length,
+              visibleActions.length,
+            )}
             interactionId="actions.reset-filters"
             onAction={resetActionFilters}
-            title="Очередь действий"
+            title="Очередь задач"
           />
           <V19QueueToolbar
             actionDisabled={actionControlsAreDefault}
