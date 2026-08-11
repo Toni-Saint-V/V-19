@@ -324,10 +324,6 @@ function submissionCard(page: Page, name: string) {
     .first();
 }
 
-function submissionCardById(page: Page, id: string) {
-  return page.locator(`[data-submission-id="${id}"]`).first();
-}
-
 function drawer(page: Page) {
   return page.getByRole("dialog").first();
 }
@@ -372,14 +368,6 @@ function returnedIvanovsAction(page: Page) {
 
 async function openReturnedIvanovsSubmission(page: Page) {
   await openAgentSubmission(page, "Ивановы", "Семья Ивановых");
-}
-
-async function expectReturnedIvanovsDecisionFrame(page: Page) {
-  const card = returnedIvanovsAction(page);
-
-  await expect(card).toHaveAttribute("data-testid", "agent-action-queue-item");
-  await expect(card).toContainText("Требует исправления");
-  await expect(card).toHaveAccessibleName(/^Выбрать действие:/);
 }
 
 function escapeRegex(value: string) {
@@ -679,23 +667,6 @@ async function uploadAllDrawerChecklistFiles(page: Page) {
   }
 
   throw new Error("Не удалось загрузить весь чеклист документов");
-}
-
-async function markVisibleIssuesFixed(page: Page) {
-  await openDrawerTab(page, ["Замечания"]);
-  const fixedButtons = drawer(page).getByRole("button", {
-    name: /Отметить (замечание )?исправленным/,
-  });
-
-  for (let safety = 0; safety < 12; safety += 1) {
-    const before = await fixedButtons.count();
-    if (before === 0) return;
-
-    await fixedButtons.first().click();
-    await expect(fixedButtons).toHaveCount(before - 1);
-  }
-
-  throw new Error("Too many visible issue fix buttons");
 }
 
 async function saveDraftFromDrawer(page: Page) {
