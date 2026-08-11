@@ -110,14 +110,37 @@ export function requiresPassportGateBeforeAction(
   action: SubmissionAction,
   now: Date = new Date(),
 ) {
-  return (
-    passportGateActions.has(action) && passportGateIssues(submission, now).length > 0
-  );
+  return passportGateIssuesForAction(submission, action, now).length > 0;
 }
 
-export function passportGateReason(submission: Submission, now: Date = new Date()) {
-  const firstIssue = passportGateIssues(submission, now)[0];
+export function passportGateReason(
+  submission: Submission,
+  action?: SubmissionAction,
+  now: Date = new Date(),
+) {
+  const firstIssue = action
+    ? passportGateIssuesForAction(submission, action, now)[0]
+    : passportGateIssues(submission, now)[0];
   return firstIssue?.message ?? "Паспортные данные не прошли боевую проверку.";
+}
+
+function passportGateIssuesForAction(
+  submission: Submission,
+  action: SubmissionAction,
+  now: Date,
+) {
+  if (!passportGateActions.has(action)) return [];
+
+  const issues = passportGateIssues(submission, now);
+  if (action !== "submit_for_review" && action !== "submit_corrections") {
+    return issues;
+  }
+
+  return issues.filter(
+    (issue) =>
+      issue.code !== "passport_not_confirmed" &&
+      issue.code !== "passport_extraction_not_reviewed",
+  );
 }
 
 function applicantPassportGateIssues(

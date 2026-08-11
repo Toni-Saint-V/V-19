@@ -657,7 +657,7 @@ describe("passport extraction state", () => {
     ).toBe(false);
   });
 
-  test("blocks domain submit actions until passport extraction review is explicit", () => {
+  test("keeps passport extraction review for admin without blocking an agent handoff", () => {
     const base = fillRequiredQuestionnaireForTest(draftSubmission());
     const draft = {
       ...base,
@@ -676,9 +676,11 @@ describe("passport extraction state", () => {
       extractedPassportNumber,
     );
 
+    expect(
+      requiresPassportExtractionReviewBeforeAction(ready, "submit_for_review"),
+    ).toBe(true);
     expect(canPerformAction(ready, "submit_for_review", "agent")).toEqual({
-      ok: false,
-      reason: "Проверьте распознанные паспортные данные перед отправкой",
+      ok: true,
     });
 
     const reviewed = markPassportExtractionReviewed(ready, "verified");

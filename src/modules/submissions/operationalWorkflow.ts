@@ -21,7 +21,6 @@ import {
 import { agentOwnerDisplayName, submissionBelongsToAgent } from "./ownership";
 import {
   passportGateReason,
-  requiresPassportExtractionReviewBeforeAction,
   requiresPassportGateBeforeAction,
 } from "./passportExtractionGuards";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
@@ -511,13 +510,9 @@ export function submitOperationalForReview(
     }
 
     if (requiresPassportGateBeforeAction(submission, "submit_for_review")) {
-      return failure("VALIDATION_ERROR", passportGateReason(submission));
-    }
-
-    if (requiresPassportExtractionReviewBeforeAction(submission, "submit_for_review")) {
       return failure(
         "VALIDATION_ERROR",
-        "Проверьте распознанные паспортные данные перед отправкой",
+        passportGateReason(submission, "submit_for_review"),
       );
     }
   }
@@ -1311,7 +1306,10 @@ export function questionnaireReviewBlockers(submission: Submission): string[] {
   return submission.applicants.flatMap((applicant) =>
     applicant.sections.flatMap((section) =>
       section.fields.flatMap((field) => {
-        if (field.reviewState !== "needs_review") {
+        if (
+          field.reviewState !== "needs_review" ||
+          field.reviewOriginSource === "passport_ocr"
+        ) {
           return [];
         }
 

@@ -502,6 +502,45 @@ describe("ApplicantsScreen interactions", () => {
     expect(screen.getByRole("button", { name: /Открыть:/ })).toBeInTheDocument();
   });
 
+  it("allows a complete uploaded document set into admin review before passport OCR confirmation", async () => {
+    const ready = readySubmission("single");
+    const passportFile = ready.files.find((file) => file.type === "passport_scan");
+    if (!passportFile) throw new Error("Missing passport scan fixture.");
+    const submission: Submission = {
+      ...ready,
+      files: ready.files.map((file) =>
+        file.id === passportFile.id
+          ? {
+              ...file,
+              mimeType: "image/jpeg",
+              originalFileName: "passport.jpg",
+              storageBucket: "submission-media",
+              storagePath: "submissions/passport.jpg",
+            }
+          : file,
+      ),
+    };
+    const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
+
+    expect(canPerformAction(submission, "submit_for_review", "agent")).toEqual({
+      ok: true,
+    });
+
+    render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(submission.id));
+  });
+
   it("keeps review confirmation cancel and focus behavior keyboard-safe", () => {
     const submission = readySubmission("single");
     const nativeConfirm = vi.spyOn(window, "confirm");

@@ -21,7 +21,6 @@ import { applicantFileStatusForFiles } from "./fileAsset";
 import {
   passportGateIssues,
   passportGateReason,
-  requiresPassportExtractionReviewBeforeAction,
   requiresPassportGateBeforeAction,
 } from "./passportExtractionGuards";
 import {
@@ -624,6 +623,24 @@ export function hasMissingRequiredWork(submission: Submission) {
   );
 }
 
+export function hasMissingRequiredWorkForAgentHandoff(submission: Submission) {
+  return hasMissingRequiredWork({
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.reviewState === "needs_review" &&
+          field.reviewOriginSource === "passport_ocr"
+            ? { ...field, reviewState: "confirmed" as const }
+            : field,
+        ),
+      })),
+    })),
+  });
+}
+
 export function adminQuestionnaireReviewReadiness(submission: Submission): {
   ok: boolean;
   reason?: string;
@@ -705,19 +722,23 @@ export function nextProblem(submission: Submission) {
   if (fixedIssueCount(submission) > 0) {
     if (submission.status === "returned") {
       if (requiresPassportGateBeforeAction(submission, "submit_corrections")) {
-        return passportGateReason(submission);
+        return passportGateReason(submission, "submit_corrections");
       }
       return "Исправления готовы к отправке";
     }
     return "Исправления ждут закрытия администратором";
   }
-  if (hasMissingRequiredWork(submission))
+  if (
+    (submission.status === "draft" || submission.status === "in_progress"
+      ? hasMissingRequiredWorkForAgentHandoff(submission)
+      : hasMissingRequiredWork(submission))
+  )
     return "Не все обязательные анкеты и файлы готовы";
   if (
     submission.status === "in_progress" &&
     requiresPassportGateBeforeAction(submission, "submit_for_review")
   ) {
-    return passportGateReason(submission);
+    return passportGateReason(submission, "submit_for_review");
   }
   if (submission.status === "submitted_for_review")
     return "Ожидает внутренней проверки";
@@ -783,7 +804,7 @@ function validateSubmissionActionPolicy(
 
   if (
     action === "submit_for_review" &&
-    hasMissingRequiredWork(submission)
+    hasMissingRequiredWorkForAgentHandoff(submission)
   ) {
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
@@ -793,16 +814,7 @@ function validateSubmissionActionPolicy(
   ) {
     return {
       ok: false,
-      reason: passportGateReason(submission),
-    };
-  }
-
-  if (
-    requiresPassportExtractionReviewBeforeAction(submission, action)
-  ) {
-    return {
-      ok: false,
-      reason: "Проверьте распознанные паспортные данные перед отправкой",
+      reason: passportGateReason(submission, action),
     };
   }
 
@@ -1256,12 +1268,9 @@ export function getPrimaryAction(
     if (decision.action === "open_history") return decision;
 
     const guard = canPerformAction(submission, decision.action, role);
-    const waitsForPassportReview =
-      requiresPassportExtractionReviewBeforeAction(submission, decision.action) &&
-      guard.reason === "Проверьте распознанные паспортные данные перед отправкой";
     return {
       ...decision,
-      disabled: !guard.ok && !waitsForPassportReview,
+      disabled: !guard.ok,
       reason: guard.reason,
     };
   }

@@ -1746,8 +1746,7 @@ describe("V-19 submission actions", () => {
     );
 
     expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
-      ok: false,
-      reason: "Скан паспорта не проверен.",
+      ok: true,
     });
 
     const failed = failPassportExtraction(inProgress, passportFile, "Не распознано");

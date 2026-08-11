@@ -153,7 +153,7 @@ describe("operational workflow logic spine", () => {
     });
   });
 
-  test("marks passport autofill fields as needs_review and blocks submit until confirmed", () => {
+  test("marks passport autofill fields as needs_review without blocking agent handoff", () => {
     const inProgress = completeInProgressSubmission();
     const applied = unwrap(
       applyPassportAutofillResult(inProgress, {
@@ -182,13 +182,9 @@ describe("operational workflow logic spine", () => {
       source: "system",
       text: "AI/OCR заполнил паспортные поля для ручной проверки",
     });
-    expect(submitOperationalForReview(applied, "agent", applied.agentId)).toEqual({
-      ok: false,
-      error: expect.objectContaining({
-        code: "VALIDATION_ERROR",
-        message: expect.stringContaining("confirm"),
-      }),
-    });
+    expect(
+      unwrap(submitOperationalForReview(applied, "agent", applied.agentId)).status,
+    ).toBe("submitted_for_review");
 
     const confirmed = unwrap(
       confirmQuestionnaireReviewFields(applied, {
@@ -279,7 +275,7 @@ describe("operational workflow logic spine", () => {
     expect(applied.applicants[0]?.passportExtraction?.appliedFieldKeys).toEqual([]);
   });
 
-  test("reuses passport OCR gates before operational submit", () => {
+  test("keeps unreviewed passport OCR for admin review without blocking agent handoff", () => {
     const inProgress = completeInProgressSubmission();
     const passportFile = inProgress.files.find(
       (file) =>
@@ -303,13 +299,9 @@ describe("operational workflow logic spine", () => {
       summary: "Passport number detected.",
     });
 
-    expect(submitOperationalForReview(extracted, "agent", extracted.agentId)).toEqual({
-      ok: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: expect.stringContaining("Проверьте распознанные паспортные данные"),
-      },
-    });
+    expect(
+      unwrap(submitOperationalForReview(extracted, "agent", extracted.agentId)).status,
+    ).toBe("submitted_for_review");
   });
 
   test("preserves draft and manual fields when OCR fails", () => {
