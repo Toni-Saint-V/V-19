@@ -29761,6 +29761,21 @@ body:has(.access-shell),
   font-size: var(--v19b-size-11);
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-passport-review-confirmation {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 767px) {
+  .vf-figma-questionnaire-screen .v19-questionnaire-passport-review-confirmation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-passport-review-confirmation button {
+    width: 100%;
+  }
+}
+
 .vf-figma-questionnaire-screen
   .v19-questionnaire-field-control:is(.is-review, .is-invalid) {
   background: var(--v19b-color-control) !important;
@@ -29839,7 +29854,9 @@ body:has(.access-shell),
   display: none;
 }
 
-.vf-figma-questionnaire-screen .v19-questionnaire-passport-review-button {
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-passport-review-confirmation
+  .v19-questionnaire-passport-review-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;

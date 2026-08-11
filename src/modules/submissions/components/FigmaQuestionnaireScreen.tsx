@@ -50,6 +50,7 @@ import {
 } from "../questionnaireBlsRules";
 import { agentQuestionnaireStatusPresentation } from "../status";
 import { agentInteractionProps } from "../agentInteractionContract";
+import { isCompletedFileAsset, isFileAssetUploadMissing } from "../fileAsset";
 import type { SmartImportReviewItem } from "../smartImport";
 import {
   passportReviewMediaTypeForIssue,
@@ -2662,6 +2663,7 @@ function departedSectionContext(key: string) {
 export function FigmaQuestionnaireScreen({
   initialFocus,
   onBack,
+  onConfirmPassportReview,
   onFieldChange,
   onMarkIssueFixed,
   onSaveDraft,
@@ -2733,6 +2735,10 @@ export function FigmaQuestionnaireScreen({
     useState<QuestionnaireSaveFailureAction>();
   const [discardExitArmed, setDiscardExitArmed] = useState(false);
   const [navigationPending, setNavigationPending] = useState(false);
+  const [passportReviewConfirmationPending, setPassportReviewConfirmationPending] =
+    useState(false);
+  const [passportReviewConfirmationError, setPassportReviewConfirmationError] =
+    useState<string>();
   const familyCopyStatusId = useId();
   const prefersReducedMotion = useReducedMotion();
   const autosaveRevisionRef = useRef(0);
@@ -2849,6 +2855,51 @@ export function FigmaQuestionnaireScreen({
       ) ?? draftSubmission.applicants[0],
     [activeApplicant, draftSubmission.applicants],
   );
+  const activePassportFile = useMemo(
+    () =>
+      draftSubmission.files.find(
+        (file) => file.applicantId === activeApplicant && file.type === "passport_scan",
+      ),
+    [activeApplicant, draftSubmission.files],
+  );
+  const canConfirmPassportReview = Boolean(
+    isEditable &&
+    onConfirmPassportReview &&
+    activeApplicantModel &&
+    activePassportFile &&
+    !isFileAssetUploadMissing(activePassportFile) &&
+    (isCompletedFileAsset(activePassportFile) ||
+      Boolean(
+        activePassportFile.generatedFileName &&
+        activePassportFile.storageBucket &&
+        activePassportFile.storagePath,
+      )) &&
+    activeApplicantModel.passportExtraction?.status !== "extracting" &&
+    !activeApplicantModel.passportExtraction?.verifiedAtIso &&
+    !activeApplicantModel.passportExtraction?.dismissedAtIso,
+  );
+
+  async function confirmPassportReview() {
+    if (
+      !canConfirmPassportReview ||
+      !onConfirmPassportReview ||
+      passportReviewConfirmationPending
+    ) {
+      return;
+    }
+
+    setPassportReviewConfirmationPending(true);
+    setPassportReviewConfirmationError(undefined);
+    try {
+      await onConfirmPassportReview(activeApplicant);
+    } catch {
+      setPassportReviewConfirmationError(
+        "Не удалось сохранить подтверждение паспорта. Повторите попытку.",
+      );
+    } finally {
+      setPassportReviewConfirmationPending(false);
+    }
+  }
 
   useEffect(() => {
     if (initialFocusAppliedRef.current) return;
@@ -4419,6 +4470,36 @@ export function FigmaQuestionnaireScreen({
     if (activeSection === "passport") {
       return (
         <>
+          {canConfirmPassportReview ? (
+            <div
+              className="v19-questionnaire-review-confirmation v19-questionnaire-passport-review-confirmation"
+              data-testid="questionnaire-passport-review-confirmation"
+            >
+              <span>
+                Сверьте паспорт с оригиналом и подтвердите проверку перед отправкой
+                подачи.
+              </span>
+              <button
+                {...agentInteractionProps("questionnaire.confirm-passport-review")}
+                aria-busy={passportReviewConfirmationPending || undefined}
+                aria-label="Подтвердить проверку паспорта"
+                className="v19-questionnaire-passport-review-button"
+                disabled={
+                  passportReviewConfirmationPending || questionnaireInteractionPending
+                }
+                type="button"
+                onClick={() => void confirmPassportReview()}
+              >
+                <CheckCircle2 aria-hidden="true" focusable="false" />
+                {passportReviewConfirmationPending
+                  ? "Подтверждаем…"
+                  : "Подтвердить проверку паспорта"}
+              </button>
+              {passportReviewConfirmationError ? (
+                <span role="alert">{passportReviewConfirmationError}</span>
+              ) : null}
+            </div>
+          ) : null}
           <FormField
             excelMap="Cell: C2"
             errorMessage={fieldErrorMessage("passport-type", "Тип документа")}

@@ -149,6 +149,14 @@ const questionnaireUpdateCanonicalEffect = {
   primaryTarget: "questionnaire_answers",
 } as const satisfies AgentInteractionCanonicalEffect;
 
+const passportReviewCanonicalEffect = {
+  before: { "applicants.passport_extraction_verified_at": null },
+  expectedAfter: {
+    "applicants.passport_extraction_verified_at": "$iso-8601",
+  },
+  primaryTarget: "applicants",
+} as const satisfies AgentInteractionCanonicalEffect;
+
 const markIssueFixedCanonicalEffect = {
   before: { "corrections.status": "open" },
   expectedAfter: { "corrections.status": "fixed" },
@@ -269,6 +277,19 @@ export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
     ],
     allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
     requiredChangedTargets: ["questionnaire_answers"],
+    requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
+  }),
+  confirm_passport_review: mutationWriteScope({
+    allowedChangedTargets: [
+      "submissions",
+      "applicants",
+      "questionnaire_answers",
+      "media_assets",
+      "corrections",
+      "status_history",
+    ],
+    allowedNetworkTargets: ["rpc:save_agent_submission_if_current"],
+    requiredChangedTargets: ["submissions", "applicants", "status_history"],
     requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
   }),
   upload_required_file: mutationWriteScope({
@@ -796,6 +817,19 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     businessIntent: "update_questionnaire_field",
     statusFixtures: editableStatusFixtures,
     writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.update_questionnaire_field,
+  },
+  "questionnaire.confirm-passport-review": {
+    canonicalEffect: passportReviewCanonicalEffect,
+    id: "questionnaire.confirm-passport-review",
+    kind: "mutation",
+    surface: "questionnaire",
+    role: "agent",
+    expectedEffect:
+      "Persist the agent's explicit passport review without changing the submission lifecycle.",
+    proof: mutationProof,
+    businessIntent: "confirm_passport_review",
+    statusFixtures: editableStatusFixtures,
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.confirm_passport_review,
   },
   "questionnaire.copy-family": {
     canonicalEffect: questionnaireUpdateCanonicalEffect,

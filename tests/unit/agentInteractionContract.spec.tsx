@@ -119,6 +119,25 @@ describe("agent interaction contract", () => {
     ]);
   });
 
+  test("describes passport confirmation as a reviewed applicant write", () => {
+    expect(
+      V19_AGENT_INTERACTION_CONTRACTS["questionnaire.confirm-passport-review"],
+    ).toMatchObject({
+      businessIntent: "confirm_passport_review",
+      canonicalEffect: {
+        before: { "applicants.passport_extraction_verified_at": null },
+        expectedAfter: {
+          "applicants.passport_extraction_verified_at": "$iso-8601",
+        },
+        primaryTarget: "applicants",
+      },
+      writeScope: {
+        requiredChangedTargets: ["submissions", "applicants", "status_history"],
+        requiredNetworkTargets: ["rpc:save_agent_submission_if_current"],
+      },
+    });
+  });
+
   test("fails closed for missing or unknown enabled controls", () => {
     const root = document.createElement("div");
     root.innerHTML = `

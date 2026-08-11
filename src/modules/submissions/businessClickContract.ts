@@ -11,6 +11,7 @@ export type BusinessClickExecutionPath =
   | "applySubmissionActionResult"
   | "applyAgentSubmitForReviewResult"
   | "createDraft"
+  | "confirmApplicantPassportReview"
   | "updateQuestionnaireField"
   | "uploadRequiredFile"
   | "addPreciseAdminIssue"
@@ -64,6 +65,14 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     productionLogic:
       "src/modules/submissions/submissionActions.updateQuestionnaireField",
     surfaces: ["questionnaire", "submission-drawer"],
+  },
+  confirm_passport_review: {
+    executionPath: "confirmApplicantPassportReview",
+    intent: "file_review",
+    ownerRole: "agent",
+    productionLogic:
+      "src/modules/submissions/passportExtraction.confirmApplicantPassportReview",
+    surfaces: ["questionnaire"],
   },
   upload_required_file: {
     executionPath: "uploadRequiredFile",

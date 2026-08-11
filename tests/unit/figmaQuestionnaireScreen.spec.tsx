@@ -4765,6 +4765,85 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
+  test("exposes the durable passport review action for the active applicant", async () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicant = draft.applicants[0];
+    if (!applicant) throw new Error("expected applicant");
+    const reviewPending = setFieldReview(
+      setField(draft, "passport-no", "752869613"),
+      "passport-no",
+      "752869613",
+      { reviewSource: "passport_ocr", reviewState: "needs_review" },
+    );
+    const submission: Submission = {
+      ...reviewPending,
+      status: "in_progress",
+      applicants: reviewPending.applicants.map((candidate) =>
+        candidate.id === applicant.id
+          ? {
+              ...candidate,
+              passportExtraction: {
+                appliedFieldKeys: ["passportNumber"],
+                extractedFields: [
+                  {
+                    confidence: "high",
+                    key: "passportNumber",
+                    needsManualReview: true,
+                    source: "passport_scan",
+                    value: "752869613",
+                    verified: false,
+                  },
+                ],
+                sourceFileId: `${applicant.id}-passport_scan`,
+                status: "ready",
+              },
+            }
+          : candidate,
+      ),
+      files: reviewPending.files.map((file) =>
+        file.applicantId === applicant.id && file.type === "passport_scan"
+          ? {
+              ...file,
+              generatedFileName: "passport.png",
+              status: "pending_review",
+              uploadStatus: "uploaded",
+            }
+          : file,
+      ),
+    };
+    const onConfirmPassportReview = vi.fn().mockResolvedValue(undefined);
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onConfirmPassportReview={onConfirmPassportReview}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Паспорт");
+    const confirm = screen.getByRole("button", {
+      name: "Подтвердить проверку паспорта",
+    });
+    expect(confirm).toHaveAttribute(
+      "data-v19-interaction-id",
+      "questionnaire.confirm-passport-review",
+    );
+    fireEvent.click(confirm);
+
+    await waitFor(() =>
+      expect(onConfirmPassportReview).toHaveBeenCalledWith(applicant.id),
+    );
+    expect(auditAgentInteractionControls(result.container)).toEqual([]);
+  });
+
   test("returns every changed questionnaire field on save and exit", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],

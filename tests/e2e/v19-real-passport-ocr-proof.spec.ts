@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { join } from "node:path";
 import {
   clickFirstVisible,
   collectBrowserProblems,
@@ -9,10 +10,20 @@ import {
 const canonicalStorageKey = "visaflow.v19.submissions.v1";
 const legacyIntakeStorageKey = "visaflow.v19.productIntakeDrafts.v1";
 
+function evidencePath(
+  testInfo: { outputPath: (name: string) => string },
+  name: string,
+) {
+  const externalRoot = process.env.V19_TEST_ARTIFACTS_DIR?.trim();
+  return externalRoot
+    ? join(externalRoot, "screenshots", name)
+    : testInfo.outputPath(name);
+}
+
 test.describe("V-19 privacy-safe passport intake proof", () => {
   test("stores a synthetic manual-review passport only in the canonical draft", async ({
     page,
-  }) => {
+  }, testInfo) => {
     const browserProblems = collectBrowserProblems(page);
     await openFreshWorkspace(page, { heading: "Мои действия" });
     const createButton = page.getByRole("button", {
@@ -37,6 +48,40 @@ test.describe("V-19 privacy-safe passport intake proof", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: /Анкета:/ }),
     ).toBeVisible();
+    const questionnaire = page.locator(".vf-figma-questionnaire-screen");
+    const passportSection = questionnaire
+      .getByRole("button", { name: /^Паспорт/ })
+      .first();
+    await expect(passportSection).toBeVisible();
+    await passportSection.click();
+    const confirmPassportReview = questionnaire.getByRole("button", {
+      name: "Подтвердить проверку паспорта",
+    });
+    await expect(confirmPassportReview).toBeVisible();
+    for (const viewport of [
+      { height: 720, width: 320 },
+      { height: 844, width: 390 },
+      { height: 1024, width: 768 },
+      { height: 900, width: 1440 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await confirmPassportReview.scrollIntoViewIfNeeded();
+      await expect(confirmPassportReview).toBeVisible();
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+          ),
+        )
+        .toBe(true);
+      await questionnaire.screenshot({
+        path: evidencePath(
+          testInfo,
+          `passport-review-confirmation-${viewport.width}.png`,
+        ),
+      });
+    }
+    await confirmPassportReview.click();
 
     await expect
       .poll(() =>
@@ -73,6 +118,55 @@ test.describe("V-19 privacy-safe passport intake proof", () => {
         legacyDraftExists: false,
         storageAdapter: "local-dev",
       });
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          ({ canonicalKey }) => {
+            const canonical = JSON.parse(
+              localStorage.getItem(canonicalKey) ?? "[]",
+            ) as Array<{
+              applicants?: Array<{
+                passportExtraction?: { verifiedAtIso?: string };
+              }>;
+              files?: Array<{ originalFileName?: string }>;
+            }>;
+            const created = canonical.find((submission) =>
+              submission.files?.some(
+                (file) => file.originalFileName === "synthetic-passport.heic",
+              ),
+            );
+            return Boolean(created?.applicants?.[0]?.passportExtraction?.verifiedAtIso);
+          },
+          { canonicalKey: canonicalStorageKey },
+        ),
+      )
+      .toBe(true);
+
+    await page.reload();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          ({ canonicalKey }) => {
+            const canonical = JSON.parse(
+              localStorage.getItem(canonicalKey) ?? "[]",
+            ) as Array<{
+              applicants?: Array<{
+                passportExtraction?: { verifiedAtIso?: string };
+              }>;
+              files?: Array<{ originalFileName?: string }>;
+            }>;
+            const created = canonical.find((submission) =>
+              submission.files?.some(
+                (file) => file.originalFileName === "synthetic-passport.heic",
+              ),
+            );
+            return Boolean(created?.applicants?.[0]?.passportExtraction?.verifiedAtIso);
+          },
+          { canonicalKey: canonicalStorageKey },
+        ),
+      )
+      .toBe(true);
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });

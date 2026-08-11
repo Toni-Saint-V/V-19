@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { QuestionnaireScreen } from "../../src/components/QuestionnaireScreen";
 import { markSubmissionIssueFixedResult } from "../../src/modules/submissions/status";
+import { requiresPassportExtractionReviewBeforeAction } from "../../src/modules/submissions/passportExtractionGuards";
 import { createDraftSubmission } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
 import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
@@ -611,5 +612,38 @@ describe("QuestionnaireScreen", () => {
       extractedFields: [expect.objectContaining({ verified: true })],
     });
     expect(submittedApplicant?.passportExtraction?.verifiedAtIso).toBeTruthy();
+  });
+
+  test("persists the visible passport review action and clears its submit guard", async () => {
+    const submission = withPendingPassportExtraction(readySubmission("in_progress"));
+    const onSubmissionChange = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <QuestionnaireScreen
+        onBack={vi.fn()}
+        onSubmissionChange={onSubmissionChange}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const passportSectionButton = screen
+      .getAllByRole("button", { name: /Паспорт/ })
+      .find((button) => !button.hasAttribute("disabled"));
+    if (!passportSectionButton) throw new Error("expected passport section button");
+    fireEvent.click(passportSectionButton);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Подтвердить проверку паспорта",
+      }),
+    );
+
+    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
+    const confirmed = onSubmissionChange.mock.calls[0]?.[0] as Submission;
+    expect(confirmed.status).toBe("in_progress");
+    expect(confirmed.applicants[0]?.passportExtraction?.verifiedAtIso).toBeTruthy();
+    expect(
+      requiresPassportExtractionReviewBeforeAction(confirmed, "submit_for_review"),
+    ).toBe(false);
   });
 });
