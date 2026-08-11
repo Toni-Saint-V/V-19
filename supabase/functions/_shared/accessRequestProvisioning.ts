@@ -16,7 +16,7 @@ type AuthAdminInviteResult = {
 export type AccessRequestAuthAdmin = {
   inviteUserByEmail: (
     email: string,
-    options: { data: Record<string, unknown> },
+    options: { data: Record<string, unknown>; redirectTo: string },
   ) => Promise<AuthAdminInviteResult>;
   listUsers: (options: {
     page: number;
@@ -43,9 +43,7 @@ export async function findAuthUserByEmail(
     });
     if (error) throw error;
     const users = data.users ?? [];
-    const existing = users.find(
-      (user) => normalizedEmail(user.email) === targetEmail,
-    );
+    const existing = users.find((user) => normalizedEmail(user.email) === targetEmail);
     if (existing) return existing;
     if (users.length < authUserPageSize) return null;
   }
@@ -56,6 +54,7 @@ export async function resolveAccessRequestUserId(
   authAdmin: AccessRequestAuthAdmin,
   email: string,
   metadata: Record<string, unknown>,
+  redirectTo: string,
 ): Promise<string> {
   const existing = await findAuthUserByEmail(authAdmin, email);
   if (existing?.id) return existing.id;
@@ -64,6 +63,7 @@ export async function resolveAccessRequestUserId(
   try {
     const { data, error } = await authAdmin.inviteUserByEmail(email, {
       data: metadata,
+      redirectTo,
     });
     if (!error && data.user?.id) return data.user.id;
     inviteFailure = error ?? inviteFailure;

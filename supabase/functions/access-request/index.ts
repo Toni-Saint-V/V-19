@@ -31,6 +31,11 @@ const corsHeaders = {
   "access-control-allow-origin": "*",
 };
 
+// Invitation links must always return to the canonical production application.
+// Falling back to Supabase Auth's project-wide SITE_URL can send recipients to
+// a stale localhost address and strand them before password setup.
+const canonicalInviteRedirectTo = "https://document-intake-system.vercel.app/";
+
 const accessRequestSelect =
   "id,user_id,email,full_name,company_name,city,phone,requested_role,status,created_at,updated_at,reviewed_at,reviewed_by_admin_id,rejection_reason";
 
@@ -304,13 +309,18 @@ async function handleApprove(
 
   const approvedUserId =
     accessRequest.user_id ??
-    (await resolveAccessRequestUserId(admin.auth.admin, accessRequest.email, {
-      city: accessRequest.city,
-      display_name: accessRequest.full_name,
-      organization_name: accessRequest.company_name,
-      password_setup_required: true,
-      phone: accessRequest.phone,
-    }));
+    (await resolveAccessRequestUserId(
+      admin.auth.admin,
+      accessRequest.email,
+      {
+        city: accessRequest.city,
+        display_name: accessRequest.full_name,
+        organization_name: accessRequest.company_name,
+        password_setup_required: true,
+        phone: accessRequest.phone,
+      },
+      canonicalInviteRedirectTo,
+    ));
 
   const { data: updatedRequest, error: finalizeError } = await admin.rpc(
     "finalize_access_request_review",
