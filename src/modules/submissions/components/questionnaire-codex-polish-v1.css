@@ -451,6 +451,10 @@
   padding: var(--v19b-size-8) var(--v19b-size-24) !important;
 }
 
+.vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-action-composer {
+  display: contents;
+}
+
 .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-next-blocker {
   display: grid !important;
   min-height: var(--v19b-size-48) !important;
@@ -689,6 +693,47 @@
 
   .vf-figma-questionnaire-screen.codex-polish-v1 .v19-questionnaire-workspace-shell {
     display: block !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-action-composer.has-copy {
+    display: grid;
+    grid-template-columns: var(--v19b-size-44) minmax(
+        var(--v19b-size-0),
+        var(--v19b-grid-fr)
+      ) !important;
+    align-items: stretch;
+    gap: var(--v19b-size-8);
+    margin-bottom: var(--v19b-size-12);
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-action-composer.has-copy
+    > .v19-questionnaire-work-toolbar {
+    display: contents !important;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-action-composer.has-copy
+    .v19-questionnaire-smart-import-button {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-action-composer.has-copy
+    .v19-questionnaire-work-toolbar-copy {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .vf-figma-questionnaire-screen.codex-polish-v1
+    .v19-questionnaire-action-composer.has-copy
+    .v19-questionnaire-work-toolbar-notice {
+    grid-row: 2;
+    grid-column: 1 / -1;
   }
 }
 

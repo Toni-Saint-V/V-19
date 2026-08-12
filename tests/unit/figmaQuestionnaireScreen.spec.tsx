@@ -849,11 +849,13 @@ describe("FigmaQuestionnaireScreen", () => {
         .sort(),
     );
     expect(
-      [...new Set(
-        bindings
-          .filter((binding) => blueprintFieldIds.has(binding.fieldId))
-          .map((binding) => binding.sectionId),
-      )].sort(),
+      [
+        ...new Set(
+          bindings
+            .filter((binding) => blueprintFieldIds.has(binding.fieldId))
+            .map((binding) => binding.sectionId),
+        ),
+      ].sort(),
     ).toEqual([...blueprintSectionIds].sort());
 
     const draft = fillEveryQuestionnaireField(
@@ -898,13 +900,9 @@ describe("FigmaQuestionnaireScreen", () => {
       .sort();
     expect(missingFields).toEqual(Object.keys(dispositions).sort());
     expect(
-      [...renderedFieldIds]
-        .filter((fieldId) => !blueprintFieldIds.has(fieldId))
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => !blueprintFieldIds.has(fieldId)).sort(),
     ).toEqual(
-      [...renderedFieldIds]
-        .filter((fieldId) => fieldId in legacyBindings)
-        .sort(),
+      [...renderedFieldIds].filter((fieldId) => fieldId in legacyBindings).sort(),
     );
   });
 
@@ -1881,9 +1879,9 @@ describe("FigmaQuestionnaireScreen", () => {
       fireEvent.change(screen.getByLabelText("Имя"), {
         target: { value: "MUST NOT WRITE" },
       });
-      expect(
-        onFieldChange.mock.calls.map(([update]) => update.fieldId),
-      ).toEqual(["surname"]);
+      expect(onFieldChange.mock.calls.map(([update]) => update.fieldId)).toEqual([
+        "surname",
+      ]);
 
       await act(async () => {
         save.resolve();
@@ -1936,7 +1934,9 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
       "Не удалось сохранить и выйти",
     );
-    expect(screen.queryByText("Подача недоступна текущему агенту.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Подача недоступна текущему агенту."),
+    ).not.toBeInTheDocument();
     expect(onBack).not.toHaveBeenCalled();
     expect(onSaveDraft).toHaveBeenCalledWith(
       expect.objectContaining({ saveIntent: "navigation" }),
@@ -1947,9 +1947,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       screen.getByText(/Последние несохранённые изменения будут потеряны/),
     ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Да, выйти без сохранения" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Да, выйти без сохранения" }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
@@ -2053,9 +2051,7 @@ describe("FigmaQuestionnaireScreen", () => {
       expect.objectContaining({ saveIntent: "autosave" }),
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).not.toHaveBeenCalled();
 
@@ -2110,9 +2106,7 @@ describe("FigmaQuestionnaireScreen", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
 
     await act(async () => {
       autosave.reject(new Error("temporary autosave failure"));
@@ -4004,6 +3998,12 @@ describe("FigmaQuestionnaireScreen", () => {
     });
     const workToolbar = copyButton.closest(".v19-questionnaire-work-toolbar");
     expect(workToolbar).not.toBeNull();
+    const actionComposer = copyButton.closest(".v19-questionnaire-action-composer");
+    expect(actionComposer).not.toBeNull();
+    expect(actionComposer).toContainElement(
+      screen.getByRole("button", { name: "Умный импорт" }),
+    );
+    expect(actionComposer).toHaveClass("has-copy");
     expect(workToolbar).toContainElement(
       screen.getByTestId("questionnaire-next-blocker"),
     );
@@ -4316,7 +4316,9 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "family",
     });
-    const mainApplicant = draft.applicants.find((applicant) => applicant.role === "main");
+    const mainApplicant = draft.applicants.find(
+      (applicant) => applicant.role === "main",
+    );
     const secondaryApplicant = draft.applicants.find(
       (applicant) => applicant.role !== "main",
     );
@@ -4600,9 +4602,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Место рождения")).toHaveClass("is-filled");
-    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass(
-      "is-filled",
-    );
+    expect(screen.getByLabelText("Предыдущие фамилии")).not.toHaveClass("is-filled");
   });
 
   test("does not duplicate a field issue as the next blocker notice", () => {
@@ -4984,9 +4984,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
     expect(onSaveAndExit).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Повторить сохранение" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Повторить сохранение" }));
 
     await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(2));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);

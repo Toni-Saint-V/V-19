@@ -403,6 +403,34 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(browserProblems).toEqual([]);
   });
 
+  test("desktop preserves separate smart-import and family-copy toolbar rows", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: 1440 });
+    await openQuestionnaire(page, { withSpouse: true });
+    await page
+      .locator(
+        ".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab",
+      )
+      .filter({ hasText: "Адрес и контакты" })
+      .click();
+
+    const smartImportButton = page.getByRole("button", { name: "Умный импорт" });
+    const copyForAllButton = page.getByRole("button", {
+      name: "Копировать для всех",
+    });
+    const [smartImportBox, copyForAllBox] = await Promise.all([
+      smartImportButton.boundingBox(),
+      copyForAllButton.boundingBox(),
+    ]);
+    expect(smartImportBox).not.toBeNull();
+    expect(copyForAllBox).not.toBeNull();
+    expect(copyForAllBox?.y ?? 0).toBeGreaterThan(
+      (smartImportBox?.y ?? 0) + (smartImportBox?.height ?? 0),
+    );
+    await expectNoDocumentOverflow(page);
+  });
+
   test("mobile keeps footer-first navigation and exposes one current issue surface", async ({
     page,
   }, testInfo) => {
@@ -411,6 +439,26 @@ test.describe("V-19 questionnaire live sanity", () => {
     await page.setViewportSize({ height: 844, width: 390 });
     await openQuestionnaire(page, { withSpouse: true });
     await expectMobileQuestionnaireLayout(page, { height: 844, width: 390 });
+
+    const addressSection = mobileQuestionnaireSection(page, "Адрес и контакты");
+    await addressSection.click();
+    const smartImportButton = page.getByRole("button", { name: "Умный импорт" });
+    const copyForAllButton = page.getByRole("button", {
+      name: "Копировать для всех",
+    });
+    await expect(smartImportButton).toBeVisible();
+    await expect(copyForAllButton).toBeVisible();
+    const [smartImportBox, copyForAllBox] = await Promise.all([
+      smartImportButton.boundingBox(),
+      copyForAllButton.boundingBox(),
+    ]);
+    expect(smartImportBox).not.toBeNull();
+    expect(copyForAllBox).not.toBeNull();
+    expect(
+      Math.abs((smartImportBox?.y ?? 0) - (copyForAllBox?.y ?? 0)),
+    ).toBeLessThanOrEqual(1);
+    expect(smartImportBox?.height).toBe(copyForAllBox?.height);
+    await expectNoDocumentOverflow(page);
 
     await expect(page.locator(".v19-questionnaire-screen-header")).toBeVisible();
     await expect(

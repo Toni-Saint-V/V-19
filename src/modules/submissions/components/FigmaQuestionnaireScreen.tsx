@@ -5605,162 +5605,168 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel" ref={workPanelRef}>
-              {isEditable ? (
-                <div className="v19-questionnaire-work-toolbar">
-                  <button
-                    {...agentInteractionProps("questionnaire.open-smart-import")}
-                    aria-haspopup="dialog"
-                    aria-label="Умный импорт"
-                    className="linear-product-action linear-product-action--secondary v19-questionnaire-smart-import-button v19-smart-import-action--dark"
-                    disabled={questionnaireInteractionPending}
-                    type="button"
-                    onClick={() => setSmartImportOpen(true)}
-                  >
-                    <Sparkles aria-hidden="true" size={16} strokeWidth={1.9} />
-                    <span>Умный импорт</span>
-                  </button>
-                </div>
-              ) : null}
+              <div
+                className={`v19-questionnaire-action-composer${showFamilyCopyControl ? " has-copy" : ""}`}
+              >
+                {isEditable ? (
+                  <div className="v19-questionnaire-work-toolbar v19-questionnaire-smart-import-toolbar">
+                    <button
+                      {...agentInteractionProps("questionnaire.open-smart-import")}
+                      aria-haspopup="dialog"
+                      aria-label="Умный импорт"
+                      className="linear-product-action linear-product-action--secondary v19-questionnaire-smart-import-button v19-smart-import-action--dark"
+                      disabled={questionnaireInteractionPending}
+                      type="button"
+                      onClick={() => setSmartImportOpen(true)}
+                    >
+                      <Sparkles aria-hidden="true" size={16} strokeWidth={1.9} />
+                      <span>Умный импорт</span>
+                    </button>
+                  </div>
+                ) : null}
 
-              {showWorkToolbar ? (
-                <div
-                  className={`v19-questionnaire-work-toolbar${
-                    showFamilyCopyControl ? " has-copy" : ""
-                  }`}
-                >
-                  <div className="v19-questionnaire-work-toolbar-notice">
-                    {isEditable &&
-                    mobileBlockerTarget &&
-                    !currentIssueCoversMobileBlocker ? (
-                      <button
-                        {...agentInteractionProps("questionnaire.navigate")}
-                        aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
-                          mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
-                        }`}
-                        className="v19-questionnaire-next-blocker"
-                        data-testid="questionnaire-next-blocker"
-                        disabled={questionnaireInteractionPending}
-                        type="button"
-                        onClick={focusFirstBlocker}
-                      >
-                        <AlertCircle aria-hidden="true" className="w-4 h-4" />
-                        <span>
-                          Заполните: <strong>{mobileBlockerLabel}</strong>
-                        </span>
-                        <ArrowRight aria-hidden="true" className="w-4 h-4" />
-                      </button>
-                    ) : null}
-                    {currentSectionIssue ? (
-                      <div
-                        aria-atomic={
-                          currentSectionIssue.status === "fixed_by_agent"
-                            ? "true"
-                            : undefined
-                        }
-                        aria-live={
-                          currentSectionIssue.status === "fixed_by_agent"
-                            ? "polite"
-                            : undefined
-                        }
-                        className={`v19-questionnaire-review-alert ${
-                          currentSectionIssue.status === "fixed_by_agent"
-                            ? "is-awaiting"
-                            : ""
-                        }`}
-                        data-testid="questionnaire-current-issue"
-                        role={
-                          currentSectionIssue.status === "fixed_by_agent"
-                            ? "status"
-                            : undefined
-                        }
-                      >
-                        <div className="v19-questionnaire-review-strip" />
-                        <div className="v19-questionnaire-review-icon">
-                          {currentSectionIssue.status === "fixed_by_agent" ? (
-                            <CheckCircle2 className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
-                          ) : (
-                            <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
-                            {currentSectionIssue.status === "fixed_by_agent"
-                              ? `Исправление${
-                                  currentSectionIssue.target.field
-                                    ? ` по полю «${currentSectionIssue.target.field}»`
-                                    : ""
-                                } отправлено, ожидает проверки администратора`
-                              : currentSectionIssue.target.field
-                                ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
-                                : currentSectionIssue.reason}
+                {showWorkToolbar ? (
+                  <div
+                    className={`v19-questionnaire-work-toolbar${
+                      showFamilyCopyControl ? " has-copy" : ""
+                    }`}
+                  >
+                    <div className="v19-questionnaire-work-toolbar-notice">
+                      {isEditable &&
+                      mobileBlockerTarget &&
+                      !currentIssueCoversMobileBlocker ? (
+                        <button
+                          {...agentInteractionProps("questionnaire.navigate")}
+                          aria-label={`Перейти к следующему обязательному действию: ${mobileBlockerLabel}${
+                            mobileBlockerReason ? `. ${mobileBlockerReason}` : ""
+                          }`}
+                          className="v19-questionnaire-next-blocker"
+                          data-testid="questionnaire-next-blocker"
+                          disabled={questionnaireInteractionPending}
+                          type="button"
+                          onClick={focusFirstBlocker}
+                        >
+                          <AlertCircle aria-hidden="true" className="w-4 h-4" />
+                          <span>
+                            Заполните: <strong>{mobileBlockerLabel}</strong>
+                          </span>
+                          <ArrowRight aria-hidden="true" className="w-4 h-4" />
+                        </button>
+                      ) : null}
+                      {currentSectionIssue ? (
+                        <div
+                          aria-atomic={
+                            currentSectionIssue.status === "fixed_by_agent"
+                              ? "true"
+                              : undefined
+                          }
+                          aria-live={
+                            currentSectionIssue.status === "fixed_by_agent"
+                              ? "polite"
+                              : undefined
+                          }
+                          className={`v19-questionnaire-review-alert ${
+                            currentSectionIssue.status === "fixed_by_agent"
+                              ? "is-awaiting"
+                              : ""
+                          }`}
+                          data-testid="questionnaire-current-issue"
+                          role={
+                            currentSectionIssue.status === "fixed_by_agent"
+                              ? "status"
+                              : undefined
+                          }
+                        >
+                          <div className="v19-questionnaire-review-strip" />
+                          <div className="v19-questionnaire-review-icon">
+                            {currentSectionIssue.status === "fixed_by_agent" ? (
+                              <CheckCircle2 className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+                            ) : (
+                              <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+                            )}
                           </div>
-                          <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
-                            {currentSectionIssue.status === "fixed_by_agent"
-                              ? "Исправление сохранено и не блокирует повторную отправку. Администратор увидит его при проверке."
-                              : currentSectionIssue.comment}
-                          </p>
-                        </div>
-                        {isEditable &&
-                        currentSectionIssue.status === "open" &&
-                        onMarkIssueFixed ? (
-                          <div className="flex shrink-0 flex-col items-end gap-2">
-                            <button
-                              {...agentInteractionProps("questionnaire.mark-fixed")}
-                              aria-busy={
-                                pendingIssueResolutionId === currentSectionIssue.id
-                              }
-                              className="v19-questionnaire-draft-button"
-                              disabled={questionnaireInteractionPending}
-                              type="button"
-                              onClick={() => void resolveCurrentIssue()}
-                            >
-                              {pendingIssueResolutionId === currentSectionIssue.id
-                                ? "Сохраняем…"
-                                : "Пометить исправленным"}
-                            </button>
-                            {issueResolutionError ? (
-                              <span
-                                className="max-w-[var(--v19b-size-220)] text-right text-[var(--v19b-size-11)] text-[var(--v19b-dot-danger)]"
-                                role="alert"
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
+                              {currentSectionIssue.status === "fixed_by_agent"
+                                ? `Исправление${
+                                    currentSectionIssue.target.field
+                                      ? ` по полю «${currentSectionIssue.target.field}»`
+                                      : ""
+                                  } отправлено, ожидает проверки администратора`
+                                : currentSectionIssue.target.field
+                                  ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
+                                  : currentSectionIssue.reason}
+                            </div>
+                            <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
+                              {currentSectionIssue.status === "fixed_by_agent"
+                                ? "Исправление сохранено и не блокирует повторную отправку. Администратор увидит его при проверке."
+                                : currentSectionIssue.comment}
+                            </p>
+                          </div>
+                          {isEditable &&
+                          currentSectionIssue.status === "open" &&
+                          onMarkIssueFixed ? (
+                            <div className="flex shrink-0 flex-col items-end gap-2">
+                              <button
+                                {...agentInteractionProps("questionnaire.mark-fixed")}
+                                aria-busy={
+                                  pendingIssueResolutionId === currentSectionIssue.id
+                                }
+                                className="v19-questionnaire-draft-button"
+                                disabled={questionnaireInteractionPending}
+                                type="button"
+                                onClick={() => void resolveCurrentIssue()}
                               >
-                                {issueResolutionError}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : null}
+                                {pendingIssueResolutionId === currentSectionIssue.id
+                                  ? "Сохраняем…"
+                                  : "Пометить исправленным"}
+                              </button>
+                              {issueResolutionError ? (
+                                <span
+                                  className="max-w-[var(--v19b-size-220)] text-right text-[var(--v19b-size-11)] text-[var(--v19b-dot-danger)]"
+                                  role="alert"
+                                >
+                                  {issueResolutionError}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {showFamilyCopyControl ? (
+                      <div className="v19-questionnaire-work-toolbar-copy">
+                        <button
+                          {...agentInteractionProps(
+                            "questionnaire.preview-family-copy",
+                          )}
+                          aria-describedby={
+                            !familyCopyPreview && familyCopyMessage
+                              ? familyCopyStatusId
+                              : undefined
+                          }
+                          className={`linear-product-action ${
+                            familyCopyPreview
+                              ? "linear-product-action--primary"
+                              : "linear-product-action--secondary"
+                          } v19-questionnaire-draft-button v19-questionnaire-copy-button`}
+                          disabled={
+                            !isEditable ||
+                            Boolean(familyCopyPreview) ||
+                            questionnaireInteractionPending
+                          }
+                          type="button"
+                          onClick={copySharedDataToFamily}
+                        >
+                          <Copy aria-hidden="true" />
+                          Копировать для всех
+                        </button>
                       </div>
                     ) : null}
                   </div>
-
-                  {showFamilyCopyControl ? (
-                    <div className="v19-questionnaire-work-toolbar-copy">
-                      <button
-                        {...agentInteractionProps("questionnaire.preview-family-copy")}
-                        aria-describedby={
-                          !familyCopyPreview && familyCopyMessage
-                            ? familyCopyStatusId
-                            : undefined
-                        }
-                        className={`linear-product-action ${
-                          familyCopyPreview
-                            ? "linear-product-action--primary"
-                            : "linear-product-action--secondary"
-                        } v19-questionnaire-draft-button v19-questionnaire-copy-button`}
-                        disabled={
-                          !isEditable ||
-                          Boolean(familyCopyPreview) ||
-                          questionnaireInteractionPending
-                        }
-                        type="button"
-                        onClick={copySharedDataToFamily}
-                      >
-                        <Copy aria-hidden="true" />
-                        Копировать для всех
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
+                ) : null}
+              </div>
 
               <div className="v19-questionnaire-work-grid">
                 {showFamilyCopyControl && (familyCopyPreview || familyCopyMessage) ? (
