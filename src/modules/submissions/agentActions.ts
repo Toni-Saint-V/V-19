@@ -1082,8 +1082,9 @@ function dueRank(due: AgentActionDue) {
 
 function applicantNameForFile(submission: Submission, file: SubmissionFile) {
   return (
-    submission.applicants.find((applicant) => applicant.id === file.applicantId)
-      ?.fullName ?? "Новый заявитель"
+    submission.applicants
+      .find((applicant) => applicant.id === file.applicantId)
+      ?.fullName.trim() || "Фамилия Имя"
   );
 }
 

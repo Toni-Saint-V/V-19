@@ -155,6 +155,7 @@ describe("PreUploadScreen canonical intake", () => {
         screen.getByRole("button", { name: "Создать и открыть анкету" }),
       ).toBeEnabled(),
     );
+    expect(screen.getByText("VOLKOV ANTON", { exact: true })).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Открыть данные из паспорта" }),
     ).toBeVisible();

@@ -140,7 +140,7 @@ export function passportIntakeApplicantName(
     (field) => field.key === "firstName",
   )?.value;
   const surname = item.extractedFields.find((field) => field.key === "surname")?.value;
-  return [firstName, surname]
+  return [surname, firstName]
     .map((value) => value?.trim())
     .filter(Boolean)
     .join(" ");

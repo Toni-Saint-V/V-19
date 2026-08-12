@@ -479,74 +479,6 @@ function visualMrzDateHints(lines: string[]) {
   return { birth: null, expiry: null };
 }
 
-function visualMrzNameHints(lines: string[]) {
-  for (const line of lines) {
-    if (!line.startsWith("P<")) continue;
-
-    const namePart = line.replace(/^P<[A-Z0-9<]{3}/, "").replace(/^<+/, "");
-    const [surnameRaw = "", ...givenParts] = namePart.split("<<");
-    const surname = cleanVisualMrzName(surnameRaw);
-    const firstName = cleanVisualMrzGivenName(givenParts.join("<"));
-    if (surname && firstName) return { firstName, surname };
-
-    const compactNamePart = (namePart.split(/<{2,}/)[0] ?? "").replace(/<+/g, "");
-    const noisyName =
-      /^([A-Z]{2,24}?)(?:ES|SS)([A-Z]{2,24}?)(?:S{2,}|K{2,}|L{2,})?$/.exec(
-        compactNamePart,
-      );
-    const noisySurname = cleanVisualMrzName(noisyName?.[1] ?? "");
-    const noisyFirstName = cleanVisualMrzName(noisyName?.[2] ?? "");
-    if (noisySurname && noisyFirstName) {
-      return { firstName: noisyFirstName, surname: noisySurname };
-    }
-  }
-
-  return { firstName: "", surname: "" };
-}
-
-function visualPrintedNameCandidate(line: string) {
-  if (
-    /\d|<|RUSSIAN|FEDERATION|PASSPORT|ISSUING|STATE|DATE|BIRTH|SEX|PLACE|AUTHORITY|EXPIRY|HOLDER|SIGNATURE|NATIONALITY|GIVEN|SURNAME|USSR|RUS/.test(
-      line,
-    )
-  ) {
-    return "";
-  }
-
-  const candidate = cleanVisualMrzName(line);
-  return candidate.replace(/\s/g, "").length >= 3 ? candidate : "";
-}
-
-function cleanPrintedGivenName(value: string) {
-  const compact = value.replace(/\s/g, "");
-  if (/^C[A-Z]{4,}AN$/.test(compact)) {
-    return cleanVisualMrzName(compact.slice(1, -2));
-  }
-  return value;
-}
-
-function visualPrintedNameHints(lines: string[]) {
-  const passportNumber = visualPassportNumber(lines);
-  if (!passportNumber) return { firstName: "", surname: "" };
-
-  const numberIndex = lines.findIndex((line) => line.includes(passportNumber));
-  const nearby = numberIndex >= 0 ? lines.slice(numberIndex + 1, numberIndex + 9) : [];
-  const candidates = Array.from(
-    new Set(nearby.map((line) => visualPrintedNameCandidate(line)).filter(Boolean)),
-  );
-  const [surname, firstName] =
-    candidates.length >= 4
-      ? [candidates[1] ?? "", cleanPrintedGivenName(candidates[3] ?? "")]
-      : candidates.length >= 3
-        ? [candidates[1] ?? "", cleanPrintedGivenName(candidates[2] ?? "")]
-        : [candidates[0] ?? "", cleanPrintedGivenName(candidates[1] ?? "")];
-
-  return {
-    firstName: firstName ?? "",
-    surname: surname ?? "",
-  };
-}
-
 function visualPassportNumber(lines: string[]) {
   const passportIndex = lines.findIndex(
     (line) => line.includes("PASSPORTNO") || line.includes("ISSUINGSTATE"),
@@ -617,15 +549,10 @@ export function parsePassportVisualText(
     ]);
   const issuePlace = visualAuthority(lines, issueDate?.compact);
   const citizenship = visualCitizenship(lines);
-  const visualNames = visualMrzNameHints(lines);
-  const printedNames =
-    visualNames.surname && visualNames.firstName
-      ? { firstName: "", surname: "" }
-      : visualPrintedNameHints(lines);
-  const surname =
-    fieldValue("surname") ?? (visualNames.surname || printedNames.surname);
-  const firstName =
-    fieldValue("firstName") ?? (visualNames.firstName || printedNames.firstName);
+  // OCR text outside a check-digit-validated MRZ is too unreliable for identity.
+  // Other visual fields may still be offered for manual verification.
+  const surname = fieldValue("surname") ?? "";
+  const firstName = fieldValue("firstName") ?? "";
 
   return [
     mrzField("surname", surname, "low"),
@@ -660,29 +587,30 @@ function hasPassportIdentity(fields: PassportExtractionField[]) {
 
 export function parsePassportMrzText(text: string): PassportExtractionField[] {
   const lines = normalizeOcrText(text);
-  const firstLineIndex = lines.findIndex((line) => line.startsWith("P<"));
-  if (firstLineIndex < 0) return [];
-
-  const line1 = (lines[firstLineIndex] ?? "").slice(0, 44);
-  const line2Candidate =
-    lines
-      .slice(firstLineIndex + 1)
-      .find((line) => line.length >= 28 && /^[A-Z0-9<]+$/.test(line)) ?? "";
-  const line2CandidateWithValidation = td3Line2Candidates(line2Candidate).find(
-    (candidate) =>
+  const line2CandidateWithValidation = lines
+    .filter((line) => line.length >= 28 && /^[A-Z0-9<]+$/.test(line))
+    .flatMap((line) => td3Line2Candidates(line))
+    .find((candidate) =>
       hasValidTd3Line2(candidate.line, {
         validateComposite: candidate.validateComposite,
       }),
-  );
+    );
   const line2 = line2CandidateWithValidation?.line;
   if (!line2) return [];
 
-  const namePart = line1.slice(5).padEnd(39, "<");
-  const [surnameRaw = "", ...givenParts] = namePart.split("<<");
-  const givenRaw = givenParts.join("<");
-  const surname = cleanVisualMrzName(surnameRaw);
-  const firstName = cleanVisualMrzGivenName(givenRaw);
-  const hasCleanIdentity = Boolean(surname && firstName);
+  const identity = lines
+    .filter((line) => line.startsWith("P<"))
+    .map((line) => {
+      const namePart = line.slice(0, 44).slice(5).padEnd(39, "<");
+      const [surnameRaw = "", ...givenParts] = namePart.split("<<");
+      const surname = cleanVisualMrzName(surnameRaw);
+      const firstName = cleanVisualMrzGivenName(givenParts.join("<"));
+      return { firstName, surname };
+    })
+    .find(({ firstName, surname }) => Boolean(surname && firstName));
+  const surname = identity?.surname ?? "";
+  const firstName = identity?.firstName ?? "";
+  const hasCleanIdentity = Boolean(identity);
   const passportNumber = line2.slice(0, 9).replace(/</g, "").trim();
   const citizenshipCode = line2.slice(10, 13).replace(/</g, "");
   const gender = line2.slice(20, 21);
@@ -952,7 +880,6 @@ async function invokeLocalPassportExtraction(input: {
     );
     workerLease = await localPassportOcrWorkerBeforeDeadline(deadline);
 
-    const recognizedTexts: string[] = [];
     let bestResult: PassportExtractionResult | null = null;
     for (const candidate of candidates) {
       const response = await recognizePassportOcrCandidate(
@@ -960,12 +887,8 @@ async function invokeLocalPassportExtraction(input: {
         candidate.canvas,
         deadline,
       );
-      recognizedTexts.push(response.data.text);
       const mrzFields = parsePassportMrzText(response.data.text);
-      const visualFields = parsePassportVisualText(
-        recognizedTexts.join("\n"),
-        mrzFields,
-      );
+      const visualFields = parsePassportVisualText(response.data.text, mrzFields);
       const fields = mergePassportFields(mrzFields, visualFields);
       const usedMrz = mrzFields.length > 0;
       if (!usedMrz && !hasUsableVisualPassportFields(fields)) continue;

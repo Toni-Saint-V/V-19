@@ -44,6 +44,21 @@ describe("submission list formatters", () => {
     expect(formatSubmissionListTitle(draft)).toBe("Кузнецовы");
   });
 
+  it("uses the surname-and-name placeholder for an unnamed single applicant", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+
+    expect(draft.applicants[0]?.fullName).toBe("Фамилия Имя");
+    expect(draft.title).toBe("Новая подача");
+    expect(formatAgentActionRowText({ kind: "fill_questionnaire" }).title).toBe(
+      "Фамилия Имя",
+    );
+  });
+
   it("shortens submission statuses without clipped blocker copy", () => {
     expect(formatSubmissionListStatus(fixture("ПД-1048"))).toBe("Возвращено 2");
     expect(formatSubmissionListStatus(fixture("ПД-1055"))).toBe("Исправление");

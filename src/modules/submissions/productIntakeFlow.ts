@@ -399,7 +399,7 @@ export function buildProductIntakeDraft(
 
   return {
     id,
-    title: namedApplicants[0] ?? (type === 'family' ? 'Семейный пакет' : 'Новый заявитель'),
+    title: namedApplicants[0] ?? (type === 'family' ? 'Семейный пакет' : 'Фамилия Имя'),
     type,
     country: 'Испания',
     city: 'Москва',

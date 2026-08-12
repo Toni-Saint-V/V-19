@@ -26,7 +26,7 @@ describe("product intake passport prefill", () => {
       "2026-07-07T07:00:00.000Z",
     );
 
-    expect(draft.title).toBe("Новый заявитель");
+    expect(draft.title).toBe("Фамилия Имя");
     expect(draft.applicants[0]?.fullName).toBe("Заявитель 1");
     expect(draft.applicants[0]?.fields).toMatchObject({
       firstName: "",
@@ -68,6 +68,7 @@ describe("product intake passport prefill", () => {
       passportNo: "752869613",
       surname: "VOLKOV",
     });
+    expect(draft.applicants[0]?.fullName).toBe("ANTON VOLKOV");
     expect(getPrefillPreviewFields(draft)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

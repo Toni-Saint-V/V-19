@@ -184,7 +184,7 @@ export function formatAgentActionRowText(
 }
 
 function applicantTitle(applicantName?: string) {
-  return applicantName?.trim() || "Новый заявитель";
+  return applicantName?.trim() || "Фамилия Имя";
 }
 
 function replacementActionLabel(fileType: SubmissionFileType) {

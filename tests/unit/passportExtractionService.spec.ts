@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { parsePassportVisualText } from "../../src/modules/submissions/passportExtractionService";
+import {
+  parsePassportMrzText,
+  parsePassportVisualText,
+} from "../../src/modules/submissions/passportExtractionService";
 
 describe("passport visual OCR parsing", () => {
   test("normalizes common Cyrillic OCR noise for Russian surname and given name", () => {
@@ -37,6 +40,44 @@ describe("passport visual OCR parsing", () => {
 
     expect(fields.map((field) => field.value)).not.toEqual(
       expect.arrayContaining(["VOLKOV", "ANTON", "LENINGRAD"]),
+    );
+  });
+
+  test("does not emit identity fields from an unvalidated MRZ name line", () => {
+    const fields = parsePassportVisualText(
+      "P<RUSVOLKOV<<ANTON<<<<<<<<<<<<<<<<<<<<<<<<<<",
+    );
+
+    expect(fields.map((field) => field.key)).not.toEqual(
+      expect.arrayContaining(["surname", "firstName"]),
+    );
+  });
+
+  test("recognizes a validated MRZ pair when its lines arrive in reverse order", () => {
+    const fields = parsePassportMrzText(`
+      7528696137RUS9008205M2602268<<<<<<<<<<<<<<00
+      P<RUSVOLKOV<<ANTON<<<<<<<<<<<<<<<<<<<<<<<<<<
+    `);
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+      ]),
+    );
+  });
+
+  test("does not combine partial MRZ identity data from separate OCR frames", () => {
+    expect(
+      parsePassportMrzText("P<RUSVOLKOV<<ANTON<<<<<<<<<<<<<<<<<<<<<<<<<<"),
+    ).toEqual([]);
+
+    const fields = parsePassportMrzText(
+      "7528696137RUS9008205M2602268<<<<<<<<<<<<<<00",
+    );
+    expect(fields.map((field) => field.key)).not.toEqual(
+      expect.arrayContaining(["surname", "firstName"]),
     );
   });
 });

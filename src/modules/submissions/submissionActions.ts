@@ -70,6 +70,9 @@ import type {
 
 let supabaseDraftSequence = 0;
 
+const applicantNamePlaceholder = "Фамилия Имя";
+const legacyApplicantNamePlaceholder = "Новый заявитель";
+
 export type CreateDraftInput = {
   agentId?: AgentOwnerId;
   city: City;
@@ -852,7 +855,8 @@ function syncApplicantNameFromQuestionnaireUpdate(
 function isPlaceholderApplicantName(value: string) {
   const normalized = value.trim();
   return (
-    normalized === "Новый заявитель" ||
+    normalized === applicantNamePlaceholder ||
+    normalized === legacyApplicantNamePlaceholder ||
     normalized === "Основной заявитель" ||
     normalized === "Супруг" ||
     /^Ребёнок \d+$/u.test(normalized)
@@ -1425,7 +1429,7 @@ function applicantIdForScheme(
 function draftApplicantName(index: number, type: Submission["type"], input?: string) {
   const normalized = input?.trim();
   if (normalized) return normalized;
-  if (type === "single") return "Новый заявитель";
+  if (type === "single") return applicantNamePlaceholder;
   if (index === 0) return "Основной заявитель";
   if (index === 1) return "Супруг";
   return `Ребёнок ${index - 1}`;
@@ -1442,7 +1446,11 @@ function draftTitle(
   firstApplicantName?: string,
   familySurname?: string,
 ) {
-  if (!firstApplicantName || firstApplicantName === "Новый заявитель") {
+  if (
+    !firstApplicantName ||
+    firstApplicantName === applicantNamePlaceholder ||
+    firstApplicantName === legacyApplicantNamePlaceholder
+  ) {
     return type === "family" ? "Новая семейная подача" : "Новая подача";
   }
   if (type === "single") return firstApplicantName;
