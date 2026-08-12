@@ -739,6 +739,10 @@ export function CommandCenter({
       throw new Error("Сохранение подачи недоступно.");
     }
 
+    const localDemoMedia =
+      __V19_LOCAL_DEMO_BUILD__ && !usesSupabase
+        ? await import("../modules/submissions/localDemoMediaStorage")
+        : undefined;
     const nextSubmission = await persistCreatedSubmissionWithPassports({
       attemptedStoragePaths: attemptedCreateStoragePathsRef.current,
       onPendingSubmission: (submission) => {
@@ -753,8 +757,11 @@ export function CommandCenter({
           [submission.id]: submission,
         }));
       },
+      simulatePrivateStorage: __V19_LOCAL_DEMO_BUILD__ && !usesSupabase,
       storageAdapter: usesSupabase ? "supabase-private" : "local-dev",
+      storeLocalDemoMedia: localDemoMedia?.saveLocalDemoMedia,
       submission: pendingSubmission,
+      withLocalDemoMutationLock: localDemoMedia?.withLocalDemoMediaMutationLock,
     });
 
     pendingCreatedSubmissionRef.current = null;
@@ -821,7 +828,7 @@ export function CommandCenter({
       fileType,
       mimeType,
       submissionId: submission.id,
-      uploadNonce: `${Date.now()}`,
+      uploadNonce: crypto.randomUUID(),
     });
     const uploadedAtIso = new Date().toISOString();
     const baseMetadata = {
@@ -832,6 +839,7 @@ export function CommandCenter({
       uploadedAtIso,
     };
     let uploadedMediaTarget: MediaStorageTarget | undefined;
+    let localDemoTarget: ReturnType<typeof buildMediaStoragePath> | undefined;
     let metadata:
       | (typeof baseMetadata & {
           storageAdapter: "local-dev";
@@ -840,6 +848,7 @@ export function CommandCenter({
           storageAdapter: "supabase-private";
           storageBucket: string;
           storagePath: string;
+          localDemoMediaStored?: true;
         });
     if (usesSupabase) {
       const target = buildMediaStoragePath(
@@ -861,6 +870,20 @@ export function CommandCenter({
         storagePath: uploaded.path,
       };
       uploadedMediaTarget = target;
+    } else if (__V19_LOCAL_DEMO_BUILD__) {
+      localDemoTarget = buildMediaStoragePath(
+        submission.id,
+        applicantId,
+        mediaSlotTypeForSubmissionFileType(fileType),
+        generatedFileName,
+      );
+      metadata = {
+        ...baseMetadata,
+        localDemoMediaStored: true,
+        storageAdapter: "supabase-private",
+        storageBucket: localDemoTarget.bucket,
+        storagePath: localDemoTarget.path,
+      };
     } else {
       metadata = { ...baseMetadata, storageAdapter: "local-dev" };
     }
@@ -900,14 +923,41 @@ export function CommandCenter({
       };
     };
 
-    const nextSubmission = onSubmissionUpdate
-      ? await onSubmissionUpdate(
-          submission.id,
-          applyUploadToLatest,
-          uploadedMediaTarget,
-        )
-      : applyUploadToLatest(submission);
-    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
+    const persistUpload = async () => {
+      const persistedSubmission = onSubmissionUpdate
+        ? await onSubmissionUpdate(
+            submission.id,
+            applyUploadToLatest,
+            uploadedMediaTarget,
+          )
+        : applyUploadToLatest(submission);
+      if (!onSubmissionUpdate) await onSubmissionsChange?.([persistedSubmission]);
+      return persistedSubmission;
+    };
+    const nextSubmission = localDemoTarget
+      ? await (
+          await import("../modules/submissions/localDemoMediaStorage")
+        ).replaceLocalDemoMediaWithCanonicalReadback({
+          file,
+          persistCanonical: persistUpload,
+          previousPath: prepared.file.localDemoMediaStored
+            ? prepared.file.storagePath
+            : undefined,
+          readCanonical: async () => {
+            if (!onSubmissionUpdate) {
+              throw new Error("Canonical submission readback is unavailable.");
+            }
+            return onSubmissionUpdate(submission.id, (current) => current);
+          },
+          referencesStoredPath: (canonical, storedPath) =>
+            canonical.files.some(
+              (candidate) =>
+                candidate.localDemoMediaStored === true &&
+                candidate.storagePath === storedPath,
+            ),
+          target: localDemoTarget,
+        })
+      : await persistUpload();
     setCanonicalOverrides((current) => ({
       ...current,
       [nextSubmission.id]: nextSubmission,

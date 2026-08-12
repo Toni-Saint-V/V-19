@@ -11,9 +11,9 @@ import {
 import {
   createQuestionnaireSections,
   normalizeSubmissionQuestionnaire,
-  updateQuestionnaireField,
   type QuestionnaireFieldUpdate,
 } from "../modules/submissions/questionnaire";
+import { updateQuestionnaireField } from "../modules/submissions/submissionActions";
 import { defaultLocalAgentOwnerId } from "../modules/submissions/ownership";
 import { confirmApplicantPassportReview } from "../modules/submissions/passportExtraction";
 import {
@@ -154,7 +154,9 @@ function applyQuestionnaireReviewConfirmations(
   if (!confirmations.length) return submission;
 
   const confirmationKeys = new Set(
-    confirmations.map((confirmation) => questionnaireReviewConfirmationKey(confirmation)),
+    confirmations.map((confirmation) =>
+      questionnaireReviewConfirmationKey(confirmation),
+    ),
   );
   const confirmationSections = new Map(
     confirmations.map((confirmation) => [
@@ -210,14 +212,20 @@ function synchronizePassportExtractionConfirmations(
     fieldUpdates.map((update) => questionnaireReviewConfirmationKey(update)),
   );
   const confirmationKeys = new Set(
-    confirmations.map((confirmation) => questionnaireReviewConfirmationKey(confirmation)),
+    confirmations.map((confirmation) =>
+      questionnaireReviewConfirmationKey(confirmation),
+    ),
   );
 
   return {
     ...submission,
     applicants: submission.applicants.map((applicant) => {
       const extraction = applicant.passportExtraction;
-      if (!extraction || extraction.status !== "ready" || !extraction.extractedFields.length) {
+      if (
+        !extraction ||
+        extraction.status !== "ready" ||
+        !extraction.extractedFields.length
+      ) {
         return applicant;
       }
 
@@ -227,7 +235,8 @@ function synchronizePassportExtractionConfirmations(
           .map((field) => [field.id, field]),
       );
       const extractedFields = extraction.extractedFields.map((field) => {
-        const questionnaireFieldId = questionnaireFieldIdByPassportExtractionKey[field.key];
+        const questionnaireFieldId =
+          questionnaireFieldIdByPassportExtractionKey[field.key];
         const key = questionnaireReviewConfirmationKey({
           applicantId: applicant.id,
           fieldId: questionnaireFieldId,
@@ -292,8 +301,7 @@ function applyQuestionnairePayload(
 ) {
   const updates = uniqueQuestionnaireUpdates(payload.fieldUpdates);
   const withFields = updates.reduce(
-    (nextSubmission, update) =>
-      updateQuestionnaireField(nextSubmission, update),
+    (nextSubmission, update) => updateQuestionnaireField(nextSubmission, update),
     submission,
   );
   const confirmations = payload.reviewConfirmations ?? [];
@@ -445,7 +453,9 @@ export function QuestionnaireScreen({
         nextSubmission.status !== "corrections_received" &&
         nextSubmission.status !== "submitted_for_review"
       ) {
-        throw new Error("Не удалось подтвердить отправку анкеты в актуальном состоянии.");
+        throw new Error(
+          "Не удалось подтвердить отправку анкеты в актуальном состоянии.",
+        );
       }
       const completedAction =
         nextSubmission.status === "corrections_received"
@@ -506,9 +516,7 @@ export function QuestionnaireScreen({
       workingSubmissionRef.current = savedSubmission;
       setWorkingSubmission(savedSubmission);
       if (assignment.assignedNow) {
-        window.alert(
-          `Анкета сохранена. Номер подачи: VF-${assignment.publicNumber}`,
-        );
+        window.alert(`Анкета сохранена. Номер подачи: VF-${assignment.publicNumber}`);
       }
     }
 

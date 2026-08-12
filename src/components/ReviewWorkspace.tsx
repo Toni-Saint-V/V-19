@@ -97,6 +97,13 @@ type OwnedVisitedMediaState = {
   types: Set<ReviewMediaType>;
 };
 
+type OwnedRenderedMediaState = {
+  ownerKey: string;
+  urls: Partial<Record<ReviewMediaType, string>>;
+};
+
+const emptyRenderedMediaUrls: Partial<Record<ReviewMediaType, string>> = {};
+
 const mediaTargetsByType: Record<ReviewMediaType, ReviewMediaTarget> = {
   passport_scan: {
     alt: "Оригинал загранпаспорта",
@@ -182,6 +189,26 @@ function reviewFileName(target: ReviewMediaTarget, file?: SubmissionFile) {
       : `${target.label} не загружен`;
 
   return file?.originalFileName ?? file?.generatedFileName ?? missingFileLabel;
+}
+
+function isReviewableLocalDemoFile(
+  file: SubmissionFile,
+  input: {
+    applicantId: string;
+    fileType: ReviewMediaType;
+    submissionId: string;
+  },
+) {
+  return (
+    __V19_LOCAL_DEMO_BUILD__ &&
+    supabaseRuntimeConfig.target === "local-demo" &&
+    file.localDemoMediaStored === true &&
+    isPersistablePrivateFileAssetAtSubmissionTarget(file, {
+      applicantId: input.applicantId,
+      fileType: input.fileType,
+      submissionId: input.submissionId,
+    })
+  );
 }
 
 function sectionActionLabel(accepted: boolean, pending: boolean, canConfirm: boolean) {
@@ -284,11 +311,16 @@ export function ReviewWorkspace({
           file.uploadStatus === "uploaded" &&
           file.reviewStatus !== "replace_required" &&
           file.reviewStatus !== "poor_quality" &&
-          isPersistablePrivateFileAssetAtSubmissionTarget(file, {
+          (isReviewableLocalDemoFile(file, {
             applicantId: selectedApplicantId,
             fileType: target.type,
             submissionId,
-          })
+          }) ||
+            isPersistablePrivateFileAssetAtSubmissionTarget(file, {
+              applicantId: selectedApplicantId,
+              fileType: target.type,
+              submissionId,
+            }))
             ? file
             : undefined;
         return { file, protectedFile, target };
@@ -324,6 +356,16 @@ export function ReviewWorkspace({
     ownedVisitedMedia.ownerKey === mediaOwnerKey
       ? ownedVisitedMedia.types
       : initialVisitedMediaTypes;
+  const [ownedRenderedMedia, setOwnedRenderedMedia] = useState<OwnedRenderedMediaState>(
+    {
+      ownerKey: mediaOwnerKey,
+      urls: {},
+    },
+  );
+  const renderedMediaUrls =
+    ownedRenderedMedia.ownerKey === mediaOwnerKey
+      ? ownedRenderedMedia.urls
+      : emptyRenderedMediaUrls;
   const [mediaRequestRevision, setMediaRequestRevision] = useState(0);
   const initialMediaPreviews = useMemo(
     () =>
@@ -474,6 +516,7 @@ export function ReviewWorkspace({
       ownerKey: mediaOwnerKey,
       types: initialVisitedMediaTypes,
     });
+    setOwnedRenderedMedia({ ownerKey: mediaOwnerKey, urls: {} });
     setZoom(100);
     setRotation(0);
     setSectionApprovalPending(false);
@@ -588,6 +631,17 @@ export function ReviewWorkspace({
             }
           : current,
       );
+      setOwnedRenderedMedia((current) => {
+        if (
+          current.ownerKey !== mediaOwnerKey ||
+          current.urls[target.type] === undefined
+        ) {
+          return current;
+        }
+        const urls = { ...current.urls };
+        delete urls[target.type];
+        return { ...current, urls };
+      });
 
       void (async () => {
         let preview: ReviewMediaPreviewState = unavailablePreview;
@@ -597,10 +651,12 @@ export function ReviewWorkspace({
               ? (
                   await import("../modules/submissions/exportMediaZipLocalDemo")
                 ).localDemoReviewMediaUrl(target.type, protectedFile, submissionId)
-              : await createMediaSignedUrl({
-                  bucket: mediaStorageBucket,
-                  path: protectedFile.storagePath,
-                });
+              : protectedFile.storagePath
+                ? await createMediaSignedUrl({
+                    bucket: mediaStorageBucket,
+                    path: protectedFile.storagePath,
+                  })
+                : null;
           const resolvedUrl = await url;
           if (!mountedRef.current || activeMediaOwnerKeyRef.current !== mediaOwnerKey) {
             if (
@@ -716,8 +772,13 @@ export function ReviewWorkspace({
     ),
   );
   const confirmationMediaStates = confirmationMediaTypes.map((type, index) => {
-    const status = mediaPreviews[type]?.status;
-    if (status) return status;
+    const preview = mediaPreviews[type];
+    if (preview?.status === "ready") {
+      return preview.url && renderedMediaUrls[type] === preview.url
+        ? "ready"
+        : "loading";
+    }
+    if (preview?.status) return preview.status;
     return confirmationMediaFiles[index] ? "loading" : "unavailable";
   });
   const allProtectedMediaReady = confirmationMediaStates.every(
@@ -905,6 +966,31 @@ export function ReviewWorkspace({
     }
   };
 
+  const clearRenderedMedia = useCallback(
+    (mediaType: ReviewMediaType) => {
+      setOwnedRenderedMedia((current) => {
+        if (current.ownerKey !== mediaOwnerKey || !current.urls[mediaType]) {
+          return current;
+        }
+        const urls = { ...current.urls };
+        delete urls[mediaType];
+        return { ...current, urls };
+      });
+    },
+    [mediaOwnerKey],
+  );
+
+  const handlePreviewReady = useCallback(
+    (mediaType: ReviewMediaType, url: string) => {
+      setOwnedRenderedMedia((current) =>
+        current.ownerKey === mediaOwnerKey
+          ? { ...current, urls: { ...current.urls, [mediaType]: url } }
+          : current,
+      );
+    },
+    [mediaOwnerKey],
+  );
+
   const handlePreviewError = (mediaType: ReviewMediaType) => {
     const objectUrl = localDemoObjectUrlByTypeRef.current.get(mediaType);
     if (objectUrl && typeof URL.revokeObjectURL === "function") {
@@ -923,6 +1009,7 @@ export function ReviewWorkspace({
           }
         : current,
     );
+    clearRenderedMedia(mediaType);
   };
 
   const handlePreviewRetry = (mediaType: ReviewMediaType) => {
@@ -943,6 +1030,7 @@ export function ReviewWorkspace({
           }
         : current,
     );
+    clearRenderedMedia(mediaType);
     setMediaRequestRevision((revision) => revision + 1);
   };
 
@@ -998,7 +1086,10 @@ export function ReviewWorkspace({
 
     const nextMediaType =
       confirmationMediaTypes.find((type) => !visitedMediaTypes.has(type)) ??
-      confirmationMediaTypes.find((type) => mediaPreviews[type]?.status !== "ready");
+      confirmationMediaTypes.find((type) => {
+        const preview = mediaPreviews[type];
+        return preview?.status !== "ready" || renderedMediaUrls[type] !== preview.url;
+      });
     if (nextMediaType) {
       handleMediaSelect(nextMediaType);
       window.requestAnimationFrame(() => {
@@ -1059,6 +1150,7 @@ export function ReviewWorkspace({
     onApplicantChange,
     prefersReducedMotion,
     reviewFields,
+    renderedMediaUrls,
     sectionAlreadyAccepted,
     visitedMediaTypes,
   ]);
@@ -1188,20 +1280,29 @@ export function ReviewWorkspace({
                 >
                   <Maximize2 aria-hidden="true" />
                 </button>
-                <a
-                  aria-disabled={!activePreviewUrl}
-                  aria-label="Скачать файл"
-                  className={`v19-review-download v19-review-toolbar-download${activePreviewUrl ? "" : " is-disabled"}`}
-                  download={
-                    activeMediaFile
-                      ? reviewFileName(activeMediaTarget, activeMediaFile)
-                      : undefined
-                  }
-                  href={activePreviewUrl}
-                  tabIndex={activePreviewUrl ? undefined : -1}
-                >
-                  <Download aria-hidden="true" />
-                </a>
+                {activePreviewUrl ? (
+                  <a
+                    aria-label="Скачать файл"
+                    className="v19-review-download v19-review-toolbar-download"
+                    download={
+                      activeMediaFile
+                        ? reviewFileName(activeMediaTarget, activeMediaFile)
+                        : undefined
+                    }
+                    href={activePreviewUrl}
+                  >
+                    <Download aria-hidden="true" />
+                  </a>
+                ) : (
+                  <button
+                    aria-label="Скачать файл"
+                    className="v19-review-download v19-review-toolbar-download is-disabled"
+                    disabled
+                    type="button"
+                  >
+                    <Download aria-hidden="true" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1227,6 +1328,7 @@ export function ReviewWorkspace({
                   testId="protected-media-preview-passport_scan"
                   variant="reference"
                   onError={() => handlePreviewError("passport_scan")}
+                  onReady={(url) => handlePreviewReady("passport_scan", url)}
                   onRetry={() => handlePreviewRetry("passport_scan")}
                 />
                 <ReviewMediaPreview
@@ -1238,6 +1340,7 @@ export function ReviewWorkspace({
                   transform={activeMediaTransform}
                   variant="active"
                   onError={() => handlePreviewError(activeMediaTarget.type)}
+                  onReady={(url) => handlePreviewReady(activeMediaTarget.type, url)}
                   onRetry={() => handlePreviewRetry(activeMediaTarget.type)}
                 />
               </div>
@@ -1252,6 +1355,7 @@ export function ReviewWorkspace({
                 transform={activeMediaTransform}
                 variant="single"
                 onError={() => handlePreviewError(activeMediaTarget.type)}
+                onReady={(url) => handlePreviewReady(activeMediaTarget.type, url)}
                 onRetry={() => handlePreviewRetry(activeMediaTarget.type)}
               />
             )}
@@ -1301,7 +1405,9 @@ export function ReviewWorkspace({
                       {target.shortLabel}
                     </span>
                     {visitedMediaTypes.has(target.type) &&
-                    mediaPreviews[target.type]?.status === "ready" ? (
+                    mediaPreviews[target.type]?.status === "ready" &&
+                    renderedMediaUrls[target.type] ===
+                      mediaPreviews[target.type]?.url ? (
                       <CheckCircle2
                         aria-hidden="true"
                         className="v19-review-media-tab-visited"
@@ -1329,20 +1435,29 @@ export function ReviewWorkspace({
                   <span>Замечание</span>
                 </button>
               ) : null}
-              <a
-                aria-disabled={!activePreviewUrl}
-                aria-label="Скачать текущий файл"
-                className={`v19-review-mobile-download${activePreviewUrl ? "" : " is-disabled"}`}
-                download={
-                  activeMediaFile
-                    ? reviewFileName(activeMediaTarget, activeMediaFile)
-                    : undefined
-                }
-                href={activePreviewUrl}
-                tabIndex={activePreviewUrl ? undefined : -1}
-              >
-                <Download aria-hidden="true" />
-              </a>
+              {activePreviewUrl ? (
+                <a
+                  aria-label="Скачать текущий файл"
+                  className="v19-review-mobile-download"
+                  download={
+                    activeMediaFile
+                      ? reviewFileName(activeMediaTarget, activeMediaFile)
+                      : undefined
+                  }
+                  href={activePreviewUrl}
+                >
+                  <Download aria-hidden="true" />
+                </a>
+              ) : (
+                <button
+                  aria-label="Скачать текущий файл"
+                  className="v19-review-mobile-download is-disabled"
+                  disabled
+                  type="button"
+                >
+                  <Download aria-hidden="true" />
+                </button>
+              )}
             </div>
           </div>
         </section>

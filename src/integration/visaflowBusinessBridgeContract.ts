@@ -1,6 +1,13 @@
-import type { ExportPackageCompletionRequest } from "../modules/submissions/exportPackageDocumentCommit";
+import type {
+  ExportPackageCompletionRequest,
+  ExportWorkbookCompletionRequest,
+  ExportWorkbookDownloadRequest,
+  WorkbookExportActionOutcome,
+  WorkbookExportReconciliationStage,
+} from "../modules/submissions/exportPackageDocumentCommit";
 import type {
   IssueInput,
+  Submission,
   SubmissionAction,
   SubmissionFileType,
   SubmissionStatus,
@@ -104,7 +111,7 @@ export interface VisaflowBusinessBridge {
   onAdminIssueAdd?: (payload: AdminIssueBridgePayload) => void | Promise<void>;
   onAdminPassportSectionApprove?: (
     payload: AdminPassportSectionApprovalBridgePayload,
-  ) => void | Promise<void>;
+  ) => Submission | void | Promise<Submission | void>;
   onAdminAiReviewRun?: (submissionId: string) => void | Promise<void>;
   onAdminAiSuggestionAccept?: (
     payload: AdminAiSuggestionBridgePayload,
@@ -118,6 +125,16 @@ export interface VisaflowBusinessBridge {
   onRemarkOpen?: (payload: RemarkBridgePayload) => void;
   onRemarkSubmit?: (payload: RemarkBridgePayload) => void | Promise<void>;
   onExportPackages?: (request: ExportPackageCompletionRequest) => void | Promise<void>;
+  onCompleteWorkbookExport?: (
+    request: ExportWorkbookCompletionRequest,
+  ) => WorkbookExportActionOutcome | Promise<WorkbookExportActionOutcome>;
+  onExportWorkbookDownloaded?: (
+    request: ExportWorkbookDownloadRequest,
+  ) => WorkbookExportActionOutcome | Promise<WorkbookExportActionOutcome>;
+  onReconcileWorkbookExport?: (
+    stage: WorkbookExportReconciliationStage,
+    request: ExportWorkbookDownloadRequest,
+  ) => WorkbookExportActionOutcome | Promise<WorkbookExportActionOutcome>;
   track?: (event: VisaflowUiEvent) => void;
 }
 

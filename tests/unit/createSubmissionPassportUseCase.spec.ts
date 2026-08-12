@@ -91,6 +91,59 @@ describe("persistCreatedSubmissionWithPassports", () => {
     expect(result.applicants[0]?.passportExtraction?.status).toBe("ready");
   });
 
+  test("records a canonical identity only after exact local-demo bytes are stored", async () => {
+    const initial = draft(1);
+    const upload = passportUpload(0);
+    const storeLocalDemoMedia = vi.fn(async (target, file: File) => {
+      expect(file).toBe(upload.file);
+      return { path: target.path };
+    });
+    const uploadMedia = vi.fn();
+
+    const result = await persistCreatedSubmissionWithPassports({
+      onPendingSubmission: () => undefined,
+      passportUploads: [upload],
+      persistSubmission: async () => undefined,
+      simulatePrivateStorage: true,
+      storageAdapter: "local-dev",
+      storeLocalDemoMedia,
+      submission: initial,
+      uploadMedia,
+      withLocalDemoMutationLock: async (operation) => operation(),
+    });
+
+    expect(storeLocalDemoMedia).toHaveBeenCalledTimes(1);
+    expect(uploadMedia).not.toHaveBeenCalled();
+    expect(result.files.find((file) => file.type === "passport_scan")).toMatchObject({
+      localDemoMediaStored: true,
+      mimeType: "image/png",
+      sizeBytes: upload.file?.size,
+      storageAdapter: "supabase-private",
+      uploadStatus: "uploaded",
+    });
+  });
+
+  test("fails closed when private-storage simulation is requested for production", async () => {
+    const persistSubmission = vi.fn(async () => undefined);
+    const uploadMedia = vi.fn();
+
+    await expect(
+      persistCreatedSubmissionWithPassports({
+        onPendingSubmission: () => undefined,
+        passportUploads: [passportUpload(0)],
+        persistSubmission,
+        simulatePrivateStorage: true,
+        storageAdapter: "supabase-private",
+        submission: draft(1),
+        uploadMedia,
+      }),
+    ).rejects.toThrow(
+      "Private Storage simulation is available only with the local-dev adapter.",
+    );
+    expect(persistSubmission).not.toHaveBeenCalled();
+    expect(uploadMedia).not.toHaveBeenCalled();
+  });
+
   test("reloads a locally persisted family with passport metadata", async () => {
     const previousStorage = Object.getOwnPropertyDescriptor(
       globalThis,

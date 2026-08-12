@@ -59,7 +59,7 @@ async function waitForAgentRowsToSettle(page: Page) {
 
 async function waitForAgentScreenToSettle(
   page: Page,
-  screen: "actions" | "submissions",
+  screen: "actions" | "create" | "submissions",
 ) {
   const surface = page.locator(
     `[data-testid="agent-screen-transition"][data-agent-screen="${screen}"]`,
@@ -117,6 +117,7 @@ test.describe("V-19 accessibility contract", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Новая подача" }),
     ).toBeVisible();
+    await waitForAgentScreenToSettle(page, "create");
     await expectNoAxeViolations(
       page,
       "create submission workspace",

@@ -46,8 +46,65 @@ describe("AgentActionsCommandCockpit", () => {
 
     expect(screen.getAllByTestId("agent-action-queue-item")).toHaveLength(1);
     const detail = screen.getByTestId("agent-action-inline-detail");
-    fireEvent.click(within(detail).getByRole("button", { name: "Добавить файл" }));
+    fireEvent.click(within(detail).getByRole("button", { name: "Добавить селфи 1" }));
     expect(onOpenPrimary).toHaveBeenCalledWith(task.relatedTasks?.[0]);
+  });
+
+  it("labels and routes multiple replacement files for the same applicant", () => {
+    const source = initialSubmissions.find((submission) => submission.id === "ПД-1048");
+    const maria = source?.applicants.find(
+      (applicant) => applicant.fullName === "Мария Иванова",
+    );
+    if (!source || !maria) throw new Error("Expected returned family fixture");
+
+    const submission = {
+      ...source,
+      files: source.files.map((file) =>
+        file.applicantId === maria.id && file.type === "selfie_2"
+          ? { ...file, status: "needs_replacement" as const }
+          : file,
+      ),
+    };
+    const queue = agentActionQueue([submission]);
+    const tasks = groupAgentActionTasksByApplicant(buildAgentActionTasks(queue.open));
+    const task = tasks.find((candidate) => candidate.applicantName === maria.fullName);
+    const relatedTask = task?.relatedTasks?.[0];
+    if (!task || !relatedTask) {
+      throw new Error("Expected two grouped replacement tasks for Maria");
+    }
+
+    const onOpenPrimary = vi.fn();
+    render(
+      <AgentActionsCommandCockpit
+        actionGroupLabel="Открытые действия"
+        desktopContextMode="inline"
+        emptyState={{ action: "Новая подача", body: "Нет действий", title: "Пусто" }}
+        expandedTaskIds={new Set([task.id])}
+        summary={summarizeAgentActionTasks(tasks)}
+        tasks={tasks}
+        onEmptyAction={vi.fn()}
+        onOpenIssue={vi.fn()}
+        onOpenPrimary={onOpenPrimary}
+        onOpenSecondary={vi.fn()}
+        onOpenTab={vi.fn()}
+        onSelectTask={vi.fn()}
+      />,
+    );
+
+    const detail = screen.getByTestId("agent-action-inline-detail");
+    const selfieOne = within(detail).getByRole("button", {
+      name: "Заменить селфи 1",
+    });
+    const selfieTwo = within(detail).getByRole("button", {
+      name: "Заменить селфи 2",
+    });
+    expect(selfieOne).toBeVisible();
+    expect(selfieTwo).toBeVisible();
+
+    fireEvent.click(selfieOne);
+    fireEvent.click(selfieTwo);
+    expect(onOpenPrimary).toHaveBeenNthCalledWith(1, task);
+    expect(onOpenPrimary).toHaveBeenNthCalledWith(2, relatedTask);
   });
 
   it("forgets expanded tasks that disappear from the current queue", () => {

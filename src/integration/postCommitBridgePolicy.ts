@@ -5,6 +5,7 @@ export type VisaflowPostCommitEventType =
   | "admin.ai.run"
   | "admin.ai.accept"
   | "admin.ai.dismiss"
+  | "export.workbook-downloaded"
   | "export.complete";
 
 export interface VisaflowPostCommitEvent {

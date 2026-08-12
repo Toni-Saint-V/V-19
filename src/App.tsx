@@ -18,6 +18,7 @@ import {
   approvePassportReviewSectionForAdmin,
   applyExportStateToSelection,
   applyActionToSubmissionListResult,
+  markSelectedExported,
 } from "./modules/submissions/submissionActions";
 import {
   acceptAiSuggestionAsIssue,
@@ -40,6 +41,11 @@ import {
   type MediaStorageTarget,
 } from "./modules/submissions/mediaStorage";
 import { exportPackageDocumentCommitMatchesIdentity } from "./modules/submissions/exportPackageDocumentCommit";
+import {
+  completeWorkbookExport,
+  reconcileWorkbookExport,
+  recordWorkbookDownloadAcknowledgement,
+} from "./modules/submissions/workbookExportPersistence";
 import {
   ensureSubmissionPublicNumber,
   isSubmissionConcurrencyConflict,
@@ -1538,19 +1544,28 @@ export default function App({
       }
 
       try {
-        await enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
-          let found = false;
-          let changed = false;
-          const nextSubmissions = submissionsRef.current.map((submission) => {
-            if (submission.id !== submissionId) return submission;
-            found = true;
-            const nextSubmission = update(submission);
-            changed ||= nextSubmission !== submission;
-            return nextSubmission;
-          });
-          if (!found) throw new Error("Подача для изменения не найдена.");
-          if (changed) await persistSubmissions(nextSubmissions, fence);
-        });
+        return await enqueueWorkspaceSubmissionMutation(
+          session.userId,
+          async (fence) => {
+            let found = false;
+            let changed = false;
+            let updatedSubmission: Submission | null = null;
+            const nextSubmissions = submissionsRef.current.map((submission) => {
+              if (submission.id !== submissionId) return submission;
+              found = true;
+              const nextSubmission = update(submission);
+              updatedSubmission = nextSubmission;
+              changed ||= nextSubmission !== submission;
+              return nextSubmission;
+            });
+            if (!found) throw new Error("Подача для изменения не найдена.");
+            if (changed) await persistSubmissions(nextSubmissions, fence);
+            if (!updatedSubmission) {
+              throw new Error("Изменённая подача не была сформирована.");
+            }
+            return updatedSubmission;
+          },
+        );
       } catch (caught) {
         const error =
           caught instanceof Error ? caught : new Error("Не удалось изменить подачу.");
@@ -1654,16 +1669,19 @@ export default function App({
         const fence = createWorkspaceMutationFence(session.userId);
         const eventId = crypto.randomUUID();
         let foundSubmission = false;
-        await updateAdminSubmission(submissionId, (submission) => {
-          foundSubmission = true;
-          const result = approvePassportReviewSectionForAdmin(
-            submission,
-            { applicantId },
-            session.userId,
-          );
-          if (!result.ok) throw new Error(result.error.message);
-          return result.data;
-        });
+        const approvedSubmission = await updateAdminSubmission(
+          submissionId,
+          (submission) => {
+            foundSubmission = true;
+            const result = approvePassportReviewSectionForAdmin(
+              submission,
+              { applicantId },
+              session.userId,
+            );
+            if (!result.ok) throw new Error(result.error.message);
+            return result.data;
+          },
+        );
         if (!foundSubmission) {
           throw new Error("Подача для подтверждения паспортной секции не найдена.");
         }
@@ -1678,8 +1696,14 @@ export default function App({
             type: "admin.passport-section.approve",
           },
           fence,
-          () => bridge.onAdminPassportSectionApprove?.({ submissionId, applicantId }),
+          async () => {
+            await bridge.onAdminPassportSectionApprove?.({
+              submissionId,
+              applicantId,
+            });
+          },
         );
+        return approvedSubmission;
       },
       onAdminAiReviewRun: async (submissionId) => {
         const session = activeApprovedSession;
@@ -1752,6 +1776,320 @@ export default function App({
           fence,
           () => bridge.onAdminAiSuggestionDismiss?.({ submissionId, suggestionId }),
         );
+      },
+      onExportWorkbookDownloaded: async ({
+        archiveInputSignature,
+        expectedCaseRevisions,
+        packageIdentity,
+        submissionIds,
+      }) => {
+        const session = activeApprovedSession;
+        if (
+          workspace !== "admin" ||
+          session?.role !== "admin" ||
+          session.status !== "active" ||
+          session.approvalStatus !== "approved"
+        ) {
+          throw new Error(
+            "Only an approved admin session can record workbook downloads.",
+          );
+        }
+
+        const postCommitFence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
+        const shouldDispatch = await enqueueWorkspaceSubmissionMutation(
+          session.userId,
+          async (fence) => {
+          const currentSubmissions = submissionsRef.current;
+          const requestedSubmissionIds = new Set(submissionIds);
+          const selectedCurrent = currentSubmissions.filter((submission) =>
+            requestedSubmissionIds.has(submission.id),
+          );
+          const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
+          const currentArchiveInputSignature =
+            buildExportArchiveInputSignature(selectedCurrent);
+          const selectionMatchesWorkbook =
+            requestedSubmissionIds.size === submissionIds.length &&
+            selectedCurrent.length === submissionIds.length &&
+            archiveInputSignature === currentArchiveInputSignature &&
+            submissionIds.every(
+              (submissionId) =>
+                caseRevisionsBySubmissionIdRef.current.get(submissionId) ===
+                expectedCaseRevisions[submissionId],
+            ) &&
+            exportPackageIdentityMatches(packageIdentity, currentPackageIdentity);
+          if (!selectionMatchesWorkbook) {
+            throw new Error("Export workbook is stale; regenerate it before retrying.");
+          }
+
+          const request = {
+            archiveInputSignature,
+            expectedCaseRevisions,
+            packageIdentity,
+            submissionIds,
+          };
+          const alreadyDownloaded = selectedCurrent.every(
+            (submission) =>
+              submission.exportState === "file_downloaded" &&
+              Boolean(
+                submission.exportPackage &&
+                exportPackageIdentityMatches(
+                  submission.exportPackage,
+                  currentPackageIdentity,
+                ),
+              ),
+          );
+          if (alreadyDownloaded && !supabaseEnabled) return false;
+
+          if (supabaseEnabled) {
+            try {
+              fence.assertCurrent();
+              const result = await recordWorkbookDownloadAcknowledgement(request);
+              fence.assertCurrent();
+              await runCanonicalSubmissionsRefresh(true);
+              return !result.duplicate;
+            } catch (error) {
+              if (isWorkspaceSessionChangedError(error)) throw error;
+              fence.assertCurrent();
+              const reconciliation = await reconcileWorkbookExport("t8", request);
+              fence.assertCurrent();
+              if (reconciliation.status === "committed") {
+                await runCanonicalSubmissionsRefresh(true);
+                return true;
+              }
+              if (reconciliation.status === "unknown") {
+                void refreshCanonicalSubmissions();
+                throw new Error(
+                  "Workbook acknowledgement outcome is unknown; canonical state will be rechecked.",
+                  { cause: error },
+                );
+              }
+              throw error;
+            }
+          }
+
+          const generatedSubmissions = applyExportStateToSelection(
+            currentSubmissions,
+            submissionIds,
+            "file_generated",
+          );
+          const downloadedSubmissions = applyExportStateToSelection(
+            generatedSubmissions,
+            submissionIds,
+            "file_downloaded",
+          );
+          if (
+            generatedSubmissions === currentSubmissions ||
+            downloadedSubmissions === generatedSubmissions
+          ) {
+            throw new Error("Workbook download state was blocked by domain guards.");
+          }
+          const selectedDownloaded = downloadedSubmissions.filter((submission) =>
+            requestedSubmissionIds.has(submission.id),
+          );
+          const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
+          if (
+            selectedDownloaded.length !== submissionIds.length ||
+            !exportPackageIdentityMatches(packageIdentity, downloadedIdentity) ||
+            selectedDownloaded.some(
+              (submission) =>
+                submission.status !== "ready_for_export" ||
+                submission.exportState !== "file_downloaded" ||
+                !submission.exportPackage ||
+                !exportPackageIdentityMatches(
+                  packageIdentity,
+                  submission.exportPackage,
+                ),
+            )
+          ) {
+            throw new Error("Workbook download state failed canonical validation.");
+          }
+          await persistSubmissions(downloadedSubmissions, fence);
+          return true;
+          },
+        );
+
+        postCommitFence.assertCurrent();
+        if (!shouldDispatch) return { duplicate: true, status: "committed" };
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: {
+              archiveInputSignature,
+              expectedCaseRevisions,
+              packageIdentity,
+              submissionIds,
+            },
+            submissionIds,
+            type: "export.workbook-downloaded",
+          },
+          postCommitFence,
+          async () => {
+            await bridge.onExportWorkbookDownloaded?.({
+              archiveInputSignature,
+              expectedCaseRevisions,
+              packageIdentity,
+              submissionIds,
+            });
+          },
+        );
+        return { duplicate: false, status: "committed" };
+      },
+      onCompleteWorkbookExport: async ({
+        archiveInputSignature,
+        expectedCaseRevisions,
+        packageIdentity,
+        submissionIds,
+      }) => {
+        const session = activeApprovedSession;
+        if (
+          workspace !== "admin" ||
+          session?.role !== "admin" ||
+          session.status !== "active" ||
+          session.approvalStatus !== "approved"
+        ) {
+          throw new Error(
+            "Only an approved admin session can complete workbook exports.",
+          );
+        }
+
+        const postCommitFence = createWorkspaceMutationFence(session.userId);
+        const eventId = crypto.randomUUID();
+        const shouldDispatch = await enqueueWorkspaceSubmissionMutation(
+          session.userId,
+          async (fence) => {
+            const currentSubmissions = submissionsRef.current;
+            const requestedSubmissionIds = new Set(submissionIds);
+            const selectedCurrent = currentSubmissions.filter((submission) =>
+              requestedSubmissionIds.has(submission.id),
+            );
+            const currentPackageIdentity = buildExportPackageIdentity(selectedCurrent);
+            const currentArchiveInputSignature =
+              buildExportArchiveInputSignature(selectedCurrent);
+            const selectionMatchesWorkbook =
+              requestedSubmissionIds.size === submissionIds.length &&
+              selectedCurrent.length === submissionIds.length &&
+              archiveInputSignature === currentArchiveInputSignature &&
+              submissionIds.every(
+                (submissionId) =>
+                  caseRevisionsBySubmissionIdRef.current.get(submissionId) ===
+                  expectedCaseRevisions[submissionId],
+              ) &&
+              exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
+              selectedCurrent.every(
+                (submission) =>
+                  submission.status === "ready_for_export" &&
+                  submission.exportState === "file_downloaded" &&
+                  Boolean(
+                    submission.exportPackage &&
+                    exportPackageIdentityMatches(
+                      submission.exportPackage,
+                      currentPackageIdentity,
+                    ),
+                  ),
+              );
+            if (!selectionMatchesWorkbook) {
+              throw new Error(
+                "Workbook completion is stale; reload canonical state before retrying.",
+              );
+            }
+
+            const request = {
+              archiveInputSignature,
+              expectedCaseRevisions,
+              packageIdentity,
+              submissionIds,
+            };
+            if (supabaseEnabled) {
+              try {
+                fence.assertCurrent();
+                const result = await completeWorkbookExport(request);
+                fence.assertCurrent();
+                await runCanonicalSubmissionsRefresh(true);
+                return !result.duplicate;
+              } catch (error) {
+                if (isWorkspaceSessionChangedError(error)) throw error;
+                fence.assertCurrent();
+                const reconciliation = await reconcileWorkbookExport("t9", request);
+                fence.assertCurrent();
+                if (reconciliation.status === "committed") {
+                  await runCanonicalSubmissionsRefresh(true);
+                  return true;
+                }
+                if (reconciliation.status === "unknown") {
+                  void refreshCanonicalSubmissions();
+                  throw new Error(
+                    "Workbook completion outcome is unknown; canonical state will be rechecked.",
+                    { cause: error },
+                  );
+                }
+                throw error;
+              }
+            }
+
+            const completedSubmissions = markSelectedExported(
+              currentSubmissions,
+              submissionIds,
+            );
+            if (completedSubmissions === currentSubmissions) {
+              throw new Error("Workbook completion was blocked by domain guards.");
+            }
+            await persistSubmissions(completedSubmissions, fence);
+            return true;
+          },
+        );
+
+        postCommitFence.assertCurrent();
+        if (!shouldDispatch) return { duplicate: true, status: "committed" };
+        dispatchPostCommitBridge(
+          {
+            actorId: session.userId,
+            committedAt: new Date().toISOString(),
+            eventId,
+            payload: {
+              archiveInputSignature,
+              expectedCaseRevisions,
+              packageIdentity,
+              submissionIds,
+            },
+            submissionIds,
+            type: "export.complete",
+          },
+          postCommitFence,
+          async () => {
+            await bridge.onCompleteWorkbookExport?.({
+              archiveInputSignature,
+              expectedCaseRevisions,
+              packageIdentity,
+              submissionIds,
+            });
+          },
+        );
+        return { duplicate: false, status: "committed" };
+      },
+      onReconcileWorkbookExport: async (stage, request) => {
+        const session = activeApprovedSession;
+        if (
+          workspace !== "admin" ||
+          session?.role !== "admin" ||
+          session.status !== "active" ||
+          session.approvalStatus !== "approved" ||
+          !supabaseEnabled
+        ) {
+          return { duplicate: false, status: "not_committed" };
+        }
+        const result = await reconcileWorkbookExport(stage, request);
+        if (result.status === "committed") {
+          await runCanonicalSubmissionsRefresh(true);
+          return { duplicate: true, status: "committed" };
+        }
+        if (result.status === "unknown") {
+          void refreshCanonicalSubmissions();
+          return { duplicate: false, status: "unknown" };
+        }
+        return { duplicate: false, status: "not_committed" };
       },
       onExportPackages: async ({
         archiveInputSignature,
@@ -1999,6 +2337,8 @@ export default function App({
       enqueueWorkspaceSubmissionMutation,
       persistSubmissions,
       refreshCanonicalSubmissions,
+      runCanonicalSubmissionsRefresh,
+      supabaseEnabled,
       updateAdminSubmission,
       workspace,
     ],
@@ -2120,6 +2460,7 @@ export default function App({
           onRejectAccessRequest: handleRejectAccessRequest,
           onSignOut: handleSignOut,
           submissions,
+          caseRevisionsBySubmissionId: caseRevisionsBySubmissionIdRef.current,
           usesSupabase: supabaseEnabled,
         }}
         agentWorkspaceProps={{

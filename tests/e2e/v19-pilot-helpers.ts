@@ -1,4 +1,9 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import {
+  questionnaireFixturePreferredOption,
+  questionnaireFixtureTextValue,
+} from "../e2e-supabase-ui/questionnaire-fixture-values";
 
 export function collectBrowserProblems(page: Page) {
   const problems: string[] = [];
@@ -86,15 +91,181 @@ export async function isVisible(locator: Locator) {
   return locator.isVisible({ timeout: 750 }).catch(() => false);
 }
 
-function mobileMenuTrigger(page: Page) {
-  return page
-    .getByRole("button", { exact: true, name: "Меню" })
-    .or(
-      page.getByRole("button", {
-        exact: true,
-        name: "Открыть меню администратора",
-      }),
+export async function fillRequiredQuestionnaireAndExit(
+  page: Page,
+  runId: string,
+  expectedApplicantNames?: readonly string[],
+) {
+  const questionnaire = page.locator(".vf-figma-questionnaire-screen").first();
+  if (!(await isVisible(questionnaire))) {
+    const open = drawer(page).getByRole("button", { name: "Открыть анкету" }).first();
+    await expect(open).toBeVisible();
+    await open.click();
+    await expect(questionnaire).toBeVisible();
+  }
+
+  const submissionId = await questionnaire.getAttribute("data-submission-id");
+  if (!submissionId) {
+    throw new Error("Questionnaire did not expose the active submission id.");
+  }
+
+  const applicants = questionnaire.locator(".v19-questionnaire-applicant-tab");
+  const applicantCount = Math.max(await applicants.count(), 1);
+  const touristSwitcher = questionnaire.getByRole("combobox", {
+    name: "Выбрать туриста",
+  });
+  let requiredFieldCount = 0;
+
+  for (let applicantIndex = 0; applicantIndex < applicantCount; applicantIndex += 1) {
+    if (applicantIndex > 0) {
+      await expect(touristSwitcher).toBeVisible();
+      await touristSwitcher.click();
+      const touristOptions = page
+        .getByRole("listbox", { name: "Выбрать туриста" })
+        .getByRole("option");
+      await expect(touristOptions).toHaveCount(applicantCount);
+      await touristOptions.nth(applicantIndex).click();
+      await expect(applicants.nth(applicantIndex)).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    }
+
+    const sections = questionnaire.locator(
+      ".v19-questionnaire-section-list--sidebar .v19-questionnaire-section-tab:visible",
     );
+    const sectionCount = await sections.count();
+    expect(sectionCount).toBeGreaterThan(0);
+
+    for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
+      await sections.nth(sectionIndex).click();
+      await expect(sections.nth(sectionIndex)).toHaveAttribute("aria-pressed", "true");
+      const sectionLabel = (await sections.nth(sectionIndex).innerText())
+        .replace(/\s+/g, " ")
+        .trim();
+      const fields = questionnaire.locator(
+        ".v19-questionnaire-work-panel [data-field-label]",
+      );
+      const fieldLabels = await fields.evaluateAll((elements) =>
+        elements
+          .map(
+            (element) =>
+              (element as unknown as { dataset?: { fieldLabel?: string } }).dataset
+                ?.fieldLabel ?? "",
+          )
+          .filter(Boolean),
+      );
+
+      for (const label of fieldLabels) {
+        const escapedLabel = label.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        const field = questionnaire
+          .locator(`.v19-questionnaire-work-panel [data-field-label="${escapedLabel}"]`)
+          .first();
+        const requiredControl = field.locator('[aria-required="true"]').first();
+        if ((await requiredControl.count()) === 0) continue;
+        requiredFieldCount += 1;
+
+        const textControl = field
+          .locator("input:not([readonly]), textarea:not([readonly])")
+          .first();
+        if (await isVisible(textControl)) {
+          const expectedName = expectedApplicantNames?.[applicantIndex]
+            ?.trim()
+            .split(/\s+/)
+            .filter(Boolean);
+          const expectedIdentityValue =
+            label === "Фамилия" && expectedName?.length
+              ? expectedName[0]!
+              : label === "Имя" && expectedName?.length
+                ? expectedName.slice(1).join(" ") || "Заявитель"
+                : null;
+          if (
+            expectedIdentityValue !== null ||
+            !(await textControl.inputValue()).trim()
+          ) {
+            const fieldValue =
+              expectedIdentityValue ??
+              (label === "С какого числа"
+                ? "01.12.2026"
+                : label === "По какое число"
+                  ? "08.12.2026"
+                  : questionnaireFixtureTextValue(
+                      label,
+                      runId,
+                      requiredFieldCount,
+                      sectionLabel,
+                    ));
+            await textControl.fill(fieldValue);
+          }
+        } else {
+          const preferredOption = questionnaireFixturePreferredOption(label);
+          const quickOptions = field.locator("button.v19-questionnaire-quick-option");
+          const quickOption = preferredOption
+            ? quickOptions.getByText(preferredOption, { exact: true })
+            : quickOptions.first();
+
+          if (await isVisible(quickOption)) {
+            if ((await field.locator('button[aria-pressed="true"]').count()) === 0) {
+              await quickOption.click();
+            }
+          } else {
+            const dropdown = field
+              .locator("button.v19-questionnaire-field-control")
+              .first();
+            if (await isVisible(dropdown)) {
+              const currentValue = (await dropdown.innerText()).trim();
+              if (currentValue.includes("Выберите")) {
+                await dropdown.click();
+                const options = questionnaire.locator(
+                  ".v19-questionnaire-dropdown:visible .v19-questionnaire-dropdown-option",
+                );
+                const option = preferredOption
+                  ? options.getByText(preferredOption, { exact: true })
+                  : options.first();
+                await option.click();
+              }
+            }
+          }
+        }
+
+        const confirmReview = field
+          .getByRole("button", { name: /^Подтвердить поле:/ })
+          .first();
+        if (await isVisible(confirmReview)) await confirmReview.click();
+      }
+    }
+
+    if (applicantIndex === 0 && applicantCount > 1) {
+      const copyShared = questionnaire.getByRole("button", {
+        name: "Копировать для всех",
+      });
+      if (await isVisible(copyShared)) {
+        await copyShared.click();
+        const confirmCopy = questionnaire.getByRole("button", {
+          name: "Подтвердить копирование",
+        });
+        await expect(confirmCopy).toBeVisible();
+        await confirmCopy.click();
+      }
+    }
+  }
+
+  expect(requiredFieldCount).toBeGreaterThan(0);
+  await questionnaire
+    .getByRole("button", { name: "Сохранить и выйти", exact: true })
+    .first()
+    .click();
+  await expect(questionnaire).toHaveCount(0);
+  return submissionId;
+}
+
+function mobileMenuTrigger(page: Page) {
+  return page.getByRole("button", { exact: true, name: "Меню" }).or(
+    page.getByRole("button", {
+      exact: true,
+      name: "Открыть меню администратора",
+    }),
+  );
 }
 
 export async function openMobileMenu(page: Page) {
@@ -162,11 +333,11 @@ async function waitForStableInViewport(locator: Locator) {
         const nextBox = await locator.boundingBox().catch(() => null);
         const isStable = Boolean(
           nextBox &&
-            previousBox &&
-            Math.abs(nextBox.x - previousBox.x) < 0.5 &&
-            Math.abs(nextBox.y - previousBox.y) < 0.5 &&
-            Math.abs(nextBox.width - previousBox.width) < 0.5 &&
-            Math.abs(nextBox.height - previousBox.height) < 0.5,
+          previousBox &&
+          Math.abs(nextBox.x - previousBox.x) < 0.5 &&
+          Math.abs(nextBox.y - previousBox.y) < 0.5 &&
+          Math.abs(nextBox.width - previousBox.width) < 0.5 &&
+          Math.abs(nextBox.height - previousBox.height) < 0.5,
         );
         previousBox = nextBox;
         return isStable;
@@ -224,9 +395,12 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
 
   if (!(await hasAtLeastOneVisible(button))) {
     await openMobileMenu(page);
-    await button.first().waitFor({ state: "visible", timeout: 2_000 }).catch(() => {
-      // Keep the original visible-button assertion below as the failure owner.
-    });
+    await button
+      .first()
+      .waitFor({ state: "visible", timeout: 2_000 })
+      .catch(() => {
+        // Keep the original visible-button assertion below as the failure owner.
+      });
   }
 
   await expectAtLeastOneVisible(
@@ -244,11 +418,13 @@ export function drawer(page: Page) {
 export function submissionCard(page: Page, name: string) {
   const fixtureIds: Record<string, string> = {
     "Нина Волкова": "ПД-1053",
-    "Петровы": "ПД-1054",
+    Петровы: "ПД-1054",
     "Семья Петровых": "ПД-1054",
   };
   const byText = page
-    .locator(".submission-card, .v17-admin-work-row, .v19-event-row, [data-submission-card]")
+    .locator(
+      ".submission-card, .v17-admin-work-row, .v19-event-row, [data-submission-card]",
+    )
     .filter({ hasText: name })
     .first();
   const fixtureId = fixtureIds[name];
@@ -472,15 +648,23 @@ export async function expectDrawerStatus(page: Page, status: string) {
 }
 
 export function e2ePassportFile(name: string) {
+  const jpeg = readFileSync(
+    new URL("../../src/assets/export-demo/selfie_2.jpg", import.meta.url),
+  );
   return {
-    buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+    // The marker makes every tourist upload byte-distinct while preserving a
+    // browser-decodable JPEG. IndexedDB/readback assertions bind the preview to
+    // this exact payload instead of a shared canned image.
+    buffer: Buffer.concat([jpeg, Buffer.from(`\nV19-E2E:${name}`, "utf8")]),
     mimeType: "image/jpeg",
     name: `e2e-passport-${name}.jpg`,
   };
 }
 
 export async function uploadAllVisibleFiles(page: Page) {
-  await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
+  await expect(
+    drawer(page).getByRole("heading", { name: "Файлы подачи" }),
+  ).toBeVisible();
 
   for (let pass = 0; pass < 40; pass += 1) {
     const fileInputs = drawer(page).locator(".drawer-file-input");
@@ -498,6 +682,29 @@ export async function uploadAllVisibleFiles(page: Page) {
   throw new Error("Unable to upload all visible files.");
 }
 
+export async function uploadAllAgentDrawerChecklistFiles(page: Page) {
+  const checklist = drawer(page).getByRole("heading", {
+    name: "Чеклист документов",
+  });
+  await expect(checklist).toBeVisible();
+
+  for (let pass = 0; pass < 40; pass += 1) {
+    const uploadRows = drawer(page).locator(
+      ".v19-agent-drawer-document-row.is-actionable",
+    );
+    const remaining = await uploadRows.count();
+    if (remaining === 0) return;
+
+    const chooserPromise = page.waitForEvent("filechooser");
+    await uploadRows.first().click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles(e2ePassportFile(`agent-drawer-checklist-${pass}`));
+    await expect(uploadRows).toHaveCount(remaining - 1);
+  }
+
+  throw new Error("Unable to upload all agent drawer checklist files.");
+}
+
 export async function markVisibleIssuesFixed(page: Page) {
   await openDrawerTab(page, ["Замечания"]);
   await expect(drawer(page).getByRole("heading", { name: "Замечания" })).toBeVisible();
@@ -509,14 +716,22 @@ export async function markVisibleIssuesFixed(page: Page) {
     name: "Отправить исправления",
   });
 
-  if (!((await submitCorrectionsButton.count()) > 0 && await submitCorrectionsButton.isEnabled())) {
-    await fixedButtons.first().waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
+  if (
+    !(
+      (await submitCorrectionsButton.count()) > 0 &&
+      (await submitCorrectionsButton.isEnabled())
+    )
+  ) {
+    await fixedButtons
+      .first()
+      .waitFor({ state: "visible", timeout: 2000 })
+      .catch(() => {});
   }
 
   for (let safety = 0; safety < 12; safety += 1) {
     if (
       (await submitCorrectionsButton.count()) > 0 &&
-      await submitCorrectionsButton.isEnabled()
+      (await submitCorrectionsButton.isEnabled())
     ) {
       return;
     }
@@ -524,7 +739,9 @@ export async function markVisibleIssuesFixed(page: Page) {
     if ((await fixedButtons.count()) === 0) return;
 
     await fixedButtons.first().click();
-    await expect(drawer(page).getByRole("heading", { name: "Замечания" })).toBeVisible();
+    await expect(
+      drawer(page).getByRole("heading", { name: "Замечания" }),
+    ).toBeVisible();
   }
 
   throw new Error("Too many visible issue fix buttons.");

@@ -82,6 +82,7 @@ interface ExportItem {
 
 interface PreparedExportPackage {
   archiveInputSignature: string;
+  expectedCaseRevisions: Record<string, number>;
   identity: ExportPackageIdentity;
   submissionIds: string[];
   submissions: Submission[];
@@ -96,6 +97,8 @@ interface PreparedExportArchive {
 type ExportQueueTab = "ready" | "selected" | "blocked";
 type ExportSort = "tripDate" | "createdAt";
 type ExportTypeFilter = "all" | "family" | "single";
+type WorkbookReconcileStage = "t8" | "t9";
+type WorkbookRetryStage = "t8" | "t9";
 type ExportFailureKind =
   | "selection"
   | "authority"
@@ -249,8 +252,10 @@ function exportAgentName(agentId: string) {
 }
 
 export function AdminExportScreen({
+  caseRevisionsBySubmissionId = new Map(),
   submissions = [],
 }: {
+  caseRevisionsBySubmissionId?: ReadonlyMap<string, number>;
   submissions?: Submission[];
 }) {
   const prefersReducedMotion = useExperienceReducedMotion();
@@ -279,6 +284,13 @@ export function AdminExportScreen({
     null,
   );
   const [archiveDownloadStarted, setArchiveDownloadStarted] = useState(false);
+  const [workbookDownloadDispatched, setWorkbookDownloadDispatched] = useState(false);
+  const [workbookAcknowledged, setWorkbookAcknowledged] = useState(false);
+  const [workbookCompletionRequested, setWorkbookCompletionRequested] = useState(false);
+  const [workbookReconcileStage, setWorkbookReconcileStage] =
+    useState<WorkbookReconcileStage | null>(null);
+  const [workbookRetryStage, setWorkbookRetryStage] =
+    useState<WorkbookRetryStage | null>(null);
   const [mobileControlOpen, setMobileControlOpen] = useState(false);
   const mobileControlSheetRef = useRef<HTMLElement>(null);
   const closeMobileControl = useCallback(() => setMobileControlOpen(false), []);
@@ -307,6 +319,11 @@ export function AdminExportScreen({
     setPreparedExport(null);
     setPreparedArchive(null);
     setArchiveDownloadStarted(false);
+    setWorkbookDownloadDispatched(false);
+    setWorkbookAcknowledged(false);
+    setWorkbookCompletionRequested(false);
+    setWorkbookReconcileStage(null);
+    setWorkbookRetryStage(null);
     if (!preserveNotice) {
       terminalNoticeSelectionRef.current = null;
       setExportNotice("");
@@ -394,6 +411,11 @@ export function AdminExportScreen({
       (terminalNoticeSelectionRef.current === selectedSignature ||
         selectedSignature === "");
     setPreparedExport(null);
+    setWorkbookDownloadDispatched(false);
+    setWorkbookAcknowledged(false);
+    setWorkbookCompletionRequested(false);
+    setWorkbookReconcileStage(null);
+    setWorkbookRetryStage(null);
     setExportError("");
     if (!preserveTerminalNotice) {
       terminalNoticeSelectionRef.current = null;
@@ -418,10 +440,9 @@ export function AdminExportScreen({
   const selectedWarnings = selectedCount ? selectedPlan.warnings.length : 0;
   const selectedBlockers = selectedCount ? selectedPlan.blockers.length : 0;
   const hasExportBlockers = selectedCount > 0 && selectedBlockers > 0;
-  const excelDownloadCompleted =
+  const workbookReceiptRecorded =
     !adminDocumentPackageExportEnabled &&
-    Boolean(preparedExport) &&
-    exportNotice.startsWith("Excel скачан:");
+    (workbookAcknowledged || selectedPlan.exportState === "file_downloaded");
   const activeBlockerReasons = activeItem?.blockerReasons ?? [];
   const selectedDiagnosticReasons = hasExportBlockers
     ? selectedPlan.blockers.map((blocker) => blocker.reason)
@@ -634,6 +655,15 @@ export function AdminExportScreen({
 
       return {
         archiveInputSignature,
+        expectedCaseRevisions: Object.fromEntries(
+          submissionIds.map((submissionId) => {
+            const revision = caseRevisionsBySubmissionId.get(submissionId);
+            if (revision === undefined && getSupabaseClient()) {
+              throw new Error("Каноническая ревизия подачи недоступна.");
+            }
+            return [submissionId, revision ?? 0];
+          }),
+        ),
         identity,
         submissionIds,
         submissions: selectedGenerated,
@@ -746,6 +776,117 @@ export function AdminExportScreen({
   };
 
   const handleDownloadBundle = async () => {
+    if (!adminDocumentPackageExportEnabled && workbookReconcileStage) {
+      if (!preparedExport || !bridge.onReconcileWorkbookExport || !beginExportOperation()) {
+        return;
+      }
+      try {
+        const outcome = await bridge.onReconcileWorkbookExport(
+          workbookReconcileStage,
+          {
+            archiveInputSignature: preparedExport.archiveInputSignature,
+            expectedCaseRevisions: preparedExport.expectedCaseRevisions,
+            packageIdentity: preparedExport.identity,
+            submissionIds: preparedExport.submissionIds,
+          },
+        );
+        if (outcome.status === "committed") {
+          setWorkbookReconcileStage(null);
+          setWorkbookRetryStage(null);
+          if (workbookReconcileStage === "t8") setWorkbookAcknowledged(true);
+          else setWorkbookCompletionRequested(true);
+          setExportError("");
+          setExportNotice("Каноническая фиксация подтверждена.");
+        } else if (outcome.status === "not_committed") {
+          setWorkbookReconcileStage(null);
+          setWorkbookRetryStage(workbookReconcileStage);
+          setExportError(
+            workbookReconcileStage === "t8"
+              ? "Подтверждение не записано. Повторите фиксацию без нового скачивания."
+              : "Завершение не записано. Повторите завершение выгрузки.",
+          );
+        } else {
+          setExportError("Исход операции пока неизвестен. Повторите только проверку фиксации.");
+        }
+      } finally {
+        finishExportOperation();
+      }
+      return;
+    }
+
+    if (!adminDocumentPackageExportEnabled && workbookReceiptRecorded) {
+      if (selectedCount === 0 || hasExportBlockers || !beginExportOperation()) return;
+      try {
+        const identity = buildExportPackageIdentity(selectedSubmissions);
+        const archiveInputSignature = buildExportArchiveInputSignature(selectedSubmissions);
+        if (!identity || !archiveInputSignature || !bridge.onCompleteWorkbookExport) {
+          throw new Error("Обработчик завершения выгрузки недоступен.");
+        }
+        await bridge.onCompleteWorkbookExport({
+          archiveInputSignature,
+          expectedCaseRevisions:
+            preparedExport?.expectedCaseRevisions ??
+            Object.fromEntries(
+              selectedItems.map((item) => [
+                item.id,
+                caseRevisionsBySubmissionId.get(item.id) ?? 0,
+              ]),
+            ),
+          packageIdentity: identity,
+          submissionIds: selectedItems.map((item) => item.id),
+        });
+        terminalNoticeSelectionRef.current = selectedSignature;
+        setWorkbookCompletionRequested(true);
+        setWorkbookRetryStage(null);
+        setExportError("");
+        setExportNotice("Выгрузка завершена и зафиксирована.");
+      } catch {
+        setWorkbookReconcileStage("t9");
+        setExportFailureKind("commit");
+        setExportError(
+          "Не удалось завершить выгрузку. Каноническое состояние будет проверено при повторе.",
+        );
+      } finally {
+        finishExportOperation();
+      }
+      return;
+    }
+
+    if (!adminDocumentPackageExportEnabled && workbookDownloadDispatched) {
+      if (selectedCount === 0 || hasExportBlockers || !beginExportOperation()) return;
+      try {
+        const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
+        if (
+          !preparedExport ||
+          !currentIdentity ||
+          preparedExport.archiveInputSignature !== selectedArchiveInputSignature ||
+          !exportPackageIdentityMatches(preparedExport.identity, currentIdentity) ||
+          !bridge.onExportWorkbookDownloaded
+        ) {
+          throw new Error("Excel изменился или обработчик подтверждения недоступен.");
+        }
+        await bridge.onExportWorkbookDownloaded({
+          archiveInputSignature: preparedExport.archiveInputSignature,
+          expectedCaseRevisions: preparedExport.expectedCaseRevisions,
+          packageIdentity: preparedExport.identity,
+          submissionIds: preparedExport.submissionIds,
+        });
+        setWorkbookAcknowledged(true);
+        setWorkbookRetryStage(null);
+        setExportError("");
+        setExportNotice("Excel сохранён: подтверждение зафиксировано.");
+      } catch {
+        setWorkbookReconcileStage("t8");
+        setExportFailureKind("commit");
+        setExportError(
+          "Подтверждение не зафиксировано. Проверьте пакет и повторите действие без нового скачивания.",
+        );
+      } finally {
+        finishExportOperation();
+      }
+      return;
+    }
+
     if (preparedArchive && archiveDownloadStarted) {
       const currentIdentity = buildExportPackageIdentity(selectedSubmissions);
       if (
@@ -783,8 +924,11 @@ export function AdminExportScreen({
           return;
         }
         setPreparedExport(prepared);
+        setWorkbookDownloadDispatched(true);
         setExportError("");
-        setExportNotice(`Excel скачан: ${result.fileName}`);
+        setExportNotice(
+          `Excel передан браузеру: ${result.fileName}. После сохранения подтвердите это отдельным нажатием.`,
+        );
         return;
       }
 
@@ -1217,28 +1361,38 @@ export function AdminExportScreen({
                   selectedCount === 0 ||
                   isExporting ||
                   hasExportBlockers ||
-                  excelDownloadCompleted
+                  workbookCompletionRequested
                 }
                 type="button"
                 onClick={() => void handleDownloadBundle()}
               >
                 {isExporting ? (
                   <UploadCloud className="h-4 w-4 animate-pulse" />
-                ) : excelDownloadCompleted ? (
+                ) : workbookCompletionRequested ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
                 {isExporting
                   ? "Готовим выгрузку…"
-                  : excelDownloadCompleted
-                    ? "Excel скачан"
+                  : workbookCompletionRequested
+                    ? "Выгрузка завершена"
+                    : workbookReconcileStage
+                      ? "Проверить фиксацию"
+                    : workbookRetryStage === "t9"
+                      ? "Повторить завершение"
+                    : workbookRetryStage === "t8"
+                      ? "Повторить фиксацию"
+                    : workbookReceiptRecorded
+                      ? "Завершить выгрузку"
+                      : workbookDownloadDispatched
+                        ? "Excel сохранён — зафиксировать"
                     : archiveDownloadStarted
                       ? "Подтвердить скачивание"
                       : adminDocumentPackageExportEnabled
                         ? "Скачать ZIP + Excel"
                         : "Скачать Excel"}
-                {!isExporting && !excelDownloadCompleted && (
+                {!isExporting && !workbookCompletionRequested && (
                   <ArrowRight className="h-4 w-4" />
                 )}
               </button>

@@ -3244,13 +3244,20 @@ export function FigmaQuestionnaireScreen({
   );
   const guardianDetailsAreVisible =
     applicantIsMinor && (Boolean(formData.guardianInfo.trim()) || showGuardianDetails);
+  const hasCompanyInviteDetails = [
+    formData.companyOrgDetails,
+    formData.companyContactPerson,
+    formData.companyPhone,
+  ].some((value) => Boolean(value.trim()));
+  const hasActionableCompanyInviteField = [
+    ["company-org-details", "Название и адрес компании/организации"],
+    ["company-contact-person", "Контактное лицо компании"],
+    ["company-phone", "Телефон компании"],
+  ].some(([fieldId, label]) => fieldReviewState(fieldId, label) !== "normal");
   const showCompanyInviteFields =
     isBlsQuestionnaireInvitingCompanySelected(formData) ||
-    [
-      formData.companyOrgDetails,
-      formData.companyContactPerson,
-      formData.companyPhone,
-    ].some((value) => Boolean(value.trim()));
+    hasActionableCompanyInviteField ||
+    (!formData.invitingPartyType.trim() && hasCompanyInviteDetails);
   const primaryApplicantId = primaryApplicantIdForPassportReview(draftSubmission);
   const primaryApplicant = draftSubmission.applicants.find(
     (applicant) => applicant.id === primaryApplicantId,

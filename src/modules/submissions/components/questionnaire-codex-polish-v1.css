@@ -1135,6 +1135,7 @@
 }
 
 .v19-select-menu-popover.is-questionnaire-tourist {
+  z-index: 2147483100;
   gap: var(--v19b-size-4);
   padding: var(--v19b-size-8);
   border-color: var(--v19b-color-border-strong);

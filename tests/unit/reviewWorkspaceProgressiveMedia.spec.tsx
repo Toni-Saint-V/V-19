@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ReviewWorkspace } from "../../src/components/ReviewWorkspace";
+import { supabaseRuntimeConfig } from "../../src/lib/supabase/config";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import * as mediaStorage from "../../src/modules/submissions/mediaStorage";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStoragePolicy";
@@ -323,7 +324,7 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(passportImage).toHaveClass("is-loading");
     expect(sectionAction).toHaveAttribute(
       "title",
-      "Откройте и проверьте каждый обязательный оригинал перед подтверждением.",
+      "Загружаем защищённые оригиналы для сверки…",
     );
 
     fireEvent.load(passportImage);
@@ -351,7 +352,16 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(
       await screen.findByRole("img", { name: "Первое селфи заявителя" }),
     ).toHaveAttribute("src", "https://media.test/selfie.jpg");
-    expect(sectionAction).toBeEnabled();
+    const selfieImage = screen.getByRole("img", {
+      name: "Первое селфи заявителя",
+    });
+    expect(selfieImage).toHaveClass("is-loading");
+    expect(sectionAction).toHaveAttribute(
+      "aria-label",
+      "Перейти к следующему шагу в паспортной секции",
+    );
+    fireEvent.load(selfieImage);
+    await waitFor(() => expect(selfieImage).toHaveClass("is-ready"));
 
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
     await waitFor(() =>
@@ -361,6 +371,16 @@ describe("ReviewWorkspace perceived feedback", () => {
       secondSelfie.resolve("https://media.test/selfie-2.jpg");
       await secondSelfie.promise;
     });
+    const secondSelfieImage = await screen.findByRole("img", {
+      name: "Второе селфи заявителя",
+    });
+    expect(secondSelfieImage).toHaveClass("is-loading");
+    expect(sectionAction).toHaveAttribute(
+      "aria-label",
+      "Перейти к следующему шагу в паспортной секции",
+    );
+    fireEvent.load(secondSelfieImage);
+    await waitFor(() => expect(secondSelfieImage).toHaveClass("is-ready"));
     await waitFor(() =>
       expect(sectionAction).toHaveAttribute(
         "aria-label",
@@ -368,6 +388,116 @@ describe("ReviewWorkspace perceived feedback", () => {
       ),
     );
     expect(sectionAction).not.toHaveAttribute("title");
+  });
+
+  test("keeps confirmation locked when a protected image cannot decode", async () => {
+    const submission = reviewSubmission();
+    const onApproveSection = vi.fn();
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://media.test/corrupt.jpg",
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={submission.applicants[0]?.id}
+        onAddRemark={() => undefined}
+        onApproveSection={onApproveSection}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const passportImage = await screen.findByRole("img", {
+      name: "Оригинал загранпаспорта",
+    });
+    Object.defineProperty(passportImage, "decode", {
+      configurable: true,
+      value: () => Promise.reject(new Error("corrupt image")),
+    });
+    fireEvent.load(passportImage);
+
+    await waitFor(() =>
+      expect(screen.getByText("Защищённый оригинал недоступен")).toBeVisible(),
+    );
+    const sectionAction = screen.getByRole("button", {
+      name: "Перейти к следующему шагу в паспортной секции",
+    });
+    expect(sectionAction).toHaveAttribute(
+      "title",
+      "Для подтверждения нужны защищённые оригиналы паспорта и двух селфи.",
+    );
+    fireEvent.click(sectionAction);
+    expect(onApproveSection).not.toHaveBeenCalled();
+  });
+
+  test("keeps HEIC confirmation locked until the reviewer acknowledges the external viewer", async () => {
+    const source = familyPartiallyReadySubmission();
+    const secondary = source.applicants[1];
+    if (!secondary) throw new Error("Expected secondary family applicant");
+    const submission: Submission = {
+      ...source,
+      files: source.files.map((file) => {
+        if (file.applicantId !== secondary.id || file.type !== "passport_scan") {
+          return file;
+        }
+        const generatedFileName = file.generatedFileName?.replace(/\.[^.]+$/, ".heic");
+        if (!generatedFileName)
+          throw new Error("Expected generated passport file name");
+        const target = buildMediaStoragePath(
+          source.id,
+          secondary.id,
+          file.type,
+          generatedFileName,
+        );
+        return {
+          ...file,
+          generatedFileName,
+          mimeType: "image/heic",
+          storageBucket: target.bucket,
+          storagePath: target.path,
+        };
+      }),
+    };
+    const onApproveSection = vi.fn().mockResolvedValue(true);
+    vi.spyOn(mediaStorage, "createMediaSignedUrl").mockResolvedValue(
+      "https://media.test/secondary-passport.heic",
+    );
+
+    render(
+      <ReviewWorkspace
+        applicantId={secondary.id}
+        onAddRemark={() => undefined}
+        onApproveSection={onApproveSection}
+        onBack={() => undefined}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const sectionAction = screen.getByRole("button", {
+      name: "Перейти к следующему шагу в паспортной секции",
+    });
+    fireEvent.click(await screen.findByRole("link", { name: "Открыть" }));
+    expect(sectionAction).toHaveAttribute(
+      "aria-label",
+      "Перейти к следующему шагу в паспортной секции",
+    );
+    expect(onApproveSection).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Подтвердить, что оригинал открылся",
+      }),
+    );
+    await waitFor(() =>
+      expect(sectionAction).toHaveAttribute(
+        "aria-label",
+        "Подтвердить паспортную секцию",
+      ),
+    );
+    fireEvent.click(sectionAction);
+    await waitFor(() => expect(onApproveSection).toHaveBeenCalledTimes(1));
   });
 
   test("shows a warning only after protected media becomes unavailable", async () => {
@@ -687,6 +817,41 @@ describe("ReviewWorkspace perceived feedback", () => {
     expect(mediaStorage.createMediaSignedUrl).toHaveBeenCalledTimes(1);
   });
 
+  test("uses local demo originals without weakening the Supabase storage identity gate", async () => {
+    const targetConfig = supabaseRuntimeConfig as { target: string };
+    const previousTarget = targetConfig.target;
+    targetConfig.target = "local-demo";
+    const submission = reviewSubmission();
+    const localDemoSubmission: Submission = {
+      ...submission,
+      files: submission.files.map((file) => ({
+        ...file,
+        localDemoSeedMedia: true,
+      })),
+    };
+    const signedUrl = vi.spyOn(mediaStorage, "createMediaSignedUrl");
+
+    try {
+      render(
+        <ReviewWorkspace
+          applicantId={localDemoSubmission.applicants[0]?.id}
+          onAddRemark={() => undefined}
+          onBack={() => undefined}
+          submission={localDemoSubmission}
+          submissionId={localDemoSubmission.id}
+        />,
+      );
+
+      expect(
+        await screen.findByRole("img", { name: "Оригинал загранпаспорта" }),
+      ).toHaveAttribute("src", expect.stringContaining("passport_scan.jpeg"));
+      expect(signedUrl).not.toHaveBeenCalled();
+      expect(screen.queryByText("Оригинал нельзя принять")).toBeNull();
+    } finally {
+      targetConfig.target = previousTarget;
+    }
+  });
+
   test("does not refetch unchanged media for a new submission object", async () => {
     const submission = reviewSubmission();
     vi.spyOn(mediaStorage, "createMediaSignedUrl").mockImplementation(
@@ -784,9 +949,28 @@ describe("ReviewWorkspace perceived feedback", () => {
     const confirmButton = screen.getByRole("button", {
       name: /Подтвердить паспортную секцию|Перейти к следующему шагу в паспортной секции/,
     });
+    const passportImage = await screen.findByRole("img", {
+      name: "Оригинал загранпаспорта",
+    });
+    fireEvent.load(passportImage);
+    await waitFor(() => expect(passportImage).toHaveClass("is-ready"));
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 1" }));
+    const selfieImage = await screen.findByRole("img", {
+      name: "Первое селфи заявителя",
+    });
+    fireEvent.load(selfieImage);
+    await waitFor(() => expect(selfieImage).toHaveClass("is-ready"));
     fireEvent.click(screen.getByRole("tab", { name: "Селфи 2" }));
-    await waitFor(() => expect(confirmButton).toBeEnabled());
+    const secondSelfieImage = await screen.findByRole("img", {
+      name: "Второе селфи заявителя",
+    });
+    fireEvent.load(secondSelfieImage);
+    await waitFor(() =>
+      expect(confirmButton).toHaveAttribute(
+        "aria-label",
+        "Подтвердить паспортную секцию",
+      ),
+    );
 
     fireEvent.click(confirmButton);
     fireEvent.click(confirmButton);

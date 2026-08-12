@@ -162,10 +162,15 @@ test.describe("V-19 UX state proof", () => {
       await selectedExport.uncheck();
     }
     await expect(page.locator(".export-preview")).toHaveCount(0);
-    await expect(page.locator("#export-action-hint")).toContainText(
-      "Выберите хотя бы одну подачу",
+    await expect(page.locator(".v19-admin-export-screen-v2")).toHaveAttribute(
+      "data-has-export-context",
+      "false",
     );
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
+    await expect(page.locator("#export-action-hint")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toHaveCount(0);
+    await expect(
+      page.getByRole("checkbox", { name: /^Выбрать / }).first(),
+    ).toBeVisible();
     await saveScreenshot(page, "export-disabled-reason");
 
     expect(problems).toEqual([]);

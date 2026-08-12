@@ -20,6 +20,7 @@ type ReviewMediaPreviewProps = {
   transform?: string;
   variant: "active" | "reference" | "single";
   onError: () => void;
+  onReady?: (url: string) => void;
   onRetry?: () => void;
 };
 
@@ -86,19 +87,22 @@ export function ReviewMediaPreview({
   transform,
   variant,
   onError,
+  onReady,
   onRetry,
 }: ReviewMediaPreviewProps) {
   const previewUrl = preview.status === "ready" ? preview.url : undefined;
   const [loadedMediaUrl, setLoadedMediaUrl] = useState<string | null>(null);
+  const [externalViewerOpenedUrl, setExternalViewerOpenedUrl] = useState<string | null>(
+    null,
+  );
   const pdfObjectRef = useRef<HTMLObjectElement | null>(null);
   const pdfFile = isPdfFile(file);
   const externalViewer = needsExternalViewer(file);
-  const embeddedMedia = Boolean(previewUrl && !externalViewer && !pdfFile);
   const mediaReady = Boolean(previewUrl && loadedMediaUrl === previewUrl);
   const mediaPending =
     preview.status === "idle" ||
     preview.status === "loading" ||
-    (embeddedMedia && !mediaReady);
+    Boolean(previewUrl && !mediaReady);
   const unavailable = unavailableCopy(file, preview);
   const mediaTransform = transform;
 
@@ -109,6 +113,12 @@ export function ReviewMediaPreview({
     return () => object.removeEventListener("error", onError);
   }, [onError, pdfFile, previewUrl]);
 
+  const handleMediaReady = (loadedUrl: string | undefined) => {
+    if (!loadedUrl || loadedUrl !== previewUrl) return;
+    setLoadedMediaUrl(loadedUrl);
+    onReady?.(loadedUrl);
+  };
+
   const handleImageLoad = async (event: SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget;
     const loadedUrl = previewUrl;
@@ -118,12 +128,13 @@ export function ReviewMediaPreview({
       try {
         await image.decode();
       } catch {
-        // A completed load can still be rendered when optional decoding rejects.
+        if (image.getAttribute("src") === loadedUrl) onError();
+        return;
       }
     }
 
     if (image.getAttribute("src") !== loadedUrl) return;
-    setLoadedMediaUrl(loadedUrl);
+    handleMediaReady(loadedUrl);
   };
 
   return (
@@ -148,22 +159,53 @@ export function ReviewMediaPreview({
           pdfFile ? (
             <object
               aria-label={alt}
-              className="is-ready"
+              className={mediaReady ? "is-ready" : "is-loading"}
               data={previewUrl}
+              onLoad={() => handleMediaReady(previewUrl)}
               ref={pdfObjectRef}
               type="application/pdf"
             >
-              <a href={previewUrl} rel="noreferrer" target="_blank">
+              <a
+                href={previewUrl}
+                onClick={() => setExternalViewerOpenedUrl(previewUrl)}
+                rel="noreferrer"
+                target="_blank"
+              >
                 Открыть оригинал
               </a>
+              {!mediaReady && externalViewerOpenedUrl === previewUrl ? (
+                <button onClick={() => handleMediaReady(previewUrl)} type="button">
+                  Подтвердить, что оригинал открылся
+                </button>
+              ) : null}
             </object>
           ) : externalViewer ? (
-            <div className="v19-review-preview-state">
+            <div
+              className={`v19-review-preview-state ${
+                mediaReady ? "is-ready" : "is-loading"
+              }`}
+            >
               <ShieldCheck aria-hidden="true" />
-              <strong>Оригинал готов</strong>
-              <a href={previewUrl} rel="noreferrer" target="_blank">
+              <strong>
+                {mediaReady
+                  ? "Оригинал проверен"
+                  : externalViewerOpenedUrl === previewUrl
+                    ? "Подтвердите просмотр оригинала"
+                    : "Откройте оригинал"}
+              </strong>
+              <a
+                href={previewUrl}
+                onClick={() => setExternalViewerOpenedUrl(previewUrl)}
+                rel="noreferrer"
+                target="_blank"
+              >
                 Открыть
               </a>
+              {!mediaReady && externalViewerOpenedUrl === previewUrl ? (
+                <button onClick={() => handleMediaReady(previewUrl)} type="button">
+                  Подтвердить, что оригинал открылся
+                </button>
+              ) : null}
             </div>
           ) : (
             <>

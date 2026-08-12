@@ -938,7 +938,7 @@ const IssuesTab = ({
             ) : issue.target.fileType ? (
               "Открыть файл"
             ) : (
-              "Открыть анкету"
+              issueActionLabel(issue)
             )}
           </button>
           <span

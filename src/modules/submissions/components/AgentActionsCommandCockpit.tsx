@@ -653,6 +653,10 @@ function AgentActionInlineDetail({
         <div className="v19-actions-inline-actions">
           {actionTasks.map((actionTask, index) => {
             const actionDisabledReason = primaryActionDisabledReason(actionTask);
+            const actionLabel =
+              actionTasks.length > 1 && actionTask.nextAction.target === "files"
+                ? actionTask.action.context
+                : actionTask.nextAction.primaryLabel;
             return (
               <Button
                 {...agentInteractionProps("actions.open-primary")}
@@ -667,7 +671,7 @@ function AgentActionInlineDetail({
                   index === 0 ? onOpenPrimary : () => onOpenRelatedPrimary(actionTask)
                 }
               >
-                {actionTask.nextAction.primaryLabel}
+                {actionLabel}
               </Button>
             );
           })}
@@ -968,6 +972,7 @@ function TimelineEvent({
         `status-${task.status}`,
         selected && "is-selected",
       )}
+      data-applicant-name={task.applicantName}
       data-action-status={task.status}
       data-submission-id={task.submission.id}
     >

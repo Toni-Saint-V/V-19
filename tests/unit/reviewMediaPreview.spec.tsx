@@ -32,6 +32,7 @@ function ruleBodies(selector: string) {
 
 describe("ReviewMediaPreview", () => {
   test("keeps ready images inside the preview canvas and preserves transforms", async () => {
+    const onReady = vi.fn();
     render(
       <ReviewMediaPreview
         alt="Оригинал загранпаспорта"
@@ -41,6 +42,7 @@ describe("ReviewMediaPreview", () => {
         transform="scale(1) rotate(0deg)"
         variant="single"
         onError={vi.fn()}
+        onReady={onReady}
       />,
     );
 
@@ -54,6 +56,7 @@ describe("ReviewMediaPreview", () => {
 
     await waitFor(() => expect(image).toHaveClass("is-ready"));
     expect(image.parentElement).toHaveAttribute("aria-busy", "false");
+    expect(onReady).toHaveBeenCalledWith("blob:passport-preview");
   });
 
   test("keeps the skeleton until async image decoding finishes", async () => {
@@ -240,6 +243,110 @@ describe("ReviewMediaPreview", () => {
       "href",
       "blob:passport-pdf",
     );
+  });
+
+  test("reports an embedded PDF as reviewed only after its load event", () => {
+    const onReady = vi.fn();
+    const { container } = render(
+      <ReviewMediaPreview
+        alt="Оригинал паспорта PDF"
+        file={
+          {
+            applicantId: "applicant-1",
+            generatedFileName: "passport.pdf",
+            id: "passport-pdf",
+            mimeType: "application/pdf",
+            status: "pending_review",
+            type: "passport_scan",
+          } satisfies SubmissionFile
+        }
+        label="Паспорт"
+        preview={{ status: "ready", url: "blob:passport-pdf" }}
+        testId="protected-media-preview-passport_scan"
+        variant="single"
+        onError={vi.fn()}
+        onReady={onReady}
+      />,
+    );
+
+    const embeddedPdf = container.querySelector("object");
+    expect(embeddedPdf).toHaveClass("is-loading");
+    expect(onReady).not.toHaveBeenCalled();
+    fireEvent.load(embeddedPdf!);
+    expect(embeddedPdf).toHaveClass("is-ready");
+    expect(onReady).toHaveBeenCalledWith("blob:passport-pdf");
+  });
+
+  test("does not treat the PDF fallback link click as a successful open", () => {
+    const onReady = vi.fn();
+    render(
+      <ReviewMediaPreview
+        alt="Оригинал паспорта PDF"
+        file={
+          {
+            applicantId: "applicant-1",
+            generatedFileName: "passport.pdf",
+            id: "passport-pdf-fallback",
+            mimeType: "application/pdf",
+            status: "pending_review",
+            type: "passport_scan",
+          } satisfies SubmissionFile
+        }
+        label="Паспорт"
+        preview={{ status: "ready", url: "blob:passport-pdf-fallback" }}
+        testId="protected-media-preview-passport_scan"
+        variant="single"
+        onError={vi.fn()}
+        onReady={onReady}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Открыть оригинал" }));
+
+    expect(onReady).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Подтвердить, что оригинал открылся",
+      }),
+    );
+    expect(onReady).toHaveBeenCalledWith("blob:passport-pdf-fallback");
+  });
+
+  test("does not treat an external HEIC viewer link click as rendered media", () => {
+    const onReady = vi.fn();
+    render(
+      <ReviewMediaPreview
+        alt="Оригинал паспорта HEIC"
+        file={
+          {
+            applicantId: "applicant-1",
+            generatedFileName: "passport.heic",
+            id: "passport-heic",
+            mimeType: "image/heic",
+            status: "pending_review",
+            type: "passport_scan",
+          } satisfies SubmissionFile
+        }
+        label="Паспорт"
+        preview={{ status: "ready", url: "blob:passport-heic" }}
+        testId="protected-media-preview-passport_scan"
+        variant="single"
+        onError={vi.fn()}
+        onReady={onReady}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Открыть" }));
+
+    expect(onReady).not.toHaveBeenCalled();
+    expect(screen.getByText("Подтвердите просмотр оригинала")).toBeVisible();
+    const confirm = screen.getByRole("button", {
+      name: "Подтвердить, что оригинал открылся",
+    });
+    fireEvent.click(confirm);
+
+    expect(onReady).toHaveBeenCalledWith("blob:passport-heic");
+    expect(screen.getByText("Оригинал проверен")).toBeVisible();
   });
 
   test("uses a positioned containing block so 100 percent media fits before zoom", () => {

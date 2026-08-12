@@ -109,6 +109,7 @@ function seedLocalDemoStoredMedia(submissions: Submission[]): Submission[] {
         return {
           ...file,
           generatedFileName: demoFile.generatedFileName,
+          localDemoSeedMedia: demoFile.localDemoSeedMedia,
           mimeType: demoFile.mimeType,
           originalFileName: demoFile.originalFileName,
           reviewStatus: demoFile.reviewStatus,
@@ -125,7 +126,10 @@ function seedLocalDemoStoredMedia(submissions: Submission[]): Submission[] {
 
 function canSeedLocalDemoStoredMedia(): boolean {
   const env = (import.meta as unknown as PersistenceImportMeta).env;
-  return Boolean(env.DEV) && env.VITE_SUPABASE_BACKEND_TARGET !== "supabase";
+  return (
+    env.VITE_SUPABASE_BACKEND_TARGET === "local-demo" ||
+    (Boolean(env.DEV) && env.VITE_SUPABASE_BACKEND_TARGET !== "supabase")
+  );
 }
 
 function isSubmissionLike(value: unknown): value is Submission {
