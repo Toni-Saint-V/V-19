@@ -20,4 +20,23 @@ describe("passport visual OCR parsing", () => {
       ]),
     );
   });
+
+  test("does not replace noisy visual OCR with fixture-specific identity values", () => {
+    const fields = parsePassportVisualText(`
+      Passport No
+      123456789
+      BORKOB
+      AHTOH
+      Date of birth
+      20081990
+      Place of birth
+      LENUH / USSR
+      Date of expiry
+      26022026
+    `);
+
+    expect(fields.map((field) => field.value)).not.toEqual(
+      expect.arrayContaining(["VOLKOV", "ANTON", "LENINGRAD"]),
+    );
+  });
 });

@@ -132,10 +132,7 @@ function localPassportFileKind(file: File): "image" | "pdf" | null {
   if (file.type === "application/pdf" || name.endsWith(".pdf")) {
     return "pdf";
   }
-  if (
-    ["image/jpeg", "image/png"].includes(file.type) ||
-    /\.(jpe?g|png)$/.test(name)
-  ) {
+  if (["image/jpeg", "image/png"].includes(file.type) || /\.(jpe?g|png)$/.test(name)) {
     return "image";
   }
 
@@ -328,27 +325,11 @@ function cleanVisualMrzName(value: string) {
     .trim()
     .replace(/([A-Z]{3,})(?:S{2,}|[KL]{2,})$/, "$1");
 
-  return /^[A-Z][A-Z ]+$/.test(cleaned) && !hasLikelyNameNoise(cleaned)
-    ? cleaned
-    : "";
-}
-
-function cyrillicOcrGivenNameAlias(value: string) {
-  const compact = value.replace(/\s/g, "");
-  if (/AHTOH/.test(compact)) return "ANTON";
-  if (/AHHA/.test(compact)) return "ANNA";
-  return "";
-}
-
-function cyrillicOcrSurnameAlias(value: string) {
-  const compact = value.replace(/\s/g, "");
-  if (/^(?:I)?BORKOB$/.test(compact)) return "VOLKOV";
-  return "";
+  return /^[A-Z][A-Z ]+$/.test(cleaned) && !hasLikelyNameNoise(cleaned) ? cleaned : "";
 }
 
 function cleanVisualMrzGivenName(value: string) {
-  const alias = cyrillicOcrGivenNameAlias(value);
-  return alias || cleanVisualMrzName(value);
+  return cleanVisualMrzName(value);
 }
 
 function mrzField(
@@ -400,10 +381,7 @@ function dateFromFormatted(value: string | undefined) {
   return date;
 }
 
-function isLikelyIssueDate(
-  value: string,
-  knownDates: Array<string | undefined>,
-) {
+function isLikelyIssueDate(value: string, knownDates: Array<string | undefined>) {
   const formatted = visualDate(value);
   const issueDate = dateFromFormatted(formatted);
   const birthDate = dateFromFormatted(knownDates[0]);
@@ -418,10 +396,7 @@ function compactDate(value: string) {
   return value.replace(/\D/g, "");
 }
 
-function firstMissingDate(
-  lines: string[],
-  knownDates: Array<string | undefined>,
-) {
+function firstMissingDate(lines: string[], knownDates: Array<string | undefined>) {
   const known = new Set(knownDates.map((date) => compactDate(date ?? "")));
   for (const line of lines) {
     const dates = line.match(/\d{8}/g) ?? [];
@@ -440,9 +415,7 @@ function visualAuthority(lines: string[], issueDateCompact: string | undefined) 
     ? lines.filter((line) => line.includes(issueDateCompact))
     : lines;
   for (const line of searchLines) {
-    const authorityLine = issueDateCompact
-      ? line.replace(issueDateCompact, "")
-      : line;
+    const authorityLine = issueDateCompact ? line.replace(issueDateCompact, "") : line;
     const match = /(?:FMS|DMC|GMC|MC|M?C)?(\d{5})(?!\d)/.exec(authorityLine);
     if (match?.[1]) return `FMS ${match[1]}`;
   }
@@ -455,18 +428,9 @@ function visualBirthLocation(lines: string[]) {
   const ussrLine = nearby.find((line) => line.includes("USSR"));
   if (!ussrLine) return [];
 
-  // English OCR reads the Cyrillic "ЛЕНИНГРАД / USSR" line as noisy Latin text.
-  // This pattern is intentionally narrow: it only fills the known high-signal
-  // birthplace when the country marker and passport label are both present.
-  const birthPlace =
-    /(?:LENINGRAD|LENUH|LENIN|MNEH|MEHW|REHW|WHTP|UHTP|HIPA)/.test(ussrLine)
-      ? "LENINGRAD"
-      : "";
-
-  return [
-    mrzField("birthCountry", "USSR", "medium"),
-    mrzField("birthPlace", birthPlace, "low"),
-  ].filter((field): field is PassportExtractionField => Boolean(field));
+  return [mrzField("birthCountry", "USSR", "medium")].filter(
+    (field): field is PassportExtractionField => Boolean(field),
+  );
 }
 
 function visualDateMatches(lines: string[]) {
@@ -504,9 +468,7 @@ function validMrzDateHint(value: string, mode: "birth" | "expiry") {
 
 function visualMrzDateHints(lines: string[]) {
   for (const line of lines) {
-    const match = /(?:RUS|RU5|US)([A-Z0-9]{6})[A-Z0-9]?([MF<])([A-Z0-9]{6})/.exec(
-      line,
-    );
+    const match = /(?:RUS|RU5|US)([A-Z0-9]{6})[A-Z0-9]?([MF<])([A-Z0-9]{6})/.exec(line);
     if (!match?.[1] || !match[3]) continue;
 
     const birth = validMrzDateHint(match[1], "birth");
@@ -528,9 +490,10 @@ function visualMrzNameHints(lines: string[]) {
     if (surname && firstName) return { firstName, surname };
 
     const compactNamePart = (namePart.split(/<{2,}/)[0] ?? "").replace(/<+/g, "");
-    const noisyName = /^([A-Z]{2,24}?)(?:ES|SS)([A-Z]{2,24}?)(?:S{2,}|K{2,}|L{2,})?$/.exec(
-      compactNamePart,
-    );
+    const noisyName =
+      /^([A-Z]{2,24}?)(?:ES|SS)([A-Z]{2,24}?)(?:S{2,}|K{2,}|L{2,})?$/.exec(
+        compactNamePart,
+      );
     const noisySurname = cleanVisualMrzName(noisyName?.[1] ?? "");
     const noisyFirstName = cleanVisualMrzName(noisyName?.[2] ?? "");
     if (noisySurname && noisyFirstName) {
@@ -555,24 +518,11 @@ function visualPrintedNameCandidate(line: string) {
 }
 
 function cleanPrintedGivenName(value: string) {
-  const alias = cyrillicOcrGivenNameAlias(value);
-  if (alias) return alias;
-
   const compact = value.replace(/\s/g, "");
   if (/^C[A-Z]{4,}AN$/.test(compact)) {
     return cleanVisualMrzName(compact.slice(1, -2));
   }
   return value;
-}
-
-function cleanPrintedSurname(value: string) {
-  const alias = cyrillicOcrSurnameAlias(value);
-  return alias || value;
-}
-
-function cleanPrintedCyrillicOcrGivenName(value: string) {
-  const compact = value.replace(/\s/g, "");
-  return cyrillicOcrGivenNameAlias(compact);
 }
 
 function visualPrintedNameHints(lines: string[]) {
@@ -582,22 +532,14 @@ function visualPrintedNameHints(lines: string[]) {
   const numberIndex = lines.findIndex((line) => line.includes(passportNumber));
   const nearby = numberIndex >= 0 ? lines.slice(numberIndex + 1, numberIndex + 9) : [];
   const candidates = Array.from(
-    new Set(
-      nearby
-        .map((line) => visualPrintedNameCandidate(line))
-        .filter(Boolean),
-    ),
+    new Set(nearby.map((line) => visualPrintedNameCandidate(line)).filter(Boolean)),
   );
-  const cyrillicOcrGivenName = cleanPrintedCyrillicOcrGivenName(candidates[2] ?? "");
   const [surname, firstName] =
     candidates.length >= 4
-      ? [
-          cleanPrintedSurname(candidates[1] ?? ""),
-          cyrillicOcrGivenName || cleanPrintedGivenName(candidates[3] ?? ""),
-        ]
+      ? [candidates[1] ?? "", cleanPrintedGivenName(candidates[3] ?? "")]
       : candidates.length >= 3
-        ? [cleanPrintedSurname(candidates[1] ?? ""), cleanPrintedGivenName(candidates[2] ?? "")]
-      : [cleanPrintedSurname(candidates[0] ?? ""), cleanPrintedGivenName(candidates[1] ?? "")];
+        ? [candidates[1] ?? "", cleanPrintedGivenName(candidates[2] ?? "")]
+        : [candidates[0] ?? "", cleanPrintedGivenName(candidates[1] ?? "")];
 
   return {
     firstName: firstName ?? "",
@@ -607,9 +549,7 @@ function visualPrintedNameHints(lines: string[]) {
 
 function visualPassportNumber(lines: string[]) {
   const passportIndex = lines.findIndex(
-    (line) =>
-      line.includes("PASSPORTNO") ||
-      line.includes("ISSUINGSTATE"),
+    (line) => line.includes("PASSPORTNO") || line.includes("ISSUINGSTATE"),
   );
   const searchLines =
     passportIndex >= 0 ? lines.slice(passportIndex, passportIndex + 4) : lines;
@@ -668,8 +608,7 @@ export function parsePassportVisualText(
     mrzFields.find((field) => field.key === key)?.value;
   const mrzDateHints = visualMrzDateHints(lines);
   const visualBirth = visualDateNear(lines, ["DATEOFBIRTH"]) ?? mrzDateHints.birth;
-  const visualExpiry =
-    visualDateNear(lines, ["DATEOFEXPIRY"]) ?? mrzDateHints.expiry;
+  const visualExpiry = visualDateNear(lines, ["DATEOFEXPIRY"]) ?? mrzDateHints.expiry;
   const issueDate =
     visualDateNear(lines, ["DATEOFISSUE"]) ??
     firstMissingDate(lines, [
@@ -683,7 +622,8 @@ export function parsePassportVisualText(
     visualNames.surname && visualNames.firstName
       ? { firstName: "", surname: "" }
       : visualPrintedNameHints(lines);
-  const surname = fieldValue("surname") ?? (visualNames.surname || printedNames.surname);
+  const surname =
+    fieldValue("surname") ?? (visualNames.surname || printedNames.surname);
   const firstName =
     fieldValue("firstName") ?? (visualNames.firstName || printedNames.firstName);
 
@@ -1003,15 +943,11 @@ async function invokeLocalPassportExtraction(input: {
     }
 
     const quality = await awaitPassportExtractionStep(
-      Promise.resolve().then(() =>
-        safePassportImageQualityFromFile(input.localFile),
-      ),
+      Promise.resolve().then(() => safePassportImageQualityFromFile(input.localFile)),
       deadline,
     );
     const candidates = await awaitPassportExtractionStep(
-      Promise.resolve().then(() =>
-        passportOcrCandidatesFromFile(input.localFile),
-      ),
+      Promise.resolve().then(() => passportOcrCandidatesFromFile(input.localFile)),
       deadline,
     );
     workerLease = await localPassportOcrWorkerBeforeDeadline(deadline);
@@ -1051,14 +987,13 @@ async function invokeLocalPassportExtraction(input: {
           : undefined,
         source: "local-ocr",
         status: "extracted",
-        summary:
-          !usedMrz
-            ? `Локальный OCR нашёл ${fields.length} визуальных паспортных полей без надежной MRZ. Проверьте их вручную перед отправкой.`
-            : candidate.rotation === 0 && !candidate.cropped
-              ? localOcrSummary(fields.length, quality)
-              : `${localOcrSummary(fields.length, quality)} MRZ найдена ${
-                  candidate.cropped ? "в зоне паспорта" : "на полном изображении"
-                } после поворота на ${candidate.rotation}°.`,
+        summary: !usedMrz
+          ? `Локальный OCR нашёл ${fields.length} визуальных паспортных полей без надежной MRZ. Проверьте их вручную перед отправкой.`
+          : candidate.rotation === 0 && !candidate.cropped
+            ? localOcrSummary(fields.length, quality)
+            : `${localOcrSummary(fields.length, quality)} MRZ найдена ${
+                candidate.cropped ? "в зоне паспорта" : "на полном изображении"
+              } после поворота на ${candidate.rotation}°.`,
       };
 
       const parsed = parsePassportExtractionResult(result);
@@ -1087,9 +1022,8 @@ async function localPassportOcrWorker(): Promise<LocalPassportOcrWorkerLease> {
   await localPassportOcrWorkerLifecycleBarrier;
   if (!localPassportOcrWorkerPromise) {
     localPassportOcrWorkerPromise = (async () => {
-      const tesseract = (await import(
-        "tesseract.js/src/index.js"
-      )) as unknown as LocalTesseractModule;
+      const tesseract =
+        (await import("tesseract.js/src/index.js")) as unknown as LocalTesseractModule;
       const createWorker = tesseract.createWorker ?? tesseract.default?.createWorker;
       if (!createWorker) {
         throw new Error("Local passport OCR worker is unavailable.");
@@ -1257,10 +1191,9 @@ async function awaitPassportExtractionStep<T>(
 
 function appendLocalPassportOcrLifecycleBarrier(task: Promise<unknown>) {
   const previousBarrier = localPassportOcrWorkerLifecycleBarrier;
-  localPassportOcrWorkerLifecycleBarrier = Promise.all([
-    previousBarrier,
-    task,
-  ]).then(() => undefined);
+  localPassportOcrWorkerLifecycleBarrier = Promise.all([previousBarrier, task]).then(
+    () => undefined,
+  );
 }
 
 async function invalidateLocalPassportOcrWorker(

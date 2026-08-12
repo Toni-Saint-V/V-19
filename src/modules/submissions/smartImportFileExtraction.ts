@@ -1,8 +1,10 @@
-import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.mjs?url";
-
 import {
   mergeSmartImportParsedResults,
   parseSmartImportText,
+  smartImportDocumentKindLabel,
+  type SmartImportConfidence,
+  type SmartImportDocumentKind,
+  type SmartImportFieldId,
   type SmartImportParsedResult,
 } from "./smartImport";
 
@@ -33,7 +35,7 @@ export type SmartImportFileExtractionAdapters = {
   extractPdfText: (file: File, signal: AbortSignal) => Promise<string>;
   recognizeImage: (
     image: unknown,
-    language: "eng",
+    language: "eng" | "rus+eng",
     signal: AbortSignal,
   ) => Promise<string>;
 };
@@ -65,10 +67,9 @@ const localTesseractWorkerOptions = {
 };
 
 const localTesseractParameters = {
+  debug_file: "/dev/null",
   preserve_interword_spaces: "1",
   tessedit_pageseg_mode: "4",
-  // Synthetic and camera sources do not always contain DPI metadata. Supplying
-  // it avoids Tesseract's stderr-only resolution estimation in the browser.
   user_defined_dpi: "300",
 };
 
@@ -79,6 +80,12 @@ const localTesseractRecognitionOptions = {
 const defaultAdapters: SmartImportFileExtractionAdapters = {
   extractPdfText: extractPdfTextLocally,
   recognizeImage: recognizeImageLocally,
+};
+
+type PreparedSmartImportSource = {
+  confidenceByField?: Partial<Record<SmartImportFieldId, SmartImportConfidence>>;
+  documentKind?: SmartImportDocumentKind;
+  text: string;
 };
 
 export async function extractSmartImportFromText(
@@ -104,6 +111,7 @@ export async function extractSmartImportFromFile(
 
   const adapters = options.adapters ?? defaultAdapters;
   let sourceText = "";
+  let parserText = "";
   try {
     sourceText =
       sourceType === "pdf"
@@ -112,13 +120,23 @@ export async function extractSmartImportFromFile(
             signal,
             pdfExtractionTimeoutMs,
           )
-        : await recognizeWithAvailableLocalLanguage(file, adapters, signal);
+        : await recognizeWithLanguageFallback(file, adapters, signal);
     throwIfCancelled(signal);
 
     if (sourceText.length > maxExtractedTextCharacters) {
       sourceText = sourceText.slice(0, maxExtractedTextCharacters);
     }
-    return parseSmartImportText(sourceText);
+    const prepared =
+      sourceType === "pdf"
+        ? await preparePdfTextForSmartImport(sourceText)
+        : await prepareImageTextForSmartImport(
+            sourceText,
+            file,
+            signal,
+            options.adapters === undefined,
+          );
+    parserText = prepared.text;
+    return applyPreparedSourceMetadata(parseSmartImportText(parserText), prepared);
   } catch (error) {
     if (error instanceof SmartImportExtractionError) throw error;
     if (isAbortError(error) || signal.aborted) {
@@ -130,8 +148,282 @@ export async function extractSmartImportFromFile(
       { cause: error },
     );
   } finally {
+    parserText = "";
     sourceText = "";
   }
+}
+
+async function preparePdfTextForSmartImport(
+  sourceText: string,
+): Promise<PreparedSmartImportSource> {
+  if (isSchengenVisaApplicationText(sourceText)) {
+    const { extractVisaApplicationPdfData } =
+      await import("./visaApplicationPdfReconciliation");
+    const data = extractVisaApplicationPdfData(sourceText);
+    return {
+      documentKind: "filled_form",
+      text: serializeRecognizedFields([
+        ["Surname", visaApplicationFieldValue(data.surname)],
+        ["First name", visaApplicationFieldValue(data.firstName)],
+        ["Birth date", visaApplicationFieldValue(data.birthDate)],
+        ["Birth place", visaApplicationFieldValue(data.birthPlace)],
+        ["Birth country", visaApplicationFieldValue(data.birthCountry)],
+        ["Nationality", visaApplicationFieldValue(data.citizenship)],
+        ["Main destination", visaApplicationFieldValue(data.destinationCountry)],
+        ["First entry country", visaApplicationFieldValue(data.firstEntryCountry)],
+        ["Entry count", visaApplicationFieldValue(data.entriesRequested)],
+        ["Arrival date", visaApplicationFieldValue(data.arrivalDate)],
+        ["Departure date", visaApplicationFieldValue(data.departureDate)],
+        ["Purpose", visaApplicationFieldValue(data.tripPurpose)],
+        ["Cost covered by", visaApplicationFieldValue(data.paymentCoverage)],
+      ]),
+    };
+  }
+
+  if (isBlsAppointmentLetterText(sourceText)) {
+    const visaType = sourceText.match(/(?:^|\n)\s*Visa\s+Type\s*:\s*([^\n]+)/iu)?.[1];
+    return { text: serializeRecognizedFields([["Purpose", visaType]]) };
+  }
+
+  return { text: sourceText };
+}
+
+function visaApplicationFieldValue(value?: string) {
+  const normalized = value?.replace(/[\r\n]+/gu, " ").trim();
+  if (!normalized || normalized.length > 200) return undefined;
+
+  const isFormControlText =
+    /(?:\bparte\s+reservada\b|\breserved\s+for\b|\bfor\s+official\s+use\b|\buso\s+oficial\b|\bслужебн\p{L}*\s+(?:част|отмет|использ)\b)/iu.test(
+      normalized,
+    );
+  return isFormControlText ? undefined : normalized;
+}
+
+async function prepareImageTextForSmartImport(
+  sourceText: string,
+  file: File,
+  signal: AbortSignal,
+  useProductionAdapter: boolean,
+): Promise<PreparedSmartImportSource> {
+  if (!isPassportIdentityOcrText(sourceText)) return { text: sourceText };
+
+  const passport = await import("./passportExtractionService");
+  let fields = passport.parsePassportVisualText(sourceText);
+  if (useProductionAdapter) {
+    try {
+      const result = await passport.invokePassportExtraction({
+        localFile: file,
+        openAiFallbackAllowed: false,
+        signal,
+      });
+      if (result.status === "extracted") fields = result.fields;
+    } catch (error) {
+      if (signal.aborted || isAbortError(error)) throw error;
+    }
+  }
+
+  const allowedPassportFields: Partial<
+    Record<
+      (typeof fields)[number]["key"],
+      { fieldId: SmartImportFieldId; label: string }
+    >
+  > = {
+    birthCountry: { fieldId: "birth-country", label: "Birth country" },
+    birthDate: { fieldId: "birth-date", label: "Birth date" },
+    birthPlace: { fieldId: "birth-place", label: "Birth place" },
+    citizenship: { fieldId: "nationality", label: "Nationality" },
+    firstName: { fieldId: "first-name", label: "First name" },
+    gender: { fieldId: "gender", label: "Gender" },
+    surname: { fieldId: "surname", label: "Surname" },
+  };
+  const confidenceByField: Partial<Record<SmartImportFieldId, SmartImportConfidence>> =
+    {};
+  const recognizedFields: Array<readonly [label: string, value?: string]> = [];
+  const seen = new Set<SmartImportFieldId>();
+  for (const field of fields) {
+    const allowed = allowedPassportFields[field.key];
+    const identityNeedsVerifiedMrz =
+      (field.key === "surname" || field.key === "firstName") &&
+      field.confidence !== "high";
+    if (
+      !allowed ||
+      identityNeedsVerifiedMrz ||
+      seen.has(allowed.fieldId) ||
+      !hasDirectPassportOcrEvidence(sourceText, field.key, field.value)
+    ) {
+      continue;
+    }
+    seen.add(allowed.fieldId);
+    confidenceByField[allowed.fieldId] = field.confidence;
+    recognizedFields.push([
+      allowed.label,
+      smartImportValueForPassportField(field.key, field.value),
+    ]);
+  }
+
+  return {
+    confidenceByField,
+    documentKind: "passport_identity",
+    text: serializeRecognizedFields(recognizedFields),
+  };
+}
+
+function hasDirectPassportOcrEvidence(sourceText: string, key: string, value: string) {
+  const sourceWords = sourceText
+    .normalize("NFKC")
+    .toLocaleUpperCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+  const valueWords = value
+    .normalize("NFKC")
+    .toLocaleUpperCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+  if (!valueWords) return false;
+
+  if (key === "gender") {
+    if (/\b(?:MALE|МУЖ\p{L}*)\b/iu.test(valueWords)) {
+      return /\b(?:MALE|МУЖ\p{L}*)\b/iu.test(sourceWords);
+    }
+    if (/\b(?:FEMALE|ЖЕН\p{L}*)\b/iu.test(valueWords)) {
+      return /\b(?:FEMALE|ЖЕН\p{L}*)\b/iu.test(sourceWords);
+    }
+    return false;
+  }
+
+  const sourceDigits = sourceText.replace(/\D/gu, "");
+  const valueDigits = value.replace(/\D/gu, "");
+  if (valueDigits.length >= 6 && sourceDigits.includes(valueDigits)) return true;
+
+  if (` ${sourceWords} `.includes(` ${valueWords} `)) return true;
+
+  const sourceTokens = sourceWords.split(" ").filter(Boolean);
+  const valueTokens = valueWords.split(" ").filter(Boolean);
+  return (
+    valueTokens.length > 1 &&
+    valueTokens.every((valueToken) =>
+      sourceTokens.some((sourceToken) => {
+        const sharedLength = Math.min(sourceToken.length, valueToken.length);
+        return (
+          sharedLength >= 5 &&
+          (sourceToken.startsWith(valueToken) || valueToken.startsWith(sourceToken))
+        );
+      }),
+    )
+  );
+}
+
+function smartImportValueForPassportField(key: string, value: string) {
+  if (key !== "gender") return value;
+  if (/(?:^|\b)(?:male|муж)/iu.test(value)) return "Мужской";
+  if (/(?:^|\b)(?:female|жен)/iu.test(value)) return "Женский";
+  return "";
+}
+
+function isPassportIdentityOcrText(sourceText: string) {
+  const compactLines = sourceText
+    .toUpperCase()
+    .replace(/[«»]/gu, "<")
+    .split(/\n+/u)
+    .map((line) => line.replace(/[^A-Z0-9<]/gu, ""));
+  const hasTd3SecondLine = compactLines.some((line) =>
+    /[A-Z0-9]{9,12}RUS[A-Z0-9]{6,8}[MF<][A-Z0-9]{6,8}<{4,}/u.test(line),
+  );
+  if (
+    hasTd3SecondLine &&
+    /(?:российская\s+федерация|russian\s+federat|place\s+of\s+birth|место\s+рождения)/iu.test(
+      sourceText,
+    )
+  ) {
+    return true;
+  }
+
+  const signals = [
+    /(?:passport\s+no|номер\s+паспорта)/iu,
+    /(?:date\s+of\s+birth|дата\s+рождения)/iu,
+    /(?:nationality|гражданство)/iu,
+    /(?:date\s+of\s+(?:expiry|issue)|дата\s+(?:окончания|выдачи))/iu,
+    /(?:P\s*[<«]\s*[A-Z]{3}|машиносчитываем)/iu,
+  ].filter((pattern) => pattern.test(sourceText)).length;
+  return signals >= 3 && /(?:passport|паспорт|P\s*[<«])/iu.test(sourceText);
+}
+
+function applyPreparedSourceMetadata(
+  parsed: SmartImportParsedResult,
+  prepared: PreparedSmartImportSource,
+): SmartImportParsedResult {
+  if (!prepared.documentKind && !prepared.confidenceByField) return parsed;
+
+  const documentKind = prepared.documentKind ?? parsed.documentKind;
+  const candidates = parsed.candidates.map((candidate) => {
+    const ceiling = prepared.confidenceByField?.[candidate.fieldId];
+    return {
+      ...candidate,
+      confidence:
+        ceiling && confidenceRank(candidate.confidence) > confidenceRank(ceiling)
+          ? ceiling
+          : candidate.confidence,
+      sourceKind: documentKind,
+    };
+  });
+  const valuesByField = new Map<SmartImportFieldId, Set<string>>();
+  for (const candidate of candidates) {
+    const values = valuesByField.get(candidate.fieldId) ?? new Set<string>();
+    values.add(candidate.value.trim().toLocaleUpperCase("ru-RU"));
+    valuesByField.set(candidate.fieldId, values);
+  }
+  const ambiguousFields = [...valuesByField.values()].filter(
+    (values) => values.size > 1,
+  ).length;
+  return {
+    candidates,
+    documentKind,
+    summary: candidates.length
+      ? `Источник: ${smartImportDocumentKindLabel(documentKind)}. Найдено полей: ${valuesByField.size}.${
+          ambiguousFields ? ` Требуют выбора: ${ambiguousFields}.` : ""
+        }`
+      : `Источник: ${smartImportDocumentKindLabel(documentKind)}. Подходящие поля не найдены.`,
+  };
+}
+
+function confidenceRank(confidence: SmartImportConfidence) {
+  return confidence === "high" ? 3 : confidence === "medium" ? 2 : 1;
+}
+
+function isSchengenVisaApplicationText(sourceText: string) {
+  const hasHeading =
+    /(?:заявление\s+на\s+получение\s+шенгенской\s+визы|application\s+for\s+(?:a\s+)?schengen\s+visa|solicitud\s+de\s+visado\s+schengen)/iu.test(
+      sourceText,
+    );
+  const fieldSignals = [
+    /(?:^|\n)\s*1\s*\.\s*Apellido\(s\).*Фамил/iu,
+    /(?:^|\n)\s*3\s*\.\s*Nombre\(s\).*Имя/iu,
+    /(?:^|\n)\s*4\s*\.\s*Fecha\s+de\s+nacimiento.*Дата/iu,
+    /(?:^|\n)\s*13\s*\.\s*Número\s+del\s+documento\s+de\s+viaje/iu,
+    /(?:^|\n)\s*19\s*\.\s*Domicilio\s+postal/iu,
+  ].filter((pattern) => pattern.test(sourceText)).length;
+  return (hasHeading && fieldSignals >= 3) || fieldSignals >= 5;
+}
+
+function isBlsAppointmentLetterText(sourceText: string) {
+  return (
+    /Appointment\s+Letter\s*-\s*BLS\s+Spain\s+Application\s+Centre/iu.test(
+      sourceText,
+    ) &&
+    /(?:^|\n)\s*Appointment\s+Details\s*(?:\n|$)/iu.test(sourceText) &&
+    /(?:^|\n)\s*Reference\s+Number\s*(?:\n|$)/iu.test(sourceText)
+  );
+}
+
+function serializeRecognizedFields(
+  fields: ReadonlyArray<readonly [label: string, value?: string]>,
+) {
+  return fields
+    .flatMap(([label, value]) => {
+      const safeValue = value?.replace(/[\r\n]+/gu, " ").trim();
+      return safeValue ? [`${label}: ${safeValue}`] : [];
+    })
+    .join("\n");
 }
 
 export async function extractSmartImportFromFiles(
@@ -160,6 +452,9 @@ export async function extractSmartImportFromFiles(
         "Пакет слишком большой. Максимальный общий размер: 60 МБ.",
       );
     }
+  }
+  if (files.length === 1 && files[0]) {
+    return extractSmartImportFromFile(files[0], options);
   }
 
   const results: SmartImportParsedResult[] = [];
@@ -200,11 +495,24 @@ function smartImportSourceType(file: File): "image" | "pdf" | undefined {
   return undefined;
 }
 
-async function recognizeWithAvailableLocalLanguage(
+async function recognizeWithLanguageFallback(
   image: unknown,
   adapters: SmartImportFileExtractionAdapters,
   signal: AbortSignal,
 ) {
+  try {
+    const bilingualText = await runWithDeadline(
+      (deadlineSignal) => adapters.recognizeImage(image, "rus+eng", deadlineSignal),
+      signal,
+      imageOcrTimeoutMs,
+    );
+    if (bilingualText.trim()) return bilingualText;
+  } catch (error) {
+    if (isCancellation(error) || signal.aborted) {
+      throw cancellationForSignal(signal, error);
+    }
+  }
+
   return runWithDeadline(
     (deadlineSignal) => adapters.recognizeImage(image, "eng", deadlineSignal),
     signal,
@@ -241,7 +549,6 @@ type SmartImportTesseractModule = {
 };
 
 async function loadSmartImportOcrWorkerFactory() {
-  // tesseract.js does not publish declarations for this runtime subpath.
   const tesseract =
     (await import("tesseract.js/src/index.js")) as unknown as SmartImportTesseractModule;
   const createWorker = tesseract.createWorker ?? tesseract.default?.createWorker;
@@ -251,7 +558,7 @@ async function loadSmartImportOcrWorkerFactory() {
 
 export async function recognizeSmartImportImageLocally(
   image: unknown,
-  language: "eng",
+  language: "eng" | "rus+eng",
   signal: AbortSignal,
   workerFactory?: SmartImportOcrWorkerFactory,
 ) {
@@ -301,7 +608,7 @@ export async function recognizeSmartImportImageLocally(
 
 async function recognizeImageLocally(
   image: unknown,
-  language: "eng",
+  language: "eng" | "rus+eng",
   signal: AbortSignal,
 ) {
   return recognizeSmartImportImageLocally(image, language, signal);
@@ -340,7 +647,12 @@ async function extractPdfTextLocally(file: File, signal: AbortSignal) {
     globalThis as typeof globalThis & { document?: BrowserDocument }
   ).document;
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+  if (typeof Worker === "function") {
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      "../../../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      import.meta.url,
+    ).toString();
+  }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   throwIfCancelled(signal);
@@ -389,7 +701,7 @@ async function extractPdfTextLocally(file: File, signal: AbortSignal) {
         const context = canvas.getContext("2d");
         if (!context) throw new Error("PDF OCR canvas context is unavailable.");
         await page.render({ canvasContext: context, viewport }).promise;
-        const text = await recognizeWithAvailableLocalLanguage(
+        const text = await recognizeWithLanguageFallback(
           canvas,
           defaultAdapters,
           signal,
@@ -429,6 +741,13 @@ function isAbortError(error: unknown) {
   return error instanceof DOMException
     ? error.name === "AbortError"
     : error instanceof Error && error.name === "AbortError";
+}
+
+function isCancellation(error: unknown) {
+  return (
+    (error instanceof SmartImportExtractionError && error.code === "cancelled") ||
+    isAbortError(error)
+  );
 }
 
 function cancellationForSignal(signal: AbortSignal, cause?: unknown) {

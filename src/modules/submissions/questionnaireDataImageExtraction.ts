@@ -51,7 +51,7 @@ const dataImageOcrOptions = {
 };
 
 const countryAliases: Array<[RegExp, string]> = [
-  [/\b(?:russia|russian federation|rf)\b|росси[яи]|рф/i, "Russian Federation"],
+  [/\b(?:russia|russian federation|rf)\b|росси|рф/i, "Russian Federation"],
   [/\bussr\b|ссср/i, "USSR"],
   [/\bspain\b|испан/i, "Spain"],
   [/\bfrance\b|франц/i, "France"],
@@ -67,7 +67,10 @@ const countryAliases: Array<[RegExp, string]> = [
 ];
 
 const occupationAliases: Array<[RegExp, string]> = [
-  [/\bit\b|айти|program|програм|developer|software|engineer|инженер-програм/i, "IT PROFESSIONAL"],
+  [
+    /\bit\b|айти|program|програм|developer|software|engineer|инженер-програм/i,
+    "IT PROFESSIONAL",
+  ],
   [/accountant|бухгалтер/i, "ACCOUNTANT"],
   [/architect|архитектор/i, "ARCHITECT"],
   [/banker|банк/i, "BANKER"],
@@ -96,24 +99,6 @@ const occupationAliases: Array<[RegExp, string]> = [
 ];
 
 const fieldSpecs: DataImageFieldSpec[] = [
-  {
-    fieldId: "appointment-city",
-    labels: ["город подачи", "application city", "appointment city"],
-    normalize: normalizeCityLikeValue,
-    sectionId: "appointment",
-  },
-  {
-    fieldId: "desired-date-1",
-    labels: ["желаемая дата 1", "preferred appointment date 1"],
-    normalize: normalizeDateValue,
-    sectionId: "appointment",
-  },
-  {
-    fieldId: "desired-date-2",
-    labels: ["желаемая дата 2", "preferred appointment date 2"],
-    normalize: normalizeDateValue,
-    sectionId: "appointment",
-  },
   {
     fieldId: "previous-surname",
     labels: [
@@ -165,7 +150,11 @@ const fieldSpecs: DataImageFieldSpec[] = [
   },
   {
     fieldId: "birth-citizenship",
-    labels: ["гражданство при рождении", "nationality at birth", "citizenship at birth"],
+    labels: [
+      "гражданство при рождении",
+      "nationality at birth",
+      "citizenship at birth",
+    ],
     normalize: normalizeCountryValue,
     sectionId: "personal",
   },
@@ -188,12 +177,6 @@ const fieldSpecs: DataImageFieldSpec[] = [
     sectionId: "personal",
   },
   {
-    fieldId: "guardian-info",
-    labels: ["данные опекуна", "guardian information", "guardian details"],
-    normalize: normalizeNameLikeValue,
-    sectionId: "personal",
-  },
-  {
     fieldId: "national-id",
     labels: ["национальный id", "national id", "id number"],
     sectionId: "personal",
@@ -206,57 +189,92 @@ const fieldSpecs: DataImageFieldSpec[] = [
   },
   {
     fieldId: "passport-no",
-    labels: ["номер паспорта", "паспорт", "passport no", "passport number"],
+    labels: [
+      "номер паспорта",
+      "№ паспорта",
+      "# паспорта",
+      "номер проездного документа",
+      "№ проездного документа",
+      "# проездного документа",
+      "паспорт",
+      "passport no",
+      "passport number",
+      "travel document no",
+      "travel document number",
+    ],
     normalize: normalizePassportNumberValue,
     sectionId: "passport",
   },
   {
     fieldId: "passport-issue-date",
-    labels: ["дата выдачи паспорта", "дата выдачи", "issue date", "issued at", "date of issue"],
+    labels: [
+      "дата выдачи паспорта",
+      "дата выдачи",
+      "issue date",
+      "issued at",
+      "date of issue",
+      "passport issue date",
+      "passport date of issue",
+    ],
     normalize: normalizeDateValue,
     sectionId: "passport",
   },
   {
     fieldId: "passport-expiry-date",
-    labels: ["дата окончания паспорта", "действителен до", "expiry date", "date of expiry", "valid until"],
+    labels: [
+      "дата окончания паспорта",
+      "действителен до",
+      "expiry date",
+      "date of expiry",
+      "valid until",
+      "passport expiry date",
+      "passport expiry",
+      "passport exp",
+      "passport expiration date",
+      "passport expiration",
+      "passport date of expiry",
+    ],
     normalize: normalizeDateValue,
     sectionId: "passport",
   },
   {
     fieldId: "passport-issue-country",
-    labels: ["страна выдачи паспорта", "страна выдачи", "issuing country", "passport issue country"],
+    labels: [
+      "страна выдачи паспорта",
+      "страна выдачи",
+      "issuing country",
+      "passport issue country",
+      "passport issuing country",
+      "passport country of issue",
+    ],
     normalize: normalizeCountryValue,
     sectionId: "passport",
   },
   {
     fieldId: "passport-issue-place",
-    labels: ["место выдачи паспорта", "место выдачи", "place of issue", "issuing place"],
+    labels: [
+      "место выдачи паспорта",
+      "место выдачи",
+      "кем выдан",
+      "орган выдачи паспорта",
+      "place of issue",
+      "issuing place",
+      "passport place of issue",
+      "passport issued by",
+      "passport issuing authority",
+    ],
     normalize: normalizeCityLikeValue,
     sectionId: "passport",
   },
   {
     fieldId: "home-address",
-    labels: ["домашний адрес", "адрес проживания", "home address", "residential address", "address line"],
-    sectionId: "contacts",
-  },
-  {
-    fieldId: "home-street",
-    labels: ["улица проживания", "home street", "residential street"],
-    sectionId: "contacts",
-  },
-  {
-    fieldId: "home-house",
-    labels: ["дом проживания", "home house", "residential house"],
-    sectionId: "contacts",
-  },
-  {
-    fieldId: "home-building",
-    labels: ["корпус проживания", "home building", "residential building"],
-    sectionId: "contacts",
-  },
-  {
-    fieldId: "home-unit",
-    labels: ["квартира проживания", "home unit", "residential unit"],
+    labels: [
+      "домашний адрес",
+      "адрес проживания",
+      "home address",
+      "residential address",
+      "address line",
+    ],
     sectionId: "contacts",
   },
   {
@@ -267,7 +285,14 @@ const fieldSpecs: DataImageFieldSpec[] = [
   },
   {
     fieldId: "contact-number",
-    labels: ["телефон заявителя", "контактный телефон", "contact number", "mobile", "phone", "телефон"],
+    labels: [
+      "телефон заявителя",
+      "контактный телефон",
+      "contact number",
+      "mobile",
+      "phone",
+      "телефон",
+    ],
     normalize: normalizePhoneValue,
     sectionId: "contacts",
   },
@@ -293,8 +318,9 @@ const fieldSpecs: DataImageFieldSpec[] = [
     fieldId: "lives-outside-citizenship",
     labels: [
       "есть вид на жительство в другой стране",
-      "resides outside country of citizenship",
+      "проживает вне страны гражданства",
       "lives outside citizenship country",
+      "residence outside nationality country",
     ],
     normalize: normalizeYesNoValue,
     sectionId: "contacts",
@@ -302,23 +328,30 @@ const fieldSpecs: DataImageFieldSpec[] = [
   {
     fieldId: "residence-permit-type",
     labels: [
-      "вид на жительство / документ",
-      "тип вида на жительство",
+      "вид на жительство",
+      "документ на проживание",
       "residence permit type",
+      "residence document type",
     ],
     sectionId: "contacts",
   },
   {
     fieldId: "residence-permit-number",
-    labels: ["номер вида на жительство", "residence permit number"],
+    labels: [
+      "номер внж",
+      "номер вида на жительство",
+      "residence permit number",
+      "residence document number",
+    ],
     sectionId: "contacts",
   },
   {
     fieldId: "residence-permit-valid-until",
     labels: [
-      "действителен до внж",
+      "внж действителен до",
       "вид на жительство действителен до",
       "residence permit valid until",
+      "residence document valid until",
     ],
     normalize: normalizeDateValue,
     sectionId: "contacts",
@@ -331,25 +364,50 @@ const fieldSpecs: DataImageFieldSpec[] = [
   },
   {
     fieldId: "occupation-specify",
-    labels: ["уточнение профессии", "должность", "position", "occupation specify", "job position"],
+    labels: [
+      "уточнение профессии",
+      "должность",
+      "position",
+      "occupation specify",
+      "job position",
+    ],
     normalize: normalizeNameLikeValue,
     sectionId: "employment",
   },
   {
     fieldId: "employer-name",
-    labels: ["работодатель", "место работы", "employer", "company", "workplace", "school", "university"],
+    labels: [
+      "работодатель",
+      "место работы",
+      "employer",
+      "company",
+      "workplace",
+      "school",
+      "university",
+    ],
     normalize: normalizeNameLikeValue,
     sectionId: "employment",
   },
   {
     fieldId: "employer-contact",
-    labels: ["телефон работодателя", "employer phone", "employer contact", "company phone", "work phone"],
+    labels: [
+      "телефон работодателя",
+      "employer phone",
+      "employer contact",
+      "work phone",
+    ],
     normalize: normalizePhoneValue,
     sectionId: "employment",
   },
   {
     fieldId: "employer-address",
-    labels: ["адрес работодателя", "рабочий адрес", "employer address", "company address", "work address"],
+    labels: [
+      "адрес работодателя",
+      "рабочий адрес",
+      "employer address",
+      "company address",
+      "work address",
+    ],
     sectionId: "employment",
   },
   {
@@ -361,9 +419,10 @@ const fieldSpecs: DataImageFieldSpec[] = [
   {
     fieldId: "stay-purpose-details",
     labels: [
-      "дополнительные сведения о цели",
+      "детали цели поездки",
+      "уточнение цели поездки",
       "purpose details",
-      "purpose of stay details",
+      "purpose of journey details",
     ],
     sectionId: "trip",
   },
@@ -411,23 +470,35 @@ const fieldSpecs: DataImageFieldSpec[] = [
   },
   {
     fieldId: "previous-biometrics-date",
-    labels: ["дата предыдущей биометрии", "previous biometrics date"],
+    labels: [
+      "дата сдачи отпечатков",
+      "дата биометрии",
+      "fingerprints date",
+      "biometrics date",
+    ],
     normalize: normalizeDateValue,
     sectionId: "trip",
   },
   {
     fieldId: "previous-visa-number",
-    labels: ["номер предыдущей визы", "previous visa number"],
+    labels: [
+      "номер предыдущей визы",
+      "номер визы",
+      "previous visa number",
+      "visa number",
+    ],
     sectionId: "trip",
   },
   {
-    fieldId: "inviting-party-type",
-    labels: ["тип принимающей стороны", "inviting party type"],
-    sectionId: "hotel",
-  },
-  {
     fieldId: "hotel-name",
-    labels: ["название отеля", "отель", "hotel name", "hotel", "host name", "inviting party name"],
+    labels: [
+      "название отеля",
+      "отель",
+      "hotel name",
+      "hotel",
+      "host name",
+      "inviting party name",
+    ],
     normalize: normalizeNameLikeValue,
     sectionId: "hotel",
   },
@@ -469,28 +540,30 @@ const fieldSpecs: DataImageFieldSpec[] = [
   {
     fieldId: "company-org-details",
     labels: [
-      "данные организации принимающей стороны",
-      "inviting organisation details",
-      "host company details",
+      "данные организации",
+      "данные приглашающей организации",
+      "organization details",
+      "company details",
     ],
     sectionId: "hotel",
   },
   {
     fieldId: "company-contact-person",
     labels: [
-      "контактное лицо принимающей стороны",
-      "inviting organisation contact person",
-      "host company contact person",
+      "контактное лицо организации",
+      "контактное лицо",
+      "company contact person",
+      "organization contact person",
     ],
-    normalize: normalizeNameLikeValue,
     sectionId: "hotel",
   },
   {
     fieldId: "company-phone",
     labels: [
-      "телефон принимающей стороны",
-      "inviting organisation phone",
-      "host company phone",
+      "телефон организации",
+      "телефон компании",
+      "company phone",
+      "organization phone",
     ],
     normalize: normalizePhoneValue,
     sectionId: "hotel",
@@ -507,7 +580,85 @@ const fieldSpecs: DataImageFieldSpec[] = [
     normalize: normalizeMeansOfSupportValue,
     sectionId: "payment",
   },
+  {
+    fieldId: "sponsor-in-host-fields",
+    labels: [
+      "спонсор указан у принимающей стороны",
+      "спонсор в данных принимающей стороны",
+      "sponsor in host fields",
+    ],
+    normalize: normalizeYesNoValue,
+    sectionId: "payment",
+  },
+  {
+    fieldId: "other-sponsor",
+    labels: ["другой спонсор", "имя спонсора", "other sponsor", "sponsor name"],
+    sectionId: "payment",
+  },
+  {
+    fieldId: "sponsor-means",
+    labels: ["средства спонсора", "sponsor means", "sponsor support means"],
+    sectionId: "payment",
+  },
 ];
+
+const exactFieldIdsByNormalizedLabel = new Map<string, string[]>();
+for (const spec of fieldSpecs) {
+  for (const label of spec.labels) {
+    const normalizedLabel = normalizeForMatch(label);
+    const fieldIds = exactFieldIdsByNormalizedLabel.get(normalizedLabel) ?? [];
+    if (!fieldIds.includes(spec.fieldId)) {
+      fieldIds.push(spec.fieldId);
+      exactFieldIdsByNormalizedLabel.set(normalizedLabel, fieldIds);
+    }
+  }
+}
+
+const questionnaireDataLabelSpans = fieldSpecs.flatMap((spec) =>
+  spec.labels.map((label) => ({
+    fieldId: spec.fieldId,
+    label,
+    pattern: normalizedLabelSpanPattern(label),
+  })),
+);
+
+export function questionnaireDataFieldIdsForExactLabel(label: string) {
+  const normalizedLabel = normalizeForMatch(label);
+  return normalizedLabel
+    ? [...(exactFieldIdsByNormalizedLabel.get(normalizedLabel) ?? [])]
+    : [];
+}
+
+export function findQuestionnaireDataLabelSpan(
+  value: string,
+  fieldIds: ReadonlySet<string>,
+) {
+  let best: { end: number; fieldId: string; label: string; start: number } | undefined;
+  for (const entry of questionnaireDataLabelSpans) {
+    if (!fieldIds.has(entry.fieldId)) continue;
+    const match = entry.pattern.exec(value);
+    if (match?.index === undefined || !match[0]) continue;
+    const leadingBoundaryLength = match[1]?.length ?? 0;
+    const start = match.index + leadingBoundaryLength;
+    const end = start + match[0].length - leadingBoundaryLength;
+    if (!best || start < best.start || (start === best.start && end > best.end)) {
+      best = { end, fieldId: entry.fieldId, label: entry.label, start };
+    }
+  }
+  return best;
+}
+
+function normalizedLabelSpanPattern(label: string) {
+  const tokens = normalizeForMatch(label).split(" ").filter(Boolean);
+  const body = tokens
+    .map((token) =>
+      token === "no" || token === "number"
+        ? "(?:no|number|№|#)"
+        : token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    )
+    .join("[^a-zа-я0-9]+?");
+  return new RegExp(`(^|[^a-zа-я0-9])${body}(?=$|[^a-zа-я0-9])`, "iu");
+}
 
 export async function extractQuestionnaireDataFromImage(
   file: File,
@@ -529,7 +680,8 @@ export async function extractQuestionnaireDataFromImage(
         fields: [],
         rawText,
         status: "empty",
-        summary: "Текст найден, но поля анкеты не распознаны. Лучше добавить подписи: Фамилия, Имя, Адрес, Телефон и т.д.",
+        summary:
+          "Текст найден, но поля анкеты не распознаны. Лучше добавить подписи: Фамилия, Имя, Адрес, Телефон и т.д.",
       };
     }
 
@@ -544,12 +696,15 @@ export async function extractQuestionnaireDataFromImage(
       fields: [],
       rawText: "",
       status: "failed",
-      summary: "Не удалось распознать фото с данными. Попробуйте более четкое изображение или заполните вручную.",
+      summary:
+        "Не удалось распознать фото с данными. Попробуйте более четкое изображение или заполните вручную.",
     };
   }
 }
 
-export function parseQuestionnaireDataText(text: string): QuestionnaireDataImageField[] {
+export function parseQuestionnaireDataText(
+  text: string,
+): QuestionnaireDataImageField[] {
   const cleanText = text.replace(/\r/g, "\n");
   const keyValueLines = extractKeyValueLines(cleanText);
   const byFieldId = new Map<string, QuestionnaireDataImageField>();
@@ -594,7 +749,9 @@ export function parseQuestionnaireDataText(text: string): QuestionnaireDataImage
     });
   }
 
-  inferUnlabelledFields(cleanText).forEach((field) => mergeDataImageField(byFieldId, field));
+  inferUnlabelledFields(cleanText).forEach((field) =>
+    mergeDataImageField(byFieldId, field),
+  );
 
   return Array.from(byFieldId.values());
 }
@@ -691,13 +848,16 @@ function fieldSpecForLabel(label: string) {
     })),
   );
 
-  const exact = labelledSpecs.find((item) => normalizedLabel === item.normalizedCandidate);
+  const exact = labelledSpecs.find(
+    (item) => normalizedLabel === item.normalizedCandidate,
+  );
   if (exact) return exact.spec;
 
   const contained = labelledSpecs
-    .filter((item) =>
-      item.normalizedCandidate.length >= 4 &&
-      normalizedLabel.includes(item.normalizedCandidate),
+    .filter(
+      (item) =>
+        item.normalizedCandidate.length >= 4 &&
+        normalizedLabel.includes(item.normalizedCandidate),
     )
     .sort((a, b) => b.normalizedCandidate.length - a.normalizedCandidate.length);
 
@@ -720,7 +880,11 @@ function inferUnlabelledFields(text: string): QuestionnaireDataImageField[] {
 
   const dates = Array.from(
     new Set(
-      (text.match(/(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2})/g) ?? [])
+      (
+        text.match(
+          /(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2})/g,
+        ) ?? []
+      )
         .map(normalizeDateValue)
         .filter(Boolean),
     ),
@@ -758,7 +922,10 @@ function mergeDataImageField(
   field: QuestionnaireDataImageField,
 ) {
   const current = byFieldId.get(field.fieldId);
-  if (!current || confidenceRank(field.confidence) >= confidenceRank(current.confidence)) {
+  if (
+    !current ||
+    confidenceRank(field.confidence) >= confidenceRank(current.confidence)
+  ) {
     byFieldId.set(field.fieldId, field);
   }
 }
@@ -799,7 +966,9 @@ function normalizeCityLikeValue(value: string) {
 }
 
 function normalizeEmailValue(value: string) {
-  return value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() ?? "";
+  return (
+    value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() ?? ""
+  );
 }
 
 function normalizePhoneValue(value: string) {
@@ -810,7 +979,12 @@ function normalizePhoneValue(value: string) {
 }
 
 function normalizePostalCodeValue(value: string) {
-  return normalizeLooseValue(value).match(/[A-Z0-9 -]{4,12}/i)?.[0]?.replace(/\s+/g, " ").trim() ?? "";
+  return (
+    normalizeLooseValue(value)
+      .match(/[A-Z0-9 -]{4,12}/i)?.[0]
+      ?.replace(/\s+/g, " ")
+      .trim() ?? ""
+  );
 }
 
 function normalizePassportNumberValue(value: string) {
@@ -831,7 +1005,8 @@ function normalizeDateValue(value: string) {
   const year = iso ? Number(iso[1]) : dotted ? Number(dotted[3]) : NaN;
   const month = iso ? Number(iso[2]) : dotted ? Number(dotted[2]) : NaN;
   const day = iso ? Number(iso[3]) : dotted ? Number(dotted[1]) : NaN;
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return "";
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day))
+    return "";
   const fullYear = year < 100 ? (year > 40 ? 1900 + year : 2000 + year) : year;
   const parsed = new Date(fullYear, month - 1, day);
   if (
@@ -859,23 +1034,45 @@ function normalizeOccupationValue(value: string) {
 
 function normalizeGenderValue(value: string) {
   const normalized = normalizeForMatch(value);
-  if (/^(f|female|ж|женскии|женщина)$/.test(normalized) || normalized.includes("female") || normalized.includes("жен")) {
-    return "Женский";
-  }
-  if (/^(m|male|м|мужскои|мужчина)$/.test(normalized) || normalized.includes("male") || normalized.includes("муж")) {
+  if (
+    /^(m|male|м|мужскои|мужчина)$/.test(normalized) ||
+    normalized.includes("male") ||
+    normalized.includes("муж")
+  ) {
     return "Мужской";
+  }
+  if (
+    /^(f|female|ж|женскии|женщина)$/.test(normalized) ||
+    normalized.includes("female") ||
+    normalized.includes("жен")
+  ) {
+    return "Женский";
   }
   return normalized ? "Другое" : "";
 }
 
 function normalizeMaritalStatusValue(value: string) {
   const normalized = normalizeForMatch(value);
-  if (normalized.includes("single") || normalized.includes("холост") || normalized.includes("не замуж")) return "Холост/не замужем";
-  if (normalized.includes("married") || normalized.includes("женат") || normalized.includes("замуж")) return "Женат/замужем";
-  if (normalized.includes("divorced") || normalized.includes("развед")) return "Разведен(а)";
-  if (normalized.includes("widow") || normalized.includes("вдов")) return "Вдовец/вдова";
-  if (normalized.includes("partner") || normalized.includes("партнер")) return "Зарегистрированное партнерство";
-  if (normalized.includes("separated") || normalized.includes("раздель")) return "Раздельно";
+  if (
+    normalized.includes("single") ||
+    normalized.includes("холост") ||
+    normalized.includes("не замуж")
+  )
+    return "Холост/не замужем";
+  if (
+    normalized.includes("married") ||
+    normalized.includes("женат") ||
+    normalized.includes("замуж")
+  )
+    return "Женат/замужем";
+  if (normalized.includes("divorced") || normalized.includes("развед"))
+    return "Разведен(а)";
+  if (normalized.includes("widow") || normalized.includes("вдов"))
+    return "Вдовец/вдова";
+  if (normalized.includes("partner") || normalized.includes("партнер"))
+    return "Зарегистрированное партнерство";
+  if (normalized.includes("separated") || normalized.includes("раздель"))
+    return "Раздельно";
   return normalized ? "Иное" : "";
 }
 
@@ -886,52 +1083,94 @@ function normalizePassportTypeValue(value: string) {
   if (normalized.includes("official")) return "Official Passport";
   if (normalized.includes("special")) return "Special Passport";
   if (normalized.includes("travel document")) return "Travel Document";
-  if (normalized.includes("ordinary") || normalized.includes("паспорт")) return "Ordinary Passport";
+  if (normalized.includes("ordinary") || normalized.includes("паспорт"))
+    return "Ordinary Passport";
   return "Ordinary Passport";
 }
 
 function normalizePurposeValue(value: string) {
   const normalized = normalizeForMatch(value);
-  if (normalized.includes("business") || normalized.includes("бизнес")) return "BUSINESS";
-  if (normalized.includes("family") || normalized.includes("friend") || normalized.includes("родствен") || normalized.includes("друз")) return "VISITING FAMILY OR FRIENDS";
+  if (normalized.includes("business") || normalized.includes("бизнес"))
+    return "BUSINESS";
+  if (
+    normalized.includes("family") ||
+    normalized.includes("friend") ||
+    normalized.includes("родствен") ||
+    normalized.includes("друз")
+  )
+    return "VISITING FAMILY OR FRIENDS";
   if (normalized.includes("study") || normalized.includes("учеб")) return "STUDY";
-  if (normalized.includes("medical") || normalized.includes("лечен")) return "MEDICAL TREATMENT";
-  if (normalized.includes("official") || normalized.includes("официаль")) return "OFFICIAL VISIT";
-  if (normalized.includes("culture") || normalized.includes("культур")) return "CULTURAL";
+  if (normalized.includes("medical") || normalized.includes("лечен"))
+    return "MEDICAL TREATMENT";
+  if (normalized.includes("official") || normalized.includes("официаль"))
+    return "OFFICIAL VISIT";
+  if (normalized.includes("culture") || normalized.includes("культур"))
+    return "CULTURAL";
   if (normalized.includes("sport") || normalized.includes("спорт")) return "SPORTS";
-  if (normalized.includes("transit") || normalized.includes("транзит")) return "TRANSIT";
-  if (normalized.includes("tour") || normalized.includes("туризм") || normalized.includes("турист")) return "TOURISM";
+  if (normalized.includes("transit") || normalized.includes("транзит"))
+    return "TRANSIT";
+  if (
+    normalized.includes("tour") ||
+    normalized.includes("туризм") ||
+    normalized.includes("турист")
+  )
+    return "TOURISM";
   return normalized ? "OTHER" : "";
 }
 
 function normalizeEntryCountValue(value: string) {
   const normalized = normalizeForMatch(value);
-  if (normalized.includes("multi") || normalized.includes("много") || normalized.includes("multiple")) return "Многократная";
+  if (
+    normalized.includes("multi") ||
+    normalized.includes("много") ||
+    normalized.includes("multiple")
+  )
+    return "Многократная";
   if (normalized.includes("two") || normalized.includes("дв")) return "Двукратная";
-  if (normalized.includes("single") || normalized.includes("одно")) return "Однократная";
+  if (normalized.includes("single") || normalized.includes("одно"))
+    return "Однократная";
   return "Многократная";
 }
 
 function normalizeYesNoValue(value: string) {
   const normalized = normalizeForMatch(value);
-  if (["yes", "y", "да", "true"].includes(normalized) || normalized.includes("yes") || normalized.includes("да")) return "Да";
-  if (["no", "n", "нет", "false"].includes(normalized) || normalized.includes("no") || normalized.includes("нет")) return "Нет";
+  if (
+    ["yes", "y", "да", "true"].includes(normalized) ||
+    normalized.includes("yes") ||
+    normalized.includes("да")
+  )
+    return "Да";
+  if (
+    ["no", "n", "нет", "false"].includes(normalized) ||
+    normalized.includes("no") ||
+    normalized.includes("нет")
+  )
+    return "Нет";
   return "";
 }
 
 function normalizeCostCoveredByValue(value: string) {
   const normalized = normalizeForMatch(value);
   if (normalized.includes("sponsor") || normalized.includes("спонс")) return "Спонсор";
-  if (normalized.includes("applicant") || normalized.includes("сам") || normalized.includes("заявител")) return "Сам заявитель";
+  if (
+    normalized.includes("applicant") ||
+    normalized.includes("сам") ||
+    normalized.includes("заявител")
+  )
+    return "Сам заявитель";
   return "Сам заявитель";
 }
 
 function normalizeMeansOfSupportValue(value: string) {
   const normalized = normalizeForMatch(value);
-  if (normalized.includes("credit") || normalized.includes("кредит")) return "Кредитная карта";
-  if (normalized.includes("cheque") || normalized.includes("чек")) return "Дорожные чеки";
-  if (normalized.includes("accommodation") || normalized.includes("жиль")) return "Жилье предоплачено";
-  if (normalized.includes("transport") || normalized.includes("транспорт")) return "Транспорт предоплачен";
+  if (normalized.includes("credit") || normalized.includes("кредит"))
+    return "Кредитная карта";
+  if (normalized.includes("cheque") || normalized.includes("чек"))
+    return "Дорожные чеки";
+  if (normalized.includes("accommodation") || normalized.includes("жиль"))
+    return "Жилье предоплачено";
+  if (normalized.includes("transport") || normalized.includes("транспорт"))
+    return "Транспорт предоплачен";
   if (normalized.includes("cash") || normalized.includes("налич")) return "Наличные";
   return "Иное";
 }

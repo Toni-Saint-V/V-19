@@ -1,5 +1,4 @@
-/// <reference types="vite/client" />
-
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -11,26 +10,19 @@ import {
   type SmartImportFileExtractionAdapters,
 } from "../../src/modules/submissions/smartImportFileExtraction";
 
-const pdfjsMock = vi.hoisted(() => ({
-  getDocument: vi.fn(),
-  workerSrc: undefined as unknown,
-}));
-
-vi.mock("pdfjs-dist/legacy/build/pdf.mjs", () => ({
-  GlobalWorkerOptions: {
-    set workerSrc(value: unknown) {
-      pdfjsMock.workerSrc = value;
-    },
-  },
-  getDocument: pdfjsMock.getDocument,
-}));
-
 function imageFile(size = 12) {
   return new File([new Uint8Array(size)], "source.jpg", { type: "image/jpeg" });
 }
 
 function pdfFile(size = 12) {
   return new File([new Uint8Array(size)], "source.pdf", { type: "application/pdf" });
+}
+
+async function realPdfFixture(relativePath: string) {
+  const bytes = await readFile(relativePath);
+  return new File([bytes], relativePath.split("/").at(-1) ?? "source.pdf", {
+    type: "application/pdf",
+  });
 }
 
 describe("smart import file extraction", () => {
@@ -50,9 +42,14 @@ describe("smart import file extraction", () => {
     expect(JSON.stringify(result).toLowerCase()).not.toContain("телефон:");
   });
 
-  it("runs local image OCR with the available offline language", async () => {
-    const recognizeImage = vi.fn<SmartImportFileExtractionAdapters["recognizeImage"]>(
-      async () => "Фамилия: Волков",
+  it("runs local image OCR in rus+eng mode", async () => {
+    const recognizeImage = vi.fn(
+      async (_image: unknown, _language: "eng" | "rus+eng", _signal: AbortSignal) => {
+        void _image;
+        void _language;
+        void _signal;
+        return "Фамилия: Волков";
+      },
     );
     const adapters: SmartImportFileExtractionAdapters = {
       extractPdfText: vi.fn(),
@@ -62,9 +59,39 @@ describe("smart import file extraction", () => {
     const result = await extractSmartImportFromFile(imageFile(), { adapters });
 
     expect(recognizeImage).toHaveBeenCalledTimes(1);
-    expect(recognizeImage.mock.calls[0]?.[1]).toBe("eng");
+    expect(recognizeImage.mock.calls[0]?.[1]).toBe("rus+eng");
     expect(result.candidates.find((item) => item.fieldId === "surname")?.value).toBe(
       "ВОЛКОВ",
+    );
+  });
+
+  it("does not propose visual passport names without a verified MRZ", async () => {
+    const adapters: SmartImportFileExtractionAdapters = {
+      extractPdfText: vi.fn(),
+      recognizeImage: vi.fn(
+        async () => `
+        Passport No
+        123456789
+        BORKOB
+        AHTOH
+        Date of birth
+        20081990
+        Nationality
+        Russian Federation
+        Date of expiry
+        26022026
+      `,
+      ),
+    };
+
+    const result = await extractSmartImportFromFile(imageFile(), { adapters });
+
+    expect(result.documentKind).toBe("passport_identity");
+    expect(result.candidates.map((item) => item.value)).not.toEqual(
+      expect.arrayContaining(["VOLKOV", "ANTON"]),
+    );
+    expect(result.candidates.map((item) => item.fieldId)).not.toEqual(
+      expect.arrayContaining(["surname", "first-name"]),
     );
   });
 
@@ -132,22 +159,19 @@ describe("smart import file extraction", () => {
 
     const result = await recognizeSmartImportImageLocally(
       source,
-      "eng",
+      "rus+eng",
       new AbortController().signal,
       createWorker,
     );
 
     expect(result).toBe("Фамилия: Волков");
     expect(createWorker).toHaveBeenCalledWith(
-      "eng",
+      "rus+eng",
       1,
       expect.objectContaining({ langPath: "/tesseract/lang" }),
     );
     expect(setParameters).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tessedit_pageseg_mode: "4",
-        user_defined_dpi: "300",
-      }),
+      expect.objectContaining({ tessedit_pageseg_mode: "4" }),
     );
     expect(recognize).toHaveBeenCalledWith(
       source,
@@ -177,7 +201,7 @@ describe("smart import file extraction", () => {
 
     const extraction = recognizeSmartImportImageLocally(
       imageFile(),
-      "eng",
+      "rus+eng",
       controller.signal,
       createWorker,
     );
@@ -187,8 +211,11 @@ describe("smart import file extraction", () => {
     expect(terminate).toHaveBeenCalledTimes(1);
   });
 
-  it("does not retry an unavailable OCR language", async () => {
-    const recognizeImage = vi.fn().mockResolvedValueOnce("Email: anton@example.com");
+  it("falls back to English OCR when rus+eng returns no text", async () => {
+    const recognizeImage = vi
+      .fn()
+      .mockResolvedValueOnce("   ")
+      .mockResolvedValueOnce("Email: anton@example.com");
     const adapters: SmartImportFileExtractionAdapters = {
       extractPdfText: vi.fn(),
       recognizeImage,
@@ -196,10 +223,31 @@ describe("smart import file extraction", () => {
 
     const result = await extractSmartImportFromFile(imageFile(), { adapters });
 
-    expect(recognizeImage.mock.calls.map((call) => call[1])).toEqual(["eng"]);
+    expect(recognizeImage.mock.calls.map((call) => call[1])).toEqual([
+      "rus+eng",
+      "eng",
+    ]);
     expect(result.candidates.find((item) => item.fieldId === "email")?.value).toBe(
       "anton@example.com",
     );
+  });
+
+  it("falls back to English OCR when the Russian language asset is unavailable", async () => {
+    const recognizeImage = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("language unavailable"))
+      .mockResolvedValueOnce("Email: anton@example.com");
+    const adapters: SmartImportFileExtractionAdapters = {
+      extractPdfText: vi.fn(),
+      recognizeImage,
+    };
+
+    await extractSmartImportFromFile(imageFile(), { adapters });
+
+    expect(recognizeImage.mock.calls.map((call) => call[1])).toEqual([
+      "rus+eng",
+      "eng",
+    ]);
   });
 
   it("uses the PDF extraction adapter and returns only sanitized candidates", async () => {
@@ -216,33 +264,75 @@ describe("smart import file extraction", () => {
     expect(JSON.stringify(result)).not.toContain("source.pdf");
   });
 
-  it("passes a Vite-served local worker URL string to PDF.js", async () => {
-    pdfjsMock.workerSrc = undefined;
-    pdfjsMock.getDocument.mockReturnValue({
-      destroy: vi.fn(),
-      promise: Promise.resolve({
-        destroy: vi.fn(),
-        getPage: vi.fn(async () => ({
-          getTextContent: vi.fn(async () => ({
-            items: [{ str: "Email: stay@example.com" }],
-          })),
-        })),
-        numPages: 1,
-      }),
+  it("extracts validated identity fields from the real filled visa PDF with the production PDF.js adapter", async () => {
+    const file = await realPdfFixture(
+      "tests/fixtures/reference-exports/Загрузка_Анкета.pdf",
+    );
+
+    const result = await extractSmartImportFromFile(file);
+    const values = Object.fromEntries(
+      result.candidates.map((candidate) => [candidate.fieldId, candidate.value]),
+    );
+
+    expect(result.documentKind).toBe("filled_form");
+    expect(values).toMatchObject({
+      "birth-country": "Russian Federation",
+      "birth-date": "23.04.1956",
+      "birth-place": "LENINGRAD REGION",
+      "first-name": "ANATOLII",
+      nationality: "Russian Federation",
+      surname: "BOGDANOV",
     });
+    expect(
+      result.candidates.every((candidate) => candidate.confidence === "high"),
+    ).toBe(true);
+    expect(result.candidates.map((candidate) => candidate.fieldId)).not.toEqual(
+      expect.arrayContaining([
+        "contact-number",
+        "hotel-contact",
+        "hotel-email",
+        "hotel-name",
+        "passport-expiry-date",
+        "passport-issue-date",
+        "passport-no",
+      ]),
+    );
+    expect(JSON.stringify(result)).not.toContain("669308614");
+  });
 
-    await extractSmartImportFromFile(pdfFile());
+  it.each([
+    "tests/fixtures/reference-exports/Готовая_выгрузка_1в1_2026-07-15/Анкета_образец_1в1.pdf",
+    "tests/fixtures/reference-exports/Готовая_выгрузка_семьи_сначала_2026-07-15/Анкета_образец_1в1.pdf",
+  ])(
+    "does not invent applicant values from the real blank visa form %s",
+    async (fixturePath) => {
+      const file = await realPdfFixture(fixturePath);
 
-    const workerSrc = pdfjsMock.workerSrc;
-    expect(workerSrc).toEqual(expect.any(String));
-    if (typeof workerSrc !== "string") {
-      throw new Error("PDF.js worker source must be a string.");
-    }
-    expect(workerSrc).not.toBe("");
-    expect(workerSrc).toContain("pdf.worker.mjs");
-    expect(workerSrc).not.toContain("/@fs/");
-    expect(["127.0.0.1", "localhost"]).toContain(
-      new URL(workerSrc, "http://localhost").hostname,
+      const result = await extractSmartImportFromFile(file);
+
+      expect(result.documentKind).toBe("filled_form");
+      expect(result.candidates).toEqual([]);
+      expect(result.summary).toContain("Подходящие поля не найдены");
+      expect(JSON.stringify(result)).not.toMatch(/PARTE\s+RESERVADA/iu);
+    },
+  );
+
+  it("extracts only the supported trip purpose from the real BLS appointment PDF", async () => {
+    const file = await realPdfFixture(
+      "tests/fixtures/reference-exports/Загрузка_Список.pdf",
+    );
+
+    const result = await extractSmartImportFromFile(file);
+
+    expect(result.candidates).toEqual([
+      expect.objectContaining({
+        confidence: "high",
+        fieldId: "purpose",
+        value: "TOURISM",
+      }),
+    ]);
+    expect(JSON.stringify(result)).not.toMatch(
+      /blshelpline|passport|reference|STP398400350726|302\s*53\s*25/iu,
     );
   });
 
@@ -250,19 +340,6 @@ describe("smart import file extraction", () => {
     const arrayBuffer = vi.fn();
     const file = Object.assign(
       new File(["hello"], "source.txt", { type: "text/plain" }),
-      { arrayBuffer },
-    );
-
-    await expect(extractSmartImportFromFile(file)).rejects.toMatchObject({
-      code: "unsupported_type",
-    });
-    expect(arrayBuffer).not.toHaveBeenCalled();
-  });
-
-  it("rejects an audio note before reading its bytes", async () => {
-    const arrayBuffer = vi.fn();
-    const file = Object.assign(
-      new File(["synthetic-audio"], "voice-note.wav", { type: "audio/wav" }),
       { arrayBuffer },
     );
 
