@@ -1,5 +1,8 @@
 # Package 2 Integration Gate
 
+> Historical integration gate. Its Excel-only export decision was superseded
+> on 2026-08-12 by `docs/release/export-artifact-scope.md`.
+
 > Historical branch evidence record only. This document is not current runtime
 > source truth and does not approve production activation. Use
 > `docs/release/canonical-domain-contract.md` and current verifier output for

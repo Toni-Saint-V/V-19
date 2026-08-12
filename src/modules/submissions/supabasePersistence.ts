@@ -224,9 +224,12 @@ type CockpitWorkbookExportReceiptRows = {
 function withoutLocalDemoMediaAuthority(submission: Submission): Submission {
   return {
     ...submission,
-    files: submission.files.map(
-      ({ localDemoMediaStored: _stored, localDemoSeedMedia: _seed, ...file }) => file,
-    ),
+    files: submission.files.map((file) => {
+      const persistedFile = { ...file };
+      delete persistedFile.localDemoMediaStored;
+      delete persistedFile.localDemoSeedMedia;
+      return persistedFile;
+    }),
   };
 }
 type CockpitMediaAssetRow = Pick<

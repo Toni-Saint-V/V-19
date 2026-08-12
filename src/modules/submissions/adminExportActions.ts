@@ -9,7 +9,10 @@ export type AdminExportActionFeedback = {
   tone: AdminActionTone;
 };
 
-export const adminDocumentPackageExportEnabled = false;
+// The approved production artifact is a one-time ZIP containing the verified
+// workbook and selected canonical documents. The terminal RPC owns the export
+// state transition after an explicit download confirmation.
+export const adminDocumentPackageExportEnabled = true;
 
 export function assertAdminDocumentPackageExportEnabled() {
   if (!adminDocumentPackageExportEnabled) {

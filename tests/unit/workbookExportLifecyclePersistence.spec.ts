@@ -60,6 +60,7 @@ describe("workbook-only durable export persistence", () => {
       "record_export_workbook_download_acknowledgement",
       {
         payload: {
+          archive_input_signature: request.archiveInputSignature,
           batch: {
             content_fingerprint: identity.contentFingerprint,
             file_name: identity.fileName,
@@ -68,6 +69,7 @@ describe("workbook-only durable export persistence", () => {
             row_count: 1,
             submission_ids: ["SUB-1"],
           },
+          expected_case_revisions: request.expectedCaseRevisions,
         },
       },
     );
@@ -100,7 +102,9 @@ describe("workbook-only durable export persistence", () => {
     });
     expect(rpc).toHaveBeenCalledWith("complete_workbook_export", {
       payload: {
+        archive_input_signature: request.archiveInputSignature,
         batch: expect.objectContaining({ idempotency_key: "abc1234" }),
+        expected_case_revisions: request.expectedCaseRevisions,
       },
     });
     const firstCall = rpc.mock.calls[0] as unknown[] | undefined;
@@ -122,7 +126,9 @@ describe("workbook-only durable export persistence", () => {
       });
       expect(rpc).toHaveBeenCalledWith("reconcile_workbook_export", {
         payload: {
+          archive_input_signature: request.archiveInputSignature,
           batch: expect.objectContaining({ submission_ids: ["SUB-1"] }),
+          expected_case_revisions: request.expectedCaseRevisions,
           stage: "t8",
         },
       });

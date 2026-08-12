@@ -1814,7 +1814,7 @@ export default function App({
             archiveInputSignature === currentArchiveInputSignature &&
             submissionIds.every(
               (submissionId) =>
-                caseRevisionsBySubmissionIdRef.current.get(submissionId) ===
+                (caseRevisionsBySubmissionIdRef.current.get(submissionId) ?? 0) ===
                 expectedCaseRevisions[submissionId],
             ) &&
             exportPackageIdentityMatches(packageIdentity, currentPackageIdentity);
@@ -1974,7 +1974,7 @@ export default function App({
               archiveInputSignature === currentArchiveInputSignature &&
               submissionIds.every(
                 (submissionId) =>
-                  caseRevisionsBySubmissionIdRef.current.get(submissionId) ===
+                  (caseRevisionsBySubmissionIdRef.current.get(submissionId) ?? 0) ===
                   expectedCaseRevisions[submissionId],
               ) &&
               exportPackageIdentityMatches(packageIdentity, currentPackageIdentity) &&
@@ -2169,11 +2169,13 @@ export default function App({
               requestedSubmissionIds.has(submission.id),
             );
             const downloadedIdentity = buildExportPackageIdentity(selectedDownloaded);
-            const downloadedArchiveInputSignature =
-              buildExportArchiveInputSignature(selectedDownloaded);
             const downloadedSelectionMatchesArtifact =
               selectedDownloaded.length === submissionIds.length &&
-              archiveInputSignature === downloadedArchiveInputSignature &&
+              // The T8 transition changes only technical lifecycle metadata
+              // (`updatedAt`). The source signature was already matched before
+              // that transition, so comparing it again would reject the ZIP
+              // artifact that the admin has just explicitly confirmed.
+              archiveInputSignature === currentArchiveInputSignature &&
               exportPackageIdentityMatches(packageIdentity, downloadedIdentity) &&
               selectedDownloaded.every(
                 (submission) =>

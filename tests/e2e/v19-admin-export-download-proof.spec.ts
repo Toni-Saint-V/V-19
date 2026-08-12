@@ -17,10 +17,11 @@ function blockingBrowserProblems(problems: string[]) {
 }
 
 test.describe("V-19 admin document export proof", () => {
-  test("admin downloads a verified family Excel package in one action", async ({
+  test("admin downloads and confirms a verified family ZIP package", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     await openFreshWorkspace(page, {
       heading: "Очередь на проверку",
@@ -50,21 +51,32 @@ test.describe("V-19 admin document export proof", () => {
       name: "Контроль пакета",
     });
     await expect(controlRail).toContainText("Текущая выгрузка");
-    const excelButton = controlRail.getByRole("button", { name: "Скачать Excel" });
-    await expect(excelButton).toBeEnabled();
+    const downloadButton = controlRail.getByRole("button", {
+      name: "Скачать ZIP + Excel",
+    });
+    await expect(downloadButton).toBeEnabled();
     const downloadPromise = page.waitForEvent("download");
-    await excelButton.click();
+    await downloadButton.click();
     const download = await downloadPromise;
 
-    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
+    expect(download.suggestedFilename()).toMatch(
+      /^visaflow-export-.+_documents\.zip$/,
+    );
     await expect(download.failure()).resolves.toBeNull();
-    await expect(
-      controlRail.getByRole("button", { name: "Excel скачан" }),
-    ).toBeDisabled();
+    const confirmDownload = controlRail.getByRole("button", {
+      name: "Подтвердить скачивание",
+    });
+    await expect(confirmDownload).toBeEnabled();
     await expect(controlRail.locator("#export-action-hint")).toContainText(
-      "Excel скачан:",
+      "ZIP с Excel передан браузеру.",
+    );
+    await confirmDownload.click();
+    await expect(controlRail.getByTestId("export-action-feedback")).toContainText(
+      "Скачивание подтверждено, пакет зафиксирован:",
     );
     await expectNoHorizontalOverflow(page, "admin Excel export complete");
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await expectNoHorizontalOverflow(page, "admin ZIP export tablet");
 
     expect(
       blockingBrowserProblems(browserProblems),
@@ -72,11 +84,10 @@ test.describe("V-19 admin document export proof", () => {
     ).toEqual([]);
   });
 
-  test("admin downloads a verified single-applicant Excel package", async ({
+  test("admin downloads and confirms a verified single-applicant ZIP package", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
-
     await openFreshWorkspace(page, {
       heading: "Очередь на проверку",
       workspaceEmail: "admin@visaflow.local",
@@ -85,7 +96,6 @@ test.describe("V-19 admin document export proof", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Центр выгрузки" }),
     ).toBeVisible();
-
     await clearExportSelection(page);
     const targetRow = page.getByTestId("admin-export-row-SUB-1101");
     await expect(targetRow).toBeVisible();
@@ -103,18 +113,28 @@ test.describe("V-19 admin document export proof", () => {
     const controlRail = page.getByRole("complementary", {
       name: "Контроль пакета",
     });
-    const excelButton = controlRail.getByRole("button", { name: "Скачать Excel" });
-    await expect(excelButton).toBeEnabled();
-    const excelDownloadPromise = page.waitForEvent("download");
-    await excelButton.click();
-    const excelDownload = await excelDownloadPromise;
-    await expect(excelDownload.failure()).resolves.toBeNull();
+    const downloadButton = controlRail.getByRole("button", {
+      name: "Скачать ZIP + Excel",
+    });
+    await expect(downloadButton).toBeEnabled();
+    const downloadPromise = page.waitForEvent("download");
+    await downloadButton.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(
+      /^visaflow-export-.+_documents\.zip$/,
+    );
+    await expect(download.failure()).resolves.toBeNull();
 
-    await expect(
-      controlRail.getByRole("button", { name: "Excel скачан" }),
-    ).toBeDisabled();
+    const confirmDownload = controlRail.getByRole("button", {
+      name: "Подтвердить скачивание",
+    });
+    await expect(confirmDownload).toBeEnabled();
     await expect(controlRail.locator("#export-action-hint")).toContainText(
-      "Excel скачан:",
+      "ZIP с Excel передан браузеру.",
+    );
+    await confirmDownload.click();
+    await expect(controlRail.getByTestId("export-action-feedback")).toContainText(
+      "Скачивание подтверждено, пакет зафиксирован:",
     );
 
     expect(

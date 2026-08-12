@@ -111,8 +111,11 @@ Export readiness is fail-closed. A submission can be exported only when:
 - city/trip/export package identity rules pass;
 - the export row model used by preview and workbook generation is the same.
 
-Excel is the active export artifact. ZIP/package export, appointment submission,
-or production delivery claims require a later approved contract.
+The active export artifact is a one-time browser ZIP containing the verified
+Excel workbook and required private documents. `complete_export_package` may
+commit T9 only after explicit download confirmation and must fail closed if the
+selection, package identity, or protected-media evidence is stale. Repeat ZIP
+download, ZIP storage, and checksum proof are not product capabilities.
 
 ### 1.8 AI, OCR, and PDF boundary
 

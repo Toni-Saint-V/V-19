@@ -1,30 +1,32 @@
 # Export Artifact Scope
 
-Status: V-19 NO-GO package 2 export closeout.
-Recorded: 2026-06-28.
+Status: V-19 ZIP + Excel export release scope.
+Approved: 2026-08-12.
 
 This document is release evidence, not production readiness approval.
 
 ## Decision
 
-V-19 pilot export scope is Excel-only.
-
-The supported pilot artifact is the `xlsx` workbook generated from the canonical
-export row model. Product copy and release evidence must not claim ZIP package
-generation, private ZIP storage, ZIP checksum proof, or repeat ZIP download.
+The supported artifact is a one-time browser ZIP download containing the
+verified `xlsx` workbook and required documents for the current selection. The
+user must explicitly confirm the download before the terminal export state is
+committed.
 
 ## Supported Artifact
 
-- Artifact: Excel workbook.
-- Format: `xlsx`.
-- Sheet: `Sheet1`.
-- Range: `A:BD`.
-- Row source: canonical export row model from `src/modules/submissions`.
-- Proof surface: parsed workbook tests compare preview rows to workbook rows.
+- Workbook: `xlsx`, `Sheet1`, range `A:BD`, generated from the canonical export
+  row model in `src/modules/submissions`.
+- Package: browser-generated `zip` containing that workbook and the required
+  private document assets for the selected submissions.
+- Source: production downloads document bytes only through the scoped Supabase
+  Storage path; it fails closed when required assets are unavailable.
+- Commit: after browser download and explicit confirmation,
+  `complete_export_package` validates package identity and performs the
+  terminal transition atomically.
 
-`src/lib/export/exportWorkbookCore.ts` uses a ZIP container internally because
-`xlsx` files are ZIP-based Office documents. That is not a product ZIP package
-and must not be described as one.
+The browser ZIP is transient: it is not stored as a private artifact, does not
+claim checksum proof, and is not available for repeat download after reload.
+Those properties must not be represented as product capabilities.
 
 ## Reload Contract
 
@@ -48,29 +50,7 @@ available from the snapshot. A fallback row without the full cockpit snapshot ma
 show durable identity metadata, but it stays in `ready` state and cannot claim
 repeat download proof.
 
-An authenticated administrator acknowledgement in
-`workbook_export_receipts`, with membership bound to the submission's exact
-current `case_revision`, rehydrates canonical `file_downloaded`. A receipt from
-an older acceptance revision is ignored. Terminal `exported`/
-`marked_exported` rehydrate requires the same receipt membership to carry the
-exact terminal revision written by the Excel-only completion transaction.
-Legacy rows are never backfilled with synthetic acknowledgement evidence.
-
-Preview/download/mark-exported gates still recompute package identity from the
-current row model before allowing workbook download or exported lifecycle state.
-
-## ZIP Scope Cut
-
-ZIP option B is active for the pilot.
-
-No product surface may promise:
-
-- ZIP package generation;
-- private ZIP storage;
-- ZIP checksum proof;
-- repeated ZIP download after reload;
-- ZIP-based export completion.
-
-If ZIP becomes release scope later, it needs a separate backend/private-storage
-artifact contract with private storage policy, checksum, manifest, reload proof,
-and stale/missing-artifact failure proof.
+The client recomputes package identity and source signature immediately before
+download and again before confirmation. Any changed selection, stale document,
+or failed terminal RPC leaves the submission non-terminal and requires a fresh
+package. Legacy rows are never backfilled with synthetic download evidence.

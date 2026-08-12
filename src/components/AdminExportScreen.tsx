@@ -633,7 +633,10 @@ export function AdminExportScreen({
       }
 
       const identity = buildExportPackageIdentity(selectedGenerated);
-      const archiveInputSignature = buildExportArchiveInputSignature(selectedGenerated);
+      // The export state transition updates `updatedAt`, but it is not a change
+      // to the selected source data. Bind the artifact to the pre-transition
+      // snapshot so the confirmation step can still detect real edits.
+      const archiveInputSignature = buildExportArchiveInputSignature(selectedSubmissions);
       const plan = exportSummary(selectedGenerated);
       const hasDownloadableState =
         plan.exportState === "file_generated" || plan.exportState === "file_downloaded";

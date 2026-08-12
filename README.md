@@ -94,8 +94,8 @@ Key boundaries:
 - canonical statuses: `draft`, `in_progress`, `submitted_for_review`,
   `returned`, `corrections_received`, `ready_for_export`, `exported`;
 - issue lifecycle: `open -> fixed_by_agent -> closed_by_admin`;
-- export is fail-closed and Excel-only unless a later approved contract says
-  otherwise;
+- export is fail-closed; the approved artifact is a one-time ZIP containing the
+  verified Excel workbook and required private documents;
 - AI/OCR/PDF helpers are advisory only and never auto-apply data or make
   domain decisions.
 

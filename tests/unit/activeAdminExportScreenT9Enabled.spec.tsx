@@ -87,7 +87,10 @@ describe("active admin export screen with T9 enabled", () => {
 
     render(
       <VisaflowBusinessBridgeProvider bridge={{ onExportPackages }}>
-        <AdminExportScreen submissions={[submission]} />
+        <AdminExportScreen
+          caseRevisionsBySubmissionId={new Map([[submission.id, 1]])}
+          submissions={[submission]}
+        />
       </VisaflowBusinessBridgeProvider>,
     );
     fireEvent.click(

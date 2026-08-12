@@ -1,5 +1,9 @@
 # V-19 Pilot Pack
 
+> Historical pilot scope. Superseded for export artifacts on 2026-08-12 by
+> `docs/release/export-artifact-scope.md`; its Excel-only and ZIP NO-GO
+> statements are not the current release contract.
+
 Status: closed-pilot tester packet.
 Audience: 5-10 invited testers.
 Scope: sandbox, local, or staging pilot only.

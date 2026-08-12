@@ -345,9 +345,11 @@ describe("active admin export screen", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Excel сохранён — зафиксировать" }),
     );
-    expect(onExportWorkbookDownloaded).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onExportWorkbookDownloaded).toHaveBeenCalledTimes(1));
     expect(onExportWorkbookDownloaded).toHaveBeenCalledWith(
       expect.objectContaining({
+        archiveInputSignature: expect.any(String),
+        expectedCaseRevisions: { [submission.id]: 0 },
         packageIdentity: expect.objectContaining({ rowCount: 1 }),
         submissionIds: [submission.id],
       }),
