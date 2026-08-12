@@ -56,6 +56,7 @@ interface AdminWorkspaceProps {
   onSignOut: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
   submissions?: Submission[];
+  caseRevisionsBySubmissionId?: ReadonlyMap<string, number>;
   usesSupabase?: boolean;
 }
 
@@ -68,6 +69,7 @@ export function AdminWorkspace({
   onRejectAccessRequest,
   onSignOut,
   submissions,
+  caseRevisionsBySubmissionId = new Map(),
   usesSupabase = false,
 }: AdminWorkspaceProps) {
   const bridge = useVisaflowBusinessBridge();
@@ -75,6 +77,8 @@ export function AdminWorkspace({
   const [currentView, setCurrentView] = useState<AdminViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [reviewApplicantId, setReviewApplicantId] = useState<string>();
+  const [reviewSubmissionOverride, setReviewSubmissionOverride] =
+    useState<Submission | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sideMenuMode, setSideMenuMode] = useState<V19SideMenuMode>("regular");
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
@@ -94,8 +98,12 @@ export function AdminWorkspace({
   const signOutPendingRef = useRef(false);
   const commandPaletteFocusOriginRef = useRef<HTMLElement | null>(null);
 
-  const selectedSubmission =
+  const canonicalSelectedSubmission =
     submissions?.find((submission) => submission.id === selectedRow) ?? null;
+  const selectedSubmission =
+    reviewSubmissionOverride?.id === selectedRow
+      ? reviewSubmissionOverride
+      : canonicalSelectedSubmission;
   const reviewQueueCount = (submissions ?? []).filter(
     isAdminReviewQueueSubmission,
   ).length;
@@ -121,6 +129,23 @@ export function AdminWorkspace({
     setReviewApplicantId(undefined);
     setRemarkFormOpen(false);
   }, [currentView, selectedRow, selectedSubmission]);
+
+  useEffect(() => {
+    if (!reviewSubmissionOverride || !canonicalSelectedSubmission) return;
+    const overrideApplicant = reviewSubmissionOverride.applicants.find(
+      (applicant) => applicant.id === reviewApplicantId,
+    );
+    const canonicalApplicant = canonicalSelectedSubmission.applicants.find(
+      (applicant) => applicant.id === reviewApplicantId,
+    );
+    const overrideVerifiedAt = overrideApplicant?.passportExtraction?.verifiedAtIso;
+    if (
+      overrideVerifiedAt &&
+      canonicalApplicant?.passportExtraction?.verifiedAtIso === overrideVerifiedAt
+    ) {
+      setReviewSubmissionOverride(null);
+    }
+  }, [canonicalSelectedSubmission, reviewApplicantId, reviewSubmissionOverride]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -193,6 +218,7 @@ export function AdminWorkspace({
     });
     setAdminAsyncError("");
     setCommandPaletteOpen(false);
+    setReviewSubmissionOverride(null);
     setSelectedRow(submissionId);
     setReviewApplicantId(
       submission ? primaryApplicantIdForPassportReview(submission) : undefined,
@@ -202,6 +228,7 @@ export function AdminWorkspace({
 
   const handleBackToQueue = () => {
     setCurrentView("main");
+    setReviewSubmissionOverride(null);
     window.requestAnimationFrame(() => {
       reviewReturnFocusRef.current?.focus({ preventScroll: true });
     });
@@ -268,7 +295,10 @@ export function AdminWorkspace({
     setAdminAsyncError("");
     adminPassportApprovalPendingRef.current = true;
     try {
-      await bridge.onAdminPassportSectionApprove(payload);
+      const approvedSubmission = await bridge.onAdminPassportSectionApprove(payload);
+      if (approvedSubmission) {
+        setReviewSubmissionOverride(approvedSubmission);
+      }
       emitVisaflowUiEvent(bridge, {
         type: "admin.passport-section.approve",
         payload,
@@ -342,6 +372,7 @@ export function AdminWorkspace({
     setCurrentView("main");
     setSelectedRow(null);
     setReviewApplicantId(undefined);
+    setReviewSubmissionOverride(null);
     setActiveNav(nav);
     setMobileNavOpen(false);
   };
@@ -552,7 +583,10 @@ export function AdminWorkspace({
                 />
               ) : null}
               {activeNav === "export" ? (
-                <AdminExportScreen submissions={submissions} />
+                <AdminExportScreen
+                  caseRevisionsBySubmissionId={caseRevisionsBySubmissionId}
+                  submissions={submissions}
+                />
               ) : null}
               {activeNav === "users" ? (
                 <AdminUsersAccessScreen

@@ -91,6 +91,18 @@ export type Database = {
         Update: Partial<ExportBatchMemberInsert>;
         Relationships: [];
       };
+      workbook_export_receipts: {
+        Row: WorkbookExportReceiptRow;
+        Insert: WorkbookExportReceiptInsert;
+        Update: Partial<WorkbookExportReceiptInsert>;
+        Relationships: [];
+      };
+      workbook_export_receipt_members: {
+        Row: WorkbookExportReceiptMemberRow;
+        Insert: WorkbookExportReceiptMemberInsert;
+        Update: Partial<WorkbookExportReceiptMemberInsert>;
+        Relationships: [];
+      };
       agent_return_packages: {
         Row: AgentReturnPackageRow;
         Insert: AgentReturnPackageInsert;
@@ -138,6 +150,18 @@ export type Database = {
           payload: ExportPackageCommitPayload;
         };
         Returns: ExportPackageCommitResult;
+      };
+      record_export_workbook_download_acknowledgement: {
+        Args: { payload: WorkbookExportPayload };
+        Returns: WorkbookExportReceiptResult;
+      };
+      complete_workbook_export: {
+        Args: { payload: WorkbookExportPayload };
+        Returns: WorkbookExportCommitResult;
+      };
+      reconcile_workbook_export: {
+        Args: { payload: WorkbookExportReconciliationPayload };
+        Returns: WorkbookExportReconciliationResult;
       };
       repair_incomplete_export_document_completion: {
         Args: {
@@ -591,6 +615,37 @@ export type ExportBatchMemberInsert = Omit<ExportBatchMemberRow, "created_at"> &
   created_at?: string;
 };
 
+export interface WorkbookExportReceiptRow extends DbRecord {
+  id: string;
+  export_batch_id: string;
+  archive_input_signature: string;
+  revision_fingerprint: string;
+  acknowledged_by: string;
+  acknowledged_at: string;
+  completed_by: string | null;
+  completed_at: string | null;
+}
+
+export type WorkbookExportReceiptInsert = Omit<
+  WorkbookExportReceiptRow,
+  "id" | "acknowledged_by" | "acknowledged_at" | "completed_by" | "completed_at"
+> & {
+  id?: string;
+  acknowledged_by?: string;
+  acknowledged_at?: string;
+  completed_by?: string | null;
+  completed_at?: string | null;
+};
+
+export interface WorkbookExportReceiptMemberRow extends DbRecord {
+  receipt_id: string;
+  submission_id: string;
+  acceptance_case_revision: number;
+  terminal_case_revision: number | null;
+}
+
+export type WorkbookExportReceiptMemberInsert = WorkbookExportReceiptMemberRow;
+
 export type AgentReturnPackageStatus = "draft" | "published";
 
 export interface AgentReturnPackageRow extends DbRecord {
@@ -738,6 +793,52 @@ export interface ExportPackageCommitPayload extends DbRecord {
     applicant_count: number;
     workbook_file_name: string;
   };
+}
+
+export interface WorkbookExportPayload extends DbRecord {
+  archive_input_signature: string;
+  batch: {
+    format: "xlsx";
+    content_fingerprint: string;
+    idempotency_key: string;
+    file_name: string;
+    row_count: number;
+    submission_ids: string[];
+  };
+  expected_case_revisions: Record<string, number>;
+}
+
+export interface WorkbookExportReconciliationPayload extends WorkbookExportPayload {
+  stage: "t8" | "t9";
+}
+
+export interface WorkbookExportReceiptResult extends DbRecord {
+  duplicate: boolean;
+  receipt: {
+    id: string;
+    exportBatchId: string;
+    revisionFingerprint: string;
+    acknowledgedBy: string;
+    acknowledgedAt: string;
+    completedBy: string | null;
+    completedAt: string | null;
+  };
+  submissions: number;
+}
+
+export interface WorkbookExportCommitResult extends WorkbookExportReceiptResult {
+  statusHistory: number;
+}
+
+export interface WorkbookExportReconciliationResult extends DbRecord {
+  receipt: WorkbookExportReceiptResult["receipt"] | null;
+  stage: "t8" | "t9";
+  status: "committed" | "not_committed" | "unknown";
+  submissions: Array<{
+    id: string;
+    caseRevision: number;
+    status: "ready_for_export" | "exported";
+  }>;
 }
 
 export interface ExportPackageDocumentCommitResult extends DbRecord {

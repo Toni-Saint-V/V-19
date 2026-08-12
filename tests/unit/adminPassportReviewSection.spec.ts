@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   addPreciseAdminIssue,
+  approveLocalDemoPassportReviewSectionForAdmin,
   approvePassportReviewSectionForAdmin,
   createDraftSubmission,
   generatedCockpitMediaFileName,
@@ -184,15 +185,19 @@ describe("admin passport review section approval", () => {
       expect.arrayContaining([...ADMIN_PASSPORT_REVIEW_FIELD_IDS]),
     );
     expect(approvedFields).toHaveLength(ADMIN_PASSPORT_REVIEW_FIELD_IDS.length);
-    expect(
-      approved.files.filter((file) => file.applicantId === applicant.id),
-    ).toEqual(
+    expect(approved.files.filter((file) => file.applicantId === applicant.id)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ status: "accepted", type: "passport_scan" }),
         expect.objectContaining({ status: "accepted", type: "selfie" }),
         expect.objectContaining({ status: "accepted", type: "selfie_2" }),
       ]),
     );
+    expect(approved.applicants[0]?.passportExtraction).toMatchObject({
+      sourceFileId: expect.any(String),
+      sourceStoragePath: expect.stringContaining("/passport_scan/"),
+      status: "unavailable",
+      verifiedAtIso: "2026-07-17T03:00:00.000Z",
+    });
     expect(submission.files.every((file) => file.status === "pending_review")).toBe(
       true,
     );
@@ -260,6 +265,37 @@ describe("admin passport review section approval", () => {
     },
   );
 
+  test("rejects metadata-only local-demo media through every approval entry point", () => {
+    const source = reviewableSubmission();
+    const submission: Submission = {
+      ...source,
+      files: source.files.map((file) => ({
+        ...file,
+        storageAdapter: "local-dev",
+        storageBucket: undefined,
+        storagePath: undefined,
+      })),
+    };
+    const applicant = submission.applicants[0];
+    if (!applicant) throw new Error("Expected applicant.");
+
+    expect(
+      approvePassportReviewSectionForAdmin(
+        submission,
+        { applicantId: applicant.id },
+        "admin-reviewer",
+      ),
+    ).toMatchObject({ ok: false });
+
+    const result = approveLocalDemoPassportReviewSectionForAdmin(
+      submission,
+      { applicantId: applicant.id },
+      "admin-reviewer",
+      "2026-08-12T01:00:00.000Z",
+    );
+    expect(result).toMatchObject({ ok: false });
+  });
+
   test("accepts only passport_scan for a secondary family applicant", () => {
     const submission = reviewableSubmission("family", 3);
     const secondary = submission.applicants[1];
@@ -276,15 +312,12 @@ describe("admin passport review section approval", () => {
       ),
     );
 
-    expect(
-      approved.files.filter((file) => file.applicantId === secondary.id),
-    ).toEqual([
+    expect(approved.files.filter((file) => file.applicantId === secondary.id)).toEqual([
       expect.objectContaining({ status: "accepted", type: "passport_scan" }),
     ]);
     expect(
       approved.files.filter(
-        (file) =>
-          file.applicantId !== secondary.id && file.status === "pending_review",
+        (file) => file.applicantId !== secondary.id && file.status === "pending_review",
       ),
     ).toHaveLength(4);
   });
@@ -372,9 +405,11 @@ describe("admin passport review section approval", () => {
     const submission = reviewableSubmission("family", 2);
     const secondary = submission.applicants[1];
     const primarySelfie = submission.files.find(
-      (file) => file.applicantId === submission.applicants[0]?.id && file.type === "selfie",
+      (file) =>
+        file.applicantId === submission.applicants[0]?.id && file.type === "selfie",
     );
-    if (!secondary || !primarySelfie) throw new Error("Expected family review fixture.");
+    if (!secondary || !primarySelfie)
+      throw new Error("Expected family review fixture.");
     const legacyFileName = generatedCockpitMediaFileName({
       applicantId: secondary.id,
       fileType: "selfie",
@@ -435,9 +470,9 @@ describe("admin passport review section approval", () => {
         (file) => file.applicantId === secondary.id && file.type === "passport_scan",
       ),
     ).toMatchObject({ status: "accepted" });
-    expect(
-      rechecked.files.find((file) => file.id === legacySelfie.id),
-    ).toMatchObject({ status: "pending_review" });
+    expect(rechecked.files.find((file) => file.id === legacySelfie.id)).toMatchObject({
+      status: "pending_review",
+    });
   });
 
   test("ignores an open section issue outside the passport review scope", () => {
@@ -530,9 +565,7 @@ describe("admin passport review section approval", () => {
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.data.issues).toEqual([
-        expect.objectContaining({ id, status }),
-      ]);
+      expect(result.data.issues).toEqual([expect.objectContaining({ id, status })]);
       expect(result.data.history[0]?.text).toBe(
         "Администратор подтвердил паспортную секцию",
       );

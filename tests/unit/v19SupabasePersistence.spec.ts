@@ -9,6 +9,8 @@ const mockState = vi.hoisted(() => ({
   applicantRows: [] as unknown[],
   correctionRows: [] as unknown[],
   exportBatchRows: [] as unknown[],
+  workbookExportReceiptMemberRows: [] as unknown[],
+  workbookExportReceiptRows: [] as unknown[],
   fromCalls: [] as string[],
   gtCalls: [] as Array<{ column: string; value: string }>,
   mediaAssetRows: [] as unknown[],
@@ -105,6 +107,10 @@ vi.mock("../../src/lib/supabase/client", () => {
                         ? mockState.correctionRows
                         : table === "status_history"
                           ? mockState.statusHistoryRows
+                          : table === "workbook_export_receipt_members"
+                            ? mockState.workbookExportReceiptMemberRows
+                            : table === "workbook_export_receipts"
+                              ? mockState.workbookExportReceiptRows
                           : table === "profiles"
                             ? mockState.profileRows
                             : mockState.exportBatchRows,
@@ -213,6 +219,8 @@ beforeEach(() => {
   mockState.applicantRows = [];
   mockState.correctionRows = [];
   mockState.exportBatchRows = [];
+  mockState.workbookExportReceiptMemberRows = [];
+  mockState.workbookExportReceiptRows = [];
   mockState.fromCalls = [];
   mockState.gtCalls = [];
   mockState.mediaAssetRows = [];
@@ -2050,6 +2058,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       "corrections",
       "status_history",
       "export_batches",
+      "workbook_export_receipt_members",
       "profiles",
     ]);
     expect(loaded.submissions[0]).toMatchObject({
@@ -2176,6 +2185,139 @@ describe("V-19 Supabase cockpit persistence", () => {
         submissionIds: [submission.id],
       },
       exportState: "ready",
+      status: "ready_for_export",
+    });
+  });
+
+  it("rehydrates file_downloaded only from a receipt bound to the current case revision", async () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-EXPORT-T8-RELOAD",
+      exportPackage: undefined,
+      exportState: "ready",
+      status: "ready_for_export",
+    };
+    const identity = buildExportPackageIdentity([submission], "xlsx");
+    if (!identity) throw new Error("Expected export package identity");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+    const batchId = "00000000-0000-4000-8000-000000000911";
+    const receiptId = "00000000-0000-4000-8000-000000000912";
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        case_revision: 7,
+        status: "ready_for_excel",
+        created_at: "2026-08-12T08:00:00.000Z",
+        updated_at: "2026-08-12T08:01:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: batchId,
+        content_fingerprint: identity.contentFingerprint,
+        created_at: "2026-08-12T08:02:00.000Z",
+        file_name: identity.fileName,
+        format: "xlsx",
+        idempotency_key: identity.idempotencyKey,
+        row_count: identity.rowCount,
+        submission_ids: identity.submissionIds,
+      },
+    ];
+    mockState.workbookExportReceiptMemberRows = [
+      {
+        acceptance_case_revision: 7,
+        receipt_id: receiptId,
+        submission_id: submission.id,
+        terminal_case_revision: null,
+      },
+    ];
+    mockState.workbookExportReceiptRows = [
+      {
+        acknowledged_at: "2026-08-12T08:03:00.000Z",
+        completed_at: null,
+        export_batch_id: batchId,
+        id: receiptId,
+        revision_fingerprint: `${submission.id}:7`,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      exportPackage: identity,
+      exportState: "file_downloaded",
+      status: "ready_for_export",
+    });
+    expect(mockState.fromCalls).toContain("workbook_export_receipts");
+  });
+
+  it("does not revive a stale T8 receipt after the acceptance revision changes", async () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-EXPORT-T8-STALE",
+      exportPackage: undefined,
+      exportState: "ready",
+      status: "ready_for_export",
+    };
+    const identity = buildExportPackageIdentity([submission], "xlsx");
+    if (!identity) throw new Error("Expected export package identity");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+    const batchId = "00000000-0000-4000-8000-000000000913";
+    const receiptId = "00000000-0000-4000-8000-000000000914";
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        case_revision: 8,
+        status: "ready_for_excel",
+        created_at: "2026-08-12T08:00:00.000Z",
+        updated_at: "2026-08-12T08:04:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: batchId,
+        content_fingerprint: identity.contentFingerprint,
+        created_at: "2026-08-12T08:02:00.000Z",
+        file_name: identity.fileName,
+        format: "xlsx",
+        idempotency_key: identity.idempotencyKey,
+        row_count: identity.rowCount,
+        submission_ids: identity.submissionIds,
+      },
+    ];
+    mockState.workbookExportReceiptMemberRows = [
+      {
+        acceptance_case_revision: 7,
+        receipt_id: receiptId,
+        submission_id: submission.id,
+        terminal_case_revision: null,
+      },
+    ];
+    mockState.workbookExportReceiptRows = [
+      {
+        acknowledged_at: "2026-08-12T08:03:00.000Z",
+        completed_at: null,
+        export_batch_id: batchId,
+        id: receiptId,
+        revision_fingerprint: `${submission.id}:7`,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      exportPackage: identity,
+      exportState: "file_generated",
       status: "ready_for_export",
     });
   });

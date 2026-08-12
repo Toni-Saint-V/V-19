@@ -750,10 +750,10 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
 
   const actions: AgentActionItem[] = [];
 
-  const replacementFile = submission.files.find(
+  const replacementFiles = submission.files.filter(
     (file) => file.status === "needs_replacement" && isActiveAgentFile(file),
   );
-  if (replacementFile) {
+  for (const replacementFile of replacementFiles) {
     const applicantName = applicantNameForFile(submission, replacementFile);
     const rowText = formatAgentActionRowText({
       applicantName,
@@ -782,7 +782,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
   const readyToSubmitCorrections =
     canPerformAction(submission, "submit_corrections", "agent").ok &&
     unresolvedOpenIssueCount(submission) === 0;
-  if (readyToSubmitCorrections && !replacementFile) {
+  if (readyToSubmitCorrections && replacementFiles.length === 0) {
     const rowText = formatAgentActionRowText({
       kind: "submit_corrections",
       submission,

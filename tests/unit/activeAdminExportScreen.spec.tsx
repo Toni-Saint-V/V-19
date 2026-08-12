@@ -300,11 +300,12 @@ describe("active admin export screen", () => {
     expect(failure).not.toHaveTextContent("token=private");
   });
 
-  test("keeps verified Excel downloadable while document ZIP authority is blocked", async () => {
+  test("requires an explicit T8 acknowledgement before offering Excel-only T9", async () => {
     if (adminDocumentPackageExportEnabled) return;
 
     const submission = readySubmission();
-    const onExportPackages = vi.fn(async () => undefined);
+    const onCompleteWorkbookExport = vi.fn(async () => undefined);
+    const onExportWorkbookDownloaded = vi.fn(async () => undefined);
     const verification =
       await import("../../src/modules/submissions/exportWorkbookVerification");
     vi.spyOn(verification, "verifyExportWorkbookArtifact").mockResolvedValue(true);
@@ -321,7 +322,9 @@ describe("active admin export screen", () => {
       .mockImplementation(() => undefined);
 
     render(
-      <VisaflowBusinessBridgeProvider bridge={{ onExportPackages }}>
+      <VisaflowBusinessBridgeProvider
+        bridge={{ onCompleteWorkbookExport, onExportWorkbookDownloaded }}
+      >
         <AdminExportScreen submissions={[submission]} />
       </VisaflowBusinessBridgeProvider>,
     );
@@ -333,10 +336,35 @@ describe("active admin export screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Скачать Excel" }));
 
     await waitFor(() => expect(anchorClick).toHaveBeenCalledTimes(1));
-    expect(onExportPackages).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Excel скачан" })).toBeDisabled();
+    expect(onCompleteWorkbookExport).not.toHaveBeenCalled();
+    expect(onExportWorkbookDownloaded).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Excel сохранён — зафиксировать" }),
+    ).toBeEnabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Excel сохранён — зафиксировать" }),
+    );
+    expect(onExportWorkbookDownloaded).toHaveBeenCalledTimes(1);
+    expect(onExportWorkbookDownloaded).toHaveBeenCalledWith(
+      expect.objectContaining({
+        packageIdentity: expect.objectContaining({ rowCount: 1 }),
+        submissionIds: [submission.id],
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Завершить выгрузку" }),
+      ).toBeEnabled(),
+    );
     expect(screen.getByTestId("export-action-feedback")).toHaveTextContent(
-      "Excel скачан",
+      "подтверждение зафиксировано",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Завершить выгрузку" }));
+    await waitFor(() => expect(onCompleteWorkbookExport).toHaveBeenCalledTimes(1));
+    expect(onCompleteWorkbookExport).toHaveBeenCalledWith(
+      expect.objectContaining({ submissionIds: [submission.id] }),
     );
   });
 

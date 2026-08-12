@@ -21,6 +21,25 @@ export interface ExportPackageCompletionRequest {
   submissionIds: string[];
 }
 
+/** Durable T8 receipt for a verified workbook download; it is not terminal T9. */
+export interface ExportWorkbookDownloadRequest {
+  archiveInputSignature: string;
+  /** Canonical revisions observed when this exact workbook was prepared. */
+  expectedCaseRevisions: Record<string, number>;
+  packageIdentity: ExportPackageIdentity;
+  submissionIds: string[];
+}
+
+/** Excel-only T9 request. It never fabricates ZIP/document audit proof. */
+export type ExportWorkbookCompletionRequest = ExportWorkbookDownloadRequest;
+
+export type WorkbookExportReconciliationStage = "t8" | "t9";
+
+export type WorkbookExportActionOutcome =
+  | { status: "committed"; duplicate: boolean }
+  | { status: "not_committed"; duplicate: false }
+  | { status: "unknown"; duplicate: false };
+
 export function exportPackageDocumentCommitMatchesIdentity(
   documentExport: ExportPackageDocumentCommit,
   packageIdentity: ExportPackageIdentity,

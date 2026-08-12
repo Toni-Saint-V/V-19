@@ -488,6 +488,9 @@ export function buildExportArchiveInputSignature(
       submissionIds: packageIdentity.submissionIds,
     },
     questionnaireFields,
+    submissionVersions: submissions
+      .map((submission) => [submission.id, submission.updatedAt] as const)
+      .sort((left, right) => left[0].localeCompare(right[0])),
   });
 }
 

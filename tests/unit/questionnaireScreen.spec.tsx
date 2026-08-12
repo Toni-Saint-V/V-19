@@ -188,6 +188,42 @@ describe("QuestionnaireScreen", () => {
     expect(nextSubmission.status).toBe("draft");
   });
 
+  test("keeps a placeholder family title synchronized with the saved main applicant name", async () => {
+    const submission = createDraftSubmission({
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const onSubmissionChange = vi.fn();
+
+    render(
+      <QuestionnaireScreen
+        onBack={vi.fn()}
+        onSubmissionChange={onSubmissionChange}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    openPersonalSection();
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "Сергеева" },
+    });
+    fireEvent.change(screen.getByLabelText("Имя"), {
+      target: { value: "Анна" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+
+    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
+
+    const nextSubmission = onSubmissionChange.mock.calls[0]?.[0] as Submission;
+    expect(nextSubmission.applicants[0]?.fullName).toBe("Анна Сергеева");
+    expect(nextSubmission.listTitle).toBe("Сергеевы");
+    expect(nextSubmission.title).toBe("Семья Сергеевых");
+  });
+
   test("keeps the full save-and-exit label on the mobile action", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -242,9 +278,7 @@ describe("QuestionnaireScreen", () => {
     expect(onAssignPublicNumber).toHaveBeenCalledOnce();
     expect(onAssignPublicNumber).toHaveBeenCalledWith(submission.id);
     expect(alert).toHaveBeenCalledOnce();
-    expect(alert).toHaveBeenCalledWith(
-      "Анкета сохранена. Номер подачи: VF-1059",
-    );
+    expect(alert).toHaveBeenCalledWith("Анкета сохранена. Номер подачи: VF-1059");
     expect(onSavedAndExit).toHaveBeenCalledWith(
       expect.objectContaining({ publicNumber: 1059 }),
     );
@@ -565,9 +599,7 @@ describe("QuestionnaireScreen", () => {
   });
 
   test("persists an explicit OCR confirmation without submitting the lifecycle", async () => {
-    const submission = withPendingPassportExtraction(
-      readySubmission("in_progress"),
-    );
+    const submission = withPendingPassportExtraction(readySubmission("in_progress"));
     const onSubmissionChange = vi.fn().mockResolvedValue(undefined);
 
     render(

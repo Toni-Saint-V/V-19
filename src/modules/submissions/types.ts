@@ -406,6 +406,10 @@ export type SubmissionFile = {
   uploadedBy?: string;
   uploadedAt?: string;
   linkedIssueId?: string;
+  /** Exact browser-local Blob exists at storagePath in local-demo IndexedDB. */
+  localDemoMediaStored?: true;
+  /** Explicit bundled fixture; never inferred for user uploads. */
+  localDemoSeedMedia?: true;
 };
 
 export type CollectionDocumentUpload = {

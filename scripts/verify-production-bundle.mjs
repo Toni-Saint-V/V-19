@@ -19,6 +19,9 @@ const forbidden = [
   "Татьяна Николаева",
   "Алексей Морозов",
   "Алексей Сидоров",
+  "visaflow-local-demo-media-v1",
+  "visaflow-local-demo-media-mutation-v1",
+  "media-metadata",
 ];
 
 const files = await collectFiles(distDir);

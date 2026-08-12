@@ -720,6 +720,23 @@ async function expectMobileActionDensity(page: Page, context: string) {
     '[data-agent-screen="actions"] .v19-actions-timeline-event:visible',
   );
   await expect(cards).toHaveCount(5);
+  const semanticTasks = await cards.evaluateAll((events) =>
+    events
+      .map(
+        (event) =>
+          `${event.getAttribute("data-submission-id")}:${event.getAttribute("data-applicant-name")}`,
+      )
+      .sort(),
+  );
+  expect(semanticTasks, `${context}: exact action identities`).toEqual(
+    [
+      "ПД-1048:Антон Иванов",
+      "ПД-1048:Марк Иванов",
+      "ПД-1048:Мария Иванова",
+      "ПД-1048:София Иванова",
+      "ПД-1051:Артём Соколов",
+    ].sort(),
+  );
   await expect(
     page.locator('[data-agent-screen="actions"] .v19-actions-timeline-node:visible'),
   ).toHaveCount(0);

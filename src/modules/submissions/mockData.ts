@@ -265,6 +265,7 @@ function localDemoStoredFile(submissionId: string, source: SubmissionFile): Subm
   return {
     ...source,
     generatedFileName,
+    localDemoSeedMedia: true,
     mimeType: "image/jpeg",
     originalFileName: generatedFileName,
     reviewStatus: "accepted",

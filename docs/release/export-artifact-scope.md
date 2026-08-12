@@ -46,7 +46,15 @@ the UI remains fail-closed. A durable batch row on a non-exported submission is
 rehydrated as `file_generated` only when the canonical cockpit row model is also
 available from the snapshot. A fallback row without the full cockpit snapshot may
 show durable identity metadata, but it stays in `ready` state and cannot claim
-repeat download proof. Exported rows are rehydrated as `marked_exported`.
+repeat download proof.
+
+An authenticated administrator acknowledgement in
+`workbook_export_receipts`, with membership bound to the submission's exact
+current `case_revision`, rehydrates canonical `file_downloaded`. A receipt from
+an older acceptance revision is ignored. Terminal `exported`/
+`marked_exported` rehydrate requires the same receipt membership to carry the
+exact terminal revision written by the Excel-only completion transaction.
+Legacy rows are never backfilled with synthetic acknowledgement evidence.
 
 Preview/download/mark-exported gates still recompute package identity from the
 current row model before allowing workbook download or exported lifecycle state.

@@ -14,6 +14,8 @@ import type {
   StatusHistoryRow,
   SubmissionDraftPersistencePayload,
   SubmissionRow,
+  WorkbookExportReceiptMemberRow,
+  WorkbookExportReceiptRow,
 } from "../../lib/supabase/database.types";
 import type {
   AppointmentStatus,
@@ -86,6 +88,10 @@ const mediaAssetSelect =
   "id,applicant_id,submission_id,type,original_file_name,generated_file_name,storage_bucket,storage_path,mime_type,size_bytes,upload_status,review_status,uploaded_at,reviewed_at,reviewed_by" as const;
 const exportBatchSelect =
   "id,created_at,file_name,format,content_fingerprint,idempotency_key,row_count,submission_ids" as const;
+const workbookExportReceiptSelect =
+  "id,export_batch_id,archive_input_signature,revision_fingerprint,acknowledged_by,acknowledged_at,completed_by,completed_at" as const;
+const workbookExportReceiptMemberSelect =
+  "receipt_id,submission_id,acceptance_case_revision,terminal_case_revision" as const;
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,source,note,changed_by,changed_at" as const;
 const correctionSelect =
@@ -194,6 +200,35 @@ type CockpitExportBatchRow = Pick<
   | "row_count"
   | "submission_ids"
 >;
+type CockpitWorkbookExportReceiptRow = Pick<
+  WorkbookExportReceiptRow,
+  | "acknowledged_at"
+  | "archive_input_signature"
+  | "completed_at"
+  | "export_batch_id"
+  | "id"
+  | "revision_fingerprint"
+>;
+type CockpitWorkbookExportReceiptMemberRow = Pick<
+  WorkbookExportReceiptMemberRow,
+  | "acceptance_case_revision"
+  | "receipt_id"
+  | "submission_id"
+  | "terminal_case_revision"
+>;
+type CockpitWorkbookExportReceiptRows = {
+  members: CockpitWorkbookExportReceiptMemberRow[];
+  receipts: CockpitWorkbookExportReceiptRow[];
+};
+
+function withoutLocalDemoMediaAuthority(submission: Submission): Submission {
+  return {
+    ...submission,
+    files: submission.files.map(
+      ({ localDemoMediaStored: _stored, localDemoSeedMedia: _seed, ...file }) => file,
+    ),
+  };
+}
 type CockpitMediaAssetRow = Pick<
   MediaAssetRow,
   | "applicant_id"
@@ -681,6 +716,73 @@ function latestExportBatchForSubmission(
     )[0];
 }
 
+function receiptBoundExportBatchForSubmission(
+  submissionId: string,
+  rowStatus: SubmissionStatus,
+  caseRevision: number | null | undefined,
+  exportBatches: CockpitExportBatchRow[],
+  workbookReceipts: CockpitWorkbookExportReceiptRows,
+  caseRevisionsBySubmissionId?: ReadonlyMap<string, number>,
+): CockpitExportBatchRow | undefined {
+  if (
+    typeof caseRevision !== "number" ||
+    !Number.isSafeInteger(caseRevision) ||
+    caseRevision < 0
+  ) {
+    return undefined;
+  }
+  const receiptMembers = workbookReceipts.members.filter((member) => {
+    if (member.submission_id !== submissionId) return false;
+    return rowStatus === "exported"
+      ? member.terminal_case_revision === caseRevision
+      : member.acceptance_case_revision === caseRevision;
+  });
+  if (!receiptMembers.length) return undefined;
+
+  const receiptIds = new Set(receiptMembers.map((member) => member.receipt_id));
+  const receipt = workbookReceipts.receipts
+    .filter(
+      (candidate) =>
+        receiptIds.has(candidate.id) &&
+        (rowStatus === "exported"
+          ? Boolean(candidate.completed_at)
+          : !candidate.completed_at),
+    )
+    .sort(
+      (left, right) =>
+        right.acknowledged_at.localeCompare(left.acknowledged_at) ||
+        right.id.localeCompare(left.id),
+    )[0];
+  if (!receipt) return undefined;
+
+  const batch = exportBatches.find((candidate) => candidate.id === receipt.export_batch_id);
+  if (!batch) return undefined;
+  const members = workbookReceipts.members.filter(
+    (member) => member.receipt_id === receipt.id,
+  );
+  if (
+    caseRevisionsBySubmissionId &&
+    members.some((member) => {
+      const currentRevision = caseRevisionsBySubmissionId.get(member.submission_id);
+      return rowStatus === "exported"
+        ? member.terminal_case_revision !== currentRevision
+        : member.acceptance_case_revision !== currentRevision;
+    })
+  ) {
+    return undefined;
+  }
+  if (
+    members.length !== batch.submission_ids.length ||
+    [...members.map((member) => member.submission_id)].sort().some(
+      (id, index) => id !== [...batch.submission_ids].sort()[index],
+    )
+  ) {
+    return undefined;
+  }
+
+  return batch;
+}
+
 function exportStateFromDurableRowStatus(
   rowStatus: SubmissionStatus,
 ): Submission["exportState"] {
@@ -703,8 +805,11 @@ function clearSnapshotExportPackage(
 function attachExportPackageRow(
   submission: Submission,
   rowStatus: SubmissionStatus,
+  caseRevision: number | null | undefined,
   exportBatches: CockpitExportBatchRow[],
+  workbookReceipts: CockpitWorkbookExportReceiptRows,
   options: { restoreGeneratedState?: boolean } = {},
+  caseRevisionsBySubmissionId?: ReadonlyMap<string, number>,
 ): Submission {
   const durableExportState = exportStateFromDurableRowStatus(rowStatus);
   if (durableExportState === "not_ready") {
@@ -717,7 +822,19 @@ function attachExportPackageRow(
     return clearSnapshotExportPackage(submission, rowStatus);
   }
 
-  const exportBatch = latestExportBatchForSubmission(submission.id, exportBatches);
+  const receiptBoundExportBatch = receiptBoundExportBatchForSubmission(
+    submission.id,
+    rowStatus,
+    caseRevision,
+    exportBatches,
+    workbookReceipts,
+    caseRevisionsBySubmissionId,
+  );
+  const exportBatch =
+    receiptBoundExportBatch ??
+    (rowStatus === "exported"
+      ? undefined
+      : latestExportBatchForSubmission(submission.id, exportBatches));
   if (!exportBatch) return clearSnapshotExportPackage(submission, rowStatus);
 
   const exportPackage = exportPackageFromBatchRow(exportBatch);
@@ -729,6 +846,8 @@ function attachExportPackageRow(
     exportState:
       rowStatus === "exported"
         ? "marked_exported"
+        : receiptBoundExportBatch
+          ? "file_downloaded"
         : options.restoreGeneratedState
           ? "file_generated"
           : durableExportState,
@@ -739,6 +858,7 @@ function reconcileCockpitSnapshotWithSubmissionRow(
   row: Pick<
     SubmissionRow,
     | "agent_id"
+    | "case_revision"
     | "created_at"
     | "exported_at"
     | "public_number"
@@ -749,6 +869,8 @@ function reconcileCockpitSnapshotWithSubmissionRow(
   applicants: CockpitApplicantRow[],
   questionnaireAnswers: CockpitQuestionnaireAnswerRow[],
   exportBatches: CockpitExportBatchRow[],
+  workbookReceipts: CockpitWorkbookExportReceiptRows,
+  caseRevisionsBySubmissionId?: ReadonlyMap<string, number>,
 ): Submission {
   const rowStatus = fromSupabaseSubmissionRowStatus(row);
   const normalizedSnapshot = {
@@ -770,17 +892,29 @@ function reconcileCockpitSnapshotWithSubmissionRow(
   };
 
   if (rowStatus !== "exported") {
-    return attachExportPackageRow(normalizedSnapshot, rowStatus, exportBatches, {
-      restoreGeneratedState: true,
-    });
+    return attachExportPackageRow(
+      normalizedSnapshot,
+      rowStatus,
+      row.case_revision,
+      exportBatches,
+      workbookReceipts,
+      { restoreGeneratedState: true },
+      caseRevisionsBySubmissionId,
+    );
   }
   if (
     normalizedSnapshot.status === "exported" &&
     normalizedSnapshot.exportState === "marked_exported"
   ) {
-    return attachExportPackageRow(normalizedSnapshot, rowStatus, exportBatches, {
-      restoreGeneratedState: true,
-    });
+    return attachExportPackageRow(
+      normalizedSnapshot,
+      rowStatus,
+      row.case_revision,
+      exportBatches,
+      workbookReceipts,
+      { restoreGeneratedState: true },
+      caseRevisionsBySubmissionId,
+    );
   }
 
   const syncedAt = row.exported_at ?? row.updated_at;
@@ -806,14 +940,17 @@ function reconcileCockpitSnapshotWithSubmissionRow(
       history: syncedHistory,
     },
     rowStatus,
+    row.case_revision,
     exportBatches,
+    workbookReceipts,
     { restoreGeneratedState: true },
+    caseRevisionsBySubmissionId,
   );
 }
 
 function cockpitSnapshotFamilyIntelligence(submission: Submission): Json {
   // The normalized tables are a query projection; this snapshot owns the full cockpit UI model.
-  const snapshotSubmission = { ...submission };
+  const snapshotSubmission = withoutLocalDemoMediaAuthority(submission);
   delete snapshotSubmission.agentDisplayName;
   return {
     status: cockpitSnapshotStatus,
@@ -1797,6 +1934,7 @@ export async function loadCockpitSubmissionsForProfile(
     correctionResult,
     statusHistoryResult,
     exportBatchRows,
+    workbookReceiptRows,
     agentProfilesResult,
   ] = await Promise.all([
     collectRowsForSubmissionIds<CockpitApplicantRow>(
@@ -1865,6 +2003,9 @@ export async function loadCockpitSubmissionsForProfile(
     profile.role === "admin"
       ? loadExportBatchRowsForSubmissions(submissionIds)
       : Promise.resolve([]),
+    profile.role === "admin"
+      ? loadWorkbookExportReceiptRowsForSubmissions(submissionIds)
+      : Promise.resolve({ members: [], receipts: [] }),
     profile.role === "admin"
       ? collectRowsForSubmissionIds<{ id: string; display_name: string }>(
           agentIds,
@@ -1983,6 +2124,8 @@ export async function loadCockpitSubmissionsForProfile(
             submissionApplicants,
             submissionQuestionnaireAnswers,
             submissionExportBatches,
+            workbookReceiptRows,
+            caseRevisionsBySubmissionId,
           )
         : attachExportPackageRow(
             snapshotResult.kind === "corrupt"
@@ -2002,15 +2145,19 @@ export async function loadCockpitSubmissionsForProfile(
                   latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
                 ),
             fromSupabaseSubmissionRowStatus(row),
+            row.case_revision,
             submissionExportBatches,
+            workbookReceiptRows,
+            {},
+            caseRevisionsBySubmissionId,
           );
-    const submission = attachDurableStatusHistoryRows(
+    const submission = withoutLocalDemoMediaAuthority(attachDurableStatusHistoryRows(
       attachDurableCorrectionRows(
         attachDurableMediaAssetRows(snapshotOrFallback, submissionMediaRows),
         submissionCorrectionRows,
       ),
       submissionStatusHistoryRows,
-    );
+    ));
 
     const agentDisplayName = agentDisplayNamesById.get(row.agent_id);
     return agentDisplayName ? { ...submission, agentDisplayName } : submission;
@@ -2073,6 +2220,77 @@ async function loadExportBatchRowsForSubmissions(
   }
 
   return [...new Map(result.data.map((row) => [row.id, row])).values()];
+}
+
+async function loadWorkbookExportReceiptRowsForSubmissions(
+  submissionIds: string[],
+): Promise<CockpitWorkbookExportReceiptRows> {
+  if (!submissionIds.length) return { members: [], receipts: [] };
+
+  const client = getSupabaseClient();
+  if (!client) return { members: [], receipts: [] };
+
+  const memberResult =
+    await collectRowsForSubmissionIds<CockpitWorkbookExportReceiptMemberRow>(
+      submissionIds,
+      async (submissionIdChunk, from, to) => {
+        const { data, error } = await client
+          .from("workbook_export_receipt_members")
+          .select(workbookExportReceiptMemberSelect)
+          .in("submission_id", submissionIdChunk)
+          .order("receipt_id", { ascending: true })
+          .order("submission_id", { ascending: true })
+          .range(from, to);
+        return {
+          data: (data ?? []) as CockpitWorkbookExportReceiptMemberRow[],
+          error,
+        };
+      },
+    );
+  if (memberResult.error) {
+    throw mapSupabasePersistenceError(memberResult.error, {
+      operation: "workbook_export_receipt_members.list",
+      fallbackKind: "database",
+    });
+  }
+
+  const members = [
+    ...new Map(
+      memberResult.data.map((row) => [
+        `${row.receipt_id}:${row.submission_id}`,
+        row,
+      ]),
+    ).values(),
+  ];
+  const receiptIds = [...new Set(members.map((row) => row.receipt_id))];
+  if (!receiptIds.length) return { members, receipts: [] };
+
+  const receiptResult = await collectRowsForSubmissionIds<CockpitWorkbookExportReceiptRow>(
+    receiptIds,
+    async (receiptIdChunk, from, to) => {
+      const { data, error } = await client
+        .from("workbook_export_receipts")
+        .select(workbookExportReceiptSelect)
+        .in("id", receiptIdChunk)
+        .order("acknowledged_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to);
+      return { data: (data ?? []) as CockpitWorkbookExportReceiptRow[], error };
+    },
+  );
+  if (receiptResult.error) {
+    throw mapSupabasePersistenceError(receiptResult.error, {
+      operation: "workbook_export_receipts.list",
+      fallbackKind: "database",
+    });
+  }
+
+  return {
+    members,
+    receipts: [
+      ...new Map(receiptResult.data.map((row) => [row.id, row])).values(),
+    ],
+  };
 }
 
 function adminCaseRevisionsFromRpc(
