@@ -12,6 +12,43 @@ import {
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 
 describe("AgentActionsCommandCockpit", () => {
+  it("shows the concrete problem before the next action", () => {
+    const queue = agentActionQueue(initialSubmissions);
+    const tasks = groupAgentActionTasksByApplicant(buildAgentActionTasks(queue.open));
+
+    render(
+      <AgentActionsCommandCockpit
+        actionGroupLabel="Открытые действия"
+        desktopContextMode="inline"
+        emptyState={{ action: "Новая подача", body: "Нет действий", title: "Пусто" }}
+        summary={summarizeAgentActionTasks(tasks)}
+        tasks={tasks}
+        onEmptyAction={vi.fn()}
+        onOpenIssue={vi.fn()}
+        onOpenPrimary={vi.fn()}
+        onOpenSecondary={vi.fn()}
+        onOpenTab={vi.fn()}
+        onSelectTask={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText("Что требует внимания").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Анкета заполнена не полностью").length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText("Дедлайн сегодня")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", {
+        name: /Что требует внимания: Анкета заполнена не полностью\. Следующее действие: Открыть анкету/,
+      }),
+    ).not.toHaveLength(0);
+    expect(
+      screen
+        .getAllByRole("button", { name: /Выбрать действие:/ })
+        .every((button) => !button.getAttribute("aria-label")?.includes("Дедлайн сегодня")),
+    ).toBe(true);
+  });
+
   it("shows one applicant card with every action available inside", () => {
     const queue = agentActionQueue(
       initialSubmissions.filter((submission) => submission.id === "ПД-1051"),

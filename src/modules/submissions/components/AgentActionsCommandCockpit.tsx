@@ -534,7 +534,7 @@ function ActionTaskCard({
       aria-controls={inlineContext ? detailId : undefined}
       aria-current={selected ? "true" : undefined}
       aria-expanded={inlineContext ? selected : undefined}
-      aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. ${task.problem}. Следующее действие: ${task.nextAction.label}${task.priority.reason ? `. ${task.priority.label}: ${task.priority.reason}` : ""}`}
+      aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. Что требует внимания: ${task.problem}. Следующее действие: ${task.nextAction.label}`}
       data-action-status={task.status}
       data-agent-action-id={task.id}
       data-submission-id={task.submission.id}
@@ -982,7 +982,7 @@ function TimelineEvent({
         className="v19-actions-timeline-hit"
         aria-controls={detailId}
         aria-expanded={selected}
-        aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. ${task.problem}. Следующее действие: ${task.nextAction.label}${task.priority.reason ? `. ${task.priority.label}: ${task.priority.reason}` : ""}`}
+        aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${queueSubjectText(task)}. Что требует внимания: ${task.problem}. Следующее действие: ${task.nextAction.label}`}
         id={rowId}
         type="button"
         onClick={onSelect}
@@ -993,8 +993,12 @@ function TimelineEvent({
           </strong>
           <small>{submissionId}</small>
         </span>
+        <span className="v19-actions-mobile-attention">
+          <small>Что требует внимания</small>
+          <strong>{task.problem}</strong>
+        </span>
         <span className="v19-actions-mobile-next">
-          <small>Следующий шаг</small>
+          <small>Следующее действие</small>
           <strong>{task.nextAction.label}</strong>
         </span>
         <span className="v19-actions-mobile-status-row">

@@ -1073,3 +1073,62 @@
     align-self: center;
   }
 }
+
+/* The collapsed card names the concrete problem and one next action. It never
+   shows an unexplained urgency marker; disclosure owns the full detail. */
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-timeline-hit {
+  grid-template-areas:
+    "identity status"
+    "attention attention"
+    "next next" !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto auto !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-mobile-attention {
+  display: flex;
+  min-width: 0;
+  grid-area: attention;
+  align-items: baseline;
+  gap: var(--v19b-size-8);
+  padding-top: var(--v19b-size-8);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border-faint);
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-mobile-next {
+  grid-area: next !important;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-mobile-attention
+  > small {
+  flex: 0 0 auto;
+  color: var(--v19b-color-text-muted);
+  font-size: var(--v19b-size-10);
+  font-weight: var(--v19b-weight-control);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+#root
+  .is-agent-shell-source-actions
+  .v19-legacy-actions-screen.surface-agent-actions
+  .v19-actions-mobile-attention
+  > strong {
+  min-width: 0;
+  color: var(--v19b-color-text);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-row);
+}
