@@ -106,24 +106,8 @@ describe("questionnaire smart import", () => {
     );
   });
 
-  test("keeps every passport candidate unselected until the agent explicitly applies it with provenance", async () => {
+  test("does not propose or apply protected passport fields", async () => {
     const { onFieldChange } = renderQuestionnaire();
-    const expectedPassportValues = {
-      "passport-type": "Ordinary Passport",
-      "passport-no": "P12345678",
-      "passport-issue-date": "01.02.2020",
-      "passport-expiry-date": "01.02.2030",
-      "passport-issue-country": "Spain",
-      "passport-issue-place": "Moscow",
-    } as const;
-    const labels = {
-      "passport-type": "Тип паспорта",
-      "passport-no": "Номер паспорта",
-      "passport-issue-date": "Дата выдачи паспорта",
-      "passport-expiry-date": "Действителен до",
-      "passport-issue-country": "Страна выдачи паспорта",
-      "passport-issue-place": "Место выдачи паспорта",
-    } as const;
 
     await importPastedText(`
       Passport type: Ordinary
@@ -133,37 +117,9 @@ describe("questionnaire smart import", () => {
       Issuing country: Spain
       Place of issue: Moscow
     `);
-    for (const fieldId of Object.keys(expectedPassportValues) as Array<
-      keyof typeof expectedPassportValues
-    >) {
-      const checkbox = await screen.findByLabelText(`Применить ${labels[fieldId]}`);
-      expect(checkbox).not.toBeChecked();
-      fireEvent.click(checkbox);
-    }
-
-    fireEvent.click(screen.getByRole("button", { name: "Применить выбранное" }));
-
-    await waitFor(() =>
-      expect(
-        onFieldChange.mock.calls.map(([change]) => ({
-          fieldId: change.fieldId,
-          reviewOriginSource: change.reviewOriginSource,
-          reviewSource: change.reviewSource,
-          reviewState: change.reviewState,
-          value: change.value,
-        })),
-      ).toEqual(
-        expect.arrayContaining(
-          Object.entries(expectedPassportValues).map(([fieldId, value]) => ({
-            fieldId,
-            reviewOriginSource: "smart_import",
-            reviewSource: "smart_import",
-            reviewState: "needs_review",
-            value,
-          })),
-        ),
-      ),
-    );
+    expect(screen.getByText(/Подходящие поля не найдены/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Применить выбранное" })).toBeDisabled();
+    expect(onFieldChange).not.toHaveBeenCalled();
   });
 
   test("does not apply an unselected conflict", async () => {
@@ -260,7 +216,7 @@ describe("questionnaire smart import", () => {
     });
   });
 
-  test("renders explicit review controls for imported invitation-company fields", async () => {
+  test("applies only supported hotel contact fields from invitation text", async () => {
     const { onFieldChange } = renderQuestionnaire();
 
     await importPastedText(`
@@ -271,33 +227,19 @@ describe("questionnaire smart import", () => {
     `);
     fireEvent.click(screen.getByRole("button", { name: "Применить выбранное" }));
 
-    await waitFor(() =>
+    await waitFor(() => {
       expect(onFieldChange).toHaveBeenCalledWith(
         expect.objectContaining({
-          fieldId: "company-org-details",
+          fieldId: "hotel-contact",
+          reviewOriginSource: "smart_import",
+          reviewSource: "smart_import",
           reviewState: "needs_review",
-          value: "Demo Host Company",
+          value: "+34910000001",
         }),
-      ),
-    );
-    fireEvent.click(
-      screen.getAllByRole("button", { name: /^Отель \/ приглашение/ })[0],
-    );
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", {
-          name: "Подтвердить поле: Название и адрес компании/организации",
-        }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", {
-          name: "Подтвердить поле: Контактное лицо компании",
-        }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Подтвердить поле: Телефон компании" }),
-      ).toBeInTheDocument();
+      );
     });
+    expect(onFieldChange).not.toHaveBeenCalledWith(
+      expect.objectContaining({ fieldId: "company-org-details" }),
+    );
   });
 });

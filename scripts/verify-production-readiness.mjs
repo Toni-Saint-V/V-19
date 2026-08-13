@@ -52,6 +52,7 @@ let currentFunctionSourceSha256Cache;
 
 const scopedDiffPaths = [
   "package.json",
+  "config/supabase-production-target.mjs",
   "config/playwright/playwright.supabase-production-export-a1-s1.config.ts",
   "config/playwright/playwright.supabase-production-export-a2-s1-abort.config.ts",
   "scripts/prepare-supabase-production-packet.mjs",
@@ -75,11 +76,14 @@ const scopedDiffPaths = [
   "supabase/migrations/20260714200000_harden_null_safe_admin_rpc_guards.sql",
   "supabase/migrations/20260715000000_document_assets_source_media_id_update_cascade.sql",
   "supabase/migrations/20260717050000_admin_passport_review_media_policy.sql",
+  "supabase/migrations/20260812090000_workbook_export_lifecycle.sql",
   "src/modules/submissions/exportPackageDocumentCommit.ts",
   "src/modules/submissions/exportPackagePersistence.ts",
   "src/modules/submissions/exportWorkflow.ts",
   "src/modules/submissions/exportMediaZip.ts",
+  "src/modules/submissions/workbookExportPersistence.ts",
   "src/modules/documents/documentRepository.ts",
+  "src/shared/ui/v19-design-system.tsx",
   "src/components/AdminExportScreen.tsx",
   "src/App.tsx",
   "src/modules/submissions/submissionActions.ts",
@@ -87,6 +91,7 @@ const scopedDiffPaths = [
   "supabase/remediation/20260712225209_save_returned_submission_update_first.rollback.sql",
   "docs/release/auth-data-production-readiness.md",
   "docs/release/supabase-production-approval-checklist.md",
+  "docs/release/protected-production-attestation-capture.md",
   "docs/release/supabase-production-promotion.md",
   "docs/release/supabase-workspace-pr-package.md",
   "tests/e2e-supabase/browser-key-audit.spec.ts",
@@ -97,8 +102,12 @@ const scopedDiffPaths = [
   "tests/unit/appProductionWorkspaceRuntime.spec.tsx",
   "tests/unit/productionCohortNetworkContract.spec.ts",
   "tests/unit/supabaseSecurityContract.spec.ts",
+  "tests/unit/supabaseProductionTarget.spec.ts",
+  "tests/unit/questionnaireSmartImport.spec.tsx",
   "tests/unit/v19SubmissionRules.spec.ts",
   "tests/unit/v19SupabasePersistence.spec.ts",
+  "tests/unit/workbookExportLifecycleMigration.spec.ts",
+  "tests/unit/workbookExportLifecyclePersistence.spec.ts",
   "production-readiness-audit.md",
 ];
 

@@ -489,7 +489,7 @@ export function V19SideMenu({
               disabled={item.disabled}
               key={item.id}
               title={displayMode === "compact" ? item.label : undefined}
-              variant="ghost"
+              variant="plain"
               onClick={item.onClick}
             >
               <span

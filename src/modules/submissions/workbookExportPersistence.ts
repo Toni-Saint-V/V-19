@@ -70,6 +70,17 @@ function toWorkbookPayload(request: WorkbookExportRequest) {
   };
 }
 
+function toTerminalCaseRevisions(
+  expectedCaseRevisions: Record<string, number>,
+): Record<string, number> | null {
+  const terminalCaseRevisions: Record<string, number> = {};
+  for (const [submissionId, revision] of Object.entries(expectedCaseRevisions)) {
+    if (revision >= Number.MAX_SAFE_INTEGER) return null;
+    terminalCaseRevisions[submissionId] = revision + 1;
+  }
+  return terminalCaseRevisions;
+}
+
 async function callWorkbookRpc(
   operation: "record_export_workbook_download_acknowledgement",
   payload: WorkbookLifecyclePayload,
@@ -87,9 +98,7 @@ async function callWorkbookRpc(
     | "complete_workbook_export"
     | "reconcile_workbook_export"
     | "record_export_workbook_download_acknowledgement",
-  payload:
-    | WorkbookLifecyclePayload
-    | WorkbookLifecycleReconciliationPayload,
+  payload: WorkbookLifecyclePayload | WorkbookLifecycleReconciliationPayload,
 ): Promise<
   | WorkbookExportCommitResult
   | WorkbookExportReceiptResult
@@ -161,8 +170,23 @@ export async function reconcileWorkbookExport(
   stage: WorkbookExportReconciliationStage,
   request: WorkbookExportRequest,
 ): Promise<WorkbookExportReconciliationResult> {
+  const payload = toWorkbookPayload(request);
+  const reconciliation = await callWorkbookRpc("reconcile_workbook_export", {
+    ...payload,
+    stage,
+  });
+  if (stage !== "t9" || reconciliation.status !== "unknown") {
+    return reconciliation;
+  }
+
+  const terminalCaseRevisions = toTerminalCaseRevisions(
+    payload.expected_case_revisions,
+  );
+  if (!terminalCaseRevisions) return reconciliation;
+
   return callWorkbookRpc("reconcile_workbook_export", {
     ...toWorkbookPayload(request),
+    expected_case_revisions: terminalCaseRevisions,
     stage,
   });
 }

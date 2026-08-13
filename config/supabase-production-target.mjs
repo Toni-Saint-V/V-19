@@ -66,6 +66,8 @@ export const SUPABASE_PRODUCTION_TARGET = Object.freeze({
     "status_history",
     "submission_files",
     "submissions",
+    "workbook_export_receipt_members",
+    "workbook_export_receipts",
   ]),
   requiredStorageBuckets: Object.freeze([
     "agent-return-packages",

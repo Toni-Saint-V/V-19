@@ -97,6 +97,8 @@ describe("Supabase production target", () => {
         "status_history",
         "submission_files",
         "submissions",
+        "workbook_export_receipt_members",
+        "workbook_export_receipts",
       ],
       requiredStorageBuckets: [
         "agent-return-packages",

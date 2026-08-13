@@ -83,6 +83,7 @@ Apply migrations only in the repository order declared by
 - `20260802000100_clean_cutover_schema_inventory.sql`
 - `20260803000100_agent_submission_concurrency.sql`
 - `20260803130255_fix_agent_submission_concurrency_variable_scope.sql`
+- `20260812090000_workbook_export_lifecycle.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

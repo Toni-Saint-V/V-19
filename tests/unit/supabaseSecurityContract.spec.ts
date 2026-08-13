@@ -108,9 +108,7 @@ describe("Supabase security contract", () => {
       ),
     ).toBe(extractFunction(originalMigration));
     expect(migration).toContain("security invoker");
-    expect(migration).toContain(
-      "from public, anon, authenticated",
-    );
+    expect(migration).toContain("from public, anon, authenticated");
     expect(migration).toContain("to authenticated");
   });
 
@@ -655,12 +653,19 @@ describe("Supabase security contract", () => {
     );
   });
 
-  test("binds the complete P1 and A2 proof surface into the readiness hash", () => {
+  test("binds the P1, A2, and workbook proof surfaces into the readiness hash", () => {
     const verifier = readProjectFile("scripts/verify-production-readiness.mjs");
     const requiredProofPaths = [
       "config/playwright/playwright.supabase-production-export-a1-s1.config.ts",
       "config/playwright/playwright.supabase-production-export-a2-s1-abort.config.ts",
+      "config/supabase-production-target.mjs",
       "src/modules/submissions/submissionActions.ts",
+      "src/modules/submissions/workbookExportPersistence.ts",
+      "src/shared/ui/v19-design-system.tsx",
+      "supabase/migrations/20260812090000_workbook_export_lifecycle.sql",
+      "docs/release/supabase-production-approval-checklist.md",
+      "docs/release/protected-production-attestation-capture.md",
+      "docs/release/supabase-production-promotion.md",
       "tests/e2e-supabase-ui/production-export-a1-s1-helpers.ts",
       "tests/e2e-supabase-ui/production-export-a1-s1-resumable.spec.ts",
       "tests/e2e-supabase-ui/production-lifecycle-helpers.ts",
@@ -668,8 +673,12 @@ describe("Supabase security contract", () => {
       "tests/unit/appProductionWorkspaceRuntime.spec.tsx",
       "tests/unit/productionCohortNetworkContract.spec.ts",
       "tests/unit/supabaseSecurityContract.spec.ts",
+      "tests/unit/supabaseProductionTarget.spec.ts",
+      "tests/unit/questionnaireSmartImport.spec.tsx",
       "tests/unit/v19SubmissionRules.spec.ts",
       "tests/unit/v19SupabasePersistence.spec.ts",
+      "tests/unit/workbookExportLifecycleMigration.spec.ts",
+      "tests/unit/workbookExportLifecyclePersistence.spec.ts",
     ];
 
     for (const proofPath of requiredProofPaths) {
