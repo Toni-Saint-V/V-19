@@ -932,6 +932,65 @@ async function expectMobileActionDensity(page: Page, context: string) {
     ).toBeLessThanOrEqual(viewport!.height + 1);
   }
 
+  if (viewport!.width <= 340) {
+    const compactDisclosure = await cards.first().evaluate((card) => {
+      const labels = [
+        ...card.querySelectorAll<HTMLElement>(
+          ".v19-actions-mobile-attention > small, .v19-actions-mobile-next > small",
+        ),
+      ];
+      const values = [
+        ...card.querySelectorAll<HTMLElement>(
+          ".v19-actions-mobile-attention > strong, .v19-actions-mobile-next > strong",
+        ),
+      ];
+
+      return {
+        accessibleName: card.querySelector("button")?.getAttribute("aria-label") ?? "",
+        cardLayout: (() => {
+          const button = card.querySelector<HTMLElement>(".v19-actions-timeline-hit");
+          const style = button ? getComputedStyle(button) : null;
+          return {
+            gap: style?.gap ?? "",
+            paddingBottom: style?.paddingBottom ?? "",
+            paddingTop: style?.paddingTop ?? "",
+          };
+        })(),
+        labels: labels.map((label) => {
+          const style = getComputedStyle(label);
+          const rect = label.getBoundingClientRect();
+          return {
+            height: rect.height,
+            position: style.position,
+            width: rect.width,
+          };
+        }),
+        valuesVisible: values.every(
+          (value) => getComputedStyle(value).display !== "none",
+        ),
+      };
+    });
+    expect(
+      compactDisclosure.labels,
+      `${context}: compact labels are visually hidden`,
+    ).toEqual([
+      { height: 1, position: "absolute", width: 1 },
+      { height: 1, position: "absolute", width: 1 },
+    ]);
+    expect(
+      compactDisclosure.valuesVisible,
+      `${context}: compact decision values stay visible`,
+    ).toBe(true);
+    expect(
+      compactDisclosure.accessibleName,
+      `${context}: compact labels remain announced`,
+    ).toMatch(/Что требует внимания: .+ Следующее действие: .+/);
+    expect(
+      compactDisclosure.cardLayout,
+      `${context}: compact card spacing overrides legacy layout`,
+    ).toEqual({ gap: "4px", paddingBottom: "8px", paddingTop: "8px" });
+  }
+
   const nextStepStyle = await cards
     .first()
     .locator(".v19-actions-mobile-next")

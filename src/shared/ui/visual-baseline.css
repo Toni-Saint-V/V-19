@@ -42489,3 +42489,41 @@ section[data-testid="agent-actions-screen"]
   background: var(--v19b-admin-error-surface);
   font-weight: var(--v19b-weight-control);
 }
+
+/* Ultra-narrow action cards keep the decision data in the first viewport.
+   The button name retains these labels for assistive technology. */
+@media (max-width: 340px) {
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-actions-board
+    .v19-actions-timeline {
+    gap: var(--v19b-size-4) !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-actions-board
+    .v19-actions-timeline-hit {
+    gap: var(--v19b-size-4) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-12) !important;
+  }
+
+  #root
+    .is-agent-shell-source-actions
+    .v19-legacy-actions-screen.surface-agent-actions
+    .v19-agent-actions-board
+    :is(.v19-actions-mobile-attention, .v19-actions-mobile-next)
+    > small {
+    position: absolute;
+    width: var(--v19b-size-1);
+    height: var(--v19b-size-1);
+    margin: calc(var(--v19b-size-1) * -1);
+    padding: var(--v19b-size-0);
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: var(--v19b-size-0);
+  }
+}
