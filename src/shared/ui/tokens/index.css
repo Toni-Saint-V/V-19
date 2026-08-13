@@ -1228,6 +1228,17 @@
     calc(var(--v19b-size-18) + 0.4cqi),
     var(--v19b-size-22)
   );
+  /* Shared operational-cell rhythm. Screens consume these role tokens instead
+     of introducing near-identical local values. */
+  --v19b-operational-cell-padding: var(--v19b-size-14);
+  --v19b-operational-cell-padding-compact: var(--v19b-size-12);
+  --v19b-operational-cell-gap: var(--v19b-size-12);
+  --v19b-operational-cell-gap-compact: var(--v19b-size-10);
+  --v19b-operational-cell-title-size: var(--v19b-size-16);
+  --v19b-operational-cell-detail-size: var(--v19b-size-11);
+  --v19b-operational-cell-meta-size: var(--v19b-size-10);
+  --v19b-operational-cell-micro-size: var(--v19b-size-9);
+  --v19b-operational-cell-icon-size: var(--v19b-size-14);
   --v19b-size-64: 64px;
   --v19b-size-68: 68px;
   --v19b-size-72: 72px;

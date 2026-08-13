@@ -1208,6 +1208,239 @@
   }
 }
 
+/* Operational-cell rhythm contract for review. Shared role tokens establish
+   the baseline; the final owner below reasserts the values the legacy wide
+   composition or utility layer can otherwise replace. */
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-metric-tabs {
+  gap: var(--v19b-operational-cell-gap);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-metric-tabs
+  .v19-metric-card {
+  min-height: var(--v19b-size-88);
+  padding: var(--v19b-operational-cell-padding);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-list {
+  gap: var(--v19b-list-gap);
+  padding: var(--v19b-operational-cell-gap);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row {
+  gap: var(--v19b-operational-cell-gap);
+  padding: var(--v19b-operational-cell-padding);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-identity {
+  gap: var(--v19b-size-4);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-identity
+  > strong {
+  font-size: var(--v19b-operational-cell-title-size);
+  line-height: 1.2;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-identity
+  > small,
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-identity
+  > em,
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-priority
+  > small,
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-trip-label {
+  font-size: var(--v19b-operational-cell-meta-size);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  :is(.v19-review-row-identity > small svg, .v19-review-trip-label svg) {
+  width: var(--v19b-operational-cell-icon-size);
+  height: var(--v19b-operational-cell-icon-size);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-priority {
+  gap: var(--v19b-size-6);
+  padding-left: var(--v19b-operational-cell-gap);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-priority
+  > strong {
+  font-size: var(--v19b-operational-cell-detail-size);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-priority-badge {
+  min-height: var(--v19b-size-24);
+  font-size: var(--v19b-operational-cell-micro-size);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-priority-badge
+  strong {
+  display: inline-grid;
+  min-height: var(--v19b-size-16);
+  place-items: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-progress
+  > div,
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-progress
+  > div
+  strong,
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-signal-chips
+  > span {
+  font-size: var(--v19b-operational-cell-micro-size);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767px) {
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-metric-tabs {
+    gap: var(--v19b-size-8);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-metric-tabs
+    .v19-metric-card {
+    min-height: var(--v19b-size-68);
+    padding: var(--v19b-size-10);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-queue-list {
+    padding: var(--v19b-size-8);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-queue-row.v19-review-queue-row {
+    gap: var(--v19b-operational-cell-gap-compact);
+    padding: var(--v19b-operational-cell-padding-compact);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-queue-row.v19-review-queue-row
+    .v19-review-row-identity
+    > strong {
+    display: -webkit-box;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-queue-row.v19-review-queue-row
+    .v19-review-row-priority {
+    gap: var(--v19b-size-6) var(--v19b-size-8);
+    padding: var(--v19b-size-10);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v19-review-command-actions button,
   .v19-review-focus-tabs > button,
@@ -1637,5 +1870,140 @@
       var(--v19b-color-control)
     );
     font-size: 0;
+  }
+}
+
+/* Final owner: only values overridden by the legacy wide/utility cascade. */
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-metric-tabs
+  button.v19-metric-card:is(.is-active, [aria-pressed="true"]) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  box-shadow:
+    inset 0 var(--v19b-size-3) 0 var(--v19b-color-primary),
+    var(--v19b-shadow-row-inner) !important;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-metric-tabs
+  button.v19-metric-card:is(.is-active, [aria-pressed="true"])
+  .v19-metric-card-icon {
+  color: var(--v19b-color-primary-text);
+  background: var(--v19b-color-primary-soft-10);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-priority-badge
+  strong {
+  display: inline-grid;
+  min-height: var(--v19b-size-16);
+  place-items: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row {
+  gap: var(--v19b-operational-cell-gap);
+  padding: var(--v19b-operational-cell-padding);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-identity
+  > strong {
+  font-size: var(--v19b-operational-cell-title-size);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  :is(
+    .v19-review-row-identity > small,
+    .v19-review-row-identity > em,
+    .v19-review-row-priority > small,
+    .v19-review-trip-label
+  ) {
+  font-size: var(--v19b-operational-cell-meta-size);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-priority {
+  padding-left: var(--v19b-operational-cell-gap);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-row-priority
+  > strong {
+  font-size: var(--v19b-operational-cell-detail-size);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  .v19-review-priority-badge {
+  min-height: var(--v19b-size-24);
+  font-size: var(--v19b-operational-cell-micro-size);
+}
+
+#root
+  .v19-admin-workspace-root
+  .ops-shell.surface-admin-review
+  .v19-admin-review-screen
+  .v19-review-queue-row.v19-review-queue-row
+  :is(
+    .v19-review-progress > div,
+    .v19-review-progress > div strong,
+    .v19-review-signal-chips > span
+  ) {
+  font-size: var(--v19b-operational-cell-micro-size);
+}
+
+@media (max-width: 767px) {
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-queue-row.v19-review-queue-row {
+    gap: var(--v19b-operational-cell-gap-compact);
+    padding: var(--v19b-operational-cell-padding-compact);
+  }
+
+  #root
+    .v19-admin-workspace-root
+    .ops-shell.surface-admin-review
+    .v19-admin-review-screen
+    .v19-review-queue-row.v19-review-queue-row
+    .v19-review-row-priority {
+    gap: var(--v19b-size-6) var(--v19b-size-8);
+    padding: var(--v19b-size-10);
   }
 }

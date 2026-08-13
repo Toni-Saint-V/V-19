@@ -497,6 +497,179 @@ async function expectAdminReviewTextReadability(
   }
 }
 
+async function expectAdminReviewRhythmContract(page: Page, context: string) {
+  const viewport = page.viewportSize();
+  expect(viewport, `${context}: viewport`).not.toBeNull();
+
+  const contract = await page.locator(".v19-admin-review-screen").evaluate((screen) => {
+    const metricStrip = screen.querySelector<HTMLElement>(".v19-review-metric-tabs");
+    const cards = [
+      ...screen.querySelectorAll<HTMLElement>(".v19-admin-review-card"),
+    ].filter((card) => getComputedStyle(card).display !== "none");
+    const metrics = [
+      ...screen.querySelectorAll<HTMLElement>(
+        ".v19-review-metric-tabs .v19-metric-card",
+      ),
+    ];
+
+    return {
+      cards: cards.map((card) => {
+        const title = card.querySelector<HTMLElement>(
+          ".v19-review-row-identity > strong",
+        );
+        const detail = card.querySelector<HTMLElement>(
+          ".v19-review-row-priority > strong",
+        );
+        const progress = card.querySelector<HTMLElement>(".v19-review-progress > div");
+        const badgeScore = card.querySelector<HTMLElement>(
+          ".v19-review-priority-badge strong",
+        );
+        const inlineIcons = [
+          ...card.querySelectorAll<HTMLElement>(
+            ".v19-review-row-identity > small svg, .v19-review-trip-label svg",
+          ),
+        ];
+        const cardStyle = getComputedStyle(card);
+
+        return {
+          cardFits: card.scrollWidth <= card.clientWidth + 1,
+          detailFontSize: detail
+            ? Number.parseFloat(getComputedStyle(detail).fontSize)
+            : 0,
+          iconSizes: inlineIcons.map((icon) => {
+            const style = getComputedStyle(icon);
+            return { height: style.height, width: style.width };
+          }),
+          paddingTop: Number.parseFloat(cardStyle.paddingTop),
+          progressFontSize: progress
+            ? Number.parseFloat(getComputedStyle(progress).fontSize)
+            : 0,
+          rowGap: Number.parseFloat(cardStyle.rowGap),
+          scoreDisplay: badgeScore ? getComputedStyle(badgeScore).display : "",
+          scoreNumeric: badgeScore
+            ? getComputedStyle(badgeScore).fontVariantNumeric
+            : "",
+          titleClamp: title ? getComputedStyle(title).webkitLineClamp : "",
+          titleFontSize: title
+            ? Number.parseFloat(getComputedStyle(title).fontSize)
+            : 0,
+          titleWhiteSpace: title ? getComputedStyle(title).whiteSpace : "",
+        };
+      }),
+      metricCards: metrics.map((metric) => {
+        const icon = metric.querySelector<HTMLElement>(".v19-metric-card-icon");
+        const value = metric.querySelector<HTMLElement>(".v19-metric-card-value");
+        const number = metric.querySelector<HTMLElement>(
+          ".v19-metric-card-value strong",
+        );
+        const style = getComputedStyle(metric);
+        const iconStyle = icon ? getComputedStyle(icon) : null;
+        const valueStyle = value ? getComputedStyle(value) : null;
+        const numberStyle = number ? getComputedStyle(number) : null;
+
+        return {
+          iconHeight: iconStyle?.height ?? "",
+          iconWidth: iconStyle?.width ?? "",
+          numberNumeric: numberStyle?.fontVariantNumeric ?? "",
+          valueAlignment: valueStyle?.alignItems ?? "",
+          width: Number.parseFloat(style.width),
+        };
+      }),
+      metricGap: metricStrip ? Number.parseFloat(getComputedStyle(metricStrip).gap) : 0,
+    };
+  });
+
+  expect(contract.cards, `${context}: review cards`).not.toHaveLength(0);
+  expect(
+    contract.cards.every(
+      (card) =>
+        card.cardFits &&
+        card.titleFontSize === 16 &&
+        card.detailFontSize === 11 &&
+        card.progressFontSize === 9 &&
+        card.scoreDisplay === "grid" &&
+        card.scoreNumeric === "tabular-nums" &&
+        card.iconSizes.every((icon) => icon.width === "14px" && icon.height === "14px"),
+    ),
+    `${context}: hierarchy, icon and number alignment use the operational cell contract`,
+  ).toBe(true);
+  expect(contract.metricCards, `${context}: metric controls`).toHaveLength(3);
+  expect(
+    contract.metricCards.every(
+      (metric) =>
+        metric.valueAlignment === "baseline" &&
+        metric.numberNumeric === "tabular-nums" &&
+        metric.width > 0,
+    ),
+    `${context}: metric numbers remain baseline-aligned and tabular`,
+  ).toBe(true);
+
+  const isPhone = viewport!.width < 768;
+  const usesCompactMetricIcons = viewport!.width < 1024;
+  expect(contract.metricGap, `${context}: metric rhythm`).toBe(isPhone ? 8 : 12);
+  expect(
+    contract.cards.every(
+      (card) =>
+        card.paddingTop === (isPhone ? 12 : 14) &&
+        card.rowGap === (isPhone ? 10 : 12) &&
+        card.titleWhiteSpace === (isPhone ? "normal" : "nowrap") &&
+        card.titleClamp === (isPhone ? "2" : "none"),
+    ),
+    `${context}: density and title wrapping follow the viewport policy`,
+  ).toBe(true);
+  expect(
+    contract.metricCards.every(
+      (metric) =>
+        metric.iconWidth === (usesCompactMetricIcons ? "24px" : "28px") &&
+        metric.iconHeight === (usesCompactMetricIcons ? "24px" : "28px"),
+    ),
+    `${context}: metric icons retain the matching control size`,
+  ).toBe(true);
+}
+
+async function expectAdminReviewMetricSelectedState(
+  page: Page,
+  context: string,
+  selectedName: "Ревью" | "Правки",
+) {
+  await page.waitForTimeout(180);
+  const state = await page.evaluate((name) => {
+    const selected = [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        ".v19-review-metric-tabs button.v19-metric-card",
+      ),
+    ].find((button) => button.getAttribute("aria-label") === name);
+    const idle = [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        ".v19-review-metric-tabs button.v19-metric-card",
+      ),
+    ].find(
+      (button) =>
+        button !== selected && button.getAttribute("aria-pressed") === "false",
+    );
+    if (!selected || !idle) return null;
+
+    return {
+      idleBackground: getComputedStyle(idle).backgroundColor,
+      selectedBackground: getComputedStyle(selected).backgroundColor,
+      selectedBoxShadow: getComputedStyle(selected).boxShadow,
+      selectedPressed: selected.getAttribute("aria-pressed"),
+    };
+  }, selectedName);
+
+  expect(state, `${context}: selected metric exists`).not.toBeNull();
+  expect(state!.selectedPressed, `${context}: selected metric semantic state`).toBe(
+    "true",
+  );
+  expect(
+    state!.selectedBackground,
+    `${context}: selected metric has its own surface`,
+  ).not.toBe(state!.idleBackground);
+  expect(state!.selectedBoxShadow, `${context}: selected metric indicator`).toContain(
+    "inset",
+  );
+}
+
 async function expectWideAdminReviewQueueComposition(
   page: Page,
   context: string,
@@ -1410,6 +1583,7 @@ test.describe("V-19 responsive proof", () => {
         `${viewport.label}: admin review`,
         true,
       );
+      await expectAdminReviewRhythmContract(page, `${viewport.label}: admin review`);
       if (viewport.width < 768) {
         await expectMobileAdminReviewDensity(page, `${viewport.label}: admin review`);
       }
@@ -1443,6 +1617,11 @@ test.describe("V-19 responsive proof", () => {
         page,
         `${viewport.label}: admin review tab`,
       );
+      await expectAdminReviewMetricSelectedState(
+        page,
+        `${viewport.label}: review metric`,
+        "Ревью",
+      );
       await screenshot(page, viewport, "admin-review-tab");
 
       await selectAdminReviewLane(page, "Правки");
@@ -1453,6 +1632,11 @@ test.describe("V-19 responsive proof", () => {
       await expectAdminReviewTextReadability(
         page,
         `${viewport.label}: admin corrections tab`,
+      );
+      await expectAdminReviewMetricSelectedState(
+        page,
+        `${viewport.label}: corrections metric`,
+        "Правки",
       );
       await screenshot(page, viewport, "admin-corrections-tab");
 

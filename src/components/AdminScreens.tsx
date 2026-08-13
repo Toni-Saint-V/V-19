@@ -532,7 +532,7 @@ export function ReviewScreen({
   return (
     <motion.div {...surfaceMotion} className="v19-admin-screen v19-admin-review-screen">
       <section className="v19-admin-review-main min-w-0 space-y-5">
-        <V19MetricStrip>
+        <V19MetricStrip className="v19-review-metric-tabs">
           <V19MetricCard
             active={activeLane === "review"}
             detail={reviewCountLabel(laneCounts.review)}
