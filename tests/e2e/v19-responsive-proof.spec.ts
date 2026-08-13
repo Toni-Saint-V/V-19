@@ -497,6 +497,121 @@ async function expectAdminReviewTextReadability(
   }
 }
 
+async function expectWideAdminReviewQueueComposition(
+  page: Page,
+  context: string,
+  expectedRowAreas: string,
+  expectedSecondaryDetailsVisible: boolean,
+) {
+  const queue = page.locator(".v19-review-queue-list");
+  const cards = queue.locator(".v19-admin-review-card:visible");
+  await expect(queue, `${context}: review queue`).toBeVisible();
+  await expect(cards, `${context}: seeded review cards`).toHaveCount(2);
+
+  const composition = await queue.evaluate((list) => {
+    const queueStyle = getComputedStyle(list);
+    const queueRect = list.getBoundingClientRect();
+    const cards = [...list.querySelectorAll<HTMLElement>(".v19-admin-review-card")];
+
+    return {
+      columnCount: queueStyle.gridTemplateColumns.trim().split(/\s+/).length,
+      cards: cards.map((card) => {
+        const cardRect = card.getBoundingClientRect();
+        const rankRect = card
+          .querySelector<HTMLElement>(".v19-review-row-rank")
+          ?.getBoundingClientRect();
+        const detailRects = [
+          ".v19-review-row-identity",
+          ".v19-review-row-priority",
+          ".v19-review-row-readiness",
+          ".v19-review-row-signals",
+          ".v19-review-row-open",
+        ].map((selector) =>
+          card.querySelector<HTMLElement>(selector)?.getBoundingClientRect(),
+        );
+        const contains = (rect: DOMRect | undefined) =>
+          Boolean(
+            rect &&
+            rect.left >= cardRect.left - 1 &&
+            rect.right <= cardRect.right + 1 &&
+            rect.top >= cardRect.top - 1 &&
+            rect.bottom <= cardRect.bottom + 1,
+          );
+
+        return {
+          agentEventVisible:
+            getComputedStyle(
+              card.querySelector<HTMLElement>(".v19-review-row-identity > em")!,
+            ).display !== "none",
+          contentFits: card.scrollWidth <= card.clientWidth + 1,
+          detailsFit: detailRects.every(contains),
+          height: cardRect.height,
+          left: cardRect.left,
+          nextActionVisible:
+            getComputedStyle(
+              card.querySelector<HTMLElement>(".v19-review-row-priority > small")!,
+            ).display !== "none",
+          openDisplay: getComputedStyle(
+            card.querySelector<HTMLElement>(".v19-review-row-open")!,
+          ).display,
+          rankPosition: rankRect
+            ? getComputedStyle(card.querySelector<HTMLElement>(".v19-review-row-rank")!)
+                .position
+            : "",
+          rankAtTrailingEdge: Boolean(
+            rankRect &&
+            rankRect.right <= cardRect.right + 1 &&
+            cardRect.right - rankRect.right <= 25,
+          ),
+          top: cardRect.top,
+          templateAreas: getComputedStyle(card)
+            .gridTemplateAreas.replace(/\s+/g, " ")
+            .trim(),
+          width: cardRect.width,
+        };
+      }),
+      width: queueRect.width,
+    };
+  });
+
+  expect(composition.columnCount, `${context}: queue uses one wide column`).toBe(1);
+  expect(
+    composition.cards.every((card) => card.width >= composition.width - 24),
+    `${context}: each review card fills the queue width`,
+  ).toBe(true);
+  expect(
+    composition.cards.every((card) => card.templateAreas === expectedRowAreas),
+    `${context}: card grid map matches the wide composition`,
+  ).toBe(true);
+  expect(
+    composition.cards.every((card) => card.rankPosition === "static"),
+    `${context}: rank participates in the grid instead of overlaying content`,
+  ).toBe(true);
+  expect(
+    composition.cards.every(
+      (card) =>
+        card.agentEventVisible === expectedSecondaryDetailsVisible &&
+        card.nextActionVisible === expectedSecondaryDetailsVisible &&
+        card.openDisplay === "grid",
+    ),
+    `${context}: secondary detail policy and open affordance are preserved`,
+  ).toBe(true);
+  expect(
+    composition.cards.every(
+      (card) => card.contentFits && card.detailsFit && card.rankAtTrailingEdge,
+    ),
+    `${context}: card details fit and rank stays on the trailing edge`,
+  ).toBe(true);
+  expect(
+    Math.abs(composition.cards[0]!.left - composition.cards[1]!.left),
+    `${context}: cards share the queue column`,
+  ).toBeLessThanOrEqual(1);
+  expect(
+    composition.cards[1]!.top,
+    `${context}: second card follows below the first`,
+  ).toBeGreaterThanOrEqual(composition.cards[0]!.top + composition.cards[0]!.height);
+}
+
 async function expectMobileExportRowComposition(
   page: Page,
   context: string,
@@ -1516,6 +1631,69 @@ test.describe("V-19 responsive proof", () => {
         `${viewport.label}: selected export`,
       );
       await screenshot(page, viewport, "export");
+    }
+
+    expect(problems).toEqual([]);
+  });
+
+  test("admin review queue preserves wide card composition", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(180_000);
+    test.skip(testInfo.project.name !== "chromium", "single-project viewport proof");
+
+    const problems = collectBrowserProblems(page);
+    const viewports: Array<
+      ViewportProof & { rowAreas: string; secondaryDetailsVisible: boolean }
+    > = [
+      {
+        height: 900,
+        label: "1440",
+        rowAreas: '"identity priority rank" "readiness signals open"',
+        secondaryDetailsVisible: true,
+        width: 1440,
+      },
+      {
+        height: 1024,
+        label: "768",
+        rowAreas:
+          '"identity identity rank" "priority priority priority" "readiness signals open"',
+        secondaryDetailsVisible: true,
+        width: 768,
+      },
+      {
+        height: 844,
+        label: "390",
+        rowAreas:
+          '"identity identity rank" "priority priority priority" "readiness readiness readiness" "signals signals open"',
+        secondaryDetailsVisible: false,
+        width: 390,
+      },
+    ];
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await openFreshWorkspace(page, {
+        heading: /^(Очередь на проверку|Проверка)$/,
+        workspaceEmail: "admin@visaflow.local",
+      });
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
+      await expectWideAdminReviewQueueComposition(
+        page,
+        `${viewport.label}: admin review`,
+        viewport.rowAreas,
+        viewport.secondaryDetailsVisible,
+      );
+      await screenshot(page, viewport, "admin-review-wide-queue");
+
+      const selectedCard = page
+        .getByRole("button", { name: "Ручная проверка заявки Нина Волкова" })
+        .first();
+      await selectedCard.click();
+      await expect(
+        page.getByRole("dialog", { name: "Сверка паспорта" }),
+        `${viewport.label}: selected review opens the existing workspace`,
+      ).toBeVisible();
     }
 
     expect(problems).toEqual([]);
