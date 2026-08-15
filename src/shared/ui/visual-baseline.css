@@ -8059,6 +8059,42 @@ section[data-testid="agent-actions-screen"] .v19-admin-list-header > div {
   flex: 0 0 auto;
   align-items: center;
   gap: var(--v19b-size-8);
+  margin-left: auto;
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-action {
+  display: inline-flex;
+  width: var(--v19b-size-40);
+  height: var(--v19b-size-40);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: var(--v19b-size-1) solid transparent;
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    border-color var(--v19b-motion-fast),
+    background-color var(--v19b-motion-fast),
+    color var(--v19b-motion-fast);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-action > svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-action:hover,
+.v19-agent-submissions-board .v19-applicant-delete-action:focus-visible {
+  border-color: var(--vf-danger-border);
+  color: var(--vf-danger);
+  background: var(--vf-danger-soft);
+}
+
+.v19-agent-submissions-board .v19-applicant-delete-action:disabled {
+  cursor: wait;
+  opacity: var(--v19b-opacity-disabled);
 }
 
 .v19-agent-submissions-board .v19-applicant-status-action {

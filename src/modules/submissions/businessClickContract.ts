@@ -19,6 +19,7 @@ export type BusinessClickExecutionPath =
   | "exportSummary"
   | "applyExportStateToSelection"
   | "completeExportPackage"
+  | "deleteSubmission"
   | "navigationOnly";
 
 export type BusinessClickContract = {
@@ -30,7 +31,8 @@ export type BusinessClickContract = {
     | "file_review"
     | "export_package"
     | "navigation"
-    | "create_submission";
+    | "create_submission"
+    | "delete_submission";
   ownerRole: Role;
   productionLogic: string;
   submissionAction?: SubmissionAction;
@@ -42,6 +44,14 @@ export type BusinessClickContract = {
 };
 
 export const V19_BUSINESS_CLICK_CONTRACTS = {
+  delete_submission: {
+    executionPath: "deleteSubmission",
+    intent: "delete_submission",
+    ownerRole: "agent",
+    productionLogic:
+      "src/modules/submissions/submissionDeletion.agentSubmissionDeletionDecision",
+    surfaces: ["agent-submissions"],
+  },
   create_submission: {
     executionPath: "createDraft",
     intent: "create_submission",
@@ -85,8 +95,7 @@ export const V19_BUSINESS_CLICK_CONTRACTS = {
     executionPath: "applyAgentSubmitForReviewResult",
     intent: "submission_lifecycle",
     ownerRole: "agent",
-    productionLogic:
-      "src/modules/submissions/status.applyAgentSubmitForReviewResult",
+    productionLogic: "src/modules/submissions/status.applyAgentSubmitForReviewResult",
     surfaces: ["agent-submissions"],
     transition: {
       from: ["draft", "in_progress"],

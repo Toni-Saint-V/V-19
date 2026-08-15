@@ -1,6 +1,25 @@
 .vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button {
+  animation: v19-smart-import-invite 2.4s ease-in-out 600ms 2;
+}
+
+@keyframes v19-smart-import-invite {
+  0%,
+  100% {
+    border-color: #2c2c31;
+    box-shadow: 0 0 0 0 rgb(119 104 232 / 0%);
+    transform: translateY(0);
+  }
+
+  45% {
+    border-color: rgb(132 118 246 / 58%);
+    box-shadow: 0 0 0 5px rgb(119 104 232 / 10%);
+    transform: translateY(-1px);
+  }
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 45px;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -30,6 +49,14 @@
 .vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+@layer v19-linear-buttons {
+  @media (max-width: 767px) {
+    .vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button {
+      min-height: 45px !important;
+    }
+  }
 }
 
 .v19-smart-import-backdrop {
@@ -658,6 +685,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .vf-figma-questionnaire-screen .v19-questionnaire-smart-import-button,
   .v19-smart-import-spinner {
     animation: none;
   }

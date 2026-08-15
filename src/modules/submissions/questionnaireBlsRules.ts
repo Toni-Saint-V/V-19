@@ -44,6 +44,17 @@ const businessPurposeValues = new Set([
   'STUDY',
 ]);
 
+export const retiredQuestionnaireFieldIds = new Set([
+  'lives-outside-citizenship',
+  'residence-not-nationality',
+  'residence-permit-type',
+  'residence-permit-number',
+  'residence-permit-valid-until',
+  'previous-biometrics',
+  'previous-biometrics-date',
+  'previous-visa-number',
+]);
+
 const blsFormKeyByQuestionnaireFieldId: Record<string, string> = {
   'birth-date': 'dob',
   'company-contact-person': 'companyContactPerson',
@@ -95,7 +106,6 @@ const blsFormKeyByQuestionnaireFieldId: Record<string, string> = {
 function read(formData: BlsFormData, key: string) {
   return (formData[key] ?? '').trim();
 }
-
 function normalizeForRule(value: string) {
   return value.trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
 }
@@ -195,6 +205,7 @@ export function isBlsQuestionnaireFieldApplicable({
   field,
   formData,
 }: Pick<BlsFieldValidationContext, 'applicantRole' | 'field' | 'formData'>) {
+  if (retiredQuestionnaireFieldIds.has(field.id)) return false;
   const hasOwnValue = fieldHasOwnValue(field);
 
   switch (field.id) {

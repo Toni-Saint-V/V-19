@@ -47,6 +47,7 @@ import {
   recordWorkbookDownloadAcknowledgement,
 } from "./modules/submissions/workbookExportPersistence";
 import {
+  deleteAgentSubmissionIfCurrent,
   ensureSubmissionPublicNumber,
   isSubmissionConcurrencyConflict,
   loadCockpitSubmissionsForProfile,
@@ -54,6 +55,11 @@ import {
   saveCockpitSubmissionsForProfile,
   type PublicNumberAssignment,
 } from "./modules/submissions/supabasePersistence";
+import {
+  agentSubmissionDeletionDecision,
+  commitLocalDemoSubmissionDeletion,
+  localDemoMediaPathsForSubmission,
+} from "./modules/submissions/submissionDeletion";
 import {
   PostCommitBridgePolicy,
   type VisaflowPostCommitEvent,
@@ -799,13 +805,24 @@ export default function App({
       if (!supabaseEnabled) {
         if (!localDemoEnabled) return;
         if (!__V19_LOCAL_DEMO_BUILD__) return;
-        const { loadSubmissions } = await import("./modules/submissions/persistence");
+        const [{ loadSubmissions }, localMedia] = await Promise.all([
+          import("./modules/submissions/persistence"),
+          import("./modules/submissions/localDemoMediaStorage"),
+        ]);
         const localSubmissions = loadSubmissions();
         setSubmissions(localSubmissions);
         setWorkspaceDataState({
           refreshedAt: new Date().toISOString(),
           status: workspaceDataStatusForCount(localSubmissions.length),
         });
+        try {
+          await localMedia.pruneUnreferencedLocalDemoMedia(loadSubmissions, {
+            orphanGracePeriodMs: 0,
+          });
+        } catch {
+          // The canonical submission list remains authoritative. A later
+          // bootstrap retries any IndexedDB cleanup that is still pending.
+        }
         return;
       }
 
@@ -1044,6 +1061,103 @@ export default function App({
       });
     },
     [activeApprovedSession, enqueueWorkspaceSubmissionMutation, persistSubmissions],
+  );
+
+  const deleteVisibleAgentSubmission = useCallback(
+    (submissionId: string): Promise<void> => {
+      const session = activeApprovedSession;
+      if (!session || session.role !== "agent") {
+        return Promise.reject(
+          new Error("Только активный агент может удалить свою подачу."),
+        );
+      }
+      const ownerAgentId = session.ownerAgentId ?? session.userId;
+
+      return enqueueWorkspaceSubmissionMutation(session.userId, async (fence) => {
+        const currentSubmission = submissionsRef.current.find(
+          (submission) => submission.id === submissionId,
+        );
+        if (!currentSubmission) throw new Error("Подача больше не доступна.");
+        const decision = agentSubmissionDeletionDecision(
+          currentSubmission,
+          ownerAgentId,
+        );
+        if (!decision.ok) throw new Error(decision.message);
+
+        const nextSubmissions = submissionsRef.current.filter(
+          (submission) => submission.id !== submissionId,
+        );
+        workspaceRefreshRequestRef.current += 1;
+        workspaceRefreshCoordinatorRef.current.invalidate();
+
+        try {
+          if (supabaseEnabled) {
+            const expectedRevision =
+              caseRevisionsBySubmissionIdRef.current.get(submissionId);
+            if (expectedRevision === undefined) {
+              throw new Error(
+                `Подача ${submissionId} не имеет server revision. Обновите данные и повторите удаление.`,
+              );
+            }
+            await deleteAgentSubmissionIfCurrent(submissionId, expectedRevision);
+          } else {
+            if (!localDemoEnabled || !__V19_LOCAL_DEMO_BUILD__) {
+              throw new Error("Удаление подачи недоступно в текущем режиме.");
+            }
+            const [persistence, localMedia] = await Promise.all([
+              import("./modules/submissions/persistence"),
+              import("./modules/submissions/localDemoMediaStorage"),
+            ]);
+            await localMedia.withLocalDemoMediaMutationLock(async () => {
+              await commitLocalDemoSubmissionDeletion({
+                cleanupPaths: localDemoMediaPathsForSubmission(currentSubmission),
+                deleteStoredMedia: localMedia.deleteLocalDemoMedia,
+                persistCanonicalDeletion: async () => {
+                  const saveResult = persistence.saveSubmissions(nextSubmissions);
+                  if (!saveResult.ok) throw new Error(saveResult.message);
+                },
+              });
+            });
+          }
+
+          fence.assertCurrent();
+          const nextCaseRevisions = new Map(caseRevisionsBySubmissionIdRef.current);
+          const nextOwnerIds = new Map(ownerIdsBySubmissionIdRef.current);
+          nextCaseRevisions.delete(submissionId);
+          nextOwnerIds.delete(submissionId);
+          quarantinedSubmissionIdsRef.current.delete(submissionId);
+          submissionsRef.current = nextSubmissions;
+          setSubmissions(nextSubmissions);
+          caseRevisionsBySubmissionIdRef.current = nextCaseRevisions;
+          ownerIdsBySubmissionIdRef.current = nextOwnerIds;
+          setOwnerIdsBySubmissionId(nextOwnerIds);
+          setWorkspaceDataState({
+            refreshedAt: new Date().toISOString(),
+            sessionUserId: session.userId,
+            status: workspaceDataStatusForCount(nextSubmissions.length),
+          });
+          workspaceRefreshRequestRef.current += 1;
+          if (supabaseEnabled) void refreshCanonicalSubmissions();
+        } catch (error) {
+          if (fence.isCurrent() && !isWorkspaceSessionChangedError(error)) {
+            setWorkspaceDataState({
+              error:
+                error instanceof Error ? error.message : "Не удалось удалить подачу.",
+              sessionUserId: session.userId,
+              status: "error",
+            });
+          }
+          throw error;
+        }
+      });
+    },
+    [
+      activeApprovedSession,
+      enqueueWorkspaceSubmissionMutation,
+      localDemoEnabled,
+      refreshCanonicalSubmissions,
+      supabaseEnabled,
+    ],
   );
 
   const updateVisibleAgentSubmission = useCallback(
@@ -2467,6 +2581,7 @@ export default function App({
         }}
         agentWorkspaceProps={{
           agentId: activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId,
+          onDeleteSubmission: deleteVisibleAgentSubmission,
           onAssignPublicNumber: assignVisibleAgentSubmissionPublicNumber,
           onSubmissionUpdate: updateVisibleAgentSubmission,
           onSubmissionsChange: persistVisibleAgentSubmissions,

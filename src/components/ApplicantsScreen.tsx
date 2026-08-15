@@ -19,6 +19,7 @@ import {
   IdCard,
   ListFilter,
   RotateCcw,
+  Trash2,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -53,6 +54,7 @@ import {
   canAgentEditSubmission,
   statusLabelFor,
 } from "../modules/submissions/status";
+import { agentSubmissionDeletionDecision } from "../modules/submissions/submissionDeletion";
 import type {
   Applicant,
   Submission,
@@ -79,10 +81,12 @@ export type ApplicantFocusRequest = {
 };
 
 interface ApplicantsScreenProps {
+  agentId?: Submission["agentId"];
   focusRequest?: ApplicantFocusRequest;
   onOpenDrawer: (id: string) => void;
   onOpenQuestionnaire?: (id: string, initialFocus?: QuestionnaireInitialFocus) => void;
   onOpenWorkspaceTarget?: (id: string, target: WorkspaceTarget) => void;
+  onDeleteSubmission?: (id: string) => Promise<void>;
   onSubmitForReview?: (id: string) => Promise<void>;
   onTypeFilterChange?: (filter: SubmissionTypeFilter) => void;
   onUploadApplicantFile?: (
@@ -373,8 +377,11 @@ type CardCallbacks = Pick<
   | "onUploadApplicantFile"
 > & {
   canSubmitForReview: boolean;
+  canDelete: boolean;
+  deleting: boolean;
   error?: string;
   now: Date;
+  onRequestDelete: (submission: Submission) => void;
   onPrimaryAction: (submission: Submission) => void;
   submitting: boolean;
 };
@@ -391,6 +398,39 @@ function openSubmissionCardFromKeyboard(
   }
   event.preventDefault();
   onOpen();
+}
+
+function SubmissionDeleteAction({
+  canDelete,
+  deleting,
+  label,
+  onRequestDelete,
+  submission,
+}: {
+  canDelete: boolean;
+  deleting: boolean;
+  label: string;
+  onRequestDelete: (submission: Submission) => void;
+  submission: Submission;
+}) {
+  if (!canDelete) return null;
+
+  return (
+    <button
+      {...agentInteractionProps("submissions.request-delete")}
+      aria-label={`Удалить подачу: ${label}`}
+      className="v19-applicant-delete-action"
+      disabled={deleting}
+      title="Удалить подачу"
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onRequestDelete(submission);
+      }}
+    >
+      <Trash2 aria-hidden="true" />
+    </button>
+  );
 }
 
 function AssignedPublicId({
@@ -505,20 +545,20 @@ function canSubmitForReviewFromList(
 ) {
   if (!canSubmitForReview) return false;
   const completionDecision = agentQuestionnaireCompletionDecision(submission);
-  return (
-    completionDecision.action === "submit_for_review" &&
-    completionDecision.ok
-  );
+  return completionDecision.action === "submit_for_review" && completionDecision.ok;
 }
 
 function FamilySubmissionCard({
+  canDelete,
   canSubmitForReview,
+  deleting,
   error,
   now,
   onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
   onPrimaryAction,
+  onRequestDelete,
   onUploadApplicantFile,
   submission,
   submitting,
@@ -602,14 +642,23 @@ function FamilySubmissionCard({
 
       <div className="v19-applicant-card-footer">
         <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
-        <SubmissionPrimaryAction
-          canSubmitForReview={canSubmitForReview}
-          label={title}
-          onPrimaryAction={onPrimaryAction}
-          submission={submission}
-          submitting={submitting}
-          visible={workflowReady}
-        />
+        <div className="v19-applicant-card-footer-actions">
+          <SubmissionDeleteAction
+            canDelete={canDelete}
+            deleting={deleting}
+            label={title}
+            onRequestDelete={onRequestDelete}
+            submission={submission}
+          />
+          <SubmissionPrimaryAction
+            canSubmitForReview={canSubmitForReview}
+            label={title}
+            onPrimaryAction={onPrimaryAction}
+            submission={submission}
+            submitting={submitting}
+            visible={workflowReady}
+          />
+        </div>
         {error ? (
           <span className="v19-applicant-submit-error" role="alert">
             {error}
@@ -621,13 +670,16 @@ function FamilySubmissionCard({
 }
 
 function IndividualSubmissionCard({
+  canDelete,
   canSubmitForReview,
+  deleting,
   error,
   now,
   onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
   onPrimaryAction,
+  onRequestDelete,
   onUploadApplicantFile,
   submission,
   submitting,
@@ -681,30 +733,39 @@ function IndividualSubmissionCard({
 
       <div className="v19-applicant-card-footer">
         <SubmissionCreatedAt createdAt={submission.createdAt} now={now} />
-        {applicant ? (
-          <SubmissionWorkflowSwitch
-            action={
-              <SubmissionPrimaryAction
-                canSubmitForReview={canSubmitForReview}
-                label={name}
-                onPrimaryAction={onPrimaryAction}
+        <div className="v19-applicant-card-footer-actions">
+          <SubmissionDeleteAction
+            canDelete={canDelete}
+            deleting={deleting}
+            label={name}
+            onRequestDelete={onRequestDelete}
+            submission={submission}
+          />
+          {applicant ? (
+            <SubmissionWorkflowSwitch
+              action={
+                <SubmissionPrimaryAction
+                  canSubmitForReview={canSubmitForReview}
+                  label={name}
+                  onPrimaryAction={onPrimaryAction}
+                  submission={submission}
+                  submitting={submitting}
+                  visible={workflowReady}
+                />
+              }
+              ready={workflowReady}
+            >
+              <ApplicantWorkflowActions
+                applicant={applicant}
+                isReplaced={workflowReady}
+                onOpenQuestionnaire={onOpenQuestionnaire}
+                onOpenWorkspaceTarget={onOpenWorkspaceTarget}
+                onUploadApplicantFile={onUploadApplicantFile}
                 submission={submission}
-                submitting={submitting}
-                visible={workflowReady}
               />
-            }
-            ready={workflowReady}
-          >
-            <ApplicantWorkflowActions
-              applicant={applicant}
-              isReplaced={workflowReady}
-              onOpenQuestionnaire={onOpenQuestionnaire}
-              onOpenWorkspaceTarget={onOpenWorkspaceTarget}
-              onUploadApplicantFile={onUploadApplicantFile}
-              submission={submission}
-            />
-          </SubmissionWorkflowSwitch>
-        ) : null}
+            </SubmissionWorkflowSwitch>
+          ) : null}
+        </div>
         {error ? (
           <span className="v19-applicant-submit-error" role="alert">
             {error}
@@ -756,7 +817,9 @@ function sortedSubmissions(submissions: Submission[], sort: ApplicantSort, now: 
 }
 
 export function ApplicantsScreen({
+  agentId,
   focusRequest,
+  onDeleteSubmission,
   onOpenDrawer,
   onOpenQuestionnaire,
   onOpenWorkspaceTarget,
@@ -777,7 +840,10 @@ export function ApplicantsScreen({
   const [relativeNow, setRelativeNow] = useState(() => Date.now());
   const [pendingReviewSubmission, setPendingReviewSubmission] =
     useState<Submission | null>(null);
+  const [pendingDeleteSubmission, setPendingDeleteSubmission] =
+    useState<Submission | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<{
     id: string;
     message: string;
@@ -785,6 +851,7 @@ export function ApplicantsScreen({
   const [submissionDialogError, setSubmissionDialogError] = useState<string | null>(
     null,
   );
+  const [deletionDialogError, setDeletionDialogError] = useState<string | null>(null);
   const submissionRequestRef = useRef<string | null>(null);
   const canonicalSubmissions = submissions ?? emptySubmissions;
   const focusSubmissionId = focusRequest?.submissionId;
@@ -941,43 +1008,96 @@ export function ApplicantsScreen({
     }
   };
 
+  const requestSubmissionDeletion = (submission: Submission) => {
+    if (
+      !onDeleteSubmission ||
+      !agentId ||
+      !agentSubmissionDeletionDecision(submission, agentId).ok
+    ) {
+      return;
+    }
+    setSubmissionError(null);
+    setDeletionDialogError(null);
+    setPendingDeleteSubmission(submission);
+  };
+
+  const confirmSubmissionDeletion = async () => {
+    const submission = pendingDeleteSubmission;
+    if (!submission || !onDeleteSubmission || submissionRequestRef.current !== null) {
+      return;
+    }
+
+    submissionRequestRef.current = submission.id;
+    setSubmissionError(null);
+    setDeletionDialogError(null);
+    setDeletingId(submission.id);
+    try {
+      await onDeleteSubmission(submission.id);
+      setPendingDeleteSubmission(null);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Не удалось удалить подачу.";
+      setSubmissionError({ id: submission.id, message });
+      setDeletionDialogError(message);
+    } finally {
+      submissionRequestRef.current = null;
+      setDeletingId(null);
+    }
+  };
+
+  const activeDialogSubmissionId =
+    pendingReviewSubmission?.id ?? pendingDeleteSubmission?.id;
+
   const cardCallbacks = {
+    canDelete: false,
     canSubmitForReview: Boolean(onSubmitForReview),
+    deleting: false,
     now,
     onOpenDrawer,
     onOpenQuestionnaire,
     onOpenWorkspaceTarget,
     onPrimaryAction: handlePrimaryAction,
+    onRequestDelete: requestSubmissionDeletion,
     onUploadApplicantFile,
   };
-  const renderSubmissionCard = (submission: Submission) =>
-    submission.type === "family" ? (
+  const renderSubmissionCard = (submission: Submission) => {
+    const canDelete = Boolean(
+      onDeleteSubmission &&
+        agentId &&
+        agentSubmissionDeletionDecision(submission, agentId).ok,
+    );
+    return submission.type === "family" ? (
       <FamilySubmissionCard
         {...cardCallbacks}
+        canDelete={canDelete}
         error={
           submissionError?.id === submission.id &&
-          pendingReviewSubmission?.id !== submission.id
+          activeDialogSubmissionId !== submission.id
             ? submissionError.message
             : undefined
         }
         key={submission.id}
         submission={submission}
         submitting={submittingId === submission.id}
+        deleting={deletingId === submission.id}
       />
     ) : (
       <IndividualSubmissionCard
         {...cardCallbacks}
+        canDelete={canDelete}
         error={
           submissionError?.id === submission.id &&
-          pendingReviewSubmission?.id !== submission.id
+          activeDialogSubmissionId !== submission.id
             ? submissionError.message
             : undefined
         }
         key={submission.id}
         submission={submission}
         submitting={submittingId === submission.id}
+        deleting={deletingId === submission.id}
       />
     );
+  };
 
   return (
     <motion.div
@@ -1153,6 +1273,34 @@ export function ApplicantsScreen({
               }
             }}
             onConfirm={() => void confirmSubmissionForReview()}
+          />
+        ) : null}
+
+        {pendingDeleteSubmission ? (
+          <ConfirmationDialog
+            busy={deletingId === pendingDeleteSubmission.id}
+            cancelLabel="Отмена"
+            cancelInteractionId="submissions.cancel-delete"
+            confirmDanger
+            confirmLabel="Удалить"
+            confirmInteractionId="submissions.delete"
+            description="Анкета и загруженные файлы будут удалены без возможности восстановления."
+            error={
+              deletionDialogError ? (
+                <span className="v19-applicant-submit-error">
+                  {deletionDialogError}
+                </span>
+              ) : undefined
+            }
+            kicker="Удаление подачи"
+            title="Удалить эту подачу?"
+            onCancel={() => {
+              if (deletingId !== pendingDeleteSubmission.id) {
+                setPendingDeleteSubmission(null);
+                setDeletionDialogError(null);
+              }
+            }}
+            onConfirm={() => void confirmSubmissionDeletion()}
           />
         ) : null}
       </div>

@@ -267,6 +267,17 @@ function clickPinnedSection(container: HTMLElement, title: string) {
   fireEvent.click(button);
 }
 
+async function revealQuestionnaireErrors(container: HTMLElement) {
+  const button = container.querySelector<HTMLButtonElement>(
+    ".v19-questionnaire-save-button",
+  );
+  if (!button) throw new Error("expected Save and Continue button");
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(screen.getByTestId("questionnaire-next-blocker")).toBeInTheDocument(),
+  );
+}
+
 function visibleFieldLabels(container: HTMLElement) {
   return Array.from(
     container.querySelectorAll(".v19-questionnaire-fields-grid [data-field-label]"),
@@ -469,7 +480,7 @@ describe("FigmaQuestionnaireScreen", () => {
         .map(([update]) => update)
         .filter((update) => update.applicantId === secondaryApplicantId),
     ).toEqual([]);
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: /Скопировать \d+ пол/ }));
 
     expect(onFieldChange.mock.calls.map(([update]) => update)).toEqual(
       expect.arrayContaining([
@@ -611,6 +622,7 @@ describe("FigmaQuestionnaireScreen", () => {
       screen.queryByRole("button", { name: /Отправить на проверку|Отправить/ }),
     ).not.toBeInTheDocument();
     clickPinnedSection(result.container, "Паспорт");
+    await revealQuestionnaireErrors(result.container);
     fireEvent.click(
       screen.getByRole("button", {
         name: /Перейти к следующему обязательному действию:/,
@@ -653,7 +665,9 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       screen.queryByRole("button", { name: /Отправить на проверку|Отправить/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Сохранить и выйти" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Сохранить и продолжить" }),
+    ).toBeEnabled();
   });
 
   test("keeps four mobile footer actions bounded to the active applicant sections", () => {
@@ -686,7 +700,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(next).toBeEnabled();
     expect(
       footerQueries.getByRole("button", {
-        name: "Сохранить и выйти — нижняя панель",
+        name: "Сохранить и продолжить — нижняя панель",
       }),
     ).toBeEnabled();
     expect(
@@ -871,8 +885,6 @@ describe("FigmaQuestionnaireScreen", () => {
     const submission = [
       ["birth-date", "20.08.2012"],
       ["inviting-party-type", "Приглашающая компания/организация"],
-      ["lives-outside-citizenship", "Да"],
-      ["previous-biometrics", "Да"],
       ["purpose", "OTHER"],
     ].reduce((current, [fieldId, value]) => setField(current, fieldId, value), draft);
     const result = render(
@@ -1042,7 +1054,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Почтовый индекс",
       "Email",
       "Телефон",
-      "Есть вид на жительство в другой стране",
     ]);
 
     clickPinnedSection(result.container, "Работа / учеба");
@@ -1062,7 +1073,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Дата въезда",
       "Дата выезда",
       "Длительность пребывания",
-      "Отпечатки ранее сдавались",
     ]);
 
     clickPinnedSection(result.container, "Отель / приглашение");
@@ -1105,66 +1115,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("persists the biometrics choice for submissions with legacy fingerprint field ids", async () => {
-    const draft = createDraftSubmission({
-      applicantNames: ["Ирина Петрова"],
-      city: "Москва",
-      familyCount: 1,
-      idScheme: "local",
-      submissions: [],
-      type: "single",
-    });
-    const submission: Submission = {
-      ...draft,
-      applicants: draft.applicants.map((applicant) => ({
-        ...applicant,
-        sections: applicant.sections.map((section) => ({
-          ...section,
-          fields: section.fields.map((field) => {
-            if (field.id === "previous-biometrics") {
-              return { ...field, id: "fingerprints-collected", value: "" };
-            }
-            if (field.id === "previous-biometrics-date") {
-              return { ...field, id: "fingerprints-date", value: "" };
-            }
-            return field;
-          }),
-        })),
-      })),
-    };
-    const onFieldChange = vi.fn();
-    const result = render(
-      <FigmaQuestionnaireScreen
-        onBack={vi.fn()}
-        onComplete={vi.fn()}
-        onFieldChange={onFieldChange}
-        submission={submission}
-      />,
-    );
-
-    clickPinnedSection(result.container, "Поездка");
-    const biometricsField = result.container.querySelector<HTMLElement>(
-      '[data-field-label="Отпечатки ранее сдавались"]',
-    );
-    if (!biometricsField) throw new Error("expected biometrics field");
-
-    const noButton = within(biometricsField).getByRole("button", { name: "Нет" });
-    fireEvent.click(noButton);
-
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Нет", pressed: true }),
-      ).toBeInTheDocument(),
-    );
-    expect(onFieldChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        fieldId: "fingerprints-collected",
-        value: "Нет",
-      }),
-    );
-  });
-
-  test("reveals only the follow-up questions required by an answer", () => {
+  test("does not render residence-permit or fingerprint fields", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -1183,40 +1134,16 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     expect(
+      screen.queryByText("Есть вид на жительство в другой стране"),
+    ).not.toBeInTheDocument();
+    expect(
       screen.queryByLabelText("Вид на жительство / документ"),
     ).not.toBeInTheDocument();
-    fireEvent.click(
-      dropdownTrigger(result.container, "Есть вид на жительство в другой стране"),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Да" }));
-    expect(screen.getByLabelText("Вид на жительство / документ")).toHaveAttribute(
-      "aria-required",
-      "true",
-    );
-    expect(screen.getByLabelText("Номер документа")).toHaveAttribute(
-      "aria-required",
-      "true",
-    );
-    expect(screen.getByLabelText("Действителен до")).toHaveAttribute(
-      "aria-required",
-      "true",
-    );
 
     clickPinnedSection(result.container, "Поездка");
-    expect(visibleFieldLabels(result.container)).not.toContain(
-      "Дополнительные сведения о цели",
-    );
+    expect(screen.queryByText("Отпечатки ранее сдавались")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Дата сдачи отпечатков")).not.toBeInTheDocument();
-    fireEvent.click(dropdownTrigger(result.container, "Цель поездки"));
-    fireEvent.click(screen.getByRole("option", { name: "OTHER" }));
-    expect(visibleFieldLabels(result.container)).toContain(
-      "Дополнительные сведения о цели",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Да" }));
-    expect(screen.getByLabelText("Дата сдачи отпечатков")).toHaveAttribute(
-      "aria-required",
-      "true",
-    );
+    expect(screen.queryByLabelText("Номер визы")).not.toBeInTheDocument();
   });
 
   test("formats dates and phones while offering common email domains", () => {
@@ -1356,7 +1283,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
-  test("reveals a required-field warning only after leaving an incomplete section", () => {
+  test("reveals required errors only after Save and Continue", async () => {
     const submission = withReadyQuestionnaireFiles(
       createDraftSubmission({
         applicantNames: ["VOLKOV ANTON"],
@@ -1377,7 +1304,12 @@ describe("FigmaQuestionnaireScreen", () => {
 
     expect(screen.queryByTestId("questionnaire-next-blocker")).not.toBeInTheDocument();
     clickPinnedSection(result.container, "Паспорт");
-    expect(screen.getByTestId("questionnaire-next-blocker")).toBeInTheDocument();
+    expect(screen.queryByTestId("questionnaire-next-blocker")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("questionnaire-next-blocker")).toBeInTheDocument(),
+    );
   });
 
   test("calculates and saves stay duration from the travel dates", async () => {
@@ -1424,7 +1356,7 @@ describe("FigmaQuestionnaireScreen", () => {
       screen.queryByText("Проверьте длительность пребывания"),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     expect(onSaveDraft.mock.calls[0]?.[0].fieldUpdates).toEqual(
       expect.arrayContaining([
@@ -1511,7 +1443,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "USSR",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     const payload = onSaveDraft.mock.calls[0]?.[0];
     expect(payload).toEqual(expect.objectContaining({ saveIntent: "manual" }));
@@ -1550,7 +1482,7 @@ describe("FigmaQuestionnaireScreen", () => {
       target: { value: "россия" },
     });
     fireEvent.click(screen.getByRole("option", { name: "Russian Federation" }));
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(legacySave).toHaveBeenCalledTimes(1));
     expect(legacySave.mock.calls[0]?.[0].fieldUpdates).toEqual(
       expect.arrayContaining([
@@ -1577,8 +1509,8 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toHaveTextContent("Spain");
   });
 
-  test("clears stale conditional answers when saving a draft", async () => {
-    const draft = createDraftSubmission({
+  test("does not reintroduce retired fields when saving a draft", async () => {
+    const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
       familyCount: 1,
@@ -1586,11 +1518,6 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "single",
     });
-    const staleSubmission = setField(
-      setField(draft, "lives-outside-citizenship", "Нет"),
-      "residence-permit-type",
-      "ВНЖ",
-    );
     const onSaveDraft = vi.fn();
 
     const result = render(
@@ -1598,22 +1525,22 @@ describe("FigmaQuestionnaireScreen", () => {
         onBack={vi.fn()}
         onComplete={vi.fn()}
         onSaveDraft={onSaveDraft}
-        submission={staleSubmission}
+        submission={submission}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
 
-    expect(onSaveDraft).toHaveBeenCalledWith(
-      expect.objectContaining({
-        fieldUpdates: expect.arrayContaining([
-          expect.objectContaining({
-            fieldId: "residence-permit-type",
-            value: "",
-          }),
-        ]),
-      }),
+    const savedFieldIds = onSaveDraft.mock.calls[0]?.[0].fieldUpdates.map(
+      (update: { fieldId: string }) => update.fieldId,
+    );
+    expect(savedFieldIds).not.toEqual(
+      expect.arrayContaining([
+        "lives-outside-citizenship",
+        "residence-permit-type",
+        "previous-biometrics",
+      ]),
     );
     expect(result.container).toBeTruthy();
   });
@@ -1644,7 +1571,7 @@ describe("FigmaQuestionnaireScreen", () => {
       target: { value: "VOLKOV" },
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+      fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
       await Promise.resolve();
     });
     await act(async () => {
@@ -1833,7 +1760,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
   test.each([
     ["Назад", "navigation"],
-    ["Сохранить и выйти", "manual"],
+    ["Сохранить и продолжить", "manual"],
   ] as const)(
     "captures the latest revision and rejects edits during deferred %s",
     async (actionName, saveIntent) => {
@@ -1889,7 +1816,10 @@ describe("FigmaQuestionnaireScreen", () => {
         await Promise.resolve();
       });
       if (actionName === "Назад") expect(onBack).toHaveBeenCalledTimes(1);
-      else expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+      else {
+        expect(onSaveAndExit).not.toHaveBeenCalled();
+        expect(screen.getByTestId("questionnaire-next-blocker")).toBeInTheDocument();
+      }
     },
   );
 
@@ -2014,25 +1944,28 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("reconciles manual Save and Exit intent after an in-flight autosave", async () => {
+  test("reconciles Save and Continue after an in-flight autosave", async () => {
     vi.useFakeTimers();
     const autosave = deferred();
-    const submission = createDraftSubmission({
-      applicantNames: ["VOLKOV ANTON"],
-      city: "Москва",
-      familyCount: 1,
-      idScheme: "local",
-      submissions: [],
-      type: "single",
-    });
-    const onSaveAndExit = vi.fn().mockResolvedValue(undefined);
+    const submission = withReadyQuestionnaireFiles(
+      fillEveryQuestionnaireField(
+        createDraftSubmission({
+          applicantNames: ["VOLKOV ANTON"],
+          city: "Москва",
+          familyCount: 1,
+          idScheme: "local",
+          submissions: [],
+          type: "single",
+        }),
+      ),
+    );
+    const onComplete = vi.fn().mockResolvedValue(undefined);
     const onSaveDraft = vi.fn().mockImplementationOnce(() => autosave.promise);
 
     const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
-        onComplete={vi.fn()}
-        onSaveAndExit={onSaveAndExit}
+        onComplete={onComplete}
         onSaveDraft={onSaveDraft}
         submission={submission}
       />,
@@ -2051,9 +1984,13 @@ describe("FigmaQuestionnaireScreen", () => {
       expect.objectContaining({ saveIntent: "autosave" }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
+    fireEvent.click(
+      result.container.querySelector<HTMLButtonElement>(
+        ".v19-questionnaire-next-button",
+      ) as HTMLButtonElement,
+    );
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
-    expect(onSaveAndExit).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
 
     await act(async () => {
       autosave.resolve();
@@ -2068,21 +2005,25 @@ describe("FigmaQuestionnaireScreen", () => {
         saveIntent: "manual",
       }),
     );
-    expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  test("retries the full edit payload when Save and Exit follows a rejected autosave", async () => {
+  test("retries the full edit payload when Save and Continue follows a rejected autosave", async () => {
     vi.useFakeTimers();
     const autosave = deferred();
-    const submission = createDraftSubmission({
-      applicantNames: ["VOLKOV ANTON"],
-      city: "Москва",
-      familyCount: 1,
-      idScheme: "local",
-      submissions: [],
-      type: "single",
-    });
-    const onSaveAndExit = vi.fn().mockResolvedValue(undefined);
+    const submission = withReadyQuestionnaireFiles(
+      fillEveryQuestionnaireField(
+        createDraftSubmission({
+          applicantNames: ["VOLKOV ANTON"],
+          city: "Москва",
+          familyCount: 1,
+          idScheme: "local",
+          submissions: [],
+          type: "single",
+        }),
+      ),
+    );
+    const onComplete = vi.fn().mockResolvedValue(undefined);
     const onSaveDraft = vi
       .fn()
       .mockImplementationOnce(() => autosave.promise)
@@ -2091,8 +2032,7 @@ describe("FigmaQuestionnaireScreen", () => {
     const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
-        onComplete={vi.fn()}
-        onSaveAndExit={onSaveAndExit}
+        onComplete={onComplete}
         onSaveDraft={onSaveDraft}
         submission={submission}
       />,
@@ -2106,7 +2046,11 @@ describe("FigmaQuestionnaireScreen", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });
-    fireEvent.click(screen.getByRole("button", { name: "Готово — сохранить и выйти" }));
+    fireEvent.click(
+      result.container.querySelector<HTMLButtonElement>(
+        ".v19-questionnaire-next-button",
+      ) as HTMLButtonElement,
+    );
 
     await act(async () => {
       autosave.reject(new Error("temporary autosave failure"));
@@ -2123,7 +2067,7 @@ describe("FigmaQuestionnaireScreen", () => {
         saveIntent: "manual",
       }),
     );
-    expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
   test("retries the full edit payload when Back follows a rejected autosave", async () => {
@@ -2245,10 +2189,10 @@ describe("FigmaQuestionnaireScreen", () => {
       type: "family",
     });
     const submission = setApplicantField(
-      setApplicantField(draft, 1, "lives-outside-citizenship", "Нет"),
+      setApplicantField(draft, 1, "purpose", "TOURISM"),
       1,
-      "residence-permit-type",
-      "ВНЖ",
+      "stay-purpose-details",
+      "Старая цель",
     );
     const secondaryApplicantId = submission.applicants[1]?.id;
     if (!secondaryApplicantId) throw new Error("expected secondary applicant");
@@ -2302,7 +2246,7 @@ describe("FigmaQuestionnaireScreen", () => {
       expect.arrayContaining([
         expect.objectContaining({
           applicantId: secondaryApplicantId,
-          fieldId: "residence-permit-type",
+          fieldId: "stay-purpose-details",
           value: "",
         }),
       ]),
@@ -2540,7 +2484,11 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Отель / приглашение");
     fireEvent.click(screen.getByRole("button", { name: "Пометить исправленным" }));
     await waitFor(() => expect(onMarkIssueFixed).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(
+      result.container.querySelector<HTMLButtonElement>(
+        ".v19-questionnaire-save-button",
+      ) as HTMLButtonElement,
+    );
 
     await act(async () => {
       markFixed.reject(new Error("Не удалось отметить замечание"));
@@ -2553,7 +2501,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("does not duplicate the draft write when Save and Exit waits for mark-fixed", async () => {
+  test("waits for mark-fixed before revealing remaining blockers", async () => {
     const markFixed = deferred();
     const submission = withQuestionnaireIssue(
       withReadyQuestionnaireFiles(
@@ -2589,7 +2537,11 @@ describe("FigmaQuestionnaireScreen", () => {
     await waitFor(() => expect(onMarkIssueFixed).toHaveBeenCalledTimes(1));
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(
+      result.container.querySelector<HTMLButtonElement>(
+        ".v19-questionnaire-save-button",
+      ) as HTMLButtonElement,
+    );
     expect(onSaveAndExit).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -2598,8 +2550,9 @@ describe("FigmaQuestionnaireScreen", () => {
       await Promise.resolve();
     });
 
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
-    expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
+    expect(onSaveAndExit).not.toHaveBeenCalled();
+    expect(screen.getByTestId("questionnaire-current-issue")).toBeInTheDocument();
   });
 
   test("clears dirty state and cancels autosave after a field is reverted", async () => {
@@ -2964,7 +2917,7 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Личные данные");
     expect(screen.getByLabelText("Фамилия")).toBeDisabled();
     expect(
-      screen.queryByRole("button", { name: "Сохранить и выйти" }),
+      screen.queryByRole("button", { name: "Сохранить и продолжить" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Отправить на проверку" }),
@@ -3050,12 +3003,9 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    clickPinnedSection(result.container, "Адрес и контакты");
-    expect(
-      screen.getByRole("group", { name: /Есть вид на жительство в другой стране/ }),
-    ).toBeInTheDocument();
-
     clickPinnedSection(result.container, "Личные данные");
+    expect(screen.getByRole("group", { name: /^Пол\*$/ })).toBeInTheDocument();
+
     fireEvent.click(dropdownTrigger(result.container, "Страна рождения"));
     const countrySearch = screen.getByLabelText("Поиск: Страна рождения");
     fireEvent.change(countrySearch, { target: { value: "испан" } });
@@ -3079,16 +3029,16 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    clickPinnedSection(result.container, "Адрес и контакты");
-    const residenceGroup = screen.getByRole("group", {
-      name: /Есть вид на жительство в другой стране/,
+    clickPinnedSection(result.container, "Личные данные");
+    const sexGroup = screen.getByRole("group", {
+      name: /^Пол\*$/,
     });
-    fireEvent.click(within(residenceGroup).getByRole("button", { name: "Да" }));
+    fireEvent.click(within(sexGroup).getByRole("button", { name: "Женский" }));
 
-    const no = within(residenceGroup).getByRole("button", { name: "Нет" });
-    expect(no).toBeInTheDocument();
-    fireEvent.click(no);
-    expect(no).toHaveAttribute("aria-pressed", "true");
+    const male = within(sexGroup).getByRole("button", { name: "Мужской" });
+    expect(male).toBeInTheDocument();
+    fireEvent.click(male);
+    expect(male).toHaveAttribute("aria-pressed", "true");
   });
 
   test("associates dropdown labels and supports keyboard selection through a listbox", async () => {
@@ -3318,6 +3268,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     clickPinnedSection(result.container, "Паспорт");
+    await revealQuestionnaireErrors(result.container);
     fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     const address = screen.getByLabelText("Улица / проспект / переулок");
@@ -3346,7 +3297,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "Паспорт",
     );
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -3354,6 +3305,7 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
+    await revealQuestionnaireErrors(result.container);
     fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     await waitFor(() => expect(screen.getByLabelText("Почтовый индекс")).toHaveFocus());
@@ -3494,7 +3446,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onOpenDocuments).not.toHaveBeenCalled();
   });
 
-  test("keeps questionnaire gaps as the only blockers when a file remark exists", () => {
+  test("keeps questionnaire gaps as the only blockers when a file remark exists", async () => {
     const submission = withQuestionnaireFileIssue(
       withReadyQuestionnaireFiles(
         createDraftSubmission({
@@ -3519,6 +3471,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Паспорт");
+    await revealQuestionnaireErrors(result.container);
     expect(screen.getByTestId("questionnaire-next-blocker")).not.toHaveAccessibleName(
       /Загранпаспорт|Скан паспорта/u,
     );
@@ -3585,7 +3538,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "Почтовый индекс",
       "Отель / приглашение",
     );
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -3593,10 +3546,11 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("questionnaire-next-blocker")).toHaveAccessibleName(
-      /Почтовый индекс/u,
+    fireEvent.click(
+      result.container.querySelector<HTMLButtonElement>(
+        ".v19-questionnaire-save-button",
+      ) as HTMLButtonElement,
     );
-    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
     await waitFor(() => expect(screen.getByLabelText("Почтовый индекс")).toHaveFocus());
   });
 
@@ -3669,7 +3623,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "open",
     );
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
@@ -3677,7 +3631,11 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
+    fireEvent.click(
+      result.container.querySelector<HTMLButtonElement>(
+        ".v19-questionnaire-save-button",
+      ) as HTMLButtonElement,
+    );
 
     await waitFor(() => expect(screen.getByLabelText("Почтовый индекс")).toHaveFocus());
     expect(
@@ -3775,16 +3733,21 @@ describe("FigmaQuestionnaireScreen", () => {
       })),
     };
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
         submission={submissionWithLongPassportTypeOptions}
       />,
     );
-    fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
+    fireEvent.click(
+      result.container.querySelector<HTMLButtonElement>(
+        ".v19-questionnaire-save-button",
+      ) as HTMLButtonElement,
+    );
 
     const passportType = await screen.findByRole("combobox", { name: /Тип документа/ });
+    await waitFor(() => expect(passportType).toHaveFocus());
     const errorId = passportType.getAttribute("aria-describedby");
     expect(passportType).toHaveAttribute("aria-invalid", "true");
     expect(errorId).toBeTruthy();
@@ -3812,13 +3775,14 @@ describe("FigmaQuestionnaireScreen", () => {
       "Устаревший раздел",
     );
 
-    render(
+    const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={vi.fn()}
         submission={submission}
       />,
     );
+    await revealQuestionnaireErrors(result.container);
     fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
     await waitFor(() => expect(screen.getByLabelText("Почтовый индекс")).toHaveFocus());
@@ -3866,7 +3830,7 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Действителен до"), {
       target: { value: "31.12.2035" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     const payload = onSaveDraft.mock.calls[0]?.[0];
@@ -3996,18 +3960,13 @@ describe("FigmaQuestionnaireScreen", () => {
     const copyButton = screen.getByRole("button", {
       name: "Копировать для всех",
     });
-    const workToolbar = copyButton.closest(".v19-questionnaire-work-toolbar");
-    expect(workToolbar).not.toBeNull();
-    const actionComposer = copyButton.closest(".v19-questionnaire-action-composer");
-    expect(actionComposer).not.toBeNull();
-    expect(actionComposer).toContainElement(
-      screen.getByRole("button", { name: "Умный импорт" }),
+    const bottomActions = copyButton.closest(".v19-questionnaire-next-action-bar");
+    expect(bottomActions).not.toBeNull();
+    expect(bottomActions).toHaveClass("has-family-copy");
+    expect(bottomActions).toContainElement(
+      screen.getByRole("button", { name: "Далее: Работа / учеба" }),
     );
-    expect(actionComposer).toHaveClass("has-copy");
-    expect(workToolbar).toContainElement(
-      screen.getByTestId("questionnaire-next-blocker"),
-    );
-    expect(copyButton.parentElement).toHaveClass("v19-questionnaire-work-toolbar-copy");
+    expect(screen.queryByTestId("questionnaire-next-blocker")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Город проживания")).toHaveAttribute(
       "autocomplete",
       "off",
@@ -4020,9 +3979,10 @@ describe("FigmaQuestionnaireScreen", () => {
       result.container.querySelectorAll('[data-family-copy-preview="true"]').length,
     ).toBeGreaterThan(0);
     const confirmCopyButton = screen.getByRole("button", {
-      name: "Подтвердить копирование",
+      name: /Скопировать \d+ пол/,
     });
-    expect(confirmCopyButton).toHaveClass("v19-questionnaire-family-copy-confirm");
+    expect(confirmCopyButton).toBe(copyButton);
+    expect(confirmCopyButton).toHaveClass("is-preview");
     fireEvent.click(confirmCopyButton);
 
     const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
@@ -4031,11 +3991,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).size;
     expect(copiedUpdates.length).toBeGreaterThan(0);
     expect(affectedApplicantCount).toBe(2);
-    expect(
-      screen.getByText(
-        `Скопировано и подтверждено после предпросмотра: ${copiedUpdates.length} полей · заявителей: ${affectedApplicantCount}.`,
-      ),
-    ).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "Скопировано" })).toBeDisabled();
     expect(copiedUpdates).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -4086,14 +4042,14 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByLabelText("Улица / проспект / переулок")).toHaveValue("Арбат");
     expect(screen.getByLabelText("Город проживания")).toHaveValue("Москва");
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     expect(onSaveDraft.mock.calls[0]?.[0].fieldUpdates).toEqual(
       expect.arrayContaining(copiedUpdates),
     );
   });
 
-  test("copies every trip field, including fields outside the former shared subset", () => {
+  test("copies active trip fields without retired biometrics data", () => {
     const draft = createDraftSubmission({
       applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
       city: "Москва",
@@ -4105,9 +4061,6 @@ describe("FigmaQuestionnaireScreen", () => {
     const primaryValues = [
       ["purpose", "TOURISM"],
       ["entry-count", "Многократная"],
-      ["previous-biometrics", "Нет"],
-      ["previous-biometrics-date", "01.02.2024"],
-      ["previous-visa-number", "VISA-123"],
     ] as const;
     const primary = markApplicantValuesManual(
       primaryValues.reduce(
@@ -4117,12 +4070,7 @@ describe("FigmaQuestionnaireScreen", () => {
       0,
       primaryValues.map(([fieldId]) => fieldId),
     );
-    const submission = setApplicantField(
-      setApplicantField(primary, 1, "entry-count", "Однократная"),
-      1,
-      "previous-biometrics",
-      "Да",
-    );
+    const submission = setApplicantField(primary, 1, "entry-count", "Однократная");
     const onFieldChange = vi.fn();
     const result = render(
       <FigmaQuestionnaireScreen
@@ -4135,7 +4083,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Поездка");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: /Скопировать \d+ пол/ }));
 
     const copiedUpdates = onFieldChange.mock.calls.map(([update]) => update);
     expect(copiedUpdates).toEqual(
@@ -4145,21 +4093,13 @@ describe("FigmaQuestionnaireScreen", () => {
           sectionId: "trip",
           value: "Многократная",
         }),
-        expect.objectContaining({
-          fieldId: "previous-biometrics",
-          sectionId: "trip",
-          value: "Нет",
-        }),
-        expect.objectContaining({
-          fieldId: "previous-biometrics-date",
-          sectionId: "trip",
-          value: "01.02.2024",
-        }),
-        expect.objectContaining({
-          fieldId: "previous-visa-number",
-          sectionId: "trip",
-          value: "VISA-123",
-        }),
+      ]),
+    );
+    expect(copiedUpdates.map((update) => update.fieldId)).not.toEqual(
+      expect.arrayContaining([
+        "previous-biometrics",
+        "previous-biometrics-date",
+        "previous-visa-number",
       ]),
     );
 
@@ -4172,10 +4112,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "Нет" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(screen.queryByText("Отпечатки ранее сдавались")).not.toBeInTheDocument();
   });
 
   test("invalidates a family-copy preview when the source value changes", () => {
@@ -4207,23 +4144,22 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Адрес и контакты");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
     expect(
-      screen.getByRole("button", { name: "Подтвердить копирование" }),
+      screen.getByRole("button", { name: /Скопировать \d+ пол/ }),
     ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Город проживания"), {
       target: { value: "Казань" },
     });
     expect(
-      screen.queryByRole("button", { name: "Подтвердить копирование" }),
+      screen.queryByRole("button", { name: /Скопировать \d+ пол/ }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Предпросмотр отменён: данные изменились. Откройте копирование заново.",
-      ),
-    ).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "Копировать для всех" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: /Скопировать \d+ пол/ }));
     expect(
       onFieldChange.mock.calls
         .map(([update]) => update)
@@ -4244,11 +4180,7 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "family",
     });
-    const submission = setField(
-      setField(draft, "home-country", ""),
-      "lives-outside-citizenship",
-      "",
-    );
+    const submission = setField(draft, "home-country", "");
     const onFieldChange = vi.fn();
     const result = render(
       <FigmaQuestionnaireScreen
@@ -4264,11 +4196,9 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
 
     expect(onFieldChange).not.toHaveBeenCalled();
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveClass("v19-questionnaire-family-copy-alert");
-    expect(alert).toHaveTextContent(
-      "У основного заявителя нет введённых пользователем значений для копирования в этом разделе.",
-    );
+    expect(
+      screen.getByText("В этом разделе пока нет заполненных полей для копирования."),
+    ).toHaveAttribute("role", "status");
   });
 
   test("does not copy OCR or legacy values without manual provenance", () => {
@@ -4300,11 +4230,11 @@ describe("FigmaQuestionnaireScreen", () => {
 
     expect(onFieldChange).not.toHaveBeenCalled();
     expect(
-      screen.queryByRole("button", { name: "Подтвердить копирование" }),
+      screen.queryByRole("button", { name: /Скопировать \d+ пол/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "У основного заявителя нет введённых пользователем значений",
-    );
+    expect(
+      screen.getByText("В этом разделе пока нет заполненных полей для копирования."),
+    ).toHaveAttribute("role", "status");
   });
 
   test("uses role main for family copy when the primary applicant is not first", () => {
@@ -4353,7 +4283,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     clickPinnedSection(result.container, "Адрес и контакты");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: /Скопировать \d+ пол/ }));
 
     expect(onFieldChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -4438,7 +4368,7 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toBeInTheDocument();
   });
 
-  test("continues to the next family applicant before offering save and exit", () => {
+  test("continues to the next family applicant before offering final save", () => {
     const submission = createDraftSubmission({
       applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
       city: "Москва",
@@ -4460,8 +4390,8 @@ describe("FigmaQuestionnaireScreen", () => {
       name: "Далее: Ivanov Anton",
     });
     expect(
-      screen.queryByRole("button", { name: "Готово — сохранить и выйти" }),
-    ).not.toBeInTheDocument();
+      result.container.querySelector(".v19-questionnaire-next-button"),
+    ).toHaveTextContent("Далее: Ivanov Anton");
     fireEvent.click(nextApplicantButton);
 
     expect(
@@ -4471,8 +4401,8 @@ describe("FigmaQuestionnaireScreen", () => {
     ).toHaveAttribute("aria-pressed", "true");
     clickPinnedSection(result.container, "Отель / приглашение");
     expect(
-      screen.getByRole("button", { name: "Готово — сохранить и выйти" }),
-    ).toBeInTheDocument();
+      result.container.querySelector(".v19-questionnaire-next-button"),
+    ).toHaveTextContent("Сохранить и продолжить");
   });
 
   test("copies hotel country, city, and postal code for another family applicant", () => {
@@ -4506,7 +4436,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Отель / приглашение");
     fireEvent.click(screen.getByRole("button", { name: "Копировать для всех" }));
-    fireEvent.click(screen.getByRole("button", { name: "Подтвердить копирование" }));
+    fireEvent.click(screen.getByRole("button", { name: /Скопировать \d+ пол/ }));
     fireEvent.click(applicantTabs[1] as HTMLButtonElement);
     clickPinnedSection(result.container, "Отель / приглашение");
 
@@ -4738,7 +4668,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     expect(birthDate).not.toHaveClass("is-review");
     expect(reviewShell).not.toHaveClass("has-confirmation");
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
     expect(onSaveDraft).toHaveBeenCalledWith(
@@ -4844,7 +4774,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(auditAgentInteractionControls(result.container)).toEqual([]);
   });
 
-  test("returns every changed questionnaire field on save and exit", async () => {
+  test("returns every changed questionnaire field on Save and Continue", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -4856,6 +4786,7 @@ describe("FigmaQuestionnaireScreen", () => {
     const applicantId = draft.applicants[0]?.id;
     if (!applicantId) throw new Error("expected applicant");
     const onBack = vi.fn();
+    const onComplete = vi.fn().mockResolvedValue(undefined);
     const onSaveDraft = vi.fn();
 
     const readySubmission = fillEveryQuestionnaireField(draft);
@@ -4863,7 +4794,7 @@ describe("FigmaQuestionnaireScreen", () => {
     const result = render(
       <FigmaQuestionnaireScreen
         onBack={onBack}
-        onComplete={vi.fn()}
+        onComplete={onComplete}
         onSaveDraft={onSaveDraft}
         submission={{
           ...readySubmission,
@@ -4885,9 +4816,10 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Имя"), {
       target: { value: "ANTON" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
-    expect(onBack).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    expect(onBack).not.toHaveBeenCalled();
 
     expect(onSaveDraft.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({ saveIntent: "manual" }),
@@ -4910,52 +4842,59 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("runs the dedicated save-and-exit callback only after a successful manual save", async () => {
-    const submission = createDraftSubmission({
-      applicantNames: ["VOLKOV ANTON"],
-      city: "Москва",
-      familyCount: 1,
-      idScheme: "local",
-      submissions: [],
-      type: "single",
-    });
+  test("runs completion only after a successful manual save", async () => {
+    const submission = withReadyQuestionnaireFiles(
+      fillEveryQuestionnaireField(
+        createDraftSubmission({
+          applicantNames: ["VOLKOV ANTON"],
+          city: "Москва",
+          familyCount: 1,
+          idScheme: "local",
+          submissions: [],
+          type: "single",
+        }),
+      ),
+    );
     const save = deferred();
     const onBack = vi.fn();
-    const onSaveAndExit = vi.fn().mockResolvedValue(undefined);
+    const onComplete = vi.fn().mockResolvedValue(undefined);
     const onSaveDraft = vi.fn().mockReturnValue(save.promise);
 
     render(
       <FigmaQuestionnaireScreen
         onBack={onBack}
-        onComplete={vi.fn()}
-        onSaveAndExit={onSaveAndExit}
+        onComplete={onComplete}
         onSaveDraft={onSaveDraft}
         submission={submission}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSaveDraft).toHaveBeenCalledTimes(1));
-    expect(onSaveAndExit).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
     expect(onBack).not.toHaveBeenCalled();
 
     save.resolve();
 
-    await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  test("retries a failed exit without duplicating an already successful draft save", async () => {
-    const submission = createDraftSubmission({
-      applicantNames: ["VOLKOV ANTON"],
-      city: "Москва",
-      familyCount: 1,
-      idScheme: "local",
-      submissions: [],
-      type: "single",
-    });
-    const onSaveAndExit = vi
+  test("retries failed completion without losing the saved draft", async () => {
+    const submission = withReadyQuestionnaireFiles(
+      fillEveryQuestionnaireField(
+        createDraftSubmission({
+          applicantNames: ["VOLKOV ANTON"],
+          city: "Москва",
+          familyCount: 1,
+          idScheme: "local",
+          submissions: [],
+          type: "single",
+        }),
+      ),
+    );
+    const onComplete = vi
       .fn()
       .mockRejectedValueOnce(new Error("Failed to fetch"))
       .mockResolvedValueOnce(undefined);
@@ -4963,8 +4902,7 @@ describe("FigmaQuestionnaireScreen", () => {
     const result = render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
-        onComplete={vi.fn()}
-        onSaveAndExit={onSaveAndExit}
+        onComplete={onComplete}
         onSaveDraft={onSaveDraft}
         submission={submission}
       />,
@@ -4974,7 +4912,7 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() =>
       expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
@@ -4982,38 +4920,41 @@ describe("FigmaQuestionnaireScreen", () => {
       ),
     );
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
-    expect(onSaveAndExit).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Повторить сохранение" }));
 
-    await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(2));
-    expect(onSaveDraft).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(2));
+    expect(onSaveDraft).toHaveBeenCalledTimes(2);
   });
 
-  test("deduplicates rapid save-and-exit clicks through the final navigation side effect", async () => {
-    const submission = createDraftSubmission({
-      applicantNames: ["VOLKOV ANTON"],
-      city: "Москва",
-      familyCount: 1,
-      idScheme: "local",
-      submissions: [],
-      type: "single",
-    });
+  test("deduplicates rapid Save and Continue clicks", async () => {
+    const submission = withReadyQuestionnaireFiles(
+      fillEveryQuestionnaireField(
+        createDraftSubmission({
+          applicantNames: ["VOLKOV ANTON"],
+          city: "Москва",
+          familyCount: 1,
+          idScheme: "local",
+          submissions: [],
+          type: "single",
+        }),
+      ),
+    );
     const save = deferred();
-    const onSaveAndExit = vi.fn().mockResolvedValue(undefined);
+    const onComplete = vi.fn().mockResolvedValue(undefined);
     const onSaveDraft = vi.fn().mockReturnValue(save.promise);
 
     render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
-        onComplete={vi.fn()}
-        onSaveAndExit={onSaveAndExit}
+        onComplete={onComplete}
         onSaveDraft={onSaveDraft}
         submission={submission}
       />,
     );
 
-    const saveAndExit = screen.getByRole("button", { name: "Сохранить и выйти" });
+    const saveAndExit = screen.getByRole("button", { name: "Сохранить и продолжить" });
     fireEvent.click(saveAndExit);
     fireEvent.click(saveAndExit);
 
@@ -5021,7 +4962,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(saveAndExit).toBeDisabled();
     save.resolve();
 
-    await waitFor(() => expect(onSaveAndExit).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
   });
 
   test("matches open issues by legacy labels after questionnaire label changes", () => {

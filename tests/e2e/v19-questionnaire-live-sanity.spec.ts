@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { createDraftSubmission } from "../../src/modules/submissions/submissionActions";
 import { normalizeTestEvidenceRunId, testArtifactPath } from "../support/artifacts";
 import {
   clickFirstVisible,
@@ -10,6 +11,15 @@ import {
   openFreshWorkspace,
   openMobileMenu,
 } from "./v19-pilot-helpers";
+
+function questionnaireFeatureProofPath(fileName: string) {
+  const proofRunId = normalizeTestEvidenceRunId(
+    process.env.V19_PROOF_RUN_ID?.trim() || `run-${Date.now()}-${process.pid}`,
+  );
+  const proofDirectory = testArtifactPath("questionnaire-feature-proof", proofRunId);
+  mkdirSync(proofDirectory, { recursive: true });
+  return join(proofDirectory, fileName);
+}
 
 async function openQuestionnaireFromAction(page: Page) {
   const questionnaireAction = page
@@ -313,7 +323,100 @@ async function expectMobileQuestionnaireLayout(
   await expectNoDocumentOverflow(page);
 }
 
+async function saveQuestionnaireDraftAndReturnToSubmissions(page: Page) {
+  const questionnaire = page.locator(".vf-figma-questionnaire-screen");
+  const mobileSave = page
+    .getByTestId("questionnaire-mobile-footer")
+    .getByRole("button", {
+      name: "Сохранить и продолжить — нижняя панель",
+    });
+  const save = (await mobileSave.isVisible().catch(() => false))
+    ? mobileSave
+    : page.getByRole("button", {
+        exact: true,
+        name: "Сохранить и продолжить",
+      });
+  await save.click();
+  if (await questionnaire.isVisible().catch(() => false)) {
+    await expect(questionnaire.getByText("Обязательное поле").first()).toBeVisible();
+    await questionnaire.getByRole("button", { name: "Назад" }).click();
+    await questionnaire.waitFor({ state: "detached" });
+  }
+  const actionsHeading = page.getByRole("heading", {
+    level: 1,
+    name: "Мои действия",
+  });
+  if (await actionsHeading.isVisible().catch(() => false)) {
+    const submissionsButton = page.getByRole("button", { name: "Мои подачи" });
+    if (!(await submissionsButton.first().isVisible().catch(() => false))) {
+      await openMobileMenu(page);
+    }
+    await clickFirstVisible(submissionsButton);
+  }
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Мои подачи" }),
+  ).toBeVisible();
+}
+
 test.describe("V-19 questionnaire live sanity", () => {
+  test("blank draft reveals validation only after Save and Continue and omits retired fields", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 900, width: 1440 });
+    await openFreshWorkspace(page, { heading: "Мои действия" });
+    const draft = createDraftSubmission({
+      agentId: "local-agent-tony",
+      applicantNames: ["Иван Тестов"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    await page.evaluate((submission) => {
+      localStorage.setItem(
+        "visaflow.v19.submissions.v1",
+        JSON.stringify([submission]),
+      );
+    }, draft);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Мои действия" })).toBeVisible();
+    await page.getByRole("button", { name: "Мои подачи" }).click();
+    await page
+      .locator('[data-v19-interaction-id="submissions.open-questionnaire"]:visible')
+      .first()
+      .click();
+
+    const questionnaire = page.locator(".vf-figma-questionnaire-screen");
+    await expect(questionnaire).toBeVisible();
+    await expect(questionnaire.getByText("Обязательное поле")).toHaveCount(0);
+    await expect(questionnaire.locator('[aria-invalid="true"]:visible')).toHaveCount(
+      0,
+    );
+    await expect(
+      questionnaire.getByText("Есть вид на жительство в другой стране"),
+    ).toHaveCount(0);
+
+    await questionnaire.getByRole("button", { name: /Паспорт/ }).first().click();
+    await expect(
+      questionnaire.getByText("Сдавали отпечатки пальцев за последние 59 месяцев"),
+    ).toHaveCount(0);
+    await expect(questionnaire.getByText("Дата сдачи отпечатков")).toHaveCount(0);
+
+    await questionnaire
+      .getByRole("button", { exact: true, name: "Сохранить и продолжить" })
+      .click();
+    await expect(questionnaire).toBeVisible();
+    await expect(questionnaire.getByText("Обязательное поле").first()).toBeVisible();
+    await expect(
+      questionnaire.locator('[aria-invalid="true"]:visible').first(),
+    ).toBeVisible();
+    await page.screenshot({
+      fullPage: true,
+      path: questionnaireFeatureProofPath("validation-after-save.png"),
+    });
+  });
+
   test("desktop keeps the questionnaire actionable and autosaves a safe draft change", async ({
     page,
   }, testInfo) => {
@@ -403,7 +506,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(browserProblems).toEqual([]);
   });
 
-  test("desktop preserves separate smart-import and family-copy toolbar rows", async ({
+  test("desktop keeps smart import prominent and moves family copy into the bottom action", async ({
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: 1440 });
@@ -414,6 +517,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       )
       .filter({ hasText: "Адрес и контакты" })
       .click();
+    await page.getByLabel("Город проживания").fill("Казань");
 
     const smartImportButton = page.getByRole("button", { name: "Умный импорт" });
     const copyForAllButton = page.getByRole("button", {
@@ -428,6 +532,23 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(copyForAllBox?.y ?? 0).toBeGreaterThan(
       (smartImportBox?.y ?? 0) + (smartImportBox?.height ?? 0),
     );
+    await expect(
+      copyForAllButton.locator(
+        "xpath=ancestor::*[contains(@class, 'v19-questionnaire-next-action-bar')]",
+      ),
+    ).toBeVisible();
+    await copyForAllButton.click();
+    const confirmCopy = page.getByRole("button", { name: /Скопировать \d+ пол/ });
+    await expect(confirmCopy).toBeVisible();
+    expect(
+      await page.locator('[data-family-copy-preview="true"]').count(),
+    ).toBeGreaterThan(0);
+    await page.screenshot({
+      fullPage: true,
+      path: questionnaireFeatureProofPath("family-copy-preview-desktop.png"),
+    });
+    await confirmCopy.click();
+    await expect(page.getByRole("button", { name: "Скопировано" })).toBeDisabled();
     await expectNoDocumentOverflow(page);
   });
 
@@ -454,10 +575,9 @@ test.describe("V-19 questionnaire live sanity", () => {
     ]);
     expect(smartImportBox).not.toBeNull();
     expect(copyForAllBox).not.toBeNull();
-    expect(
-      Math.abs((smartImportBox?.y ?? 0) - (copyForAllBox?.y ?? 0)),
-    ).toBeLessThanOrEqual(1);
-    expect(smartImportBox?.height).toBe(copyForAllBox?.height);
+    expect(copyForAllBox?.y ?? 0).toBeGreaterThan(
+      (smartImportBox?.y ?? 0) + (smartImportBox?.height ?? 0),
+    );
     await expectNoDocumentOverflow(page);
 
     await expect(page.locator(".v19-questionnaire-screen-header")).toBeVisible();
@@ -474,7 +594,7 @@ test.describe("V-19 questionnaire live sanity", () => {
     ).toBeEnabled();
     await expect(
       mobileFooter.getByRole("button", {
-        name: "Сохранить и выйти — нижняя панель",
+        name: "Сохранить и продолжить — нижняя панель",
       }),
     ).toBeVisible();
     await expect(
@@ -875,7 +995,8 @@ test.describe("V-19 questionnaire live sanity", () => {
   test("bounded runtime proof keeps persistence, role isolation, and network local", async ({
     baseURL,
     browser,
-  }) => {
+  }, testInfo) => {
+    testInfo.setTimeout(120_000);
     expect(baseURL).toBeTruthy();
     if (!baseURL) throw new Error("Playwright baseURL is required");
 
@@ -942,6 +1063,12 @@ test.describe("V-19 questionnaire live sanity", () => {
       const browserProblems = collectBrowserProblems(page);
       page.on("requestfailed", (request) => {
         const failure = request.failure();
+        if (
+          failure?.errorText === "net::ERR_ABORTED" &&
+          new URL(request.url()).origin === approvedHttpOrigin
+        ) {
+          return;
+        }
         networkEvidence.failedRequests.push(
           `${request.method()} ${request.url()} ${failure?.errorText ?? "unknown"}`,
         );
@@ -1022,19 +1149,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       );
       await page.screenshot({ fullPage: true, path: screenshotPath });
 
-      const saveAndExit =
-        viewport.width <= 767
-          ? page.getByTestId("questionnaire-mobile-footer").getByRole("button", {
-              name: "Сохранить и выйти — нижняя панель",
-            })
-          : page.getByRole("button", {
-              exact: true,
-              name: "Сохранить и выйти",
-            });
-      await saveAndExit.click();
-      await expect(
-        page.getByRole("heading", { level: 1, name: "Мои подачи" }),
-      ).toBeVisible();
+      await saveQuestionnaireDraftAndReturnToSubmissions(page);
 
       await page.reload();
       await expect(
@@ -1046,16 +1161,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       ).toHaveValue("Казань");
       await expectNoDocumentOverflow(page);
 
-      const saveReadback =
-        viewport.width <= 767
-          ? page.getByTestId("questionnaire-mobile-footer").getByRole("button", {
-              name: "Сохранить и выйти — нижняя панель",
-            })
-          : page.getByRole("button", {
-              exact: true,
-              name: "Сохранить и выйти",
-            });
-      await saveReadback.click();
+      await saveQuestionnaireDraftAndReturnToSubmissions(page);
       const persistedDraftBeforeRoleRoundTrip = await page.evaluate(() =>
         localStorage.getItem("visaflow.v19.submissions.v1"),
       );

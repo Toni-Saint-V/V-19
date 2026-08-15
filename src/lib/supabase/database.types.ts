@@ -136,6 +136,35 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      begin_agent_submission_deletion: {
+        Args: {
+          expected_revision: number;
+          operation_id: string;
+          submission_id: string;
+        };
+        Returns: {
+          operationId: string;
+          storageObjects: Array<{
+            bucket: "submission-files" | "submission-media";
+            path: string;
+          }>;
+          submissionId: string;
+        };
+      };
+      cancel_agent_submission_deletion: {
+        Args: {
+          operation_id: string;
+          submission_id: string;
+        };
+        Returns: boolean;
+      };
+      mark_agent_submission_deletion_cleanup_started: {
+        Args: {
+          operation_id: string;
+          submission_id: string;
+        };
+        Returns: boolean;
+      };
       ensure_submission_public_number: {
         Args: {
           submission_id: string;
@@ -150,6 +179,17 @@ export type Database = {
           payload: ExportPackageCommitPayload;
         };
         Returns: ExportPackageCommitResult;
+      };
+      finalize_agent_submission_deletion: {
+        Args: {
+          operation_id: string;
+          submission_id: string;
+        };
+        Returns: {
+          deleted: boolean;
+          operationId: string;
+          submissionId: string;
+        };
       };
       record_export_workbook_download_acknowledgement: {
         Args: { payload: WorkbookExportPayload };

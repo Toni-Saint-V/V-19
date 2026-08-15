@@ -315,48 +315,6 @@ const fieldSpecs: DataImageFieldSpec[] = [
     sectionId: "contacts",
   },
   {
-    fieldId: "lives-outside-citizenship",
-    labels: [
-      "есть вид на жительство в другой стране",
-      "проживает вне страны гражданства",
-      "lives outside citizenship country",
-      "residence outside nationality country",
-    ],
-    normalize: normalizeYesNoValue,
-    sectionId: "contacts",
-  },
-  {
-    fieldId: "residence-permit-type",
-    labels: [
-      "вид на жительство",
-      "документ на проживание",
-      "residence permit type",
-      "residence document type",
-    ],
-    sectionId: "contacts",
-  },
-  {
-    fieldId: "residence-permit-number",
-    labels: [
-      "номер внж",
-      "номер вида на жительство",
-      "residence permit number",
-      "residence document number",
-    ],
-    sectionId: "contacts",
-  },
-  {
-    fieldId: "residence-permit-valid-until",
-    labels: [
-      "внж действителен до",
-      "вид на жительство действителен до",
-      "residence permit valid until",
-      "residence document valid until",
-    ],
-    normalize: normalizeDateValue,
-    sectionId: "contacts",
-  },
-  {
     fieldId: "occupation",
     labels: ["профессия", "occupation", "profession", "job title"],
     normalize: normalizeOccupationValue,
@@ -460,33 +418,6 @@ const fieldSpecs: DataImageFieldSpec[] = [
     fieldId: "stay-duration",
     labels: ["длительность", "duration", "stay duration", "days"],
     normalize: normalizeNumberValue,
-    sectionId: "trip",
-  },
-  {
-    fieldId: "previous-biometrics",
-    labels: ["отпечатки", "биометрия", "fingerprints", "biometrics"],
-    normalize: normalizeYesNoValue,
-    sectionId: "trip",
-  },
-  {
-    fieldId: "previous-biometrics-date",
-    labels: [
-      "дата сдачи отпечатков",
-      "дата биометрии",
-      "fingerprints date",
-      "biometrics date",
-    ],
-    normalize: normalizeDateValue,
-    sectionId: "trip",
-  },
-  {
-    fieldId: "previous-visa-number",
-    labels: [
-      "номер предыдущей визы",
-      "номер визы",
-      "previous visa number",
-      "visa number",
-    ],
     sectionId: "trip",
   },
   {

@@ -186,7 +186,32 @@ vi.mock("../../src/components/AccessGate", () => ({
 }));
 
 vi.mock("../../src/components/CommandCenter", () => ({
-  CommandCenter: () => <div data-testid="agent-workspace" />,
+  CommandCenter: ({
+    onDeleteSubmission,
+    submissions,
+  }: {
+    onDeleteSubmission?: (submissionId: string) => Promise<void>;
+    submissions?: Array<{ id: string }>;
+  }) => (
+    <div data-testid="agent-workspace">
+      <span data-testid="agent-submission-count">{submissions?.length ?? 0}</span>
+      {submissions?.[0] && onDeleteSubmission ? (
+        <button
+          type="button"
+          onClick={() => {
+            runtime.lastMutationPromise = onDeleteSubmission(submissions[0]!.id).catch(
+              (error) => {
+                runtime.lastMutationError =
+                  error instanceof Error ? error : new Error(String(error));
+              },
+            );
+          }}
+        >
+          Delete agent submission
+        </button>
+      ) : null}
+    </div>
+  ),
 }));
 
 vi.mock("../../src/components/AdminWorkspace", async () => {
@@ -397,6 +422,8 @@ const persistenceMocks = vi.hoisted(() => {
     };
   });
   return {
+    deleteAgentSubmissionIfCurrent: vi.fn(async () => undefined),
+    ensureSubmissionPublicNumber: vi.fn(),
     isAdminSubmissionConcurrencyConflict: vi.fn(() => false),
     isSubmissionConcurrencyConflict: vi.fn(() => false),
     loadCockpitSubmissionsForProfile: vi.fn(() => runtime.loadPromise),
@@ -472,6 +499,8 @@ function resetDeferredRuntime() {
   persistenceMocks.loadCockpitSubmissionsForProfile.mockImplementation(
     () => runtime.loadPromise,
   );
+  persistenceMocks.deleteAgentSubmissionIfCurrent.mockReset();
+  persistenceMocks.deleteAgentSubmissionIfCurrent.mockResolvedValue(undefined);
   persistenceMocks.saveCockpitSubmissionsForProfile.mockReset();
   persistenceMocks.saveCockpitSubmissionsForProfile.mockImplementation(async () => {
     const ownerIdsBySubmissionId = await runtime.savePromise;
@@ -716,6 +745,57 @@ describe("App production workspace runtime", () => {
     expect(await screen.findByTestId("agent-workspace")).toBeInTheDocument();
     expect(screen.queryByTestId("admin-workspace")).not.toBeInTheDocument();
     expect(supabaseAuthLifecycle.signOut).not.toHaveBeenCalled();
+  });
+
+  test("removes an owned draft only after the agent deletion RPC succeeds", async () => {
+    authMocks.getCurrentAppSession.mockResolvedValue({
+      mode: "supabase",
+      profile: {
+        displayName: "Production Agent",
+        email: "agent@example.test",
+        id: "agent-production-uuid",
+        organizationName: "VisaFlow",
+        role: "agent",
+      },
+      supabaseSession: {
+        expires_at: 2_000_000_100,
+        user: {
+          created_at: "2026-07-22T10:00:00.000Z",
+          id: "agent-production-uuid",
+        },
+      },
+    });
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map([["submission-1", 4]]),
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-production-uuid"]]),
+      submissions: [
+        {
+          ...loadedSubmission,
+          agentId: "agent-production-uuid",
+          status: "draft",
+        },
+      ],
+    });
+
+    render(<App />);
+    await screen.findByTestId("agent-workspace");
+    expect(screen.getByTestId("agent-submission-count")).toHaveTextContent("1");
+    runtime.loadPromise = Promise.resolve({
+      caseRevisionsBySubmissionId: new Map<string, number>(),
+      ownerIdsBySubmissionId: new Map<string, string>(),
+      submissions: [],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Delete agent submission" }));
+    await act(async () => {
+      await runtime.lastMutationPromise;
+    });
+
+    expect(persistenceMocks.deleteAgentSubmissionIfCurrent).toHaveBeenCalledWith(
+      "submission-1",
+      4,
+    );
+    expect(screen.getByTestId("agent-submission-count")).toHaveTextContent("0");
+    expect(runtime.lastMutationError).toBeNull();
   });
 
   test("fails closed and clears the workspace on a Supabase SIGNED_OUT event", async () => {

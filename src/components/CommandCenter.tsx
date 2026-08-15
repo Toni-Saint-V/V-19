@@ -124,6 +124,7 @@ const initialCreateNavigationState: CreateNavigationState = {
 type CommandCenterProps = {
   agentId?: Submission["agentId"];
   onAssignPublicNumber?: (submissionId: string) => Promise<PublicNumberAssignment>;
+  onDeleteSubmission?: (submissionId: string) => Promise<void>;
   onSubmissionUpdate?: (
     submissionId: string,
     update: (submission: Submission) => Submission,
@@ -199,6 +200,7 @@ function restoreCommandPaletteFocus(origin: HTMLElement | null) {
 export function CommandCenter({
   agentId,
   onAssignPublicNumber,
+  onDeleteSubmission,
   onSubmissionUpdate,
   onSubmissionsChange,
   reservedSubmissionIds,
@@ -393,6 +395,22 @@ export function CommandCenter({
       ? questionnaireSubmissionSnapshotRef.current
       : undefined);
   const submissionCards = effectiveCanonicalSubmissions;
+
+  const deleteSubmissionFromList = async (submissionId: string) => {
+    if (!onDeleteSubmission) throw new Error("Удаление подачи недоступно.");
+    await onDeleteSubmission(submissionId);
+    setCanonicalOverrides((current) => {
+      if (!Object.hasOwn(current, submissionId)) return current;
+      const next = { ...current };
+      delete next[submissionId];
+      return next;
+    });
+    if (selectedRow === submissionId) {
+      setSelectedRow(null);
+      setDrawerOpen(false);
+      setCurrentView("main");
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -1327,7 +1345,11 @@ export function CommandCenter({
                   <div>
                     <AgentReturnPackagesPanel enabled={usesSupabase} />
                     <ApplicantsScreen
+                      agentId={agentId}
                       focusRequest={submissionFocusRequest}
+                      onDeleteSubmission={
+                        onDeleteSubmission ? deleteSubmissionFromList : undefined
+                      }
                       onOpenDrawer={handleRowClick}
                       onOpenQuestionnaire={handleOpenQuestionnaire}
                       onOpenWorkspaceTarget={handleOpenWorkspaceTarget}

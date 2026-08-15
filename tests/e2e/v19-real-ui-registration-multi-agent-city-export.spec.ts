@@ -480,7 +480,7 @@ async function saveQuestionnaireDraftAndReadId(page: Page) {
   expect(submissionId).toBeTruthy();
   if (!submissionId) throw new Error("Created submission id is unavailable");
 
-  await questionnaire.getByRole("button", { name: "Сохранить и выйти" }).click();
+  await questionnaire.getByRole("button", { name: "Сохранить и продолжить" }).click();
   await expect(questionnaire).toHaveCount(0);
   await openMySubmissions(page);
   await expect(agentSubmissionCard(page, submissionId)).toBeVisible();
@@ -729,7 +729,7 @@ export async function fixReturnedSubmission(page: Page, submissionId: string) {
     "ожидает проверки администратора",
   );
   await questionnaire
-    .getByRole("button", { name: "Сохранить и выйти", exact: true })
+    .getByRole("button", { name: "Сохранить и продолжить", exact: true })
     .click();
   await expect(questionnaire).toHaveCount(0);
   await expect
@@ -1139,7 +1139,7 @@ test.describe("V-19 real UI registration to city Excel export", () => {
       await expect(
         questionnaire.locator(".v19-questionnaire-applicant-tab").nth(1),
       ).toHaveAttribute("aria-pressed", "true");
-      await questionnaire.getByRole("button", { name: "Сохранить и выйти" }).click();
+      await questionnaire.getByRole("button", { name: "Сохранить и продолжить" }).click();
       await expect(questionnaire).toHaveCount(0);
     }
 

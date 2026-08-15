@@ -21,6 +21,8 @@ const mockState = vi.hoisted(() => ({
     name: string;
   }>,
   rpcResults: [] as Array<{ data?: unknown; error: unknown | null }>,
+  storageRemoveCalls: [] as Array<{ bucket: string; paths: string[] }>,
+  storageRemoveResults: [] as Array<{ data?: unknown; error: unknown | null }>,
   submissionRows: [] as unknown[],
   statusHistoryRows: [] as unknown[],
 }));
@@ -111,9 +113,9 @@ vi.mock("../../src/lib/supabase/client", () => {
                             ? mockState.workbookExportReceiptMemberRows
                             : table === "workbook_export_receipts"
                               ? mockState.workbookExportReceiptRows
-                          : table === "profiles"
-                            ? mockState.profileRows
-                            : mockState.exportBatchRows,
+                              : table === "profiles"
+                                ? mockState.profileRows
+                                : mockState.exportBatchRows,
             ),
         };
       },
@@ -146,6 +148,16 @@ vi.mock("../../src/lib/supabase/client", () => {
         }
         return Promise.resolve({ error: null });
       },
+      storage: {
+        from: (bucket: string) => ({
+          remove: (paths: string[]) => {
+            mockState.storageRemoveCalls.push({ bucket, paths });
+            return Promise.resolve(
+              mockState.storageRemoveResults.shift() ?? { data: [], error: null },
+            );
+          },
+        }),
+      },
     }),
   };
 });
@@ -162,6 +174,7 @@ import {
   cockpitSnapshotStatus,
   cockpitSnapshotVersion,
   cockpitSubmissionFingerprintMap,
+  deleteAgentSubmissionIfCurrent,
   ensureSubmissionPublicNumber,
   isAdminSubmissionConcurrencyConflict,
   isSubmissionConcurrencyConflict,
@@ -228,6 +241,8 @@ beforeEach(() => {
   mockState.questionnaireRows = [];
   mockState.rpcCalls = [];
   mockState.rpcResults = [];
+  mockState.storageRemoveCalls = [];
+  mockState.storageRemoveResults = [];
   mockState.submissionRows = [];
   mockState.statusHistoryRows = [];
 });
@@ -344,6 +359,111 @@ describe("V-19 Supabase cockpit persistence", () => {
       safeCode: "rpc.ensure_submission_public_number:rls:42501",
       supabaseCode: "42501",
     });
+  });
+
+  it("deletes private media before finalizing a revision-checked submission deletion", async () => {
+    const operationId = "00000000-0000-4000-8000-000000000099";
+    const submissionId = "VF-DRAFT-DELETE";
+    const storagePath =
+      "submissions/VF-DRAFT-DELETE/applicants/applicant-1/passport_scan/file_passport_scan.pdf";
+    const typedFilePath =
+      "VF-DRAFT-DELETE/applicant-1/PASSPORT_1_passport_scan.pdf";
+    mockState.rpcResults = [
+      {
+        data: {
+          operationId,
+          storageObjects: [
+            { bucket: "submission-media", path: storagePath },
+            { bucket: "submission-files", path: typedFilePath },
+          ],
+          submissionId,
+        },
+        error: null,
+      },
+      { data: true, error: null },
+      {
+        data: { deleted: true, operationId, submissionId },
+        error: null,
+      },
+    ];
+
+    await expect(
+      deleteAgentSubmissionIfCurrent(submissionId, 7),
+    ).resolves.toBeUndefined();
+
+    expect(rpcNames()).toEqual([
+      "begin_agent_submission_deletion",
+      "mark_agent_submission_deletion_cleanup_started",
+      "finalize_agent_submission_deletion",
+    ]);
+    expect(mockState.rpcCalls[0]?.args).toMatchObject({
+      expected_revision: 7,
+      submission_id: submissionId,
+    });
+    expect(mockState.rpcCalls[1]?.args).toEqual({
+      operation_id: operationId,
+      submission_id: submissionId,
+    });
+    expect(mockState.rpcCalls[2]?.args).toEqual({
+      operation_id: operationId,
+      submission_id: submissionId,
+    });
+    expect(mockState.storageRemoveCalls).toEqual([
+      { bucket: "submission-media", paths: [storagePath] },
+      { bucket: "submission-files", paths: [typedFilePath] },
+    ]);
+  });
+
+  it("keeps the deletion receipt locked when private media cleanup may be partial", async () => {
+    const operationId = "00000000-0000-4000-8000-000000000098";
+    const submissionId = "VF-DRAFT-DELETE";
+    mockState.rpcResults = [
+      {
+        data: {
+          operationId,
+          storageObjects: [
+            {
+              bucket: "submission-media",
+              path: "submissions/VF-DRAFT-DELETE/applicants/applicant-1/passport_scan/file_passport_scan.pdf",
+            },
+            {
+              bucket: "submission-files",
+              path: "VF-DRAFT-DELETE/applicant-1/PASSPORT_1_passport_scan.pdf",
+            },
+          ],
+          submissionId,
+        },
+        error: null,
+      },
+      { data: true, error: null },
+    ];
+    mockState.storageRemoveResults = [
+      { data: [], error: null },
+      { data: null, error: { message: "storage unavailable", status: 503 } },
+    ];
+
+    await expect(deleteAgentSubmissionIfCurrent(submissionId, 3)).rejects.toThrow();
+
+    expect(rpcNames()).toEqual([
+      "begin_agent_submission_deletion",
+      "mark_agent_submission_deletion_cleanup_started",
+    ]);
+    expect(mockState.rpcCalls[1]?.args).toEqual({
+      operation_id: operationId,
+      submission_id: submissionId,
+    });
+    expect(mockState.storageRemoveCalls).toEqual([
+      {
+        bucket: "submission-media",
+        paths: [
+          "submissions/VF-DRAFT-DELETE/applicants/applicant-1/passport_scan/file_passport_scan.pdf",
+        ],
+      },
+      {
+        bucket: "submission-files",
+        paths: ["VF-DRAFT-DELETE/applicant-1/PASSPORT_1_passport_scan.pdf"],
+      },
+    ]);
   });
 
   it("keeps an empty remote workspace empty instead of loading local demo data", async () => {

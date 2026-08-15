@@ -81,6 +81,15 @@ board, saved-filter, legal-promise, or multi-country primary surfaces.
 Agents own intake, questionnaire completion, required media upload/replacement,
 fixing returned issues, and resubmitting corrections.
 
+An agent may permanently delete only an owned `draft` or `in_progress`
+submission after explicit confirmation. Deletion is not a status transition: it
+removes the submission and its dependent questionnaire, applicant, issue,
+history, and private-media data. Production deletion must be revision-checked,
+must remove the exact private Storage objects before the database row, and must
+fail closed if ownership, status, revision, or media cleanup no longer matches.
+Submissions in any later lifecycle state, submissions owned by another agent,
+and admin-initiated deletion are forbidden.
+
 Admins own review, issue creation, issue closure, acceptance for export,
 export readiness validation, and export completion.
 
@@ -423,17 +432,18 @@ All issue transitions not listed as allowed are forbidden.
 
 ### 11.1 Agent actions
 
-| Agent action                    | Allowed statuses                   | Domain effect                                                                           |
-| ------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
-| Create draft                    | none                               | Creates `draft`.                                                                        |
-| Edit questionnaire              | `draft`, `in_progress`, `returned` | Mutates questionnaire only; does not bypass status guards.                              |
-| Upload/reupload `passport_scan` | `draft`, `in_progress`, `returned` | Mutates canonical passport media slot.                                                  |
-| Upload/reupload `selfie`        | `draft`, `in_progress`, `returned` | Mutates straight/front selfie slot.                                                     |
-| Upload/reupload `selfie_2`      | `draft`, `in_progress`, `returned` | Mutates side/profile selfie slot.                                                       |
-| Save/start progress             | `draft`                            | `draft -> in_progress`.                                                                 |
-| Submit for review               | `in_progress`, `ready_for_export`  | Moves the submission to `submitted_for_review`; re-submission clears export readiness.  |
-| Submit corrections              | `returned`                         | `returned -> corrections_received`; open issues become `fixed_by_agent` when corrected. |
-| View status/history             | Any owned status                   | Read-only.                                                                              |
+| Agent action                    | Allowed statuses                   | Domain effect                                                                                              |
+| ------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Create draft                    | none                               | Creates `draft`.                                                                                           |
+| Edit questionnaire              | `draft`, `in_progress`, `returned` | Mutates questionnaire only; does not bypass status guards.                                                 |
+| Upload/reupload `passport_scan` | `draft`, `in_progress`, `returned` | Mutates canonical passport media slot.                                                                     |
+| Upload/reupload `selfie`        | `draft`, `in_progress`, `returned` | Mutates straight/front selfie slot.                                                                        |
+| Upload/reupload `selfie_2`      | `draft`, `in_progress`, `returned` | Mutates side/profile selfie slot.                                                                          |
+| Save/start progress             | `draft`                            | `draft -> in_progress`.                                                                                    |
+| Delete submission               | `draft`, `in_progress`             | Permanently removes only the agent's own revision-matched submission and private media after confirmation. |
+| Submit for review               | `in_progress`, `ready_for_export`  | Moves the submission to `submitted_for_review`; re-submission clears export readiness.                     |
+| Submit corrections              | `returned`                         | `returned -> corrections_received`; open issues become `fixed_by_agent` when corrected.                    |
+| View status/history             | Any owned status                   | Read-only.                                                                                                 |
 
 Agent must not:
 

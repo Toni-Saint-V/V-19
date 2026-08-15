@@ -61,6 +61,9 @@ export type AgentInteractionMutationTarget =
 
 export type AgentInteractionNetworkWriteTarget =
   | "edge:access-request"
+  | "rpc:begin_agent_submission_deletion"
+  | "rpc:cancel_agent_submission_deletion"
+  | "rpc:finalize_agent_submission_deletion"
   | "rpc:save_agent_submission_if_current"
   | "storage:submission-media";
 
@@ -141,6 +144,12 @@ const createSubmissionCanonicalEffect = {
   primaryTarget: "submissions",
 } as const satisfies AgentInteractionCanonicalEffect;
 
+const deleteSubmissionCanonicalEffect = {
+  before: { "submissions.exists": true },
+  expectedAfter: { "submissions.exists": false },
+  primaryTarget: "submissions",
+} as const satisfies AgentInteractionCanonicalEffect;
+
 const questionnaireUpdateCanonicalEffect = {
   before: { "questionnaire_answers.value_sha256": null },
   expectedAfter: {
@@ -182,6 +191,28 @@ const submitCorrectionsCanonicalEffect = {
 } as const satisfies AgentInteractionCanonicalEffect;
 
 export const V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES = {
+  delete_submission: mutationWriteScope({
+    allowedChangedTargets: [
+      "submissions",
+      "applicants",
+      "questionnaire_answers",
+      "media_assets",
+      "corrections",
+      "status_history",
+      "submission-media",
+    ],
+    allowedNetworkTargets: [
+      "rpc:begin_agent_submission_deletion",
+      "storage:submission-media",
+      "rpc:finalize_agent_submission_deletion",
+      "rpc:cancel_agent_submission_deletion",
+    ],
+    requiredChangedTargets: ["submissions", "applicants"],
+    requiredNetworkTargets: [
+      "rpc:begin_agent_submission_deletion",
+      "rpc:finalize_agent_submission_deletion",
+    ],
+  }),
   create_submission: mutationWriteScope({
     allowedChangedTargets: [
       "submissions",
@@ -676,6 +707,44 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
       "Open the selected submission questionnaire at the requested target.",
     proof: domProof,
   },
+  "submissions.request-delete": {
+    id: "submissions.request-delete",
+    kind: "dialog",
+    surface: "agent-submissions",
+    role: "agent",
+    expectedEffect: "Open deletion confirmation without changing canonical state.",
+    proof: domProof,
+    statusFixtures: ["draft", "in_progress"],
+  },
+  "submissions.delete": {
+    businessIntent: "delete_submission",
+    canonicalEffect: deleteSubmissionCanonicalEffect,
+    id: "submissions.delete",
+    kind: "mutation",
+    surface: "agent-submissions",
+    role: "agent",
+    expectedEffect:
+      "Delete one owned draft or in-progress submission and its private media.",
+    proof: ["storage-readback", "network-readback", "reload-readback"],
+    statusFixtures: ["draft", "in_progress"],
+    disabledStatusFixtures: [
+      "submitted_for_review",
+      "returned",
+      "corrections_received",
+      "ready_for_export",
+      "exported",
+      "requires_action",
+    ],
+    writeScope: V19_AGENT_BUSINESS_INTENT_WRITE_SCOPES.delete_submission,
+  },
+  "submissions.cancel-delete": {
+    id: "submissions.cancel-delete",
+    kind: "dialog",
+    surface: "agent-submissions",
+    role: "agent",
+    expectedEffect: "Close deletion confirmation without changing canonical state.",
+    proof: domProof,
+  },
   "submissions.upload-file": {
     canonicalEffect: uploadCanonicalEffect,
     id: "submissions.upload-file",
@@ -851,14 +920,6 @@ export const V19_AGENT_INTERACTION_CONTRACTS = {
     role: "agent",
     expectedEffect:
       "Preview the exact family fields and recipients without changing data.",
-    proof: domProof,
-  },
-  "questionnaire.cancel-family-copy": {
-    id: "questionnaire.cancel-family-copy",
-    kind: "dialog",
-    surface: "questionnaire",
-    role: "agent",
-    expectedEffect: "Cancel the family-copy preview without changing data.",
     proof: domProof,
   },
   "questionnaire.open-smart-import": {

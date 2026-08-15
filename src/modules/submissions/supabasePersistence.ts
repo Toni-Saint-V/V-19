@@ -118,6 +118,153 @@ export type PublicNumberAssignment = {
   publicNumber: number;
 };
 
+type AgentSubmissionDeletionReceipt = {
+  operationId: string;
+  storageObjects: Array<{
+    bucket: "submission-files" | "submission-media";
+    path: string;
+  }>;
+  submissionId: string;
+};
+
+function agentSubmissionDeletionReceiptFromRpc(
+  value: unknown,
+  expectedSubmissionId: string,
+): AgentSubmissionDeletionReceipt {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Supabase вернул некорректное подтверждение удаления подачи.");
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.operationId !== "string" ||
+    !record.operationId.trim() ||
+    record.submissionId !== expectedSubmissionId ||
+    !Array.isArray(record.storageObjects) ||
+    record.storageObjects.some(
+      (storageObject) => {
+        if (!storageObject || typeof storageObject !== "object") return true;
+        const candidate = storageObject as Record<string, unknown>;
+        const path = candidate.path;
+        return (
+          (candidate.bucket !== "submission-files" &&
+            candidate.bucket !== "submission-media") ||
+          typeof path !== "string" ||
+          !path.trim() ||
+          path.startsWith("/") ||
+          path.includes("//") ||
+          path.split("/").some((segment) => segment === "." || segment === "..")
+        );
+      },
+    )
+  ) {
+    throw new Error("Supabase вернул небезопасные данные удаления подачи.");
+  }
+  return {
+    operationId: record.operationId,
+    storageObjects: Array.from(
+      new Map(
+        (record.storageObjects as AgentSubmissionDeletionReceipt["storageObjects"]).map(
+          (storageObject) => [
+            `${storageObject.bucket}/${storageObject.path}`,
+            storageObject,
+          ],
+        ),
+      ).values(),
+    ),
+    submissionId: expectedSubmissionId,
+  };
+}
+
+function agentSubmissionDeletionFinalizedFromRpc(
+  value: unknown,
+  receipt: AgentSubmissionDeletionReceipt,
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.deleted === true &&
+    record.operationId === receipt.operationId &&
+    record.submissionId === receipt.submissionId
+  );
+}
+
+export async function deleteAgentSubmissionIfCurrent(
+  submissionId: string,
+  expectedRevision: number,
+): Promise<void> {
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new Error(
+      `Подача ${submissionId} не имеет server revision. Обновите данные и повторите удаление.`,
+    );
+  }
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase недоступен для удаления подачи.");
+  }
+
+  const requestedOperationId = crypto.randomUUID();
+  const begin = await client.rpc("begin_agent_submission_deletion", {
+    expected_revision: expectedRevision,
+    operation_id: requestedOperationId,
+    submission_id: submissionId,
+  });
+  if (begin.error) {
+    throw mapSupabasePersistenceError(begin.error, {
+      operation: "rpc.begin_agent_submission_deletion",
+      fallbackKind: "save",
+    });
+  }
+  const receipt = agentSubmissionDeletionReceiptFromRpc(begin.data, submissionId);
+
+  const cleanupStarted = await client.rpc(
+    "mark_agent_submission_deletion_cleanup_started",
+    {
+      operation_id: receipt.operationId,
+      submission_id: receipt.submissionId,
+    },
+  );
+  if (cleanupStarted.error) {
+    throw mapSupabasePersistenceError(cleanupStarted.error, {
+      operation: "rpc.mark_agent_submission_deletion_cleanup_started",
+      fallbackKind: "save",
+    });
+  }
+  if (cleanupStarted.data !== true) {
+    throw new Error("Supabase не заблокировал подачу на время удаления файлов.");
+  }
+
+  for (const bucket of ["submission-media", "submission-files"] as const) {
+    const paths = receipt.storageObjects
+      .filter((storageObject) => storageObject.bucket === bucket)
+      .map((storageObject) => storageObject.path);
+    if (!paths.length) continue;
+    const storageRemoval = await client.storage.from(bucket).remove(paths);
+    if (storageRemoval.error) {
+      throw mapSupabasePersistenceError(storageRemoval.error, {
+        operation: `storage.delete_submission_assets.${bucket}`,
+        fallbackKind: "storage",
+      });
+    }
+  }
+
+  const finalize = () =>
+    client.rpc("finalize_agent_submission_deletion", {
+      operation_id: receipt.operationId,
+      submission_id: receipt.submissionId,
+    });
+  let finalized = await finalize();
+  if (finalized.error) finalized = await finalize();
+  if (finalized.error) {
+    throw mapSupabasePersistenceError(finalized.error, {
+      operation: "rpc.finalize_agent_submission_deletion",
+      fallbackKind: "save",
+    });
+  }
+  if (!agentSubmissionDeletionFinalizedFromRpc(finalized.data, receipt)) {
+    throw new Error("Supabase не подтвердил удаление подачи.");
+  }
+}
+
 function publicNumberAssignmentFromRpc(value: unknown): PublicNumberAssignment {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Supabase вернул некорректный результат выдачи номера.");

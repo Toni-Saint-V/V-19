@@ -376,14 +376,17 @@
     color: var(--v19-depth-text-faint) !important;
   }
 
-  .danger-action {
+  .danger-action,
+  .dialog-actions .primary-button.danger-action {
     border-color: transparent !important;
     background: transparent !important;
     color: var(--vf-red-soft-text) !important;
     box-shadow: none !important;
   }
 
-  .danger-action:not(:disabled, [aria-disabled="true"]):hover {
+  .danger-action:not(:disabled, [aria-disabled="true"]):hover,
+  .dialog-actions
+    .primary-button.danger-action:not(:disabled, [aria-disabled="true"]):hover {
     border-color: transparent !important;
     background: transparent !important;
     color: var(--vf-red) !important;

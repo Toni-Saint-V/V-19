@@ -26,7 +26,6 @@ import type {
   PassportExtractedFieldKey,
   Submission,
 } from "../modules/submissions/types";
-import { blsQuestionnaireReadiness } from "../modules/submissions/questionnaireBlsRules";
 import type { PublicNumberAssignment } from "../modules/submissions/supabasePersistence";
 
 interface QuestionnaireScreenProps {
@@ -470,8 +469,35 @@ export function QuestionnaireScreen({
           source: "agent",
         },
       });
+
+      let completedSubmission = nextSubmission;
+      if (onAssignPublicNumber) {
+        const assignment = await onAssignPublicNumber(nextSubmission.id);
+        completedSubmission = {
+          ...nextSubmission,
+          publicNumber: assignment.publicNumber,
+        };
+        workingSubmissionRef.current = completedSubmission;
+        setWorkingSubmission(completedSubmission);
+        if (assignment.assignedNow) {
+          window.alert(`Анкета сохранена. Номер подачи: VF-${assignment.publicNumber}`);
+        }
+      }
+
+      if (onSavedAndExit) {
+        await onSavedAndExit(completedSubmission);
+        return;
+      }
+      onBack();
     },
-    [bridge, onSubmitForReview, persistSubmissionUpdate],
+    [
+      bridge,
+      onAssignPublicNumber,
+      onBack,
+      onSavedAndExit,
+      onSubmitForReview,
+      persistSubmissionUpdate,
+    ],
   );
 
   const handleMarkIssueFixed = useCallback(
@@ -505,28 +531,6 @@ export function QuestionnaireScreen({
     [persistSubmissionUpdate],
   );
 
-  const handleSaveAndExit = useCallback(async () => {
-    let savedSubmission = workingSubmissionRef.current;
-    if (blsQuestionnaireReadiness(savedSubmission).ready && onAssignPublicNumber) {
-      const assignment = await onAssignPublicNumber(savedSubmission.id);
-      savedSubmission = {
-        ...savedSubmission,
-        publicNumber: assignment.publicNumber,
-      };
-      workingSubmissionRef.current = savedSubmission;
-      setWorkingSubmission(savedSubmission);
-      if (assignment.assignedNow) {
-        window.alert(`Анкета сохранена. Номер подачи: VF-${assignment.publicNumber}`);
-      }
-    }
-
-    if (onSavedAndExit) {
-      await onSavedAndExit(savedSubmission);
-      return;
-    }
-    onBack();
-  }, [onAssignPublicNumber, onBack, onSavedAndExit]);
-
   return (
     <FigmaQuestionnaireScreen
       initialFocus={initialFocus}
@@ -537,7 +541,6 @@ export function QuestionnaireScreen({
       onMarkIssueFixed={handleMarkIssueFixed}
       onOpenDocuments={onOpenDocuments}
       onSaveDraft={handleSaveDraft}
-      onSaveAndExit={handleSaveAndExit}
       onUploadFile={onUploadFile}
     />
   );

@@ -141,7 +141,7 @@ describe("QuestionnaireScreen", () => {
     expect(
       screen.queryByRole("button", { name: /Текущее гражданство/ }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
 
     const normalized = onSubmissionChange.mock.calls[0]?.[0] as Submission;
@@ -179,7 +179,7 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
 
@@ -214,7 +214,7 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Имя"), {
       target: { value: "Анна" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
 
@@ -243,9 +243,9 @@ describe("QuestionnaireScreen", () => {
     );
 
     const saveAndExit = screen.getByRole("button", {
-      name: "Сохранить и выйти",
+      name: "Сохранить и продолжить",
     });
-    expect(saveAndExit).toHaveTextContent("Сохранить и выйти");
+    expect(saveAndExit).toHaveTextContent("Сохранить и продолжить");
     expect(saveAndExit).not.toHaveTextContent(/^Сохранить$/);
   });
 
@@ -271,10 +271,10 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSavedAndExit).toHaveBeenCalledTimes(1));
-    expect(onSubmissionChange).toHaveBeenCalledTimes(1);
+    expect(onSubmissionChange).toHaveBeenCalledTimes(2);
     expect(onAssignPublicNumber).toHaveBeenCalledOnce();
     expect(onAssignPublicNumber).toHaveBeenCalledWith(submission.id);
     expect(alert).toHaveBeenCalledOnce();
@@ -307,7 +307,7 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSavedAndExit).toHaveBeenCalledTimes(1));
     expect(onAssignPublicNumber).toHaveBeenCalledOnce();
@@ -319,7 +319,7 @@ describe("QuestionnaireScreen", () => {
     alert.mockRestore();
   });
 
-  test("exits an incomplete draft without assigning or announcing a public number", async () => {
+  test("keeps an incomplete draft open and reveals errors without assigning a public number", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -345,16 +345,15 @@ describe("QuestionnaireScreen", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
-    await waitFor(() => expect(onSavedAndExit).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
     expect(onSubmissionChange).toHaveBeenCalledTimes(1);
     expect(onAssignPublicNumber).not.toHaveBeenCalled();
     expect(alert).not.toHaveBeenCalled();
-    expect(onSavedAndExit).toHaveBeenCalledWith(
-      expect.objectContaining({ publicNumber: null, status: "draft" }),
-    );
+    expect(onSavedAndExit).not.toHaveBeenCalled();
     expect(onBack).not.toHaveBeenCalled();
+    expect(screen.getAllByText("Обязательное поле").length).toBeGreaterThan(0);
 
     alert.mockRestore();
   });
@@ -406,7 +405,7 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSubmissionUpdate).toHaveBeenCalledTimes(1));
     expect(fieldValue(latestSubmission, "surname")).toBe("VOLKOV");
@@ -449,7 +448,7 @@ describe("QuestionnaireScreen", () => {
     expect(autosaved.history).toHaveLength(submission.history.length);
     expect(fieldValue(autosaved, "surname")).toBe("VOLKOV");
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));
 
     const manuallySaved = onSubmissionChange.mock.calls[1]?.[0] as Submission;
@@ -476,7 +475,7 @@ describe("QuestionnaireScreen", () => {
       screen.queryByRole("button", { name: "Отправить на проверку" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Сохранить и выйти" }),
+      screen.queryByRole("button", { name: "Сохранить и продолжить" }),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("questionnaire-read-only-status")).toHaveTextContent(
       "На проверке",
@@ -507,7 +506,7 @@ describe("QuestionnaireScreen", () => {
     expect(
       screen.queryByRole("button", { name: "Отправить на проверку" }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() =>
       expect(screen.getByTestId("questionnaire-save-error")).toHaveTextContent(
         "Сервис не подтвердил сохранение",
@@ -515,7 +514,7 @@ describe("QuestionnaireScreen", () => {
     );
     expect(screen.queryByText("Supabase недоступен")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(2));
 
     const retrySubmission = onSubmissionChange.mock.calls[1]?.[0] as Submission;
@@ -568,7 +567,7 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: `${surname.value}A` },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
 
     const edited = onSubmissionChange.mock.calls[0]?.[0] as Submission;
@@ -626,7 +625,7 @@ describe("QuestionnaireScreen", () => {
         name: "Подтвердить поле: Номер паспорта",
       }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Сохранить и выйти" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));
 
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
     const submitted = onSubmissionChange.mock.calls[0]?.[0] as Submission;

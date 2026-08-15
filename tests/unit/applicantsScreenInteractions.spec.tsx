@@ -671,9 +671,9 @@ describe("ApplicantsScreen interactions", () => {
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
 
-    expect(
-      canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok,
-    ).toBe(false);
+    expect(canPerformAction(acceptedLegacy, "submit_for_review", "agent").ok).toBe(
+      false,
+    );
 
     render(
       <ApplicantsScreen
@@ -696,10 +696,7 @@ describe("ApplicantsScreen interactions", () => {
     expect(onOpenDrawer).not.toHaveBeenCalled();
 
     expect(
-      applyAgentSubmitForReviewResult(
-        acceptedLegacy,
-        acceptedLegacy.agentId,
-      ),
+      applyAgentSubmitForReviewResult(acceptedLegacy, acceptedLegacy.agentId),
     ).toMatchObject({
       ok: false,
       error: { code: "VALIDATION_ERROR" },
@@ -726,6 +723,106 @@ describe("ApplicantsScreen interactions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Готово к выгрузке" }));
     expect(onOpenDrawer).toHaveBeenCalledWith(accepted.id);
+  });
+
+  it("cancels draft deletion without mutating the submission", () => {
+    const draft = createSubmission("single");
+    const onDeleteSubmission = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ApplicantsScreen
+        agentId={draft.agentId}
+        onDeleteSubmission={onDeleteSubmission}
+        onOpenDrawer={vi.fn()}
+        submissions={[draft]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Удалить подачу:/ }));
+    expect(
+      screen.getByRole("dialog", { name: "Удалить эту подачу?" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+
+    expect(
+      screen.queryByRole("dialog", { name: "Удалить эту подачу?" }),
+    ).not.toBeInTheDocument();
+    expect(onDeleteSubmission).not.toHaveBeenCalled();
+  });
+
+  it("deletes an owned draft only after confirmation", async () => {
+    const draft = createSubmission("single");
+    const onDeleteSubmission = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ApplicantsScreen
+        agentId={draft.agentId}
+        onDeleteSubmission={onDeleteSubmission}
+        onOpenDrawer={vi.fn()}
+        submissions={[draft]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Удалить подачу:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Удалить" }));
+
+    await waitFor(() => expect(onDeleteSubmission).toHaveBeenCalledOnce());
+    expect(onDeleteSubmission).toHaveBeenCalledWith(draft.id);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Удалить эту подачу?" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("keeps later lifecycle states protected from deletion", () => {
+    const submitted = {
+      ...readySubmission("single"),
+      status: "submitted_for_review" as const,
+    };
+
+    render(
+      <ApplicantsScreen
+        agentId={submitted.agentId}
+        onDeleteSubmission={vi.fn().mockResolvedValue(undefined)}
+        onOpenDrawer={vi.fn()}
+        submissions={[submitted]}
+        typeFilter="single"
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /Удалить подачу:/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the confirmation open when deletion fails", async () => {
+    const draft = createSubmission("single");
+    const onDeleteSubmission = vi
+      .fn()
+      .mockRejectedValue(new Error("Подача изменилась. Обновите список."));
+
+    render(
+      <ApplicantsScreen
+        agentId={draft.agentId}
+        onDeleteSubmission={onDeleteSubmission}
+        onOpenDrawer={vi.fn()}
+        submissions={[draft]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Удалить подачу:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Удалить" }));
+
+    expect(
+      await screen.findByText("Подача изменилась. Обновите список."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Удалить эту подачу?" }),
+    ).toBeInTheDocument();
   });
 
   it("submits a ready saved draft through the canonical review handoff", async () => {

@@ -278,39 +278,22 @@ describe("canonical BLS questionnaire readiness", () => {
     expectReadyParity(submission);
   });
 
-  test("requires the complete residence permit group when applicable", () => {
-    let submission = readySingleSubmission();
-    submission = setApplicantField(
-      submission,
-      0,
-      "lives-outside-citizenship",
-      "Да",
+  test("does not include retired residence-permit or biometrics fields", () => {
+    const submission = readySingleSubmission();
+    const fieldIds = submission.applicants.flatMap((applicant) =>
+      applicant.sections.flatMap((section) => section.fields.map((field) => field.id)),
     );
 
-    expect(blsQuestionnaireReadiness(submission).ready).toBe(false);
-
-    submission = setApplicantField(submission, 0, "residence-permit-type", "Residence permit");
-    submission = setApplicantField(submission, 0, "residence-permit-number", "QA-12345");
-    submission = setApplicantField(
-      submission,
-      0,
-      "residence-permit-valid-until",
-      "20.08.2030",
-    );
-    expectReadyParity(submission);
-  });
-
-  test("requires a biometrics date only after a positive answer", () => {
-    let submission = readySingleSubmission();
-    submission = setApplicantField(submission, 0, "previous-biometrics", "Да");
-    submission = setApplicantField(submission, 0, "previous-biometrics-date", "");
-    expect(blsQuestionnaireReadiness(submission).ready).toBe(false);
-
-    submission = setApplicantField(
-      submission,
-      0,
-      "previous-biometrics-date",
-      "20.08.2024",
+    expect(fieldIds).not.toEqual(
+      expect.arrayContaining([
+        "lives-outside-citizenship",
+        "residence-permit-type",
+        "residence-permit-number",
+        "residence-permit-valid-until",
+        "previous-biometrics",
+        "previous-biometrics-date",
+        "previous-visa-number",
+      ]),
     );
     expectReadyParity(submission);
   });

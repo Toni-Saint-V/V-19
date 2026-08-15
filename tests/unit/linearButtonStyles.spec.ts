@@ -34,9 +34,12 @@ describe("Linear Indigo product button contract", () => {
       "linear-product-action linear-product-action--primary v19-admin-export-primary-action",
     );
     expect(productActions).toContain("familyCopyPreview");
-    expect(productActions).toContain('? "linear-product-action--primary"');
     expect(productActions).toContain(
-      "} v19-questionnaire-draft-button v19-questionnaire-copy-button",
+      "linear-product-action linear-product-action--secondary v19-questionnaire-draft-button v19-questionnaire-copy-button",
+    );
+    expect(productActions).toContain("aria-pressed={Boolean(familyCopyPreview)}");
+    expect(productActions).toContain(
+      "familyCopyPreview ? confirmFamilyCopy : copySharedDataToFamily",
     );
     expect(productActions).toContain('primaryButtonClassName === "is-warning"');
     expect(productActions).toContain('? "linear-product-action--warning"');
@@ -84,5 +87,8 @@ describe("Linear Indigo product button contract", () => {
       "height: var(--v19-linear-button-height-compact) !important",
     );
     expect(stylesheet).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(stylesheet).toContain(
+      ".dialog-actions .primary-button.danger-action",
+    );
   });
 });

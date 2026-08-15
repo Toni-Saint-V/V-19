@@ -1588,7 +1588,7 @@ test.describe("V-19 operations workspace", () => {
       timeout: 15_000,
     });
     await questionnaire
-      .getByRole("button", { exact: true, name: "Сохранить и выйти" })
+      .getByRole("button", { exact: true, name: "Сохранить и продолжить" })
       .click();
     await expect(questionnaire).toHaveCount(0);
 
@@ -1621,7 +1621,7 @@ test.describe("V-19 operations workspace", () => {
     }
     expect(confirmedImportFields).toBeGreaterThan(0);
     await questionnaire
-      .getByRole("button", { exact: true, name: "Сохранить и выйти" })
+      .getByRole("button", { exact: true, name: "Сохранить и продолжить" })
       .click();
     await expect(questionnaire).toHaveCount(0);
     await clickWorkspaceButton(page, /Мои подачи/);

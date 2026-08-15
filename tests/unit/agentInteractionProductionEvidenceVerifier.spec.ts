@@ -136,6 +136,12 @@ function productionFixture() {
   } as const;
   const writePathByTarget = {
     "edge:access-request": "/functions/v1/access-request",
+    "rpc:begin_agent_submission_deletion":
+      "/rest/v1/rpc/begin_agent_submission_deletion",
+    "rpc:cancel_agent_submission_deletion":
+      "/rest/v1/rpc/cancel_agent_submission_deletion",
+    "rpc:finalize_agent_submission_deletion":
+      "/rest/v1/rpc/finalize_agent_submission_deletion",
     "rpc:save_agent_submission_if_current":
       "/rest/v1/rpc/save_agent_submission_if_current",
     "storage:submission-media":

@@ -102,8 +102,6 @@ const blsCountryOptions = [
   "Other",
 ];
 
-const yesNoOptions = ["Нет", "Да"];
-
 const questionnaireBlueprint: Array<{
   id: string;
   title: string;
@@ -149,32 +147,6 @@ const questionnaireBlueprint: Array<{
       { id: "postal-code", label: "Почтовый индекс", placeholder: "Например, 101000" },
       { id: "email", label: "Email", placeholder: "name@example.com" },
       { id: "contact-number", label: "Телефон", placeholder: "+7 900 000-00-00" },
-      {
-        id: "lives-outside-citizenship",
-        label: "Есть вид на жительство в другой стране",
-        placeholder: "Выберите ответ",
-        control: "select",
-        options: yesNoOptions,
-        value: "Нет",
-      },
-      {
-        id: "residence-permit-type",
-        label: "Вид на жительство / документ",
-        placeholder: "Например, Вид на жительство",
-        required: false,
-      },
-      {
-        id: "residence-permit-number",
-        label: "Номер документа",
-        placeholder: "Например, AB123456",
-        required: false,
-      },
-      {
-        id: "residence-permit-valid-until",
-        label: "Действителен до",
-        placeholder: "ДД.ММ.ГГГГ",
-        required: false,
-      },
       {
         id: "home-address",
         label: "Домашний адрес",
@@ -243,25 +215,6 @@ const questionnaireBlueprint: Array<{
         id: "stay-duration",
         label: "Длительность пребывания",
         placeholder: "Рассчитывается автоматически",
-      },
-      {
-        id: "previous-biometrics",
-        label: "Отпечатки ранее сдавались",
-        placeholder: "Выберите ответ",
-        control: "select",
-        options: yesNoOptions,
-      },
-      {
-        id: "previous-biometrics-date",
-        label: "Дата сдачи отпечатков",
-        placeholder: "ДД.ММ.ГГГГ",
-        required: false,
-      },
-      {
-        id: "previous-visa-number",
-        label: "Номер визы",
-        placeholder: "Например, ESP123456789",
-        required: false,
       },
       {
         id: "final-entry-permit",
