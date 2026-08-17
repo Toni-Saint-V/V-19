@@ -59,8 +59,12 @@ import {
 } from "../passportReviewContract";
 import { suggestedRussianAddress } from "../russianAddress";
 import {
-  composeQuestionnaireHomeAddress,
+  canonicalQuestionnaireHomeAddress,
+  composeLatinQuestionnaireHomeAddress,
+  latinQuestionnaireHomeAddressFromText,
+  latinQuestionnaireHomeAddressParts,
   structuredQuestionnaireHomeAddressFromText,
+  transliterateQuestionnaireText,
 } from "../questionnaireAddressFields";
 import {
   QuestionnaireProgressBadge,
@@ -179,6 +183,7 @@ const familyCopySectionIds = new Set<SectionId>([
 
 type FormFieldProps = {
   addressAssist?: boolean;
+  addressSuggestionFormatter?: (value: string) => string;
   compact?: boolean;
   excelMap?: string;
   errorMessage?: string;
@@ -186,6 +191,7 @@ type FormFieldProps = {
   fullWidth?: boolean;
   hint?: string;
   label: string;
+  modelFieldAliases?: readonly string[];
   modelFieldId: string;
   number?: string;
   onAddressSuggestionAccept?: (value: string) => void;
@@ -422,6 +428,44 @@ type StructuredHomeAddressKey =
   | "homeStreet"
   | "homeUnit";
 
+const combinedHomeAddressLabel = "Адрес проживания";
+const combinedHomeAddressFieldIds = [
+  "home-street",
+  "home-house",
+  "home-building",
+  "home-unit",
+  "home-address",
+] as const;
+const requiredCombinedHomeAddressFieldIds = new Set([
+  "home-address",
+  "home-house",
+  "home-street",
+]);
+const smartImportLatinTextFieldIds = new Set([
+  "birth-place",
+  "employer-address",
+  "employer-name",
+  "first-name",
+  "home-building",
+  "home-city",
+  "home-house",
+  "home-street",
+  "home-unit",
+  "hotel-address",
+  "hotel-city",
+  "hotel-name",
+  "occupation",
+  "previous-surname",
+  "surname",
+]);
+const combinedHomeAddressSourceLabels = new Set([
+  "Улица / проспект / переулок",
+  "Дом",
+  "Корпус / строение",
+  "Квартира / офис / помещение",
+  "Домашний адрес",
+]);
+
 type QuestionnaireFieldUpdateOrigin = "manual" | "smart_import";
 
 type QuestionnaireFieldUpdateOptions = {
@@ -468,21 +512,6 @@ const BLS_COUNTRY_OPTIONS = [
   "United Arab Emirates",
   "Other",
 ];
-
-const RUSSIAN_STREET_TYPE_SUGGESTIONS = [
-  "улица ",
-  "проспект ",
-  "переулок ",
-  "набережная ",
-  "шоссе ",
-  "проезд ",
-  "площадь ",
-  "бульвар ",
-];
-
-const RUSSIAN_BUILDING_TYPE_SUGGESTIONS = ["корпус ", "строение "];
-
-const RUSSIAN_UNIT_TYPE_SUGGESTIONS = ["квартира ", "офис ", "помещение "];
 
 const BLS_OCCUPATION_OPTIONS = [
   "UNEMPLOYED",
@@ -683,12 +712,14 @@ function inputAutocomplete(label: string, type: FormFieldProps["type"]) {
 
 function FormField({
   addressAssist,
+  addressSuggestionFormatter,
   compact,
   errorMessage,
   focused,
   fullWidth,
   hint,
   label,
+  modelFieldAliases,
   modelFieldId,
   number,
   onAddressSuggestionAccept,
@@ -767,14 +798,23 @@ function FormField({
       .slice(0, 10);
   }, [inputSuggestions, value]);
   const addressSuggestion = useMemo(
-    () => (addressAssist ? suggestedRussianAddress(value) : undefined),
-    [addressAssist, value],
+    () => {
+      const suggestion = addressAssist ? suggestedRussianAddress(value) : undefined;
+      return suggestion && addressSuggestionFormatter
+        ? addressSuggestionFormatter(suggestion)
+        : suggestion;
+    },
+    [addressAssist, addressSuggestionFormatter, value],
   );
   const inputSuggestionListOpen = Boolean(
     inputSuggestions.length &&
     isSuggestionsOpen &&
     !addressSuggestion &&
     visibleInputSuggestions.length,
+  );
+  const contractFieldIds = useMemo(
+    () => [modelFieldId, ...(modelFieldAliases ?? [])],
+    [modelFieldAliases, modelFieldId],
   );
 
   useEffect(() => {
@@ -790,14 +830,39 @@ function FormField({
     if (!value) setQuickOptionsExpanded(true);
   }, [value]);
 
-  const canonicalRequired = fieldContract?.required(modelFieldId) ?? false;
-  const canonicalFocused = fieldContract?.focused(modelFieldId) ?? focused;
-  const copyPreview = fieldContract?.copyPreview(modelFieldId) ?? false;
-  const canonicalState = fieldContract?.state(modelFieldId, label) ?? state;
-  const canonicalReviewSource =
-    fieldContract?.reviewSource(modelFieldId, label) ?? reviewSource;
+  const contractStates = fieldContract
+    ? contractFieldIds.map((fieldId) => ({
+        fieldId,
+        state: fieldContract.state(fieldId, label),
+      }))
+    : [];
+  const invalidContractField = contractStates.find((entry) => entry.state === "invalid");
+  const reviewContractField = contractStates.find(
+    (entry) => entry.state === "needs_review",
+  );
+  const canonicalRequired =
+    fieldContract?.required(modelFieldId) === true ||
+    Boolean(modelFieldAliases?.some((fieldId) => fieldContract?.required(fieldId)));
+  const canonicalFocused =
+    focused || Boolean(fieldContract && contractFieldIds.some(fieldContract.focused));
+  const copyPreview = Boolean(
+    fieldContract && contractFieldIds.some(fieldContract.copyPreview),
+  );
+  const canonicalState = invalidContractField
+    ? "invalid"
+    : reviewContractField
+      ? "needs_review"
+      : state;
+  const reviewFieldId = reviewContractField?.fieldId ?? modelFieldId;
+  const canonicalReviewSource = reviewContractField
+    ? fieldContract?.reviewSource(reviewFieldId, label)
+    : reviewSource;
   const canonicalErrorMessage =
-    fieldContract?.errorMessage(modelFieldId, label) ?? errorMessage;
+    (fieldContract
+      ? contractFieldIds
+          .map((fieldId) => fieldContract.errorMessage(fieldId, label))
+          .find(Boolean)
+      : undefined) ?? errorMessage;
   const validationMessage = validateFormFieldValue({
     label,
     required: canonicalRequired,
@@ -929,7 +994,9 @@ function FormField({
   function selectSuggestionAt(index: number) {
     const suggestion = visibleInputSuggestions[index];
     if (!suggestion) return;
-    onChange?.(suggestion);
+    onChange?.(
+      emailField ? suggestion : transliterateQuestionnaireText(suggestion),
+    );
     setIsSuggestionsOpen(false);
     setActiveSuggestionIndex(-1);
   }
@@ -1008,11 +1075,29 @@ function FormField({
     handleSuggestionKeyboard(event);
   }
 
+  function normalizeTextInputToLatin() {
+    onBlur?.();
+    if (
+      onBlur ||
+      !onChange ||
+      dateField ||
+      emailField ||
+      phonePrefix ||
+      type === "number" ||
+      type === "tel"
+    ) {
+      return;
+    }
+    const normalized = transliterateQuestionnaireText(value);
+    if (normalized !== value) onChange(normalized);
+  }
+
   return (
     <div
       data-field-focused={canonicalFocused ? "true" : undefined}
       data-field-filled={isFilled ? "true" : undefined}
       data-field-label={label}
+      data-model-field-aliases={modelFieldAliases?.join(" ") || undefined}
       data-model-field-id={modelFieldId}
       data-family-copy-preview={copyPreview ? "true" : undefined}
       className={`v19-questionnaire-field v19-questionnaire-field-cell flex flex-col ${
@@ -1201,7 +1286,7 @@ function FormField({
             className={`${baseClasses} is-textarea ${compact ? "is-compact-address" : ""} ${stateClasses}`}
             id={fieldId}
             name={modelFieldId}
-            onBlur={onBlur}
+            onBlur={normalizeTextInputToLatin}
             placeholder={visiblePlaceholder}
             readOnly={readOnly ?? !onChange}
             value={value}
@@ -1266,11 +1351,11 @@ function FormField({
                   );
                   if (normalizedDate !== value) onChange(normalizedDate);
                 }
-                onBlur?.();
                 if (
                   suggestionsRef.current?.contains(event.relatedTarget as Node | null)
                 )
                   return;
+                normalizeTextInputToLatin();
                 setIsSuggestionsOpen(false);
                 setActiveSuggestionIndex(-1);
               }}
@@ -1341,7 +1426,14 @@ function FormField({
               {...agentInteractionProps("questionnaire.update-field")}
               aria-label={`Подтвердить поле: ${label}`}
               type="button"
-              onClick={() => fieldContract?.confirmReview(modelFieldId)}
+              onClick={() => {
+                if (!fieldContract) return;
+                for (const entry of contractStates) {
+                  if (entry.state === "needs_review") {
+                    fieldContract.confirmReview(entry.fieldId);
+                  }
+                }
+              }}
             >
               Подтвердить
             </button>
@@ -1589,6 +1681,13 @@ function fallbackQuestionnaireFormData(): QuestionnaireFormData {
     travelStart: "",
     visaType: "",
   };
+}
+
+function combinedHomeAddressValue(formData: QuestionnaireFormData) {
+  return canonicalQuestionnaireHomeAddress({
+    ...formData,
+    homeAddress: formData.contactAddress,
+  });
 }
 
 function submissionFieldValue(
@@ -2377,7 +2476,6 @@ export const questionnaireUiNonRenderedFieldDispositions = {
   "final-entry-permit-issued-by": "reserved optional visa field",
   "final-entry-permit-valid-from": "reserved optional visa field",
   "final-entry-permit-valid-to": "reserved optional visa field",
-  "home-address": "derived from structured address fields",
   "means-of-support": "service-managed payment value",
   nationality: "derived from passport issue country",
   "visa-type": "service-managed appointment value",
@@ -3469,51 +3567,101 @@ export function FigmaQuestionnaireScreen({
     updateField("stayDuration", blsStayDurationFromDates(travelStart, travelEnd));
   }
 
-  function updateStructuredAddressField(key: StructuredHomeAddressKey, value: string) {
-    const nextAddressData = { ...formData, [key]: value };
-    updateField(key, value);
-    updateField("contactAddress", composeQuestionnaireHomeAddress(nextAddressData));
+  function updateCombinedHomeAddress(value: string) {
+    const structured = structuredQuestionnaireHomeAddressFromText(value);
+    const nextAddress =
+      structured ??
+      ({
+        homeBuilding: "",
+        homeHouse: "",
+        homeStreet: value,
+        homeUnit: "",
+      } satisfies Record<StructuredHomeAddressKey, string>);
+
+    updateField("homeStreet", nextAddress.homeStreet);
+    updateField("homeHouse", nextAddress.homeHouse);
+    updateField("homeBuilding", nextAddress.homeBuilding);
+    updateField("homeUnit", nextAddress.homeUnit);
+    updateField("contactAddress", value);
   }
 
   function applyHomeAddressSuggestion(value: string) {
-    const structured = structuredQuestionnaireHomeAddressFromText(value);
+    const structured =
+      structuredQuestionnaireHomeAddressFromText(
+        formDataRef.current.contactAddress,
+      ) ?? structuredQuestionnaireHomeAddressFromText(value);
     if (!structured) {
-      updateStructuredAddressField("homeStreet", value);
+      updateCombinedHomeAddress(transliterateQuestionnaireText(value));
       return;
     }
 
-    updateField("homeStreet", structured.homeStreet);
-    updateField("homeHouse", structured.homeHouse);
-    updateField("homeBuilding", structured.homeBuilding);
-    updateField("homeUnit", structured.homeUnit);
-    updateField("contactAddress", composeQuestionnaireHomeAddress(structured));
+    const latin = latinQuestionnaireHomeAddressParts(structured);
+
+    updateField("homeStreet", latin.homeStreet);
+    updateField("homeHouse", latin.homeHouse);
+    updateField("homeBuilding", latin.homeBuilding);
+    updateField("homeUnit", latin.homeUnit);
+    updateField("contactAddress", composeLatinQuestionnaireHomeAddress(latin));
+  }
+
+  function normalizeCombinedHomeAddressToLatin() {
+    const value = formDataRef.current.contactAddress;
+    if (!value.trim()) return;
+    applyHomeAddressSuggestion(latinQuestionnaireHomeAddressFromText(value));
   }
 
   function applySmartImportItems(items: SmartImportReviewItem[]) {
     if (!isEditable || !items.length) return;
 
-    const structuredAddressFieldIds = new Set([
-      "home-street",
-      "home-house",
-      "home-building",
-      "home-unit",
-    ]);
-    let structuredAddressChanged = false;
+    const addressItems = new Map(
+      items
+        .filter((item) =>
+          combinedHomeAddressFieldIds.some((fieldId) => fieldId === item.fieldId),
+        )
+        .map((item) => [item.fieldId, item]),
+    );
 
     for (const item of items) {
+      if (addressItems.has(item.fieldId)) continue;
       const binding = questionnaireFieldBindings.find(
         (candidate) => candidate.fieldId === item.fieldId,
       );
       if (!binding) continue;
 
-      updateField(binding.formKey, item.value, { origin: "smart_import" });
-      structuredAddressChanged ||= structuredAddressFieldIds.has(item.fieldId);
+      updateField(
+        binding.formKey,
+        smartImportLatinTextFieldIds.has(item.fieldId)
+          ? transliterateQuestionnaireText(item.value)
+          : item.value,
+        { origin: "smart_import" },
+      );
     }
 
-    if (structuredAddressChanged) {
+    if (addressItems.has("home-street") && addressItems.has("home-house")) {
+      const addressBindings = [
+        ["home-street", "homeStreet"],
+        ["home-house", "homeHouse"],
+        ["home-building", "homeBuilding"],
+        ["home-unit", "homeUnit"],
+      ] as const;
+      for (const [fieldId, formKey] of addressBindings) {
+        const item = addressItems.get(fieldId);
+        if (item) {
+          updateField(formKey, transliterateQuestionnaireText(item.value), {
+            origin: "smart_import",
+          });
+        } else if (
+          fieldId === "home-building" || fieldId === "home-unit"
+        ) {
+          // An imported address is one tuple. Missing optional parts explicitly
+          // clear old values so a recipient cannot retain a stale корпус/квартиру.
+          updateField(formKey, "", { origin: "manual" });
+        }
+      }
+
       updateField(
         "contactAddress",
-        composeQuestionnaireHomeAddress(formDataRef.current),
+        composeLatinQuestionnaireHomeAddress(formDataRef.current),
         // The canonical address is deterministically composed from the selected
         // structured fields. It has no independent source value or visible
         // confirmation control, so it must not become a hidden review blocker.
@@ -3562,7 +3710,9 @@ export function FigmaQuestionnaireScreen({
   }
 
   function normalizeBirthPlaceField() {
-    const normalized = historicalBirthPlaceForDate(formData.birthPlace, formData.dob);
+    const normalized = transliterateQuestionnaireText(
+      historicalBirthPlaceForDate(formData.birthPlace, formData.dob),
+    );
     if (normalized !== formData.birthPlace) updateField("birthPlace", normalized);
   }
 
@@ -3598,6 +3748,18 @@ export function FigmaQuestionnaireScreen({
             ...(questionnaireFieldAliasesByFormKey[binding.formKey] ?? []),
           ],
           canonicalFieldId: binding.fieldId,
+          ...(combinedHomeAddressFieldIds.some(
+            (fieldId) => fieldId === binding.fieldId,
+          )
+            ? {
+                copyEmpty: true,
+                copyGroup: "home-address",
+                copyGroupRequired: requiredCombinedHomeAddressFieldIds.has(
+                  binding.fieldId,
+                ),
+                previewFieldId: "home-street",
+              }
+            : {}),
           sectionId: binding.sectionId,
         })),
       recipients: familyCopyRecipients,
@@ -4071,9 +4233,12 @@ export function FigmaQuestionnaireScreen({
 
   function focusFieldLabel(label: string | undefined) {
     if (!label) return;
+    const visibleLabel = combinedHomeAddressSourceLabels.has(label)
+      ? combinedHomeAddressLabel
+      : label;
     window.setTimeout(() => {
       const element = screenRef.current?.querySelector<HTMLElement>(
-        `[data-field-label="${CSS.escape(label)}"]`,
+        `[data-field-label="${CSS.escape(visibleLabel)}"]`,
       );
       const target = element?.querySelector<HTMLElement>(
         "input, textarea, button, [tabindex]",
@@ -4630,7 +4795,7 @@ export function FigmaQuestionnaireScreen({
             label="Место выдачи"
             modelFieldId="passport-issue-place"
             number="6"
-            placeholder="Например, МВД 780-001"
+            placeholder="Например, MVD 780-001"
             value={formData.passportIssuePlace}
             onChange={(value) => updateField("passportIssuePlace", value)}
           />
@@ -4661,49 +4826,25 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             addressAssist
+            addressSuggestionFormatter={latinQuestionnaireHomeAddressFromText}
             fullWidth
-            hint="Можно написать коротко — полный адрес появится как предложение после номера дома."
-            label="Улица / проспект / переулок"
+            hint="Можно написать по-русски — подставим адрес латиницей."
+            label={combinedHomeAddressLabel}
+            modelFieldAliases={combinedHomeAddressFieldIds.slice(1)}
             modelFieldId="home-street"
             number="3"
             onAddressSuggestionAccept={applyHomeAddressSuggestion}
-            placeholder="Улица Ленина"
+            onBlur={normalizeCombinedHomeAddressToLatin}
+            placeholder="Улица Ленина, 15, корпус 2, квартира 12"
             compact
-            suggestions={RUSSIAN_STREET_TYPE_SUGGESTIONS}
-            value={formData.homeStreet}
-            onChange={(value) => updateStructuredAddressField("homeStreet", value)}
-          />
-          <FormField
-            label="Дом"
-            modelFieldId="home-house"
-            number="4"
-            placeholder="Например, 15"
-            value={formData.homeHouse}
-            onChange={(value) => updateStructuredAddressField("homeHouse", value)}
-          />
-          <FormField
-            label="Корпус / строение"
-            modelFieldId="home-building"
-            number="5"
-            placeholder="Например, Корпус 2"
-            suggestions={RUSSIAN_BUILDING_TYPE_SUGGESTIONS}
-            value={formData.homeBuilding}
-            onChange={(value) => updateStructuredAddressField("homeBuilding", value)}
-          />
-          <FormField
-            label="Квартира / офис / помещение"
-            modelFieldId="home-unit"
-            number="6"
-            placeholder="Например, Квартира 12"
-            suggestions={RUSSIAN_UNIT_TYPE_SUGGESTIONS}
-            value={formData.homeUnit}
-            onChange={(value) => updateStructuredAddressField("homeUnit", value)}
+            value={combinedHomeAddressValue(formData)}
+            onChange={updateCombinedHomeAddress}
           />
           <FormField
             excelMap="Анкета: residence-postal-code"
             label="Почтовый индекс"
             modelFieldId="postal-code"
-            number="7"
+            number="4"
             placeholder="Например, 101000"
             value={formData.residencePostalCode}
             onChange={(value) => updateField("residencePostalCode", value)}
@@ -4712,7 +4853,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: D4"
             label="Email"
             modelFieldId="email"
-            number="8"
+            number="5"
             type="email"
             value={formData.contactEmail}
             onChange={(value) => updateField("contactEmail", value)}
@@ -4721,7 +4862,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: D3"
             label="Телефон"
             modelFieldId="contact-number"
-            number="9"
+            number="6"
             phonePrefix="+7"
             placeholder="900 000-00-00"
             value={formData.contactPhone}
@@ -5734,7 +5875,7 @@ export function FigmaQuestionnaireScreen({
                       )}
                       {familyCopyPreview
                         ? `Скопировать ${familyCopyFieldCountLabel(
-                            familyCopyPreview.updates.length,
+                            familyCopyPreview.visibleFieldCount,
                           )}`
                         : familyCopyMessage === familyCopySuccessMessage
                           ? familyCopySuccessMessage
@@ -5748,7 +5889,7 @@ export function FigmaQuestionnaireScreen({
                     role="status"
                   >
                     {familyCopyPreview
-                      ? `Выделено полей: ${familyCopyPreview.updates.length}`
+                      ? `Выделено полей: ${familyCopyPreview.visibleFieldCount}`
                       : familyCopyMessage}
                   </span>
                   <button

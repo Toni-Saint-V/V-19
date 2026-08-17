@@ -33,6 +33,7 @@ import {
 } from "./submissionIdentity";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
+import { canonicalQuestionnaireHomeAddress } from "./questionnaireAddressFields";
 import {
   isCity,
   isQuestionnaireReviewSource,
@@ -1272,7 +1273,13 @@ function toApplicantInsert(
     birth_date: questionnaireDateValue(birthDate),
     patronymic: null,
     citizenship: questionnaireFieldValue(applicant, "nationality"),
-    address: questionnaireFieldValue(applicant, "home-address"),
+    address: canonicalQuestionnaireHomeAddress({
+      homeAddress: questionnaireFieldValue(applicant, "home-address"),
+      homeBuilding: questionnaireFieldValue(applicant, "home-building") ?? "",
+      homeHouse: questionnaireFieldValue(applicant, "home-house") ?? "",
+      homeStreet: questionnaireFieldValue(applicant, "home-street") ?? "",
+      homeUnit: questionnaireFieldValue(applicant, "home-unit") ?? "",
+    }),
     phone: questionnaireFieldValue(applicant, "contact-number"),
     email: questionnaireFieldValue(applicant, "email"),
     passport_number: questionnaireFieldValue(applicant, "passport-no") ?? "",

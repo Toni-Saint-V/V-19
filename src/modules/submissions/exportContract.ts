@@ -1,6 +1,6 @@
 import type { Applicant, City, Submission } from "./types";
 import { agentOwnerDisplayName } from "./ownership";
-import { composeQuestionnaireHomeAddress } from "./questionnaireAddressFields";
+import { canonicalQuestionnaireHomeAddress } from "./questionnaireAddressFields";
 import {
   digitsOnly,
   exportDurationDays,
@@ -103,15 +103,13 @@ function buildExportContractRow(
     ? field("sponsor-means")
     : field("means-of-support");
   const familyGroupId = submission.type === "family" ? submission.id : undefined;
-  const homeAddress = firstNonEmpty(
-    field("home-address"),
-    composeQuestionnaireHomeAddress({
-      homeBuilding: field("home-building"),
-      homeHouse: field("home-house"),
-      homeStreet: field("home-street"),
-      homeUnit: field("home-unit"),
-    }),
-  );
+  const homeAddress = canonicalQuestionnaireHomeAddress({
+    homeAddress: field("home-address"),
+    homeBuilding: field("home-building"),
+    homeHouse: field("home-house"),
+    homeStreet: field("home-street"),
+    homeUnit: field("home-unit"),
+  });
 
   return {
     addressCity: field("home-city"),

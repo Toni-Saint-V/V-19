@@ -481,17 +481,20 @@ test.describe("V-19 questionnaire live sanity", () => {
       .getByRole("button", { name: /Адрес и контакты/ })
       .first()
       .click();
-    const street = page.getByRole("combobox", {
-      name: "Улица / проспект / переулок",
+    const address = page.getByRole("textbox", {
+      name: "Адрес проживания",
     });
-    await street.fill("ул");
-    await expect(page.getByRole("option", { name: "улица" })).toBeVisible();
+    await address.fill("ул ленина д 5 корп 2 кв 12");
+    const applyAddress = page.getByRole("button", {
+      name: "Подставить адрес: Адрес проживания",
+    });
+    await expect(applyAddress).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path: testInfo.outputPath("questionnaire-address-desktop.png"),
     });
-    await page.getByRole("option", { name: "улица" }).click();
-    await expect(street).toHaveValue("улица ");
+    await applyAddress.click();
+    await expect(address).toHaveValue("ulitsa Lenina, 5, bldg. 2, apt. 12");
     await expect(
       page.locator("[role='status']:visible").filter({ hasText: "Сохранено" }),
     ).toBeVisible({
@@ -860,33 +863,29 @@ test.describe("V-19 questionnaire live sanity", () => {
     expect(cityBox.y).toBeGreaterThan(countryBox.y + 2);
     expect(Math.abs(countryBox.width - cityBox.width)).toBeLessThanOrEqual(2);
 
-    const [houseBox, buildingBox] = await Promise.all([
-      page.locator('[data-field-label="Дом"]').boundingBox(),
-      page.locator('[data-field-label="Корпус / строение"]').boundingBox(),
-    ]);
-    expect(houseBox).not.toBeNull();
-    expect(buildingBox).not.toBeNull();
-    expect(buildingBox?.y ?? 0).toBeGreaterThan((houseBox?.y ?? 0) + 2);
-
-    const [unitBox, postalBox] = await Promise.all([
-      page.locator('[data-field-label="Квартира / офис / помещение"]').boundingBox(),
+    const [addressBox, postalBox] = await Promise.all([
+      page.locator('[data-field-label="Адрес проживания"]').boundingBox(),
       page.locator('[data-field-label="Почтовый индекс"]').boundingBox(),
     ]);
-    expect(unitBox).not.toBeNull();
+    expect(addressBox).not.toBeNull();
     expect(postalBox).not.toBeNull();
-    expect(postalBox?.y ?? 0).toBeGreaterThan((unitBox?.y ?? 0) + 2);
+    expect(postalBox?.y ?? 0).toBeGreaterThan((addressBox?.y ?? 0) + 2);
+    expect(Math.abs((addressBox?.width ?? 0) - (postalBox?.width ?? 0))).toBeLessThanOrEqual(
+      2,
+    );
 
     await page
       .getByRole("button", { name: /Адрес и контакты/ })
       .first()
       .click();
-    const street = page.getByRole("combobox", {
-      name: "Улица / проспект / переулок",
+    const address = page.getByRole("textbox", {
+      name: "Адрес проживания",
     });
-    await street.fill("ул");
-    await expect(page.getByRole("option", { name: "улица" })).toBeVisible();
-    await page.getByRole("option", { name: "улица" }).click();
-    await expect(street).toHaveValue("улица ");
+    await address.fill("ул ленина д 5 корп 2 кв 12");
+    await page
+      .getByRole("button", { name: "Подставить адрес: Адрес проживания" })
+      .click();
+    await expect(address).toHaveValue("ulitsa Lenina, 5, bldg. 2, apt. 12");
 
     const continueAction = page.locator(
       ".v19-questionnaire-next-action-bar .v19-questionnaire-next-button",
@@ -1113,7 +1112,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       expect(cityOptionBox).not.toBeNull();
       expect(cityOptionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
       await kazan.click();
-      await expect(city).toHaveValue("Казань");
+      await expect(city).toHaveValue("Kazan");
       if (viewport.width > 767) {
         await expect(
           page.locator("[role='status']:visible").filter({ hasText: "Сохранено" }),
@@ -1140,7 +1139,7 @@ test.describe("V-19 questionnaire live sanity", () => {
               .find((field) => field.id === "home-city")?.value;
           }),
         )
-        .toBe("Казань");
+        .toBe("Kazan");
       await expectNoDocumentOverflow(page);
 
       const screenshotPath = join(
@@ -1158,7 +1157,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       await openQuestionnaireFromAction(page);
       await expect(
         page.getByRole("combobox", { name: "Город проживания" }),
-      ).toHaveValue("Казань");
+      ).toHaveValue("Kazan");
       await expectNoDocumentOverflow(page);
 
       await saveQuestionnaireDraftAndReturnToSubmissions(page);
@@ -1195,7 +1194,7 @@ test.describe("V-19 questionnaire live sanity", () => {
       await openQuestionnaireFromAction(page);
       await expect(
         page.getByRole("combobox", { name: "Город проживания" }),
-      ).toHaveValue("Казань");
+      ).toHaveValue("Kazan");
 
       const badResponses = networkEvidence.responses.filter(
         (response) => response.status >= 400,
@@ -1218,8 +1217,8 @@ test.describe("V-19 questionnaire live sanity", () => {
       expect(networkEvidence.requests.length).toBeGreaterThan(0);
 
       viewportReceipts.push({
-        action: "set home city to Казань",
-        canonicalReadbackAfterReload: "Казань",
+        action: "set home city to Kazan",
+        canonicalReadbackAfterReload: "Kazan",
         consoleAndPageErrors: browserProblems,
         dropdownOptionHeights: {
           select: countryOptionBox?.height,

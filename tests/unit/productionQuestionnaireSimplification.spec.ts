@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
+  canonicalQuestionnaireHomeAddress,
+  composeLatinQuestionnaireHomeAddress,
   composeQuestionnaireHomeAddress,
+  latinQuestionnaireHomeAddressFromText,
   structuredQuestionnaireHomeAddressFromText,
+  transliterateQuestionnaireText,
 } from "../../src/modules/submissions/questionnaireAddressFields";
 import {
   createQuestionnaireSections,
@@ -97,6 +101,62 @@ describe("production questionnaire simplification", () => {
     expect(structured && composeQuestionnaireHomeAddress(structured)).toBe(
       "улица Ленина, д 5, корпус 2, строение 1, квартира 12, подъезд 3, этаж 4",
     );
+  });
+
+  test("parses common international address orders without Russian tokens", () => {
+    expect(
+      structuredQuestionnaireHomeAddressFromText("Calle Mayor, 14, 2"),
+    ).toEqual({
+      homeBuilding: "",
+      homeHouse: "14",
+      homeStreet: "Calle Mayor",
+      homeUnit: "2",
+    });
+    expect(
+      structuredQuestionnaireHomeAddressFromText("221B Baker Street, Flat 2"),
+    ).toEqual({
+      homeBuilding: "",
+      homeHouse: "221B",
+      homeStreet: "Baker Street",
+      homeUnit: "Flat 2",
+    });
+    expect(structuredQuestionnaireHomeAddressFromText("Baker Street")).toBeUndefined();
+  });
+
+  test("uses one deterministic aggregate-first address invariant", () => {
+    const structured = {
+      homeBuilding: "2",
+      homeHouse: "15",
+      homeStreet: "улица Ленина",
+      homeUnit: "12",
+    };
+
+    expect(
+      canonicalQuestionnaireHomeAddress({
+        ...structured,
+        homeAddress: "Сохранённый адрес",
+      }),
+    ).toBe("Сохранённый адрес");
+    expect(
+      canonicalQuestionnaireHomeAddress({ ...structured, homeAddress: "" }),
+    ).toBe("улица Ленина, д 15, корп 2, кв 12");
+  });
+
+  test("turns Russian UI input into a Latin address without losing its parts", () => {
+    expect(transliterateQuestionnaireText("МВД 78007")).toBe("MVD 78007");
+    expect(
+      latinQuestionnaireHomeAddressFromText(
+        "ул ленина д 5 корп 2 кв 12",
+      ),
+    ).toBe("ulitsa Lenina, 5, bldg. 2, apt. 12");
+    expect(
+      composeLatinQuestionnaireHomeAddress({
+        homeBuilding: "2",
+        homeHouse: "10",
+        homeStreet: "проспект Мира",
+        homeUnit: "офис 4",
+      }),
+    ).toBe("prospekt Mira, 10, bldg. 2, ofis 4");
   });
 
   test("keeps guardian details optional even for a child", () => {

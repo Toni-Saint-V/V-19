@@ -357,6 +357,50 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(auditAgentInteractionControls(result.container)).toEqual([]);
   });
 
+  test("transliterates fillable questionnaire text in the UI on blur", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Паспорт");
+    const issuePlace = screen.getByLabelText("Место выдачи");
+    fireEvent.change(issuePlace, { target: { value: "МВД 78007" } });
+    fireEvent.blur(issuePlace);
+    expect(issuePlace).toHaveValue("MVD 78007");
+
+    clickPinnedSection(result.container, "Работа / учеба");
+    const employer = screen.getByLabelText("Работодатель / учебное заведение");
+    fireEvent.change(employer, { target: { value: "ООО Спектр" } });
+    fireEvent.blur(employer);
+    expect(employer).toHaveValue("OOO Spektr");
+    expect(onFieldChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fieldId: "passport-issue-place",
+        value: "MVD 78007",
+      }),
+    );
+    expect(onFieldChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fieldId: "employer-name",
+        value: "OOO Spektr",
+      }),
+    );
+  });
+
   test("opens a desired interval issue on the exact questionnaire field", async () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -902,6 +946,11 @@ describe("FigmaQuestionnaireScreen", () => {
       )) {
         const fieldId = field.dataset.modelFieldId;
         if (fieldId) renderedFieldIds.add(fieldId);
+        for (const alias of (field.dataset.modelFieldAliases ?? "")
+          .split(/\s+/u)
+          .filter(Boolean)) {
+          renderedFieldIds.add(alias);
+        }
       }
     }
 
@@ -1047,10 +1096,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(visibleFieldLabels(result.container)).toEqual([
       "Страна проживания",
       "Город проживания",
-      "Улица / проспект / переулок",
-      "Дом",
-      "Корпус / строение",
-      "Квартира / офис / помещение",
+      "Адрес проживания",
       "Почтовый индекс",
       "Email",
       "Телефон",
@@ -2599,7 +2645,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onSaveDraft).not.toHaveBeenCalled();
   });
 
-  test("uses structured address fields with street and city completion", () => {
+  test("uses one address autocomplete while preserving structured address fields", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -2619,55 +2665,49 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Адрес и контакты");
-    const street = screen.getByLabelText("Улица / проспект / переулок");
+    const address = screen.getByLabelText("Адрес проживания");
     expect(screen.getByLabelText("Город проживания")).toHaveAttribute(
       "placeholder",
       "Санкт-Петербург",
     );
-    expect(street).toHaveAttribute("placeholder", "Улица Ленина");
-    expect(street.getAttribute("placeholder")).not.toMatch(/\d/u);
-    expect(screen.getByLabelText("Дом")).toHaveAttribute("placeholder", "15");
-    expect(screen.getByLabelText("Корпус / строение")).toHaveAttribute(
+    expect(address).toHaveAttribute(
       "placeholder",
-      "Корпус 2",
+      "Улица Ленина, 15, корпус 2, квартира 12",
     );
-    expect(screen.getByLabelText("Квартира / офис / помещение")).toHaveAttribute(
-      "placeholder",
-      "Квартира 12",
-    );
-    fireEvent.focus(street);
-    fireEvent.change(street, { target: { value: "ул" } });
-    fireEvent.click(screen.getByRole("option", { name: "улица" }));
-    expect(street).toHaveValue("улица ");
-    expect(screen.getByLabelText("Дом")).toBeInTheDocument();
-    expect(screen.getByLabelText("Корпус / строение")).toBeInTheDocument();
-    expect(screen.getByLabelText("Квартира / офис / помещение")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Дом")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Корпус / строение")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Квартира / офис / помещение"),
+    ).not.toBeInTheDocument();
 
-    fireEvent.change(street, {
+    fireEvent.change(address, {
       target: { value: "ул ленина д 5 корп 2 кв 12" },
     });
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Подставить адрес: Улица / проспект / переулок",
+        name: "Подставить адрес: Адрес проживания",
       }),
     );
-    expect(street).toHaveValue("улица Ленина");
-    expect(screen.getByLabelText("Дом")).toHaveValue("5");
-    expect(screen.getByLabelText("Корпус / строение")).toHaveValue("2");
-    expect(screen.getByLabelText("Квартира / офис / помещение")).toHaveValue("12");
-    expect(onFieldChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        fieldId: "home-address",
-        value: "улица Ленина, д 5, корп 2, кв 12",
-      }),
+    expect(address).toHaveValue("ulitsa Lenina, 5, bldg. 2, apt. 12");
+    expect(onFieldChange.mock.calls.map(([update]) => update)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId: "home-street", value: "ulitsa Lenina" }),
+        expect.objectContaining({ fieldId: "home-house", value: "5" }),
+        expect.objectContaining({ fieldId: "home-building", value: "2" }),
+        expect.objectContaining({ fieldId: "home-unit", value: "12" }),
+        expect.objectContaining({
+          fieldId: "home-address",
+          value: "ulitsa Lenina, 5, bldg. 2, apt. 12",
+        }),
+      ]),
     );
 
     const city = screen.getByLabelText("Город проживания");
     fireEvent.focus(city);
     fireEvent.change(city, { target: { value: "спб" } });
     fireEvent.click(screen.getByRole("option", { name: "Санкт-Петербург" }));
-    expect(city).toHaveValue("Санкт-Петербург");
+    expect(city).toHaveValue("Sankt-Peterburg");
     fireEvent.change(city, { target: { value: "с" } });
     expect(screen.getByRole("option", { name: "Самара" })).toBeInTheDocument();
 
@@ -2675,6 +2715,63 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(
       screen.getByLabelText("Адрес работодателя / учебного заведения"),
     ).toHaveAttribute("placeholder", "Проспект Мира, 10, офис 4");
+  });
+
+  test("confirms every imported address part from the one visible control", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const reviewedStreet = setFieldReview(draft, "home-street", "Арбат", {
+      reviewSource: "smart_import",
+      reviewState: "needs_review",
+    });
+    const reviewedHouse = setFieldReview(reviewedStreet, "home-house", "1", {
+      reviewSource: "smart_import",
+      reviewState: "needs_review",
+    });
+    const submission = setFieldReview(
+      reviewedHouse,
+      "home-address",
+      "Арбат, д 1",
+      {
+        reviewSource: "smart_import",
+        reviewState: "needs_review",
+      },
+    );
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Адрес и контакты");
+    const address = screen.getByLabelText("Адрес проживания");
+    expect(address).toHaveClass("is-review");
+    expect(
+      screen.getAllByRole("button", {
+        name: "Подтвердить поле: Адрес проживания",
+      }),
+    ).toHaveLength(1);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Подтвердить поле: Адрес проживания",
+      }),
+    );
+
+    expect(onFieldChange.mock.calls.map(([update]) => update.fieldId)).toEqual(
+      expect.arrayContaining(["home-street", "home-house", "home-address"]),
+    );
+    expect(address).not.toHaveClass("is-review");
   });
 
   test("keeps questionnaire placeholders sentence-cased and the idle search status hidden", () => {
@@ -2712,7 +2809,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
   });
 
-  test("suggests building and unit types while keeping their values editable", () => {
+  test("keeps office and premises details in the combined address value", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -2732,30 +2829,24 @@ describe("FigmaQuestionnaireScreen", () => {
     );
 
     clickPinnedSection(result.container, "Адрес и контакты");
-    const building = screen.getByLabelText("Корпус / строение");
-    fireEvent.focus(building);
-    expect(screen.getByRole("option", { name: "корпус" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: "строение" }));
-    fireEvent.change(building, { target: { value: "строение 2" } });
-    expect(building).toHaveValue("строение 2");
-
-    const unit = screen.getByLabelText("Квартира / офис / помещение");
-    fireEvent.focus(unit);
-    expect(screen.getByRole("option", { name: "квартира" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "офис" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: "помещение" }));
-    fireEvent.change(unit, { target: { value: "помещение 12" } });
-    expect(unit).toHaveValue("помещение 12");
+    const address = screen.getByLabelText("Адрес проживания");
+    fireEvent.change(address, { target: { value: "проспект мира 10 оф 4" } });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Подставить адрес: Адрес проживания",
+      }),
+    );
+    expect(address).toHaveValue("prospekt Mira, 10, ofis 4");
 
     expect(onFieldChange.mock.calls.map(([update]) => update)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          fieldId: "home-building",
-          value: "строение 2",
+          fieldId: "home-house",
+          value: "10",
         }),
         expect.objectContaining({
           fieldId: "home-unit",
-          value: "помещение 12",
+          value: "ofis 4",
         }),
       ]),
     );
@@ -3271,7 +3362,7 @@ describe("FigmaQuestionnaireScreen", () => {
     await revealQuestionnaireErrors(result.container);
     fireEvent.click(screen.getByTestId("questionnaire-next-blocker"));
 
-    const address = screen.getByLabelText("Улица / проспект / переулок");
+    const address = screen.getByLabelText("Адрес проживания");
     await waitFor(() => expect(address).toHaveFocus());
     expect(address).toHaveAttribute("aria-invalid", "true");
     expect(
@@ -3915,6 +4006,7 @@ describe("FigmaQuestionnaireScreen", () => {
       ["home-city", "Москва"],
       ["home-street", "Арбат"],
       ["home-house", "1"],
+      ["home-address", "Арбат, д 1"],
       ["email", "family@example.com"],
       ["contact-number", "79000000000"],
       ["surname", "PRIMARY"],
@@ -4039,7 +4131,7 @@ describe("FigmaQuestionnaireScreen", () => {
     );
     fireEvent.click(applicantTabs[1] as HTMLButtonElement);
     clickPinnedSection(result.container, "Адрес и контакты");
-    expect(screen.getByLabelText("Улица / проспект / переулок")).toHaveValue("Арбат");
+    expect(screen.getByLabelText("Адрес проживания")).toHaveValue("Арбат, д 1");
     expect(screen.getByLabelText("Город проживания")).toHaveValue("Москва");
 
     fireEvent.click(screen.getByRole("button", { name: "Сохранить и продолжить" }));

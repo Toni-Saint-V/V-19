@@ -416,8 +416,15 @@ function visualAuthority(lines: string[], issueDateCompact: string | undefined) 
     : lines;
   for (const line of searchLines) {
     const authorityLine = issueDateCompact ? line.replace(issueDateCompact, "") : line;
-    const match = /(?:FMS|DMC|GMC|MC|M?C)?(\d{5})(?!\d)/.exec(authorityLine);
-    if (match?.[1]) return `FMS ${match[1]}`;
+    const match = /(?:(MVD|FMS|DMC|GMC|MC|M?C))?(\d{5})(?!\d)/.exec(
+      authorityLine,
+    );
+    if (match?.[2]) {
+      const issueYear = Number(issueDateCompact?.slice(4));
+      const authority =
+        match[1] === "MVD" || (!match[1] && issueYear >= 2016) ? "MVD" : "FMS";
+      return `${authority} ${match[2]}`;
+    }
   }
   return "";
 }

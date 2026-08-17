@@ -199,7 +199,7 @@ describe("questionnaire smart import", () => {
         expect.arrayContaining([
           expect.objectContaining({
             fieldId: "home-street",
-            value: "проспект Ленинский",
+            value: "prospekt Leninskiy",
           }),
           expect.objectContaining({ fieldId: "home-house", value: "40" }),
           expect.objectContaining({ fieldId: "home-building", value: "2" }),
@@ -209,11 +209,28 @@ describe("questionnaire smart import", () => {
             reviewOriginSource: "manual",
             reviewSource: "manual",
             reviewState: undefined,
-            value: "проспект Ленинский, д 40, корп 2, кв 14",
+            value: "prospekt Leninskiy, 40, bldg. 2, apt. 14",
           }),
         ]),
       );
     });
+  });
+
+  test("does not mix a partial imported address with stored address parts", async () => {
+    const { onFieldChange } = renderQuestionnaire();
+
+    await importPastedText("Улица: Арбат");
+    await screen.findByText("Арбат");
+    const apply = screen.getByRole("button", { name: "Применить выбранное" });
+    expect(apply).toBeEnabled();
+    fireEvent.click(apply);
+
+    expect(onFieldChange).not.toHaveBeenCalledWith(
+      expect.objectContaining({ fieldId: "home-street" }),
+    );
+    expect(onFieldChange).not.toHaveBeenCalledWith(
+      expect.objectContaining({ fieldId: "home-address" }),
+    );
   });
 
   test("applies only supported hotel contact fields from invitation text", async () => {

@@ -218,6 +218,20 @@ async function workbookFilesFromBlob(blob: Blob): Promise<Record<string, string>
   return files;
 }
 
+async function workbookZipHeaders(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const local = new DataView(bytes.buffer, bytes.byteOffset);
+  const endOffset = bytes.length - 22;
+  const end = new DataView(bytes.buffer, bytes.byteOffset + endOffset);
+  const centralOffset = end.getUint32(16, true);
+  const central = new DataView(
+    bytes.buffer,
+    bytes.byteOffset + centralOffset,
+  );
+
+  return { central, end, local };
+}
+
 describe("V-19 export workbook contract", () => {
   test("rejects workbook rows that are not exactly 56 columns wide", () => {
     expect(() =>
@@ -263,6 +277,35 @@ describe("V-19 export workbook contract", () => {
     expect(worksheetXml).not.toMatch(/\br="BE\d+"/);
     expect(worksheetXml).not.toContain("1048572");
     expect(await verifyExportWorkbookArtifact(artifact)).toBe(true);
+  });
+
+  test("emits a standards-compatible UTF-8 xlsx container for Windows and macOS", async () => {
+    const blob = createExportWorkbookBlob([
+      exportContractHeaders(),
+      Array.from({ length: EXPORT_WORKBOOK_COLUMN_COUNT }, (_, index) =>
+        index === 0 ? "Москва — José" : "",
+      ),
+    ]);
+    const { central, end, local } = await workbookZipHeaders(blob);
+
+    expect(blob.type).toBe(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    expect(local.getUint32(0, true)).toBe(0x04034b50);
+    expect(local.getUint16(6, true) & 0x0800).toBe(0x0800);
+    expect(local.getUint16(8, true)).toBe(0);
+    expect(local.getUint16(12, true)).toBe(33);
+    expect(central.getUint32(0, true)).toBe(0x02014b50);
+    expect(central.getUint16(8, true) & 0x0800).toBe(0x0800);
+    expect(central.getUint16(10, true)).toBe(0);
+    expect(central.getUint16(14, true)).toBe(33);
+    expect(end.getUint32(0, true)).toBe(0x06054b50);
+
+    const files = await workbookFilesFromBlob(blob);
+    expect(files["[Content_Types].xml"]).toContain(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+    );
+    expect(files["xl/sharedStrings.xml"]).toContain("Москва — José");
   });
 
   test("writes Passport No into column G and keeps external BLS headers free of Agent or Family debug columns", () => {

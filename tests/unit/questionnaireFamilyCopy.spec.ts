@@ -91,6 +91,7 @@ describe("questionnaire family copy plan", () => {
           value: "Москва",
         },
       ],
+      visibleFieldCount: 1,
     });
     expect(validate).toHaveBeenCalledWith(recipient.sections[0]?.fields[0], "Москва");
   });
@@ -211,5 +212,81 @@ describe("questionnaire family copy plan", () => {
         value: "Самара",
       }),
     );
+    expect(plan.visibleFieldCount).toBe(1);
+  });
+
+  test("copies a home address atomically and clears stale optional parts", () => {
+    const source = applicant("main", [
+      questionnaireField("home-street", "Арбат", { reviewSource: "manual" }),
+      questionnaireField("home-house", "1", { reviewSource: "manual" }),
+      questionnaireField("home-building", ""),
+      questionnaireField("home-unit", ""),
+      questionnaireField("home-address", "Арбат, д 1", {
+        reviewSource: "manual",
+      }),
+    ]);
+    const recipient = applicant("spouse", [
+      questionnaireField("home-street", "Тверская"),
+      questionnaireField("home-house", "8"),
+      questionnaireField("home-building", "2"),
+      questionnaireField("home-unit", "14"),
+      questionnaireField("home-address", "Тверская, д 8, корп 2, кв 14"),
+    ]);
+    const addressBindings: QuestionnaireFamilyCopyBinding[] = [
+      "home-street",
+      "home-house",
+      "home-building",
+      "home-unit",
+      "home-address",
+    ].map((fieldId) => ({
+      ...binding(fieldId),
+      copyEmpty: true,
+      copyGroup: "home-address",
+      copyGroupRequired: ["home-street", "home-house", "home-address"].includes(
+        fieldId,
+      ),
+      previewFieldId: "home-street",
+    }));
+
+    const plan = buildQuestionnaireFamilyCopyPlan({
+      bindings: addressBindings,
+      recipients: [recipient],
+      sourceApplicant: source,
+      validate: () => undefined,
+    });
+
+    expect(plan.visibleFieldCount).toBe(1);
+    expect(plan.previewFields).toEqual([
+      { applicantId: "spouse", fieldId: "home-street" },
+      { applicantId: "main", fieldId: "home-street" },
+    ]);
+    expect(plan.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId: "home-street", value: "Арбат" }),
+        expect.objectContaining({ fieldId: "home-house", value: "1" }),
+        expect.objectContaining({ fieldId: "home-building", value: "" }),
+        expect.objectContaining({ fieldId: "home-unit", value: "" }),
+        expect.objectContaining({
+          fieldId: "home-address",
+          value: "Арбат, д 1",
+        }),
+      ]),
+    );
+
+    const incomplete = applicant("main", [
+      questionnaireField("home-street", "Арбат", { reviewSource: "manual" }),
+      questionnaireField("home-house", ""),
+      questionnaireField("home-building", ""),
+      questionnaireField("home-unit", ""),
+      questionnaireField("home-address", "Арбат", { reviewSource: "manual" }),
+    ]);
+    expect(
+      buildQuestionnaireFamilyCopyPlan({
+        bindings: addressBindings,
+        recipients: [recipient],
+        sourceApplicant: incomplete,
+        validate: () => undefined,
+      }).updates,
+    ).toEqual([]);
   });
 });

@@ -62,6 +62,8 @@ const numericColumnNames = new Set([
 ]);
 const familyStyleBaseId = 52;
 const familyStyleVariantCount = 4;
+const zipUtf8Flag = 0x0800;
+const zipDosEpochDate = (1 << 5) | 1;
 const familyWorkbookFills = [
   "C6E0B4",
   "FFF2CC",
@@ -691,7 +693,10 @@ function localHeader(name: Uint8Array, data: Uint8Array, crc: number): Uint8Arra
   const view = new DataView(header.buffer);
   view.setUint32(0, 0x04034b50, true);
   view.setUint16(4, 20, true);
+  view.setUint16(6, zipUtf8Flag, true);
   view.setUint16(8, 0, true);
+  view.setUint16(10, 0, true);
+  view.setUint16(12, zipDosEpochDate, true);
   view.setUint32(14, crc, true);
   view.setUint32(18, data.length, true);
   view.setUint32(22, data.length, true);
@@ -711,6 +716,10 @@ function centralHeader(
   view.setUint32(0, 0x02014b50, true);
   view.setUint16(4, 20, true);
   view.setUint16(6, 20, true);
+  view.setUint16(8, zipUtf8Flag, true);
+  view.setUint16(10, 0, true);
+  view.setUint16(12, 0, true);
+  view.setUint16(14, zipDosEpochDate, true);
   view.setUint32(16, crc, true);
   view.setUint32(20, data.length, true);
   view.setUint32(24, data.length, true);

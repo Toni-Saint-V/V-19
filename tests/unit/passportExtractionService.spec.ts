@@ -5,6 +5,28 @@ import {
 } from "../../src/modules/submissions/passportExtractionService";
 
 describe("passport visual OCR parsing", () => {
+  test("prefers MVD for current authority codes while preserving explicit legacy FMS", () => {
+    const current = parsePassportVisualText(`
+      Date of issue 13052022 MVD 78007
+      Date of expiry 13052032
+    `);
+    const legacy = parsePassportVisualText(`
+      Date of issue 13052012 DMC 78007
+      Date of expiry 13052022
+    `);
+
+    expect(current).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "passportIssuePlace", value: "MVD 78007" }),
+      ]),
+    );
+    expect(legacy).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "passportIssuePlace", value: "FMS 78007" }),
+      ]),
+    );
+  });
+
   test("normalizes common Cyrillic OCR noise for Russian surname and given name", () => {
     const fields = parsePassportVisualText(`
       RUS752869613
