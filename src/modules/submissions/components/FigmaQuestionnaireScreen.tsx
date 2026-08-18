@@ -1684,6 +1684,11 @@ function fallbackQuestionnaireFormData(): QuestionnaireFormData {
 }
 
 function combinedHomeAddressValue(formData: QuestionnaireFormData) {
+  // Preserve the exact in-progress value so a trailing space is not removed
+  // between keystrokes. Blur/autocomplete still reconciles the canonical
+  // aggregate with the structured address parts.
+  if (formData.contactAddress.length > 0) return formData.contactAddress;
+
   return canonicalQuestionnaireHomeAddress({
     ...formData,
     homeAddress: formData.contactAddress,

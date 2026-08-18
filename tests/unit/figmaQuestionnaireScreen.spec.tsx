@@ -2680,6 +2680,14 @@ describe("FigmaQuestionnaireScreen", () => {
       screen.queryByLabelText("Квартира / офис / помещение"),
     ).not.toBeInTheDocument();
 
+    fireEvent.change(address, { target: { value: "Lenina" } });
+    fireEvent.change(address, { target: { value: "Lenina " } });
+    expect(address).toHaveValue("Lenina ");
+    fireEvent.change(address, {
+      target: { value: `${(address as HTMLInputElement).value}15` },
+    });
+    expect(address).toHaveValue("Lenina 15");
+
     fireEvent.change(address, {
       target: { value: "ул ленина д 5 корп 2 кв 12" },
     });
