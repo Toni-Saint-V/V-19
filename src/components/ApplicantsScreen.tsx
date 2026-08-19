@@ -544,6 +544,9 @@ function canSubmitForReviewFromList(
   canSubmitForReview: boolean,
 ) {
   if (!canSubmitForReview) return false;
+  if (submission.status === "ready_for_export" || submission.status === "exported") {
+    return false;
+  }
   const completionDecision = agentQuestionnaireCompletionDecision(submission);
   return completionDecision.action === "submit_for_review" && completionDecision.ok;
 }
@@ -857,6 +860,21 @@ export function ApplicantsScreen({
   const focusSubmissionId = focusRequest?.submissionId;
   const focusRevision = focusRequest?.revision;
 
+  useEffect(() => {
+    if (!pendingReviewSubmission) return;
+    const currentSubmission = canonicalSubmissions.find(
+      (submission) => submission.id === pendingReviewSubmission.id,
+    );
+    if (
+      currentSubmission &&
+      canSubmitForReviewFromList(currentSubmission, Boolean(onSubmitForReview))
+    ) {
+      return;
+    }
+    setPendingReviewSubmission(null);
+    setSubmissionDialogError(null);
+  }, [canonicalSubmissions, onSubmitForReview, pendingReviewSubmission]);
+
   const changeTypeFilter = (filter: SubmissionTypeFilter) => {
     if (controlledTypeFilter === undefined) setInternalTypeFilter(filter);
     onTypeFilterChange?.(filter);
@@ -983,8 +1001,19 @@ export function ApplicantsScreen({
   };
 
   const confirmSubmissionForReview = async () => {
-    const submission = pendingReviewSubmission;
-    if (!submission || !onSubmitForReview || submissionRequestRef.current !== null) {
+    const submission = canonicalSubmissions.find(
+      (candidate) => candidate.id === pendingReviewSubmission?.id,
+    );
+    if (
+      !submission ||
+      !onSubmitForReview ||
+      !canSubmitForReviewFromList(submission, true) ||
+      submissionRequestRef.current !== null
+    ) {
+      if (pendingReviewSubmission) {
+        setPendingReviewSubmission(null);
+        setSubmissionDialogError(null);
+      }
       return;
     }
 
@@ -1063,8 +1092,8 @@ export function ApplicantsScreen({
   const renderSubmissionCard = (submission: Submission) => {
     const canDelete = Boolean(
       onDeleteSubmission &&
-        agentId &&
-        agentSubmissionDeletionDecision(submission, agentId).ok,
+      agentId &&
+      agentSubmissionDeletionDecision(submission, agentId).ok,
     );
     return submission.type === "family" ? (
       <FamilySubmissionCard

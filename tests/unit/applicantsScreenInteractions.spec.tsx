@@ -614,13 +614,18 @@ describe("ApplicantsScreen interactions", () => {
     expect(screen.getByRole("button", { name: "Отправить" })).toBeEnabled();
   });
 
-  it("sends an export-ready package back to admin review from the card action", async () => {
+  it("hides review submission on export-state cards without changing the domain transition", () => {
     const ready = readySubmission("single");
     const accepted: Submission = {
       ...ready,
       exportState: "ready",
       files: ready.files.map((file) => ({ ...file, status: "accepted" })),
       status: "ready_for_export",
+    };
+    const exported: Submission = {
+      ...accepted,
+      id: `${accepted.id}-exported`,
+      status: "exported",
     };
     const onOpenDrawer = vi.fn();
     const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
@@ -629,15 +634,20 @@ describe("ApplicantsScreen interactions", () => {
       <ApplicantsScreen
         onOpenDrawer={onOpenDrawer}
         onSubmitForReview={onSubmitForReview}
-        submissions={[accepted]}
+        submissions={[accepted, exported]}
         typeFilter="single"
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
-    await waitFor(() => expect(onSubmitForReview).toHaveBeenCalledWith(accepted.id));
-    expect(onOpenDrawer).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: /Отправить на проверку:/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Отправить на проверку администратору?",
+      }),
+    ).not.toBeInTheDocument();
+    expect(onSubmitForReview).not.toHaveBeenCalled();
 
     const transition = applyAgentSubmitForReviewResult(accepted, accepted.agentId);
     expect(transition.ok).toBe(true);
@@ -649,6 +659,48 @@ describe("ApplicantsScreen interactions", () => {
     expect(
       transition.data.files.every((file) => file.status === "pending_review"),
     ).toBe(true);
+  });
+
+  it("closes a stale review dialog when the submission enters an export state", () => {
+    const submission = readySubmission("single");
+    const accepted: Submission = {
+      ...submission,
+      exportState: "ready",
+      files: submission.files.map((file) => ({ ...file, status: "accepted" })),
+      status: "ready_for_export",
+    };
+    const onSubmitForReview = vi.fn().mockResolvedValue(undefined);
+    const view = render(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[submission]}
+        typeFilter="single"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Отправить на проверку:/ }));
+    expect(
+      screen.getByRole("dialog", {
+        name: "Отправить на проверку администратору?",
+      }),
+    ).toBeInTheDocument();
+
+    view.rerender(
+      <ApplicantsScreen
+        onOpenDrawer={vi.fn()}
+        onSubmitForReview={onSubmitForReview}
+        submissions={[accepted]}
+        typeFilter="single"
+      />,
+    );
+
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Отправить на проверку администратору?",
+      }),
+    ).not.toBeInTheDocument();
+    expect(onSubmitForReview).not.toHaveBeenCalled();
   });
 
   it("keeps export-ready resubmission fail-closed when canonical intake data drifts", () => {
